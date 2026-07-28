@@ -122,25 +122,36 @@ replayable, testable, and renderable by a hand-written template when the LLM is 
 The deterministic core is a thin, setting-specific layer sitting on Evennia contribs — not a
 from-scratch engine.
 
-| Our module | Underlying contrib | Strategy |
+| Our module | Underlying contrib / core module | Strategy |
 |---|---|---|
-| `rules/traits.py` | `rpg.traits` TraitHandler | **Use directly.** Define the setting's trait set only |
-| `rules/sexual_state.py` | `rpg.traits` custom trait class | **Extend.** Register an `OrderedLevelTrait`; reuse counter/flag types |
-| `rules/buffs.py` | `rpg.buffs` BuffHandler | **Use directly.** Duration/tick/stacking are done |
-| `typeclasses/entities.py` | `base_systems.components` | **Use directly.** QuestGiver / Merchant / GuildStaff as attachable components |
-| Map · grid layer | `grid.xyzgrid` | **Use directly.** XYZRoom, ASCII maps, shortest path, FOV minimap |
-| Map · virtual layer | `grid.wilderness` | **Extend.** Subclass `WildernessMapProvider` |
-| Map · instance layer | `prototypes.spawner` | **Use directly.** `spawn()` on SceneBuilder output |
-| `ai/client.py` | `rpg.llm` LLMClient | **Subclass.** Keep the Twisted async skeleton; override payload for `/v1/chat/completions` |
-| `ai/npc_dialogue.py` | `rpg.llm` LLMNPC | **Subclass.** Chat memory, prompt priority chain, thinking state are done |
-| `rules/combat.py` | `rpg.evadventure` | **Reference only.** It is d20; we are linear. Borrow its *structure*, not its *formulas* |
-| `rules/dice.py` | `rpg.dice` | **Use directly** for the d100 roller |
-| Front-end panel | WebClient GoldenLayout | **Configure + plugin.** Edit `goldenlayout_default_config.js`, add an OOB receiver |
+| `rules/traits.py` | `evennia.contrib.rpg.traits` — `TraitHandler`, `Trait`, `StaticTrait`, `CounterTrait`, `GaugeTrait` | **Use directly.** Define the setting's trait set only |
+| `rules/sexual_state.py` | `evennia.contrib.rpg.traits` — no ordered/enum trait class ships. Author a new `Trait` subclass (see `CounterTrait`'s `descs` mapping — numeric-bucket-to-label — for the closest built-in precedent) and register its dotted path in `settings.TRAIT_CLASS_PATHS`, the same mechanism the contrib's own example custom trait (`RageTrait`, registered as `world.traits.RageTrait`) uses | **Extend, not subclass-of-existing.** There is nothing named `OrderedLevelTrait` to reuse; the ordered-level trait type must be written from scratch on top of `Trait` |
+| `rules/buffs.py` | `evennia.contrib.rpg.buffs` — `BuffHandler`, `BaseBuff` | **Use directly.** Duration/tick/stacking are done |
+| `typeclasses/entities.py` | `evennia.contrib.base_systems.components` — `Component`, `ComponentHolderMixin`, `ComponentProperty` | **Use directly.** `QuestGiver` / `Merchant` / `GuildStaff` are project-authored `Component` subclasses; Evennia ships the base class, not these names |
+| Map · grid layer | `evennia.contrib.grid.xyzgrid` — `XYZRoom`, `XYZExit` (module `xyzgrid/xyzroom.py`) | **Use directly.** XYZRoom, ASCII maps, shortest path, FOV minimap |
+| Map · virtual layer | `evennia.contrib.grid.wilderness` — `WildernessMapProvider` (module `wilderness/wilderness.py`) | **Extend.** Subclass `WildernessMapProvider`; the contrib ships a worked example subclass, `PyramidMapProvider`, to model the override points on |
+| Map · instance layer | `evennia.prototypes.spawner` — **this is core Evennia, not a contrib module; do not look for it under `evennia.contrib`** | **Use directly.** `spawn(*prototypes, caller=None, **kwargs)` on SceneBuilder output |
+| `ai/client.py` | `evennia.contrib.rpg.llm` — `LLMClient` (module `llm.py` → `llm_client.py`; built on Twisted's `protocol.Protocol` / HTTP11 client factory) | **Subclass.** Keep the Twisted async skeleton; override payload for `/v1/chat/completions` |
+| `ai/npc_dialogue.py` | `evennia.contrib.rpg.llm` — `LLMNPC(DefaultCharacter)` (module `llm_npc.py`) | **Subclass.** Chat memory, prompt priority chain, thinking state are done |
+| `rules/combat.py` | `evennia.contrib.tutorials.evadventure` — **corrected path; it is not under `contrib.rpg`** (`EvAdventureRollEngine` in `rules.py`, `CombatAction` subclasses and `EvAdventureCombatBaseHandler` in `combat_base.py`) | **Reference only.** It is d20 (confirmed: `EvAdventureRollEngine.roll()` rolls `1d20`/`2d20` against a target of 15); we are linear. Borrow its *structure*, not its *formulas* |
+| `rules/dice.py` | `evennia.contrib.rpg.dice` — `roll()` (module `dice.py`) | **Use directly** for the d100 roller — `roll(1, 100, ...)` or the string form `"1d100"` |
+| Front-end panel | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed) | **Configure + plugin.** Edit `goldenlayout_default_config.js`, add an OOB receiver |
 
-> **Unverified.** The module paths above come from a secondary research document
-> (`tmp/evennia.md`), not from the installed Evennia. **Change 1 must verify every contrib's actual
-> API signature against the installed version and correct this matrix in place.** Do not assume the
-> research document is accurate.
+> **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (`pip install evennia`; requires
+> Python >=3.12, imports and CLI both verified in an isolated venv) — the version that was actually
+> installed, superseding the unverified matrix that previously stood here (sourced from
+> `tmp/evennia.md`, a secondary research document). Three corrections were made against that
+> document: (1) `evadventure` lives under `contrib.tutorials`, not `contrib.rpg`; (2) no
+> `OrderedLevelTrait` class exists anywhere in Evennia — `sexual_state.py` must author its own
+> ordered-level `Trait` subclass and register it via `settings.TRAIT_CLASS_PATHS`; (3)
+> `prototypes.spawner` is core Evennia, not a contrib module. Also confirmed accurate and unchanged:
+> default ports (telnet 4000, webserver 4001, websocket 4002, matching §9), the
+> `evennia --init <name>` project skeleton (`commands/`, `server/`, `typeclasses/`, `web/`,
+> `world/`), and all other module paths and class names in the table above. One operational nuance
+> for §9: `evennia start --log` does not make the server write directly to stdout — `start` still
+> daemonizes Portal+Server writing to `server/logs/*.log` as usual, and `--log` separately tails
+> those files and streams them to stdout, blocking the foreground process. The `server/logs` volume
+> mount in §9 is therefore load-bearing, not optional, even when running with `--log`.
 
 ---
 
@@ -339,7 +350,8 @@ shifts, such as dropping a disguise.
 
 ```python
 class SexualState:
-    # ordered levels (OrderedLevelTrait, not numeric)
+    # ordered levels — project-authored Trait subclass, not numeric.
+    # Evennia ships no ordered/enum trait type; see §4 for the registration mechanism.
     arousal       平靜 → 微興奮 → 中等 → 高度 → 極限
     wetness       乾燥 → 微濕 → 濕潤 → 大量 → 泛濫
     shame         無 → 輕微 → 中等 → 強烈 → 成癮
@@ -560,10 +572,13 @@ compose.yaml      evennia + volumes; ollama and sd-webui reached over the networ
   the venv and application code.
 - **Non-root with arbitrary UID.** Group 0 writable, OpenShift-compatible, and no root-owned files
   when run locally.
-- **Evennia is two processes** (Portal + Server). Run `evennia start --log` in the foreground so
-  logs go to stdout rather than files.
+- **Python floor is 3.12**, set by Evennia 6.1.0. Do not target 3.11.
+- **Evennia is two processes** (Portal + Server). `evennia start --log` daemonizes both and writes
+  to `server/logs/*.log`; the `--log` flag then tails those files to stdout and blocks in the
+  foreground. It does **not** redirect logging away from disk, so the `server/logs` volume is
+  load-bearing rather than optional.
 - **Ports.** 4000 telnet, 4001 webserver, 4002 websocket.
-- **Volumes.** SQLite DB, scene art store, `server/logs`.
+- **Volumes.** SQLite DB, scene art store, `server/logs` (required — see above).
 - **GPU services stay outside.** Ollama and sd-webui are reached via environment variables or
   `extra_hosts`; the image needs no GPU runtime and stays small.
 
@@ -610,7 +625,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 7 | `sexual-state` | 6 | `OrderedLevelTrait`, `SexualState`, `sexual.yaml`, per-rule tests |
+| 7 | `sexual-state` | 6 | Ordered-level `Trait` subclass (authored from scratch, registered via `settings.TRAIT_CLASS_PATHS`), `SexualState`, `sexual.yaml`, per-rule tests |
 | 8 | `action-resolver` | 5, 6 | ActionResolver, targeting, out-of-combat skill use |
 | 9 | `dice-combat` | 8 | d100 resolution, damage, initiative, turn loop |
 | 10 | `overwhelm-resolution` | 9 | Overwhelm threshold, single-shot resolution, EventLog compression |
