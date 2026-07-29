@@ -22,9 +22,13 @@
 ## 3. Character and world schemas (`world/imports/schema.py`)
 
 - [ ] 3.1 Define `CHARACTER_SCHEMA_V1` as a JSON Schema (draft 2020-12) dict per design.md D-1/D-3/
-      D-4: `required` includes `schema_version`, `key`, `display_name`, `age`, `apparent_age`,
-      `race`, `stats`, `disguised_stats`, `skills`, `passives`, `equipment`, `inventory`,
-      `sexual_baseline`, `persona`; `subrace` is present in `properties` but not `required`.
+      D-4: `required` includes `record_type`, `schema_version`, `key`, `display_name`, `age`,
+      `apparent_age`, `race`, `stats`, `disguised_stats`, `skills`, `passives`, `equipment`,
+      `inventory`, `sexual_baseline`, `persona`; `subrace` is present in `properties` but not
+      `required`. Set `record_type` to `{"const": "character", "description": ...}` per design.md
+      D-1, with the description stating this is the required discriminator `validate.py` dispatches
+      on, and that it exists specifically so a record cannot be silently misrouted to
+      `WORLD_SCHEMA_V1` by guessing from which other fields are present or absent.
 - [ ] 3.2 Set `age` and `apparent_age` to `{"type": "integer", "minimum": 18, "description": ...}`
       per design.md D-3, with the description stating the hard-gate, never-a-warning nature of the
       check in language readable without the design doc.
@@ -48,15 +52,22 @@
       .SENSITIVITY_LEVELS)}}` (free-form keys, constrained values), `virgin` typed `boolean`.
       Import the six tuples from `world.lore.sexual_vocab` (task 2.1) rather than re-typing the
       Chinese strings a second time.
-- [ ] 3.7 Define `WORLD_SCHEMA_V1` per design.md D-14: `required: ["schema_version", "key",
-      "content"]`, `content` a non-empty string with the opaque/narrative-only description quoted
-      in D-14, `tags` an optional array of strings, `additionalProperties: false`.
+- [ ] 3.7 Define `WORLD_SCHEMA_V1` per design.md D-14: `required: ["record_type", "schema_version",
+      "key", "content"]`, `content` a non-empty string with the opaque/narrative-only description
+      quoted in D-14, `tags` an optional array of strings, `additionalProperties: false`. Set
+      `record_type` to `{"const": "world_entry", "description": ...}`, the counterpart discriminator
+      to task 3.1's character-side field.
 
 ## 4. Semantic validation layer (`world/imports/validate.py`)
 
 - [ ] 4.1 Implement `classify_record(raw: dict) -> Literal["character", "world_entry"]` per
-      design.md D-1: dispatch on presence of `age` vs `content`; raise a clear error naming the
-      record's `key` (or `<unknown>`) if neither is present.
+      design.md D-1 (revised): dispatch strictly on the required `record_type` field
+      (`"character"` / `"world_entry"`) — never on which other fields happen to be present or
+      absent. Raise `RecordClassificationError` naming the record's `key` (or `<unknown>`), the
+      actual `record_type` value found (including `None` if the field is missing entirely), and the
+      two valid values, for anything that is not exactly `"character"` or `"world_entry"`. This
+      check runs before any other validation, so an incomplete character record is never routed to
+      the wrong schema and never silently skips the age gate.
 - [ ] 4.2 Implement structural validation: run `jsonschema.validate()` against `CHARACTER_SCHEMA_V1`
       or `WORLD_SCHEMA_V1` per the classification, translating `jsonschema.ValidationError` into
       this module's `Issue` type (field path, message) so reject-report formatting is consistent
@@ -82,6 +93,13 @@
       absent from it, emit a rejection-class `Issue`; if present, emit nothing. Document the
       forward-declared module path (`world.skills.registry.SKILL_REGISTRY`) directly in this
       function's docstring.
+- [ ] 4.6a Implement `DegradedCheck` (frozen dataclass: `name`, `reason`) and
+      `collect_degraded_checks() -> list[DegradedCheck]` per design.md D-5's "Degraded-mode banner"
+      addition: currently checks only `_resolve_skill_registry() is None`, appending a
+      `DegradedCheck("skill-registry", ...)` with a reason string naming the unavailable module path
+      and stating that skill-key checks are warnings-only until it exists. Write this as a small,
+      generic list (not hardcoded to assume skills is the only ever-pluggable check) so a future
+      pluggable check can append to the same list with no new banner-printing code.
 - [ ] 4.7 Implement `_check_world_entry_key_uniqueness(records) -> list[Issue]` (batch-level, world
       schema only): reject on duplicate `key` values across a batch of world-info records.
 - [ ] 4.8 Implement `validate_character(record: dict) -> RecordReport` and `validate_world_entry
@@ -91,12 +109,19 @@
 - [ ] 4.9 Implement `validate_batch(paths: list[Path]) -> BatchReport` per design.md D-11: reads
       and classifies every file (task 4.1), dispatches to `validate_character`/`validate_world_entry`
       (task 4.8) plus the batch-level uniqueness check (task 4.7), and aggregates into a
-      `BatchReport` with an `all_valid` property (true only if zero rejections across every record)
-      and a way to retrieve the validated character records for `loader.py`'s use.
+      `BatchReport` with an `all_valid` property (true only if zero rejections across every record),
+      a `degraded_checks: list[DegradedCheck]` field populated from task 4.6a's
+      `collect_degraded_checks()`, and a way to retrieve the validated character records for
+      `loader.py`'s use.
 - [ ] 4.10 Implement the `python -m world.imports.validate <files...>` CLI entry point: reads file
-      arguments (glob-expanded by the shell before this process sees them), calls `validate_batch`,
-      prints a per-record, per-issue report (record key or path, field, reason, reject/warning
-      marker), and exits 0 if `all_valid` else a non-zero status.
+      arguments (glob-expanded by the shell before this process sees them), calls `validate_batch`.
+      Per design.md D-5's "Degraded-mode banner": if `report.degraded_checks` is non-empty, print
+      the banner block **first, before any per-record output**, naming every degraded check and its
+      reason — every single run while degraded, not gated behind a verbosity flag. Then print the
+      per-record, per-issue report (record key or path, field, reason, reject/warning marker), and
+      exit 0 if `all_valid` else a non-zero status. The banner's presence or absence has no effect
+      on the exit code — a batch can be degraded and still exit 0 if nothing rejected — it exists to
+      make "clean report" and "fully enforced" visibly distinct states.
 
 ## 5. Loader (`world/imports/loader.py`)
 
@@ -123,8 +148,9 @@
 
 ## 6. Reference example (`world/imports/examples/`)
 
-- [ ] 6.1 Author `world/imports/examples/example_character.json` per design.md D-15: an elf,
-      `subrace: "ciaran"`, `age`/`apparent_age` both comfortably above 18 (e.g. 22, not exactly 18),
+- [ ] 6.1 Author `world/imports/examples/example_character.json` per design.md D-15:
+      `"record_type": "character"` (the required discriminator, D-1), an elf, `subrace: "ciaran"`,
+      `age`/`apparent_age` both comfortably above 18 (e.g. 22, not exactly 18),
       all eight `stats` keys set with `atk_phys`/`agility`/`defense` inside the elf `static_baseline`
       band (70-95) and `hp`/`mp`/`sp` at or near the elf `vital_baseline` (10000), a non-empty
       `disguised_stats` that is a proper subset of `stats`' keys, non-empty `skills` and `passives`
@@ -151,22 +177,49 @@
       `additionalProperties: false` and non-negative constraint; disguised_stats integer-value
       constraint with no key constraint at schema layer; persona accepts arbitrary object shapes
       and rejects non-objects; sexual_baseline required-field and vocabulary-enum enforcement for
-      all six fields; world entry required-field enforcement. Assert the `age`, `apparent_age`, and
-      `stats` `description` strings contain the documented invariant language (tasks 3.2/3.3).
+      all six fields; world entry required-field enforcement; `record_type` is `const`-constrained
+      to `"character"`/`"world_entry"` on the respective schema and rejects any other value at the
+      schema layer. Assert the `age`, `apparent_age`, and `stats` `description` strings contain the
+      documented invariant language (tasks 3.2/3.3).
+- [ ] 7.2a `world/imports/tests/test_record_dispatch.py` — per design.md D-1 (revised) and the
+      `import-validation` capability: `classify_record()` returns `"character"` for
+      `record_type: "character"` and `"world_entry"` for `record_type: "world_entry"`, regardless of
+      which other fields are present or absent (including an otherwise-incomplete character record
+      missing `age` — it must still classify as `"character"` and then fail the age gate, not be
+      silently routed to `WORLD_SCHEMA_V1`); a record with `record_type` missing, `None`,
+      misspelled, or any value other than the two valid ones is rejected, and the rejection message
+      names both valid values.
 - [ ] 7.3 `world/imports/tests/test_validation_semantics.py` — per the `import-validation`
       capability: race/subrace existence and cross-reference (task 4.4); disguised_stats subset
       check (task 4.3); stats-band warning behavior including the `foxkin` vital-override case
       (task 4.5); sexual_baseline shape violations reported as rejections, not warnings (design.md
       D-7); the pluggable skill-registry check in both its degraded (module absent, warning) and
       promoted (module present via mock, reject-on-unknown-key) states (task 4.6) — this is the
-      test that proves design.md D-5's self-upgrading behavior actually works, not just one branch
-      of it.
+      test that proves design.md D-5's self-upgrading *logic* works in isolation, not just one
+      branch of it. This test mocks the import; it is deliberately distinct from and does not
+      replace task 7.3a below.
+- [ ] 7.3a `world/imports/tests/test_skill_registry_self_arming.py` — per design.md D-5's "Self-arming
+      landing test" addition, **not mocked**: `pytest.importorskip("world.skills.registry")` at the
+      top (skips the whole test while change 5 has not landed, exactly as it will for the entire
+      duration of this change's own implementation and review); once that import genuinely succeeds,
+      assert that a definitely-unknown skill key produces a rejection, not a warning, via
+      `_check_skills()`. This test's job is to fail in CI if change 5 ever lands with a
+      `SKILL_REGISTRY` that still leaves unknown keys unenforced — it must not be satisfied by a
+      mock, only by the real module.
 - [ ] 7.4 `world/imports/tests/test_batch_all_or_nothing.py` — per the `import-validation` and
       `import-loader` capabilities: a batch with one rejecting file among otherwise-valid files
       fails the whole batch (CLI exit code non-zero, report lists all files); `load_batch()`
       constructs zero entities for such a batch and raises `ImportRejected` carrying the full
       report; a fully valid batch produces one entity per character record and zero for world-info
       records in the same batch.
+- [ ] 7.4a `world/imports/tests/test_degraded_banner.py` — per design.md D-5's "Degraded-mode banner"
+      addition and the `import-validation` capability: with the skill registry unavailable (the
+      default state today), the CLI's printed output contains the degraded-mode banner naming
+      `skill-registry` and the reason text, appearing before any per-record output, **even when
+      every record in the batch is otherwise fully valid and the exit code is 0** — a clean exit
+      code must never suppress the banner. With `_resolve_skill_registry` mocked to return a
+      non-`None` registry (simulating change 5 having landed), the same CLI run produces no banner
+      and no `DegradedCheck` entries.
 - [ ] 7.5 `world/imports/tests/test_loader_trait_values.py` — per the `import-loader` capability:
       literal imported stat values land in `entity.traits` verbatim; an omitted stat key falls back
       to `race_floor()`'s value; every loaded trait value stays within the constructing race's
@@ -181,18 +234,23 @@
 - [ ] 7.7 `world/imports/tests/test_reference_example.py` — **permanent**: loads
       `examples/example_character.json` and asserts zero rejections and zero warnings against the
       current schema and lore registries (per the `import-reference-example` capability); asserts
-      the example sets a subrace, all eight stats keys, a non-empty disguised_stats subset,
-      non-empty skills/passives, a sexual_baseline with an optional field beyond the required three,
-      and a multi-key persona.
+      the example sets `record_type: "character"`, a subrace, all eight stats keys, a non-empty
+      disguised_stats subset, non-empty skills/passives, a sexual_baseline with an optional field
+      beyond the required three, and a multi-key persona.
 
 ## 8. Verification
 
 - [ ] 8.1 Run the full `world/imports/tests/` and `world/lore/tests/test_sexual_vocab.py` suites and
       confirm all tests pass.
 - [ ] 8.2 Run `python -m world.imports.validate world/imports/examples/example_character.json` from
-      a shell and confirm it exits 0 with a clean report, matching what task 7.7 asserts
-      programmatically.
+      a shell and confirm it exits 0, that the degraded-mode banner appears (since
+      `world/skills/registry.py` does not exist in this repository yet) naming `skill-registry`
+      before the per-record report, and that the per-record report itself is clean — matching what
+      tasks 7.7 and 7.4a assert programmatically.
 - [ ] 8.3 Run `openspec validate import-contract --strict` and confirm it passes.
+- [ ] 8.6 Confirm `world/imports/tests/test_skill_registry_self_arming.py` (task 7.3a) reports as
+      **skipped**, not passed or failed, in the current environment — a pass would mean it is
+      exercising a mock instead of the real module, silently defeating its purpose.
 - [ ] 8.4 Confirm no function in `world/imports/loader.py` multiplies a stored trait value by 10,
       100, or 1000 (grep by hand as a spot check, mirroring change 3's task 7.5 discipline).
 - [ ] 8.5 Confirm `world/imports/schema.py` contains no hardcoded race-band or magic-cap number —

@@ -92,6 +92,10 @@ mygame/
 │   │                    dice · combat · action · targeting · clock
 │   │                    traits · sexual_state · buffs · progression
 │   │                    rulebook/   declarative rule tables (YAML)
+│   ├── skills/          registry (SkillDef definitions) · handler · equipment
+│   │                    Own package rather than under lore/ or rules/, because
+│   │                    skills carry both static definitions and resolution
+│   │                    behaviour. Path forward-declared by change 4.
 │   ├── quests/          blueprint · runtime
 │   ├── ai/              client · profiles · schemas/
 │   │                    director · scene · narrator · npc_dialogue · guardrail

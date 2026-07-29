@@ -3,9 +3,9 @@
 ### Requirement: validate.py provides a CLI that validates one or more record files
 `world/imports/validate.py` SHALL be runnable as `python -m world.imports.validate <files...>`,
 accepting one or more JSON file paths (including shell-expanded globs such as `cards/*.json`),
-classifying each as a character record or a world-info record, validating each against the
-corresponding schema and semantic rules, and printing a report naming, for every issue, which
-record, which field, and why.
+classifying each by its required `record_type` field as a character record or a world-info record,
+validating each against the corresponding schema and semantic rules, and printing a report naming,
+for every issue, which record, which field, and why.
 
 #### Scenario: A clean batch of files exits successfully
 - **WHEN** `python -m world.imports.validate` is run against a set of files that all pass every
@@ -18,10 +18,35 @@ record, which field, and why.
 - **THEN** the process exits with a non-zero status, and the report identifies that specific file,
   the specific field that failed, and the reason
 
-#### Scenario: A record matching neither schema is reported as unclassifiable
-- **WHEN** a file contains a JSON object with neither an `age` field nor a `content` field
-- **THEN** the report flags that file as unclassifiable and this counts as a rejection for exit-code
-  purposes
+#### Scenario: A record with a missing or unrecognized record_type is reported as a rejection, not routed to either schema
+- **WHEN** a file contains a JSON object whose `record_type` is absent, `null`, or a value other
+  than `"character"`/`"world_entry"`
+- **THEN** the report flags that file as rejected for its `record_type`, naming both valid values,
+  and this counts as a rejection for exit-code purposes — the file is never validated against
+  either `CHARACTER_SCHEMA_V1` or `WORLD_SCHEMA_V1` on a guess
+
+### Requirement: The CLI prints a prominent banner whenever any check is running in degraded mode
+Whenever `validate_batch()`'s result reports one or more degraded checks (currently: the pluggable
+skill-registry check, when `world.skills.registry.SKILL_REGISTRY` is not importable), `validate.py`
+SHALL print a banner naming every degraded check and the reason it is degraded, before any
+per-record report output, on every run for which the condition holds — never only in a verbose
+mode, and never suppressed by an otherwise-clean result.
+
+#### Scenario: The banner appears before the per-record report when a check is degraded
+- **WHEN** the skill registry is unavailable and `validate.py` is run against any batch of files
+- **THEN** the printed output's degraded-mode banner appears before any per-record validation
+  output, naming `skill-registry` and the reason it is not being enforced
+
+#### Scenario: The banner appears even when every record in the batch is otherwise valid
+- **WHEN** the skill registry is unavailable but every file in the batch passes every other
+  reject-level check
+- **THEN** the CLI still prints the degraded-mode banner, and the process still exits 0 — a clean
+  exit code does not suppress the banner
+
+#### Scenario: No banner is printed once the degraded check is no longer degraded
+- **WHEN** the skill registry is available (a resolvable `SKILL_REGISTRY`)
+- **THEN** the CLI prints no degraded-mode banner, since `validate_batch()` reports zero degraded
+  checks
 
 ### Requirement: race and subrace must resolve in the lore registries, with subrace cross-checked against race
 `validate.py` SHALL reject a character record whose `race` does not exist as a key in
@@ -113,6 +138,23 @@ stating the registry is unavailable, never a rejection. When the module is impor
 - **WHEN** `world.skills.registry.SKILL_REGISTRY` is importable and contains the key
   `"fire_mastery"`, and a character record's `skills` includes `"fire_mastery"`
 - **THEN** no warning or rejection is produced for that key
+
+### Requirement: The skill-registry promotion is verified against the real module, not only a mock
+Alongside the mocked-import test of the degrade/promote logic, the test suite SHALL include a test
+that checks whether `world.skills.registry.SKILL_REGISTRY` is genuinely importable in the current
+environment — skipping itself while it is not — and, once it genuinely is, asserts that an unknown
+skill key is rejected. This test SHALL NOT be satisfiable by a mock; it exists so that change 5
+cannot be considered complete while its registry leaves skill-key validation permanently lenient.
+
+#### Scenario: The self-arming test skips while the registry does not genuinely exist
+- **WHEN** the test suite runs in an environment where `world.skills.registry` does not exist
+- **THEN** the self-arming skill-registry test reports as skipped, not passed and not failed
+
+#### Scenario: The self-arming test actively asserts rejection once the registry genuinely exists
+- **WHEN** the test suite runs in an environment where `world.skills.registry.SKILL_REGISTRY`
+  genuinely exists and is importable (not mocked)
+- **THEN** the self-arming skill-registry test executes and fails if an unknown skill key is not
+  rejected by `_check_skills()`
 
 ### Requirement: Import validation is all-or-nothing across a batch of files
 `validate.py` SHALL treat a set of files passed to one invocation as one batch: if any file in the

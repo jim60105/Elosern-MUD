@@ -1,10 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: One valid, adult-compliant reference character card exists and stays valid
-`world/imports/examples/example_character.json` SHALL be a single character record satisfying
-`CHARACTER_SCHEMA_V1` and every semantic validation rule with zero rejections, with `age` and
-`apparent_age` both at least 18. A permanent test SHALL load this file and assert it produces zero
-rejections and zero warnings against the current schema and lore registries.
+`world/imports/examples/example_character.json` SHALL be a single character record with
+`"record_type": "character"`, satisfying `CHARACTER_SCHEMA_V1` and every semantic validation rule
+with zero rejections, with `age` and `apparent_age` both at least 18. A permanent test SHALL load
+this file and assert it produces zero rejections and zero warnings against the current schema and
+lore registries.
+
+#### Scenario: The reference example sets the required record_type discriminator
+- **WHEN** `examples/example_character.json`'s `record_type` field is inspected
+- **THEN** it is exactly `"character"`
 
 #### Scenario: The reference example produces zero rejections
 - **WHEN** `examples/example_character.json` is validated with `world.imports.validate`

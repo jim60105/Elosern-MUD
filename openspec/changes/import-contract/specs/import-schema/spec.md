@@ -1,5 +1,43 @@
 ## ADDED Requirements
 
+### Requirement: Both schemas require an explicit record_type discriminator, not implicit field sniffing
+`CHARACTER_SCHEMA_V1` SHALL require a `record_type` property constrained to the literal value
+`"character"`, and `WORLD_SCHEMA_V1` SHALL require a `record_type` property constrained to the
+literal value `"world_entry"`. Dispatch between the two schemas SHALL be performed by reading this
+field, never by inferring the record's kind from which other fields happen to be present or absent.
+A record whose `record_type` is missing, `null`, or any value other than the one its intended schema
+requires SHALL be rejected, with the rejection message naming both valid values.
+
+#### Scenario: A character record with the correct record_type passes the discriminator check
+- **WHEN** a character record has `"record_type": "character"`
+- **THEN** the record is dispatched to `CHARACTER_SCHEMA_V1` and this check does not reject it
+
+#### Scenario: A world entry with the correct record_type passes the discriminator check
+- **WHEN** a world-info record has `"record_type": "world_entry"`
+- **THEN** the record is dispatched to `WORLD_SCHEMA_V1` and this check does not reject it
+
+#### Scenario: A record with a mismatched record_type fails schema validation
+- **WHEN** a record intended as a world entry has `"record_type": "character"` (or vice versa)
+- **THEN** validation against the corresponding schema's `const` constraint fails
+
+#### Scenario: A record with a missing record_type is rejected before any other check runs
+- **WHEN** a character record — otherwise complete and valid, including `age`/`apparent_age` both
+  18 or above — omits `record_type` entirely
+- **THEN** the record is rejected specifically for the missing `record_type`, and this rejection
+  does not depend on, or get confused with, any other field's presence or absence
+
+#### Scenario: An incomplete character record is never silently misrouted to WORLD_SCHEMA_V1
+- **WHEN** a record has `"record_type": "character"` but omits `age`
+- **THEN** the record is validated against `CHARACTER_SCHEMA_V1` (never against `WORLD_SCHEMA_V1`
+  on the reasoning that it lacks an age-like field) and fails specifically because `age` is a
+  required `CHARACTER_SCHEMA_V1` property — the age gate is still the failure reported, not an
+  unrelated `WORLD_SCHEMA_V1` complaint about a missing `content` field
+
+#### Scenario: An unrecognized record_type value is rejected naming both valid values
+- **WHEN** a record has `"record_type": "npc"` (neither `"character"` nor `"world_entry"`)
+- **THEN** the record is rejected, and the rejection message names both `"character"` and
+  `"world_entry"` as the only valid values
+
 ### Requirement: CHARACTER_SCHEMA_V1 rejects any record where age or apparent_age is below 18
 `world/imports/schema.py` SHALL define `CHARACTER_SCHEMA_V1` as a JSON Schema (draft 2020-12)
 document whose `age` and `apparent_age` properties are each `{"type": "integer", "minimum": 18}`,
@@ -125,16 +163,18 @@ never inspected beyond confirming it is an object.
 - **THEN** schema validation passes
 
 ### Requirement: WORLD_SCHEMA_V1 validates a minimal, opaque world-info entry
-`world/imports/schema.py` SHALL define `WORLD_SCHEMA_V1` as a JSON Schema requiring
-`schema_version`, `key`, and `content`, where `content` is a non-empty string documented as opaque
-narrative flavor text never treated as mechanical world truth.
+`world/imports/schema.py` SHALL define `WORLD_SCHEMA_V1` as a JSON Schema requiring `record_type`
+(constrained to `"world_entry"`), `schema_version`, `key`, and `content`, where `content` is a
+non-empty string documented as opaque narrative flavor text never treated as mechanical world
+truth.
 
 #### Scenario: A world entry with only the required fields passes validation
-- **WHEN** a record is `{"schema_version": 1, "key": "tavern_flavor_01", "content": "..."}`
+- **WHEN** a record is `{"record_type": "world_entry", "schema_version": 1, "key":
+  "tavern_flavor_01", "content": "..."}`
 - **THEN** `WORLD_SCHEMA_V1` validation passes
 
 #### Scenario: A world entry missing content fails validation
-- **WHEN** a record has `schema_version` and `key` but no `content` field
+- **WHEN** a record has `record_type`, `schema_version`, and `key` but no `content` field
 - **THEN** `WORLD_SCHEMA_V1` validation fails
 
 #### Scenario: content's description states it is never a source of mechanical truth

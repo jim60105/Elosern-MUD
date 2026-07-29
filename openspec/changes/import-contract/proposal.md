@@ -23,9 +23,14 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
 
 - Add `world/imports/schema.py`: `CHARACTER_SCHEMA_V1` and `WORLD_SCHEMA_V1` as JSON Schema (draft
   2020-12) documents, validated via the `jsonschema` package — consistent with design doc §7.5's
-  own guardrail pipeline, which already names "local jsonschema validation" as a step. The age gate
-  is encoded structurally (`"minimum": 18` on both `age` and `apparent_age`, loudly documented in
-  each field's own `description`), not left to a semantic-layer check that could be forgotten.
+  own guardrail pipeline, which already names "local jsonschema validation" as a step. Both schemas
+  require a `record_type` discriminator (`"character"` / `"world_entry"`) that `validate.py`
+  dispatches on explicitly; a record with a missing or unrecognized `record_type` is rejected
+  outright, naming the valid values — this is deliberate for an implementer who cannot ask us
+  questions: an inferred dispatch (e.g. "has an `age` field") would misclassify a malformed
+  character record that happens to omit `age`, routing it away from the age gate entirely. The age
+  gate is encoded structurally (`"minimum": 18` on both `age` and `apparent_age`, loudly documented
+  in each field's own `description`), not left to a semantic-layer check that could be forgotten.
   `stats`'s `description` states, in the schema itself, that every value is a **base**,
   pre-skill-multiplier number — the `88*1000` source-card notation is base `88` with a separate
   ×1000 skill multiplier, never a stored `88000`.
@@ -43,7 +48,11 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
   typed per §5.3, unlike the plausibility-only `stats` check), `stats` inside the race's
   plausible band (warn), and `persona` type-only. Import is **all-or-nothing** across every file
   given on one CLI invocation: any single rejection anywhere in the batch fails the whole batch,
-  and the report names which record, which field, and why.
+  and the report names which record, which field, and why. Whenever any check is running in
+  degraded mode (currently: skill-key validation when the skill registry is unavailable — see
+  below), the CLI prints a **prominent banner** at the top of its output naming exactly which
+  checks are not being enforced and why, so an importer author cannot mistake a degraded pass for
+  a clean one.
 - Add `world/imports/loader.py`: instantiates `PlayerCharacter`/`NPC` instances **only after**
   `validate.py`'s batch validation reports zero rejections. Populates `entity.traits` from the
   literal imported `stats` values (merged onto `race_floor()` for any keys the card omits) — never
@@ -61,14 +70,19 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
   (`world.skills.registry.SKILL_REGISTRY`) that change 5 is expected to create. Until that module
   exists, the import fails and the check degrades to a **warning**; once change 5 lands, the same
   code starts rejecting unknown skill keys automatically, with no code change here. **No dependency
-  on change 5 is added; design doc §11's dependency graph is unchanged.**
+  on change 5 is added; design doc §11's dependency graph is unchanged.** A self-arming test
+  (skipped while the registry is absent, active the moment it is importable) asserts an unknown
+  skill key is REJECTED once change 5 lands — change 5 cannot land while leaving skill validation
+  permanently lenient without that test failing.
 - **Resolves the `sexual_baseline` vocabulary ownership question** (design doc D-6): the ordered
   level names live in `world/lore/sexual_vocab.py` (this change), a one-directional dependency both
   this change and change 7 read from — no circular dependency, and change 7 does not need to exist
   for this change to validate `sexual_baseline` shape correctly today.
 - Add a permanent regression test asserting an age-17 record is rejected (never deleted, never
   relaxed, per design doc §10) plus the full reject/warn matrix, the all-or-nothing batch behavior,
-  and the pluggable-skill-check degrade/promote behavior (simulated both ways).
+  the `record_type` discriminator's reject-on-missing/unrecognized behavior, the degraded-mode
+  banner's presence whenever a pluggable check is degraded, and the self-arming skill-registry test
+  described above.
 
 ## Capabilities
 

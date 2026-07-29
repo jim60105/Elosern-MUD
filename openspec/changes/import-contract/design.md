@@ -35,7 +35,9 @@ either concern unowned.
   especially the age gate and the base-value stats convention — documented loudly in the schema
   itself, not only in prose surrounding it.
 - A CLI (`validate.py`) implementing design doc §5.3's reject/warn table exactly, all-or-nothing
-  across a batch of files, with per-record/per-field/per-reason error reporting.
+  across a batch of files, with per-record/per-field/per-reason error reporting, explicit
+  `record_type`-based schema dispatch (D-1), and a prominent banner whenever any check is running in
+  degraded mode (D-5).
 - A loader (`loader.py`) that instantiates entities strictly after validation passes, writes literal
   imported stat values (never re-derived, never skill-multiplied) into `entity.traits`, and stores
   everything this change does not interpret (persona, sexual baseline, skills, equipment, inventory)
@@ -66,33 +68,54 @@ either concern unowned.
 
 ## Decisions
 
-### D-1. Two schemas, dispatched by a distinguishing required field — not a wrapper envelope.
+### D-1. Two schemas, dispatched by an explicit, required `record_type` discriminator — not
+implicit field-presence sniffing.
 
-Design doc §5.3's own JSON example is a bare character object with no wrapping `"kind"` or
-`"type"` discriminator, and the CLI usage shown (`validate cards/*.json`) implies each file on the
-command line is independently one record, not a manifest of many. Adding an artificial
-discriminator field not present in the design doc's own example would diverge from the frozen
-shape it already established. **Decision**: `validate.py` classifies each file by the presence of
-a field unique to each schema — `age` (required, character-only) or `content` (required,
-world-entry-only) — and raises a clear "cannot classify: has neither `age` nor `content`" error for
-anything matching neither. This is a CLI-level dispatch rule, not a schema-level field, so it adds
-nothing to either frozen JSON shape.
+**Revised after review.** An earlier version of this decision dispatched by which distinguishing
+field was present (`age` for a character, `content` for a world entry), reasoning that design doc
+§5.3's own worked example has no wrapping discriminator and that adding one would diverge from the
+frozen shape it established. That reasoning traded away exactly the wrong thing: this contract goes
+to an implementer who cannot ask the design authors questions, and implicit dispatch is fragile in
+precisely the case that matters most — a malformed character record that happens to omit `age`
+(the single most important field in the entire schema) gets silently misclassified as a world
+entry, validated against the wrong schema entirely, and reported back with an error about a missing
+`content` field instead of a missing `age` field. The age gate would never even run against it. A
+`content`-less, `age`-less garbage record is the one input this contract most needs to fail loudly
+and unambiguously on, and field-sniffing was the one dispatch mechanism guaranteed to fail
+ambiguously on it instead.
+
+**Decision**: both `CHARACTER_SCHEMA_V1` and `WORLD_SCHEMA_V1` require a `record_type` property —
+`{"const": "character"}` and `{"const": "world_entry"}` respectively. `validate.py` reads
+`record_type` first, before attempting any other validation, and dispatches explicitly:
 
 ```python
 def classify_record(raw: dict) -> Literal["character", "world_entry"]:
-    if "age" in raw:
+    record_type = raw.get("record_type")
+    if record_type == "character":
         return "character"
-    if "content" in raw:
+    if record_type == "world_entry":
         return "world_entry"
     raise RecordClassificationError(
-        f"record {raw.get('key', '<unknown>')!r} has neither 'age' (character) "
-        f"nor 'content' (world entry) — cannot determine which schema applies"
+        f"record {raw.get('key', '<unknown>')!r} has record_type={record_type!r}; "
+        f"expected one of 'character', 'world_entry'"
     )
 ```
 
-**Alternative considered**: a `"record_type"` discriminator field. Rejected — it would add a
-required field to `CHARACTER_SCHEMA_V1` that does not appear in design doc §5.3's own worked
-example, and the example is the frozen shape this change must not silently expand.
+A record with a missing, misspelled, or otherwise unrecognized `record_type` is rejected
+immediately, naming the valid values — this never falls through to a wrong schema, and it never
+depends on which other fields happen to be present or absent. This costs the card author one field
+per record; in exchange, a whole class of "validated against the wrong schema, error message points
+at the wrong problem" failures cannot happen at all. The reference example (D-15) sets
+`"record_type": "character"` accordingly.
+
+**Alternative considered (previous decision, superseded)**: dispatch by presence of a
+distinguishing field (`age` vs. `content`), with no schema-level discriminator, on the reasoning
+that it keeps the frozen shape minimal and matches design doc §5.3's example exactly. Rejected on
+review — the failure mode above (an incomplete character record silently routed to the wrong
+schema, hiding the age-gate failure behind an unrelated error) is worse than the one field of
+friction an explicit discriminator costs, and design doc §5.3's example is illustrative of the
+record's *content* fields, not a claim that no envelope field may ever be added by the change
+authorized to freeze this exact contract.
 
 ### D-2. Schemas are JSON Schema (draft 2020-12) dicts, validated via the `jsonschema` package.
 
@@ -239,10 +262,79 @@ def _check_skills(record: dict) -> tuple[list[Issue], list[Issue]]:
 
 This is a genuine, self-upgrading pluggability mechanism, not a permanent softening: the check
 promotes itself from WARNING to REJECT the moment `world/skills/registry.py::SKILL_REGISTRY`
-exists on the Python path, with zero edits to this file. A test (task 5.6) simulates both states —
-one run with the import mocked to fail (asserts WARNING), one with it mocked to succeed and contain
-a known-bad key (asserts REJECT) — so the degrade/promote behavior itself is covered, not just one
-branch of it.
+exists on the Python path, with zero edits to this file. A test simulates both states with the
+import mocked — one run mocked to fail (asserts WARNING), one mocked to succeed and contain a
+known-bad key (asserts REJECT) — so the degrade/promote *logic* itself is covered in isolation, not
+just one branch of it. This mocked test is necessary but not sufficient — see the two additions
+below, both added on review because a mock proves the logic works, not that anyone will ever notice
+if the real world stays in the degraded state forever.
+
+**Degraded-mode banner (added on review).** A silent WARNING is exactly the kind of thing an
+importer author will not notice: they run the CLI, see every record reported as valid (warnings and
+all, since warnings never fail the batch — D-11), and ship the batch. If change 5 then lands and
+the same cards are re-validated, cards that were never actually checked against a real skill list
+start rejecting for the first time, with nothing in what the author wrote having changed — a
+confusing, delayed failure with no visible cause at the time it appears. **Decision**: `validate.py`
+tracks every check currently running in degraded mode as a small, generic list (not hardcoded to
+skills specifically, so a future pluggable check reuses the same path with no new banner code):
+
+```python
+@dataclass(frozen=True)
+class DegradedCheck:
+    name: str        # e.g. "skill-registry"
+    reason: str       # e.g. "world.skills.registry.SKILL_REGISTRY is not importable"
+
+def collect_degraded_checks() -> list[DegradedCheck]:
+    checks: list[DegradedCheck] = []
+    if _resolve_skill_registry() is None:
+        checks.append(DegradedCheck(
+            "skill-registry",
+            "world.skills.registry.SKILL_REGISTRY is not importable -- skill-key "
+            "checks are WARNINGS only and will not catch a typo'd or invalid "
+            "skill key. This is expected before change 5 (skills-equipment) "
+            "lands, and stops happening automatically once it does.",
+        ))
+    return checks
+```
+
+The CLI prints this list as a **prominent banner at the top of its output**, before any per-record
+report — not folded into `--verbose` output, not a single line easy to scroll past — every single
+time it runs while any check is degraded, whether the batch is otherwise clean or not:
+
+```
+================================================================================
+ DEGRADED VALIDATION -- the following checks are NOT being enforced:
+   * skill-registry: world.skills.registry.SKILL_REGISTRY is not importable --
+     skill-key checks are WARNINGS only and will not catch a typo'd or invalid
+     skill key. This is expected before change 5 (skills-equipment) lands, and
+     stops happening automatically once it does.
+================================================================================
+```
+
+**Self-arming landing test (added on review).** The mocked test above proves the degrade/promote
+*logic* is correct, but a mock can pass forever even if change 5 lands with a `SKILL_REGISTRY` that
+is empty, mistyped, or otherwise broken in a way that still leaves every real skill key unverified
+— the real risk the pluggable approach carries, and the reason a hard dependency on change 5 was
+rejected only after weighing this risk explicitly. **Decision**: a second, separate test checks the
+*real* import, not a mock:
+
+```python
+def test_skill_registry_rejects_unknown_key_once_available():
+    pytest.importorskip("world.skills.registry")  # skip -- change 5 not landed yet
+    from world.skills.registry import SKILL_REGISTRY
+    assert "definitely_not_a_real_skill_xyz" not in SKILL_REGISTRY
+    rejections, _ = _check_skills({"skills": ["definitely_not_a_real_skill_xyz"], "passives": []})
+    assert rejections  # must reject, not warn, once the registry genuinely exists
+```
+
+This test is a no-op (skipped) for the entire lifetime of this change's own review and everything
+up to the moment change 5 lands — the same "no-op today, tripwire tomorrow" pattern change 3's D-9
+already used for its disguise-boundary source scan. Once `world/skills/registry.py` exists on the
+Python path with real content, this test stops skipping and starts asserting the promotion actually
+happened. **Change 5 physically cannot land in CI while leaving skill validation permanently
+lenient** without this test failing — which is the property that lets this design accept the
+pluggable approach (D-5's chosen option) instead of forcing a hard dependency on change 5, per the
+coordinator's explicit reasoning for accepting this trade-off.
 
 **Coordination contract with change 5**: this design forward-declares the exact module path and
 symbol name (`world.skills.registry.SKILL_REGISTRY`, a `Mapping[str, Any]` keyed by skill key) that
@@ -485,8 +577,18 @@ WORLD_SCHEMA_V1 = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "WORLD_SCHEMA_V1",
     "type": "object",
-    "required": ["schema_version", "key", "content"],
+    "required": ["record_type", "schema_version", "key", "content"],
     "properties": {
+        "record_type": {
+            "const": "world_entry",
+            "description": (
+                "Required discriminator (see D-1). Must be the literal "
+                "string 'world_entry' -- this is what tells validate.py to "
+                "apply WORLD_SCHEMA_V1 instead of CHARACTER_SCHEMA_V1, "
+                "explicitly, rather than by guessing from which other "
+                "fields happen to be present."
+            ),
+        },
         "schema_version": {"const": 1},
         "key": {"type": "string", "minLength": 1},
         "display_name": {"type": "string"},
@@ -525,8 +627,9 @@ surface.
 
 ### D-15. The reference example: one valid, adult, fully-typed elf card.
 
-`world/imports/examples/example_character.json` — age 22, apparent_age 22 (comfortably adult, not
-boundary-testing 18, so the example itself never looks like it's probing the edge), `race: "elf"`,
+`world/imports/examples/example_character.json` — `record_type: "character"` (per D-1's
+discriminator), age 22, apparent_age 22 (comfortably adult, not boundary-testing 18, so the example
+itself never looks like it's probing the edge), `race: "elf"`,
 `subrace: "ciaran"` (exercising the subrace cross-check, D-10), `stats` with all eight keys set
 (exercising both the literal-value path and the "every key present" case for `loader.py`'s merge
 logic, D-12), `disguised_stats` a proper subset of `stats`' keys, `skills`/`passives` non-empty
@@ -546,10 +649,17 @@ immediately rather than discovered by the import implementer.
 ## Risks / Trade-offs
 
 - **[Risk] The pluggable skill-check (D-5) could stay a WARNING forever if change 5's implementer
-  places `SKILL_REGISTRY` at a different module path than the one this change forward-declares.**
-  → Mitigation: the exact path (`world.skills.registry.SKILL_REGISTRY`) is recorded in this design
-  doc and in `validate.py`'s own docstring; flagged here explicitly so it is visible when change 5
-  is proposed, the same handoff discipline change 2 used for `Subrace` → change 4.
+  places `SKILL_REGISTRY` at a different module path than the one this change forward-declares, or
+  if it lands with a broken/empty registry that still leaves every key unverified.** → Mitigation:
+  the exact path (`world.skills.registry.SKILL_REGISTRY`) is recorded in this design doc and in
+  `validate.py`'s own docstring; the self-arming landing test (D-5) skips today and actively asserts
+  REJECT-on-unknown-key the moment the real module exists, so a change 5 that lands without genuine
+  skill-key enforcement fails that test in CI rather than silently shipping as "done."
+- **[Risk] An importer author could run the CLI while the skill-registry check is degraded, see a
+  clean report, and ship a batch that starts failing later with no visible cause once change 5
+  lands.** → Mitigation: the CLI's degraded-mode banner (D-5) prints prominently, every run, whenever
+  any check — currently only skill-registry — is not being enforced, naming which check and why,
+  so "clean report" and "fully enforced" are never confused with each other.
 - **[Risk] `world/lore/sexual_vocab.py`'s ownership could be missed by whoever proposes change 7,
   who might redefine the ladder inline instead of importing this module, causing drift between two
   copies of the same five-level list.** → Mitigation: flagged explicitly here (D-6) and in this
