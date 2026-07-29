@@ -86,6 +86,8 @@ mygame/
 ├── world/
 │   ├── lore/            static world data derived from world_info
 │   │                    geography · factions · races · magic · economy · bestiary
+│   │                    sexual_vocab   ordered-level vocabularies (owned by change 4,
+│   │                                   consumed by change 7 — frozen with the contract)
 │   ├── rules/           deterministic engine — SOLE WRITER
 │   │                    dice · combat · action · targeting · clock
 │   │                    traits · sexual_state · buffs · progression
