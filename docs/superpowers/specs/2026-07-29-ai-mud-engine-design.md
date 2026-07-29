@@ -173,9 +173,29 @@ class RaceProfile:
     lifespan: tuple[int, int]
     magic_cap: int              # human 90 | beastfolk 30 | elf 900
     vital_baseline: Vitals      # human 100 | beastfolk HP/SP 150-200 MP 30-50 | elf 10000
+    static_baseline: StaticBand # atk_phys / agility / defense band — see below
     learning_multiplier: float  # elf 10.0
     can_use_divine_arts: bool   # elf only
 ```
+
+**Vital pools and static stats scale by different factors, and neither may be derived from the
+other.** Pools scale ~100× from human to elf (120-150 → 10000); static combat stats scale ~10×
+(human elite 8 → elf 88), matching `world_info.md`'s "身體素質為人類精銳戰士的 10 倍". Magic level
+likewise scales 10× (cap 90 → 900). Reference points taken from the sample cards:
+
+| | human elite | human non-combatant | elf | ratio |
+|---|---|---|---|---|
+| `atk_phys` / `agility` / `defense` | 8 / 9 / 7 | 5 / 6 / 6 | 88 / 92 / 90 | ~10× |
+| `magic_level` cap | 90 | 90 | 900 | 10× |
+| `hp` | 120 | 150 | 10000 | ~100× |
+
+The asymmetry is deliberate: elves are absurdly durable but "only" ten times as damaging, which is
+why `hp` is an input to `effective_power()` — a stat-only ratio would not flag an elf-versus-human
+fight as overwhelming even though the human cannot win.
+
+**Skill multipliers are a third, independent layer** applied on top of base stats at resolution
+time: ×10 (統御術 partial effect), ×100 (身體強化), ×1000 (身體超強化). They are never baked into
+stored stats.
 
 Other registries: `Element` (eight elements), `MagicTier` (初級→究極), `RankTitle`
 (學徒→術師→大師→賢者→主宰), `Nation` (three states), `GuildRank` (F→S with reward bands),
@@ -254,7 +274,9 @@ world/imports/
   "age": 22, "apparent_age": 22,
   "race": "elf", "subrace": "ciaran",
 
-  "stats":           { "hp": 10000, "atk_phys": 88000, "magic_level": 250, "…": 0 },
+  // Base values only. Skill multipliers (×10 / ×100 / ×1000) are applied at
+  // resolution time and must never be baked in here.
+  "stats":           { "hp": 10000, "atk_phys": 88, "agility": 92, "magic_level": 250 },
   "disguised_stats": { "atk_phys": 60, "magic_level": 30 },
 
   "skills":   ["fire_mastery", "flight", "status_disguise"],

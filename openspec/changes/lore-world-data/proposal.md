@@ -15,11 +15,20 @@ module.
 - Add `world/lore/` as frozen-dataclass registries derived from `world_info.md`, per design doc
   §5.1 and D9 (lore is Python, not YAML):
   - `RaceProfile` (human / beastfolk / elf) with the exact field list from §5.1 — `key`,
-    `lifespan`, `magic_cap`, `vital_baseline`, `learning_multiplier`, `can_use_divine_arts` — the
-    single place that encodes the three-orders-of-magnitude power gap between the three races.
+    `lifespan`, `magic_cap`, `vital_baseline`, `static_baseline`, `learning_multiplier`,
+    `can_use_divine_arts` — the single place that encodes the power gap between the three races.
+    `vital_baseline` (HP/MP/SP pools) and `static_baseline` (atk_phys/agility/defense) scale by
+    different factors (~100× and ~10× human-to-elf respectively) and neither is derived from the
+    other.
+  - `StaticTier` — a new registry recording the named power bands within each race's
+    `static_baseline` (human 平民→大劍豪, beastfolk 幼年→獸王級, elf 一般→異數), since
+    `world_info.md` specifies human and beastfolk combat strength as tiered distributions, not a
+    single flat band.
   - `Subrace` — a new registry (not named in §5.1, needed to model the elf three-branch split the
     import contract's reference example already assumes `subrace: "ciaran"` exists for). Covers
-    the three elf branches (Fionnen/Ciaran/Eolas) and the seven named beastfolk subspecies.
+    the three elf branches (Fionnen/Ciaran/Eolas) and the seven named beastfolk subspecies, and now
+    also carries each beastfolk subspecies' documented stat-distribution skew (e.g. 貓人 favors
+    `agility`, penalizes `defense`) and, for 狐人, an override of the species MP vital band.
   - `Element` (八元素: 火水風土雷冰光暗).
   - `MagicTier` (初級/中級/高級/超級/究極) with non-overlapping level bands.
   - `RankTitle` (學徒/術師/大師/賢者/主宰).
@@ -40,9 +49,9 @@ module.
 ## Capabilities
 
 ### New Capabilities
-- `lore-registries`: the frozen-dataclass registries themselves — `RaceProfile`, `Subrace`,
-  `Element`, `MagicTier`, `RankTitle`, `Nation`, `GuildRank`, `MonsterTier`, `Anchor`, and the
-  currency/price-table module — derived from `world_info.md` and internally self-consistent.
+- `lore-registries`: the frozen-dataclass registries themselves — `RaceProfile`, `StaticTier`,
+  `Subrace`, `Element`, `MagicTier`, `RankTitle`, `Nation`, `GuildRank`, `MonsterTier`, `Anchor`,
+  and the currency/price-table module — derived from `world_info.md` and internally self-consistent.
 - `lore-startup-sync`: the idempotent mechanism that mirrors every registry entry into the DB at
   Evennia server start, keyed by `key`, safe to run on every restart without duplicating rows.
 

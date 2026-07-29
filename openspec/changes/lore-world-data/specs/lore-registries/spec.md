@@ -2,7 +2,7 @@
 
 ### Requirement: RaceProfile encodes the three-race power gap
 `world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields
-`key`, `lifespan`, `magic_cap`, `vital_baseline`, `learning_multiplier`, and
+`key`, `lifespan`, `magic_cap`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and
 `can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
 exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 
@@ -11,11 +11,21 @@ exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 - **THEN** it contains exactly the keys `"human"`, `"beastfolk"`, and `"elf"`, each mapping to a
   `RaceProfile` instance, and no other keys
 
-#### Scenario: Elf sits three orders of magnitude above human on vitals
+#### Scenario: Elf sits roughly two orders of magnitude above human on vital pools
 - **WHEN** `RACE_REGISTRY["elf"].vital_baseline.hp[0]` (the elf HP baseline) is compared against
   `RACE_REGISTRY["human"].vital_baseline.hp[1]` (the human HP gifted ceiling)
 - **THEN** the elf value is at least 50 times the human value, reflecting the documented
-  100-vs-10000 gap design doc D1 depends on
+  120-150-vs-10000 gap design doc §5.1 depends on
+
+#### Scenario: Elf sits roughly one order of magnitude above the human elite tier on static stats
+- **WHEN** `RACE_REGISTRY["elf"].static_baseline.atk_phys[0]` (the elf `atk_phys` floor) is
+  compared against `STATIC_TIER_REGISTRY["human_elite"].band[1]` (the human 精銳-tier `atk_phys`
+  ceiling, 14) — **not** `RACE_REGISTRY["human"].static_baseline`'s species-wide ceiling, which
+  includes the S-rank 大劍豪 tier and would understate the ratio
+- **THEN** the ratio is between 5× and 15×, reflecting `world_info.md`'s own worked comparison
+  ("對照人類精銳(7-14)約為8-10倍，與設定文字「10倍」相符") — and this ratio is checked
+  independently of the vital-pool ratio above; neither scenario's assertion may be satisfied by
+  deriving one band from the other
 
 #### Scenario: Only elves can use divine arts
 - **WHEN** `RACE_REGISTRY` is inspected
@@ -25,12 +35,39 @@ exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 - **WHEN** the three races' `magic_cap` values are compared
 - **THEN** `beastfolk.magic_cap < human.magic_cap < elf.magic_cap`, matching 30 / 90 / 900
 
-### Requirement: Subrace registry covers elf branches and beastfolk subspecies
-`world/lore/races.py` SHALL define a frozen `Subrace` dataclass with fields `key`, `race_key`,
-`display_name_zh`, `common_name_zh`, `population`, `home_anchor_key`, `affinity_elements`, and
-`specialty`, and a module-level `SUBRACE_REGISTRY: dict[str, Subrace]` containing the three elf
-branches (`fionnen`, `ciaran`, `eolas`) and the seven named beastfolk subspecies (`wolfkin`,
-`catkin`, `bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`).
+### Requirement: StaticTier registry records named power bands within each race's static_baseline
+`world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`,
+`display_name_zh`, `order`, `band`, `guild_rank_hint`, and `description`, and a module-level
+`STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers,
+and two elf tiers.
+
+#### Scenario: Every tier references a real race and stays within that race's static_baseline
+- **WHEN** every entry in `STATIC_TIER_REGISTRY` is inspected
+- **THEN** each entry's `race_key` exists as a key in `RACE_REGISTRY`, and each entry's `band` falls
+  within (or, for the top tier of a race, extends to) that race's `static_baseline` range on every
+  axis
+
+#### Scenario: Human tiers are ordered and reach the species ceiling
+- **WHEN** the five human tiers are sorted by `order`
+- **THEN** the sequence is 平民與非戰鬥者, 一般冒險者, 精銳, 一流, 大劍豪 with strictly increasing
+  `order`, and the highest tier's `band` upper bound equals `RACE_REGISTRY["human"]
+  .static_baseline.atk_phys[1]` (22) — a human S-rank adventurer is numerically representable, not
+  capped out by a narrower species band
+
+#### Scenario: Guild rank hints are present only where world_info.md states them
+- **WHEN** every `StaticTier` entry is inspected
+- **THEN** `guild_rank_hint` is a non-`None` `GuildRank` key for every human tier above 平民 (F-D,
+  C-B, A, S), and `None` for every beastfolk and elf tier, since `world_info.md` does not state a
+  guild-rank correlation for those two races
+
+### Requirement: Subrace registry covers elf branches and beastfolk subspecies with stat modifiers
+`world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`,
+`agility`, and `defense` (each a `float` fractional delta, default `0.0`), a frozen `Subrace`
+dataclass with fields `key`, `race_key`, `display_name_zh`, `common_name_zh`, `population`,
+`home_anchor_key`, `affinity_elements`, `specialty`, `static_modifiers`, and `vital_overrides`, and
+a module-level `SUBRACE_REGISTRY: dict[str, Subrace]` containing the three elf branches
+(`fionnen`, `ciaran`, `eolas`) and the seven named beastfolk subspecies (`wolfkin`, `catkin`,
+`bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`).
 
 #### Scenario: Every subrace references a real race
 - **WHEN** every entry in `SUBRACE_REGISTRY` is inspected
@@ -44,6 +81,37 @@ branches (`fionnen`, `ciaran`, `eolas`) and the seven named beastfolk subspecies
 #### Scenario: Beastfolk subspecies have no fabricated population figures
 - **WHEN** the seven beastfolk subspecies entries are inspected
 - **THEN** each has `population=None`, since `world_info.md` gives no per-subspecies count
+
+#### Scenario: Elf branches carry no stat-distribution skew
+- **WHEN** `SUBRACE_REGISTRY["fionnen"]`, `["ciaran"]`, and `["eolas"]` are inspected
+- **THEN** each has `static_modifiers == StatModifiers()` (all fields `0.0`) and
+  `vital_overrides is None`, since `world_info.md` documents no per-branch stat skew for elves
+
+#### Scenario: Beastfolk subspecies carry the documented stat-distribution skew
+- **WHEN** `SUBRACE_REGISTRY["catkin"]`, `["bearkin"]`, `["rabbitkin"]`, `["bovinekin"]`,
+  `["tigerkin"]`, and `["foxkin"]` are inspected
+- **THEN** each has all three `static_modifiers` fields matching `world_info.md`'s 「亞種數值傾向」
+  block exactly (e.g. `catkin.static_modifiers == StatModifiers(atk_phys=-0.10, agility=0.40,
+  defense=-0.30)`), and `wolfkin.static_modifiers == StatModifiers()` (balanced, all zero)
+
+#### Scenario: Every beastfolk subspecies' static_modifiers sum to exactly zero
+- **WHEN** every one of the seven beastfolk `SUBRACE_REGISTRY` entries' `static_modifiers` is
+  inspected
+- **THEN** `atk_phys + agility + defense == 0.0` for every entry, with no exemption for `foxkin` —
+  its physical-axis modifiers alone already sum to zero (`-0.05 + 0.15 + -0.10 == 0.0`); its
+  separate MP vital-band override (below) is a different, independently-checked mechanism and is
+  not required to make this sum work
+
+#### Scenario: Foxkin overrides its MP vital band above the species baseline
+- **WHEN** `SUBRACE_REGISTRY["foxkin"]` is inspected
+- **THEN** `vital_overrides` is not `None` and `vital_overrides["mp"] == (50, 70)`, which is a
+  higher band than `RACE_REGISTRY["beastfolk"].vital_baseline.mp` ((30, 50)) — confirming a subrace
+  can override a vital bound, not only a static one
+
+#### Scenario: Every other subrace leaves vital_overrides unset
+- **WHEN** every `SUBRACE_REGISTRY` entry other than `"foxkin"` is inspected
+- **THEN** `vital_overrides is None`, meaning that subrace uses `RaceProfile.vital_baseline`
+  unmodified
 
 ### Requirement: Element registry covers the eight documented elements
 `world/lore/elements.py` SHALL define a frozen `Element` dataclass and a module-level

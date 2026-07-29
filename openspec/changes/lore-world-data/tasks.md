@@ -6,23 +6,51 @@
       `monsters.py`, `anchors.py`, `economy.py`, `sync.py` as empty modules with module docstrings
       referencing design doc §5.1 and this change.
 
-## 2. Races and subraces (`world/lore/races.py`)
+## 2. Races, static tiers, and subraces (`world/lore/races.py`)
 
 - [ ] 2.1 Define `Vitals` (frozen dataclass: `hp`, `mp`, `sp`, each `tuple[int, int]`) per
       design.md D-2.
-- [ ] 2.2 Define `RaceProfile` (frozen dataclass: `key`, `lifespan`, `magic_cap`,
-      `vital_baseline`, `learning_multiplier`, `can_use_divine_arts`) per design.md D-1 — exactly
-      these six fields, no more.
-- [ ] 2.3 Populate `RACE_REGISTRY` with `human`, `beastfolk`, `elf` using the values tabulated in
-      design.md D-1 and D-2.
-- [ ] 2.4 Define `Subrace` (frozen dataclass: `key`, `race_key`, `display_name_zh`,
-      `common_name_zh`, `population`, `home_anchor_key`, `affinity_elements`, `specialty`) per
+- [ ] 2.2 Define `StaticBand` (frozen dataclass: `atk_phys`, `agility`, `defense`, each
+      `tuple[int, int]`) per design.md D-2b. Do not reuse or derive from `Vitals` — the two scale
+      by different factors (~100× vs ~8-10× human-to-elf) and must stay independent types.
+- [ ] 2.3 Define `RaceProfile` (frozen dataclass: `key`, `lifespan`, `magic_cap`,
+      `vital_baseline`, `static_baseline`, `learning_multiplier`, `can_use_divine_arts`) per
+      design.md D-1 — exactly these seven fields, no more.
+- [ ] 2.4 Populate `RACE_REGISTRY` with `human`, `beastfolk`, `elf`. `static_baseline` is now the
+      **species-wide floor-to-ceiling band** per design.md D-2b, taken directly from
+      `world_info.md`'s 物理數值 blocks: human `(1, 22)`, beastfolk `(4, 34)`, elf `(70, 95)`
+      (open-ended above 95 for 精靈中的異數, same treatment as the elf `vital_baseline`). Do not
+      derive these from the sample character cards alone — the cards are illustrative examples
+      inside the bands, not the bands themselves.
+- [ ] 2.5 Define `StaticTier` (frozen dataclass: `key`, `race_key`, `display_name_zh`, `order`,
+      `band`, `guild_rank_hint`, `description`) per design.md D-2c.
+- [ ] 2.6 Populate `STATIC_TIER_REGISTRY` with the eleven tiers tabulated in design.md D-2c: five
+      human (`human_commoner` 1-5, `human_adventurer` 5-9, `human_elite` 7-14, `human_veteran`
+      14-18, `human_swordmaster` 18-22), four beastfolk (`beastfolk_juvenile` 4-8,
+      `beastfolk_warrior` 10-16, `beastfolk_city_apex` 18-24, `beastfolk_tribal_apex` 26-34), two
+      elf (`elf_common` 70-95, `elf_prodigy` 95-open). Set `guild_rank_hint` for the four
+      guild-correlated human tiers (`"F"`-adjacent through `"S"` per D-2c's table) and leave it
+      `None` everywhere else. Note the intentional overlaps in the source data (human adventurer/
+      elite bands overlap at 7-9; `beastfolk_city_apex` overlaps `human_swordmaster` at 18-22) —
+      do not "fix" these into non-overlapping ranges.
+- [ ] 2.7 Define `StatModifiers` (frozen dataclass: `atk_phys`, `agility`, `defense`, each `float`
+      defaulting to `0.0`) and `Subrace` (frozen dataclass: `key`, `race_key`, `display_name_zh`,
+      `common_name_zh`, `population`, `home_anchor_key`, `affinity_elements`, `specialty`,
+      `static_modifiers`, `vital_overrides: dict[str, tuple[int, int]] | None = None`) per
       design.md D-3.
-- [ ] 2.5 Populate `SUBRACE_REGISTRY` with the three elf branches (`fionnen`, `ciaran`, `eolas`)
-      and the seven beastfolk subspecies (`wolfkin`, `catkin`, `bearkin`, `rabbitkin`,
-      `bovinekin`, `tigerkin`, `foxkin`) per design.md D-3. Elf branches reference
-      `home_anchor_key` values that must exist once task 8 populates `ANCHOR_REGISTRY` — sequence
-      this after task 8, or forward-declare and verify with the test in task 6.2.
+- [ ] 2.8 Populate `SUBRACE_REGISTRY` with the three elf branches (`fionnen`, `ciaran`, `eolas`,
+      each `static_modifiers=StatModifiers()` and `vital_overrides=None`) and the seven beastfolk
+      subspecies (`wolfkin`, `catkin`, `bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`)
+      per design.md D-3, with each beastfolk subspecies' `static_modifiers` set from
+      `world_info.md`'s 亞種數值傾向 table (design.md D-3's table) — all three axes are now stated
+      explicitly for every subspecies: `wolfkin` (0.0, 0.0, 0.0), `catkin` (-0.10, +0.40, -0.30),
+      `bearkin` (+0.45, -0.40, -0.05), `rabbitkin` (-0.35, +0.50, -0.15), `bovinekin` (-0.10, -0.35,
+      +0.45), `tigerkin` (+0.35, +0.10, -0.45), `foxkin` (-0.05, +0.15, -0.10) — every triple sums
+      to exactly `0.0`; do not default any axis to `0.0` from omission, all seven are fully
+      specified in the source. Set `foxkin.vital_overrides = {"mp": (50, 70)}`; leave every other
+      subrace's `vital_overrides` as `None`. Elf branches reference `home_anchor_key` values that
+      must exist once task 5.1 populates `ANCHOR_REGISTRY` — sequence this after task 5.1, or
+      forward-declare and verify with the test in task 9.1.
 
 ## 3. Elements (`world/lore/elements.py`)
 
@@ -90,18 +118,37 @@
 - [ ] 8.3 Implement `sync_one(category: str, key: str, entry: Any) -> None` — get-or-create a
       `LoreRecord` keyed `f"lore:{category}:{key}"`, then unconditionally overwrite `.db.fields`
       with `dataclasses.asdict(entry)`.
-- [ ] 8.4 Implement `sync_all() -> None` iterating all ten registries (`RACE_REGISTRY`,
-      `SUBRACE_REGISTRY`, `ELEMENT_REGISTRY`, `MAGIC_TIER_REGISTRY`, `RANK_TITLE_REGISTRY`,
-      `NATION_REGISTRY`, `GUILD_RANK_REGISTRY`, `MONSTER_TIER_REGISTRY`, `ANCHOR_REGISTRY`,
-      `PRICE_TABLE`) and calling `sync_one` for every entry.
+- [ ] 8.4 Implement `sync_all() -> None` iterating all eleven registries (`RACE_REGISTRY`,
+      `STATIC_TIER_REGISTRY`, `SUBRACE_REGISTRY`, `ELEMENT_REGISTRY`, `MAGIC_TIER_REGISTRY`,
+      `RANK_TITLE_REGISTRY`, `NATION_REGISTRY`, `GUILD_RANK_REGISTRY`, `MONSTER_TIER_REGISTRY`,
+      `ANCHOR_REGISTRY`, `PRICE_TABLE`) and calling `sync_one` for every entry.
 - [ ] 8.5 Wire a single call to `world.lore.sync.sync_all()` into
       `server/conf/at_server_startstop.py`'s `at_server_start()` hook.
 
 ## 9. Self-consistency tests (`world/lore/tests/`)
 
-- [ ] 9.1 `test_races.py` — registry membership (exactly 3 races, exactly 10 subraces), the
-      elf/human vitals magnitude assertion, `magic_cap` ordering, every subrace's `race_key`
-      resolves, every elf branch's `home_anchor_key` resolves to an `ELVEN_VILLAGE` anchor.
+- [ ] 9.1 `test_races.py` — registry membership (exactly 3 races, exactly 11 static tiers, exactly
+      10 subraces), `magic_cap` ordering, every subrace's `race_key` resolves, every elf branch's
+      `home_anchor_key` resolves to an `ELVEN_VILLAGE` anchor, every `StaticTier.race_key` resolves
+      and its `band` stays within that race's `static_baseline`, human tiers ordered 1–5 reaching
+      the species ceiling (22), guild-rank hints present only on the four guild-correlated human
+      tiers; **and the two independent scaling-factor assertions from design.md D-2b as separate
+      test functions**: (a) the elf/human `vital_baseline` ratio is ~100× (elf `hp[0]` at least 50×
+      human `hp[1]`), and (b) the elf/human `static_baseline` ratio is ~8-10× — compared against
+      `STATIC_TIER_REGISTRY["human_elite"].band`, **not** `RACE_REGISTRY["human"].static_baseline`
+      (elf `atk_phys[0]` between 5× and 15× the human elite tier's `atk_phys` ceiling, per D-2c) —
+      written so that a future change deriving one band from the other, or collapsing them to the
+      same scale, fails at least one of the two tests; plus every beastfolk subspecies'
+      `static_modifiers` matches design.md D-3's table, `wolfkin.static_modifiers == StatModifiers()`,
+      elf branches' `static_modifiers == StatModifiers()`, `foxkin.vital_overrides == {"mp": (50,
+      70)}`, and every other subrace's `vital_overrides is None`; **and a dedicated assertion that
+      every one of the seven beastfolk subspecies' `static_modifiers.atk_phys +
+      static_modifiers.agility + static_modifiers.defense == 0.0`, with no exemption for `foxkin`**
+      — this is the invariant design.md D-3 documents as keeping subspecies balanced against each
+      other (no subspecies stronger in aggregate, only differently distributed), and it must fail
+      if a future subspecies is added, or an existing one edited, without keeping its three axes
+      summing to zero. `foxkin`'s vital-band override is checked separately (above) and is not
+      part of this sum.
 - [ ] 9.2 `test_elements.py` — exactly 8 elements with distinct keys.
 - [ ] 9.3 `test_magic.py` — magic tier band contiguity (0/16/31/71/91 seams, no overlap,
       `ultimate.level_max is None`); rank title ordering (1–5, no duplicates) and every non-`None`
@@ -123,8 +170,8 @@
       entry's `max_copper >= min_copper` where not `None`.
 - [ ] 9.9 `test_sync.py` (Evennia integration test, `EvenniaTest` base) — running `sync_all()`
       twice against a fresh test DB produces no duplicate records and the record count equals the
-      total entry count across all ten registries; changing a registry value in a test double and
-      re-running sync updates the existing record rather than creating a new one.
+      total entry count across all eleven registries; changing a registry value in a test double
+      and re-running sync updates the existing record rather than creating a new one.
 
 ## 10. Verification
 
