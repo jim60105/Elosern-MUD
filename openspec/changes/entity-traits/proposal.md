@@ -21,13 +21,21 @@ it in `RaceProfile`.
   assignment of that contrib to `typeclasses/entities.py`) so later changes can attach
   `QuestGiver`/`Merchant`/`GuildStaff` components without a base-class change.
 - Add `world/rules/traits.py`: the derivation logic that seeds a `LivingEntity`'s initial trait
-  values from `RaceProfile.vital_baseline` (hp/mp/sp gauge maxes) and `RaceProfile.magic_cap`
-  (magic_level counter max) — the single place the three-orders-of-magnitude gap (human HP ~100 vs
-  elf HP 10000) propagates from lore into runtime state, never as a hardcoded per-race number in
-  entity code. Also derives `atk_phys`/`agility`/`defense` static bases from the same race-level
-  scale factor, since `RaceProfile` has no dedicated combat-stat field (see design.md D-3 for the
-  gap and how it's bridged) and a matching bridge for `Monster` trait baselines from `MonsterTier`
-  (which likewise carries no numeric baseline — see design.md D-4).
+  values by **reading change 2's lore fields directly** — `RaceProfile.vital_baseline` (hp/mp/sp
+  gauge maxes), `RaceProfile.static_baseline` (atk_phys/agility/defense static bases — a distinct
+  field from `vital_baseline`, since the two scale by different, independently documented factors:
+  ~100× human→elf for vitals, ~10× for statics), and `RaceProfile.magic_cap` (magic_level counter
+  max). `Subrace.static_modifiers` (per-subspecies fractional deltas) and `Subrace.vital_overrides`
+  (per-subspecies band replacements, e.g. 狐人's raised MP ceiling) are applied on top, in a fixed,
+  tested order (see design.md D-5). `Monster` trait baselines are read directly from
+  `MonsterTier.static_band`/`hp_band` (see design.md D-6). No formula derives one stat axis from
+  another anywhere in this module — every value is a direct lore-registry read. Every stored value
+  is a **base** value, pre-skill-multiplier (see design.md D-7): the sample cards' `88*1000`
+  notation is base `88` plus a `×1000` skill multiplier, never a stored `88000`, and skill
+  multipliers are applied only at resolution time by change 5/9, never baked into `entity.traits`.
+- Add `race: str | None` and `subrace: str | None` attributes on `LivingEntity` (see design.md D-3)
+  — the lore-registry keys `world/rules/traits.py`'s derivation functions read as input, and
+  `import-contract` (change 4) is expected to populate once it validates a character record.
 - Add `typeclasses/characters.py::PlayerCharacter(LivingEntity)`, `typeclasses/npcs.py::NPC
   (LivingEntity)`, and `typeclasses/monsters.py::Monster(LivingEntity)` (a new file; §3.2's tree
   doesn't name one — see design.md D-2) with the extra fields §5.2 names, split into what this
@@ -73,8 +81,9 @@ it in `RaceProfile`.
   `typeclasses/monsters.py`, `world/rules/traits.py`, `typeclasses/tests/`, `world/rules/tests/`.
 - **Modified files**: none outside this change's new files — `typeclasses/` and `world/rules/`
   currently exist only as empty stub packages from change 1.
-- **Depends on**: change 1 (Evennia skeleton, pinned Evennia 6.1.0) and change 2 (`RaceProfile`,
-  `MonsterTier`, and the other lore registries).
+- **Depends on**: change 1 (Evennia skeleton, pinned Evennia 6.1.0) and change 2's current,
+  corrected shape of `RaceProfile` (`static_baseline`, `STATIC_TIER_REGISTRY`), `Subrace`
+  (`static_modifiers`, `vital_overrides`), and `MonsterTier` (`static_band`, `hp_band`).
 - **Consumers deferred to later changes**: `import-contract` (4) instantiates these typeclasses
   from validated JSON and populates `persona`/`sexual_baseline`/etc.; `skills-equipment` (5) mounts
   `SkillHandler`/`EquipmentHandler` onto the declared seams and builds `Monster.loot_table`;

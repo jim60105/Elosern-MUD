@@ -17,6 +17,21 @@ project SHALL duplicate the trait-mounting or handler-declaration logic `LivingE
   change can attach a `Component` subclass (e.g. `QuestGiver`, `Merchant`, `GuildStaff`) without
   modifying `LivingEntity`'s base classes
 
+### Requirement: LivingEntity carries race and subrace as lore-registry key attributes
+`LivingEntity` SHALL declare `race: str | None` and `subrace: str | None` attributes, both
+defaulting to `None`, holding keys into change 2's `RACE_REGISTRY` and `SUBRACE_REGISTRY`
+respectively. These are the inputs the trait-scale derivation functions (see the
+`entity-trait-scales` capability) read; setting them does not, by itself, mutate `entity.traits`.
+
+#### Scenario: race and subrace default to None on a freshly created entity
+- **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected before any race is set
+- **THEN** `entity.race` and `entity.subrace` are both `None`
+
+#### Scenario: Setting race alone does not require a subrace
+- **WHEN** `entity.race` is set to a valid `RACE_REGISTRY` key and `entity.subrace` is left `None`
+- **THEN** the entity remains valid; a subrace is optional, matching change 2's own treatment of
+  `Subrace` as optional at the import layer
+
 ### Requirement: PlayerCharacter, NPC, and Monster subclass LivingEntity with their documented extra fields
 `typeclasses/characters.py::PlayerCharacter`, `typeclasses/npcs.py::NPC`, and
 `typeclasses/monsters.py::Monster` SHALL each subclass `LivingEntity` and expose the extra fields

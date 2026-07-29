@@ -8,8 +8,9 @@ value stored in `entity.traits`.
 
 #### Scenario: Setting disguised_stats does not change true trait values
 - **WHEN** `entity.db.disguised_stats` is set to `{"atk_phys": 60, "magic_level": 30}` on an entity
-  whose true `atk_phys` is 88000 and true `magic_level` is 250
-- **THEN** `entity.traits.atk_phys.value` still equals 88000 and `entity.traits.magic_level.value`
+  whose true `atk_phys` base is 88 (within the elf `elf_common` `StaticBand` of 70-95 — a base
+  value, per design.md D-7, never a skill-multiplied `88000`) and true `magic_level` is 250
+- **THEN** `entity.traits.atk_phys.value` still equals 88 and `entity.traits.magic_level.value`
   still equals 250
 
 #### Scenario: disguised_stats may be absent
@@ -25,13 +26,13 @@ SHALL be the only code path in the project that can return a disguised value.
 
 #### Scenario: get_display_value returns the disguised value when present
 - **WHEN** `get_display_value(entity, "atk_phys")` is called on an entity with
-  `disguised_stats = {"atk_phys": 60}` and true `atk_phys` value 88000
+  `disguised_stats = {"atk_phys": 60}` and true `atk_phys` base value 88
 - **THEN** it returns 60
 
 #### Scenario: get_display_value falls back to the true value when absent
 - **WHEN** `get_display_value(entity, "defense")` is called on an entity with `disguised_stats =
-  {"atk_phys": 60}` (no `defense` key) and true `defense` value 90000
-- **THEN** it returns 90000
+  {"atk_phys": 60}` (no `defense` key) and true `defense` base value 90
+- **THEN** it returns 90
 
 ### Requirement: Combat, resolution, and damage modules never call the disguise accessor
 No module implementing combat, action resolution, targeting, or dice/damage logic SHALL reference
