@@ -46,19 +46,22 @@ required from any other change).
 
 #### Scenario: persona is stored without inspection
 - **WHEN** a valid character record's `persona` object contains arbitrary nested structure
-- **THEN** the constructed entity's `entity.persona` equals that object exactly, unmodified
+- **THEN** the constructed entity's `entity.db.persona` equals that object exactly, unmodified,
+  leaving the bare `entity.persona` name free for the `PersonaStore` handler to mount on
 
 #### Scenario: sexual_baseline is stored as a raw dict, not converted into a state-machine object
 - **WHEN** a valid character record's `sexual_baseline` is `{"arousal": "微興奮", "virgin": true,
   "sensitivity": {}}`
-- **THEN** the constructed entity's `entity.sexual` equals that dict exactly, and no
-  `SexualState`-like object is constructed (that class does not exist yet)
+- **THEN** the constructed entity's `entity.db.sexual` equals that dict exactly, and no
+  `SexualState`-like object is constructed (that class does not exist yet), leaving the bare
+  `entity.sexual` name free for change 7's `SexualState` to mount on
 
 #### Scenario: skills and passives are stored together as a raw structure
 - **WHEN** a valid character record has `"skills": ["fire_mastery"]` and `"passives":
   ["defense_instinct"]`
-- **THEN** the constructed entity's `entity.skills` contains both lists, unmodified, with no
-  resolution against any skill registry performed by the loader itself
+- **THEN** the constructed entity's `entity.db.skills` contains both lists, unmodified, with no
+  resolution against any skill registry performed by the loader itself, and the bare `entity.skills`
+  name is left free for change 5's `SkillHandler` to mount on
 
 #### Scenario: disguised_stats is stored using the storage convention entity-traits already declared
 - **WHEN** a valid character record has a non-empty `disguised_stats`

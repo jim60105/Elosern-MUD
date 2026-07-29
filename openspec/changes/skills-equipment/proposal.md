@@ -33,11 +33,13 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   weapon arts (雙刀流, 輕劍術, 影斬, 瞬影步), 狀態偽裝, 統御術, and the passive set (防禦本能,
   刀術強化, 極限耐久, 魔法陣理解, 魔力精密控制, 侍從武術訓練, 護主本能, and per-character 轉生特典
   entries for Elosia/Yuka/Yuna).
-- Add `world/skills/handler.py`: `SkillHandler`, a facade object constructed from an entity
-  (`SkillHandler(entity)`, exposed via a new `entity.skill_handler` property on `LivingEntity`) that
-  reads the raw `{"active": [...], "passive": [...]}` dict change 4's loader already writes to
-  `entity.skills` (change 3's seam attribute) without requiring any change to how that attribute is
-  populated. Provides `effective_value(trait_key)` — the sole place stat-multiplier skills
+- Add `world/skills/handler.py`: `SkillHandler`, mounted directly as `entity.skills` on
+  `LivingEntity` — per design doc §5.2, `skills` **is** the `SkillHandler`, the same relationship
+  `traits` has to `TraitHandler` — replacing change 3's placeholder `AttributeProperty`. The handler
+  reads its backing data from a new private attribute, `entity.db.skills` (holding the
+  `{"active": [...], "passive": [...]}` shape change 4's loader already produces), the same
+  private-storage convention change 3 used for `disguised_stats` and change 4 used for `inventory`.
+  Provides `effective_value(trait_key)` — the sole place stat-multiplier skills
   (身體強化/身體超強化/基礎身體強化) are applied: it reads `entity.traits.<key>.value` (the base) and
   returns a derived, transient multiplied value, **never** writing back into `entity.traits`. A
   regression test (mirroring change 3's D-9 disguise-boundary tripwire) asserts no function in this
@@ -47,13 +49,16 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
 - Add the 統御術 (dominion art) data model: a frozen `ConferredSkillGrant` dataclass (`source_key`,
   `skill_key`, `trait_keys`, `scale`) stored in a new, additive attribute (`entity.db.skill_grants`,
   requiring no edit to change 3's typeclass, mirroring change 4's D-13 treatment of
-  `entity.db.inventory`). `SkillHandler.effective_value()` folds in any conferred grants at the
-  documented scale (Violet's card: a partial ×10 grant from Elosia's ×100 身體強化). The *casting* of
-  統御術 — i.e., an entity actually creating a grant on another entity through gameplay — is
-  declared as a seam for change 8's `ActionResolver` (effect-resolution step); this change builds the
-  data shape and the read-side computation, not the cast-time write path. The analogous partial
-  magic-growth-rate grant (Elosia → Violet) is explicitly deferred to whichever change owns
-  progression/learning-rate mechanics — noted as an unresolved seam, not built here.
+  `entity.db.inventory`, and kept separate from `entity.db.skills`'s import-populated shape). `Skill
+  Handler.effective_value()` folds in any conferred grants at the documented scale (Violet's card: a
+  partial ×10 grant from Elosia's ×100 身體強化). The *casting* of 統御術 — i.e., an entity actually
+  creating a grant on another entity through gameplay — is declared as a seam for change 8's
+  `ActionResolver` (effect-resolution step); this change builds the data shape and the read-side
+  computation, not the cast-time write path. The analogous partial magic-growth-rate grant
+  (Elosia → Violet) is a rate-of-change concept and is assigned to change 6 (`buffs-rulebook`) per
+  design doc §6.4 ("buffs modify exactly three things — rate of change, clamped bounds, and decay
+  rate") — named as its owner, not left as an unresolved seam, though not built here since
+  `BuffHandler` does not exist yet.
 - Wire 狀態偽裝 as a registered `SkillDef` whose effect resolution (a small, directly-callable
   function, not routed through any rulebook engine) can only ever set `entity.db.disguised_stats`
   (change 3's D-8 storage) — it contains no code path that reads or writes `entity.traits`, so it
@@ -62,16 +67,24 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   `ARMOR`, `ACCESSORY`) borrowing evadventure's wield-location slot *structure* (design doc §4:
   reference only, not its d20 formulas), sized to the sample cards' own equipment shapes (a single
   weapon or a dual-wielded pair, one body armor slot, a small list of accessories). `EquipmentHandler`
-  is a facade over the same raw dict change 4's loader already writes to `entity.equipment`,
-  providing `.equip()`/`.unequip()`/`.slot_contents()`. Plain module-level functions
+  is mounted directly as `entity.equipment` — per design doc §5.2 — replacing change 3's placeholder,
+  reading its backing data from the new private `entity.db.equipment` attribute, and providing
+  `.equip()`/`.unequip()`/`.slot_contents()`. Plain module-level functions
   (`add_item`/`remove_item`/`list_items`) operate directly on `entity.db.inventory`, the raw
   attribute change 4's D-13 already established with no seam declaration required.
 - Replace the `skills`/`equipment` placeholder `AttributeProperty` declarations in
-  `typeclasses/entities.py` with the real handler-access properties (`skill_handler`,
-  `equipment_handler`) per change 3's own D-10, which explicitly anticipates this change replacing
-  the placeholder "the same way `traits` is mounted" — the underlying `entity.skills`/
-  `entity.equipment` attributes themselves are left exactly as change 3/4 defined them, so change 4's
-  loader continues to work unmodified.
+  `typeclasses/entities.py` with real handler mounts (`entity.skills`/`entity.equipment` themselves
+  return `SkillHandler`/`EquipmentHandler` instances, the same way `entity.traits` returns a
+  `TraitHandler`), per change 3's own D-10, which explicitly anticipates this change replacing the
+  placeholder "the same way `traits` is mounted."
+- **Names a required one-line adjustment to change 4's `loader.py`** (not made by this change): its
+  `instantiate_character()` currently bare-assigns `entity.skills = {...}` / `entity.equipment =
+  {...}`, which breaks once those names become read-only handler-returning properties. The fix
+  targets the new private storage location instead: `entity.db.skills = {...}` /
+  `entity.db.equipment = {...}`. This touches zero external contract surface — `CHARACTER_SCHEMA_V1`,
+  `validate.py`, and the reference example are all unaffected, since what is actually frozen is the
+  on-disk JSON schema, not `loader.py`'s private internals. Recorded in design.md's Migration Plan for
+  the coordinator to carry into change 4.
 - Add a verification task confirming change 4's `test_skill_registry_self_arming.py` now runs
   (not skipped) and passes once `world.skills.registry.SKILL_REGISTRY` exists — the acceptance
   criterion for the cross-change contract this change fulfills.
@@ -84,8 +97,8 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
 - `skill-handler`: `SkillHandler`, the resolution-time-only multiplier boundary, the 統御術 partial
   conferral data model and read-side computation, the 狀態偽裝/D2 compliance guarantee, and the
   declared `ActionResolver` seam (no combat-state branching anywhere in this module).
-- `equipment-inventory`: `EquipmentSlot`, `EquipmentHandler`, and the inventory helper functions,
-  compatible with change 4's `entity.equipment`/`entity.db.inventory` write pattern.
+- `equipment-inventory`: `EquipmentSlot`, `EquipmentHandler` (mounted as `entity.equipment`), and the
+  inventory helper functions, compatible with change 4's `entity.db.inventory` write pattern.
 
 ### Modified Capabilities
 - None. `openspec/specs/` is currently empty (changes 1–4 have not been archived yet).
@@ -95,18 +108,25 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
 - **New files**: `world/skills/__init__.py`, `world/skills/registry.py`, `world/skills/handler.py`,
   `world/skills/equipment.py`, `world/skills/tests/`.
 - **Modified files**: `typeclasses/entities.py` — replaces the `skills`/`equipment` placeholder
-  `AttributeProperty` declarations (change 3, D-10) with real handler-access properties, per that
-  change's own anticipation of this exact replacement. No other file from change 3 or change 4 is
-  modified.
+  `AttributeProperty` declarations (change 3, D-10) with real handler mounts (`entity.skills`/
+  `entity.equipment` return `SkillHandler`/`EquipmentHandler` instances), per that change's own
+  anticipation of this exact replacement.
+- **Required follow-up in change 4** (named here, not made by this change — see design.md D-10 and
+  Migration Plan): `world/imports/loader.py`'s `instantiate_character()` needs its two bare-assignment
+  lines (`entity.skills = ...` / `entity.equipment = ...`) retargeted to `entity.db.skills = ...` /
+  `entity.db.equipment = ...`. This is an internal `loader.py` adjustment only — `CHARACTER_SCHEMA_V1`,
+  `validate.py`, and the reference example (the actual frozen, externally-depended-on contract) are
+  untouched.
 - **Depends on**: change 3 (`entity-traits`) for `LivingEntity`, the `skills`/`equipment` seam
   attributes, and the base-value trait boundary (D-7). Transitively on change 2
   (`lore-world-data`) for `ELEMENT_REGISTRY`/`RANK_TITLE_REGISTRY`.
 - **Satisfies a forward declaration from**: change 4 (`import-contract`), which reads
   `world.skills.registry.SKILL_REGISTRY` and self-arms its own skill-key validation from WARNING to
-  REJECT the moment this module exists — no edit to change 4 is made or required.
+  REJECT the moment this module exists.
 - **Consumers deferred to later changes**: change 6 (`buffs-rulebook`) owns the rulebook YAML engine
   that will eventually interpret this change's opaque `effects: list[str]` effect IDs (other than the
-  `stat_multiply:` convention this change interprets directly for its own multiplier resolution);
-  change 8 (`action-resolver`) owns actually casting a skill — resource checks, targeting, effect
-  resolution, and the 統御術 cast-time grant-creation path — reading `TargetSpec`/`SkillKind` from
-  this change rather than redefining them.
+  `stat_multiply:` convention this change interprets directly for its own multiplier resolution), and
+  now also owns the partial magic-growth-rate conferral (Elosia → Violet) as a rate-of-change buff
+  modifier per design doc §6.4; change 8 (`action-resolver`) owns actually casting a skill — resource
+  checks, targeting, effect resolution, and the 統御術 cast-time grant-creation path — reading
+  `TargetSpec`/`SkillKind` from this change rather than redefining them.

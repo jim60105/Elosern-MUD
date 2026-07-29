@@ -14,30 +14,35 @@ structure (design doc §4: reference only, not its d20 formulas).
 - **THEN** `slot_contents(EquipmentSlot.WEAPON_MAIN)` and `slot_contents(EquipmentSlot.WEAPON_OFF)`
   each return their own distinct item key, and neither slot's assignment affects the other
 
-### Requirement: EquipmentHandler is a facade over the raw dict change 4's loader already writes to entity.equipment
-`LivingEntity` SHALL expose an `equipment_handler` property returning an `EquipmentHandler` instance
-bound to that entity, reading and writing the same raw dict change 4's loader already writes to
-`entity.equipment` (`entity.equipment = record["equipment"]`), without requiring any change to how
-that attribute is populated or mounted.
+### Requirement: EquipmentHandler is mounted directly as entity.equipment
+`LivingEntity` SHALL expose `entity.equipment` as an `EquipmentHandler` instance bound to that
+entity — per design doc §5.2, `equipment` **is** the `EquipmentHandler`, the same relationship
+`traits` has to `TraitHandler` — replacing change 3's placeholder `AttributeProperty`. The handler
+SHALL read and write the private `entity.db.equipment` attribute, holding the raw dict change 4's
+loader writes there (`entity.db.equipment = record["equipment"]`).
 
-#### Scenario: equipment_handler reads equipment change 4's loader already wrote
-- **WHEN** `entity.equipment` is `{"weapon_main": "light_sword", "weapon_off": None, "armor":
+#### Scenario: entity.equipment reads equipment from entity.db.equipment
+- **WHEN** `entity.db.equipment` is `{"weapon_main": "light_sword", "weapon_off": None, "armor":
   "elf_traditional_garb", "accessories": ["crescent_earring"]}`
-- **THEN** `entity.equipment_handler.slot_contents(EquipmentSlot.WEAPON_MAIN)` returns
-  `"light_sword"` and `slot_contents(EquipmentSlot.ACCESSORY)` returns a list containing
-  `"crescent_earring"`
+- **THEN** `entity.equipment.slot_contents(EquipmentSlot.WEAPON_MAIN)` returns `"light_sword"` and
+  `slot_contents(EquipmentSlot.ACCESSORY)` returns a list containing `"crescent_earring"`
 
-#### Scenario: equipment_handler tolerates an entity never populated by the import loader
-- **WHEN** `entity.equipment` is `None` (an entity never run through change 4's loader) or `{}` (the
-  design doc §5.3 reference example's empty equipment)
+#### Scenario: entity.equipment tolerates an entity never populated by the import loader
+- **WHEN** `entity.db.equipment` is `None` (an entity never run through change 4's loader) or `{}`
+  (the design doc §5.3 reference example's empty equipment)
 - **THEN** every slot reads as empty (`None` for single slots, `[]` for `ACCESSORY`) rather than
   raising
 
-#### Scenario: Assigning entity.equipment directly continues to work unmodified
-- **WHEN** code assigns `entity.equipment = {...}` directly, the same way change 4's
-  `instantiate_character()` already does
-- **THEN** the assignment succeeds with no error, and a subsequently constructed
-  `entity.equipment_handler` reflects the newly assigned data
+#### Scenario: entity.equipment has no bare-assignment form
+- **WHEN** code attempts `entity.equipment = {...}` directly
+- **THEN** the assignment raises, since `entity.equipment` is a read-only computed property returning
+  an `EquipmentHandler` instance — the same way `entity.traits = {...}` is not a valid operation
+
+#### Scenario: Writing to entity.db.equipment directly is reflected by entity.equipment
+- **WHEN** code assigns `entity.db.equipment = {...}` directly, the way change 4's
+  `instantiate_character()` is expected to (once adjusted per this change's design.md D-10)
+- **THEN** the assignment succeeds with no error, and `entity.equipment` subsequently reflects the
+  newly assigned data
 
 ### Requirement: ACCESSORY is a bounded multi-item slot
 `EquipmentHandler` SHALL treat `ACCESSORY` as a list-valued slot capped at `ACCESSORY_MAX_SLOTS`

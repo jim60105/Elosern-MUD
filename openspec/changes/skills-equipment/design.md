@@ -39,10 +39,11 @@ authoritative; `world_info.md` and design doc §5.1/§5.2 are.
 - `world/skills/registry.py`: `SkillKind`, `TargetSpec`, `SkillDef` (exactly design doc §5.2's seven
   fields), and `SKILL_REGISTRY` at the exact forward-declared path, seeded with a representative
   cross-category skill set (not an exhaustive catalogue of every skill on every card).
-- `world/skills/handler.py`: `SkillHandler`, a facade over the raw dict change 4's loader already
-  writes to `entity.skills`, with `effective_value()` as the **one and only place** a stat-multiplier
-  skill's multiplier is applied — reading a base trait value and returning a derived, transient
-  result, never writing back.
+- `world/skills/handler.py`: `SkillHandler`, mounted directly as `entity.skills` per design doc §5.2
+  (replacing change 3's placeholder `AttributeProperty`, the same way `TraitHandler` is mounted as
+  `entity.traits`), reading its backing data from the private `entity.db.skills` attribute — with
+  `effective_value()` as the **one and only place** a stat-multiplier skill's multiplier is applied —
+  reading a base trait value and returning a derived, transient result, never writing back.
 - A concrete, buildable data model and read-side computation for 統御術's partial-conferral
   mechanic (Violet's card: a ×10 grant from Elosia's ×100 身體強化) — the mechanic this task
   description calls "the most structurally awkward skill in the set."
@@ -76,8 +77,10 @@ authoritative; `world_info.md` and design doc §5.1/§5.2 are.
   during play) — declared as a seam for change 8. This change builds the data shape
   (`ConferredSkillGrant`) and the read-side fold-in computation only.
 - No partial magic-growth-rate conferral (Elosia's 轉生特典 partial effect on Violet) — this is a
-  learning-rate/progression concept, not a combat-stat multiplier, and has no obvious owning change
-  yet (see Open Questions). Declared as an unresolved seam, not built.
+  learning-rate/progression concept, not a combat-stat multiplier. **Owned by change 6
+  (`buffs-rulebook`)**, as a rate-of-change buff modifier per design doc §6.4 (see D-6) — named here
+  as a seam for that change to inherit, not built by this change since `BuffHandler` does not exist
+  yet.
 - No sexual-state mechanics (change 7) — 性魔法主宰/神之秘法：性愛系統-type skills are registered as
   opaque `SkillDef` entries with `effects` IDs that change 7 will eventually interpret; this change
   does not simulate arousal or any sexual-state field.
@@ -244,10 +247,13 @@ class SkillHandler:
 
     @property
     def _raw(self) -> dict:
-        # entity.skills is change 3's seam attribute; change 4's loader already
-        # writes {"active": [...], "passive": [...]} into it. Default to the
-        # same shape for an entity never populated by the import loader.
-        return self.entity.skills or {"active": [], "passive": []}
+        # entity.db.skills is the private raw-storage attribute (see D-10),
+        # distinct from entity.skills itself -- which IS this handler,
+        # per design doc S5.2. Change 4's loader (once adjusted per D-10)
+        # writes {"active": [...], "passive": [...]} to entity.db.skills.
+        # Default to the same shape for an entity never populated by the
+        # import loader.
+        return self.entity.db.skills or {"active": [], "passive": []}
 
     def owned_keys(self) -> list[str]:
         return [*self._raw.get("active", []), *self._raw.get("passive", [])]
@@ -312,10 +318,13 @@ class ConferredSkillGrant:
                                      # 1/10 scale-down, not a flat x10 constant)
 ```
 
-Stored in a new, additive attribute, `entity.db.skill_grants: list[ConferredSkillGrant]`, requiring
-**no edit to change 3's typeclass** — this is the identical pattern change 4's D-13 already used for
-`entity.db.inventory` (a raw Evennia attribute-store attribute, not a declared seam). `SkillHandler`
-gains:
+Stored in a new, additive attribute, `entity.db.skill_grants: list[ConferredSkillGrant]` — deliberately
+separate from `entity.db.skills` (D-10's raw `{"active": [...], "passive": [...]}` storage, which
+change 4's loader populates): a conferred grant is not one of the entity's own owned skill keys, it is
+a fact about another entity's skill applying partially here, so it gets its own attribute rather than
+a third key crammed into the import-populated dict. This requires **no edit to change 3's
+typeclass** — the identical pattern change 4's D-13 already used for `entity.db.inventory` (a raw
+Evennia attribute-store attribute, not a declared seam). `SkillHandler` gains:
 
 ```python
     def conferred_grants(self) -> list[ConferredSkillGrant]:
@@ -341,16 +350,18 @@ entity B as a target, `ActionResolver` validates the interaction, and only then 
 `grant_conferred()` exists now as the seam change 8 will call into, not as something this change's own
 code path invokes autonomously.
 
-**What is out of scope entirely, not merely deferred**: Violet's card also narrates a partial
-*magic-growth-rate* effect from Elosia's 轉生特典 ("魔法成長百倍增幅" → Violet's unspecified partial
-acceleration). This is not a combat-stat multiplier at all — it is a learning-rate/progression
-concept with no obvious owning change in design doc §11 yet (progression/leveling is not explicitly
-named against any roadmap item). Building a second, structurally different conferral mechanism for a
-concept no later change has claimed would both blow this change's one-day budget and risk guessing
-wrong about a system nobody has designed. **Decision**: this is named here as an explicitly unresolved
-seam (see Open Questions), not implemented, and not silently folded into `ConferredSkillGrant` (which
-is typed specifically around `trait_keys`/multiplicative `scale`, a shape that does not fit a
-learning-rate concept without distortion).
+**What is out of scope entirely, not merely deferred — and now has a named owner**: Violet's card also
+narrates a partial *magic-growth-rate* effect from Elosia's 轉生特典 ("魔法成長百倍增幅" → Violet's
+unspecified partial acceleration). This is not a combat-stat multiplier at all — it is a rate-of-change
+concept, and design doc §6.4 states plainly that buffs modify exactly three things: "rate of change,
+clamped bounds, and decay rate." A conferred magic-growth-rate modifier is precisely a rate-of-change
+modifier applied to one entity's learning speed, sourced from another entity's skill — squarely
+`BuffHandler` territory. **Decision**: this is recorded here as owned by change 6 (`buffs-rulebook`),
+not left as an unowned gap for a future author to rediscover. It is not built by this change —
+`BuffHandler` does not exist yet, and buffs are this change's own Non-Goals — and it is deliberately
+not folded into `ConferredSkillGrant` (typed specifically around `trait_keys`/multiplicative `scale`,
+a shape that does not fit a rate-of-change concept without distortion); change 6's author should reach
+for its own buff-shaped mechanism instead.
 
 **Alternative considered**: modeling 統御術 as a `BuffHandler` effect (change 6) instead of a
 dedicated data model here, since a "temporary grant from another entity" sounds buff-shaped. Rejected
@@ -418,11 +429,14 @@ class EquipmentHandler:
 
     @property
     def _raw(self) -> dict:
-        # entity.equipment is change 3's seam attribute; change 4's loader already
-        # writes the imported equipment dict into it verbatim. This change is the
-        # first to define its canonical inner shape (change 4's schema only
-        # required `type: object`, per its own Non-Goals deferring slot shape here).
-        return self.entity.equipment or {
+        # entity.db.equipment is the private raw-storage attribute (see D-10),
+        # distinct from entity.equipment itself -- which IS this handler, per
+        # design doc S5.2. Change 4's loader (once adjusted per D-10) writes
+        # the imported equipment dict to entity.db.equipment verbatim. This
+        # change is the first to define its canonical inner shape (change 4's
+        # schema only required `type: object`, per its own Non-Goals deferring
+        # slot shape here).
+        return self.entity.db.equipment or {
             "weapon_main": None, "weapon_off": None, "armor": None, "accessories": [],
         }
 
@@ -431,7 +445,7 @@ class EquipmentHandler:
     def slot_contents(self, slot: EquipmentSlot) -> str | list[str] | None: ...
 ```
 
-**This change defines the canonical `entity.equipment` dict shape going forward** — change 4's
+**This change defines the canonical `entity.db.equipment` dict shape going forward** — change 4's
 `CHARACTER_SCHEMA_V1.equipment` property only requires `{"type": "object"}` (its own Non-Goals defer
 slot shape here explicitly: "equipment slot logic — change 5's job"). A card's raw `equipment: {}`
 (the design doc §5.3 reference example) is a valid empty state under this shape (every slot `None`,
@@ -464,41 +478,80 @@ means — a weapon's stats, a potion's effect — belongs to whichever later cha
 definitions, not named against any roadmap item yet). Sizing this any richer would not fit the
 one-day budget and would guess at a system no roadmap item has claimed.
 
-### D-10. `SkillHandler`/`EquipmentHandler` are facades constructed on demand, not descriptor-mounted
-replacements of `entity.skills`/`entity.equipment` — because change 4's loader already writes plain
-dicts to those exact attribute names.
+### D-10. `SkillHandler`/`EquipmentHandler` are mounted directly as `entity.skills`/`entity.equipment`,
+replacing change 3's placeholder — backed by the private `entity.db.skills`/`entity.db.equipment`
+attributes, the same convention change 3 used for `disguised_stats` and change 4 used for `inventory`.
 
-Change 3's D-10 declared `skills`/`equipment` as `None`-defaulting `AttributeProperty` placeholders,
-explicitly anticipating that this change would replace them "with a real handler mounted the same way
-`traits` is mounted." But change 4's loader (already frozen, not edited by this change) writes
-directly to those attribute names as plain data:
+Design doc §5.2 is explicit, not just suggestive: `skills` **is** `SkillHandler` and `equipment` **is**
+`EquipmentHandler` on `LivingEntity` — the same relationship `traits` has to `TraitHandler`. Change 3's
+D-10 already anticipated this change replacing the placeholder `AttributeProperty` "with a real
+handler mounted the same way `traits` is mounted." **Correction from an earlier draft of this design**:
+that draft treated change 4's `loader.py` internals as frozen alongside `CHARACTER_SCHEMA_V1` and, to
+avoid touching them, added parallel `skill_handler`/`equipment_handler`-suffixed properties instead of
+replacing `entity.skills`/`entity.equipment` outright — leaving two representations of the same
+concept and directly contradicting §5.2's literal statement. **What is actually frozen is
+`CHARACTER_SCHEMA_V1`** — the on-disk JSON record shape handed to the external import author. Where
+`loader.py` subsequently stashes that validated data on the entity is a private implementation detail
+no external party sees or depends on, and it can be adjusted alongside this change landing.
+
+**The mount**, replacing change 3's `skills = AttributeProperty(default=None)` and
+`equipment = AttributeProperty(default=None)` in `typeclasses/entities.py`:
+
+```python
+@lazy_property
+def skills(self):
+    return SkillHandler(self)
+
+@lazy_property
+def equipment(self):
+    return EquipmentHandler(self)
+```
+
+(`evennia.utils.lazy_property`, mirroring the caching convention Evennia's own handlers typically use
+— **flagged for implementer verification** against however change 3 actually mounted `entity.traits`,
+consistent with this project's established discipline for Evennia-API assumptions.) `entity.skills`
+and `entity.equipment` are now read-only computed properties returning handler instances, exactly
+parallel to `entity.traits` — there is no bare-assignment form, the same way `entity.traits = {...}`
+is not a thing.
+
+**Raw imported data now lives at `entity.db.skills`/`entity.db.equipment`** — private, internal-only
+attribute names distinct from the public `entity.skills`/`entity.equipment` property, the identical
+storage convention change 3 already used for `disguised_stats` (`entity.db.disguised_stats`, D-8) and
+change 4 already used for `entity.db.inventory` (D-13). `SkillHandler`/`EquipmentHandler` read and
+write these private attributes internally (D-5, D-8); nothing outside the handler classes is expected
+to touch them directly.
+
+**Required one-line adjustment to change 4's `loader.py` — named here, not made here.** Change 4's
+`instantiate_character()` currently writes:
 
 ```python
 entity.skills = {"active": record["skills"], "passive": record["passives"]}
 entity.equipment = record["equipment"]
 ```
 
-If `skills`/`equipment` became property-mounted handler objects with no setter (the way `entity.traits`
-itself has no bare-assignment form — you call `.add()`, you don't do `entity.traits = {...}`), change
-4's loader would break the moment it tried to assign a raw dict to a property with no setter. Since
-change 4 cannot be edited (it is a separate, already-authored change), this change instead:
+This was correct against change 3's placeholder `AttributeProperty`, but breaks against this change's
+read-only property (assigning to a property with no setter raises `AttributeError`). The fix is a
+two-line adjustment, targeting the private storage location this change now owns instead of the
+public property name:
 
-- **Leaves `entity.skills`/`entity.equipment` exactly as change 3/4 defined and populate them** — a
-  plain, `None`-defaulting attribute holding a raw dict.
-- **Adds two new properties to `typeclasses/entities.py`**, `skill_handler` and `equipment_handler`,
-  each returning a freshly-constructed facade (`SkillHandler(self)` / `EquipmentHandler(self)`) that
-  reads the raw dict as its data source. This is additive, not a replacement of the existing
-  attribute's mounting — `entity.skills = {...}` (change 4's write) continues to work completely
-  unmodified, and `entity.skill_handler.effective_value(...)` (this change's read API) is a new,
-  parallel access path.
+```python
+entity.db.skills = {"active": record["skills"], "passive": record["passives"]}
+entity.db.equipment = record["equipment"]
+```
 
-This satisfies change 3's D-10 anticipation ("replaced with a real handler") in spirit — there is now
-a real handler object with real methods — without literally reusing `TraitHandler`'s exact mounting
-mechanism, which assumes nobody ever bare-assigns to `entity.traits` (an assumption change 4 does not
-share for `skills`/`equipment`). **Alternative considered**: asking change 4 to be edited to call
-`entity.skill_handler.load(...)` instead of bare-assigning. Rejected outright — the task instructions
-for this change are explicit that no other change's artifacts may be modified, and change 4 is
-handed off/frozen per its own Milestones framing regardless.
+**This does not touch `CHARACTER_SCHEMA_V1`, `validate.py`, the reference example, or anything an
+external import author depends on** — only two lines inside `loader.py`'s private write path. Per
+this change's own scope boundary (no other change's artifacts are modified by this change), this
+adjustment is named here for the coordinator to carry into change 4's `loader.py` (its task 5.2), not
+made directly by this change.
+
+**Alternative considered (superseded)**: the parallel `skill_handler`/`equipment_handler`-suffixed
+properties from this design's earlier draft. Rejected on review — it left `entity.skills` holding a
+raw dict while a separately-named property held the real handler, which both contradicts design doc
+§5.2's literal wording and would have required every future consumer (change 8's `ActionResolver`
+especially) to remember which of two names to call. A two-line adjustment to a private write path
+inside an unmodified-by-us file is a smaller and more honest fix than maintaining that permanent
+split indefinitely.
 
 ### D-11. No combat-state branching anywhere in `world/skills/` — the `ActionResolver` seam is
 declared, not built.
@@ -558,34 +611,46 @@ budget.
   matching changes 1–4's identical discipline for unverified contrib-API assumptions; the four-slot
   shape itself is justified independently against the sample cards' own equipment data, not solely
   against evadventure, so it remains a reasonable design even if evadventure's exact enum differs.
-- **[Risk] `typeclasses/entities.py` is a file change 3 authored; this change modifying it (D-10)
-  could be read as overstepping change 3's boundary.** → Mitigation: change 3's own design.md D-10
-  explicitly anticipates and names this exact replacement ("a plain placeholder attribute until its
-  owning change replaces it with a real handler mounted the same way `traits` is mounted above"),
-  and this change's edit is additive (two new properties) rather than a removal or behavioral change
-  to anything change 3 built — `entity.skills`/`entity.equipment`'s existing mounting and change 4's
-  write pattern are left completely intact.
+- **[Risk] `typeclasses/entities.py` is a file change 3 authored; this change replacing its
+  `skills`/`equipment` placeholder declarations (D-10) with real handler mounts could be read as
+  overstepping change 3's boundary.** → Mitigation: change 3's own design.md D-10 explicitly
+  anticipates and names this exact replacement ("a plain placeholder attribute until its owning
+  change replaces it with a real handler mounted the same way `traits` is mounted above") — this
+  change's edit is precisely the replacement change 3 asked for, not a redesign of anything change 3
+  built; `entity.traits`'s own mounting is left completely untouched.
+- **[Risk] Change 4's `loader.py` bare-assigns to `entity.skills`/`entity.equipment`, which raises
+  `AttributeError` once those names become read-only properties (D-10), and this change cannot edit
+  change 4 to fix it directly.** → Mitigation: named explicitly in D-10 as a required, minimal
+  two-line adjustment (`entity.db.skills = ...` / `entity.db.equipment = ...` instead of the bare
+  attribute) for the coordinator to carry into change 4's `loader.py` (its task 5.2). The adjustment
+  touches zero external contract surface — `CHARACTER_SCHEMA_V1`, `validate.py`, and the reference
+  example are all completely unaffected — so it carries no risk to the frozen schema handoff, only to
+  an internal, never-externally-observed implementation line.
 
 ## Migration Plan
 
 Not applicable in the backward-compatibility sense — the project is unreleased with zero users, and
-`world/skills/` currently contains no code at all. The only sequencing concern is operational: this
-change must land after change 3 (needs `LivingEntity` and the `skills`/`equipment` seam attributes
-importable) and should land in a way that change 4's already-written self-arming test
-(`test_skill_registry_self_arming.py`) transitions from skipped to passing the moment
-`world.skills.registry.SKILL_REGISTRY` is importable with genuine content — no code change to change 4
-is required or made for that transition to happen.
+`world/skills/` currently contains no code at all. The only sequencing concerns are operational:
+
+- This change must land after change 3 (needs `LivingEntity` and the `skills`/`equipment` seam
+  attributes importable).
+- **Change 4's `loader.py` needs its own one-line adjustment landed alongside this change** (D-10):
+  `instantiate_character()`'s two lines that currently bare-assign
+  `entity.skills = {...}`/`entity.equipment = {...}` must instead target
+  `entity.db.skills = {...}`/`entity.db.equipment = {...}`. This is a private-implementation-detail
+  change inside a file this change does not itself edit — named here for the coordinator to apply to
+  change 4 directly. Nothing about `CHARACTER_SCHEMA_V1` or any artifact handed to an external import
+  author changes.
+- This change should land in a way that change 4's already-written self-arming test
+  (`test_skill_registry_self_arming.py`) transitions from skipped to passing the moment
+  `world.skills.registry.SKILL_REGISTRY` is importable with genuine content.
 
 ## Open Questions
 
-- **Who owns the partial magic-growth-rate conferral (Elosia → Violet's accelerated learning)?** No
-  roadmap item in design doc §11 explicitly names progression/leveling mechanics. Left as an
-  unresolved seam (D-6) rather than this change guessing at an owning change or a data shape for a
-  concept nobody has designed yet.
-- **Should `validate.py` (change 4, frozen) eventually structurally check `entity.equipment`'s inner
-  shape against this change's four-slot convention (D-8)?** Change 4's schema currently only requires
-  `{"type": "object"}`. This change does not, and cannot, edit change 4 to add that check; left open
-  for whoever next touches the import contract.
+- **Should `validate.py` (change 4, frozen) eventually structurally check `entity.db.equipment`'s
+  inner shape against this change's four-slot convention (D-8)?** Change 4's schema currently only
+  requires `{"type": "object"}`. This change does not, and cannot, edit change 4 to add that check;
+  left open for whoever next touches the import contract.
 - **Should a listed "active" vs. "passive" skill key (the two arrays change 4's loader already
   separates) be cross-checked against that key's own `SkillDef.kind`?** Not part of change 4's frozen
   reject/warn table, and not built here since it would require editing change 4's frozen validator.

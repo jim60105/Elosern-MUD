@@ -134,9 +134,12 @@
       `entity.traits` from task 5.1's values via `TraitHandler` (matching the same
       `initial_trait_config`-style kwargs shape change 3's `world/rules/traits.py` already uses —
       reuse that helper if its signature accepts literal values, or call `TraitHandler.add()`
-      directly with the same keyword shape), sets `entity.db.disguised_stats`, `entity.persona`,
-      `entity.sexual`, `entity.skills` (`{"active": ..., "passive": ...}`), `entity.equipment`, and
-      `entity.db.inventory` verbatim from the validated record. Default `typeclass` is `NPC`; no
+      directly with the same keyword shape), sets `entity.db.disguised_stats`, `entity.db.persona`,
+      `entity.db.sexual`, `entity.db.skills` (`{"active": ..., "passive": ...}`),
+      `entity.db.equipment`, and
+      `entity.db.inventory` verbatim from the validated record. **Never assign the bare
+      `entity.persona`/`sexual`/`skills`/`equipment` names — design doc §5.2 reserves those for the
+      handlers changes 5, 6 and 7 mount there.** Default `typeclass` is `NPC`; no
       Account/session binding performed for `PlayerCharacter`.
 - [ ] 5.3 Implement `load_batch(paths: list[Path], typeclass: type = NPC) -> list[LivingEntity]` per
       design.md D-11: calls `world.imports.validate.validate_batch()`; if `not report.all_valid`,
@@ -224,8 +227,9 @@
       literal imported stat values land in `entity.traits` verbatim; an omitted stat key falls back
       to `race_floor()`'s value; every loaded trait value stays within the constructing race's
       documented band (catching an accidentally-baked-in skill multiplier the same way change 3's
-      own regression test does); `entity.persona`/`entity.sexual`/`entity.skills`/`entity.equipment`
-      /`entity.db.disguised_stats`/`entity.db.inventory` are all stored verbatim with no
+      own regression test does); `entity.db.persona`/`entity.db.sexual`/`entity.db.skills`
+      /`entity.db.equipment`/`entity.db.disguised_stats`/`entity.db.inventory` are all stored
+      verbatim with no
       interpretation; `instantiate_character()` defaults to `NPC` and accepts `typeclass=
       PlayerCharacter` with no Account/session side effects.
 - [ ] 7.6 `world/lore/tests/test_sexual_vocab.py` — the six tuples match design doc §6.4 exactly, in

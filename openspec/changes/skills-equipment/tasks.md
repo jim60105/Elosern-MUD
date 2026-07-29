@@ -35,8 +35,9 @@
 ## 3. Skill handler and resolution-time multiplier (`world/skills/handler.py`)
 
 - [ ] 3.1 Implement `SkillHandler.__init__(self, entity)` and `_raw` per design.md D-10: reads
-      `entity.skills`, defaulting to `{"active": [], "passive": []}` when `None`, with no assumption
-      that the attribute has ever been touched by change 4's loader.
+      `entity.db.skills` (the private raw-storage attribute, distinct from `entity.skills` itself,
+      which will be this handler), defaulting to `{"active": [], "passive": []}` when `None`, with no
+      assumption that the attribute has ever been touched by change 4's loader.
 - [ ] 3.2 Implement `SkillHandler.owned_keys()` returning the combined active+passive key list.
 - [ ] 3.3 Implement `_parse_stat_multiply(effect_id: str) -> tuple[str, float] | None` per design.md
       D-5: parses the `stat_multiply:<trait_key>:<multiplier>` convention only; returns `None` for
@@ -57,10 +58,17 @@
 - [ ] 3.7 Implement `apply_disguise_effect(entity, overrides: dict[str, int]) -> None` per design.md
       D-7: the complete effect body for `status_disguise`, setting `entity.db.disguised_stats =
       overrides` and containing no reference to `entity.traits` anywhere in the function.
-- [ ] 3.8 Add `skill_handler` as a property on `LivingEntity` (`typeclasses/entities.py`) returning
-      `SkillHandler(self)`, per design.md D-10 — additive only; do not remove or alter the existing
-      `skills = AttributeProperty(default=None)` declaration change 3 authored, so change 4's
-      `entity.skills = {...}` write pattern continues to work unmodified.
+- [ ] 3.8 In `typeclasses/entities.py`, **replace** change 3's `skills = AttributeProperty(default=
+      None)` declaration with a real handler mount per design.md D-10:
+      ```python
+      @lazy_property
+      def skills(self):
+          return SkillHandler(self)
+      ```
+      (`evennia.utils.lazy_property` — confirm the exact caching mechanism against however change 3
+      mounted `entity.traits`, per this project's established contrib-verification discipline, before
+      assuming `lazy_property` is the right primitive). `entity.skills` is now read-only — there is no
+      bare-assignment form, matching `entity.traits`.
 
 ## 4. Equipment and inventory (`world/skills/equipment.py`)
 
@@ -69,17 +77,23 @@
       as unverified against a locally installed Evennia 6.1.0 — confirm before assuming any literal
       reuse, per this project's established contrib-verification discipline (changes 1-4).
 - [ ] 4.2 Implement `EquipmentHandler.__init__(self, entity)` and `_raw` per design.md D-8/D-10: reads
-      `entity.equipment`, defaulting to `{"weapon_main": None, "weapon_off": None, "armor": None,
-      "accessories": []}` when `None` or `{}`.
+      `entity.db.equipment` (the private raw-storage attribute, distinct from `entity.equipment`
+      itself, which will be this handler), defaulting to `{"weapon_main": None, "weapon_off": None,
+      "armor": None, "accessories": []}` when `None` or `{}`.
 - [ ] 4.3 Implement `EquipmentHandler.equip(slot, item_key)`, `.unequip(slot)`,
       `.slot_contents(slot)` per design.md D-8: the three single-item slots (`WEAPON_MAIN`,
       `WEAPON_OFF`, `ARMOR`) hold one item key or `None`; `ACCESSORY` holds a list capped at
       `ACCESSORY_MAX_SLOTS = 3` (judgment call, documented as invented — no source states a cap);
       `.equip()` on a full `ACCESSORY` slot raises rather than silently exceeding the cap.
-- [ ] 4.4 Add `equipment_handler` as a property on `LivingEntity` (`typeclasses/entities.py`) returning
-      `EquipmentHandler(self)`, additive only — do not alter the existing `equipment =
-      AttributeProperty(default=None)` declaration, so change 4's `entity.equipment = {...}` write
-      pattern continues to work unmodified.
+- [ ] 4.4 In `typeclasses/entities.py`, **replace** change 3's `equipment = AttributeProperty(default=
+      None)` declaration with a real handler mount per design.md D-10:
+      ```python
+      @lazy_property
+      def equipment(self):
+          return EquipmentHandler(self)
+      ```
+      `entity.equipment` is now read-only — there is no bare-assignment form, matching
+      `entity.traits`.
 - [ ] 4.5 Implement `add_item(entity, item_key)`, `remove_item(entity, item_key)`, `list_items(entity)`
       per design.md D-9: plain functions operating directly on `entity.db.inventory` (the raw
       attribute change 4's D-13 already established), tolerating `None` as "empty."
@@ -105,8 +119,9 @@
       skills, exactly one conferral skill and one disguise skill, and at least three distinct
       per-character-unique passives.
 - [ ] 6.2 `world/skills/tests/test_handler.py` — per the `skill-handler` capability:
-      `entity.skill_handler` reads `entity.skills` correctly and tolerates `None`; assigning
-      `entity.skills` directly still works; `effective_value()` multiplies correctly for a known base
+      `entity.skills` reads `entity.db.skills` correctly and tolerates `None`; `entity.skills = {...}`
+      raises (no bare-assignment form); assigning `entity.db.skills = {...}` directly still works and
+      is reflected by `entity.skills`; `effective_value()` multiplies correctly for a known base
       value and known active multiplier skill; `effective_value()` never mutates
       `entity.traits.<key>.value`; grep-based assertion that `world/skills/handler.py` contains no
       assignment to `entity.traits.<anything>`; an entity with no matching multiplier skill returns
@@ -127,9 +142,11 @@
       and 5.2.
 - [ ] 6.6 `world/skills/tests/test_equipment.py` — per the `equipment-inventory` capability:
       `EquipmentSlot` has exactly its four documented members; a dual-wielded pair occupies
-      `WEAPON_MAIN`/`WEAPON_OFF` independently; `entity.equipment_handler` reads equipment change 4's
-      loader already wrote and tolerates `None`/`{}`; assigning `entity.equipment` directly still
-      works; accessories can be equipped up to `ACCESSORY_MAX_SLOTS` and equipping one more raises.
+      `WEAPON_MAIN`/`WEAPON_OFF` independently; `entity.equipment` reads `entity.db.equipment`
+      correctly and tolerates `None`/`{}`; `entity.equipment = {...}` raises (no bare-assignment
+      form); assigning `entity.db.equipment = {...}` directly still works and is reflected by
+      `entity.equipment`; accessories can be equipped up to `ACCESSORY_MAX_SLOTS` and equipping one
+      more raises.
 - [ ] 6.7 `world/skills/tests/test_inventory.py` — per the `equipment-inventory` capability:
       `add_item`/`remove_item`/`list_items` behave correctly against `entity.db.inventory`, including
       the `None`-tolerance case and reflecting an inventory already populated by change 4's
@@ -137,6 +154,15 @@
 
 ## 7. Cross-change contract verification
 
+- [ ] 7.0 **Name, for the coordinator to carry into change 4** (do not edit change 4's artifacts from
+      this change): `world/imports/loader.py`'s `instantiate_character()` must be adjusted from
+      `entity.skills = {...}` / `entity.equipment = {...}` (bare assignment, correct against change
+      3's placeholder `AttributeProperty`) to `entity.db.skills = {...}` / `entity.db.equipment =
+      {...}` (targeting the private storage location `SkillHandler`/`EquipmentHandler` now read from,
+      per design.md D-10). This is a two-line, internal `loader.py` change only —
+      `CHARACTER_SCHEMA_V1`, `validate.py`, and the reference example are unaffected, since the frozen
+      contract handed to the external import author is the JSON schema, not `loader.py`'s private
+      write path.
 - [ ] 7.1 Run change 4's full `world/imports/tests/` suite and confirm
       `test_skill_registry_self_arming.py` (change 4's task 7.3a) is no longer reported as skipped —
       it now executes and passes, asserting an unknown skill key is rejected via `_check_skills()`.
@@ -156,7 +182,11 @@
 - [ ] 8.1 Run the full `world/skills/tests/` suite and confirm all tests pass.
 - [ ] 8.2 Confirm no function in `world/skills/handler.py` assigns to `entity.traits.<anything>`,
       `.base`, or `.mod` (grep by hand as a spot check, mirroring change 3's task 7.5 discipline).
-- [ ] 8.3 Confirm `typeclasses/entities.py`'s diff is additive only for this change — the existing
-      `skills`/`equipment` `AttributeProperty` declarations from change 3 are unchanged, and only the
-      two new `skill_handler`/`equipment_handler` properties are added.
-- [ ] 8.4 Run `openspec validate skills-equipment --strict` and confirm it passes.
+- [ ] 8.3 Confirm `typeclasses/entities.py`'s diff for this change touches only the `skills`/
+      `equipment` declarations — each replaced with a `@lazy_property` handler mount per design.md
+      D-10 — and no other attribute, method, or base class change 3 authored is altered.
+- [ ] 8.4 Confirm the required change-4 `loader.py` adjustment (task 7.0) has been communicated/applied
+      (by the coordinator, not by this change) before considering this change's cross-change contract
+      complete — `entity.skills = {...}`/`entity.equipment = {...}` bare assignment left unadjusted in
+      change 4 would raise `AttributeError` at import time against this change's read-only mounts.
+- [ ] 8.5 Run `openspec validate skills-equipment --strict` and confirm it passes.

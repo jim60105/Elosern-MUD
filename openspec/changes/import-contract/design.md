@@ -530,19 +530,28 @@ scaled or multiplied value.
 already-shape-validated data — and adds one new raw attribute, `entity.db.inventory`, with no
 change-3 edit required.
 
-`persona`, `sexual`, `skills`, and `equipment` are `None`-defaulting `AttributeProperty` seams
-change 3 already declared on `LivingEntity` (D-10 of that change's design.md), each commented with
-its owning later change. `loader.py` writes the validated-but-uninterpreted payload directly into
-each:
+**The loader writes raw payload to `entity.db.*`, never to the bare attribute names.** Design doc
+§5.2 reserves `persona`, `sexual`, `skills`, `equipment`, `buffs`, and `relations` on
+`LivingEntity` for the *handlers* that later changes mount there (`PersonaStore`, `SexualState`,
+`SkillHandler`, `EquipmentHandler`, `BuffHandler`, `RelationHandler`). Assigning raw dicts to those
+names would collide with every one of those changes and leave two representations of the same data.
+
+The loader therefore follows the storage convention change 3 established for `disguised_stats`:
+validated-but-uninterpreted payload goes to the private `entity.db.*` backing store, and each
+owning change mounts its handler on the public name to read from there.
 
 ```python
-entity.persona = record["persona"]                                   # opaque; change 4 stores, never interprets
-entity.sexual = record["sexual_baseline"]                            # raw dict; change 7 builds SexualState from it
-entity.skills = {"active": record["skills"], "passive": record["passives"]}
-entity.equipment = record["equipment"]
-entity.db.disguised_stats = record["disguised_stats"] or None        # change 3 D-8's storage convention
+entity.db.persona = record["persona"]                      # opaque; stored, never interpreted
+entity.db.sexual = record["sexual_baseline"]               # raw dict; change 7 builds SexualState from it
+entity.db.skills = {"active": record["skills"], "passive": record["passives"]}
+entity.db.equipment = record["equipment"]
+entity.db.disguised_stats = record["disguised_stats"] or None
 entity.db.inventory = record["inventory"]
 ```
+
+Note that "frozen" applies to `CHARACTER_SCHEMA_V1` — the on-disk record shape handed to the
+external importer author — not to where `loader.py` privately stashes the data afterwards. No
+external party observes or depends on these attribute names.
 
 `inventory` was not declared as a seam attribute by change 3 (§5.2's handler list is `traits` /
 `sexual` / `buffs` / `equipment` / `skills` / `relations` / `persona` — no separate inventory

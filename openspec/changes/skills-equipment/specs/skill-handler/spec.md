@@ -1,24 +1,31 @@
 ## ADDED Requirements
 
-### Requirement: SkillHandler is accessible from a LivingEntity via a facade property
-`LivingEntity` SHALL expose a `skill_handler` property returning a `SkillHandler` instance bound to
-that entity, reading the raw `{"active": [...], "passive": [...]}` structure change 4's loader already
-writes to `entity.skills` without requiring any change to how that attribute is populated or mounted.
+### Requirement: SkillHandler is mounted directly as entity.skills
+`LivingEntity` SHALL expose `entity.skills` as a `SkillHandler` instance bound to that entity — per
+design doc §5.2, `skills` **is** the `SkillHandler`, the same relationship `traits` has to
+`TraitHandler` — replacing change 3's placeholder `AttributeProperty`. The handler SHALL read its
+backing data from the private `entity.db.skills` attribute, holding the
+`{"active": [...], "passive": [...]}` structure change 4's loader writes there.
 
-#### Scenario: skill_handler reads the raw skills dict change 4's loader writes
-- **WHEN** `entity.skills` is `{"active": ["fire_ball"], "passive": ["defense_instinct"]}`
-- **THEN** `entity.skill_handler.owned_keys()` returns a list containing both `"fire_ball"` and
+#### Scenario: entity.skills reads the raw skills dict from entity.db.skills
+- **WHEN** `entity.db.skills` is `{"active": ["fire_ball"], "passive": ["defense_instinct"]}`
+- **THEN** `entity.skills.owned_keys()` returns a list containing both `"fire_ball"` and
   `"defense_instinct"`
 
-#### Scenario: skill_handler tolerates an entity never populated by the import loader
-- **WHEN** `entity.skills` is `None` (an entity never run through change 4's loader)
-- **THEN** `entity.skill_handler.owned_keys()` returns an empty list rather than raising
+#### Scenario: entity.skills tolerates an entity never populated by the import loader
+- **WHEN** `entity.db.skills` is `None` (an entity never run through change 4's loader)
+- **THEN** `entity.skills.owned_keys()` returns an empty list rather than raising
 
-#### Scenario: Assigning entity.skills directly continues to work unmodified
-- **WHEN** code assigns `entity.skills = {"active": [...], "passive": [...]}` directly, the same way
-  change 4's `instantiate_character()` already does
-- **THEN** the assignment succeeds with no error, and a subsequently constructed `entity.skill_handler`
-  reflects the newly assigned data
+#### Scenario: entity.skills has no bare-assignment form
+- **WHEN** code attempts `entity.skills = {"active": [...], "passive": [...]}` directly
+- **THEN** the assignment raises, since `entity.skills` is a read-only computed property returning a
+  `SkillHandler` instance — the same way `entity.traits = {...}` is not a valid operation
+
+#### Scenario: Writing to entity.db.skills directly is reflected by entity.skills
+- **WHEN** code assigns `entity.db.skills = {"active": [...], "passive": [...]}` directly, the way
+  change 4's `instantiate_character()` is expected to (once adjusted per this change's design.md D-10)
+- **THEN** the assignment succeeds with no error, and `entity.skills` subsequently reflects the newly
+  assigned data
 
 ### Requirement: effective_value is the sole resolution-time multiplier application point and never writes to entity.traits
 `SkillHandler.effective_value(trait_key)` SHALL compute a derived value by reading
@@ -31,7 +38,7 @@ other function in `world/skills/handler.py` SHALL NOT assign to `entity.traits.<
 #### Scenario: effective_value multiplies the base trait value by an owned skill's multiplier
 - **WHEN** an entity's `entity.traits.atk_phys.value` is `88` and the entity owns the
   `body_enhancement_extreme` skill (`stat_multiply:atk_phys:1000`) as active
-- **THEN** `entity.skill_handler.effective_value("atk_phys")` returns `88000`
+- **THEN** `entity.skills.effective_value("atk_phys")` returns `88000`
 
 #### Scenario: effective_value never mutates the stored trait value
 - **WHEN** `effective_value("atk_phys")` is called on any entity
@@ -44,7 +51,7 @@ other function in `world/skills/handler.py` SHALL NOT assign to `entity.traits.<
 
 #### Scenario: An entity with no matching multiplier skill returns the unmultiplied base value
 - **WHEN** an entity owns no skill whose `effects` include a `stat_multiply:atk_phys:*` entry
-- **THEN** `entity.skill_handler.effective_value("atk_phys")` returns exactly
+- **THEN** `entity.skills.effective_value("atk_phys")` returns exactly
   `entity.traits.atk_phys.value`
 
 #### Scenario: Every static trait's stored base value stays within its documented band regardless of effective_value calls
@@ -57,23 +64,24 @@ other function in `world/skills/handler.py` SHALL NOT assign to `entity.traits.<
 ### Requirement: A skill can confer a scaled-down partial effect of another entity's skill (統御術)
 `world/skills/handler.py` SHALL define a frozen `ConferredSkillGrant` dataclass (`source_key`,
 `skill_key`, `trait_keys`, `scale`) and `SkillHandler.conferred_grants()`/`grant_conferred()` methods
-operating on a new, additive attribute `entity.db.skill_grants`. `effective_value()` SHALL fold every
-applicable grant's `scale` into its multiplier computation, in addition to the entity's own owned
-skills.
+operating on a new, additive attribute `entity.db.skill_grants`, kept separate from
+`entity.db.skills`'s import-populated `{"active": [...], "passive": [...]}` structure.
+`effective_value()` SHALL fold every applicable grant's `scale` into its multiplier computation, in
+addition to the entity's own owned skills.
 
 #### Scenario: A conferred grant applies its own scale, independent of the source skill's own multiplier
 - **WHEN** an entity has no `body_enhancement` skill of its own but has a `ConferredSkillGrant` with
   `skill_key="body_enhancement"`, `trait_keys=("atk_phys", "agility", "defense")`, `scale=0.1` (a
   ×10 partial effect of a ×100 source skill), and a base `atk_phys` of `60`
-- **THEN** `entity.skill_handler.effective_value("atk_phys")` returns `600` — a ×10 multiplier — not
-  `6000` (which would be the source's own full ×100)
+- **THEN** `entity.skills.effective_value("atk_phys")` returns `600` — a ×10 multiplier — not `6000`
+  (which would be the source's own full ×100)
 
 #### Scenario: grant_conferred records a grant without performing any ownership or resource check
-- **WHEN** `entity.skill_handler.grant_conferred("elosia", "body_enhancement", ("atk_phys",
+- **WHEN** `entity.skills.grant_conferred("elosia", "body_enhancement", ("atk_phys",
   "agility", "defense"), 0.1)` is called
-- **THEN** `entity.skill_handler.conferred_grants()` includes a `ConferredSkillGrant` with exactly
-  those field values, and no exception is raised regardless of whether `"elosia"` is a real,
-  reachable, or currently-owning entity
+- **THEN** `entity.skills.conferred_grants()` includes a `ConferredSkillGrant` with exactly those
+  field values, and no exception is raised regardless of whether `"elosia"` is a real, reachable, or
+  currently-owning entity
 
 #### Scenario: Casting 統御術 during play is not implemented by this change
 - **WHEN** the codebase added by this change is inspected for any code path that creates a
