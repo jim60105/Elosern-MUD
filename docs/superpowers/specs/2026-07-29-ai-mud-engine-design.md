@@ -666,6 +666,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 | 9 | `dice-combat` | 8 | d100 resolution, damage, initiative, turn loop |
 | 10 | `overwhelm-resolution` | 9 | Overwhelm threshold, single-shot resolution, EventLog compression |
 | 11 | `world-clock` | 7, 9 | Clock, scheduled events, time-skip commands, safety gate |
+| 11b | `character-progression` | 5, 6, 11 | XP, magic-level growth, skill improvement, and the consumer for conferred growth-rate multipliers. §3.2 lists `rules/progression` but no change owned it; surfaced by change 6, which built `growth_rate_multiplier()` with nothing to call it. Guild merit and rank remain change 16's. |
 
 ### Phase 3 — World space
 
