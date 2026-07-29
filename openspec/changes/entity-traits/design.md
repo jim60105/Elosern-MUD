@@ -13,17 +13,30 @@ Design doc §5.2 sketches `LivingEntity` as a diagram with seven handlers (`trai
 handler and non-trait field, so later changes (5, 6, 7, 15, 16, 19) have a stable seam to attach to
 instead of having to modify the base class shape when their turn comes.
 
-**Correction round.** The first draft of this design computed two derived values —
+**Correction round 1.** The first draft of this design computed two derived values —
 `atk_phys`/`agility`/`defense` static-trait bases from a hardcoded human reference scaled by the
 elf/human HP ratio, and monster trait baselines from an invented `10⁰`–`10³` decade ladder keyed to
 `MonsterTier` ordering — because at the time, `RaceProfile` and `MonsterTier` carried no numeric
 data for those axes. Change 2 has since been corrected to carry that data directly
 (`RaceProfile.static_baseline`, `STATIC_TIER_REGISTRY`, `Subrace.static_modifiers`/
 `vital_overrides`, `MonsterTier.static_band`/`hp_band`), all derived from `world_info.md` rather
-than invented. This design has been rewritten to read those fields directly instead of computing a
-ratio — see D-4, D-5, and D-6 below. Design doc §4 (the Contrib Reuse Matrix) remains verified
-against the installed Evennia 6.1.0 and is authoritative for every module path and class name this
-design cites; nothing about §4 changed in this correction.
+than invented. This design was rewritten to read those fields directly instead of computing a
+ratio — see D-4, D-5, and D-6 below.
+
+**Correction round 2.** Round 1 still left `STATIC_TIER_REGISTRY` and every position within a
+`MonsterTier`'s band unreachable — every entity landed at its species/tier *floor* unconditionally,
+with tier-aware construction flagged as an open question for change 4. That was itself an unowned
+seam of exactly the kind that produced round 1's invented formulas: change 9 (`dice-combat`) will
+need to construct a mid-tier opponent to write repeatable combat tests against, and leaving that
+unowned invites someone downstream to invent their own scale rather than read
+`STATIC_TIER_REGISTRY`/`MonsterTier.static_band` as intended. D-4 and D-6 below now give
+`build_initial_traits()` an optional `tier` parameter and
+`build_initial_traits_for_monster_tier()` an optional `position` parameter, both still direct,
+deterministic lore reads — no randomization, stat-point allocation, or level-up curve.
+
+Design doc §4 (the Contrib Reuse Matrix) remains verified against the installed Evennia 6.1.0 and
+is authoritative for every module path and class name this design cites; nothing about §4 changed
+in either correction round.
 
 ## Goals / Non-Goals
 
@@ -38,6 +51,10 @@ design cites; nothing about §4 changed in this correction.
   (`RaceProfile.vital_baseline`/`static_baseline`/`magic_cap` for `PlayerCharacter`/`NPC`;
   `MonsterTier.static_band`/`hp_band` for `Monster`) — no derived ratio, no hardcoded per-race or
   per-tier number anywhere in this change's code.
+- Optional, explicit tier-aware construction: a caller may name a `STATIC_TIER_REGISTRY` tier (for
+  `PlayerCharacter`/`NPC`) or a band position (for `Monster`) to land inside a specific named power
+  band instead of the species/tier floor — still a single deterministic value per call, validated
+  against the entity's race where applicable.
 - `Subrace.static_modifiers` and `Subrace.vital_overrides` applied in a fixed, tested order on top
   of the race baseline.
 - An explicit boundary: every trait value this change stores or derives is a **base** value,
@@ -61,6 +78,11 @@ design cites; nothing about §4 changed in this correction.
   (`×1000`), never a stored `88000`. Applying that multiplier at resolution time is change 5's
   (skill effects) and change 9's (combat math) job; this change only guarantees `entity.traits`
   never holds an already-multiplied value.
+- No randomization, stat-point allocation, or level-up curve for tier-aware construction (D-4/D-6).
+  A caller names one tier (or, for monsters, one band position) and gets one deterministic value;
+  rolling a specific individual within a tier, or a progression system that moves an entity between
+  tiers over time, belongs to a later change (skills-equipment/progression, or whichever change
+  eventually owns character advancement).
 - No import schema, validation CLI, or loader (change 4) — this change only provides the typeclasses
   change 4 will instantiate into, plus the `race`/`subrace` attributes it will populate.
 - No guild-rank progression, quest-log population, or wallet earn/spend logic (changes 15, 16, 19) —
@@ -166,17 +188,60 @@ mixed with a computed ratio for statics. The species ceiling (e.g., human
 freshly constructed entity's default; `magic_cap` remains the counter's *maximum*, not its starting
 value — a new character starts at `magic_level` 0 and progresses toward the race's cap.
 
-**`STATIC_TIER_REGISTRY` is deliberately not read by this change's default-construction path.**
-Change 2 also added `STATIC_TIER_REGISTRY` (named power bands within each race's `static_baseline`,
-e.g. `human_adventurer`, `elf_prodigy`), but it exists to *classify* an already-known character's
-power level (import-range validation in change 4; guild-rank correlation in change 16), not to
-*generate* one from scratch for a role-unknown, freshly constructed entity. Reading it here would
-require this change to invent a policy for which tier a generic entity defaults to — precisely the
-kind of invented number this correction round is removing elsewhere. Left as an explicit scope
-boundary (see Open Questions) rather than a silent omission.
+**`STATIC_TIER_REGISTRY` is read when a caller explicitly asks for a tier — never as an implicit
+default.** Change 2 also added `STATIC_TIER_REGISTRY` (named power bands within each race's
+`static_baseline`, e.g. `human_adventurer`, `elf_prodigy`), which is a genuine gap-closer: without
+it, every entity this change constructs sits at its species floor forever, which makes the registry
+decorative until some far-later change reads it, and leaves change 9 (`dice-combat`) with no way to
+construct a mid-tier opponent to write combat tests against. `build_initial_traits()` therefore
+takes an optional `tier` parameter (see below) — when omitted, behavior is unchanged (species
+floor); when supplied, the named tier's band supplies the static values instead. This is still a
+direct lore read, not an invented default: the caller names the tier, `STATIC_TIER_REGISTRY`
+supplies the number, and no policy for "which tier does a role-unknown entity get" is invented
+anywhere in this module.
+
+```python
+def build_initial_traits(
+    race_key: str,
+    subrace_key: str | None = None,
+    tier: str | None = None,
+) -> dict[str, int]:
+    """Order: (1) race baseline OR named tier band, (2) subrace
+    static_modifiers, (3) subrace vital_overrides. See below for how `tier`
+    substitutes into step 1, and D-5 for steps 2-3."""
+    race = RACE_REGISTRY[race_key]
+    values = race_floor(race)                                # (1) race baseline
+
+    if tier is not None:
+        static_tier = STATIC_TIER_REGISTRY[tier]              # KeyError if tier doesn't exist
+        if static_tier.race_key != race_key:
+            raise ValueError(
+                f"tier {tier!r} belongs to race {static_tier.race_key!r}, not {race_key!r}"
+            )
+        tier_floor = static_tier.band[0]
+        values["atk_phys"] = tier_floor
+        values["agility"] = tier_floor
+        values["defense"] = tier_floor
+
+    # ... steps (2)-(3), unchanged from D-5 below, follow here.
+    return values
+```
+
+`tier` only ever replaces the *static* three axes' starting point (`atk_phys`/`agility`/`defense`)
+— `hp`/`mp`/`sp`/`magic_level` still come from `race_floor()` unconditionally, since
+`STATIC_TIER_REGISTRY` (per its own name and change 2's D-2c) is a static-combat-stat concept only,
+with no vital or magic dimension. **Cross-race requests fail loudly, not silently**: every
+`StaticTier` carries its own `race_key` (change 2's D-2c), so asking for `human_swordmaster` on an
+elf raises a `ValueError` naming the mismatch, rather than either ignoring the request or returning
+a human-scale value on an elf entity. A test (task 6.8) asserts this raises. No randomization, stat
+point allocation, level-up curve, or per-individual variance is introduced — a caller asks for one
+named tier and gets one deterministic value (the tier band's floor), the same category of
+determinism `race_floor()` already provides; anything richer (rolling a specific individual within
+a tier, level-up progression) belongs to a later change.
 
 **No hardcoded per-race number remains anywhere in `world/rules/traits.py`** — every value
-`race_floor()` produces is a direct attribute read from `RaceProfile`.
+`race_floor()` and the `tier`-substitution branch above produces is a direct attribute read from
+`RaceProfile`/`STATIC_TIER_REGISTRY`.
 
 ### D-5. `Subrace.static_modifiers` and `Subrace.vital_overrides` apply in a fixed, tested order:
 race baseline → `static_modifiers` → `vital_overrides`.
@@ -190,14 +255,10 @@ race baseline, while `vital_overrides` is an *absolute replacement* of one gauge
 them in the wrong order, or blending an override with the baseline instead of replacing it, would
 corrupt one or the other.
 
-```python
-def build_initial_traits(race_key: str, subrace_key: str | None = None) -> dict[str, int]:
-    """Order: (1) race baseline, (2) subrace static_modifiers, (3) subrace
-    vital_overrides. Each step reads a lore field directly; no step computes
-    a ratio between unrelated fields (see D-4's correction)."""
-    race = RACE_REGISTRY[race_key]
-    values = race_floor(race)                                    # (1) race baseline
+Continuing `build_initial_traits()` from D-4's snippet (steps (2) and (3), appended after the
+`tier`-substitution block and before `return values`):
 
+```python
     if subrace_key is not None:
         subrace = SUBRACE_REGISTRY[subrace_key]
         for axis in ("atk_phys", "agility", "defense"):          # (2) static_modifiers
@@ -211,16 +272,17 @@ def build_initial_traits(race_key: str, subrace_key: str | None = None) -> dict[
 ```
 
 **Why this order and not another**: `static_modifiers` is meaningless without a baseline to apply a
-percentage delta to, so it must come after step 1. `vital_overrides` *replaces*
-`RaceProfile.vital_baseline` outright for the named stat (change 2's D-3: `vital_overrides=None`
-means "use `RaceProfile.vital_baseline` unmodified") — it is not a delta and has nothing to do with
-`static_modifiers`' axes (`atk_phys`/`agility`/`defense` vs. `mp`), so its position relative to step
-2 does not change the arithmetic result, but it is placed last so the function reads as one
-direction — baseline, then adjust the static axes, then apply any full override — with no step
-depending on a later one. A test (task 6.4) constructs a `foxkin` entity and asserts the final `mp`
-gauge max is exactly `50` (the override's floor), not a value derived from `vital_baseline.mp[0]`
-(`30`) or blended with it — proving the override wins outright rather than being averaged with the
-baseline.
+percentage delta to, so it must come after step 1 (which is now "race floor, optionally overridden
+by a named tier's floor" per D-4, but is still resolved before any subrace adjustment is applied).
+`vital_overrides` *replaces* `RaceProfile.vital_baseline` outright for the named stat (change 2's
+D-3: `vital_overrides=None` means "use `RaceProfile.vital_baseline` unmodified") — it is not a delta
+and has nothing to do with `static_modifiers`' axes (`atk_phys`/`agility`/`defense` vs. `mp`), so its
+position relative to step 2 does not change the arithmetic result, but it is placed last so the
+function reads as one direction — baseline (or tier), then adjust the static axes, then apply any
+full override — with no step depending on a later one. A test (task 6.5) constructs a `foxkin`
+entity and asserts the final `mp` gauge max is exactly `50` (the override's floor), not a value
+derived from `vital_baseline.mp[0]` (`30`) or blended with it — proving the override wins outright
+rather than being averaged with the baseline.
 
 ### D-6. Monster trait baselines read `MonsterTier.static_band` and `.hp_band` directly — no
 derived multiplier.
@@ -233,24 +295,49 @@ from `world_info.md`'s own guild-rank correspondence (F-E inside `human_adventur
 is removed entirely; this change reads the two bands directly:
 
 ```python
-def build_initial_traits_for_monster_tier(tier_key: str) -> dict[str, int]:
+def _resolve_band_position(band: tuple[int, int | None], position: str) -> int:
+    """Deterministic position within a closed band -- no distribution, no
+    randomness. `position` is one of "floor" / "mid" / "ceiling"."""
+    floor, ceiling = band
+    if position == "floor":
+        return floor
+    if ceiling is None:
+        raise ValueError(f"position {position!r} requires a closed band; {band!r} is open-ended")
+    if position == "ceiling":
+        return ceiling
+    if position == "mid":
+        return (floor + ceiling) // 2
+    raise ValueError(f"unknown position {position!r}")
+
+def build_initial_traits_for_monster_tier(tier_key: str, position: str = "floor") -> dict[str, int]:
     """Reads MonsterTier's own static_band/hp_band directly -- no ladder,
-    no formula. Raises KeyError if tier_key doesn't resolve in
-    MONSTER_TIER_REGISTRY, so a Monster can never be constructed with a
-    silently-defaulted trait scale."""
+    no formula. `position` selects where within the tier's band to land
+    ("floor" default, "mid", or "ceiling") -- still a single deterministic
+    value per call, not a distribution. Raises KeyError if tier_key doesn't
+    resolve in MONSTER_TIER_REGISTRY, so a Monster can never be constructed
+    with a silently-defaulted trait scale."""
     tier = MONSTER_TIER_REGISTRY[tier_key]
+    static_value_getter = lambda band: _resolve_band_position(band, position)
     return {
-        "hp": tier.hp_band[0],
+        "hp": _resolve_band_position(tier.hp_band, position),
         "mp": 0,   # world_info.md documents no monster MP/SP band (change 2's
         "sp": 0,   # own Non-Goals: "MonsterTier carries exactly the two numeric
                    # bands world_info.md specifies -- physical stats, HP"); 0 is
                    # the non-inventing default, not a fabricated number
-        "atk_phys": tier.static_band.atk_phys[0],
-        "agility": tier.static_band.agility[0],
-        "defense": tier.static_band.defense[0],
+        "atk_phys": static_value_getter(tier.static_band.atk_phys),
+        "agility": static_value_getter(tier.static_band.agility),
+        "defense": static_value_getter(tier.static_band.defense),
         "magic_level": 0,
     }
 ```
+
+Every one of change 2's four `MonsterTier` bands (`hp_band` and all three `static_band` axes) is
+fully closed (no `None` ceiling), so `position="mid"`/`"ceiling"` always resolves in practice today;
+`_resolve_band_position()` still guards the open-ended case for robustness rather than assuming it
+can never happen. `position` is a caller-chosen discrete selector, not a random roll or a stat-point
+budget — change 9 (`dice-combat`) can now construct, say, a `mid`-tier monster at `position="mid"`
+to write a repeatable combat test against, without this change inventing anything beyond "which of
+three fixed points in an already-documented band."
 
 `magic_level`'s counter *maximum* for a `Monster` is likewise `0` rather than reading any race's
 `magic_cap`, which doesn't apply to monsters — consistent with change 2's own scope boundary that
@@ -281,7 +368,7 @@ at resolution time by whichever module computes effective combat power (change 5
 resolution and/or change 9's combat math), reading `entity.traits.<key>.value` as an input and
 producing a separate, transient effective value for that one calculation.
 
-This change adds a regression test (task 6.6) asserting that `build_initial_traits()` /
+This change adds a regression test (tasks 6.3 and 7.5) asserting that `build_initial_traits()` /
 `build_initial_traits_for_monster_tier()` never return a static-trait value outside the exact
 `StaticBand`/`static_band` range for the race/tier being constructed — a value in the tens-of-
 thousands range (i.e., a skill multiplier accidentally baked in) fails this test immediately, since
@@ -420,14 +507,19 @@ that its owning change hasn't designed yet.
   outside that band and fail immediately.
 - **[Risk] Applying `Subrace.static_modifiers` before the race baseline exists, or blending
   `vital_overrides` instead of replacing, would silently corrupt subrace-adjusted values.** →
-  Mitigation: D-5 fixes and documents the exact order, and task 6.4 asserts the `foxkin` MP override
+  Mitigation: D-5 fixes and documents the exact order, and task 6.5 asserts the `foxkin` MP override
   resolves to exactly `50` (the override's floor), not a value blended with `vital_baseline.mp[0]`
   (`30`).
 - **[Risk] A future edit could store a skill-multiplied "effective" value directly into
   `entity.traits`, reintroducing the `88000`-instead-of-`88` error this correction fixed.** →
-  Mitigation: D-7's range-check regression test (task 6.6) asserts every constructed static trait
-  value stays inside its race's/tier's documented band; an accidentally-multiplied value (three
-  orders of magnitude larger) fails immediately.
+  Mitigation: D-7's range-check regression test (tasks 6.3 and 7.5) asserts every constructed static
+  trait value stays inside its race's/tier's documented band; an accidentally-multiplied value
+  (three orders of magnitude larger) fails immediately.
+- **[Risk] A caller could request a `STATIC_TIER_REGISTRY` tier that belongs to a different race
+  than the entity being constructed (e.g. `human_swordmaster` on an elf), silently producing a
+  human-scale value on a race it was never documented for.** → Mitigation: `build_initial_traits()`
+  checks `StaticTier.race_key` against the requested `race_key` and raises `ValueError` on mismatch
+  (D-4); task 6.8 asserts this raises rather than silently returning a value.
 - **[Risk] The `DefaultCharacter` base-class assumption (D-1) could be wrong if Evennia 6.1.0's
   `DefaultCharacter` carries player-puppet-only behavior that misbehaves for `NPC`/`Monster`
   instances that are never puppeted.** → Mitigation: task list includes an explicit verification
@@ -463,14 +555,6 @@ and `MonsterTier`'s current, corrected shape importable) and before changes 4–
   persisting *imported* fields verbatim; `relations` is plausibly `npc-dialogue`'s (change 19), since
   its `adjust_relation` intent (§7.4) is the first named consumer. Both are left as unassigned seams
   in D-10 rather than this change asserting an ownership design doc §11 doesn't state.
-- **Should a freshly constructed `PlayerCharacter` default to a `STATIC_TIER_REGISTRY` tier (e.g.
-  `human_adventurer`) instead of the species-wide floor (D-4), since the floor formally includes
-  non-combatants?** Left as a deliberate scope boundary in D-4 for this change (defaulting to a
-  specific tier would require inventing a "which tier does a role-unknown entity start at" policy),
-  but flagged here for whoever proposes change 4 — the import loader may want to apply a
-  `STATIC_TIER_REGISTRY` band as a *validation* range rather than a construction default, which is a
-  different and already-anticipated use of that registry (§5.3's "stats fall inside the race's
-  plausible band → Warn").
 - **Exact `TraitHandler.add()` call shape** (keyword names for gauge rate, counter bounds, etc.) is
   left to the implementer to confirm against the installed Evennia 6.1.0 `evennia.contrib.rpg.traits`
   source, consistent with the verification discipline changes 1 and 2 already established — design

@@ -104,6 +104,39 @@ never blend or average with it.
 - **THEN** every trait's initial value equals the plain elf race-baseline value, identical to an
   elf entity constructed with no subrace at all
 
+### Requirement: A caller may name a STATIC_TIER_REGISTRY tier to land inside a specific power band instead of the species floor
+`world/rules/traits.py`'s trait-construction function SHALL accept an optional `tier` argument
+naming a key in `world.lore.races.STATIC_TIER_REGISTRY`. When `tier` is omitted, construction SHALL
+behave exactly as it does with no `tier` support (species floor). When `tier` is supplied, the
+resulting `atk_phys`/`agility`/`defense` bases SHALL be read from that tier's own `.band` (its floor
+value) rather than from `RaceProfile.static_baseline`'s species floor; `hp`/`mp`/`sp`/`magic_level`
+SHALL remain driven by `RaceProfile.vital_baseline`/`magic_cap` regardless of `tier`, since
+`STATIC_TIER_REGISTRY` carries no vital or magic dimension. This mechanism SHALL introduce no
+randomization, stat-point allocation, or level-up curve — one named tier always produces one
+deterministic value.
+
+#### Scenario: A named tier places static traits inside that tier's own band
+- **WHEN** a human `PlayerCharacter` is constructed with `tier="human_swordmaster"`
+  (`STATIC_TIER_REGISTRY["human_swordmaster"].band == (18, 22)`)
+- **THEN** `entity.traits.atk_phys`, `agility`, and `defense` bases each fall within `18`-`22`
+
+#### Scenario: A different named tier on the same race places static traits inside its own, different band
+- **WHEN** a human `PlayerCharacter` is constructed with `tier="human_commoner"`
+  (`STATIC_TIER_REGISTRY["human_commoner"].band == (1, 5)`)
+- **THEN** `entity.traits.atk_phys`, `agility`, and `defense` bases each fall within `1`-`5`, not
+  `18`-`22`
+
+#### Scenario: Requesting a tier that belongs to a different race fails loudly
+- **WHEN** an elf `PlayerCharacter` is constructed with `tier="human_swordmaster"` (a tier whose
+  `race_key` is `"human"`, not `"elf"`)
+- **THEN** construction raises an error rather than silently returning a human-scale value on the
+  elf entity or silently falling back to the elf species floor
+
+#### Scenario: Omitting tier reproduces the unchanged species-floor behavior
+- **WHEN** a `PlayerCharacter` or `NPC` is constructed with no `tier` argument
+- **THEN** its static trait bases equal `RaceProfile.static_baseline`'s floor values, identical to
+  construction before this tier-aware mechanism existed
+
 ### Requirement: Monster trait baselines read MonsterTier.static_band and hp_band directly, never a derived multiplier
 `world/rules/traits.py` SHALL derive a `Monster`'s initial `atk_phys`/`agility`/`defense` static
 bases from its `threat_tier`'s `MonsterTier.static_band`, and its initial `hp` gauge maximum from
@@ -137,6 +170,33 @@ band.
 - **THEN** `entity.traits.mp` and `entity.traits.sp` maxima are `0` and `entity.traits.magic_level`'s
   maximum is `0`, since `MonsterTier` documents no numeric MP/SP/magic band and this change does not
   invent one
+
+### Requirement: A caller may select a deterministic position within a Monster's tier band instead of always landing at the floor
+`world/rules/traits.py`'s monster trait-construction function SHALL accept an optional `position`
+argument (`"floor"`, `"mid"`, or `"ceiling"`; default `"floor"`), resolving each of
+`MonsterTier.hp_band` and `MonsterTier.static_band`'s three axes to the corresponding point within
+that band. This mechanism SHALL introduce no randomization or distribution — one named position
+always produces one deterministic value per band, and requesting `"mid"` or `"ceiling"` on an
+open-ended band (`None` ceiling) SHALL fail loudly rather than silently substituting a value.
+
+#### Scenario: The default position reproduces the unchanged floor behavior
+- **WHEN** a `Monster` is constructed with no `position` argument
+- **THEN** its `hp` maximum and static trait bases equal the tier's band floors, identical to
+  construction before this mechanism existed
+
+#### Scenario: A mid position lands strictly between the floor and ceiling
+- **WHEN** a `Monster` with `threat_tier="mid"` is constructed with `position="mid"`
+- **THEN** its `hp` maximum equals `MONSTER_TIER_REGISTRY["mid"].hp_band`'s floor-and-ceiling
+  midpoint, strictly greater than the tier's floor and strictly less than its ceiling
+
+#### Scenario: A ceiling position lands exactly at the tier's documented ceiling
+- **WHEN** a `Monster` with `threat_tier="mid"` is constructed with `position="ceiling"`
+- **THEN** its `hp` maximum equals `MONSTER_TIER_REGISTRY["mid"].hp_band[1]` exactly
+
+#### Scenario: An unrecognized position fails loudly
+- **WHEN** a `Monster` is constructed with `position="random"` (not one of `"floor"`/`"mid"`/
+  `"ceiling"`)
+- **THEN** construction raises an error rather than silently defaulting to a value
 
 ### Requirement: guild_merit starts at zero with no upper bound
 `world/rules/traits.py` SHALL initialize every `LivingEntity`'s `guild_merit` counter at `0` with

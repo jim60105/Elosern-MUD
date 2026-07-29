@@ -33,38 +33,58 @@
       starting value). No formula, ratio, or hardcoded per-race number — every value is a direct
       attribute read from `RaceProfile`. Import `RaceProfile`/`RACE_REGISTRY` from
       `world.lore.races`.
-- [ ] 3.2 Define `build_initial_traits(race_key: str, subrace_key: str | None = None) -> dict[str,
-      int]` per design.md D-5: starts from `race_floor(RACE_REGISTRY[race_key])`; if `subrace_key`
-      is given, applies `SUBRACE_REGISTRY[subrace_key].static_modifiers` as fractional deltas to
-      `atk_phys`/`agility`/`defense` (`value = round(value * (1 + delta))`), then applies
-      `SUBRACE_REGISTRY[subrace_key].vital_overrides` (if any) as absolute band-floor replacements
-      — in that exact order. Import `SUBRACE_REGISTRY`/`StatModifiers` from `world.lore.races`.
-- [ ] 3.3 Define `initial_trait_config(race_key: str, subrace_key: str | None = None) -> dict[str,
-      dict]` that wraps `build_initial_traits()`'s output into the kwargs `TraitHandler.add()` needs
-      per trait type (gauge max + regen rate for hp/mp/sp; static base + mod=0 for
-      atk_phys/agility/defense; counter base + max for magic_level/guild_merit). Confirm the exact
-      `TraitHandler.add()` keyword names against the installed Evennia 6.1.0
-      `evennia.contrib.rpg.traits` source before wiring this up (see design.md Open Questions).
+- [ ] 3.2 Define `build_initial_traits(race_key: str, subrace_key: str | None = None, tier: str |
+      None = None) -> dict[str, int]` per design.md D-4/D-5: starts from
+      `race_floor(RACE_REGISTRY[race_key])`; if `tier` is given, looks up
+      `STATIC_TIER_REGISTRY[tier]`, raises `ValueError` if `.race_key` does not match `race_key`
+      (see task 3.2a), and otherwise overwrites the `atk_phys`/`agility`/`defense` entries with the
+      tier's `.band[0]` (floor) — `hp`/`mp`/`sp`/`magic_level` are unaffected by `tier`; then, if
+      `subrace_key` is given, applies `SUBRACE_REGISTRY[subrace_key].static_modifiers` as fractional
+      deltas to `atk_phys`/`agility`/`defense` (`value = round(value * (1 + delta))`), then applies
+      `SUBRACE_REGISTRY[subrace_key].vital_overrides` (if any) as absolute band-floor replacements —
+      in that exact order (race/tier baseline → static_modifiers → vital_overrides). Import
+      `SUBRACE_REGISTRY`/`StatModifiers`/`STATIC_TIER_REGISTRY` from `world.lore.races`.
+- [ ] 3.2a Implement the tier/race cross-check inside task 3.2: `STATIC_TIER_REGISTRY[tier]` raises
+      `KeyError` if `tier` doesn't exist at all; if it exists but its `.race_key` differs from the
+      `race_key` argument, raise a `ValueError` naming both the requested tier and the mismatched
+      race (e.g. "tier 'human_swordmaster' belongs to race 'human', not 'elf'") — this must fail
+      loudly, never silently return a value or fall back to the species floor.
+- [ ] 3.3 Define `initial_trait_config(race_key: str, subrace_key: str | None = None, tier: str |
+      None = None) -> dict[str, dict]` that wraps `build_initial_traits()`'s output (passing `tier`
+      through unchanged) into the kwargs `TraitHandler.add()` needs per trait type (gauge max +
+      regen rate for hp/mp/sp; static base + mod=0 for atk_phys/agility/defense; counter base + max
+      for magic_level/guild_merit). Confirm the exact `TraitHandler.add()` keyword names against the
+      installed Evennia 6.1.0 `evennia.contrib.rpg.traits` source before wiring this up (see
+      design.md Open Questions).
 - [ ] 3.4 Define `GAUGE_REGEN_RATE_PCT` (a single flat placeholder regen-rate percentage of max,
       applied uniformly across gauges and races — actual tick-driven regen application is change
       11's job; this change only needs a concrete, non-`None` rate for `GaugeTrait` construction).
-- [ ] 3.5 Define `build_initial_traits_for_monster_tier(tier_key: str) -> dict[str, int]` per
-      design.md D-6: reads `MONSTER_TIER_REGISTRY[tier_key].hp_band[0]` for `hp`,
-      `.static_band.{atk_phys,agility,defense}[0]` for the three static traits, and sets `mp`, `sp`,
-      and `magic_level` to `0` (no monster MP/SP/magic band exists in `MonsterTier` — `0` is the
-      non-inventing default, not a fabricated number). Raise a clear error (e.g. the natural
-      `KeyError` from the registry lookup) if `tier_key` does not resolve in
-      `MONSTER_TIER_REGISTRY`. Then define `initial_trait_config_for_monster_tier(tier_key: str) ->
-      dict[str, dict]` wrapping it into `TraitHandler.add()` kwargs, the same way task 3.3 does for
-      races. No multiplier, ladder, or tier-ordering-derived formula anywhere in either function.
-- [ ] 3.6 Wire `PlayerCharacter`/`NPC` to a method (e.g. `apply_race_baseline()`) that reads
-      `self.race`/`self.subrace`, calls `initial_trait_config(race, subrace)`, and populates
-      `entity.traits` from it; wire `Monster` to a method (e.g. `apply_monster_tier()`) that reads
-      `self.threat_tier` and calls `initial_trait_config_for_monster_tier(threat_tier)` instead.
-      Document that the caller (change 4's import loader, or a test helper in this change) is
-      responsible for setting `race`/`subrace`/`threat_tier` and then explicitly invoking the
-      appropriate method, since `at_object_creation()` fires before any of these are necessarily
-      known for a generically spawned object (design.md D-3).
+- [ ] 3.5 Define `_resolve_band_position(band: tuple[int, int | None], position: str) -> int` per
+      design.md D-6: `"floor"` returns `band[0]`; `"ceiling"` returns `band[1]` (raising `ValueError`
+      if `band[1] is None`); `"mid"` returns `(band[0] + band[1]) // 2` (same `None`-ceiling guard);
+      any other `position` raises `ValueError`. No randomness, no distribution — one deterministic
+      value per call.
+- [ ] 3.6 Define `build_initial_traits_for_monster_tier(tier_key: str, position: str = "floor") ->
+      dict[str, int]` per design.md D-6: reads `MONSTER_TIER_REGISTRY[tier_key]`, then uses task
+      3.5's `_resolve_band_position()` against `.hp_band` for `hp` and against each of
+      `.static_band.{atk_phys,agility,defense}` for the three static traits (all at the same
+      `position`), and sets `mp`, `sp`, and `magic_level` to `0` (no monster MP/SP/magic band exists
+      in `MonsterTier` — `0` is the non-inventing default, not a fabricated number). Raise a clear
+      error (e.g. the natural `KeyError` from the registry lookup) if `tier_key` does not resolve in
+      `MONSTER_TIER_REGISTRY`. Then define `initial_trait_config_for_monster_tier(tier_key: str,
+      position: str = "floor") -> dict[str, dict]` wrapping it into `TraitHandler.add()` kwargs, the
+      same way task 3.3 does for races. No multiplier, ladder, or tier-ordering-derived formula
+      anywhere in either function.
+- [ ] 3.7 Wire `PlayerCharacter`/`NPC` to a method (e.g. `apply_race_baseline(tier: str | None =
+      None)`) that reads `self.race`/`self.subrace`, calls `initial_trait_config(race, subrace,
+      tier)`, and populates `entity.traits` from it; wire `Monster` to a method (e.g.
+      `apply_monster_tier(position: str = "floor")`) that reads `self.threat_tier` and calls
+      `initial_trait_config_for_monster_tier(threat_tier, position)` instead. Document that the
+      caller (change 4's import loader, change 9's test fixtures, or a test helper in this change)
+      is responsible for setting `race`/`subrace`/`threat_tier` and then explicitly invoking the
+      appropriate method with whatever `tier`/`position` it needs, since `at_object_creation()`
+      fires before any of these are necessarily known for a generically spawned object (design.md
+      D-3).
 
 ## 4. Disguised-stats accessor and boundary (`world/rules/traits.py`)
 
@@ -90,7 +110,7 @@
 - [ ] 5.2 Define `NPC(LivingEntity)` with `dialogue_memory` (default `None`), `schedule` (default
       `None`) — declared seams per design.md D-11, no behavior.
 - [ ] 5.3 Define `Monster(LivingEntity)` with `threat_tier` (a `MonsterTier` key, required — used by
-      task 3.5/3.6's trait derivation), `loot_table` (default `[]`), `behaviour_tree` (default
+      task 3.6's trait derivation), `loot_table` (default `[]`), `behaviour_tree` (default
       `None`) — the latter two are declared seams per design.md D-11.
 
 ## 6. Tests
@@ -130,13 +150,23 @@
       produces trait values identical to constructing with no subrace at all.
 - [ ] 6.6 `world/rules/tests/test_monster_scale.py` — a `calamity`-tier `Monster`'s `atk_phys` base
       equals `MONSTER_TIER_REGISTRY["calamity"].static_band.atk_phys[0]` and `hp` max equals
-      `MONSTER_TIER_REGISTRY["calamity"].hp_band[0]` exactly (not a multiplier-derived value); a
-      `calamity`-tier `Monster`'s stats are higher than a `low`-tier `Monster`'s, because the
-      registry's own bands differ, not because of an applied formula; `mp`/`sp`/`magic_level` are
-      all `0`; constructing a `Monster` with an unknown `threat_tier` raises rather than silently
-      defaulting.
+      `MONSTER_TIER_REGISTRY["calamity"].hp_band[0]` exactly at the default `position="floor"` (not
+      a multiplier-derived value); a `calamity`-tier `Monster`'s stats are higher than a `low`-tier
+      `Monster`'s, because the registry's own bands differ, not because of an applied formula;
+      `mp`/`sp`/`magic_level` are all `0`; constructing a `Monster` with an unknown `threat_tier`
+      raises rather than silently defaulting; `position="mid"` and `position="ceiling"` each land at
+      `_resolve_band_position()`'s documented value for `MONSTER_TIER_REGISTRY["mid"].hp_band`
+      (floor < mid < ceiling, strictly), and an unrecognized `position` string raises `ValueError`.
 - [ ] 6.7 `world/rules/tests/test_disguise_boundary.py` — the source-scanning regression test (task
       4.2) and the positive accessor test (task 4.3).
+- [ ] 6.8 `world/rules/tests/test_tier_construction.py` — per this change's tier-aware construction
+      addition: constructing a human with `tier="human_swordmaster"` lands `atk_phys`/`agility`/
+      `defense` inside `18-22` (`STATIC_TIER_REGISTRY["human_swordmaster"].band`); constructing a
+      human with `tier="human_commoner"` lands inside `1-5`
+      (`STATIC_TIER_REGISTRY["human_commoner"].band`); constructing an elf with
+      `tier="human_swordmaster"` raises `ValueError` (cross-race tier request), not a silently
+      returned value; omitting `tier` entirely still reproduces today's species-floor behaviour
+      unchanged (a regression guard against this addition altering the no-tier path).
 
 ## 7. Verification
 

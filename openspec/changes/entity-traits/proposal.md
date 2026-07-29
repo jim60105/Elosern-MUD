@@ -36,6 +36,14 @@ it in `RaceProfile`.
 - Add `race: str | None` and `subrace: str | None` attributes on `LivingEntity` (see design.md D-3)
   — the lore-registry keys `world/rules/traits.py`'s derivation functions read as input, and
   `import-contract` (change 4) is expected to populate once it validates a character record.
+- Give the trait-construction functions optional, explicit tier support so `STATIC_TIER_REGISTRY`
+  and `MonsterTier`'s bands are reachable now rather than being an unowned seam someone downstream
+  invents their own scale for (see design.md D-4/D-6): `build_initial_traits()` takes an optional
+  `tier` naming a `STATIC_TIER_REGISTRY` key (e.g. `"human_swordmaster"`), validated against the
+  entity's race and raising loudly on mismatch; `build_initial_traits_for_monster_tier()` takes an
+  optional `position` (`"floor"`/`"mid"`/`"ceiling"`) selecting where within the tier's band to
+  land. Both remain direct, deterministic lore reads — no randomization, stat-point allocation, or
+  level-up curve; omitting either argument reproduces the unchanged species/tier-floor behavior.
 - Add `typeclasses/characters.py::PlayerCharacter(LivingEntity)`, `typeclasses/npcs.py::NPC
   (LivingEntity)`, and `typeclasses/monsters.py::Monster(LivingEntity)` (a new file; §3.2's tree
   doesn't name one — see design.md D-2) with the extra fields §5.2 names, split into what this
