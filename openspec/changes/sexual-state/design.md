@@ -2,13 +2,23 @@
 
 This is roadmap item #7 (design doc §11), depending on change 6 (`buffs-rulebook`) for
 `world/rules/rulebook/schema.py`'s shared condition grammar (`Rule`, `load_rules()`,
-`evaluate_condition()`) — a handoff change 6's own design doc D-1/D-2 wrote explicitly for this
-change to consume rather than reinvent — and on change 4 (`import-contract`) for
+`evaluate_condition()`) — a handoff change 6's own design doc D-1/D-2 wrote explicitly for a future
+sexual rule table to consume rather than reinvent — and on change 4 (`import-contract`) for
 `world/lore/sexual_vocab.py`'s six frozen ordered-level tuples and the `entity.db.sexual` raw
 baseline storage convention its `loader.py` already writes to. No code exists yet for this change's
 scope: `world/rules/` currently holds `traits.py` (change 3), `rulebook/schema.py`,
-`buffs.py`/`combat_modifiers.py` and their YAML tables (change 6) — nothing named `sexual_state.py`
-or `rulebook/sexual.yaml`.
+`buffs.py`/`combat_modifiers.py` and their YAML tables (change 6) — nothing named `sexual_state.py`.
+
+**This change was split from a larger scope during review.** The first pass through this design also
+transcribed `tmp/story_settings/variable_rule.md` into `rulebook/sexual.yaml` (~25 transition rules)
+and their per-rule tests. That combined scope was flagged as too large for a one-working-day change,
+and the coordinator split it: this change (7) builds the trait type, the handler, both baseline
+construction paths, the climax-phase cycle guard, and the decay/reset callables — everything a rule
+table needs to attach to, but no rule table itself. A follow-on change, **`sexual-transition-rules`
+(7b, depending on this one)**, owns `rulebook/sexual.yaml`, `apply_event()`, and the per-rule tests.
+**D-7 below — the `variable_rule.md` ambiguity and self-contradiction analysis — is preserved
+verbatim from that first pass specifically for 7b's author to start from; it does not describe
+anything this change builds.**
 
 Two artifacts already point at this change before it exists. First, change 6's
 `combat_modifiers.yaml` carries two rules — `high_arousal_agility_accuracy_penalty` and
@@ -16,11 +26,13 @@ Two artifacts already point at this change before it exists. First, change 6's
 when `entity.sexual` is not the change-3 placeholder `None`; a dedicated test,
 `test_combat_modifiers_self_arming.py::test_high_arousal_rule_fires_once_sexual_state_exists`,
 guarded by `pytest.importorskip("world.rules.sexual_state")`, reports **skipped** until this module
-exists and `entity.sexual` is real. Second, `tmp/story_settings/variable_rule.md` is the only
-behavioral specification for how each field transitions — an update-guide written for a different,
-prose-driven system, never expressed in `when`/`then` form, containing (documented below in D-8) one
-direct self-contradiction and several race-specific asides that do not belong in a species-agnostic
-baseline rule table.
+exists and `entity.sexual` is real. **Neither of these needs a single transition rule to exist** —
+only a live, correctly-comparable `entity.sexual.arousal`/`.climax_phase` — which is exactly why this
+narrower scope is sufficient to flip that test on its own, ahead of change 7b. Second,
+`tmp/story_settings/variable_rule.md` is the only behavioral specification for how each field
+transitions; this change does not transcribe it (7b does), but D-7 carries forward the analysis of
+where it is ambiguous or self-contradictory, since that analysis was already done and should not be
+redone from scratch.
 
 Design doc §6.4 gives the field model exactly: six ordered levels (`arousal`, `wetness`, `shame`,
 `exposure`, `climax_phase`, and a `sensitivity` dict keyed by body part), a daily counter
@@ -38,30 +50,34 @@ something to subclass directly.
   (`__eq__`/`__ge__`/`__gt__`/etc.) that accepts a raw Chinese level string, another
   `OrderedLevelTrait`, or a bare ordinal — registered at `world.rules.sexual_state.OrderedLevelTrait`
   in `settings.TRAIT_CLASS_PATHS`.
-- `SexualState`, mounted as `entity.sexual` (replacing change 3's `None` placeholder), with two
+- `SexualState`, mounted as `entity.sexual` (replacing change 3's `None` placeholder), with three
   distinct construction paths: from `entity.db.sexual` (change 4's raw imported baseline) for
-  `PlayerCharacter`/`NPC`, and a monster-default baseline (普通 sensitivity, `shame` permanently
-  clamped to 無) for `Monster` entities, which are never routed through change 4's JSON import
-  pipeline.
-- `rulebook/sexual.yaml`: every event/field-triggered transition transcribed faithfully from
-  `variable_rule.md`, sharing change 6's `when` grammar unmodified, with a `then` vocabulary this
-  change defines and owns.
-- A rule-evaluation function, `apply_event(entity, event, **context)`, that mutates `SexualState`
-  fields — the one structural difference from change 6's read-only `evaluate_combat_modifiers()`,
-  per change 6's own D-1 framing ("sexual transitions ... mutate one named field").
+  `PlayerCharacter`/`NPC`; a monster-default baseline (普通 sensitivity, `shame` permanently clamped
+  to 無) for `Monster` entities, which are never routed through change 4's JSON import pipeline; and
+  a generic floor-level default for any other entity constructed with no raw baseline at all.
+- A clean, public property/method surface on `SexualState` (`.arousal`, `.wetness`, `.shame`,
+  `.exposure`, `.climax_phase`, `.climax_today`, `.virgin`, `.experience_types`, `.sensitivity`) —
+  this is the exact seam change 7b's future rule table and change 9's combat-modifier read both
+  attach to; nothing outside this change should ever need to reach into `SexualState`'s internal
+  `TraitHandler` directly.
+- `_apply_climax_phase_set()` — the sole permitted write path for `climax_phase`, enforcing that it
+  moves only along its valid cycle (未達→接近→進行中→餘韻→未達, plus 餘韻→接近), not treated as a
+  plain intensity ladder.
 - `decay_tick(entity, elapsed_seconds)` and `reset_daily_counters(entity)`, exposed as plain
   callables for change 11 (`world-clock`) to invoke at its own chosen point in the fixed settlement
   order — no ordering relative to trait regen or buff ticks is assumed or hardcoded here.
-- A mechanical rule-ID-to-test-name correspondence check, mirroring change 6's D-7 discipline
-  exactly, so a rule cannot be added to `sexual.yaml` without a matching `test_rule_<id>` function.
-- A resolved, documented answer for every place `variable_rule.md` is ambiguous or
-  self-contradictory (D-8), rather than a silent pick.
+- A preserved, documented answer for every place `tmp/story_settings/variable_rule.md` is ambiguous
+  or self-contradictory (D-7), carried forward specifically for change 7b's author rather than
+  re-derived by them from scratch.
 
 **Non-Goals:**
-- No `ActionResolver`, targeting, or effect-resolution pipeline (change 8) — `apply_event()` is the
-  seam change 8's step 5 ("effect resolution, driven by rulebook") is expected to call once a skill
-  or command narrates a stimulus; this change does not decide which player commands fire which
-  events.
+- **No `rulebook/sexual.yaml`, no transition rules, no `apply_event()`, and no per-rule tests** —
+  change 7b's entire scope. This change builds the target surface a rule table attaches to; it
+  authors no rule.
+- No `ActionResolver`, targeting, or effect-resolution pipeline (change 8) — change 7b's future
+  `apply_event()` is the seam change 8's step 5 ("effect resolution, driven by rulebook") is expected
+  to call; this change does not decide which player commands fire which events, because no events
+  exist here at all.
 - No combat resolution, to-hit formula, or damage math (change 9) — change 6's
   `evaluate_combat_modifiers()` already reads `entity.sexual.arousal`/`.climax_phase` today; this
   change only has to make that read live, not build anything in `combat_modifiers.py` itself.
@@ -70,12 +86,13 @@ something to subclass directly.
   exactly mirroring change 6's `tick_buffs(entity)` seam.
 - No new buff definitions in `buffs.yaml` and no edit to `buffs.py`'s `_apply_rate_modifier()`. Hard
   requirement 8 asks this change to "define which sexual fields those three levers apply to" — this
-  change documents the target-field naming convention a future buff would use (D-6) and reads
+  change documents the target-field naming convention a future buff would use and reads
   `entity.buffs` for any such buff at decay/apply time, but authors no concrete buff instance. The
   race-specific behaviors `variable_rule.md` describes (elf rapid post-climax recovery, elf
-  long-term arousal floor, magic-induced temporary sensitivity spikes) are exactly what such a
-  future buff would model — building them is change 8's or a skill-effect's job, not this change's
-  (see D-8, D-9).
+  long-term arousal floor, magic-induced temporary sensitivity spikes, elf rapid re-entry into
+  climax from 餘韻) are exactly what such a future buff would model — building them belongs to
+  change 6's `buffs.yaml` (a future addition to it, authored whenever a concrete skill/passive needs
+  one), not to this change or to change 7b's rule table (see D-7).
 - No SP/exhaustion coupling (`variable_rule.md`'s "climax consumes 20-30 SP" / "虛脫" status below a
   SP threshold) — that is a resource-deduction concern belonging to change 8's `ActionResolver`
   pipeline step 6, which reads `entity.traits`, not `entity.sexual`. Flagged as an integration point
@@ -83,6 +100,11 @@ something to subclass directly.
 - No exhaustive per-monster-species sexual-baseline table. Design doc §6.4 says "most monsters" sit
   at the flat default this change builds; a bestiary field carrying per-species overrides would
   require an edit to change 2's `MonsterTier`/bestiary registries, which this change does not make.
+- No narrative-only fields. `variable_rule.md`'s `身體感受`, `興奮要素`, `被注視感受`, `最後性活動`,
+  `乳房.整體狀態`, `私處.外觀`, and the top-level `基本資訊.狀態` enum are all free-text or derived
+  narrative material with no ordered level, counter, or flag shape — they do not appear in design
+  doc §6.4's field model at all, and belong to the Narrator (change 18) and `PersonaStore`, not
+  `SexualState` (see D-7).
 - No backward-compatibility, migration, or deprecation handling — the project is unreleased with
   zero users.
 
@@ -96,8 +118,8 @@ label, e.g. `0-25: "weak"`) is the closest built-in precedent design doc §4 nam
 already has a pattern for "a stored number that displays as a human label." What it does not give is
 a *bijective*, *comparable* enum: `descs` buckets a continuous numeric range into coarse labels for
 *display*, but the six vocabularies here (`AROUSAL_LEVELS` etc.) are the entire value space — there
-is no numeric range underneath, only five or four discrete named rungs, and every consumer (this
-change's own rules, change 6's `combat_modifiers.yaml`) needs to compare *by rung*, not by an
+is no numeric range underneath, only five or four discrete named rungs, and every consumer (change
+7b's future rules, change 6's `combat_modifiers.yaml`) needs to compare *by rung*, not by an
 underlying number a label happens to be drawn over.
 
 **Decision**: `OrderedLevelTrait` stores a plain integer ordinal (0-indexed into whichever tuple it
@@ -163,6 +185,8 @@ evaluating `context["arousal"] >= "高度"`, which resolves through `OrderedLeve
 as documented. This is the concrete fulfillment of the risk change 6's design doc flagged as
 "[Risk] change 7 might get wrong by passing the raw Chinese string through unordered" — it is not
 wrong, because the object handed into the context *is* the comparable value, never the bare string.
+Change 6's own `combat_modifiers.py::_build_context()` is exactly this call site, and needs no edit
+to benefit from it.
 
 **Registration**: added to `settings.TRAIT_CLASS_PATHS` (wherever change 1's project skeleton put
 it, likely `server/conf/settings.py`) as `world.rules.sexual_state.OrderedLevelTrait` — the identical
@@ -180,8 +204,8 @@ where the domain model wants exactly one of five named states, never a sixth. A 
 subclass with `levels` as its defining parameter states this domain constraint directly instead of
 gluing a display convention onto a numeric-range primitive that does not otherwise fit.
 
-### D-2. `SexualState` mounts a second, private `TraitHandler` — distinct from `entity.traits` —
-over the fixed fields and a dynamically-keyed `sensitivity` sub-collection.
+### D-2. `SexualState` mounts a second, private `TraitHandler` — distinct from `entity.traits` — and
+exposes every field through a clean public property surface.
 
 ```python
 class SexualState:
@@ -189,25 +213,71 @@ class SexualState:
     3's None placeholder. entity.db.sexual stays the raw imported baseline
     (change 4); this class is the live handler built from it, never confused
     with the bare name -- the exact convention corrected across changes 4/5
-    that must not regress here (hard requirement 3)."""
+    that must not regress here (hard requirement 3).
+
+    Public surface -- the ONLY thing change 7b's future rule table and
+    change 9's combat-modifier read are expected to touch. Nothing outside
+    this class should ever reach into `self._traits` directly."""
 
     def __init__(self, entity):
         self._entity = entity
         self._traits = TraitHandler(entity, db_attribute_key="sexual_traits")
-        self._decay_accumulator = entity.attributes.get(
-            "sexual_decay_accumulator", default={}, category="sexual_state"
-        )
         baseline = entity.db.sexual
         if baseline is not None:
             self._build_from_baseline(baseline)                  # character path
         elif isinstance(entity, Monster):
-            self._build_from_baseline(build_monster_sexual_baseline())  # D-7
+            self._build_from_baseline(build_monster_sexual_baseline())
+            self._traits.shame.min = self._traits.shame.max = 0   # D-5's clamp
         else:
-            self._build_from_baseline(_generic_default_baseline())      # e.g. a
-                                                                          # hand-spawned
-                                                                          # NPC never
-                                                                          # routed through
-                                                                          # change 4
+            self._build_from_baseline(_generic_default_baseline())  # e.g. a
+                                                                       # hand-spawned
+                                                                       # NPC never
+                                                                       # routed through
+                                                                       # change 4
+
+    # --- public field surface ---
+    @property
+    def arousal(self) -> OrderedLevelTrait: return self._traits.arousal
+
+    @property
+    def wetness(self) -> OrderedLevelTrait: return self._traits.wetness
+
+    @property
+    def shame(self) -> OrderedLevelTrait: return self._traits.shame
+
+    @property
+    def exposure(self) -> OrderedLevelTrait: return self._traits.exposure
+
+    @property
+    def climax_phase(self) -> OrderedLevelTrait: return self._traits.climax_phase
+
+    @property
+    def climax_today(self) -> int: return self._traits.climax_today.value
+
+    @property
+    def sensitivity(self) -> "_SensitivityProxy": return self._sensitivity  # D-3
+
+    @property
+    def virgin(self) -> bool: return self._entity.attributes.get(
+        "virgin", default=True, category="sexual_state")
+
+    @virgin.setter
+    def virgin(self, value: bool) -> None:
+        if self.virgin is False:
+            return    # irreversible -- once false, every later write is a no-op,
+                       # never an exception; this is a data-integrity guard, not
+                       # a caller error
+        self._entity.attributes.add("virgin", bool(value), category="sexual_state")
+
+    @property
+    def experience_types(self) -> frozenset[str]: return self._entity.attributes.get(
+        "experience_types", default=frozenset(), category="sexual_state")
+
+    def add_experience_type(self, key: str) -> None:
+        """The only mutator for experience_types -- always a union, never a
+        replacement or a removal."""
+        self._entity.attributes.add(
+            "experience_types", self.experience_types | {key}, category="sexual_state")
 ```
 
 `self._traits` is a **second** `TraitHandler` instance bound to its own attribute
@@ -220,7 +290,15 @@ versa. `arousal`/`wetness`/`shame`/`exposure`/`climax_phase` are added at constr
 `sensitivity` is not one key but a lazily-populated sub-collection (D-3); `climax_today` is a plain
 `CounterTrait` (min 0, no max); `virgin` (`bool`) and `experience_types` (`frozenset[str]`) are
 **not** `TraitHandler` entries at all — they have no ordinal, gauge, or counter shape, and are stored
-directly as `entity.attributes` under the `sexual_state` category, next to the decay accumulator.
+directly as `entity.attributes` under the `sexual_state` category.
+
+**Why the public property surface matters for the split.** Since change 7b is a separate change with
+its own author, `SexualState`'s public contract (`.arousal`, `.wetness`, ..., `.virgin`,
+`add_experience_type()`) is the entire interface that author needs to read — they should never need
+to know `self._traits` exists, what `TraitHandler` is mounted underneath, or which attribute category
+backs `virgin`. Every property above returns exactly what change 6's `combat_modifiers.py` already
+expects (`sexual.arousal`, `sexual.climax_phase` — bare attributes, not `.level`), so no code in
+`combat_modifiers.py` needs to change once this handler exists.
 
 **Alternative considered**: reusing `entity.traits` (the same `TraitHandler` instance change 3
 mounts) for the ordered-level fields too, since it is already present on every `LivingEntity`.
@@ -248,7 +326,7 @@ class _SensitivityProxy:
     entity.db.sexual['sensitivity'], change 4's raw baseline) are seeded at
     construction; any part accessed afterward that was never seeded defaults
     to 普通 -- this is the one mechanism that gives monsters '普通 sensitivity'
-    for free (D-7) without a separate code path."""
+    for free (D-5) without a separate code path."""
 
     def __init__(self, traits: TraitHandler, entity):
         self._traits = traits
@@ -272,9 +350,10 @@ class _SensitivityProxy:
 ```
 
 Storing sensitivity keys as `sensitivity__<part>` entries on the same private `TraitHandler` (rather
-than a second handler, or a bespoke dict on `entity.db`) means `sensitivity_up_on_frequent_stimulation`
-(D-4's rule 25) is exactly as testable and exactly as bound-clampable-by-a-future-buff as any other
-ordered-level field — no special-cased storage for the one field that happens to be dict-shaped.
+than a second handler, or a bespoke dict on `entity.db`) means a future rule targeting `sensitivity`
+(change 7b's `sensitivity_up_on_frequent_stimulation`, per D-7's carried-forward analysis) is exactly
+as testable and exactly as bound-clampable-by-a-future-buff as any other ordered-level field — no
+special-cased storage for the one field that happens to be dict-shaped.
 
 **Alternative considered**: a plain `dict[str, str]` of raw level strings, converted to/from
 `OrderedLevelTrait` only at comparison time. Rejected — this would mean `sensitivity` values are
@@ -284,219 +363,18 @@ ordered-level field — no special-cased storage for the one field that happens 
 `OrderedLevelTrait` on the private handler gives that future buff the same clamp mechanism every
 other field already has.
 
-### D-4. `rulebook/sexual.yaml`: the transition table, transcribed from `variable_rule.md`, with a
-`then` vocabulary this change owns.
-
-Sharing change 6's `when` grammar unmodified — `event`, `field`+`equals`/`gte`, `field_changed`+
-`direction` (this change never needs `buff_active` in its own `when` clauses, though nothing prevents
-a future rule from using it) — and defining `then` as follows, since change 6's D-1 leaves `then`
-entirely to the owning table:
-
-| `then` key | Meaning |
-|---|---|
-| `field` | Target field name (required on every rule) |
-| `delta` | Signed int (`"+1"`, `"-1"`) or an inclusive range (`"+1..+2"`), resolved via `random.randint` at apply time |
-| `set` | Absolute value: a level name for ordered fields, `true`/`false` for `virgin` |
-| `add` | A value appended to a `frozenset`-valued field (`experience_types` only) |
-| `set_from` | Sources the absolute value from a context key supplied by the caller of `apply_event()` (used once — clothing-driven exposure) |
-| `part_from_context` | Marks that `field: sensitivity` is further keyed by `context["part"]`, since `sensitivity` is dict-valued, not scalar |
-| `irreversible` | Marks a `set` mutation as one-way; once applied, no later `then` clause (from any rule, ever) can move the field back |
-
-The full table, grouped by field (every row transcribed from a specific `variable_rule.md` bullet,
-cited inline):
-
-```yaml
-# world/rules/rulebook/sexual.yaml
-
-# --- arousal (性狀態.性喚起) ---
-- id: arousal_up_on_stimulus
-  when: { event: stimulus_applied }
-  then: { field: arousal, delta: "+1..+2" }        # 接受性刺激時提升1-2級
-
-- id: arousal_up_on_sustained_stimulus
-  when: { event: sustained_stimulus }
-  then: { field: arousal, delta: "+1" }            # 持續刺激經過合理時長後再提升1級
-
-- id: arousal_jump_on_extreme_stimulus
-  when: { event: extreme_stimulus }
-  then: { field: arousal, set: 極限 }               # 極端刺激可直接躍升至極限
-
-- id: arousal_reset_after_climax
-  when: { event: climax_ends }
-  then: { field: arousal, set: 微興奮 }             # 高潮後短暫降至微興奮
-
-# --- wetness (性狀態.私處.濕潤程度) ---
-- id: wetness_follows_arousal_increase
-  when: { field_changed: arousal, direction: up }
-  then: { field: wetness, delta: "+1" }             # 性喚起每提升1級，濕潤程度至少提升1級
-
-- id: wetness_up_on_direct_stimulus
-  when: { event: direct_stimulus_applied }
-  then: { field: wetness, delta: "+1..+2" }         # 接受直接刺激時快速提升
-
-- id: wetness_max_on_climax
-  when: { event: climax_reached }
-  then: { field: wetness, set: 泛濫 }               # 高潮時達到泛濫
-
-# --- climax_phase (性狀態.高潮狀態) — see D-5 for the cyclic-field guard ---
-- id: climax_gate
-  when: { field: arousal, equals: 極限 }
-  then: { field: climax_phase, set: 接近 }          # 性喚起達至極限時轉為接近
-
-- id: climax_progresses_on_continued_stimulus
-  when: { field: climax_phase, equals: 接近, event: stimulus_applied }
-  then: { field: climax_phase, set: 進行中 }         # 達臨界點時轉為進行中 -- D-8 ambiguity
-
-- id: climax_ends_to_afterglow
-  when: { event: climax_ends }
-  then: { field: climax_phase, set: 餘韻 }          # 高潮結束後轉為餘韻
-
-# --- climax_today (性狀態.今日高潮) ---
-- id: climax_today_increments_on_climax
-  when: { event: climax_reached }
-  then: { field: climax_today, delta: "+1" }        # 每次達到高潮時+1
-
-# --- virgin / experience_types (性狀態.處女 / 性狀態.性經驗類型) ---
-- id: virginity_once
-  when: { event: first_vaginal_penetration }
-  then: { field: virgin, set: false, irreversible: true }   # D-8: resolved contradiction
-
-- id: experience_vaginal_added
-  when: { event: first_vaginal_penetration }
-  then: { field: experience_types, add: 陰道性交 }
-
-- id: experience_masturbation_added
-  when: { event: first_masturbation_climax }
-  then: { field: experience_types, add: 自慰 }
-
-- id: experience_lesbian_added
-  when: { event: penetrative_contact_with_female }
-  then: { field: experience_types, add: 女女性愛 }
-
-- id: experience_breast_service_added
-  when: { event: breast_service_performed }
-  then: { field: experience_types, add: 乳交 }
-
-- id: experience_watched_added
-  when: { event: sexual_activity_observed }
-  then: { field: experience_types, add: 被觀看 }
-
-- id: experience_exposure_added
-  when: { event: deliberate_public_exposure }
-  then: { field: experience_types, add: 露出 }
-
-- id: experience_interspecies_added
-  when: { event: sexual_activity_with_nonhuman }
-  then: { field: experience_types, add: 異種性愛 }
-
-# --- shame (性狀態.羞恥感) ---
-- id: shame_up_on_exposure_increase
-  when: { field_changed: exposure, direction: up }
-  then: { field: shame, delta: "+1" }               # 暴露增加時提升
-
-- id: shame_up_on_public_activity
-  when: { event: public_sexual_activity }
-  then: { field: shame, delta: "+1" }               # 公開場合性活動時提升
-
-- id: shame_up_on_being_watched
-  when: { event: watched }
-  then: { field: shame, delta: "+1" }               # 被注視時提升
-
-# --- exposure (性狀態.暴露程度) ---
-- id: exposure_set_on_clothing_change
-  when: { event: clothing_changed }
-  then: { field: exposure, set_from: garment_exposure_level }  # 更換/故意調整服裝
-
-- id: exposure_up_on_clothing_damage
-  when: { event: clothing_damaged_in_combat }
-  then: { field: exposure, delta: "+1" }            # 戰鬥中服裝破損可能增加暴露
-
-# --- sensitivity (性狀態.乳房/私處.敏感度) ---
-- id: sensitivity_up_on_frequent_stimulation
-  when: { event: part_frequently_stimulated }
-  then: { field: sensitivity, part_from_context: true, delta: "+1" }  # 頻繁刺激可逐步提升
-```
-
-25 rules, one `id` each, none omitted. `habituation` (羞恥感's diminishing-returns note) and every
-race-specific aside are deliberately **not** rows in this table — see D-8/D-9.
-
-### D-5. `apply_event()`: a fixed-point evaluation loop, because `field_changed` rules depend on
-what an earlier rule in the same pass just did.
-
-```python
-def apply_event(entity, event: str, **event_context) -> list[str]:
-    """Returns the list of rule IDs that fired. Mutates entity.sexual fields
-    directly -- this is change 6's D-1 structural difference from
-    evaluate_combat_modifiers() made concrete: sexual transitions write,
-    combat modifiers only read."""
-    fired: list[str] = []
-    changed: dict[str, str] = {}          # field -> "up"/"down", this pass
-    for _ in range(_MAX_PASSES):           # small, fixed cap -- these tables
-        context = _build_context(entity, event, changed, **event_context)
-        pass_changed: dict[str, str] = {}
-        for rule in _RULES:
-            if rule.id in fired and "field_changed" not in rule.when:
-                continue    # event-triggered rules fire once per apply_event() call
-            if evaluate_condition(rule.when, context):
-                direction = _apply_then(entity, rule.then, context)
-                if direction:
-                    pass_changed[rule.then["field"]] = direction
-                fired.append(rule.id)
-        if not pass_changed:
-            break
-        changed = pass_changed
-        event = None    # subsequent passes are field_changed-driven only,
-                          # not a re-fire of the original event
-    return fired
-```
-
-`_MAX_PASSES` is a small constant (5) — every cascade `variable_rule.md` describes is at most two
-links deep (stimulus → arousal → wetness; arousal → climax_gate), so this is a defensive cap, not a
-tuned parameter. A rule that already fired once for a given `event` does not re-fire on a later pass
-of the *same* `apply_event()` call unless it is itself `field_changed`-triggered — this is what
-prevents `arousal_up_on_stimulus` from re-applying its delta a second time once `wetness_follows_
-arousal_increase` fires in pass 2.
-
-**`context` construction** mirrors change 6's `_build_context()` shape exactly, extended with this
-change's own fields:
-
-```python
-def _build_context(entity, event, changed, **event_context) -> dict:
-    sexual = entity.sexual
-    return {
-        "event": event,
-        "arousal": sexual._traits.arousal,
-        "wetness": sexual._traits.wetness,
-        "shame": sexual._traits.shame,
-        "exposure": sexual._traits.exposure,
-        "climax_phase": sexual._traits.climax_phase,
-        "climax_today": sexual._traits.climax_today.value,
-        "virgin": sexual.virgin,
-        "experience_types": sexual.experience_types,
-        "active_buffs": entity_active_buffs(entity),   # change 6's own helper, reused
-        "_changed": changed,
-        **event_context,
-    }
-```
-
-Reusing `entity_active_buffs()` (change 6, `world/rules/buffs.py`) rather than reaching into
-`entity.buffs` directly keeps this change importing change 6's public seam, not its internals — the
-same discipline change 6's own `combat_modifiers.py` already applied to itself.
-
-### D-6. `climax_phase` is a cyclic field, not a monotonic ladder — valid transitions are enforced by
-the effect interpreter, not the `when` grammar.
+### D-4. `climax_phase` is a cyclic field, not a monotonic ladder — valid transitions are enforced by
+one guarded function, not the condition grammar.
 
 `CLIMAX_PHASE_LEVELS = ("未達", "接近", "進行中", "餘韻")` is ordered for `gte`/`equals` comparison
 purposes (combat_modifiers.yaml's `climax_phase, equals: 進行中` needs exactly this), but the *valid
 transition graph* is a cycle (`未達→接近→進行中→餘韻→未達`), not "higher is always further along" —
 `餘韻`'s ordinal is the highest in the tuple, yet the correct next transition from `餘韻` is back down
-to `未達` (via decay) or, per `variable_rule.md`'s elf-specific note, directly back up to `接近`.
-Change 6's `when` grammar has no way to express "AND climax_phase is currently X" as a second,
-independent `field`-condition in the same block (a `when` dict's keys must be unique — one `field`
-key per block, combined only with `equals`/`gte`, not stacked against a second field). Rather than
-inventing a second condition kind in `schema.py` (forbidden — hard requirement 5), the guard lives
-entirely in `_apply_then()`'s own dispatch for `climax_phase`, which `then` is opaque to `schema.py`
-anyway and interpreted only here:
+to `未達` (via decay) or, per `variable_rule.md`'s elf-specific note (D-7), directly back up to
+`接近`. This change's `decay_tick()` is the first real caller of this guard (afterglow decay,
+`餘韻→未達`); change 7b's future rules are expected to route every `climax_phase` mutation through
+the same function rather than writing the trait directly, since `then` is opaque to `schema.py`
+anyway and any such interpretation belongs to this module:
 
 ```python
 _VALID_CLIMAX_TRANSITIONS = {
@@ -504,25 +382,26 @@ _VALID_CLIMAX_TRANSITIONS = {
     "接近": {"進行中", "未達"},   # 未達: arousal can fall away before climax
     "進行中": {"餘韻"},
     "餘韻": {"未達", "接近"},      # 未達: normal afterglow decay;
-                                    # 接近: elf-style rapid re-arousal (D-9) --
+                                    # 接近: elf-style rapid re-arousal (D-7) --
                                     # this change permits the transition edge;
-                                    # nothing today drives it there but decay
+                                    # nothing in this change's own scope drives
+                                    # it there except decay, which only ever
+                                    # targets 未達
 }
 
 def _apply_climax_phase_set(entity, target_level: str) -> str | None:
-    current = entity.sexual._traits.climax_phase.level
+    current = entity.sexual.climax_phase.level
     if target_level not in _VALID_CLIMAX_TRANSITIONS.get(current, set()):
-        return None   # no-op: e.g. climax_gate re-firing while already 進行中
+        return None   # no-op: e.g. an attempt to set 進行中 -> 接近 directly
                         # does not silently regress the phase
     entity.sexual._traits.climax_phase.value = CLIMAX_PHASE_LEVELS.index(target_level)
     return "cycle"
 ```
 
-This means `climax_gate` (arousal stays 極限 while some unrelated event also fires) cannot regress an
-in-progress climax back to 接近, and `climax_progresses_on_continued_stimulus` cannot fire out of
-turn from `未達` — both guarded by the same table, in one place, rather than duplicated per rule.
+This is the single enforcement point for every future `climax_phase` writer, including change 7b's
+rule table once it exists — no per-caller special-casing is duplicated.
 
-### D-7. Monster baselines: 普通 sensitivity comes free from D-3's lazy default; `shame` is the one
+### D-5. Monster baselines: 普通 sensitivity comes free from D-3's lazy default; `shame` is the one
 field this change clamps explicitly.
 
 ```python
@@ -546,10 +425,12 @@ piece that genuinely is monster-specific is the `shame` clamp: `SexualState.__in
 from the monster-default baseline (only that path, never the character path), sets `shame`'s bounds
 to `(0, 0)` via the private `TraitHandler`'s own min/max-setting API (exact call shape flagged for
 implementer verification, consistent with changes 1–6) — `shame` is permanently pinned at `無`
-because its own range has collapsed to one point, not because some rule refuses to fire. Every other
-field (`arousal`, `wetness`, `exposure`, `climax_phase`) keeps its full, unclamped range, since design
-doc §6.4 only names `shame` for the clamp — a monster can still be aroused, wet, exposed, or
-mid-climax; it simply cannot feel shame.
+because its own range has collapsed to one point, not because some rule refuses to fire (there are no
+rules in this change's scope). A test asserts that even a direct attempt to raise a monster's `shame`
+(bypassing any future rule entirely, e.g. by attempting `entity.sexual._traits.shame.value += 1` in a
+test) leaves it clamped at `0`. Every other field (`arousal`, `wetness`, `exposure`, `climax_phase`)
+keeps its full, unclamped range — a monster can still be aroused, wet, exposed, or mid-climax; it
+simply cannot feel shame.
 
 **Construction dispatch, generalized beyond "Monster vs. everything else":**
 
@@ -573,91 +454,147 @@ nothing prevents a future change from spawning an `NPC` outside the import pipel
 generic NPC, per design doc §7.2's `spawner.spawn()`); such an entity should default sensibly rather
 than crash on a missing baseline, but it is not a monster and must not get the shame clamp.
 
-### D-8. Resolving `variable_rule.md`'s ambiguities and one direct self-contradiction.
+### D-6. `decay_tick()`/`reset_daily_counters()`: plain callables, decay expressed as small
+per-field configuration rather than a rule table.
+
+Decay is clock-triggered, not condition-triggered — the same reasoning that keeps change 6's
+`buffs.yaml` out of a `when`/`then` shape applies here: "a long time with no stimulus" is not an
+event `apply_event()` receives, it is the absence of one, measured by elapsed clock time. **Decision**:
+a small `DECAY_CONFIG` mapping, not a YAML rule table, read by one plain callable:
+
+```python
+DECAY_CONFIG = {
+    "arousal": {"interval_seconds": 1800, "floor": "平靜"},   # variable_rule.md:
+    "wetness": {"interval_seconds": 900, "floor": "乾燥"},     # "長期無刺激可能降低
+    "shame": {"interval_seconds": 1800, "floor": "無"},        # 1級" / "未受刺激時
+    "climax_phase": {"interval_seconds": 300,                  # 逐漸降低" / "獨自
+                      "floor": "未達", "only_from": "餘韻"},   # 在私密場所時緩慢
+                                                                 # 降低" -- see D-7
+                                                                 # for the race-
+                                                                 # specific asides
+                                                                 # this table
+                                                                 # deliberately
+                                                                 # excludes
+}
+
+def decay_tick(entity, elapsed_seconds: int) -> None:
+    """Invokable directly in a test, no WorldClock present -- mirrors change
+    6's tick_buffs(entity) seam exactly. Accumulates elapsed_seconds per
+    configured field in entity.attributes (category "sexual_state"); when a
+    field's accumulator crosses its configured interval, decrements that
+    field by one level toward its floor, resetting the accumulator.
+    climax_phase's decrement (afterglow, 餘韻 -> 未達 only) routes through
+    _apply_climax_phase_set() (D-4) -- this function never writes
+    climax_phase's value directly."""
+    ...
+
+def reset_daily_counters(entity) -> None:
+    """Sets climax_today to 0. No other field changes. Change 11 is expected
+    to call this once per in-game day rollover, per design doc S6.5's
+    'daily resets (climax_today)' settlement step -- this function invents
+    no ordering relative to any other settlement step."""
+    entity.sexual._traits.climax_today.value = 0
+```
+
+`sensitivity` and `exposure` have no natural decay per `variable_rule.md` (sensitivity only rises,
+via stimulation or a future magic buff; exposure only changes via clothing events) and are therefore
+absent from `DECAY_CONFIG` — not an oversight, a direct transcription of the source's own asymmetry.
+
+**Buff-lever seam, documented but not filled.** Hard requirement 8 asks this change to "define which
+sexual fields those three levers apply to" without authoring a buff. `decay_tick()` is the one
+function where a future buff's `decay` lever would apply (skipping or slowing a field's interval
+accumulation) and where a future buff's `bounds` lever would apply (a temporarily raised floor, e.g.
+elf sensitivity rarely dropping below 微興奮). Neither is implemented here: `decay_tick()` documents,
+in its own docstring, the target-field naming convention such a buff would need
+(`field key` = one of `DECAY_CONFIG`'s keys, or a `sensitivity__<part>` key), but reads no buff state
+today, since no concrete buff exists yet in `buffs.yaml` targeting a sexual field. See D-7 for exactly
+which `variable_rule.md` behaviors this seam is for.
+
+### D-7. `variable_rule.md`'s ambiguities and self-contradiction — **carried forward for change 7b's
+author**, not re-derived by them from scratch.
+
+This section is preserved from the original, larger-scoped pass through this design specifically
+because the coordinator asked that this analysis not be lost in the scope split. **Nothing in this
+section describes something this change (7) builds** — it exists here as the starting point for
+whoever writes change 7b's `design.md` and `rulebook/sexual.yaml`.
 
 **Self-contradiction (resolved): the virginity trigger.** §性狀態.處女 states the "唯一更新條件"
-(sole update condition) is "首次**同種異性**陰道插入" (first *same-species, opposite-sex* vaginal
+(sole update condition) is "首次**同種異性**陰道插入" (first *same-species, opposite-sex*
 penetration), but §性狀態.性經驗類型's own 陰道性交 entry says simply "首次被插入後添加（同時處女變
 false）" (added after first penetration — full stop — simultaneously flips virgin to false), with no
 species/gender qualifier at all. These cannot both be the literal, exact trigger: either virginity
 requires a same-species-opposite-sex partner specifically, or any first penetration counts and the
-`性經驗類型` section's plainer wording is the accurate one. **Decision**: use the unqualified trigger
-— `first_vaginal_penetration`, any partner — for three reasons: (1) design doc §6.4 itself gives the
-worked example as `event: first_vaginal_penetration` with no species/gender qualifier, and this
-change transcribes into that exact grammar; (2) `異種性愛` (interspecies) is its own, separate
+`性經驗類型` section's plainer wording is the accurate one. **Recommended resolution, carried
+forward**: use the unqualified trigger — `first_vaginal_penetration`, any partner — for three
+reasons: (1) design doc §6.4 itself gives the worked example as `event: first_vaginal_penetration`
+with no species/gender qualifier; (2) `異種性愛` (interspecies) is its own, separate
 `experience_types` entry triggered by a *different* event (`sexual_activity_with_nonhuman`), which
 would be structurally redundant with a species-qualified virginity trigger — the vocabulary already
 has a dedicated place for "this was with a non-human partner," so virginity does not need to encode
 species a second time; (3) the narrower reading would leave virginity never flipping at all for an
-interspecies or a same-sex first encounter, which contradicts `性經驗類型`'s own unconditional
-"同時處女變 false." `virginity_once` and `experience_vaginal_added` therefore share the identical
-`when: { event: first_vaginal_penetration }` clause.
+interspecies or a same-sex first encounter, which contradicts `性經驗類型`'s own unconditional "同時
+處女變 false." Change 7b's `virginity_once` and `experience_vaginal_added` rules should therefore
+share the identical `when: { event: first_vaginal_penetration }` clause. This change's own
+`SexualState.virgin` setter (D-2) is deliberately event-agnostic — it just enforces one-way
+irreversibility — so this resolution costs 7b nothing structural, only the choice of which single
+event name to wire both rules to.
 
 **Ambiguity (resolved): what "達臨界點" (reaching the critical point) means for 接近→進行中.**
 `variable_rule.md` never defines this numerically or behaviorally — no duration, no roll, no
-secondary threshold. **Decision**: interpret it as "stimulus continues while already at 接近" —
-`climax_progresses_on_continued_stimulus`'s `when: { field: climax_phase, equals: 接近, event:
+secondary threshold. **Recommended resolution, carried forward**: interpret it as "stimulus continues
+while already at 接近" — a rule with `when: { field: climax_phase, equals: 接近, event:
 stimulus_applied }`. This is the smallest reading consistent with the surrounding prose (which
 otherwise only ever gates transitions on stimulus events or field thresholds, never on elapsed
-real-time within a single event) and requires no new condition kind. Flagged explicitly here as an
+real-time within a single event) and requires no new condition kind. Flagged explicitly as an
 assumption, not a fact `variable_rule.md` states.
 
 **Ambiguity (resolved): "濕潤程度至少提升1級" — "at least" one level.** The word "至少" (at least)
 suggests wetness could rise by more than one level per arousal increase under some circumstances
-`variable_rule.md` never specifies. **Decision**: the baseline rule (`wetness_follows_arousal_
-increase`) applies exactly `+1`; the "more than one" case is covered by the separate, faster
-`wetness_up_on_direct_stimulus` rule (`+1..+2`) firing independently when direct stimulus is also
-present. Two rules, not one rule with an unbounded delta, keeps each individually testable and
-matches the text's own separation of "喚起提升時" (arousal rises) from "接受直接刺激時" (receiving
-direct stimulus) as two distinct triggers.
+`variable_rule.md` never specifies. **Recommended resolution, carried forward**: a baseline rule
+(arousal rising → wetness `+1`) plus a separate, faster rule (direct stimulus → wetness `+1..+2`)
+firing independently when direct stimulus is also present. Two rules, not one rule with an unbounded
+delta, keeps each individually testable and matches the text's own separation of "喚起提升時" (arousal
+rises) from "接受直接刺激時" (receiving direct stimulus) as two distinct triggers.
 
-**Explicitly out of scope, not an ambiguity to resolve but a scope boundary: every race-specific
+**Explicitly out of scope for both this change and change 7b's rule table: every race-specific
 aside.** `variable_rule.md` repeatedly qualifies a rule with "因精靈體質" / "精靈族天生" / "精靈族具備
 多重高潮體質" (elf constitution / elves are innately.../elves have a multi-orgasm constitution) —
 rapid post-climax arousal recovery, a floor that rarely drops below 微興奮, innately elevated
-sensitivity, and rapid re-entry into climax from 餘韻. None of these become rows in `sexual.yaml`:
-the table is species-agnostic by design (design doc §6.4 never scopes any field to one race), and
-every one of these asides is expressible as a future buff modifying rate-of-change, clamped bounds,
-or decay rate on a specific entity — exactly hard requirement 8's three levers, and exactly the
-seam this change documents (Non-Goals) but does not fill with a concrete buff instance. Building an
-"elf sensitivity" buff is change 8's or a skill-effect's job once a concrete skill/passive needs one;
-authoring it here would mean editing `buffs.yaml` (change 6's file) for a mechanic no roadmap item
-has asked this change to build.
+sensitivity, and rapid re-entry into climax from 餘韻. **None of these should become rows in change
+7b's `sexual.yaml`**: the table should stay species-agnostic (design doc §6.4 never scopes any field
+to one race), and every one of these asides is expressible as a future buff modifying rate-of-change,
+clamped bounds, or decay rate on a specific entity — exactly hard requirement 8's three levers, and
+exactly the seam this change documents (D-6, Non-Goals) but does not fill. Building an "elf
+sensitivity" or "elf rapid recovery" buff is **change 6's `buffs.yaml`'s** job (a future addition to
+it), authored whenever a concrete skill/passive needs one — not this change's, and not change 7b's
+rule table's, even though 7b's rules are the eventual trigger for such a buff's effect.
 
-**Explicitly out of scope: every purely descriptive field.** `身體感受`, `興奮要素`, `被注視感受`,
-`乳房.整體狀態`, `私處.外觀`, and `最後性活動` are all free-text narrative fields with no ordered
-levels, counters, or flags — they do not appear anywhere in design doc §6.4's field model. These are
-prose-generation material for the Narrator (change 18) or `PersonaStore`-adjacent storage, not
-`SexualState` fields; `basic_info.狀態` (a top-level 正常/性興奮/戰鬥中/... status enum in
-`variable_rule.md`) is likewise not part of §6.4's model and is left unbuilt here — it looks like a
-derived narrative label (combining combat state, rest state, and sexual state) rather than a new
-mechanical field this change owns.
+**Explicitly out of scope for both this change and change 7b: every purely descriptive field.**
+`身體感受`, `興奮要素`, `被注視感受`, `乳房.整體狀態`, `私處.外觀`, and `最後性活動` are all free-text
+narrative fields with no ordered levels, counters, or flags — they do not appear anywhere in design
+doc §6.4's field model. These are prose-generation material for the Narrator (change 18) or
+`PersonaStore`-adjacent storage, not `SexualState` fields; `basic_info.狀態` (a top-level
+正常/性興奮/戰鬥中/... status enum in `variable_rule.md`) is likewise not part of §6.4's model and
+should not be built by 7b either — it looks like a derived narrative label (combining combat state,
+rest state, and sexual state) rather than a new mechanical field anyone in this design's chain owns.
 
-### D-9. Rule-ID-to-test correspondence — mirrors change 6's D-7 exactly, extended to `sexual.yaml`.
-
-`world/rules/tests/test_sexual_rule_id_test_correspondence.py::test_every_sexual_rule_has_a_test`
-walks `sexual.yaml`'s loaded `Rule.id` values (via `load_rules()`, the identical function change 6's
-own correspondence check uses) and asserts a `test_rule_<id>` function exists in
-`test_sexual_state.py` via `inspect.getmembers`. This makes "every rule has an ID and every ID has a
-unit test" (design doc §10, hard requirement 4) a property CI checks the moment a 26th row is added
-to `sexual.yaml` without a matching test, not a discipline that depends on reviewer attention — the
-identical mechanism, not a parallel reimplementation, as change 6's own
-`test_rule_id_test_correspondence.py`.
-
-### D-10. Flipping change 6's self-arming test: the three things that must all be true.
+### D-8. Flipping change 6's self-arming test: the three things that must all be true, none of which
+require a transition rule.
 
 `test_combat_modifiers_self_arming.py::test_high_arousal_rule_fires_once_sexual_state_exists` is
 guarded by `pytest.importorskip("world.rules.sexual_state")` and asserts, against a *real*
 `entity.sexual` at or above `高度` arousal, that `evaluate_combat_modifiers()` returns
 `high_arousal_agility_accuracy_penalty`'s bundle. Three things this change delivers must all hold for
-it to flip from skipped to passed:
+it to flip from skipped to passed — **notably, none of them is "a transition rule fired"**:
 
 1. `world.rules.sexual_state` must exist and import cleanly (trivially true once this change lands).
 2. `entity.sexual` must be a live object, not `None` — requires the `typeclasses/entities.py` mount
    edit (D-2) replacing change 3's placeholder.
 3. `entity.sexual.arousal >= "高度"` must evaluate correctly through Python's own `>=` operator with
    no special-casing on change 6's side — requires D-1's `OrderedLevelTrait.__ge__` contract to hold
-   exactly as documented.
+   exactly as documented. The test constructs the entity with `arousal` set directly (via the
+   trait's own `.value` setter, not via any rule), since no rule exists in this change's scope to
+   drive it there narratively.
 
 A verification task runs this specific test in isolation both before (skipped) and after
 (passed) the full change lands, mirroring change 6's own task 6.5 discipline for the identical test
@@ -665,36 +602,28 @@ in its pre-change-7 state.
 
 ## Risks / Trade-offs
 
-- **[Risk] 25 individual rule IDs, each requiring its own dedicated unit test plus the mechanical
-  correspondence check, is a lot of granular test surface for a one-day change.** → Accepted; this is
-  inherent to change 6's shared grammar having no OR-combinator across distinct event names (only
-  implicit AND within one `when` block) — merging, say, the three `shame_up_on_*` rules into one
-  would require inventing a second condition-combination kind in `schema.py`, which hard requirement
-  5 forbids. If scope must shrink, the safest cut is deferring `sensitivity_up_on_frequent_
-  stimulation` and its long-term/permanent-change framing (the one rule whose real-world trigger —
-  "frequent" — is itself vague) rather than thinning the well-specified arousal/wetness/climax core.
-- **[Risk] The fixed-point evaluation loop (D-5) could, in a pathological future rule addition, cycle
-  without converging within `_MAX_PASSES`.** → Mitigation: the cap is a hard stop (rules simply stop
-  firing after 5 passes, they do not raise), and a regression test constructs a rule table that would
-  cycle forever without the cap and asserts `apply_event()` still returns within `_MAX_PASSES`
-  iterations, never hangs.
-- **[Risk] `_apply_then()`'s dispatch by `then.field`'s "kind" (ordered_level / counter / flag /
-  append_only_set / cyclic) is Python logic outside the shared `when`/`then` grammar, which could
-  drift from `sexual.yaml`'s actual field list if a 26th field is ever added without updating the
-  kind registry.** → Mitigation: a regression test asserts every distinct `field` value appearing
-  anywhere in `sexual.yaml` has a corresponding entry in the `FIELD_KINDS` registry, failing loudly
-  (naming the unmapped field) rather than falling through to a default.
-- **[Risk] The climax-phase cycle guard (D-6) is bespoke logic that a future rule author could
-  bypass by adding a new `sexual.yaml` row with a `set` clause that ignores `_VALID_CLIMAX_
-  TRANSITIONS`.** → Accepted: `_apply_climax_phase_set()` is the *only* code path that ever writes
-  `climax_phase`'s value (no rule's `then` clause reaches the trait directly), so any new rule
-  targeting `climax_phase` is automatically routed through the same guard; a test constructs a
-  fabricated rule attempting `進行中 → 接近` directly and asserts it no-ops.
-- **[Risk] Every race-specific behavior `variable_rule.md` describes (D-8) is deliberately left
-  unbuilt, meaning the shipped baseline table under-models what the source document actually
-  narrates for elf characters specifically.** → Accepted and documented explicitly; the buff-based
-  seam (rate/bounds/decay levers, per hard requirement 8) is the correct future home, named in
-  Non-Goals, not silently dropped.
+- **[Risk] Splitting the rule table into change 7b means this change ships a handler with no
+  behavior a player can actually trigger yet** — `entity.sexual` exists and decays on its own, but
+  nothing narrates a stimulus into it until 7b lands. → Accepted: this is the direct, intended
+  consequence of the scope split, and the self-arming test flip (D-8) — the concrete, checkable
+  proof this change's slice is complete — needs none of that behavior to exist.
+- **[Risk] `_apply_climax_phase_set()` (D-4) is bespoke logic outside the shared `when`/`then`
+  grammar; change 7b's author could bypass it by writing a rule whose `then` clause reaches
+  `entity.sexual._traits.climax_phase` directly instead of routing through this function.** →
+  Mitigation: this design and D-7 state explicitly that 7b's rules must route every `climax_phase`
+  mutation through `_apply_climax_phase_set()`; a test in this change fabricates a direct out-of-cycle
+  attempt (e.g. `進行中 → 接近`) and asserts it no-ops, proving the guard itself is correct
+  independent of who calls it.
+- **[Risk] The public property surface (D-2) could still be bypassed by a future consumer reaching
+  into `entity.sexual._traits` directly, since Python has no true private attributes.** → Accepted;
+  the same convention-over-enforcement trade-off change 6 already accepted for `entity.buffs`'s
+  internal storage — the leading underscore and this design's explicit documentation are the
+  guardrail, not a language-level lock.
+- **[Risk] Every race-specific behavior `variable_rule.md` describes (D-7) is deliberately left
+  unbuilt by both this change and change 7b, meaning the eventual shipped rule table will
+  under-model what the source document actually narrates for elf characters specifically.** →
+  Accepted and documented explicitly; the buff-based seam (rate/bounds/decay levers, per hard
+  requirement 8) is the correct future home, named in Non-Goals and D-7, not silently dropped.
 - **[Risk] `OrderedLevelTrait`'s exact base-class API (`Trait.__init__`'s signature, min/max
   attribute names) is assumed, not confirmed against the installed Evennia 6.1.0 package.** →
   Flagged for implementer verification, consistent with changes 1–6's identical discipline for every
@@ -705,31 +634,34 @@ in its pre-change-7 state.
 Not applicable in the backward-compatibility sense — the project is unreleased with zero users, and
 `world/rules/sexual_state.py` does not exist yet. The only sequencing concerns are operational:
 
-- This change must land after change 6 (needs `world/rules/rulebook/schema.py`'s `Rule`/
-  `load_rules()`/`evaluate_condition()` importable) and change 4 (needs `world/lore/sexual_vocab.py`'s
-  six tuples and the `entity.db.sexual` raw-baseline convention).
+- This change must land after change 6 (needs `world/rules/rulebook/schema.py` importable for the
+  self-arming test, and `entity_active_buffs()` as a documented future seam) and change 4 (needs
+  `world/lore/sexual_vocab.py`'s six tuples and the `entity.db.sexual` raw-baseline convention).
 - Landing this change is what flips change 6's `test_combat_modifiers_self_arming.py` test from
   skipped to passed — no edit to that test file is made or required; the flip is a side effect of
   `world.rules.sexual_state` existing and `entity.sexual` being real.
-- Change 8 (`action-resolver`) is expected to call `apply_event()` from its effect-resolution step
-  and to author any sexual-magic buff instances; change 11 (`world-clock`) is expected to invoke
+- **Change 7b (`sexual-transition-rules`) depends on this change** — it consumes `SexualState`'s
+  public property surface and `_apply_climax_phase_set()` as its target, and inherits D-7's
+  `variable_rule.md` analysis as its own starting point rather than re-deriving it.
+- Change 8 (`action-resolver`) is expected to call change 7b's future `apply_event()` and to author
+  any sexual-magic buff instances; change 11 (`world-clock`) is expected to invoke
   `decay_tick()`/`reset_daily_counters()` at its own settlement-order position. Neither call exists
   yet — this change only guarantees the callables exist with the documented signatures.
 
 ## Open Questions
 
 - **Should a future bestiary field (e.g. `MonsterTier.sexual_profile`) let specific monster species
-  override the flat `build_monster_sexual_baseline()` default (D-7)?** Left to whoever next touches
+  override the flat `build_monster_sexual_baseline()` default (D-5)?** Left to whoever next touches
   the bestiary — design doc §6.4 says "most monsters," implying some do not fit the flat default
   (e.g. a monster archetype whose narrative role specifically involves shame or exposure), but no
-  roadmap item currently owns that extension, and this change does not guess at its shape.
-  Note also that `experience_types`' `異種性愛` (interspecies) entry already implies interspecies sexual
-  content is expected in this setting at least from the character side; a monster-side sexual profile
-  richer than the flat default would plausibly matter for those encounters specifically.
-- **Which concrete buff(s) will eventually model the race-specific behaviors named in D-8?** Left to
-  change 8 or whichever skill-effect change introduces elf-specific passives — this change documents
-  the target-field naming convention (`rate`/`bounds`/`decay` on a sexual-state field key) such a buff
-  would use, but authors none.
+  roadmap item currently owns that extension, and this change does not guess at its shape. Note also
+  that `experience_types`' `異種性愛` (interspecies) entry already implies interspecies sexual content
+  is expected in this setting at least from the character side; a monster-side sexual profile richer
+  than the flat default would plausibly matter for those encounters specifically.
+- **Which concrete buff(s) will eventually model the race-specific behaviors named in D-7?** Left to
+  whichever skill-effect change introduces elf-specific passives, authored into change 6's
+  `buffs.yaml` — this change documents the target-field naming convention (`rate`/`bounds`/`decay` on
+  a sexual-state field key) such a buff would use, but authors none.
 - **Exact `TraitHandler`/`Trait` constructor keyword names** (`min`/`max`, `base` vs `value` at
   construction) are left to the implementer to confirm against the installed Evennia 6.1.0
   `evennia.contrib.rpg.traits` source, consistent with the verification discipline changes 1–6 already

@@ -37,13 +37,15 @@ never move away from `無`. Every other field (`arousal`, `wetness`, `exposure`,
 `sensitivity`) SHALL retain its full, unclamped range.
 
 #### Scenario: A monster's shame is permanently pinned to 無
-- **WHEN** a `Monster` entity with no `entity.db.sexual` baseline has `entity.sexual` read
-- **THEN** `entity.sexual.shame.level` equals `"無"`, and any subsequent attempt to raise it (e.g. via
-  `apply_event()`'s `shame_up_on_being_watched` rule) leaves it unchanged at `"無"`
+- **WHEN** a `Monster` entity with no `entity.db.sexual` baseline has `entity.sexual` read, and a
+  direct attempt is made to raise its `shame` field (bypassing any rule or event — this change
+  authors no rule table, so the attempt is a direct trait-value write in a test)
+- **THEN** `entity.sexual.shame.level` remains `"無"`, unchanged by the attempt, because `shame`'s
+  bounds were clamped to a single point at construction
 
 #### Scenario: A monster's other fields are not clamped
-- **WHEN** a `Monster` entity's `arousal` field is subjected to an `apply_event()` call that would
-  normally raise it
+- **WHEN** a `Monster` entity's `arousal` field is directly raised (via the trait's own `.value`
+  setter, in a test)
 - **THEN** `entity.sexual.arousal` changes exactly as it would for a non-monster entity with the same
   starting value
 
@@ -76,12 +78,35 @@ ever grow — no mechanism SHALL remove an entry once added.
 #### Scenario: virgin cannot be reversed once false
 - **WHEN** `entity.sexual.virgin` has been set to `False` by any means
 - **THEN** every subsequent read of `entity.sexual.virgin` returns `False`, regardless of what any
-  later rule or direct call attempts
+  later caller (a direct write, or a future rule once change 7b exists) attempts
 
 #### Scenario: experience_types only grows
 - **WHEN** `"陰道性交"` has been added to `entity.sexual.experience_types`
 - **THEN** it remains present in `entity.sexual.experience_types` for the lifetime of the entity, and
   no function in this change's scope removes an entry from this set
+
+### Requirement: climax_phase can only move along its valid cycle, enforced by one guarded function
+`world/rules/sexual_state.py` SHALL provide `_apply_climax_phase_set(entity, target_level)`, the sole
+permitted write path for `climax_phase`'s value. It SHALL apply the mutation only when `target_level`
+is a valid edge from the entity's current `climax_phase` level in the cycle
+未達→接近→進行中→餘韻→未達 (plus 餘韻→接近), and SHALL no-op (leave `climax_phase` unchanged) for
+any other requested target. No other function in this change's scope SHALL write `climax_phase`'s
+value directly.
+
+#### Scenario: A valid cycle transition applies
+- **WHEN** `_apply_climax_phase_set(entity, "接近")` is called on an entity whose `climax_phase` is
+  currently `"未達"`
+- **THEN** `entity.sexual.climax_phase.level` becomes `"接近"`
+
+#### Scenario: An invalid transition no-ops rather than applying
+- **WHEN** `_apply_climax_phase_set(entity, "接近")` is called on an entity whose `climax_phase` is
+  currently `"進行中"`
+- **THEN** `entity.sexual.climax_phase.level` remains `"進行中"`, unchanged
+
+#### Scenario: The afterglow-to-未達 edge and the 餘韻-to-接近 edge are both valid
+- **WHEN** `_apply_climax_phase_set(entity, "未達")` or `_apply_climax_phase_set(entity, "接近")` is
+  called on an entity whose `climax_phase` is currently `"餘韻"`
+- **THEN** either call succeeds, changing `climax_phase` to the requested level
 
 ### Requirement: decay_tick and reset_daily_counters are exposed as plain callables with no settlement order invented
 `world/rules/sexual_state.py` SHALL expose `decay_tick(entity, elapsed_seconds)` and
@@ -95,6 +120,12 @@ decay, trait regen, and buff ticks — that fixed settlement order remains desig
   `WorldClock` or scheduler present
 - **THEN** it applies at most one level of decay to each configured field whose accumulated elapsed
   time has crossed its configured interval, and completes without requiring any other module to exist
+
+#### Scenario: climax_phase's afterglow decay routes through the cycle guard
+- **WHEN** `decay_tick()` decrements an entity's `climax_phase` from `"餘韻"` after its configured
+  interval has accumulated
+- **THEN** the mutation is applied via `_apply_climax_phase_set(entity, "未達")`, not by writing
+  `climax_phase`'s underlying trait value directly
 
 #### Scenario: reset_daily_counters resets climax_today to zero
 - **WHEN** `reset_daily_counters(entity)` is called on an entity whose `climax_today` is greater than
