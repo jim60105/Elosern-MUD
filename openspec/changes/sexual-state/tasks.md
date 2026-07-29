@@ -58,6 +58,11 @@
       `TraitHandler`), `.climax_today` (int), `.sensitivity` (the `_SensitivityProxy`). This is the
       entire surface change 7b and change 9 are expected to read — no consumer outside this module
       should need `entity.sexual._traits`.
+- [ ] 3.7a Implement `record_climax() -> None`, incrementing `climax_today` by one. `climax_today` is
+      the only field exposed as a plain value rather than a live trait object, so without this method
+      change 7b's `climax_today_increment_on_climax` rule has no legal write path and would be forced
+      to reach into `_traits`. Surfaced by change 7b's author as a cross-change coordination point.
+      Add a test asserting two consecutive calls yield `2` and that no other field changes.
 - [ ] 3.8 Implement `virgin`/`experience_types` accessors on `SexualState` per design.md D-2: `virgin`
       getter/setter refuses to set `True` once `False` has been stored (irreversibility enforced at
       the attribute-write level, not only by whatever future rule calls it); `experience_types`

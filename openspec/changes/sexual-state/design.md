@@ -254,6 +254,13 @@ class SexualState:
     @property
     def climax_today(self) -> int: return self._traits.climax_today.value
 
+    def record_climax(self) -> None:
+        """Increment climax_today by one. The only legal write path for this
+        counter — change 7b's rule table has no other way to satisfy
+        variable_rule.md's 「每次達到高潮時+1」 without reaching into
+        self._traits, which consumers are forbidden from touching."""
+        self._traits.climax_today.value += 1
+
     @property
     def sensitivity(self) -> "_SensitivityProxy": return self._sensitivity  # D-3
 
