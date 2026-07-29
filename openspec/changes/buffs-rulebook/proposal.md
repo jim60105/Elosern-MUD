@@ -43,7 +43,7 @@ own ad hoc mechanism.
   `conferred_growth_rate` — the mechanism inherited from change 5's D-6, modeling Elosia's partial
   magic-growth-rate conferral onto Violet as a buff instance carrying a `source_key` and a `scale`,
   applied via `entity.buffs.add(...)`, exposed through a pure query function,
-  `growth_rate_multiplier(entity)`, for whichever future progression change reads it.
+  `growth_rate_multiplier(entity)`, for change 11b (`character-progression`) to read.
 - Declare, but do not build, three seams: the sexual state machine's own transitions (change 7), the
   `ActionResolver` step that checks a buff forbids an action and calls the cast-time 統御術-style grant
   creation (change 8), and the world clock's fixed settlement order that ticks buff durations relative to
@@ -82,4 +82,6 @@ own ad hoc mechanism.
   into `combat_modifiers.py`'s duck-typed context; change 8 (`action-resolver`) owns the buff-forbids-action
   check and any cast-time grant creation; change 9 (`dice-combat`) calls
   `evaluate_combat_modifiers()` during combat resolution; change 11 (`world-clock`) owns the fixed
-  settlement order that invokes this change's buff-tick hooks.
+  settlement order that invokes this change's buff-tick hooks; change 11b (`character-progression`,
+  added to the roadmap to close a gap this change's design surfaced) reads `growth_rate_multiplier()`
+  when it wires up magic-level growth.

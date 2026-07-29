@@ -117,17 +117,34 @@
       `world/rules/rulebook/schema.py`'s module docstring names a future sexual-state rule table as an
       expected importer of its condition grammar and loader.
 - [ ] 5.3 `world/rules/tests/test_combat_modifiers.py` — per the `combat-modifier-table` capability: one
-      test function per rule ID (`test_rule_poison_agility_penalty`, `test_rule_paralysis_locks_actions`,
-      `test_rule_fear_agility_and_accuracy_penalty`, `test_rule_high_arousal_agility_accuracy_penalty`,
-      `test_rule_climax_in_progress_locks_actions`) each constructing the minimal context/entity state
-      that satisfies that one rule and asserting its exact `then` bundle appears in
-      `evaluate_combat_modifiers()`'s output; a test asserting multiple simultaneously active rules merge
-      into one bundle; a test asserting the function never mutates `entity.traits`/`entity.buffs` state
-      across repeated calls; a test asserting an entity with nothing active returns an empty bundle; a
-      test (`test_high_arousal_rule_is_inert_without_sexual_state`) asserting the two sexual-field rules
-      never fire while `entity.sexual is None`; a skipped self-arming test
-      (`test_high_arousal_rule_fires_once_sexual_state_exists`, `pytest.importorskip(
-      "world.rules.sexual_state")`) asserting the same rule fires once a real `entity.sexual` exists.
+      test function per buff-presence rule ID (`test_rule_poison_agility_penalty`,
+      `test_rule_paralysis_locks_actions`, `test_rule_fear_agility_and_accuracy_penalty`), each
+      constructing the minimal buff state that satisfies that one rule and asserting its exact `then`
+      bundle appears in `evaluate_combat_modifiers()`'s output; a test asserting multiple simultaneously
+      active rules merge into one bundle; a test asserting the function never mutates
+      `entity.traits`/`entity.buffs` state across repeated calls; a test asserting an entity with
+      nothing active returns an empty bundle.
+- [ ] 5.3a `world/rules/tests/test_combat_modifiers.py` — **the unit-test half for the two sexual-field
+      rules, which runs today and must not be confused with 5.3b's integration test.** Implement
+      `test_rule_high_arousal_agility_accuracy_penalty` and
+      `test_rule_climax_in_progress_locks_actions` by feeding `_build_context()` (or
+      `evaluate_combat_modifiers()` directly, via a small test seam) a duck-typed stub object exposing
+      `.arousal`/`.climax_phase` attributes — a plain fake, explicitly NOT a real `entity.sexual`,
+      since `SexualState` does not exist yet — and assert the rule evaluates against the stub and
+      produces the documented `then` bundle (`agility: "-20%", accuracy: -15` /
+      `actions_per_turn: 0` respectively). This proves the condition grammar and the effect vocabulary
+      for these two rules work now, independent of change 7. Also implement
+      `test_high_arousal_rule_is_inert_without_sexual_state`, asserting neither of these two rules ever
+      fires when `entity.sexual is None` (every entity's real state today, per change 3's placeholder).
+- [ ] 5.3b `world/rules/tests/test_combat_modifiers_self_arming.py` — **the integration-test half,
+      kept in its own module so neither half of this pair can be dropped without the omission being
+      conspicuous.** Implement `test_high_arousal_rule_fires_once_sexual_state_exists`, guarded by
+      `pytest.importorskip("world.rules.sexual_state")`: constructs a real entity with a real
+      `entity.sexual` (once change 7 exists) whose `arousal` is at or above `高度`, and asserts
+      `evaluate_combat_modifiers()` returns `high_arousal_agility_accuracy_penalty`'s bundle against the
+      live object, not a stub. This test is expected to report **skipped** — not passed, not failed —
+      for the entire lifetime of this change and until change 7 lands; see task 6.6 for the verification
+      step confirming that.
 - [ ] 5.4 `world/rules/tests/test_rule_id_test_correspondence.py` — the mechanical check per design.md
       D-7: walks `combat_modifiers.yaml`'s loaded rule IDs and asserts a `test_rule_<id>` function exists
       in `test_combat_modifiers.py` via `inspect.getmembers`; walks `buffs.yaml`'s buff keys and asserts a
@@ -164,8 +181,9 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run the full `world/rules/tests/` suite added or extended by this change and confirm all
-      tests pass.
+- [ ] 6.1 Run the full `world/rules/tests/` suite added or extended by this change and confirm every
+      test passes, except `test_high_arousal_rule_fires_once_sexual_state_exists` (task 5.3b), which is
+      expected to report skipped rather than passed until change 7 lands — see task 6.5.
 - [ ] 6.2 Confirm no function in `world/rules/buffs.py` or `world/rules/combat_modifiers.py` assigns to
       `entity.traits.<anything>.value`/`.base`/`.mod` except through `_apply_rate_modifier()`'s
       documented, additive-only Mod path (grep by hand, mirroring change 3's task 7.5 and change 5's
@@ -175,4 +193,12 @@
 - [ ] 6.4 Confirm every rule ID in `combat_modifiers.yaml` and every buff key in `buffs.yaml` has exactly
       one corresponding test function (task 5.4's mechanical check, run explicitly as part of this
       verification pass).
-- [ ] 6.5 Run `openspec validate buffs-rulebook --strict` and confirm it passes.
+- [ ] 6.5 Run `world/rules/tests/test_combat_modifiers_self_arming.py` (task 5.3b) in isolation and
+      confirm pytest reports `test_high_arousal_rule_fires_once_sexual_state_exists` as **skipped**,
+      not passed and not failed, at this point in the roadmap (before change 7 exists). A pass here
+      would mean the test is silently exercising something other than a real `SexualState` — the same
+      failure mode change 4's D-5 self-arming pattern (the skill-registry pluggable check) explicitly
+      guards against — and would indicate the test's `importorskip` guard is broken, not that the
+      feature is somehow already done. This check is distinct from and does not replace 5.3a's
+      always-runs unit test against the duck-typed stub.
+- [ ] 6.6 Run `openspec validate buffs-rulebook --strict` and confirm it passes.

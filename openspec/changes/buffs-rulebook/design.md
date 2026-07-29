@@ -66,10 +66,11 @@ card actually narrates; none of their numeric or narrative content is authoritat
   change 11 to invoke at the point in its fixed settlement order (§6.5: regen → buffs → sexual decay →
   ...) that change 11 decides; this change does not invent, assume, or hardcode any ordering relative to
   regen or sexual decay.
-- No progression, XP, or leveling system reading `growth_rate_multiplier()`'s output for real — no
-  roadmap item currently owns "how magic_level actually increases over time." This change builds the
-  query function and proves it returns the right number given buff state; wiring it into an XP-gain event
-  is left to whichever future change owns progression (see Open Questions).
+- No progression, XP, or leveling system reading `growth_rate_multiplier()`'s output for real — change
+  11b (`character-progression`, depends on changes 5/6/11) owns "how magic_level actually increases over
+  time" and is this function's consumer. This change builds the query function and proves it returns the
+  right number given buff state; wiring it into an XP-gain event is change 11b's job, not this change's
+  (see Open Questions for the sequencing note this leaves).
 - No exhaustive status-effect catalogue. A representative seed set (poison, paralysis, fear, conferred
   growth rate) exercises every modifier category (rate, bounds, decay, marker-only) at least once; this
   is not a catalogue of every status effect the finished game will ever need.
@@ -374,8 +375,9 @@ def _apply_rate_modifier(entity, rate_mod: dict) -> None:
     exact Mod/GaugeTrait interface. When the target is not a known trait key
     (e.g. magic_level_growth, sexual-state fields once change 7 exists), this
     function raises NotImplementedError with a message naming the owning
-    change (change 7, or the unclaimed progression change -- see Open
-    Questions) rather than silently no-op'ing."""
+    change (change 7 for sexual-state fields, change 11b
+    character-progression for magic_level_growth) rather than silently
+    no-op'ing."""
     ...
 
 def entity_active_buffs(entity) -> set[str]:
@@ -466,16 +468,23 @@ no second lookup path to remember.
 ### D-6. What is out of scope, with a named owner: applying `growth_rate_multiplier()`'s output to an
 actual XP/leveling event.
 
-No roadmap item (§11) currently owns "how `magic_level` actually increases as a character plays" — change
-2's `RaceProfile.learning_multiplier` (elf ×10.0) exists as lore data, but no change has yet built the
-progression mechanism that would read it, let alone fold in a conferred buff's `scale`. **Decision**:
-this change builds `growth_rate_multiplier()` as a complete, tested, standalone query function — proven
-correct against buff state alone, with a test constructing an entity holding a `conferred_growth_rate`
-buff at `scale=0.5` and asserting the function returns `0.5`, and an entity with no such buff returning
-`1.0` — and explicitly does not wire it into any XP-gain code path, since none exists. This is recorded
-as an open question (below), not silently assumed to belong to a future change without saying so, the
-same discipline change 3 and change 5 both used for their own unclaimed seams (`NPC.schedule`,
-`relations`/`persona`).
+**Resolved during review.** At the time this design was first written, no roadmap item (§11) owned "how
+`magic_level` actually increases as a character plays" — change 2's `RaceProfile.learning_multiplier`
+(elf ×10.0) existed as lore data, but no change had yet built the progression mechanism that would read
+it, let alone fold in a conferred buff's `scale`. That gap has since been closed at the roadmap level,
+not just noted here: the coordinator added **change 11b (`character-progression`, depends on changes
+5, 6, 11)** to §11, covering XP, magic-level growth, and skill improvement — guild merit and rank stay
+change 16's. Change 11b is `growth_rate_multiplier()`'s consumer.
+
+**Decision**: this change still builds `growth_rate_multiplier()` as a complete, tested, standalone query
+function — proven correct against buff state alone, with a test constructing an entity holding a
+`conferred_growth_rate` buff at `scale=0.5` and asserting the function returns `0.5`, and an entity with
+no such buff returning `1.0` — and still does not wire it into any XP-gain code path, since change 11b
+has not been proposed yet. Building the function here and having change 11b consume it later is the
+correct split, not a compromise: it is the identical shape change 5's `effective_value()` had before
+changes 8/9 existed to call it. Naming change 11b as the consumer now (rather than continuing to record
+this as unclaimed, the way change 3 left `NPC.schedule`/`Monster.behaviour_tree` and change 5 left
+`relations`/`persona`) is the one update this review round makes to this decision.
 
 **Alternative considered**: deferring the entire mechanism a second time, on the reasoning that without a
 progression system there is nothing real to test it against. Rejected — the task explicitly asks this
@@ -496,12 +505,24 @@ matching test function, rather than a discipline that only holds as long as code
 absence — the same "structural guarantee, not a docstring" standard change 5's D-7 held itself to for
 狀態偽裝's D2 compliance.
 
-Two self-arming tests (mirroring change 4's D-5 and this change's own D-3) additionally assert:
-`test_high_arousal_rule_is_inert_without_sexual_state()` — today, with `entity.sexual is None`,
-`evaluate_combat_modifiers()` never includes an `agility`/`accuracy` adjustment from the two sexual-field
-rules — and a skipped
-`test_high_arousal_rule_fires_once_sexual_state_exists()` (`pytest.importorskip("world.rules.sexual_state")`),
-which starts asserting the rule actually fires against a live `entity.sexual` the moment change 7 lands.
+The two sexual-field rules get **two distinct tests, not one, each proving a different half of the
+claim** (mirroring change 4's D-5 pluggable-check pattern, which likewise needed both a mocked test and a
+real-import test to be convincing): a **unit test that runs today**,
+`test_rule_high_arousal_agility_accuracy_penalty()`, feeding `evaluate_combat_modifiers()` a duck-typed
+stub exposing `.arousal` (not a real `entity.sexual`, since `SexualState` does not exist yet) and
+asserting the rule evaluates and produces the documented adjustment bundle right now — this proves the
+condition grammar and the effect vocabulary work today, independent of change 7. A companion,
+`test_high_arousal_rule_is_inert_without_sexual_state()`, asserts the same rule never fires while
+`entity.sexual is None` (every entity's actual state today). Neither of these is sufficient on its own to
+claim the rule will work against a *real* `SexualState`: a stub can be shaped however the test author
+likes, and proves the matcher, not the eventual integration. A separate, **self-arming integration
+test**, `test_high_arousal_rule_fires_once_sexual_state_exists()`
+(`pytest.importorskip("world.rules.sexual_state")`), is therefore also required, living in its own test
+module so it cannot be quietly folded into or dropped alongside the unit test: it skips — reported as
+skipped, not passed — for the entire lifetime of this change and until change 7 lands, at which point it
+starts asserting the rule fires against a genuinely live `entity.sexual`. A verification task confirms
+this test currently reports skipped rather than passed, the same "a pass here would mean something is
+silently wrong" discipline change 4's D-5 applied to its own skill-registry self-arming test.
 
 ## Risks / Trade-offs
 
@@ -527,7 +548,8 @@ which starts asserting the rule actually fires against a live `entity.sexual` th
   can actually exercise end-to-end today; `conferred_growth_rate`'s own rate modifier has no real target
   to write into yet.** → Accepted and stated directly in D-6: `growth_rate_multiplier()` is tested as a
   pure query against buff state, independent of any trait/field it would eventually feed, which is the
-  complete and correct scope for a change with no progression system to integrate against yet.
+  complete and correct scope for a change whose progression consumer (change 11b,
+  `character-progression`) has not been proposed yet.
 - **[Risk] `BuffHandler`'s exact accessor names (`all()`, `.add()`, the default `dbkey`) are assumed, not
   confirmed against a locally installed Evennia 6.1.0 package.** → Flagged for implementer verification
   throughout D-3/D-4/D-5, consistent with changes 1–5's identical discipline for every other
@@ -558,11 +580,13 @@ operational:
 
 ## Open Questions
 
-- **Who owns wiring `growth_rate_multiplier()`'s output into an actual `magic_level` progression/XP
-  event?** No roadmap item (§11) currently claims a progression system. Left as an unassigned seam per
-  D-6, the same way change 3 left `NPC.schedule`/`Monster.behaviour_tree` unassigned and change 5 left
-  `relations`/`persona` unassigned — whoever eventually proposes a progression change should claim this
-  function as its reader rather than this change guessing at an owner.
+- **Resolved: change 11b (`character-progression`) owns wiring `growth_rate_multiplier()`'s output into
+  an actual `magic_level` progression/XP event.** No longer unassigned — the coordinator added change 11b
+  (depends on changes 5, 6, 11; covers XP, magic-level growth, and skill improvement, with guild merit and
+  rank staying change 16's) to §11 specifically to close this gap. What remains genuinely open, since
+  change 11b has not itself been proposed yet: the exact call shape change 11b will use to read
+  `growth_rate_multiplier()` (once per level-up check, once per XP-gain event, or some other cadence) is
+  change 11b's own design decision, not fixed by this change.
 - **Should `_apply_rate_modifier()`'s target vocabulary (currently just `entity.traits`' gauge keys) be
   extended once change 7 exists, so a buff can modify a `SexualState` field's rate/bounds/decay
   directly?** Left to change 7's own author to decide when `SexualState`'s concrete field API exists;
