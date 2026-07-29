@@ -4,9 +4,10 @@ Change 7 (`sexual-state`) built `entity.sexual` — a live, comparable `SexualSt
 authored no rule that moves it. Change 6 (`buffs-rulebook`) built the shared condition grammar
 (`Rule`, `load_rules()`, `evaluate_condition()`) `sexual.yaml` is contractually required to reuse,
 and left `then` opaque specifically so this table can define its own effect vocabulary. This design
-covers exactly that: the ~24 rows of `rulebook/sexual.yaml`, the module that interprets their `then`
-clauses against `SexualState`'s public surface, and the test discipline that makes "every rule has a
-test" and "every field is reachable" structurally checked rather than merely followed.
+covers exactly that: the 25 rows of `rulebook/sexual.yaml`, the module that interprets their `then`
+clauses against `SexualState`'s public surface (and, for one rule, change 3's `entity.traits`
+surface — see D-8), and the test discipline that makes "every rule has a test" and "every field is
+reachable" structurally checked rather than merely followed.
 
 Change 7's design doc D-7 already analyzed `tmp/story_settings/variable_rule.md` for ambiguity and
 one direct self-contradiction, with resolutions this design inherits verbatim (virginity's trigger
@@ -15,16 +16,28 @@ narrative-only field exclusion). This document does not repeat that analysis; it
 handful of additional ambiguities D-7 did not cover, because they concern fields or transitions D-7
 was not scoped to walk line-by-line.
 
+**Post-review addendum.** A coordinator review of the initial 24-rule draft found one genuine
+coverage gap this document's own D-6/D-7 process had not surfaced: `variable_rule.md`'s
+`當前狀態.體力值` section couples a sexual event (climax) to a non-`SexualState` field (`sp`, the
+stamina/體力 gauge change 3 mounts on `entity.traits`). D-8 (below) resolves it as rule 25,
+`sp_cost_on_climax`, and widens `FIELD_KINDS` with a fourth kind, `vital_gauge`, for exactly this
+one cross-domain case. The review also confirmed a second `體力值` line — `疲勞狀態` — is correctly
+excluded from this table; D-9 records why and names its owner. Both were reviewed and folded into
+this document rather than left as loose ends; `world_info.md`, the master design doc, and every
+other change's own artifacts remain untouched.
+
 ## Goals / Non-Goals
 
 **Goals:**
-- `world/rules/rulebook/sexual.yaml`: ~24 rules, each with a unique `id`, transcribing every
-  behaviourally-meaningful line of `variable_rule.md`'s `性狀態.*` section not already excluded by
-  D-7 or by this document's own additional resolutions (below).
+- `world/rules/rulebook/sexual.yaml`: 25 rules, each with a unique `id`, transcribing every
+  behaviourally-meaningful line of `variable_rule.md`'s `性狀態.*` section (plus one `當前狀態.體力值`
+  line whose trigger is a sexual event, D-8) not already excluded by D-7 or by this document's own
+  additional resolutions (below).
 - `world/rules/sexual_transitions.py`: `FIELD_KINDS`, `_parse_delta()`, `_apply_then()`,
   `_build_context()`, and `apply_event(entity, event, **event_context)` — the interpreter for
-  `sexual.yaml`'s `then` vocabulary, built entirely on `SexualState`'s public property surface and
-  change 6's `evaluate_condition()`. No second condition evaluator.
+  `sexual.yaml`'s `then` vocabulary, built entirely on `SexualState`'s public property surface (plus,
+  for one rule, change 3's equally public `entity.traits.<key>.value` surface — D-8) and change 6's
+  `evaluate_condition()`. No second condition evaluator.
 - `apply_event()`'s fixed-point loop: one call can trigger a short cascade (e.g. `arousal_up_on_
   stimulus` raises `arousal` to `極限`, which `climax_gate` then reacts to in the same call) without
   re-firing a rule for a field-change that already fully propagated, and without looping forever.
@@ -43,17 +56,27 @@ was not scoped to walk line-by-line.
 - No combat resolution (change 9) and no settlement order (change 11) — `decay_tick()`/
   `reset_daily_counters()` remain change 7's exposed callables, invoked at change 11's own chosen
   point; nothing here calls them, competes with them, or re-derives their ordering.
-- No sexual-magic buff instance or SP/exhaustion coupling — those are change 6's `buffs.yaml` and
-  change 8's resource-deduction step respectively, per change 7's design doc Non-Goals, which this
-  design does not revisit.
+- No sexual-magic buff instance. That remains change 6's `buffs.yaml`, per change 7's design doc
+  Non-Goals, which this design does not revisit.
+- No stamina-threshold action-efficiency modifier (`variable_rule.md`'s `疲勞狀態: ≤30點時所有行動
+  效率降低`) — a standing-condition combat/action modifier belongs in change 6's
+  `combat_modifiers.yaml` alongside poison and the arousal thresholds, not in this event-triggered
+  transition table. See D-9 for why, named explicitly rather than silently dropped. This design does
+  build the one `體力值` line that *is* a sexual-event-triggered transition — the climax SP cost
+  itself (D-8) — since that line, unlike the threshold, is exactly this table's shape: an event
+  causing a field change, not a standing condition producing a modifier bundle.
 
 ## Decisions
 
 ### D-1. The `then` effect vocabulary: `field` + one of `delta` / `set` / `add`, dispatched by
 `FIELD_KINDS`.
 
-Six field *kinds* exist, each with a different legal effect shape and a different write path onto
-`SexualState`'s public surface:
+Seven field *kinds* exist, each with a different legal effect shape and a different write path.
+Six write onto `SexualState`'s public surface; the seventh (`vital_gauge`, added per D-8) writes
+onto change 3's equally public `entity.traits.<key>.value` surface — the one place this table's
+scope crosses out of `SexualState` entirely, because `variable_rule.md` itself couples the trigger
+(a sexual event) to a non-sexual field (see D-8 for why that coupling belongs here rather than in a
+second table):
 
 ```python
 # world/rules/sexual_transitions.py
@@ -64,9 +87,11 @@ FIELD_KINDS = {
     "exposure":         "ordered_level",
     "climax_phase":     "ordered_level_cyclic",   # routes through _apply_climax_phase_set() only
     "sensitivity":      "ordered_level_dict",     # part-keyed; needs context["part"]
-    "climax_today":     "counter",                # plain int; see D-5 for its write-path gap
+    "climax_today":     "counter",                # plain int; entity.sexual.record_climax() (D-5)
     "virgin":           "flag_one_way",           # entity.sexual.virgin = False only
     "experience_types": "append_only_set",        # entity.sexual.add_experience_type(key) only
+    "sp":               "vital_gauge",            # entity.traits.sp.value -= N (D-8) -- the one
+                                                     # field this table targets outside SexualState
 }
 ```
 
@@ -98,8 +123,9 @@ FIELD_KINDS = {
   hands back, not a private reach-around (see D-3's discussion of why this is the single generic
   rule design.md's D-3 for change 7 already named by ID).
 - **`counter`** (`climax_today`): `then` carries `delta` only, applied as plain integer addition (no
-  ordinal, no clamp). See D-5 for the write-path gap this field's read-only public property creates,
-  and the proposed minimal resolution.
+  ordinal, no clamp), via `entity.sexual.record_climax()` — the sole mutator change 7 added to
+  `SexualState`'s public surface for exactly this field (D-5). `_apply_then()` never reads or writes
+  `entity.sexual._traits.climax_today` directly.
 - **`flag_one_way`** (`virgin`): `then` carries only `{"set": false}` (transcribed from design doc
   §6.4's own worked example, which also carries a documentary `irreversible: true` key — kept in the
   YAML for fidelity to that example, but `_apply_then()` does not need to read it: irreversibility is
@@ -107,30 +133,59 @@ FIELD_KINDS = {
   table's job is only to decide *when* the event fires, never to re-implement the guard.
 - **`append_only_set`** (`experience_types`): `then` carries `add` (a single Chinese type string).
   Write path: `entity.sexual.add_experience_type(add_value)` — change 7's documented sole mutator.
+- **`vital_gauge`** (`sp` — the one field outside `SexualState`, D-8): `then` carries `delta` only
+  (a negative range, per D-8 — no rule in this table ever raises a vital gauge, only spends one).
+  Write path: `entity.traits.sp.value += delta` (delta already negative) — `entity.traits` is change
+  3's own `TraitHandler`, mounted independently of `entity.sexual`'s private one; reading/writing
+  `entity.traits.<key>.value` is the exact, already-public contract change 3's design doc states
+  every combat/resolution consumer uses ("Combat, resolution, and damage MUST read
+  `entity.traits.<key>.value`"), so this is not a new precedent, only this table's first use of an
+  existing one. `sp`'s own lower bound (0, per change 3's `TraitHandler` construction) clamps the
+  result — this table does not add a floor of its own, the same way `ordered_level` deltas rely on
+  `OrderedLevelTrait`'s own clamp rather than reimplementing one.
 
 **Alternative considered**: one universal `{field, op, value}` triple for every kind. Rejected —
-`sensitivity`'s dynamic part-key and `climax_phase`'s guard indirection are genuinely different
-shapes, not a naming variance on one shape; forcing them into an identical grammar would either give
-`sensitivity` and `climax_phase` rows a `part`/`guard` key that every other row's schema silently
-ignores, or push kind-dispatch logic into `sexual.yaml` itself (which change 6's D-1 already
-rejected doing to `then` in general). A `FIELD_KINDS` lookup table, read once at rule-table load
-time by `_apply_then()`, keeps every row's YAML shape exactly as small as its own kind needs.
+`sensitivity`'s dynamic part-key, `climax_phase`'s guard indirection, and `vital_gauge`'s different
+target handler are genuinely different shapes, not a naming variance on one shape; forcing them into
+an identical grammar would either give every row a `part`/`guard`/`handler` key that most rows'
+schema silently ignores, or push kind-dispatch logic into `sexual.yaml` itself (which change 6's D-1
+already rejected doing to `then` in general). A `FIELD_KINDS` lookup table, read once at rule-table
+load time by `_apply_then()`, keeps every row's YAML shape exactly as small as its own kind needs.
+
+**Alternative considered for `sp` specifically**: a second rule table (e.g.
+`rulebook/vital_costs.yaml`) owned by whichever change eventually owns resource costs, keeping
+`sexual.yaml` scoped strictly to `SexualState` fields. Rejected, per explicit coordinator direction:
+`variable_rule.md` itself puts this coupling on the sexual side (`性狀態`'s own climax completion is
+the cause; `體力值`'s cost is a documented, unconditional consequence of it, not a separate mechanic
+with its own trigger), the triggering event (`climax_ends`) is already this table's own vocabulary,
+and splitting cause from effect into two tables loaded and evaluated separately would buy no
+isolation `sexual.yaml` doesn't already have via `FIELD_KINDS`' kind dispatch — it would only force a
+future reader to correlate two files to understand one sentence of source material.
 
 ### D-2. `_parse_delta()`: fixed and random-range deltas, mirroring design doc §6.4's own
-`"+1..+2"` example verbatim.
+`"+1..+2"` example verbatim, extended to a same-sign descending-magnitude range for `sp_cost_on_climax`
+(D-8).
 
 ```python
 def _parse_delta(spec: str) -> int | tuple[int, int]:
-    """"+1" / "-1" -> int. "+1..+2" -> (1, 2), resolved via rng.randint() at apply time.
-    Raises ValueError on any other shape -- a malformed delta string in sexual.yaml
-    should fail at rule-table load time, not silently apply zero."""
+    """"+1" / "-1" -> int. "+1..+2" -> (1, 2); "-30..-20" -> (-30, -20); both range forms
+    resolved via rng.randint(lo, hi) at apply time, requiring lo <= hi (raises otherwise --
+    a range whose bounds are given backwards is a sexual.yaml authoring bug, not something
+    to silently swap). Raises ValueError on any other shape -- a malformed delta string in
+    sexual.yaml should fail at rule-table load time, not silently apply zero."""
 ```
+
+The range form's regex accepts a leading `+` or `-` on *both* numbers (`^([+-]\d+)\.\.([+-]\d+)$`),
+not only `+`; `variable_rule.md`'s own `20~30` SP cost (D-8) is expressed in `sexual.yaml` as
+`"-30..-20"`, the negative-ascending mirror of the doc's own `"+1..+2"` example — `_parse_delta()`
+does not special-case sign, it only requires the parsed tuple satisfy `lo <= hi` so `rng.randint(lo,
+hi)` is always well-formed.
 
 `apply_event()` accepts an optional `rng` (defaulting to the `random` module), the same seam design
 doc §10's "fixed seed, deterministic assertions" testing discipline for dice/combat already
-establishes elsewhere in this project — every per-rule test exercising a range delta passes a
-`random.Random(<fixed seed>)` or a stub exposing `.randint()`, never asserting against a live,
-unseeded random draw.
+establishes elsewhere in this project — every per-rule test exercising a range delta (including
+`sp_cost_on_climax`'s negative range) passes a `random.Random(<fixed seed>)` or a stub exposing
+`.randint()`, never asserting against a live, unseeded random draw.
 
 ### D-3. `_build_context()` and `apply_event()`'s fixed-point loop.
 
@@ -182,7 +237,7 @@ stopped changing two passes ago no longer matches, because `_changed` no longer 
 ordered-level field is bounded (`OrderedLevelTrait` clamps, per change 7's D-1), so even a cascade
 that walks a field to its ceiling converges in at most `len(levels) - 1` passes for that field, well
 under `max_passes`; `max_passes` is a defensive ceiling against a future rule author introducing a
-genuine two-rule oscillation, not a value this table's current 24 rules are expected to approach.
+genuine two-rule oscillation, not a value this table's current 25 rules are expected to approach.
 
 **Why event-conditioned rules only fire on pass 1.** If `current_event` stayed set across every
 pass, an event rule would refire on every subsequent pass for the remaining lifetime of the
@@ -198,7 +253,7 @@ the state that existed when `apply_event()` was called). Rejected — this would
 `apply_event()` twice per meaningful action and to know, ahead of time, which rules chain into which
 — exactly the coupling a declarative rule table exists to avoid.
 
-### D-4. Rule catalog — 24 rules, organized by field, each mapped to its `variable_rule.md` source
+### D-4. Rule catalog — 25 rules, organized by field, each mapped to its `variable_rule.md` source
 line and, where relevant, its D-7 resolution.
 
 | # | Rule ID | `when` | `then` | Source line |
@@ -227,51 +282,36 @@ line and, where relevant, its D-7 resolution.
 | 22 | `shame_up_on_public_sexual_activity` | `event: public_sexual_activity` | `field: shame, delta: "+1"` | 「…公開場合性活動時提升」— other half of the same OR bullet |
 | 23 | `shame_up_on_watched` | `event: watched_during_activity` | `field: shame, delta: "+1"` | 「被注視時提升」— see D-6 for event-name unification with rule 18 |
 | 24 | `exposure_up_on_clothing_damaged` | `event: clothing_damaged_in_combat` | `field: exposure, delta: "+1"` | 「戰鬥中服裝破損可能增加暴露」— see D-6 for exposure's other two bullets, excluded |
+| 25 | `sp_cost_on_climax` | `event: climax_ends` | `field: sp, delta: "-30..-20"` | 當前狀態.體力值:「性活動消耗: 高潮消耗20~30點」— the one line in this catalog whose `then.field` is not a `SexualState` field; see D-8 |
 
 Every rule's `event` name is a vocabulary this design defines but does not wire to any player command
 — change 8 (`action-resolver`) decides which command or narrated action emits which event, per this
-proposal's Impact section.
+proposal's Impact section. See D-8 for why rule 25 targets a field outside `SexualState` entirely.
 
-### D-5. `climax_today`'s write-path gap — flagged for change 7's owner, not worked around.
+### D-5. `climax_today` increments through `SexualState.record_climax()`, change 7's public surface.
 
 Change 7's documented `SexualState` public surface gives every ordered-level field
 (`arousal`/`wetness`/`shame`/`exposure`/`climax_phase`) a property returning the *live trait object*,
-so a rule can legally mutate it via the object's own `.value` (D-1). `climax_today`'s property,
-per change 7's design.md D-2, returns a plain `int` by value:
-
-```python
-@property
-def climax_today(self) -> int: return self._traits.climax_today.value
-```
-
-There is no live handle to mutate and no setter. `virgin` has `@virgin.setter`; `experience_types`
-has `add_experience_type()` as its sole mutator; `climax_today` has neither. Rule 12
-(`climax_today_increment_on_climax`, transcribing `variable_rule.md`'s plain, unconditional 「每次
-達到高潮時+1」) therefore has no legal write path under change 7's documented contract as given, and
-this design is explicitly instructed not to reach into `SexualState._traits` from outside the class,
-and not to edit change 7's artifacts.
-
-**This is a genuine boundary gap, not an ambiguity `variable_rule.md` itself creates** — the
-behavior it describes is simple and unconditional; the gap is that change 7's property surface, as
-documented, does not yet expose a way to satisfy it. **Resolution, flagged for coordination with
-change 7's owner rather than worked around silently**: add one small, additive method,
-`SexualState.record_climax()`, incrementing `climax_today` by exactly one — mirroring
-`add_experience_type()`'s "sole mutator" shape (a single, narrowly-scoped method rather than a
-general setter, keeping the same "one function owns this field's one legal mutation" discipline
-change 7 already established for `virgin` and `experience_types`). `_apply_then()`'s `counter`
-branch calls `entity.sexual.record_climax()`, never `entity.sexual._traits.climax_today.value += 1`.
-This proposal does not implement or specify that method inside change 7's own files — tasks.md's
-dependency-verification section flags it as a pre-implementation coordination point, the same
-discipline change 7 itself used for its own Evennia-contrib API-signature verification tasks (design
-doc D-1's "flagged for implementer verification").
+so a rule can legally mutate it via the object's own `.value` (D-1). `climax_today`'s own property
+returns a plain `int` by value, not a live handle — the same read-only shape `virgin` and
+`experience_types` would have if they lacked their own dedicated mutators. Change 7 closes that gap
+with `SexualState.record_climax()`: a single, narrowly-scoped method incrementing `climax_today` by
+exactly one, mirroring `add_experience_type()`'s "one function owns this field's one legal mutation"
+discipline. Rule 12 (`climax_today_increment_on_climax`, transcribing `variable_rule.md`'s plain,
+unconditional 「每次達到高潮時+1」) uses it directly: `_apply_then()`'s `counter` branch calls
+`entity.sexual.record_climax()`, and never reads or writes
+`entity.sexual._traits.climax_today.value` — this table still has no reach into `SexualState`'s
+private `TraitHandler` anywhere, the same discipline every other field kind in D-1 already holds to.
 
 **Alternative considered**: reach into `entity.sexual._traits.climax_today.value` directly from
 `sexual_transitions.py`, the same way change 7's own `reset_daily_counters()` does internally.
-Rejected — that function is defined *inside* `sexual_state.py`, the class's own module; replicating
-the identical private-attribute access from a different module is precisely the bypass change 7's
-D-2 warns a future consumer might attempt, and this task's own instructions name it explicitly:
-"attach to it, never reach into the private `TraitHandler`." A one-line coordination flag is more
-honest than a silent violation of a boundary this design was explicitly told to respect.
+Rejected even though `record_climax()` now exists and makes this moot in practice — that function is
+defined *inside* `sexual_state.py`, the class's own module; replicating the identical
+private-attribute access from a different module would have been precisely the bypass change 7's D-2
+warns a future consumer might attempt, and this task's own instructions name it explicitly: "attach
+to it, never reach into the private `TraitHandler`." Flagging the gap and waiting for change 7's
+owner to close it with a proper additive method — rather than reaching in ourselves — is exactly why
+this table has nothing to walk back now that the method exists.
 
 ### D-6. Ambiguities this document resolves that D-7 did not already cover.
 
@@ -356,16 +396,74 @@ task 8.2 discipline for its own module) asserting `sexual_transitions.py` contai
 `.climax_phase.value =` or `._traits.climax_phase` outside the one call site inside `_apply_then()`'s
 `ordered_level_cyclic` branch that invokes `_apply_climax_phase_set()`.
 
+### D-8. `sp_cost_on_climax` — one line of `當前狀態.體力值` belongs in `sexual.yaml`, because
+`variable_rule.md` puts the coupling on the sexual side.
+
+`variable_rule.md`'s `當前狀態.體力值` section (stamina) is not part of `SexualState`'s field model at
+all — it is change 3's `entity.traits.sp`, the ordinary vital-gauge trait every combat/resolution
+consumer already reads via `entity.traits.<key>.value` (change 3's own established contract). Its
+one line, 「性活動消耗: 高潮消耗20~30點」(climax costs 20–30 stamina), is nonetheless triggered by the
+exact same event this table already models end-to-end (`climax_ends` — the same event driving rules
+7, 11, and 12): a sexual occurrence causing a non-sexual field to change, not a non-sexual event this
+table happens to also read. This was found during coordinator review of the initial 24-rule draft —
+`FIELD_KINDS` covered exactly the fields the draft's rules targeted, all `SexualState` fields, so
+nothing in this table's own coverage check (D-7) could have caught a field the table simply never
+targeted at all.
+
+**Decision**: rule 25, `sp_cost_on_climax`, lives in `sexual.yaml` alongside the other 24, and
+`FIELD_KINDS` gains a fourth kind, `vital_gauge` (D-1), whose write path is
+`entity.traits.sp.value += delta` rather than anything on `SexualState`. The delta is expressed as
+`"-30..-20"` (D-2's extended range grammar) — `variable_rule.md`'s own `20~30`, applied as a cost
+rather than a gain, resolved by the same `rng.randint()` seam every other range delta in this table
+already uses.
+
+**Why this table, not a second one.** The source text places this line under `當前狀態`, a different
+top-level section from `性狀態` — a naive reading might conclude it belongs to whatever table
+eventually governs `當前狀態` fields generally. But no such table exists in this roadmap, and more
+importantly the *cause* is unambiguously sexual (climax completion) while the *effect* is the only
+thing that lives elsewhere; splitting this one line into a separate table keyed off the identical
+`climax_ends` event `sexual.yaml` already dispatches would duplicate the event vocabulary for zero
+isolation benefit — a reader trying to understand "what happens when a climax ends" would need to
+open two files instead of one. This is the same reasoning D-6's other resolutions already lean on:
+keep behaviorally-coupled material next to its trigger unless a structural reason (a genuinely
+different evaluator, a genuinely different lifecycle) forces a split. None applies here — `sp` is
+read/written through the exact same `entity.traits.<key>.value` contract change 3 already documents
+for every other consumer, so this table gains no new coupling to Evennia internals by touching it.
+
+**Scope boundary this decision does not cross.** `sp`'s *floor behavior* (`疲勞狀態: ≤30點時所有行動
+效率降低` — an action-efficiency penalty once stamina is low) is a different shape entirely: a
+standing condition producing a modifier bundle, not an event causing a field change. That line does
+not become a row here; see D-9.
+
+### D-9. `疲勞狀態`'s action-efficiency penalty is excluded from this table, named for change 6.
+
+`variable_rule.md`'s 「疲勞狀態: ≤30點時所有行動效率降低」(at or below 30 stamina, all action
+efficiency drops) is structurally identical to change 6's own `combat_modifiers.yaml` rows
+(`high_arousal_agility_accuracy_penalty`, `poison_agility_penalty`): a `field: sp, lte: 30`-shaped
+condition producing an adjustment bundle (`{agility: "-N%", ...}` or similar) for as long as the
+condition holds — not a one-shot transition this table's `when`/`then` event-and-delta shape is built
+for. `sexual.yaml`'s rules each describe "this happened, so this field moved once"; a fatigue
+penalty describes "this condition currently holds, so every action is discounted," read at
+combat/action-resolution time exactly the way `high_arousal_agility_accuracy_penalty` already is.
+
+**Decision**: no row for this line exists in `sexual.yaml`. It is named here, with an explicit owner,
+specifically so it is not lost for having fallen between this change and change 6's scope the way an
+unnamed exclusion would: **change 6's `combat_modifiers.yaml`** is the correct home for a future
+`fatigue_action_penalty`-shaped row (`when: { field: sp, lte: 30 }`, `then: { <efficiency modifier
+bundle> }`), added whenever a change touching `combat_modifiers.yaml` next has reason to. This
+mirrors D-7's own treatment of race-specific asides — excluded from this table, but recorded with a
+named future owner rather than silently dropped.
+
 ## Risks / Trade-offs
 
-- **[Risk] `climax_today`'s write-path gap (D-5) means this proposal cannot fully implement rule 12
-  without a coordinated, additive change to change 7's `sexual_state.py`.** → Documented explicitly
-  rather than worked around; tasks.md's dependency-verification section flags the exact one-method
-  addition needed (`record_climax()`) as a pre-implementation coordination point with change 7's
-  owner, the same discipline change 7 itself used for unverified Evennia-contrib signatures.
+- **[Risk] Widening `FIELD_KINDS` with `vital_gauge` (D-1/D-8) means `sexual.yaml` is no longer
+  scoped strictly to `SexualState` fields — a future reader skimming `FIELD_KINDS` might assume every
+  key is a `SexualState` property.** → Mitigated by the inline comment on `sp`'s `FIELD_KINDS` entry
+  and by D-8 stating explicitly, by name, that it is the one exception; accepted rather than split
+  into a second table for the reasons D-8 gives (cause and effect belong together).
 - **[Risk] Unifying `watched_during_activity` across two source bullets (D-6.2) could under-model a
   future scenario where "watched, not sexual" and "watched, sexual" need different shame/experience
-  consequences.** → Accepted for this table's current 24 rules; flagged explicitly as a resolution a
+  consequences.** → Accepted for this table's current 25 rules; flagged explicitly as a resolution a
   future rule addition should split out with a new event name, not retroactively guessed at now.
 - **[Risk] `max_passes=50` in `apply_event()`'s fixed-point loop is a defensive ceiling this table's
   current rules never approach (every ordered-level field converges in at most 4 passes by
@@ -381,6 +479,12 @@ task 8.2 discipline for its own module) asserting `sexual_transitions.py` contai
   addition (a per-behavior repetition counter) neither change 7 nor this change is scoped to add. →
   Accepted and named explicitly for the same reason race-specific behaviors are (D-7): a future
   mechanism, not a silently dropped requirement.
+- **[Risk] `疲勞狀態`'s action-efficiency penalty (D-9) has a named owner (change 6) but no landed
+  row yet** — until a future change actually adds it to `combat_modifiers.yaml`, low-`sp` characters
+  suffer no mechanical penalty despite `variable_rule.md` describing one. → Accepted; this change's
+  scope is `sexual.yaml`, not `combat_modifiers.yaml`, and naming the owner explicitly (rather than
+  silently dropping the requirement, or building it in the wrong table for expedience) is the correct
+  boundary per the coordinator's own direction.
 
 ## Migration Plan
 
@@ -388,15 +492,17 @@ Not applicable in the backward-compatibility sense — unreleased project, zero 
 `world/rules/rulebook/sexual.yaml` and `world/rules/sexual_transitions.py` do not exist yet. Sequencing
 concerns only:
 
-- Must land after change 7 (needs `SexualState`'s public surface and `_apply_climax_phase_set()`
-  importable) and change 6 (needs `schema.py`'s `Rule`/`load_rules()`/`evaluate_condition()`
-  importable).
-- D-5's `record_climax()` coordination should ideally land as part of change 7 if change 7 has not
-  yet been implemented when this change starts; if change 7 is already implemented without it, the
-  minimal additive patch is this change's own first task, scoped to exactly one method, not a
-  broader edit to change 7's file.
+- Must land after change 7 (needs `SexualState`'s public surface, including `record_climax()`, and
+  `_apply_climax_phase_set()`, importable) and change 6 (needs `schema.py`'s
+  `Rule`/`load_rules()`/`evaluate_condition()` importable).
+- Also depends on change 3 (`entity-traits`) for `entity.traits.sp`, read/written directly by rule 25
+  (D-8) — a dependency this table did not have before the coordinator's review, since every other
+  rule targets only `entity.sexual`.
 - Change 8 (`action-resolver`) is expected to call `apply_event()` from its effect-resolution step
   and to decide which command emits which event name; no such wiring exists yet.
+- Change 6 (`buffs-rulebook`) is expected to add a `fatigue_action_penalty`-shaped row to
+  `combat_modifiers.yaml` (D-9) whenever a change touching that file next has reason to; this change
+  does not add it and does not block on it.
 
 ## Open Questions
 
@@ -412,3 +518,6 @@ concerns only:
   maps to an `exposure` level.
 - **Habituation (D-6.4)** — left unowned pending a future field-model addition (a per-behavior
   repetition counter) that neither change 7 nor this change is scoped to add.
+- **`疲勞狀態`'s action-efficiency penalty (D-9)** — named for change 6 (`combat_modifiers.yaml`),
+  not built here; left to whichever future change touching that file next has reason to add the
+  `field: sp, lte: 30` row.

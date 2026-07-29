@@ -1,16 +1,11 @@
-## 1. Dependency verification and coordination
+## 1. Dependency verification
 
-- [ ] 1.1 Confirm `world.rules.rulebook.schema.Rule`/`load_rules`/`evaluate_condition` (change 6) and
-      `world.rules.sexual_state.SexualState`/`OrderedLevelTrait`/`_apply_climax_phase_set` (change 7)
-      are importable before writing any rule or interpreter code.
-- [ ] 1.2 **Coordination point (design.md D-5)**: confirm whether change 7's `SexualState` already
-      exposes a sanctioned mutator for `climax_today` (a setter, or a dedicated increment method). If
-      not, add exactly one small, additive method — `SexualState.record_climax()`, incrementing
-      `climax_today` by one, mirroring `add_experience_type()`'s "sole mutator" shape — coordinating
-      with change 7's owner if change 7 is mid-implementation, or as this change's own first, narrowly
-      -scoped patch to `world/rules/sexual_state.py` if change 7 has already landed without it. Do not
-      proceed to task 3.12 (the `climax_today` rule) until this method exists.
-- [ ] 1.3 Create `world/rules/rulebook/sexual.yaml` and `world/rules/sexual_transitions.py` as empty
+- [ ] 1.1 Confirm `world.rules.rulebook.schema.Rule`/`load_rules`/`evaluate_condition` (change 6),
+      `world.rules.sexual_state.SexualState`/`OrderedLevelTrait`/`_apply_climax_phase_set`/
+      `SexualState.record_climax()` (change 7), and `entity.traits.sp` (change 3) are importable
+      before writing any rule or interpreter code. `record_climax()` is already part of change 7's
+      landed public surface — no coordination or additive patch to `sexual_state.py` is needed.
+- [ ] 1.2 Create `world/rules/rulebook/sexual.yaml` and `world/rules/sexual_transitions.py` as empty
       scaffolds with module docstrings referencing design doc §6.4, this change, and change 7's D-7
       (inherited ambiguity analysis).
 
@@ -19,10 +14,12 @@
 - [ ] 2.1 Define `FIELD_KINDS` per design.md D-1: `arousal`/`wetness`/`shame`/`exposure` →
       `"ordered_level"`; `climax_phase` → `"ordered_level_cyclic"`; `sensitivity` →
       `"ordered_level_dict"`; `climax_today` → `"counter"`; `virgin` → `"flag_one_way"`;
-      `experience_types` → `"append_only_set"`.
+      `experience_types` → `"append_only_set"`; `sp` → `"vital_gauge"` (D-8 — the one field this
+      table targets outside `SexualState`).
 - [ ] 2.2 Implement `_parse_delta(spec: str) -> int | tuple[int, int]` per design.md D-2: `"+N"`/
-      `"-N"` → `int`; `"+N..+M"` → `(N, M)`; any other shape raises `ValueError` at rule-table load
-      time, not at apply time.
+      `"-N"` → `int`; `"+N..+M"` → `(N, M)`; `"-M..-N"` (both negative, ascending, e.g. `"-30..-20"`
+      for `sp_cost_on_climax`) → `(-M, -N)`; requires `lo <= hi` for any range form (raises
+      otherwise); any other shape raises `ValueError` at rule-table load time, not at apply time.
 - [ ] 2.3 Implement `_apply_then(entity, then: dict, context: dict, rng) -> tuple[str | None, str | None]`
       per design.md D-1, dispatching on `FIELD_KINDS[then["field"]]`:
       - `ordered_level`: resolve `delta` (via `_parse_delta`, drawing from `rng` for a range) or
@@ -32,24 +29,28 @@
         then["set"])` — the only call site in this module referencing `climax_phase`'s value.
       - `ordered_level_dict`: read `context["part"]`, raising if absent; write through
         `entity.sexual.sensitivity[part].value`.
-      - `counter`: call `entity.sexual.record_climax()` (task 1.2) — never
-        `entity.sexual._traits.climax_today`.
+      - `counter`: call `entity.sexual.record_climax()` — never `entity.sexual._traits.climax_today`.
       - `flag_one_way`: `entity.sexual.virgin = then["set"]` (the setter's own irreversibility guard,
         change 7's D-2, does the rest).
-      - `flag_one_way`... — `append_only_set`: `entity.sexual.add_experience_type(then["add"])`.
+      - `append_only_set`: `entity.sexual.add_experience_type(then["add"])`.
+      - `vital_gauge`: resolve `delta` (via `_parse_delta`, drawing from `rng` for a range) and apply
+        it to `entity.traits.<field>.value` — change 3's `TraitHandler`, never `entity.sexual`
+        (design.md D-8). Relies on the trait's own configured floor to prevent a negative value; this
+        branch adds no clamp of its own.
       Return `(field, direction)` for the caller's `_changed` bookkeeping, or `(None, None)` if the
       call was a guarded no-op (e.g. an invalid `climax_phase` transition).
 - [ ] 2.4 Implement `_build_context(entity, event: str | None, changed: dict, event_context: dict) ->
       dict` per design.md D-3: live `arousal`/`wetness`/`shame`/`exposure`/`climax_phase` trait
       objects, plain `climax_today`/`virgin`/`experience_types` values, `_changed`, `event`, and
-      `**event_context` merged in.
+      `**event_context` merged in. (`sp` is not added to the context — no rule in this table
+      conditions on it, only `sp_cost_on_climax`'s `then` writes it.)
 - [ ] 2.5 Implement `apply_event(entity, event: str, *, rng=None, max_passes: int = 50,
       **event_context) -> dict` per design.md D-3: the fixed-point loop, clearing `event` after pass
       1, resetting `_changed` to only the immediately-preceding pass's deltas each iteration, and
       terminating when a pass produces zero changes. `rng` defaults to the `random` module and is
       injectable for deterministic tests.
 
-## 3. `sexual.yaml` — the 24 rules (design.md D-4's catalog)
+## 3. `sexual.yaml` — the 25 rules (design.md D-4's catalog)
 
 - [ ] 3.1 `arousal_up_on_stimulus` — `event: stimulus_applied` → `field: arousal, delta: "+1..+2"`
       (design doc §6.4's own worked example, transcribed verbatim).
@@ -73,7 +74,7 @@
       resolution for「達臨界點」).
 - [ ] 3.11 `climax_phase_ends_to_afterglow` — `event: climax_ends` → `field: climax_phase, set: 餘韻`.
 - [ ] 3.12 `climax_today_increment_on_climax` — `event: climax_ends` →
-      `field: climax_today, delta: "+1"` (depends on task 1.2's `record_climax()`).
+      `field: climax_today, delta: "+1"` (via change 7's `record_climax()`, task 1.1).
 - [ ] 3.13 `virginity_once` — `event: first_vaginal_penetration` → `field: virgin, set: false` (change
       7's D-7 resolved, unqualified event; design doc §6.4's own worked example, transcribed
       verbatim).
@@ -99,7 +100,10 @@
       (shares `experience_watched_added`'s event name, per design.md D-6.2).
 - [ ] 3.24 `exposure_up_on_clothing_damaged` — `event: clothing_damaged_in_combat` →
       `field: exposure, delta: "+1"`.
-- [ ] 3.25 Confirm every entry has a unique `id` and that `load_rules()` loads all 24 without error.
+- [ ] 3.25 `sp_cost_on_climax` — `event: climax_ends` → `field: sp, delta: "-30..-20"` (design.md
+      D-8 — `當前狀態.體力值`'s 「高潮消耗20~30點」; the one rule targeting `entity.traits.sp` rather
+      than a `SexualState` field).
+- [ ] 3.26 Confirm every entry has a unique `id` and that `load_rules()` loads all 25 without error.
 
 ## 4. Tests — one per rule ID (`world/rules/tests/test_sexual_transitions.py`)
 
@@ -152,6 +156,9 @@
       `watched_during_activity`, independent of task 4.18's assertion on the same event.
 - [ ] 4.24 `test_rule_exposure_up_on_clothing_damaged` — asserts `exposure` rises by `1` on
       `clothing_damaged_in_combat`.
+- [ ] 4.25 `test_rule_sp_cost_on_climax` — asserts `entity.traits.sp.value` decreases by the injected
+      RNG's resolved value within `[20, 30]` on `climax_ends`, and asserts a second case where `sp`
+      starts below the resolved cost stops at the gauge's own floor rather than going negative.
 
 ## 5. Structural and cross-cutting tests
 
@@ -160,7 +167,7 @@
       `test_rule_<id>` function exists for an `id` not present in `sexual.yaml`.
 - [ ] 5.2 `test_field_kinds_covers_every_targetable_field()` — per design.md D-7: asserts
       `FIELD_KINDS`'s key set equals exactly the set of `then.field` values used anywhere in
-      `sexual.yaml`.
+      `sexual.yaml` — now including `sp` (D-8), the one field outside `SexualState`.
 - [ ] 5.3 `test_virginity_once_is_irreversible()` — per hard requirement 4: fires
       `first_vaginal_penetration` via `apply_event()` twice in sequence, and separately attempts a
       direct `entity.sexual.virgin = True` afterward; asserts `virgin` is `False` after every
@@ -183,14 +190,25 @@
       narrative-only field (身體感受, 興奮要素, 被注視感受, 最後性活動, 基本資訊.狀態) — a plain
       read-through of the loaded rule table, per the `sexual-transition-rulebook` capability's
       exclusion requirement.
+- [ ] 5.9 `test_sp_cost_never_reaches_through_entity_sexual()` — a source-inspection test asserting
+      the `vital_gauge`-kind branch of `_apply_then()` references `entity.traits.<field>.value` only,
+      with no reference to `entity.sexual` anywhere in that branch (design.md D-8).
+- [ ] 5.10 Confirm no rule in `sexual.yaml` models `疲勞狀態`'s action-efficiency threshold (`≤30點時
+      所有行動效率降低`) — a plain read-through of the loaded rule table, per design.md D-9 and the
+      `sexual-transition-rulebook` capability's exclusion requirement naming change 6 as the owner of
+      that future `combat_modifiers.yaml` row.
 
 ## 6. Final verification
 
 - [ ] 6.1 Run the full `world/rules/tests/` suite added by this change and confirm every test
       passes.
-- [ ] 6.2 Confirm no edit was made to any file owned by change 6 or change 7 (`schema.py`,
-      `combat_modifiers.yaml`/`.py`, `buffs.yaml`/`.py`, `sexual_state.py` itself beyond the one
-      coordinated addition from task 1.2, if needed) — this change reads their public seams only.
+- [ ] 6.2 Confirm no edit was made to any file owned by change 3, change 6, or change 7
+      (`entity_traits.py` or equivalent, `schema.py`, `combat_modifiers.yaml`/`.py`,
+      `buffs.yaml`/`.py`, `sexual_state.py`) — this change reads `entity.traits.sp`,
+      `SexualState`'s public surface (including `record_climax()`), and change 6's rule-loading
+      machinery only, without modifying any of them.
 - [ ] 6.3 Confirm `world/rules/sexual_transitions.py` contains no `ActionResolver`, targeting,
-      combat-resolution, or `WorldClock` reference — those remain changes 8, 9, and 11's scope.
+      combat-resolution, or `WorldClock` reference — those remain changes 8, 9, and 11's scope. Also
+      confirm it contains no `combat_modifiers.yaml`-shaped threshold-and-modifier-bundle rule — that
+      remains change 6's scope (design.md D-9).
 - [ ] 6.4 Run `openspec validate sexual-transition-rules --strict` and confirm it passes.

@@ -118,9 +118,9 @@ silently applying to an arbitrary or default part.
 - **WHEN** `apply_event(entity, "frequent_stimulation")` is called with no `part` keyword
 - **THEN** it raises, rather than silently no-op'ing or defaulting to an arbitrary body part
 
-### Requirement: climax_today increments through a single sanctioned mutator, never through SexualState's private handler
-The rule targeting `climax_today` SHALL increment it by calling exactly one sanctioned mutation
-point on `SexualState`'s public surface, and SHALL NOT read or write
+### Requirement: climax_today increments through SexualState.record_climax(), never through SexualState's private handler
+The rule targeting `climax_today` SHALL increment it by calling `entity.sexual.record_climax()` —
+change 7's sanctioned mutator for this field — and SHALL NOT read or write
 `entity.sexual._traits.climax_today` (or any other private attribute) directly.
 
 #### Scenario: A climax event increments climax_today by exactly one
@@ -130,8 +130,30 @@ point on `SexualState`'s public surface, and SHALL NOT read or write
 #### Scenario: The increment path never touches SexualState's private TraitHandler
 - **WHEN** `world/rules/sexual_transitions.py` is inspected
 - **THEN** no line references `entity.sexual._traits` or any other leading-underscore attribute of
-  `SexualState`; the `climax_today` mutation goes through a single named public method or property
-  setter on `SexualState`'s documented surface
+  `SexualState`; the `climax_today` mutation goes exclusively through a call to
+  `entity.sexual.record_climax()`
+
+### Requirement: The one rule targeting a vital gauge outside SexualState writes through change 3's entity.traits surface, never through SexualState
+`sp_cost_on_climax` SHALL apply its cost by mutating `entity.traits.sp.value` directly — change 3's
+own public `TraitHandler` contract — and SHALL NOT reach through `entity.sexual` to do so. The delta
+SHALL resolve to a negative integer in the source's documented `20`–`30` range, applied as a
+subtraction.
+
+#### Scenario: A climax event costs stamina in the documented range
+- **WHEN** `apply_event(entity, "climax_ends", rng=<fixed-value stub returning -25>)` is called
+- **THEN** `entity.traits.sp.value` decreases by exactly `25`, and no `SexualState` field is touched
+  by this specific rule's effect
+
+#### Scenario: The stamina cost never reaches through entity.sexual
+- **WHEN** `world/rules/sexual_transitions.py` is inspected
+- **THEN** the `vital_gauge`-kind branch of `_apply_then()` references `entity.traits.<field>.value`
+  only, with no reference to `entity.sexual` anywhere in that branch
+
+#### Scenario: The stamina cost respects the gauge's own floor
+- **WHEN** `apply_event(entity, "climax_ends")` fires on an entity whose `sp` is below the rule's
+  delta magnitude
+- **THEN** `entity.traits.sp.value` stops at its own configured floor (change 3's `TraitHandler`
+  bound), rather than this rule producing a negative stamina value
 
 ### Requirement: virgin and experience_types rules are irreversible and append-only end-to-end through apply_event()
 Firing `virginity_once`'s triggering event SHALL flip `entity.sexual.virgin` to `False` permanently;
@@ -196,3 +218,15 @@ field (身體感受, 興奮要素, 被注視感受, 最後性活動, or the top-
 #### Scenario: No rule targets a narrative-only field
 - **WHEN** `sexual.yaml` is inspected
 - **THEN** no rule's `then.field` names 身體感受, 興奮要素, 被注視感受, 最後性活動, or 基本資訊.狀態
+
+### Requirement: The stamina action-efficiency threshold has no row in sexual.yaml and is named for change 6
+`sexual.yaml` SHALL contain no rule expressing `variable_rule.md`'s `疲勞狀態` action-efficiency
+threshold (`≤30點時所有行動效率降低`) — a standing-condition modifier belongs in change 6's
+`combat_modifiers.yaml`, alongside the existing arousal-threshold and poison rows, not in this
+event-triggered transition table.
+
+#### Scenario: No rule models the stamina action-efficiency threshold
+- **WHEN** `sexual.yaml` is inspected
+- **THEN** no rule's `when` references an `sp`-threshold condition producing an action-efficiency
+  modifier bundle, and this change's design documentation names change 6's `combat_modifiers.yaml`
+  as the owner of that future row rather than leaving it unrecorded
