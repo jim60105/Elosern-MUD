@@ -151,20 +151,43 @@ put a placeholder file's shape on the record before change 8 has any say in it. 
 here (for change 8 to reuse) is no different from change 2 authoring `Subrace` for change 4 to
 complete.
 
-### D-3. `SkillDef` carries exactly design doc §5.2's seven fields — no more, no less.
+### D-3. `SkillDef` carries design doc §5.2's seven fields plus one added by review.
 
 ```python
+class FactionConstraint(StrEnum):
+    ANY = "any"              # anyone present — the default
+    ALLY = "ally"
+    ENEMY = "enemy"
+    SELF_ONLY = "self_only"
+
 @dataclass(frozen=True)
 class SkillDef:
     key: str
     kind: SkillKind
     target_spec: TargetSpec
+    faction_constraint: FactionConstraint = FactionConstraint.ANY
     cost: dict[str, int]              # e.g. {"mp": 20, "sp": 5}; {} for most PASSIVE skills
     usable_out_of_combat: bool
     element: Element | None            # world.lore.elements.ELEMENT_REGISTRY entry, or None
     effects: list[str]                  # opaque effect IDs; see D-5 for the one convention this
                                           # change itself interprets
 ```
+
+`faction_constraint` is the eighth field, added during review. Change 8 initially placed it on
+`ActionRequest` — decided per cast by the caller — on the reading that §5.2's seven fields were
+frozen. They are not; §5.2 is a design document, not an external contract like
+`CHARACTER_SCHEMA_V1`. And putting the constraint on the request is semantically wrong: which
+factions a skill may legally target is a property of the skill, not of whoever invokes it. On the
+request, a caller could declare a fireball `ALLY`-only, or a heal `ENEMY`-only, and the resolver
+would have no basis to object.
+
+It defaults to `ANY`, which preserves §6.2's rule that out of combat, with no hostility model
+present, `SINGLE` may target anyone present. Only skills that genuinely restrict their targets set
+anything else, and `SELF_ONLY` is the one value that is redundant with `target_spec=SELF` — kept for
+the case of an `AREA` skill that may only cover the caster.
+
+Change 8 owns validating this field; this change owns declaring it and populating it across the seed
+set.
 
 `element` references a real `Element` instance from change 2's `ELEMENT_REGISTRY` (not a bare string
 key), matching design doc §5.2's literal type. `cost` and `effects` are transcribed verbatim from

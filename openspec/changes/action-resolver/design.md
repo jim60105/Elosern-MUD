@@ -42,8 +42,10 @@ identical shape change 6 already used for `entity.sexual` before change 7 landed
   did nothing" structurally unreachable, proven by a failure-injection test at each of the eight steps
   plus a dedicated commit-rollback test.
 - `world/rules/targeting.py`: the four ordered validations (presence → alive → range → faction),
-  `Faction`, combat-shortcut expansion as pure sugar, and an `ActionContext` protocol that lets combat
-  and non-combat callers share one validation code path with no special-casing.
+  reading `SkillDef.faction_constraint` (change 5's `FactionConstraint`, added to its own frozen-in-
+  spirit-only field list during review), combat-shortcut expansion as pure sugar, and an
+  `ActionContext` protocol that lets combat and non-combat callers share one validation code path with
+  no special-casing.
 - A structural (not documentary) guarantee that neither `action.py`/`targeting.py` nor any skill
   branches on combat state, mirroring change 3's D-9 and change 5's D-11 source-scanning tripwire
   style.
@@ -106,6 +108,7 @@ including the deduction, the effect(s), and the very act of producing an `EventL
 class PendingEffect:
     entity: "LivingEntity"          # whose state this effect touches; used for snapshot/restore
     description: str                # human-diagnostic label, folded into EventEntry construction
+    surfaces: frozenset[str]        # declared mutation surface(s) — see the coverage-boundary fix below
     apply: Callable[[], None]       # zero-argument mutator — the ONLY place real mutation happens
 
 def resolve(request: ActionRequest) -> ActionResult:
@@ -124,7 +127,7 @@ def resolve(request: ActionRequest) -> ActionResult:
     try:
         _commit(pending)                     # the ONLY place any PendingEffect.apply() runs
     except CommitFailed as failure:
-        return ActionResult.rejected(RejectReason.COMMIT_FAILED, str(failure))
+        return ActionResult.rejected(failure.reason, failure.detail)
 
     return ActionResult.success(event_log, time_cost)
 ```
@@ -141,26 +144,69 @@ have actually run, because they describe *what the pending effects represent*, n
 happened*. A failure in any of steps 5-8 raises `RejectedAction` before a single `PendingEffect.apply`
 has been called anywhere.
 
-**Phase 3: the one and only commit point.**
+**Phase 3: the one and only commit point — now gated by a surface check, closing a coverage boundary
+found in coordinator review.**
+
+The first pass of this design had `_commit()` snapshot exactly four sub-handlers with no check that a
+staged effect's actual mutation stayed inside that set. That is a latent, not live, gap today — no
+effect handler this change builds touches anything else — but the effect registry (D-7) is
+deliberately open, and changes 9 (`damage:*`), 15 (`quest-runtime`, plausibly inventory/quest-state
+effects), and 21 (`scene-builder`) will all register new handlers into it. The first one that mutates
+inventory, room contents, a spawned object, or a quest record would silently escape rollback,
+undermining the one guarantee this change exists to provide. **Fix**: every `PendingEffect` carries the
+mutation surface(s) it touches, declared once per handler at registration time, and `_commit()` refuses
+to run the action at all if any staged effect declares a surface outside what it snapshots — before
+touching a single entity.
 
 ```python
+SNAPSHOTTED_SURFACES = frozenset({"traits", "sexual", "buffs", "skill_grants"})
+
+class UnsnapshottedSurfaceError(Exception):
+    """Raised immediately when register_effect_handler() is called with a surface set outside
+    SNAPSHOTTED_SURFACES -- fails loudly at registration time (when change 9/15/21's module
+    imports and registers its handler), not silently at resolution time when a player happens
+    to cast the one skill that exercises it."""
+
+_EFFECT_HANDLER_SURFACES: dict[str, frozenset[str]] = {}
+
+def register_effect_handler(prefix: str, handler: "EffectHandler", surfaces: frozenset[str]) -> None:
+    unsupported = surfaces - SNAPSHOTTED_SURFACES
+    if unsupported:
+        raise UnsnapshottedSurfaceError(
+            f"handler for {prefix!r} declares surfaces {sorted(unsupported)} outside "
+            f"_commit()'s snapshot set {sorted(SNAPSHOTTED_SURFACES)} -- extend "
+            f"_snapshot_entity_state()/_restore_entity_state() first, or use a supported surface"
+        )
+    _EFFECT_HANDLERS[prefix] = handler
+    _EFFECT_HANDLER_SURFACES[prefix] = surfaces
+
 def _commit(pending: list[PendingEffect]) -> None:
+    for effect in pending:
+        unsupported = effect.surfaces - SNAPSHOTTED_SURFACES
+        if unsupported:
+            # Defense in depth: register_effect_handler() already refused this surface set at
+            # registration time. This second check catches a PendingEffect that somehow reached
+            # here without going through that gate -- it should be unreachable in practice, and
+            # a test constructs exactly that unreachable case to prove the gate is not decorative.
+            raise CommitFailed(
+                RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE,
+                f"{effect.description}: surfaces {sorted(unsupported)} outside "
+                f"{sorted(SNAPSHOTTED_SURFACES)}",
+            )
     touched = {effect.entity for effect in pending}
     snapshot = {entity: _snapshot_entity_state(entity) for entity in touched}
-    applied: list[PendingEffect] = []
     try:
         with transaction.atomic():           # django.db.transaction — secondary hardening, see below
             for effect in pending:
                 effect.apply()
-                applied.append(effect)
     except Exception as exc:
         for entity in touched:
             _restore_entity_state(entity, snapshot[entity])
-        raise CommitFailed(str(exc)) from exc
+        raise CommitFailed(RejectReason.COMMIT_FAILED, str(exc)) from exc
 ```
 
-`_snapshot_entity_state(entity)` captures every substate this change's effect handlers are permitted to
-touch — `entity.traits.all()` values (hp/mp/sp/atk_phys/agility/defense/magic_level/guild_merit),
+`_snapshot_entity_state(entity)` captures every substate `SNAPSHOTTED_SURFACES` names —
+`entity.traits.all()` values (hp/mp/sp/atk_phys/agility/defense/magic_level/guild_merit),
 `entity.sexual`'s public field values when not `None`, `entity.buffs`'s active-key set, and
 `entity.db.skill_grants` — through the exact same public accessors the effects themselves use, never a
 private/internal shortcut. Restoring is symmetric: trait/sexual field restoration is a plain `.value =`
@@ -168,8 +214,22 @@ write-back through the identical public setter surface the effect used to mutate
 buff restoration is a set-difference (`.remove()` any buff key present after the failed attempt that
 was absent in the snapshot) because `BuffHandler` has no bulk "replace active state" primitive. This is
 a **generic, effect-agnostic snapshot** — it does not need updating every time a new effect handler is
-registered, because it walks the same four sub-handlers every `LivingEntity` already exposes, not a
-list of "things this particular effect touches."
+registered *as long as that handler's declared surfaces are already in `SNAPSHOTTED_SURFACES`*; the
+moment one is not, `register_effect_handler()`'s own check is what forces `SNAPSHOTTED_SURFACES` (and
+`_snapshot_entity_state()`/`_restore_entity_state()` alongside it) to be extended deliberately, rather
+than the gap being discovered by a bug report. Extending the set is still the future change's own job
+to get right — the registration-time check makes the gap **visible and blocking**, it does not
+automatically make a new surface's snapshot/restore logic correct; a test registering a handler that
+declares an unsupported surface and asserting the action rejects (both at `register_effect_handler()`
+time and, separately, via a test that injects a bad entry directly into `_EFFECT_HANDLER_SURFACES` to
+exercise `_commit()`'s own independent, defensive check) is part of this change's own suite.
+
+`_step5_effect_resolution` stamps each returned `PendingEffect`'s `surfaces` field from the handler's
+own registered declaration (`dataclasses.replace(effect, surfaces=_EFFECT_HANDLER_SURFACES[prefix])`)
+rather than trusting each handler author to set it correctly on every `PendingEffect` they construct —
+one source of truth (the registration call), not N call sites that could drift from it. Step 6's
+resource-deduction effects are constructed directly by this module (not through the registry) and
+always declare `surfaces=frozenset({"traits"})`.
 
 **Why this, and not the alternatives:**
 
@@ -216,9 +276,19 @@ class RejectReason(StrEnum):
     RESOURCE_DEDUCTION_FAILED = "resource_deduction_failed"       # step 6 — defensive re-check
     EVENT_LOG_CONSTRUCTION_FAILED = "event_log_construction_failed"  # step 7
     TIME_COST_LOOKUP_FAILED = "time_cost_lookup_failed"           # step 8
+    UNSNAPSHOTTED_EFFECT_SURFACE = "unsnapshotted_effect_surface"  # the commit point's surface gate (D-1)
     COMMIT_FAILED = "commit_failed"                                # the single commit point (D-1)
 
 class RejectedAction(Exception):
+    def __init__(self, reason: RejectReason, detail: str = ""):
+        self.reason = reason
+        self.detail = detail
+
+class CommitFailed(Exception):
+    """Raised only inside _commit() (D-1) -- either the surface-declaration gate refused to run
+    the action (UNSNAPSHOTTED_EFFECT_SURFACE) or a staged effect's apply() raised mid-loop
+    (COMMIT_FAILED), in which case every touched entity has already been restored from its
+    snapshot before this is raised."""
     def __init__(self, reason: RejectReason, detail: str = ""):
         self.reason = reason
         self.detail = detail
@@ -299,8 +369,8 @@ class Relation(StrEnum):
 ```
 
 `world/rules/targeting.py`'s faction-validation step calls `context.relation_to(actor, target)` and
-compares the result against the skill invocation's declared `Faction` constraint (D-5) — it has no
-idea, and does not need to know, whether `context` represents a room or a battlefield.
+compares the result against the skill's own declared `FactionConstraint` (D-5) — it has no idea, and
+does not need to know, whether `context` represents a room or a battlefield.
 
 **Built now**: `RoomActionContext` — the out-of-combat implementation. `is_present()` checks room
 co-location; `relation_to()` returns `Relation.SELF` for the actor itself and `Relation.ALLY` for
@@ -320,54 +390,68 @@ would force one class to know both a room's and a battlefield's semantics. Two c
 one protocol, selected by the *caller* (the command layer picks `RoomActionContext`; change 9's turn
 scheduler picks its own `BattlefieldActionContext`), is what makes the branch disappear rather than move.
 
-### D-5. Targeting: four ordered validations, `Faction` as a caller-declared constraint (not a
-`SkillDef` field), `SINGLE` vs. `AREA` filtering, and shortcuts as pure sugar.
+### D-5. Targeting: four ordered validations, `FactionConstraint` read from `SkillDef` (not the
+request), `SINGLE` vs. `AREA` filtering, and shortcuts as pure sugar.
 
-**`Faction` is supplied by the `ActionRequest`, not stored on `SkillDef`.** Design doc §5.2's `SkillDef`
-is frozen at exactly seven fields by change 5 (its own D-3: "no eighth field... any felt need... is
-reported rather than silently added") — none of them a faction constraint, and this change cannot edit
-change 5's artifact. §6.2 also frames faction constraint as a *validation the resolver performs*, not
-a property of the skill definition itself. **Decision**: `ActionRequest` carries an explicit
-`faction: Faction = Faction.ANY` field, set by the caller — the command layer or combat turn scheduler
-— matching the skill's narrative intent at cast time (a heal command supplies `ALLY`, an attack command
-supplies `ENEMY`, a self-buff supplies `SELF_ONLY`, an unrestricted skill leaves the default `ANY`).
-This is flagged explicitly as a judgment call (see Open Questions) rather than silently assumed:
-nothing in design doc §5.2/§6.2 states which layer owns assigning a skill's faction constraint, and
-putting it on the request — decided once, at the exact point where a human or an AI already chose
-*who* to cast this on — avoids inventing a per-skill data field on a dataclass another change already
-closed.
+**Corrected during review: `FactionConstraint` lives on `SkillDef`, not on `ActionRequest`.** The
+original draft of this design put the constraint on `ActionRequest`, reasoning that design doc §5.2's
+seven `SkillDef` fields were frozen by change 5. That reading was wrong on two counts, per coordinator
+review: (1) §5.2 is a design document, not an external, frozen contract like `CHARACTER_SCHEMA_V1` —
+change 5 was told to flag a felt need for an eighth field, not that the list was immutable, and it has
+since added one; (2) the request is the semantically wrong home regardless of field-count concerns:
+which factions a skill may legally target is a property of the *skill*, not of whoever happens to
+invoke it. Putting it on the request would let a caller declare a fireball `ALLY`-only or a heal
+`ENEMY`-only, and the resolver would have no basis to object — it would be validating the caller's own
+claim against itself, not against anything the skill's designer decided.
+
+**Decision, now in force**: change 5's `SkillDef` carries an eighth field,
+`faction_constraint: FactionConstraint = FactionConstraint.ANY` (change 5's own `FactionConstraint`
+enum — `ANY`/`ALLY`/`ENEMY`/`SELF_ONLY` — declared and populated across its seed set by that change).
+This change **imports** `FactionConstraint` from `world.skills.registry` rather than defining a second,
+competing enum, and validates `skill.faction_constraint` directly — change 5 declares and populates it,
+this change validates it, the identical "declare here, validate in change 8" split already established
+for `TargetSpec`/`SkillKind` (change 5's own D-2). The default, `ANY`, is what preserves design doc
+§6.2's rule that out of combat, with no hostility model present, `SINGLE` may target anyone present:
+only skills that genuinely restrict their targets set anything else.
 
 ```python
-class Faction(StrEnum):
-    ANY = "any"
-    ALLY = "ally"
-    ENEMY = "enemy"
-    SELF_ONLY = "self_only"
+from world.skills.registry import FactionConstraint   # change 5's enum — not redefined here
 
-def validate_faction(relation: Relation, constraint: Faction) -> bool:
-    if constraint is Faction.ANY:
+def validate_faction(relation: "Relation", constraint: FactionConstraint) -> bool:
+    if constraint is FactionConstraint.ANY:
         return True
-    if constraint is Faction.SELF_ONLY:
+    if constraint is FactionConstraint.SELF_ONLY:
         return relation is Relation.SELF
-    if constraint is Faction.ALLY:
+    if constraint is FactionConstraint.ALLY:
         return relation in (Relation.SELF, Relation.ALLY)   # self counts as its own ally
-    if constraint is Faction.ENEMY:
+    if constraint is FactionConstraint.ENEMY:
         return relation is Relation.ENEMY
 ```
+
+`Relation` (`SELF`/`ALLY`/`ENEMY`) remains this change's own type — it is the *resolver's* live
+read of "what is this target to this actor right now," queried from `context.relation_to()` (D-4),
+which is a different axis from `FactionConstraint` (the *skill's* static, authored restriction).
+Keeping them distinct types, rather than collapsing to one four-value enum used on both sides, is what
+keeps `validate_faction()` a simple, total truth table rather than a function that has to reason about
+which of its two enum-typed arguments is the "live" one and which is the "declared" one.
 
 **The four validations, in design doc §6.2's exact order**, each a small pure function taking
 `(actor, target, skill, context)` and raising the matching `RejectReason` on failure:
 
 1. **Presence** — `context.is_present(actor, target)`; `TARGET_NOT_PRESENT`.
 2. **Alive** — `target.traits.hp.value > 0`; `TARGET_DEAD`.
-3. **Range** — `context.is_in_range(actor, target, skill)`; `TARGET_OUT_OF_RANGE`. **Judgment call**:
-   no roadmap item has introduced a positional/distance data model (map layers, changes 12–14, govern
-   world navigation, not combat range), so `RoomActionContext.is_in_range()` returns `True`
-   unconditionally today — this is a deliberate, named no-op seam (like `combat_modifiers.py`'s
-   duck-typed sexual-state context before change 7 existed), not a missing feature. A test constructs a
-   context whose `is_in_range()` is stubbed to return `False`, proving the rejection path is real and
-   wired correctly even though production code never exercises it yet.
-4. **Faction** — `validate_faction(context.relation_to(actor, target), request.faction)`;
+3. **Range** — `context.is_in_range(actor, target, skill)`; `TARGET_OUT_OF_RANGE`. **Judgment call,
+   now with a named owner.** No roadmap item this change depends on has introduced a
+   positional/distance data model, so `RoomActionContext.is_in_range()` returns `True` unconditionally
+   today — a deliberate, named no-op seam (like `combat_modifiers.py`'s duck-typed sexual-state context
+   before change 7 existed), not a missing feature. **Owner: change 9 (`dice-combat`).** Combat is
+   where distance first has real consequences — melee versus 弓術 versus 瞬影步's burst movement — and
+   change 12 (`map-anchor-grid`) is what will supply the coordinates that make range computable at all;
+   this change's `RoomActionContext` has no coordinate system to compute against, out of combat, and
+   does not invent one. A test constructs a context whose `is_in_range()` is stubbed to return `False`,
+   proving the rejection path itself is real and correctly wired even though production code never
+   exercises it as a genuine constraint yet — see Open Questions for the explicit hand-off.
+4. **Faction** — `validate_faction(context.relation_to(actor, target), skill.faction_constraint)`;
    `TARGET_FACTION_FORBIDDEN`.
 
 **`SINGLE` vs. `AREA` filtering semantics.** For `TargetSpec.SINGLE`, exactly one target is required;
@@ -423,28 +507,28 @@ expansion) while still catching a future `if in_combat:`-shaped addition anywher
 modules the moment it is written.
 
 **Positive proof, not just an absence-of-tokens check.** A second test calls `ActionResolver.resolve()`
-twice with byte-identical `ActionRequest`s (same actor, same skill, same `Faction.ENEMY` constraint)
-differing *only* in which concrete `ActionContext` is supplied: once with `RoomActionContext` (target
-rejects with `TARGET_FACTION_FORBIDDEN`, since a room has no enemies) and once with a test double
-satisfying `ActionContext`'s protocol whose `relation_to()` reports `Relation.ENEMY` for that same
-target (the call succeeds). The *only* thing that differs between the two calls is the context object
-handed in — `action.py`'s and `targeting.py`'s own source is byte-identical across both runs — which is
-the concrete, executable demonstration that combat-vs-non-combat behavior lives entirely in which
-`ActionContext` the caller chooses, never in a branch inside the resolver.
+twice with byte-identical `ActionRequest`s (same actor, same `skill_key` for a skill whose
+`SkillDef.faction_constraint` is `FactionConstraint.ENEMY`) differing *only* in which concrete
+`ActionContext` is supplied: once with `RoomActionContext` (rejects with `TARGET_FACTION_FORBIDDEN`,
+since a room has no enemies) and once with a test double satisfying `ActionContext`'s protocol whose
+`relation_to()` reports `Relation.ENEMY` for that same target (the call succeeds). The *only* thing
+that differs between the two calls is the context object handed in — `action.py`'s and `targeting.py`'s
+own source is byte-identical across both runs — which is the concrete, executable demonstration that
+combat-vs-non-combat behavior lives entirely in which `ActionContext` the caller chooses, never in a
+branch inside the resolver, and — separately — that the *skill*, not the caller, is what decided this
+skill needed an enemy in the first place.
 
-### D-7. Effect resolution: an open, prefix-keyed handler registry, seeded with what changes 5/6 already
-expose, `damage:*` declared for change 9, and a self-arming bridge to change 7b.
+### D-7. Effect resolution: an open, prefix-keyed handler registry — every handler declares the
+surfaces it mutates — seeded with what changes 5/6 already expose, `damage:*` declared for change 9,
+and a self-arming bridge to change 7b.
 
 ```python
 # world/rules/action.py
 EffectHandler = Callable[["LivingEntity", list["LivingEntity"], str, dict], list[PendingEffect]]
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
-
-def register_effect_handler(prefix: str, handler: EffectHandler) -> None:
-    """The extension point change 9 (damage:*) and any future change import and call — never a
-    direct dict mutation from outside this module, matching change 6's own clean-API discipline
-    (schema.py's evaluate_condition() vs. reaching into its internals)."""
-    _EFFECT_HANDLERS[prefix] = handler
+# _EFFECT_HANDLER_SURFACES and register_effect_handler(prefix, handler, surfaces) are defined in D-1,
+# alongside SNAPSHOTTED_SURFACES and the UnsnapshottedSurfaceError it raises — the registry and the
+# atomicity mechanism are one design, not two independent ones that happen to share a dict.
 
 def _step5_effect_resolution(request, skill, targets) -> list[PendingEffect]:
     pending: list[PendingEffect] = []
@@ -453,36 +537,55 @@ def _step5_effect_resolution(request, skill, targets) -> list[PendingEffect]:
         handler = _EFFECT_HANDLERS.get(prefix)
         if handler is None:
             raise RejectedAction(RejectReason.UNKNOWN_EFFECT_ID, effect_id)
+        surfaces = _EFFECT_HANDLER_SURFACES[prefix]   # already validated a subset of
+                                                        # SNAPSHOTTED_SURFACES at registration time
         try:
-            pending.extend(handler(request.actor, targets, effect_id, request.context.event_context))
+            new_effects = handler(request.actor, targets, effect_id, request.context.event_context)
         except RejectedAction:
             raise
         except Exception as exc:
             raise RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, f"{effect_id}: {exc}") from exc
+        # Stamp every effect with its handler's declared surfaces here, in the one place that reads
+        # the registry -- a handler author never sets `surfaces` on the PendingEffect instances it
+        # constructs; there is exactly one source of truth per prefix, not N call sites that could
+        # drift from each other.
+        pending.extend(dataclasses.replace(effect, surfaces=surfaces) for effect in new_effects)
     return pending
 ```
 
 No conditional in this loop distinguishes one effect kind from another beyond the prefix lookup itself
-— adding a new effect kind means registering a new handler, never editing this function, the identical
-discipline change 6's D-1 already used for `combat_modifiers.py`'s rule evaluation.
+— adding a new effect kind means registering a new handler (declaring its surfaces), never editing this
+function, the identical discipline change 6's D-1 already used for `combat_modifiers.py`'s rule
+evaluation.
 
 **Handlers this change builds, reusing changes 5/6's public seams verbatim — never reaching into any
-private state:**
+private state — each registered with its declared mutation surface:**
 
-- `confer_skill_partial` → 統御術. Stages `target.skills.grant_conferred(source_key, skill_key,
+- `confer_skill_partial` → 統御術.
+  `register_effect_handler("confer_skill_partial", _handle_confer_skill_partial,
+  surfaces=frozenset({"skill_grants"}))`. Stages `target.skills.grant_conferred(source_key, skill_key,
   trait_keys, scale)` (change 5's exact seam) as a thunk. `skill_key`/`scale`/`trait_keys` come from
   `request.context.event_context` (the specific skill/scale a given cast confers, since one opaque
   effect ID cannot itself encode a per-cast choice) — required keys missing raises
   `EFFECT_RESOLUTION_FAILED` naming the missing key, not a silent no-op.
-- `set_disguise` → 狀態偽裝. Stages `apply_disguise_effect(target, overrides)` (change 5's exact D-7
+- `set_disguise` → 狀態偽裝. `register_effect_handler("set_disguise", _handle_set_disguise,
+  surfaces=frozenset({"traits"}))` — `apply_disguise_effect()` writes `entity.db.disguised_stats`,
+  which this change treats as covered by the same `traits`-adjacent surface `_snapshot_entity_state()`
+  already walks alongside `entity.traits.all()` (both are read/restored via the same trait-handler
+  sweep; see task 5.15). Stages `apply_disguise_effect(target, overrides)` (change 5's exact D-7
   function) as a thunk; `overrides` comes from `event_context`.
-- `buff_apply:<key>` → any `buffs.yaml` entry. Stages `target.buffs.add(key, **buff_kwargs)` per
-  target, reusing change 6's `BuffHandler` mount directly.
-- `confer_growth_rate` → the rate-of-change counterpart to 統御術, calling change 6's
-  `grant_conferred_growth_rate(target, source_key, scale)` — the same registry mechanism generalizing
-  to a second conferral shape with no new dispatch logic.
-- `sexual_event:<name>` → **self-arming, per this change's own dependency boundary (Context).** Lazily
-  imports `world.rules.sexual_transitions.apply_event`:
+- `buff_apply:<key>` → any `buffs.yaml` entry. `register_effect_handler("buff_apply", _handle_buff_apply,
+  surfaces=frozenset({"buffs"}))`. Stages `target.buffs.add(key, **buff_kwargs)` per target, reusing
+  change 6's `BuffHandler` mount directly.
+- `confer_growth_rate` → the rate-of-change counterpart to 統御術.
+  `register_effect_handler("confer_growth_rate", _handle_confer_growth_rate,
+  surfaces=frozenset({"buffs"}))` (change 6's D-5 models this as a `RulebookBuff` instance, so it is a
+  `buffs` surface, not `skill_grants`). Calls change 6's `grant_conferred_growth_rate(target, source_key,
+  scale)` — the same registry mechanism generalizing to a second conferral shape with no new dispatch
+  logic.
+- `sexual_event:<name>` → **self-arming, per this change's own dependency boundary (Context).**
+  `register_effect_handler("sexual_event", _handle_sexual_event, surfaces=frozenset({"sexual"}))`.
+  Lazily imports `world.rules.sexual_transitions.apply_event`:
 
   ```python
   def _handle_sexual_event(actor, targets, effect_id, event_context) -> list[PendingEffect]:
@@ -497,6 +600,7 @@ private state:**
       target = _single_target(targets)
       return [PendingEffect(
           entity=target, description=f"apply_event({event_name}) on {target.key}",
+          surfaces=frozenset(),   # overwritten by _step5_effect_resolution's stamping, see above
           apply=lambda: apply_event(target, event_name, **event_context.get("sexual", {})),
       )]
   ```
@@ -509,10 +613,15 @@ private state:**
 **Declared, not built**: `damage:*`. No handler is registered for this prefix. A skill like
 `fire_ball` (change 5's own seed registry) whose `effects` include a `damage:fire:magic`-shaped ID
 rejects today with `UNKNOWN_EFFECT_ID` naming that exact string — the correct, honest state until
-change 9 calls `register_effect_handler("damage", ...)`, at which point the identical skill resolves
-with zero change to `action.py`. A test proves the registry itself is genuinely open: registering a
-synthetic, test-only handler for a made-up prefix and confirming a skill using that prefix resolves —
-proving the extension mechanism works without needing change 9's real damage math to exist.
+change 9 calls `register_effect_handler("damage", ..., surfaces=...)`, declaring whatever it actually
+touches (almost certainly `traits`, for hp/mp/sp changes — already snapshotted — but change 9's own
+author decides and the registration call enforces it), at which point the identical skill resolves with
+zero change to `action.py`. A test proves the registry itself is genuinely open: registering a
+synthetic, test-only handler for a made-up prefix with `surfaces=frozenset({"traits"})` and confirming
+a skill using that prefix resolves — proving the extension mechanism works without needing change 9's
+real damage math to exist. A second test registers a handler declaring an unsupported surface (e.g.
+`surfaces=frozenset({"inventory"})`) and asserts `register_effect_handler()` itself raises
+`UnsnapshottedSurfaceError` immediately, before any skill ever tries to use it.
 
 **Effect IDs that produce no `PendingEffect` at all**: `stat_multiply:*` (change 5's own multiplier
 convention) is a pure *query*, not a mutating event — `SkillHandler.effective_value()` is read directly
@@ -648,15 +757,24 @@ claim, not a parallel implementation of anything `action.py` already does.
 
 ## Risks / Trade-offs
 
-- **[Risk] The snapshot/restore commit mechanism (D-1) assumes every effect this change's handlers
-  produce mutates state only through `entity.traits`, `entity.sexual`, `entity.buffs`, or
-  `entity.db.skill_grants` — a future effect handler writing somewhere else would be invisible to
-  `_snapshot_entity_state()` and could survive a failed rollback.** → Mitigation: D-1 documents the
-  exact four sub-handlers snapshotted, explicitly, and the centerpiece atomicity test (a `PendingEffect`
-  deliberately raising mid-commit) is written against *every* handler this change registers, not just
-  one — a future handler touching an unlisted sub-handler is expected to extend
-  `_snapshot_entity_state()` alongside it, the same discipline change 6's D-4 held itself to for
-  `_apply_rate_modifier()`'s target vocabulary.
+- **[Risk, mitigated during review] The snapshot/restore commit mechanism (D-1) originally had a
+  silent coverage boundary**: `_commit()` snapshots exactly `entity.traits`, `entity.sexual`,
+  `entity.buffs`, and `entity.db.skill_grants`, but the effect-handler registry (D-7) is deliberately
+  open — changes 9 (damage), 15 (quest-runtime, likely inventory/quest-state effects), and 21
+  (scene-builder) will all register handlers into it. The first one that mutates a surface outside that
+  set (inventory, room contents, a spawned object, a quest record) would silently escape rollback,
+  defeating this change's entire reason for existing, and nothing in the original design would have
+  caught it — the gap was latent, not live, since no such handler exists yet. → **Fixed, not merely
+  flagged**: D-7 now requires every registered effect handler to declare, at registration time, the
+  exact set of surfaces it mutates, and `register_effect_handler()` itself raises immediately if a
+  declared surface is not one `_commit()` already knows how to snapshot — a handler needing a new
+  surface fails loudly the moment it is registered (dev-time, before any player can hit it), forcing its
+  author to either extend `_snapshot_entity_state()`/`_restore_entity_state()` or justify an exemption
+  in review, never to add it silently. `_commit()` itself re-asserts the same constraint defensively
+  against every staged `PendingEffect` immediately before touching any entity, as a second, independent
+  layer in case a handler was ever registered by a path bypassing `register_effect_handler()`. A test
+  registers a handler declaring an unsupported surface and asserts the action rejects rather than
+  running partially observed.
 - **[Risk] `transaction.atomic()`'s exact interaction with Evennia's `TraitHandler`/`BuffHandler`
   internals is unverified** — if either contrib caches state outside the connection's transaction
   boundary, the secondary DB-hardening layer would not actually roll back an in-flight write the way
@@ -664,20 +782,15 @@ claim, not a parallel implementation of anything `action.py` already does.
   implementer verification, consistent with changes 1–7's identical discipline for every other
   Evennia-contrib assumption; the *primary* mechanism (explicit snapshot/restore) does not depend on
   this being true, which is exactly why it is the primary mechanism and not `transaction.atomic()` alone.
-- **[Risk] `Faction` living on `ActionRequest` rather than `SkillDef` means the caller (command layer,
-  combat scheduler) is trusted to pick the constraint matching a skill's narrative intent — nothing
-  stops a caller from casting a heal skill with `Faction.ENEMY`.** → Accepted and named explicitly in
-  D-5 and Open Questions: `SkillDef` is frozen at seven fields by change 5, and no roadmap item owns
-  adding an eighth; a future change wanting to enforce "this skill may only ever be cast with `ALLY`"
-  server-side has a clear extension point (a per-skill-key lookup table, the identical shape
-  `SKILL_TIME_OVERRIDES` already establishes) but this change does not build it, since no source
-  material specifies which skills should be so constrained.
 - **[Risk] `is_in_range()` always returning `True` (D-5) means "range" is not a real constraint in this
   change's shipped behavior** — any skill can hit any present target regardless of a distance concept
-  this project has not yet built. → Accepted and named explicitly; no roadmap item introduces
+  this project has not yet built. → Accepted, named, and now assigned an explicit owner: change 9
+  (`dice-combat`), once change 12 (`map-anchor-grid`) supplies the coordinates that make range
+  computable — see D-5 and Open Questions. No roadmap item this change depends on introduces
   positional combat data, and inventing one here would be scope creep against a one-day change; the
   rejection path itself is tested via a stubbed context, so wiring in a real range model later requires
-  no change to `targeting.py`'s call sites.
+  no change to `targeting.py`'s call sites — only a new `BattlefieldActionContext.is_in_range()`
+  implementation change 9 supplies.
 - **[Risk] `EFFECT_HANDLERS`' seed set leaves every damage-shaped effect ID unresolved until change 9
   lands, meaning no skill exercising actual combat math can be cast through this change alone.** →
   Accepted and stated as a Non-Goal explicitly; `UNKNOWN_EFFECT_ID` is the correct, honest, and tested
@@ -701,10 +814,13 @@ only sequencing concerns are operational:
   (D-7); a guarded integration test confirms it reports skipped, not passed, until 7b exists, the same
   verification discipline change 6's own task list applied to its own self-arming test.
 - Change 9 (`dice-combat`) is expected to: implement `BattlefieldActionContext` conforming to this
-  change's `ActionContext` protocol (D-4); call `ActionResolver.resolve()` from its turn loop; and
-  register `damage:*` effect handlers via `register_effect_handler()` (D-7). None of these calls or
-  registrations exist yet — this change only guarantees the protocol and the registry function exist
-  with the documented shape.
+  change's `ActionContext` protocol (D-4); call `ActionResolver.resolve()` from its turn loop; register
+  `damage:*` effect handlers via `register_effect_handler()`, declaring whatever mutation surfaces they
+  touch (D-7) — extending `SNAPSHOTTED_SURFACES`/`_snapshot_entity_state()` first if damage touches
+  anything beyond `entity.traits`; and replace `RoomActionContext`'s always-`True` `is_in_range()` with
+  a real, coordinate-based implementation once change 12 (`map-anchor-grid`) exists (D-5). None of
+  these calls, registrations, or implementations exist yet — this change only guarantees the protocol,
+  the registry function, and the surface-declaration gate exist with the documented shape.
 - Change 10 (`overwhelm-resolution`) is expected to compress multiple `EventLog`s this change produces;
   change 11 (`world-clock`) is expected to read `ActionResult.success().time_cost_seconds` and decide
   how to advance; change 18 (`narrator`) is expected to consume `EventLog` and may reuse
@@ -712,16 +828,19 @@ only sequencing concerns are operational:
 
 ## Open Questions
 
-- **Who decides a given cast's `Faction` constraint when a skill's narrative intent is ambiguous (e.g.
-  a skill that could plausibly be cast on either an ally or an enemy)?** This change places the
-  decision on the caller (command layer / combat scheduler) per cast, since `SkillDef` has no field for
-  it and is frozen. Left open for whichever future change authors a richer command-parsing layer to
-  decide whether some skills should carry a *recommended* default constraint (not enforced, just a
-  parser convenience) — not a gap in this change's own pipeline, which works correctly either way.
-- **Should a future change add a per-skill-key `Faction` lookup table (mirroring
-  `SKILL_TIME_OVERRIDES`'s shape) to prevent a caller from casting a heal on an enemy?** Not built here;
-  named as a plausible extension point in Risks, not committed to, since no source material specifies
-  which of change 5's 24 seed skills should be so restricted.
+- **Resolved during coordinator review: `FactionConstraint` lives on `SkillDef` (change 5), not
+  `ActionRequest`.** No longer open — see D-5's full account of the correction. Change 5 declares and
+  populates `faction_constraint`; this change validates it.
+- **Resolved during coordinator review: `is_in_range()`'s real implementation is change 9's job.** No
+  longer unowned — see D-5 and the Migration Plan. Change 9 (`dice-combat`) inherits this seam
+  explicitly rather than rediscovering an unconditional `True` and wondering whether it was deliberate;
+  change 12 (`map-anchor-grid`) is the dependency that makes a real implementation possible at all.
+- **Should `SNAPSHOTTED_SURFACES` eventually grow beyond `traits`/`sexual`/`buffs`/`skill_grants`
+  proactively, ahead of any handler actually needing a new surface?** Not done here — D-7's
+  registration-time assertion means a future handler needing (say) `inventory` fails loudly and
+  visibly the moment it is registered, which this change treats as the correct forcing function rather
+  than speculatively snapshotting surfaces nothing yet touches. Left to whichever change (9, 15, or 21)
+  first needs one.
 - **Exact `django.db.transaction` import path and whether Evennia 6.1.0's `TraitHandler`/`BuffHandler`
   bypass the ORM's transaction boundary via an in-memory cache** — left to the implementer to confirm
   against the installed package, consistent with the verification discipline changes 1–7 already

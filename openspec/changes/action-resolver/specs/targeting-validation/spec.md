@@ -21,7 +21,7 @@ it fails, and no later validation SHALL run for a candidate that already failed 
 
 #### Scenario: A faction-forbidden target rejects at the faction check
 - **WHEN** target resolution runs against a candidate whose `context.relation_to(actor, target)` does
-  not satisfy the request's declared `Faction` constraint
+  not satisfy the skill's own `SkillDef.faction_constraint`
 - **THEN** it rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`
 
 #### Scenario: A target failing multiple validations reports the earliest one
@@ -49,40 +49,50 @@ list, except that an `AREA` action whose final target list is empty after filter
 - **THEN** the action rejects with `RejectReason.NO_VALID_TARGETS_IN_AREA` before any resource is
   deducted
 
-### Requirement: Faction is a caller-declared request constraint, validated via a Relation query
-`ActionRequest` SHALL carry a `faction: Faction` field (`ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`), independent
-of `SkillDef`. Faction validation SHALL compare the constraint against `context.relation_to(actor,
-target)`, which SHALL return `Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean
-in-combat flag.
+### Requirement: FactionConstraint is read from SkillDef, not declared by the caller
+`world/rules/targeting.py` SHALL validate targets against `SkillDef.faction_constraint` — change 5's
+`FactionConstraint` enum (`ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`), a property of the skill definition itself
+— never against a value the calling `ActionRequest` supplies independently. Faction validation SHALL
+compare `skill.faction_constraint` against `context.relation_to(actor, target)`, which SHALL return
+`Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean in-combat flag.
+
+#### Scenario: The skill's own constraint governs, regardless of who casts it or how
+- **WHEN** two different callers both invoke the same `skill_key` against the same target, once from
+  `CmdCast` and once from a stand-in combat caller
+- **THEN** both calls validate the target against the identical `SkillDef.faction_constraint` value —
+  neither caller can supply a different constraint for the same skill
 
 #### Scenario: SELF_ONLY accepts only the actor itself
-- **WHEN** `Faction.SELF_ONLY` is checked against a target where `relation_to()` returns
-  `Relation.ALLY`
+- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.SELF_ONLY` is validated against a
+  target where `relation_to()` returns `Relation.ALLY`
 - **THEN** faction validation rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`
 
 #### Scenario: ALLY accepts both SELF and ALLY relations
-- **WHEN** `Faction.ALLY` is checked against a target where `relation_to()` returns `Relation.SELF`,
-  and separately against a target where it returns `Relation.ALLY`
+- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ALLY` is validated against a target
+  where `relation_to()` returns `Relation.SELF`, and separately against a target where it returns
+  `Relation.ALLY`
 - **THEN** both checks pass
 
 #### Scenario: ANY accepts every relation
-- **WHEN** `Faction.ANY` is checked against targets returning `Relation.SELF`, `Relation.ALLY`, and
-  `Relation.ENEMY` respectively
+- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ANY` (the default) is validated
+  against targets returning `Relation.SELF`, `Relation.ALLY`, and `Relation.ENEMY` respectively
 - **THEN** all three checks pass
 
 ### Requirement: Out-of-combat targeting has no hostility model
 `RoomActionContext.relation_to()` SHALL return `Relation.SELF` for the actor itself and
-`Relation.ALLY` for every other present entity — never `Relation.ENEMY` — so that `TargetSpec.SINGLE`
-may target any present entity out of combat.
+`Relation.ALLY` for every other present entity — never `Relation.ENEMY` — so that a skill whose
+`faction_constraint` is `ANY` or `ALLY` (`SINGLE`-targeted) may target any present entity out of
+combat.
 
 #### Scenario: Support magic, self-buffing, and sexual magic on a companion all validate identically
-- **WHEN** a `TargetSpec.SINGLE`, `Faction.ALLY` skill is resolved out of combat against (a) the actor
-  itself, (b) a present companion entity, using `RoomActionContext`
+- **WHEN** a `TargetSpec.SINGLE` skill whose `faction_constraint` is `FactionConstraint.ALLY` is
+  resolved out of combat against (a) the actor itself, (b) a present companion entity, using
+  `RoomActionContext`
 - **THEN** both (a) and (b) pass faction validation with no special-cased branch distinguishing the two
 
 #### Scenario: An ENEMY-constrained skill has no valid target out of combat
-- **WHEN** a `Faction.ENEMY` skill is resolved out of combat against any present entity via
-  `RoomActionContext`
+- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ENEMY` is resolved out of combat
+  against any present entity via `RoomActionContext`
 - **THEN** it rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`, because `RoomActionContext` never
   reports `Relation.ENEMY`
 
@@ -114,7 +124,9 @@ this change.
 - **WHEN** `RoomActionContext` is constructed with a room and queried via all four protocol members
 - **THEN** every member returns a value of the documented type with no `NotImplementedError`
 
-#### Scenario: is_in_range() is a named, tested no-op today
+#### Scenario: is_in_range() is a named, tested no-op today, owned by change 9 going forward
 - **WHEN** `RoomActionContext.is_in_range()` is called for any actor/target/skill combination
 - **THEN** it returns `True` unconditionally, and a separate test using a stubbed context whose
-  `is_in_range()` returns `False` confirms the rejection path itself is wired correctly
+  `is_in_range()` returns `False` confirms the rejection path itself is wired correctly; this change's
+  design records change 9 (`dice-combat`, once change 12 supplies positional data) as the owner of
+  replacing this constant with a real, coordinate-based implementation

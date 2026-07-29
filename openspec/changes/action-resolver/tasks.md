@@ -8,9 +8,11 @@
 - [ ] 1.2 Confirm `commands/` exists as an empty package (change 1); create `commands/action.py` as an
       empty module.
 - [ ] 1.3 Confirm the exact import paths for `world.skills.registry.{SkillDef, SkillKind, TargetSpec,
-      SKILL_REGISTRY}` (change 5), `world.skills.handler.{grant_conferred, apply_disguise_effect}`
-      (change 5, exact function names/module location — confirm against how change 5 actually landed),
-      and `world.rules.buffs.{blocks_action, entity_active_buffs, BLOCKING_BUFF_KEYS,
+      FactionConstraint, SKILL_REGISTRY}` (change 5 — `FactionConstraint` and `SkillDef.
+      faction_constraint` were added to change 5's design during this change's own review; confirm they
+      landed as documented), `world.skills.handler.{grant_conferred, apply_disguise_effect}` (change 5,
+      exact function names/module location — confirm against how change 5 actually landed), and
+      `world.rules.buffs.{blocks_action, entity_active_buffs, BLOCKING_BUFF_KEYS,
       grant_conferred_growth_rate}` (change 6) — no code in this change should assume an unconfirmed
       symbol name before this step.
 - [ ] 1.4 Confirm the `django.db.transaction` import path against the installed Django version Evennia
@@ -19,11 +21,14 @@
 ## 2. Named rejection reasons and the ActionRequest/ActionResult shape
 
 - [ ] 2.1 In `world/rules/action.py`, define `RejectReason(StrEnum)` with every value listed in
-      design.md D-2 (one per pipeline step, plus the four target sub-reasons and `COMMIT_FAILED`).
-- [ ] 2.2 Define `RejectedAction(Exception)` carrying `reason: RejectReason` and `detail: str`.
+      design.md D-2 (one per pipeline step, plus the four target sub-reasons,
+      `UNSNAPSHOTTED_EFFECT_SURFACE`, and `COMMIT_FAILED`).
+- [ ] 2.2 Define `RejectedAction(Exception)` and `CommitFailed(Exception)`, both carrying
+      `reason: RejectReason` and `detail: str`, per design.md D-2.
 - [ ] 2.3 Define `ActionRequest` (frozen dataclass): `actor`, `skill_key: str`,
       `targets: list[LivingEntity] | Literal["all-enemies", "all-allies", "all"]`,
-      `faction: Faction = Faction.ANY`, `context: ActionContext`.
+      `context: ActionContext`. **No `faction` field** — `FactionConstraint` is read from the resolved
+      `SkillDef` (change 5), never supplied by the caller; see design.md D-5's corrected account.
 - [ ] 2.4 Define `ActionResult` (frozen dataclass) with `outcome: Literal["success", "rejected"]`,
       `event_log: EventLog | None`, `time_cost_seconds: int | None`, `reason: RejectReason | None`,
       `detail: str | None`, plus `ActionResult.success(event_log, time_cost)` and
@@ -32,27 +37,31 @@
 
 ## 3. Targeting (`world/rules/targeting.py`)
 
-- [ ] 3.1 Define `Faction(StrEnum)`: `ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`, and `Relation(StrEnum)`:
-      `SELF`/`ALLY`/`ENEMY`, per design.md D-5.
+- [ ] 3.1 Import `FactionConstraint` from `world.skills.registry` (change 5 — do **not** redefine a
+      competing enum in this module). Define `Relation(StrEnum)`: `SELF`/`ALLY`/`ENEMY` — this change's
+      own type, distinct from `FactionConstraint` — per design.md D-5.
 - [ ] 3.2 Define `ActionContext` as a `Protocol` (or ABC) with `battlefield: Battlefield | None`,
       `is_present(actor, target) -> bool`, `relation_to(actor, target) -> Relation`,
       `is_in_range(actor, target, skill) -> bool`, per design.md D-4.
 - [ ] 3.3 Implement `RoomActionContext` (out-of-combat, built now): `is_present()` checks room
       co-location; `relation_to()` returns `Relation.SELF` for the actor and `Relation.ALLY` for every
-      other present entity, never `Relation.ENEMY`; `is_in_range()` returns `True` unconditionally;
-      `battlefield` is always `None`.
-- [ ] 3.4 Implement `validate_faction(relation, constraint) -> bool` per design.md D-5's exact truth
-      table (`ANY` always true; `SELF_ONLY` requires `SELF`; `ALLY` accepts `SELF` or `ALLY`; `ENEMY`
-      requires `ENEMY`).
+      other present entity, never `Relation.ENEMY`; `is_in_range()` returns `True` unconditionally
+      (owned going forward by change 9 once change 12 supplies positional data — see design.md D-5's
+      Open Questions); `battlefield` is always `None`.
+- [ ] 3.4 Implement `validate_faction(relation: Relation, constraint: FactionConstraint) -> bool` per
+      design.md D-5's exact truth table (`ANY` always true; `SELF_ONLY` requires `SELF`; `ALLY` accepts
+      `SELF` or `ALLY`; `ENEMY` requires `ENEMY`).
 - [ ] 3.5 Implement the four ordered per-candidate validation functions (`_validate_presence`,
       `_validate_alive`, `_validate_range`, `_validate_faction`), each raising the matching
-      `RejectReason` from task 2.1.
+      `RejectReason` from task 2.1. `_validate_faction` reads its constraint from `skill.
+      faction_constraint`, never from the request.
 - [ ] 3.6 Implement `resolve_targets(request, skill, candidates) -> list[LivingEntity]`: for
       `TargetSpec.SINGLE`/`SELF`, any candidate failing any validation rejects the whole action with
       that validation's reason; for `TargetSpec.AREA`, each candidate is validated independently,
       failures are dropped silently, and an empty result after filtering raises
       `RejectReason.NO_VALID_TARGETS_IN_AREA`; for `TargetSpec.NONE`, returns `[]` with no validation
-      run at all.
+      run at all. Faction validation reads `skill.faction_constraint` (change 5's field) — `resolve_
+      targets()` takes no separate faction argument from `request`.
 - [ ] 3.7 Implement `expand_target_shorthand(actor, context, shorthand: str) -> list[LivingEntity]` for
       `"all-enemies"`/`"all-allies"`/`"all"`, reading `context.battlefield`'s roster (declared shape
       only, per change 9's future `BattlefieldActionContext`); raises
@@ -60,7 +69,9 @@
       candidate list is handed to the exact same `resolve_targets()` from task 3.6 — no parallel
       validation path.
 - [ ] 3.8 Declare (docstring/type-only, no implementation) `BattlefieldActionContext`'s expected shape
-      as the protocol-conformance target for change 9 — do not implement combat roster/team logic.
+      as the protocol-conformance target for change 9 — do not implement combat roster/team logic. Note
+      in the docstring that change 9 also owns replacing `is_in_range()`'s always-`True` behavior with a
+      real, coordinate-based check once change 12 (`map-anchor-grid`) exists.
 
 ## 4. EventLog (`world/rules/event_log.py`)
 
@@ -85,35 +96,50 @@
       in `skill.cost`, raises `RejectReason.INSUFFICIENT_RESOURCE` if
       `getattr(actor.traits, resource_key).value < amount`.
 - [ ] 5.3 Implement `_step3_targeting(request, skill) -> list[LivingEntity]`: expands shorthand (task
-      3.7) if `request.targets` is a shorthand string, then calls `resolve_targets()` (task 3.6) with
-      `request.faction`.
+      3.7) if `request.targets` is a shorthand string, then calls `resolve_targets(request, skill,
+      candidates)` (task 3.6) — `skill.faction_constraint` is read inside targeting, not passed by this
+      caller as a separate value.
 - [ ] 5.4 Implement `_step4_capability(actor) -> None`: raises `RejectReason.ACTION_FORBIDDEN` if
       `blocks_action(actor)` (change 6's exact seam) is `True`.
-- [ ] 5.5 Implement the `_EFFECT_HANDLERS` registry and `register_effect_handler(prefix, handler)` per
-      design.md D-7; implement `_step5_effect_resolution(request, skill, targets) -> list[PendingEffect]`
-      dispatching purely by effect-ID prefix, raising `RejectReason.UNKNOWN_EFFECT_ID` for an
-      unregistered prefix and wrapping any other handler exception as
-      `RejectReason.EFFECT_RESOLUTION_FAILED`.
-- [ ] 5.6 Implement the `confer_skill_partial` handler: stages
-      `target.skills.grant_conferred(source_key, skill_key, trait_keys, scale)` (change 5's exact seam)
-      as a `PendingEffect`, reading `confer_skill_key`/`confer_scale`/`confer_trait_keys` from
-      `request.context.event_context`; raises `EFFECT_RESOLUTION_FAILED` naming any missing key.
-- [ ] 5.7 Implement the `set_disguise` handler: stages `apply_disguise_effect(target, overrides)`
-      (change 5's exact D-7 function) as a `PendingEffect`.
-- [ ] 5.8 Implement the `buff_apply:<key>` handler: stages `target.buffs.add(key, **buff_kwargs)` per
-      target (change 6's `BuffHandler` mount, one `PendingEffect` per target for `AREA`).
-- [ ] 5.9 Implement the `confer_growth_rate` handler: stages
+- [ ] 5.5 Implement `SNAPSHOTTED_SURFACES = frozenset({"traits", "sexual", "buffs", "skill_grants"})`,
+      `UnsnapshottedSurfaceError`, the `_EFFECT_HANDLERS`/`_EFFECT_HANDLER_SURFACES` registries, and
+      `register_effect_handler(prefix, handler, surfaces)` per design.md D-1/D-7:
+      `register_effect_handler()` raises `UnsnapshottedSurfaceError` immediately if `surfaces` is not a
+      subset of `SNAPSHOTTED_SURFACES`. Implement `_step5_effect_resolution(request, skill, targets) ->
+      list[PendingEffect]` dispatching purely by effect-ID prefix, raising `RejectReason.
+      UNKNOWN_EFFECT_ID` for an unregistered prefix, wrapping any other handler exception as
+      `RejectReason.EFFECT_RESOLUTION_FAILED`, and stamping every returned `PendingEffect`'s `surfaces`
+      field from `_EFFECT_HANDLER_SURFACES[prefix]` via `dataclasses.replace()` — a handler never sets
+      its own `surfaces` value.
+- [ ] 5.6 Implement the `confer_skill_partial` handler, registered with
+      `surfaces=frozenset({"skill_grants"})`: stages `target.skills.grant_conferred(source_key,
+      skill_key, trait_keys, scale)` (change 5's exact seam) as a `PendingEffect`, reading
+      `confer_skill_key`/`confer_scale`/`confer_trait_keys` from `request.context.event_context`; raises
+      `EFFECT_RESOLUTION_FAILED` naming any missing key.
+- [ ] 5.7 Implement the `set_disguise` handler, registered with `surfaces=frozenset({"traits"})`: stages
+      `apply_disguise_effect(target, overrides)` (change 5's exact D-7 function) as a `PendingEffect`.
+- [ ] 5.8 Implement the `buff_apply:<key>` handler, registered with `surfaces=frozenset({"buffs"})`:
+      stages `target.buffs.add(key, **buff_kwargs)` per target (change 6's `BuffHandler` mount, one
+      `PendingEffect` per target for `AREA`).
+- [ ] 5.9 Implement the `confer_growth_rate` handler, registered with `surfaces=frozenset({"buffs"})`
+      (change 6's D-5 models this as a `RulebookBuff` instance): stages
       `grant_conferred_growth_rate(target, source_key, scale)` (change 6's exact seam).
-- [ ] 5.10 Implement the self-arming `sexual_event:<name>` handler per design.md D-7: lazily imports
+- [ ] 5.10 Implement the self-arming `sexual_event:<name>` handler, registered with
+      `surfaces=frozenset({"sexual"})`, per design.md D-7: lazily imports
       `world.rules.sexual_transitions.apply_event` inside a `try/except ImportError`, raising
       `RejectReason.EFFECT_RESOLUTION_FAILED` with a message naming change 7b when the module is not
       yet importable; stages `apply_event(target, event_name, **event_context.get("sexual", {}))` as a
       `PendingEffect` when it is.
+- [ ] 5.10a Add a test-only synthetic handler registration exercising an unsupported surface (e.g.
+      `surfaces=frozenset({"inventory"})`) and confirm `register_effect_handler()` raises
+      `UnsnapshottedSurfaceError` immediately, before any skill references that prefix — per hard
+      requirement 1's "no undeclared handler defeats atomicity" fix.
 - [ ] 5.11 Implement `_step6_resource_deduction(actor, skill) -> list[PendingEffect]`: for every
       `(resource_key, amount)` in `skill.cost`, re-checks the current value defensively and raises
       `RejectReason.RESOURCE_DEDUCTION_FAILED` if it no longer covers `amount` (unreachable in today's
       single-threaded staging discipline but wired and tested per hard requirement 1), then stages a
-      `PendingEffect` decrementing `entity.traits.<key>.value` by `amount`.
+      `PendingEffect` (constructed directly by this module, `surfaces=frozenset({"traits"})`, not via
+      the registry) decrementing `entity.traits.<key>.value` by `amount`.
 - [ ] 5.12 Implement `_step7_build_event_log(request, skill, pending) -> EventLog` per design.md D-8:
       builds one `EventEntry` per `PendingEffect` (using each effect's `description` and a
       kind/text_template pair appropriate to the effect it represents — `resource_spend` for step 6's
@@ -126,21 +152,28 @@
       raising `RejectReason.TIME_COST_LOOKUP_FAILED` otherwise. Confirm this function calls nothing
       resembling `WorldClock.advance()` anywhere.
 - [ ] 5.14 Implement `PendingEffect` (frozen dataclass: `entity`, `description: str`,
-      `apply: Callable[[], None]`) per design.md D-1.
+      `surfaces: frozenset[str]`, `apply: Callable[[], None]`) per design.md D-1. Effect-handler
+      authors construct instances with a placeholder `surfaces` value (e.g. `frozenset()`) — task 5.5's
+      `_step5_effect_resolution` overwrites it from the registry before it is ever staged into the
+      pending list returned to `resolve()`.
 - [ ] 5.15 Implement `_snapshot_entity_state(entity) -> dict` and `_restore_entity_state(entity,
-      snapshot) -> None` per design.md D-1: snapshot captures `entity.traits.all()` values,
-      `entity.sexual`'s public field values when not `None`, `entity.buffs`'s active-key set, and
-      `entity.db.skill_grants`; restore writes traits/sexual fields back via their own public setters
-      and reconciles the buff set via `.add()`/`.remove()` set-difference.
-- [ ] 5.16 Implement `_commit(pending: list[PendingEffect]) -> None` per design.md D-1: snapshots every
-      touched entity, applies every `PendingEffect.apply()` inside one `django.db.transaction.atomic()`
-      block, and on any exception restores every touched entity from its snapshot before re-raising as
-      `CommitFailed`.
+      snapshot) -> None` per design.md D-1: snapshot captures `entity.traits.all()` values (including
+      `entity.db.disguised_stats`, treated as part of the `traits` surface — see design.md D-7's
+      `set_disguise` entry), `entity.sexual`'s public field values when not `None`, `entity.buffs`'s
+      active-key set, and `entity.db.skill_grants`; restore writes traits/sexual fields back via their
+      own public setters and reconciles the buff set via `.add()`/`.remove()` set-difference.
+- [ ] 5.16 Implement `_commit(pending: list[PendingEffect]) -> None` per design.md D-1: **first**,
+      iterates every `PendingEffect` and raises `CommitFailed(RejectReason.
+      UNSNAPSHOTTED_EFFECT_SURFACE, ...)` if any declares a surface outside `SNAPSHOTTED_SURFACES`,
+      before touching any entity (defense in depth alongside task 5.5's registration-time check); only
+      then snapshots every touched entity, applies every `PendingEffect.apply()` inside one
+      `django.db.transaction.atomic()` block, and on any exception restores every touched entity from
+      its snapshot before re-raising `CommitFailed(RejectReason.COMMIT_FAILED, ...)`.
 - [ ] 5.17 Implement `ActionResolver.resolve(request: ActionRequest) -> ActionResult` per design.md
       D-1: runs steps 1–8 inside one `try/except RejectedAction` block returning
-      `ActionResult.rejected(...)`, then calls `_commit(pending)` inside a second `try/except
-      CommitFailed` returning `ActionResult.rejected(RejectReason.COMMIT_FAILED, ...)`, otherwise
-      returns `ActionResult.success(event_log, time_cost)`.
+      `ActionResult.rejected(rejection.reason, rejection.detail)`, then calls `_commit(pending)` inside
+      a second `try/except CommitFailed` returning `ActionResult.rejected(failure.reason,
+      failure.detail)`, otherwise returns `ActionResult.success(event_log, time_cost)`.
 
 ## 6. Out-of-combat command (`commands/action.py`)
 
@@ -164,25 +197,32 @@
       `PendingEffect`s with the second one's `apply()` raising a test-injected exception; assert
       `resolve()` returns `RejectReason.COMMIT_FAILED` and the first effect's mutation is fully
       reversed; a companion test stages a skill's own effect plus its resource-deduction effect and
-      asserts a failure in the effect's `apply()` leaves the actor's `mp`/`sp` completely undeducted.
+      asserts a failure in the effect's `apply()` leaves the actor's `mp`/`sp` completely undeducted;
+      a third test injects a bad entry directly into `_EFFECT_HANDLER_SURFACES` (bypassing
+      `register_effect_handler()`'s own check) and asserts `_commit()`'s independent defensive
+      assertion still rejects with `RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE` before touching any
+      entity.
 - [ ] 7.3 `world/rules/tests/test_targeting.py` — per the `targeting-validation` capability: each of the
       four validations in isolation; `SINGLE` hard-rejects on one invalid target; `AREA` silently drops
       one invalid candidate among several valid ones; `AREA` rejects with `NO_VALID_TARGETS_IN_AREA`
-      when every candidate is filtered; `Faction` truth table (`ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`) against
-      each `Relation` value; `RoomActionContext.relation_to()` never returns `Relation.ENEMY`; shorthand
-      expansion feeds the identical validation path and rejects with `TARGET_SPEC_MISMATCH` out of
-      combat.
+      when every candidate is filtered; `FactionConstraint` truth table (`ANY`/`ALLY`/`ENEMY`/
+      `SELF_ONLY`, change 5's enum) against each `Relation` value; confirm two different callers casting
+      the identical `skill_key` cannot produce two different faction outcomes (the constraint lives on
+      `SkillDef`, not the request); `RoomActionContext.relation_to()` never returns `Relation.ENEMY`;
+      shorthand expansion feeds the identical validation path and rejects with `TARGET_SPEC_MISMATCH`
+      out of combat.
 - [ ] 7.4 `world/rules/tests/test_event_log.py` — per the `event-log` capability: `EventEntry`/
       `EventLog` JSON round-trip with no live reference; `render_plain_text()`'s worked 統御術 example
       renders the exact expected string with no `world/ai/` import; multi-entry ordering; a rejected
       `resolve()` call produces `event_log is None`; concatenating two `EventLog.entries` tuples
       produces a validly renderable combined sequence.
 - [ ] 7.5 `world/rules/tests/test_effect_handlers.py` — per the `action-resolution-pipeline`
-      capability's registry requirement: a synthetic test-only prefix registered and resolved
-      end-to-end; 統御術's conferral committing atomically with its resource cost
-      (`entity.db.skill_grants` gains exactly one matching `ConferredSkillGrant`); 狀態偽裝's
-      `set_disguise` handler touching only `entity.db.disguised_stats`; `buff_apply:` applying to every
-      `AREA` target; `confer_growth_rate` calling change 6's exact seam.
+      capability's registry requirement: a synthetic test-only prefix registered (with a supported
+      `surfaces` value) and resolved end-to-end; a synthetic registration with an unsupported `surfaces`
+      value asserted to raise `UnsnapshottedSurfaceError` immediately; 統御術's conferral committing
+      atomically with its resource cost (`entity.db.skill_grants` gains exactly one matching
+      `ConferredSkillGrant`); 狀態偽裝's `set_disguise` handler touching only `entity.db.disguised_stats`;
+      `buff_apply:` applying to every `AREA` target; `confer_growth_rate` calling change 6's exact seam.
 - [ ] 7.6 `world/rules/tests/test_sexual_event_self_arming.py` — always-runs test asserting a
       `sexual_event:`-effect skill rejects with `EFFECT_RESOLUTION_FAILED` (not a crash) while
       `world.rules.sexual_transitions` is not importable; a `pytest.importorskip`-gated companion test
@@ -190,8 +230,9 @@
       expected to report **skipped**, not passed, until then. A verification task (7.9) confirms this.
 - [ ] 7.7 `world/rules/tests/test_no_combat_branching.py` — per design.md D-6: the forbidden-token
       source scan across `action.py`/`targeting.py`/`event_log.py`; the `inspect.signature()` scan for
-      combat-shaped parameter names; the positive polymorphism proof (identical `ActionRequest`, two
-      different `ActionContext` implementations, different `Faction.ENEMY` outcomes).
+      combat-shaped parameter names; the positive polymorphism proof (identical `ActionRequest`, same
+      skill whose `faction_constraint` is `FactionConstraint.ENEMY`, two different `ActionContext`
+      implementations, different outcomes).
 - [ ] 7.8 `world/rules/tests/test_cmd_cast.py` — `CmdCast` end-to-end: a successful cast renders via
       `render_plain_text()`; a rejected cast renders the matching `REJECTION_MESSAGES` entry.
 
@@ -206,7 +247,13 @@
       3's task 7.5 and change 5's task 8.2 discipline).
 - [ ] 8.3 Confirm `ActionResolver.resolve()` is the only function in `world/rules/` or `world/skills/`
       that constructs an `EventLog` (grep-based check).
-- [ ] 8.4 Confirm this change modifies no file authored by any earlier change — `git diff --stat`
-      against the pre-change tree shows only new files under `world/rules/`, `commands/`, and their
-      `tests/` subdirectories.
-- [ ] 8.5 Run `openspec validate action-resolver --strict` and confirm it passes.
+- [ ] 8.4 Confirm this change modifies no file authored by any earlier change **other than change 5's
+      own design.md**, which the coordinator has already amended directly to add `FactionConstraint`/
+      `SkillDef.faction_constraint` — `git diff --stat` against the pre-change tree shows only new files
+      under `world/rules/`, `commands/`, and their `tests/` subdirectories, plus that one pre-existing
+      edit to change 5's design.
+- [ ] 8.5 Confirm every effect handler registered by this change (task 5.6–5.10) declares a `surfaces`
+      value that is a genuine subset of `SNAPSHOTTED_SURFACES`, and that `register_effect_handler()`
+      itself is the only place in `action.py` that writes to `_EFFECT_HANDLERS`/
+      `_EFFECT_HANDLER_SURFACES` (grep-based check).
+- [ ] 8.6 Run `openspec validate action-resolver --strict` and confirm it passes.

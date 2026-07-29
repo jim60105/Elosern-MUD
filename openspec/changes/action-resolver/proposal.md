@@ -29,14 +29,16 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
   Django ORM per design doc §3.1) — any exception during commit restores every touched entity to its
   pre-commit snapshot and the whole call rejects. "Mana spent but the skill did nothing" has no code
   path: resource deduction is just another item in the same commit as the skill's own effects.
-- Add `world/rules/targeting.py`: `Faction` (`ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`), the four ordered
-  validations (presence → alive → range → faction), and `expand_target_shorthand()` for the combat
-  shortcuts `all-enemies`/`all-allies`/`all` — sugar that expands to an explicit list and re-enters the
-  identical four validations, bypassing nothing. Combat-vs-non-combat behavior is expressed entirely
-  through an `ActionContext` protocol supplied by the caller (a built `RoomActionContext` for
-  out-of-combat use; a declared seam, `BattlefieldActionContext`, for change 9) — `targeting.py` and
-  `action.py` contain no `if in_combat`-shaped branch anywhere, enforced by a source-scanning
-  regression test in the style already established by changes 3 (D-9) and 5 (D-11).
+- Add `world/rules/targeting.py`: the four ordered validations (presence → alive → range → faction),
+  reading `SkillDef.faction_constraint` — change 5's `FactionConstraint` enum (`ANY`/`ALLY`/`ENEMY`/
+  `SELF_ONLY`), added to `SkillDef` during coordinator review as the property of the *skill*, not of
+  whoever casts it — and `expand_target_shorthand()` for the combat shortcuts
+  `all-enemies`/`all-allies`/`all` — sugar that expands to an explicit list and re-enters the identical
+  four validations, bypassing nothing. Combat-vs-non-combat behavior is expressed entirely through an
+  `ActionContext` protocol supplied by the caller (a built `RoomActionContext` for out-of-combat use; a
+  declared seam, `BattlefieldActionContext`, for change 9) — `targeting.py` and `action.py` contain no
+  `if in_combat`-shaped branch anywhere, enforced by a source-scanning regression test in the style
+  already established by changes 3 (D-9) and 5 (D-11).
 - Add `world/rules/event_log.py`: `EventEntry`/`EventLog` — frozen, JSON-serializable dataclasses with
   no live entity references (entity keys only), and `render_plain_text()`, a minimal reference
   degradation renderer proving the structure is consumable with zero LLM involvement. Designed for all
@@ -51,7 +53,10 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
   self-arming `sexual_event:*` bridge to change 7b's `apply_event()`, and `buff_apply:*`) and declares,
   by name, as the extension point change 9 will register `damage:*` handlers into later — an
   unregistered effect-ID prefix rejects loudly with a named reason today, exactly the same "self-arms
-  once its dependency lands" pattern changes 4 and 6 already established.
+  once its dependency lands" pattern changes 4 and 6 already established. **Every registered handler
+  declares the entity-state surfaces it mutates**, checked against exactly what the commit mechanism's
+  snapshot/restore covers — a handler declaring an unsupported surface fails loudly at registration,
+  before any player can reach it, rather than silently escaping rollback.
 
 ## Capabilities
 
@@ -60,9 +65,10 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
   pipeline steps, the staged-effect/commit atomicity mechanism, the effect-handler registry, and the
   structural (source-scanned) guarantee that neither the resolver nor any skill branches on combat
   state.
-- `targeting-validation`: `Faction`, the four ordered target validations, `SINGLE` vs. `AREA` filtering
-  semantics, combat-shortcut expansion as pure sugar, and the `ActionContext` protocol that lets combat
-  and non-combat callers share one validation code path with zero special-casing.
+- `targeting-validation`: the four ordered target validations (reading change 5's
+  `FactionConstraint` off `SkillDef`), `SINGLE` vs. `AREA` filtering semantics, combat-shortcut
+  expansion as pure sugar, and the `ActionContext` protocol that lets combat and non-combat callers
+  share one validation code path with zero special-casing.
 - `event-log`: `EventEntry`/`EventLog`'s structure, its serializable/replayable contract, and
   `render_plain_text()` as the reference no-LLM degradation path.
 
@@ -76,10 +82,12 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
 - **Modified files**: none. This change adds no attribute or method to any typeclass another change
   authored — every handler it calls (`entity.skills`, `entity.buffs`, `entity.sexual`,
   `entity.traits`) already exists as a mounted, public seam from changes 3/5/6/7.
-- **Depends on**: change 5 (`skills-equipment`) for `SkillDef`/`SkillKind`/`TargetSpec`,
-  `SkillHandler.grant_conferred()`, and `apply_disguise_effect()`; change 6 (`buffs-rulebook`) for
-  `blocks_action()`, `entity_active_buffs()`, `BLOCKING_BUFF_KEYS`, and `grant_conferred_growth_rate()`.
-  Matches design doc §11's stated dependency (5, 6) exactly.
+- **Depends on**: change 5 (`skills-equipment`) for `SkillDef`/`SkillKind`/`TargetSpec`/
+  `FactionConstraint` (the eighth `SkillDef` field, added during review — a skill's legal targets are
+  the skill's own property, not the caster's claim), `SkillHandler.grant_conferred()`, and
+  `apply_disguise_effect()`; change 6 (`buffs-rulebook`) for `blocks_action()`, `entity_active_buffs()`,
+  `BLOCKING_BUFF_KEYS`, and `grant_conferred_growth_rate()`. Matches design doc §11's stated dependency
+  (5, 6) exactly.
 - **Not a hard dependency, but self-arming**: change 7 (`sexual-state`) and 7b
   (`sexual-transition-rules`) are not on this change's dependency list per §11's roadmap ordering (this
   change is designed to be buildable in parallel with them), so the `sexual_event:*` effect handler
@@ -88,9 +96,11 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
   before change 7 landed. A guarded, `pytest.importorskip`-style test proves this transitions from
   skipped to passing once 7b lands, with no edit to this change's code required.
 - **Consumers deferred to later changes**: change 9 (`dice-combat`) is expected to call
-  `ActionResolver.resolve()` from its turn loop, supply `BattlefieldActionContext`, and register
-  `damage:*` effect handlers into this change's open registry; change 10
-  (`overwhelm-resolution`) is expected to compress multiple `EventLog`s produced by this change into
-  one; change 11 (`world-clock`) is expected to read this change's reported time-cost value and decide
-  how to advance; change 18 (`narrator`) is expected to consume `EventLog` as a pure function and may
-  reuse `render_plain_text()` directly as its own degradation path.
+  `ActionResolver.resolve()` from its turn loop, supply `BattlefieldActionContext`, register `damage:*`
+  effect handlers into this change's open registry (declaring their mutation surfaces), and — assigned
+  explicitly during this review — replace `RoomActionContext`'s always-`True` `is_in_range()` with a
+  real, coordinate-based implementation once change 12 (`map-anchor-grid`) supplies positional data;
+  change 10 (`overwhelm-resolution`) is expected to compress multiple `EventLog`s produced by this
+  change into one; change 11 (`world-clock`) is expected to read this change's reported time-cost value
+  and decide how to advance; change 18 (`narrator`) is expected to consume `EventLog` as a pure function
+  and may reuse `render_plain_text()` directly as its own degradation path.

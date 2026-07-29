@@ -82,6 +82,12 @@ state it held before `resolve()` was called.
 - **WHEN** `resolve()` rejects at any step
 - **THEN** the returned `ActionResult` has `event_log is None` and `time_cost_seconds is None`
 
+#### Scenario: An effect handler declaring an unsupported mutation surface is refused, not silently run
+- **WHEN** a skill's effect resolves to a `PendingEffect` whose declared `surfaces` includes a value
+  outside the exact set `_commit()`'s snapshot/restore mechanism covers
+- **THEN** `resolve()` returns `ActionResult(outcome="rejected", reason=
+  RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE)` before any entity referenced by the request is touched
+
 ### Requirement: Neither ActionResolver nor targeting branches on combat state
 `world/rules/action.py` and `world/rules/targeting.py` SHALL contain no conditional that distinguishes
 combat from non-combat behavior other than the single, explicitly marked `usable_out_of_combat` gate.
@@ -100,24 +106,43 @@ implementation the caller supplies.
 - **THEN** no parameter is named `in_combat`, `combat_state`, `turn`, or `is_combat`
 
 #### Scenario: Identical code, different ActionContext, different faction outcome
-- **WHEN** `ActionResolver.resolve()` is called twice with byte-identical `ActionRequest`s differing
-  only in which `ActionContext` is supplied — once with `RoomActionContext`, once with a test double
-  whose `relation_to()` reports `Relation.ENEMY` for the same target — for a skill declaring
-  `Faction.ENEMY`
+- **WHEN** `ActionResolver.resolve()` is called twice with byte-identical `ActionRequest`s (same actor,
+  same `skill_key` whose `SkillDef.faction_constraint` is `FactionConstraint.ENEMY`) differing only in
+  which `ActionContext` is supplied — once with `RoomActionContext`, once with a test double whose
+  `relation_to()` reports `Relation.ENEMY` for the same target
 - **THEN** the `RoomActionContext` call rejects with `RejectReason.TARGET_FACTION_FORBIDDEN` and the
   test-double call succeeds, with no difference in `action.py`'s or `targeting.py`'s executed source
   between the two calls
 
-### Requirement: The effect-resolution registry is open and prefix-keyed
-`world/rules/action.py` SHALL expose `register_effect_handler(prefix, handler)` as the only sanctioned
-way to add an effect-ID handler. Step 5 SHALL dispatch purely by looking up an effect ID's prefix (the
-substring before its first `:`) in the registry, with no other conditional distinguishing one effect
-kind from another.
+### Requirement: The effect-resolution registry is open, prefix-keyed, and every handler declares its
+mutation surfaces
+`world/rules/action.py` SHALL expose `register_effect_handler(prefix, handler, surfaces)` as the only
+sanctioned way to add an effect-ID handler, where `surfaces` is the exact set of entity-state surfaces
+that handler's staged effects mutate. Step 5 SHALL dispatch purely by looking up an effect ID's prefix
+(the substring before its first `:`) in the registry, with no other conditional distinguishing one
+effect kind from another. Registration SHALL fail immediately if `surfaces` is not a subset of the
+surfaces `_commit()`'s snapshot/restore mechanism covers, and `_commit()` SHALL independently refuse to
+run any action whose staged effects declare a surface outside that same set.
 
 #### Scenario: A newly registered handler resolves a previously-unknown prefix
-- **WHEN** a test registers a handler for a synthetic prefix not built into this change, then resolves
-  a skill whose `effects` list contains an ID with that prefix
+- **WHEN** a test registers a handler for a synthetic prefix not built into this change, declaring
+  `surfaces=frozenset({"traits"})`, then resolves a skill whose `effects` list contains an ID with that
+  prefix
 - **THEN** `resolve()` succeeds and the registered handler's staged effect is committed
+
+#### Scenario: Registering a handler with an unsupported surface fails immediately
+- **WHEN** `register_effect_handler()` is called with a `surfaces` value containing a surface outside
+  `_commit()`'s snapshot/restore coverage (e.g. `"inventory"`)
+- **THEN** it raises `UnsnapshottedSurfaceError` immediately, naming the unsupported surface, before any
+  skill can ever reference that prefix
+
+#### Scenario: A handler bypassing registration is still caught at commit time
+- **WHEN** a test injects an entry directly into the internal handler-surface mapping (bypassing
+  `register_effect_handler()`'s own check) declaring an unsupported surface, then resolves a skill using
+  that prefix
+- **THEN** `_commit()`'s own independent assertion rejects the action with
+  `RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE` before touching any entity, proving the commit-time check
+  is not merely decorative alongside the registration-time one
 
 #### Scenario: 統御術's cast-time conferral commits atomically with its own resource cost
 - **WHEN** `resolve()` is called for 統御術 (`dominion_art`) targeting a single ally, with
