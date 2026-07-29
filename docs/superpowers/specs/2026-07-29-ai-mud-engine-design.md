@@ -666,6 +666,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 | 8 | `action-resolver` | 5, 6 | ActionResolver, targeting, out-of-combat skill use |
 | 9 | `dice-combat` | 8 | d100 resolution, damage, initiative, turn loop |
 | 10 | `overwhelm-resolution` | 9 | Overwhelm threshold, single-shot resolution, EventLog compression |
+| 10b | `monster-behaviour` | 9, 10 | Monster combat AI. `Monster.behaviour_tree` has been an unbuilt seam since change 3; change 9 supplies only a labelled placeholder that attacks the lowest-hp enemy. The change-16 milestone claims a complete playable game, which needs monsters that fight sensibly. |
 | 11 | `world-clock` | 7, 9 | Clock, scheduled events, time-skip commands, safety gate |
 | 11b | `character-progression` | 5, 6, 11 | XP, magic-level growth, skill improvement, and the consumer for conferred growth-rate multipliers. §3.2 lists `rules/progression` but no change owned it; surfaced by change 6, which built `growth_rate_multiplier()` with nothing to call it. Guild merit and rank remain change 16's. |
 
