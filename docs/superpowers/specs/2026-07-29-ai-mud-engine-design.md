@@ -661,7 +661,8 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 7 | `sexual-state` | 6 | Ordered-level `Trait` subclass (authored from scratch, registered via `settings.TRAIT_CLASS_PATHS`), `SexualState`, `sexual.yaml`, per-rule tests |
+| 7 | `sexual-state` | 6 | Ordered-level `Trait` subclass (authored from scratch, registered via `settings.TRAIT_CLASS_PATHS`), the `SexualState` handler, character and monster baselines, the decay callable. Flips change 6's self-arming test. |
+| 7b | `sexual-transition-rules` | 7 | `sexual.yaml` — ~25 transition rules transcribed from `variable_rule.md` into change 6's condition grammar, each with a matching per-rule test. Split from change 7 because the rule-plus-test surface alone fills a working day. |
 | 8 | `action-resolver` | 5, 6 | ActionResolver, targeting, out-of-combat skill use |
 | 9 | `dice-combat` | 8 | d100 resolution, damage, initiative, turn loop |
 | 10 | `overwhelm-resolution` | 9 | Overwhelm threshold, single-shot resolution, EventLog compression |
