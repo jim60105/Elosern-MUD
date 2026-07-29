@@ -196,10 +196,12 @@ through 7.
   rank
 - **THEN** every value is an `int`, never a `float`
 
-### Requirement: MonsterTier registry covers the four documented threat bands
-`world/lore/monsters.py` SHALL define a frozen `MonsterTier` dataclass and a module-level
-`MONSTER_TIER_REGISTRY: dict[str, MonsterTier]` with four entries corresponding to F-E, D-C, B-A,
-and 災厄級 (S and above), each carrying example monster names from `world_info.md`.
+### Requirement: MonsterTier registry has physical stat and HP bands derived from guild rank
+`world/lore/monsters.py` SHALL define a frozen `MonsterTier` dataclass with fields `key`,
+`display_name_zh`, `guild_rank_range`, `static_band` (a `StaticBand`), `hp_band`, and
+`example_monsters_zh`, and a module-level `MONSTER_TIER_REGISTRY: dict[str, MonsterTier]` with four
+entries corresponding to F-E, D-C, B-A, and 災厄級 (S and above), each carrying example monster
+names from `world_info.md`.
 
 #### Scenario: Registry has exactly the four threat bands
 - **WHEN** `MONSTER_TIER_REGISTRY` is inspected
@@ -210,6 +212,29 @@ and 災厄級 (S and above), each carrying example monster names from `world_inf
 - **WHEN** every `MonsterTier` entry is inspected
 - **THEN** `example_monsters_zh` contains at least one name drawn from `world_info.md` (e.g.
   史萊姆, 哥布林 for the lowest tier; 古龍, 魔神 for 災厄級)
+
+#### Scenario: Each monster tier's static band is beatable by the guild rank that handles it
+- **WHEN** each `MonsterTier` entry's `static_band` is compared against the corresponding
+  `StaticTier` band from `STATIC_TIER_REGISTRY`
+- **THEN** `low`'s band falls inside `human_adventurer`'s band (a novice handles it solo); `mid`'s
+  band exceeds `human_elite`'s band (stronger than one veteran, needs a party); `high`'s band
+  reaches or exceeds `human_swordmaster`'s band (matches or exceeds the human ceiling); and
+  `calamity`'s band exceeds `elf_common`'s band (beyond human scale entirely) — this
+  guild-rank-to-monster-tier correspondence, not any single literal number, is the property under
+  test
+
+#### Scenario: Calamity-tier monsters deliberately exceed the elf band and this is not corrected away
+- **WHEN** `MONSTER_TIER_REGISTRY["calamity"].static_band` is compared against
+  `RACE_REGISTRY["elf"].static_baseline`
+- **THEN** `calamity`'s band overlaps and extends above the elf band, reflecting `world_info.md`'s
+  explicit statement that 古龍/魔神-tier threats are beyond what any human — or even a typical elf —
+  can face alone
+
+#### Scenario: HP bands scale with static bands at the documented ratio
+- **WHEN** each `MonsterTier` entry's `hp_band` is compared against its own `static_band`
+- **THEN** the HP band is within roughly 15-20× the static band at both ends, matching
+  `world_info.md`'s stated ratio (and the human reference point: Lidzia's `atk_phys` 8 to `hp` 120
+  is 15×)
 
 ### Requirement: Anchor registry covers capitals, elven villages, and known dungeons
 `world/lore/anchors.py` SHALL define an `AnchorKind` string enum (`CAPITAL`, `ELVEN_VILLAGE`,

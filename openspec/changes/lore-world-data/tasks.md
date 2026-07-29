@@ -86,9 +86,16 @@
       across all seven ranks (F 10–100, E 100–500, D 500–5,000, C 5,000–50,000, B 50,000–500,000,
       A 500,000–5,000,000, S 5,000,000+).
 - [ ] 5.4 Define `MonsterTier` (frozen dataclass: `key`, `display_name_zh`, `guild_rank_range`,
-      `example_monsters_zh`, `description`) in `world/lore/monsters.py`. Populate
-      `MONSTER_TIER_REGISTRY` with the four bands (F-E, D-C, B-A, 災厄級) and their example
-      monsters from `world_info.md`'s 魔獸 section.
+      `static_band: StaticBand`, `hp_band: tuple[int, int]`, `example_monsters_zh`, `description`)
+      in `world/lore/monsters.py` — import `StaticBand` from `races.py` (design.md D-6b). Populate
+      `MONSTER_TIER_REGISTRY` with the four bands (F-E, D-C, B-A, 災厄級), their example monsters
+      from `world_info.md`'s 魔獸 section, and the physical/HP bands now specified there:
+      `low` (guild F-E, static (3, 8), hp (50, 150)), `mid` (guild D-C, static (12, 20), hp (200,
+      400)), `high` (guild B-A, static (22, 35), hp (400, 700)), `calamity` (guild S+, static (60,
+      150), hp (1200, 3000)). Populate `static_band` uniformly across `atk_phys`/`agility`/
+      `defense` for each tier, matching D-2b's "one shared band across all three stats" convention.
+      Do not add loot tables, behaviour, or resistances — those are out of scope (design.md
+      Non-Goals); this task is stats only.
 
 ## 6. Currency and price table (`world/lore/economy.py`)
 
@@ -162,7 +169,12 @@
       and equals the next rank's `reward_min_copper`) — this is the assertion that caught the
       earlier wrong exchange rate, and it must stay in place to keep catching regressions.
 - [ ] 9.6 `test_monsters.py` — exactly 4 tiers, `guild_rank_range` values partition
-      `GUILD_RANK_REGISTRY`'s keys without gaps, every tier has at least one example monster.
+      `GUILD_RANK_REGISTRY`'s keys without gaps, every tier has at least one example monster;
+      **the guild-rank-to-monster-tier correspondence, not literal values** (design.md D-6b): `low`
+      falls inside `human_adventurer`'s static band, `mid` exceeds `human_elite`'s, `high` reaches
+      or exceeds `human_swordmaster`'s, `calamity` exceeds `elf_common`'s (deliberately, per
+      `world_info.md` — assert this overlap holds, do not treat it as a bug to fix); and each
+      tier's `hp_band` is within roughly 15-20× its own `static_band` at both ends.
 - [ ] 9.7 `test_anchors.py` — exactly 9 anchors (3/3/3 split by kind), dungeon floor counts
       (80/50/60), elven villages have `nation_key is None`.
 - [ ] 9.8 `test_economy.py` — `to_copper` conversion correctness (1 gold = 10,000, 1 silver = 100,

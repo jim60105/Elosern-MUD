@@ -34,7 +34,9 @@ module.
   - `RankTitle` (學徒/術師/大師/賢者/主宰).
   - `Nation` (格蘭迪亞帝國 / 阿爾托利亞王國 / 瓦爾哈拉獸王國).
   - `GuildRank` (F–S) with reward bands.
-  - `MonsterTier` (F-E / D-C / B-A / 災厄級).
+  - `MonsterTier` (F-E / D-C / B-A / 災厄級), with physical-stat and HP bands derived from
+    `world_info.md`'s guild-rank-to-monster correspondence, so change 3 can instantiate `Monster`
+    entities without inventing numbers of its own.
   - `Anchor` (three capitals, three elven villages, three known dungeons — 永夜迷宮 80F, 龍之巢穴
     50F, 魔導遺跡 60F).
   - Currency stored as an integer count of 銅 (1 金 = 100 銀 = 10000 銅), plus the purchasing-power

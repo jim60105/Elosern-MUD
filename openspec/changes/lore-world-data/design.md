@@ -35,6 +35,10 @@ changes 3, 4, 9, 10, and 16's jobs, each reading these registries rather than ha
   (change 16 / change 20's ScenarioDirector), and import range checks (change 4) are not
   implemented here — only the data they will read.
 - No `LivingEntity`, `TraitHandler`, or any runtime entity state (change 3).
+- No monster loot tables, behaviour trees, or elemental resistances. `MonsterTier` (D-6b) carries
+  exactly the two numeric bands `world_info.md` specifies (physical stats, HP) so change 3 can
+  instantiate `Monster` entities without inventing numbers; everything else about how a monster
+  fights or what it drops belongs to the bestiary work in change 3 and later.
 - No Rooms, no `XYZRoom` grid entries for the anchors listed here — `Anchor` is pure lore data;
   turning an anchor into a walkable room is change 12 (`map-anchor-grid`)'s job.
 - No YAML lore format. D9 is explicit that `world/lore/` is Python; this change does not introduce
@@ -341,7 +345,9 @@ world/lore/
 same future consumers (entity trait scaling; magic-rank gating) and splitting them buys nothing.
 `anchors.py` depends on `nations.py` (a `Nation.capital_anchor_key` and an `Anchor.nation_key` are
 each other's forward/back reference) — resolved by keeping both as plain string keys with no
-circular import, validated by a test rather than by type-level referential integrity.
+circular import, validated by a test rather than by type-level referential integrity. `monsters.py`
+imports `StaticBand` from `races.py` (D-6b) — a plain type import, not a registry cross-reference,
+so it carries no circularity risk.
 
 ### D-5. `MagicTier` bands are non-overlapping; the 90/91 seam is a resolved ambiguity.
 
@@ -419,6 +425,63 @@ by hand.
 The purchasing-power price table (`economy.py`'s `PRICE_TABLE`) is converted at the same corrected
 rate (e.g. 魔法藥劑 "50銅-5銀" → `(50, 500)`; 普通劍 "1-5銀" → `(100, 500)`), and is likewise
 non-degenerate throughout.
+
+### D-6b. `MonsterTier` carries physical-stat and HP bands, derived from the guild-rank
+correspondence `world_info.md` states — not invented.
+
+An earlier gap in this change: `MonsterTier` shipped purely qualitative (F-E / D-C / B-A / 災厄級,
+example monster names, no numbers). Change 3's author, needing concrete stats to instantiate
+`Monster` entities and lacking a source number, invented a 10⁰–10³ decade ladder — which would put
+a 災厄級 monster at 1000× a human, a ratio with no basis anywhere in `world_info.md` and wildly out
+of step with the elf ratio (~10×) this design spent three correction rounds pinning down precisely.
+
+**The numbers were derivable all along.** `world_info.md`'s own 怪物 section states monster tiers
+are defined by *which adventurer rank can handle them* — F-E for a novice solo, D-C needs a party
+stronger than one veteran, B-A matches or exceeds a human sword-master, 災厄級 exceeds human scale
+entirely. Once the adventurer physical bands existed (D-2c's `STATIC_TIER_REGISTRY`), the monster
+bands fall out of that correspondence, and the user has now written the derived numbers into
+`world_info.md` directly rather than leaving them for change 3 to invent:
+
+```python
+@dataclass(frozen=True)
+class MonsterTier:
+    key: str
+    display_name_zh: str
+    guild_rank_range: tuple[str, str]   # references GuildRank.key, e.g. ("F", "E")
+    static_band: StaticBand             # atk_phys/agility/defense, reuses the D-2b shape
+    hp_band: tuple[int, int]
+    example_monsters_zh: tuple[str, ...]
+    description: str                    # English
+```
+
+| key | guild ranks | static band | hp band | correspondence |
+|---|---|---|---|---|
+| `low` | F–E | (3, 8) | (50, 150) | inside `human_adventurer` (5-9) — one novice solo |
+| `mid` | D–C | (12, 20) | (200, 400) | exceeds `human_elite` (7-14) — needs a party |
+| `high` | B–A | (22, 35) | (400, 700) | at or above `human_swordmaster` (18-22) |
+| `calamity` | S+ | (60, 150) | (1200, 3000) | above `elf_common` (70-95) — beyond human scale |
+
+`static_band` reuses `StaticBand` (D-2b) rather than introducing a third shape, since it is the
+same three-axis concept (`atk_phys`/`agility`/`defense`) at a monster's scale rather than a race's.
+`hp_band` is a plain `tuple[int, int]`, not a full `Vitals` (which also carries `mp`/`sp`) —
+`world_info.md` only specifies HP for monsters ("大致為物理數值的 15-20 倍"), and MP/SP are not
+part of this change's scope (bestiary behavior, resistances, and loot are change 3's and later's
+concern, per the Non-Goals below).
+
+**災厄級's band deliberately overlaps and exceeds the elf band (70-95) — this is preserved, not
+"fixed."** `world_info.md` states this is intentional: 古龍 (ancient dragons) and 魔神 (demon gods)
+are explicitly not adversaries humans can face; the source's own legends about defeating them
+involve elves or age-of-gods figures. This is also the story's stated explanation for why fewer
+than ten S-rank adventurers exist on the entire continent — the same fact `GuildRank`'s `S` entry
+and `STATIC_TIER_REGISTRY["human_swordmaster"]` already record independently. The test suite
+(tasks.md §9.6) asserts this overlap-and-exceed relationship directly, so a future edit that
+"corrects" 災厄級 back into a human-scale band would fail immediately.
+
+**What this does *not* add**: no loot tables, no behaviour trees, no elemental resistances. Those
+are explicitly out of scope for this change (Non-Goals) and belong to whichever later change
+introduces `Monster(LivingEntity)` and its bestiary data — this decision adds exactly the two
+numeric bands `world_info.md` now specifies (physical stats, HP) and nothing else on the monster
+side.
 
 ### D-7. `Anchor` and `Nation` cross-reference by string key, `AnchorKind` distinguishes the three
 anchor shapes.
@@ -502,6 +565,13 @@ more scaffolding than the direct `at_server_start()` call for no behavioral bene
   (D-5) with the reasoning, and the test suite (tasks.md §9.3) asserts the exact bands so any
   accidental "correction" back toward the source's literal overlapping text fails a test
   immediately.
+- **[Risk] A future edit could "correct" `MonsterTier["calamity"].static_band` back into a
+  human-scale range, on the reasoning that it looks like an outlier compared to the other three
+  tiers, erasing the deliberate above-elf overlap `world_info.md` states is intentional.** →
+  Mitigation: D-6b documents the narrative reason (古龍/魔神 are not human-scale threats; this is
+  also the story's own explanation for why fewer than ten S-rank adventurers exist), and
+  tasks.md §9.6 asserts the overlap-and-exceed relationship against `elf_common` directly, so a
+  "fix" back to human scale fails a test rather than silently passing review.
 - **[Risk] The guild-rank reward ladder silently regresses to a degenerate or non-monotonic shape
   if the exchange-rate constants (`COPPER_PER_SILVER`, `COPPER_PER_GOLD`) are ever edited without
   re-deriving every band.** → Mitigation: tasks.md §9.5 asserts the ladder is strictly increasing
