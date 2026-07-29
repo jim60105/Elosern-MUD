@@ -182,8 +182,16 @@ Other registries: `Element` (eight elements), `MagicTier` (初級→究極), `Ra
 `MonsterTier` (F-E / D-C / B-A / 災厄級), `Anchor` (capitals, the three elven villages, known
 dungeon entrances).
 
-**Currency is stored as an integer count of 銅.** 1 金 = 10 銀 = 100 銅. Conversion happens only at
-display time. No floats anywhere in the money path.
+**Currency is stored as an integer count of 銅.** 1 金 = 100 銀 = 10000 銅. Conversion happens only
+at display time. No floats anywhere in the money path.
+
+> **Corrected 2026-07-29.** `world_info.md` originally stated `1金=10銀=100銅`, but that rate is
+> inconsistent with the same document's own reward and price tables: it collapses the F-rank band
+> (`10銅-1銀`) and the C-rank band (`50銀-5金`) to single points, and it puts a commoner's annual
+> income (5-10 金) at roughly one tenth of their annual food cost (3 meals/day at 5-10 銅). At
+> `1金 = 100銀 = 10000銅` all seven guild bands are non-degenerate and form a clean ten-fold ladder
+> (F 10-100 → S 5,000,000+), and the price table becomes internally coherent. The exchange-rate line
+> was the outlier and has been corrected in `world_info.md` as well.
 
 ### 5.2 Entities
 
