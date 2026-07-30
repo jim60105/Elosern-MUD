@@ -1,10 +1,13 @@
-## ADDED Requirements
+# event-log Specification
 
+## Purpose
+TBD - created by archiving change action-resolver. Update Purpose after archive.
+## Requirements
 ### Requirement: EventLog and EventEntry are frozen, serializable, entity-key-only records
 `world/rules/event_log.py` SHALL define `EventEntry` and `EventLog` as frozen dataclasses whose fields
 are plain JSON-compatible data (strings, dicts, tuples of the same) and entity **keys**, never live
-entity references. `EventLog` SHALL only ever be constructed for a successfully committed
-`ActionResolver.resolve()` call; a rejected action SHALL NOT produce an `EventLog`.
+entity references. A staged `EventLog` SHALL only be returned or emitted after a successfully
+committed `ActionResolver.resolve()` call; a rejected action SHALL NOT expose an `EventLog`.
 
 #### Scenario: EventLog round-trips through JSON with no live reference
 - **WHEN** an `EventLog` produced by a successful `resolve()` call is serialized to JSON and
@@ -61,3 +64,4 @@ Nothing in `EventLog`'s construction SHALL require, or provide, a write API back
 #### Scenario: EventLog exposes no method that mutates entity state
 - **WHEN** every public method and property on `EventLog` and `EventEntry` is inspected
 - **THEN** none of them accepts a live entity reference or performs an attribute write
+

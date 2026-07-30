@@ -2,9 +2,7 @@
 
 Defines immutable skill metadata, shared targeting enums, representative seed definitions, and the
 registry contract used to validate imported active and passive skill keys.
-
 ## Requirements
-
 ### Requirement: SKILL_REGISTRY exists at the exact path change 4 forward-declared
 `world/skills/registry.py` SHALL define a module-level `SKILL_REGISTRY: dict[str, SkillDef]` importable
 as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and symbol name change 4
@@ -25,36 +23,20 @@ as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and sy
   present in `SKILL_REGISTRY` (e.g. `"fire_ball"`)
 - **THEN** no rejection is produced for that key
 
-### Requirement: SkillDef carries exactly the seven fields design doc §5.2 specifies
-`world/skills/registry.py` SHALL define a frozen `SkillDef` dataclass with exactly the fields `key`,
-`kind`, `target_spec`, `cost`, `usable_out_of_combat`, `element`, and `effects` — no additional field
-added and none of these dropped. Its `cost` and `effects` collections SHALL reject mutation so
-registry definitions remain immutable beyond the dataclass's top level.
+### Requirement: SkillDef carries the action resolver's skill-owned faction constraint
+`world/skills/registry.py` SHALL define a frozen `SkillDef` dataclass with the fields `key`, `kind`,
+`target_spec`, `cost`, `usable_out_of_combat`, `element`, `effects`, and `faction_constraint`.
+`faction_constraint` SHALL be a `FactionConstraint` value (`ANY`, `ALLY`, `ENEMY`, or `SELF_ONLY`)
+and SHALL default to `ANY`. Its `cost` and `effects` collections SHALL reject mutation.
 
-#### Scenario: Every SKILL_REGISTRY entry exposes exactly the seven documented fields
-- **WHEN** any `SkillDef` instance in `SKILL_REGISTRY` is inspected via `dataclasses.fields()`
-- **THEN** the field names are exactly `{key, kind, target_spec, cost, usable_out_of_combat, element,
-  effects}`, in any order, with no additional field present
+#### Scenario: Every skill exposes its immutable targeting policy
+- **WHEN** any `SkillDef` in `SKILL_REGISTRY` is inspected
+- **THEN** it has all eight documented fields and its `faction_constraint` is a
+  `FactionConstraint` value
 
-#### Scenario: kind is one of ACTIVE or PASSIVE
-- **WHEN** any `SkillDef.kind` is inspected
-- **THEN** it is a `SkillKind` enum member, either `ACTIVE` or `PASSIVE`
-
-#### Scenario: target_spec is one of the four documented values
-- **WHEN** any `SkillDef.target_spec` is inspected
-- **THEN** it is a `TargetSpec` enum member, one of `NONE`, `SELF`, `SINGLE`, or `AREA`
-
-#### Scenario: element is either a real lore-registry Element or None
-- **WHEN** any `SkillDef.element` that is not `None` is inspected
-- **THEN** it is an `Element` instance present in `world.lore.elements.ELEMENT_REGISTRY`'s values
-
-#### Scenario: cost is a mapping of resource key to non-negative integer
-- **WHEN** any `SkillDef.cost` is inspected
-- **THEN** it is a `dict[str, int]` (possibly empty) whose values are all non-negative integers
-
-#### Scenario: Nested skill-definition collections reject mutation
-- **WHEN** a caller tries to alter a registry entry's `cost` dict or `effects` list
-- **THEN** the operation raises and the process-wide registry definition remains unchanged
+#### Scenario: Direct offensive seed skills target enemies
+- **WHEN** the `fire_ball` and `wind_blade` definitions are inspected
+- **THEN** their `faction_constraint` is `FactionConstraint.ENEMY`
 
 ### Requirement: SkillKind and TargetSpec are forward-declared for change 8 to import
 `world/skills/registry.py` SHALL define `SkillKind` (`ACTIVE`, `PASSIVE`) and `TargetSpec` (`NONE`,
@@ -99,3 +81,4 @@ exhaustive transcription of every skill mentioned on every sample card.
 - **WHEN** `SKILL_REGISTRY` is inspected
 - **THEN** it contains at least three distinct keys representing a 轉生特典-pattern passive, each with
   a different `effects` entry, none sharing a single generic "reincarnation boon" key
+

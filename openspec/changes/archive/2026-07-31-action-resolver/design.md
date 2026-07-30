@@ -8,14 +8,15 @@ change 1.
 
 Two changes already left named, unfilled seams for this one to close:
 
-1. **Change 5's D-6** built `ConferredSkillGrant` and `SkillHandler.grant_conferred()` for 統御術's
+1. **Change 5's D-6** built `ConferredSkillGrant` and
+   `world.rules.skill_effects.record_conferred_grant()` for 統御術's
    partial-conferral mechanic but explicitly deferred "the actual *casting* of 統御術 during play —
-   entity A selects entity B as a target, `ActionResolver` validates the interaction, and only then is
-   `grant_conferred()` called" to this change. Change 5's D-7 similarly built `apply_disguise_effect()`
+   entity A selects entity B as a target, `ActionResolver` validates the interaction, and only then
+   calls the conferral write" to this change. Change 5's D-7 similarly built `apply_disguise_effect()`
    for 狀態偽裝 but left "when a player actually casts it" unbuilt.
 2. **Change 6's D-4** built `blocks_action(entity)` — "declared seam for change 8's `ActionResolver`
    step 4" — and D-5 built `grant_conferred_growth_rate()`, the rate-of-change counterpart to
-   `grant_conferred()`, with the identical "seam, not the cast" framing.
+   `record_conferred_grant()`, with the identical "seam, not the cast" framing.
 
 Design doc §5.2 states the boundary this change exists to enforce: "A skill does not know whether it
 is in combat. `ActionResolver` is the sole entry point; the combat turn scheduler and the out-of-combat
@@ -137,7 +138,7 @@ by construction — there is nothing to undo.
 
 **Phase 2 (steps 5-8): staging.** Effect resolution (5) and resource deduction (6) never call a
 mutating function directly — they build `PendingEffect` closures over the *real* mutators
-(`entity.skills.grant_conferred(...)`, `entity.traits.mp.value -= cost`, `apply_event(...)`,
+(`record_conferred_grant(...)`, `entity.traits.mp.value -= cost`, `apply_event(...)`,
 `entity.buffs.add(...)`) without invoking them. `EventLog` construction (7) and time-cost lookup (8)
 are pure functions of the staged list plus the request/skill data — they do not need any effect to
 have actually run, because they describe *what the pending effects represent*, not *what already
@@ -205,14 +206,13 @@ def _commit(pending: list[PendingEffect]) -> None:
         raise CommitFailed(RejectReason.COMMIT_FAILED, str(exc)) from exc
 ```
 
-`_snapshot_entity_state(entity)` captures every substate `SNAPSHOTTED_SURFACES` names —
-`entity.traits.all()` values (hp/mp/sp/atk_phys/agility/defense/magic_level/guild_merit),
-`entity.sexual`'s public field values when not `None`, `entity.buffs`'s active-key set, and
-`entity.db.skill_grants` — through the exact same public accessors the effects themselves use, never a
-private/internal shortcut. Restoring is symmetric: trait/sexual field restoration is a plain `.value =`
-write-back through the identical public setter surface the effect used to mutate in the first place;
-buff restoration is a set-difference (`.remove()` any buff key present after the failed attempt that
-was absent in the snapshot) because `BuffHandler` has no bulk "replace active state" primitive. This is
+`_snapshot_entity_state(entity)` captures the complete raw persistent attributes behind every
+substate `SNAPSHOTTED_SURFACES` names, including whether each attribute existed before resolution.
+This preserves gauge timestamps and configuration, sexual trait data, the full buff cache,
+`disguised_stats`, and `skill_grants` without invoking lazy handlers that create missing attributes.
+Restoration replaces or removes those attributes exactly and invalidates cached trait/sexual handlers
+so later reads rebuild from the restored persistence. Validation reads gauge backing values without
+calling the wall-clock-updating `.value` accessor. This is
 a **generic, effect-agnostic snapshot** — it does not need updating every time a new effect handler is
 registered *as long as that handler's declared surfaces are already in `SNAPSHOTTED_SURFACES`*; the
 moment one is not, `register_effect_handler()`'s own check is what forces `SNAPSHOTTED_SURFACES` (and
@@ -563,8 +563,9 @@ private state — each registered with its declared mutation surface:**
 
 - `confer_skill_partial` → 統御術.
   `register_effect_handler("confer_skill_partial", _handle_confer_skill_partial,
-  surfaces=frozenset({"skill_grants"}))`. Stages `target.skills.grant_conferred(source_key, skill_key,
-  trait_keys, scale)` (change 5's exact seam) as a thunk. `skill_key`/`scale`/`trait_keys` come from
+  surfaces=frozenset({"skill_grants"}))`. Stages `record_conferred_grant(target, source_key,
+  skill_key, trait_keys, scale)` (change 5's landed deterministic write seam) as a thunk.
+  `skill_key`/`scale`/`trait_keys` come from
   `request.context.event_context` (the specific skill/scale a given cast confers, since one opaque
   effect ID cannot itself encode a per-cast choice) — required keys missing raises
   `EFFECT_RESOLUTION_FAILED` naming the missing key, not a silent no-op.
@@ -584,7 +585,9 @@ private state — each registered with its declared mutation surface:**
   scale)` — the same registry mechanism generalizing to a second conferral shape with no new dispatch
   logic.
 - `sexual_event:<name>` → **self-arming, per this change's own dependency boundary (Context).**
-  `register_effect_handler("sexual_event", _handle_sexual_event, surfaces=frozenset({"sexual"}))`.
+  `register_effect_handler("sexual_event", _handle_sexual_event,
+  surfaces=frozenset({"sexual", "traits"}))`; the `traits` surface is required because the landed
+  transition rulebook includes events that spend `sp`.
   Lazily imports `world.rules.sexual_transitions.apply_event`:
 
   ```python
@@ -740,7 +743,11 @@ class CmdCast(Command):
         targets = [self.caller.search(target_key.strip())] if target_key.strip() else []
         request = ActionRequest(
             actor=self.caller, skill_key=skill_key.strip(), targets=targets,
-            context=RoomActionContext(room=self.caller.location),
+            context=RoomActionContext(
+                room=self.caller.location,
+                event_context={"disguise": dict(self.caller.db.disguised_stats or {})}
+                if skill_key.strip() == "status_disguise" else {},
+            ),
         )
         result = ActionResolver.resolve(request)
         if result.outcome == "success":
@@ -749,7 +756,9 @@ class CmdCast(Command):
             self.caller.msg(REJECTION_MESSAGES.get(result.reason, "That didn't work."))
 ```
 
-This is the entire out-of-combat integration surface this change builds — no target-string
+The stored `disguised_stats` value is the deterministic preset for a context-free
+`status_disguise` cast, ensuring the stock registry has a successful command path. This is the
+entire out-of-combat integration surface this change builds — no target-string
 disambiguation beyond Evennia's own `caller.search()`, no multi-target syntax. Its only job is proving
 that an out-of-combat cast and a (declared, not built) combat cast are the same
 `ActionResolver.resolve()` call with a different `ActionContext` — the concrete instance of D-3/D-4's
@@ -807,7 +816,7 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 `world/rules/action.py`/`targeting.py`/`event_log.py`, plus `commands/action.py`, do not exist yet. The
 only sequencing concerns are operational:
 
-- This change must land after change 5 (`SkillDef`/`SkillHandler`, `grant_conferred()`,
+- This change must land after change 5 (`SkillDef`/`SkillHandler`, `record_conferred_grant()`,
   `apply_disguise_effect()`) and change 6 (`blocks_action()`, `entity_active_buffs()`,
   `grant_conferred_growth_rate()`), matching design doc §11 exactly.
 - This change does **not** need change 7/7b to land first — the `sexual_event:*` handler self-arms

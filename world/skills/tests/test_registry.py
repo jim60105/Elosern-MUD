@@ -5,6 +5,7 @@ import unittest
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.registry import (
+    FactionConstraint,
     SKILL_REGISTRY,
     SkillDef,
     SkillKind,
@@ -25,6 +26,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "usable_out_of_combat",
                 "element",
                 "effects",
+                "faction_constraint",
             ],
         )
         for key, skill in SKILL_REGISTRY.items():
@@ -37,6 +39,7 @@ class SkillRegistryTests(unittest.TestCase):
             if skill.element is not None:
                 self.assertIsInstance(skill.element, Element)
                 self.assertIn(skill.element, ELEMENT_REGISTRY.values())
+            self.assertIsInstance(skill.faction_constraint, FactionConstraint)
 
     def test_enums_have_only_the_forward_declared_members(self):
         self.assertEqual(set(SkillKind.__members__), {"ACTIVE", "PASSIVE"})

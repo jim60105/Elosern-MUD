@@ -5,7 +5,7 @@ use — combat or not — must pass, and §5.2 states plainly "a skill does not 
 combat." Today nothing enforces that: change 5 (`skills-equipment`) built `SkillDef`/`SkillHandler`
 as pure data and query functions with zero cast-time behavior, change 6 (`buffs-rulebook`) built
 `blocks_action()` and the combat-modifier/rulebook engine but explicitly deferred "when an action is
-forbidden" to this change, and change 5's own `grant_conferred()` (統御術's partial-conferral write)
+forbidden" to this change, and change 5's own `record_conferred_grant()` (統御術's partial-conferral write)
 and change 6's `grant_conferred_growth_rate()` exist purely as seams with no caller. Without this
 change, there is no code path by which a player or an AI-controlled NPC actually invokes a skill —
 combat (change 9) and out-of-combat commands would each have to invent their own resolution logic,
@@ -73,18 +73,19 @@ acceptance criterion that the game stays playable with the LLM offline (§7.5, �
   `render_plain_text()` as the reference no-LLM degradation path.
 
 ### Modified Capabilities
-- None. `openspec/specs/` is currently empty (changes 1–7b have not been archived yet).
+- `skill-registry`: add the skill-owned `FactionConstraint` required by target validation.
 
 ## Impact
 
 - **New files**: `world/rules/action.py`, `world/rules/targeting.py`, `world/rules/event_log.py`,
   `commands/action.py`, `world/rules/tests/` (new test modules for this change's scope).
-- **Modified files**: none. This change adds no attribute or method to any typeclass another change
-  authored — every handler it calls (`entity.skills`, `entity.buffs`, `entity.sexual`,
-  `entity.traits`) already exists as a mounted, public seam from changes 3/5/6/7.
+- **Modified files**: `world/skills/registry.py` and its contract test/spec gain the skill-owned
+  faction constraint; `commands/default_cmdsets.py` registers `CmdCast`; the disguise-boundary test
+  permits the resolver's atomic snapshot/restore without permitting disguise reads in resolution.
+  This change adds no attribute or method to a typeclass authored by another change.
 - **Depends on**: change 5 (`skills-equipment`) for `SkillDef`/`SkillKind`/`TargetSpec`/
   `FactionConstraint` (the eighth `SkillDef` field, added during review — a skill's legal targets are
-  the skill's own property, not the caster's claim), `SkillHandler.grant_conferred()`, and
+  the skill's own property, not the caster's claim), `record_conferred_grant()`, and
   `apply_disguise_effect()`; change 6 (`buffs-rulebook`) for `blocks_action()`, `entity_active_buffs()`,
   `BLOCKING_BUFF_KEYS`, and `grant_conferred_growth_rate()`. Matches design doc §11's stated dependency
   (5, 6) exactly.

@@ -64,6 +64,15 @@ class TargetSpec(StrEnum):
     AREA = "area"
 
 
+class FactionConstraint(StrEnum):
+    """Relations a skill permits the resolver to target."""
+
+    ANY = "any"
+    ALLY = "ally"
+    ENEMY = "enemy"
+    SELF_ONLY = "self_only"
+
+
 @dataclass(frozen=True)
 class SkillDef:
     """Immutable definition of a skill known to deterministic consumers."""
@@ -75,6 +84,7 @@ class SkillDef:
     usable_out_of_combat: bool
     element: Element | None
     effects: list[str]
+    faction_constraint: FactionConstraint = FactionConstraint.ANY
 
 
 def _skill(
@@ -86,6 +96,7 @@ def _skill(
     usable_out_of_combat: bool = False,
     element: str | None = None,
     effects: list[str] | None = None,
+    faction_constraint: FactionConstraint = FactionConstraint.ANY,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     return SkillDef(
@@ -96,6 +107,7 @@ def _skill(
         usable_out_of_combat=usable_out_of_combat,
         element=None if element is None else ELEMENT_REGISTRY[element],
         effects=_FrozenList([] if effects is None else effects),
+        faction_constraint=faction_constraint,
     )
 
 
@@ -157,6 +169,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"mp": 20},
             element="fire",
             effects=["damage:fire:magic"],
+            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "wind_blade",
@@ -165,6 +178,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"mp": 24},
             element="wind",
             effects=["damage:wind:magic"],
+            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "flight",
@@ -188,6 +202,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.SINGLE,
             cost={"sp": 6},
             effects=["weapon_style:light_sword"],
+            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "shadow_slash",
@@ -196,6 +211,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"sp": 18},
             element="dark",
             effects=["damage:dark:physical"],
+            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "flash_step",
