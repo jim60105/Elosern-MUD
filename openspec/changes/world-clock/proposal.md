@@ -38,10 +38,12 @@ sexual decay, and daily resets in a fixed, non-accidental order.
   commands, each computing a concrete duration (explicit, regen-to-full-capped, or
   calendar-arithmetic-to-next-daypart) and each gated by the safety check below.
 - Add `world/rules/skip_safety.py::evaluate_skip_safety(actor)` — the safety gate: rejects a skip if
-  the actor is an active (non-fled) member of an unresolved `Battlefield` ("in combat"), is in the
-  `fled` set of a `Battlefield` that has not concluded ("targeted by a hostile"), or shares a room with
-  a living `Monster` ("unsafe location" — the only location-safety signal available before changes
-  12-14 build map layers). No "shorten" branch is added at the gate itself; see design.md D-3 for why.
+  the actor is an active (non-fled) member of an unresolved `Battlefield` ("in combat"), or shares a
+  room with a living `Monster` ("targeted by a hostile" / "unsafe location," folded into one condition
+  — the only location-safety signal available before changes 12-14 build map layers). `Battlefield.fled`
+  was considered as a proxy for "targeted by a hostile" and rejected — it records combatants who
+  successfully disengaged, the opposite of being hunted; see design.md D-6. No "shorten" branch is
+  added at the gate itself; see design.md D-6 for why.
 - Wire the two already-built time-cost producers this change can concretely reach: update
   `commands/action.py::CmdCast` (change 8) to call `WorldClock.advance(time_cost_seconds,
   AdvanceSource.COMMAND)` on success, and add `world/rules/clock.py::settle_combat_result()` as the
@@ -64,8 +66,10 @@ sexual decay, and daily resets in a fixed, non-accidental order.
 - `settlement-stage-order`: the fixed, tested settlement order; `AdvanceSource`-conditional stage
   skipping to prevent combat double-ticking; quantum-based batching for long skips; the declared no-op
   seams for caravan/shop/quest/npc stages; the `ScheduledEvent` and event-source extension registry.
-- `skip-safety-gate`: `evaluate_skip_safety()` — the three named reject conditions (in combat, targeted
-  by a hostile, unsafe location) built from data available at this point in the roadmap.
+- `skip-safety-gate`: `evaluate_skip_safety()` — two reject conditions (in combat; a co-located living
+  hostile, which is the one honest expression this project's data gives to both "targeted by a hostile"
+  and "unsafe location") built from data available at this point in the roadmap. `Battlefield.fled` was
+  considered and rejected as a third signal — see design.md D-6.
 - `time-skip-commands`: `rest <duration>`, `sleep`, `wait until <daypart>` — duration computation and
   safety-gate integration for all three.
 

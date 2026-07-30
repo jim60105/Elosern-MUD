@@ -64,8 +64,11 @@ hours → quest deadlines → NPC schedules) without inventing their data.
 - Quantum-batched settlement for long jumps: no per-second iteration, an explicit early-exit once
   nothing remains to settle, and boundary-arithmetic (not iteration) for hourly/daily stages.
 - A concrete, simple, subtropical four-season calendar with no invented month names.
-- `world/rules/skip_safety.py::evaluate_skip_safety(actor)` — the three named reject conditions, built
-  from data genuinely available at this point in the roadmap (no map layers).
+- `world/rules/skip_safety.py::evaluate_skip_safety(actor)` — two reject conditions built from data
+  genuinely available at this point in the roadmap (no map layers): active combat, and a co-located
+  living hostile, which is the one honest expression this project's data gives to both "targeted by a
+  hostile" and "unsafe location" (design doc §6.5 names them separately; nothing distinguishes them
+  today — see D-6).
 - `commands/skip.py`: `rest <duration>`, `sleep`, `wait until <daypart>`.
 - Declared, no-op seam stages (and an open `ScheduledEvent` source registry) for caravan arrivals, shop
   hours, quest deadlines, and NPC schedules.
@@ -483,21 +486,42 @@ is nothing to defer here, and routing an already-real, already-owned stage throu
 built for *unowned* future stages would blur which stages are this change's own settled behavior versus
 a seam for someone else.
 
-### D-6. `evaluate_skip_safety(actor)`: three reject conditions built entirely from data that exists
-today — no invented location metadata.
+### D-6. `evaluate_skip_safety(actor)`: two reject conditions built entirely from data that exists
+today — no invented location metadata, and no semantically-inverted proxy.
 
 Design doc §6.5: "reject or shorten a skip if the player is in combat, targeted by a hostile, or in an
 unsafe location. Otherwise players will `sleep 8h` in front of a monster." Changes 12-14 (map layers,
-location-safety tagging) have not landed. The only two data sources available at this point in the
-roadmap are change 9's `Battlefield` (`teams`, `roster`, `fled`) and plain Evennia room co-location
+location-safety tagging) have not landed. The only data sources available at this point in the roadmap
+are change 9's `Battlefield` (`teams`, `roster`, `fled`) and plain Evennia room co-location
 (`entity.location.contents`, available since change 1's bootstrap) plus change 3's `Monster` typeclass.
-**Decision: map all three named conditions onto these two sources, with no fabricated third signal.**
+
+**`Battlefield.fled` was considered for "targeted by a hostile" and rejected — it records the opposite
+condition.** An earlier pass through this design mapped "targeted by a hostile" onto membership in
+`battlefield.fled`, reasoning that a fight the actor left is still ongoing for whoever remains. That
+reasoning inverts what `fled` actually means: `fled` (populated by change 10c, `combat-disengage`, once
+it lands; the field already exists on change 9's `Battlefield` today) records combatants who
+*successfully disengaged* — the ones no longer in a hostile's immediate reach, not the ones being
+hunted. Wiring a "danger" reject condition to the one flag that specifically means "got away safely"
+would reject skips for the wrong population and, worse, invite change 10c's own author to read this
+gate's use of `fled` as confirmation that the two concepts were meant to line up. **They are not, and
+this design explicitly disclaims the connection so that mistake is not repeated downstream.**
+
+**Decision: drop the middle condition. `evaluate_skip_safety()` has exactly two reject conditions.**
+Design doc §6.2 states plainly that "out of combat there is no hostility model" — there is no aggro
+table, no threat score, nothing that names a specific hostile as "targeting" a specific actor outside
+an actual `Battlefield`. With no aggro/threat model anywhere in the roadmap and `fled` ruled out as a
+proxy, "a living `Monster` is co-located with the actor" is already the only honest expression this
+project's data can give to "something hostile can reach me" — a third, textually-distinct condition
+would either duplicate that same check under a different name or reach for `fled` again, which is
+exactly the mistake being corrected. Two conditions that are both genuinely grounded in real data beat
+three where one is quietly backwards.
 
 ```python
 class SkipRejectReason(StrEnum):
-    IN_COMBAT = "in_combat"                 # active, non-fled roster member of an unresolved Battlefield
-    TARGETED_BY_HOSTILE = "targeted_by_hostile"   # fled an unresolved Battlefield -- the fight isn't over
-    HOSTILE_PRESENT = "hostile_present"      # a living Monster shares the actor's current room
+    IN_COMBAT = "in_combat"            # active, non-fled roster member of an unresolved Battlefield
+    HOSTILE_PRESENT = "hostile_present"  # a living Monster shares the actor's current room -- this
+                                          # is also design doc S6.5's "targeted by a hostile" AND its
+                                          # "unsafe location," folded into one condition; see above
 
 def evaluate_skip_safety(actor) -> SkipRejectReason | None:
     battlefield = _active_battlefield_for(actor)   # caller-supplied lookup; see Open Questions
@@ -505,32 +529,25 @@ def evaluate_skip_safety(actor) -> SkipRejectReason | None:
         if actor.key in battlefield.roster and actor.key not in battlefield.fled \
                 and actor.traits.hp.value > 0 and not is_battle_over(battlefield):
             return SkipRejectReason.IN_COMBAT
-        if actor.key in battlefield.fled and not is_battle_over(battlefield):
-            return SkipRejectReason.TARGETED_BY_HOSTILE
     for obj in actor.location.contents:
         if isinstance(obj, Monster) and obj.traits.hp.value > 0:
             return SkipRejectReason.HOSTILE_PRESENT
     return None   # safe to skip
 ```
 
-**Why "targeted by a hostile" maps to `battlefield.fled`, not a bespoke aggro/threat model.** Design
-doc §6.2 states plainly that "out of combat there is no hostility model" — there is no aggro table, no
-threat score, nothing that names a specific hostile as "targeting" a specific actor outside an actual
-`Battlefield`. The one condition that genuinely means "a hostile from a fight I was just in could still
-reach me" with data that exists today is: the actor is recorded as having fled (`battlefield.fled`) an
-encounter whose `is_battle_over()` is still `False` — the fight the actor left is still ongoing for
-whoever remains, which is a real, present-tense danger signal, not an invented one. (Change 10c,
-`combat-disengage`, is what will actually populate `fled` during play — the field already exists on
-`Battlefield` today per change 9's dataclass, and reading it imposes no dependency on 10c's own write
-path landing first, mirroring how change 9 itself already reads `battlefield.fled` before 10c exists.)
+`battlefield.fled` is read here only as part of `IN_COMBAT`'s own definition (an actor who fled is, by
+construction, not an *active* roster member and must not trip `IN_COMBAT` on that basis) — never as a
+positive signal of danger. No other function in this change reads `fled` for any other purpose.
 
-**Why "unsafe location" collapses to "a living Monster shares this room," not a terrain/zone
-classification.** There is no `AnchorRoom`/`GridRoom`/safe-zone tag to read (changes 12-14 haven't
-built one) — the only room-level fact available today is *what is physically standing in it*. A
-wandering monster co-located with the actor, with no `Battlefield` yet formed at all (the player has not
-engaged it, or it has not aggro'd), is exactly the scenario design doc's own worked example names
-("sleep 8h in front of a monster") — this decision makes that literal sentence the literal rejection
-condition.
+**Why "targeted by a hostile" and "unsafe location" collapse to the same single check, not two.**
+Design doc §6.5 names them as separate phrases, but with no aggro/threat model anywhere in this
+project's roadmap, there is no data distinguishing "a monster is hunting this specific actor" from "a
+monster happens to be in this room" — both reduce to the identical, only-available fact: a living
+`Monster` shares the actor's location. A wandering, unengaged monster co-located with the actor, with no
+`Battlefield` formed at all, is exactly the scenario design doc's own worked example names ("sleep 8h in
+front of a monster") — this decision makes that literal sentence the literal rejection condition, under
+one name (`HOSTILE_PRESENT`) rather than two conditions that would collapse to identical code with
+different labels.
 
 **Why the gate rejects outright and does not attempt a "shorten" verdict of its own.** Hard requirement
 2 says "reject or shorten." This decision reads that as two different commands' responsibility, not two
@@ -747,6 +764,17 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 none of `world/rules/clock.py`, `world/rules/skip_safety.py`, `world/rules/rulebook/clock.yaml`, or
 `commands/skip.py` exist yet. The only sequencing concerns are operational:
 
+- **Load-bearing warning for anyone touching combat settlement after this change lands: changes 9 and
+  10 carry no warning, in their own artifacts, that `run_round()`'s per-round upkeep already calls
+  `tick_buffs()`/`decay_tick()`.** That fact is recorded here, not there, because this change is the
+  settlement-order authority and neither change 9 nor change 10 will be reopened to add it. **If
+  `AdvanceSource.COMBAT`'s stage-skip (D-3) is ever removed, refactored away, or bypassed — for
+  example, by a future change calling `_run_stages()` directly instead of through
+  `settle_combat_result()`/`advance(..., AdvanceSource.COMBAT, ...)` — every poisoned combatant's hp and
+  every in-combat sexual-decay field will silently double-tick for the full duration of every fight,
+  with no test outside this change's own suite (task 7.5) positioned to catch it.** Anyone modifying
+  `world/rules/clock.py`'s stage runner, or anyone building the eventual top-level combat command that
+  calls `settle_combat_result()`, must preserve this gate.
 - This change must land after change 7 (`decay_tick()`/`reset_daily_counters()`) and change 9
   (`Battlefield`, `BattleResult.total_seconds`, `tick_buffs()`/`decay_tick()` already called inside
   `run_round()`'s own upkeep) — matching design doc §11 exactly. Change 6 (`tick_buffs()`) is a

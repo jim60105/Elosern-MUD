@@ -202,14 +202,15 @@
 
 ## 11. Skip safety gate (`world/rules/skip_safety.py`)
 
-- [ ] 11.1 Implement `SkipRejectReason` (`StrEnum`: `IN_COMBAT`, `TARGETED_BY_HOSTILE`,
-      `HOSTILE_PRESENT`) — a plain enumeration with no associated partial-duration field, per design.md
-      D-6.
+- [ ] 11.1 Implement `SkipRejectReason` (`StrEnum`: `IN_COMBAT`, `HOSTILE_PRESENT` — exactly two
+      values) — a plain enumeration with no associated partial-duration field, per design.md D-6. Do
+      **not** add a third value keyed to `battlefield.fled`; design.md D-6 documents why that proxy was
+      considered and rejected (it records disengagement, not danger).
 - [ ] 11.2 Implement `evaluate_skip_safety(actor) -> SkipRejectReason | None` per design.md D-6: checks,
       in order, whether `actor` is a living, non-fled member of a `Battlefield` whose `is_battle_over()`
-      is `False` (`IN_COMBAT`); whether `actor` is present in a `Battlefield`'s `fled` set whose
-      `is_battle_over()` is `False` (`TARGETED_BY_HOSTILE`); whether any living (`hp.value > 0`)
-      `Monster` shares `actor.location` (`HOSTILE_PRESENT`); returns `None` if none apply.
+      is `False` (`IN_COMBAT`); whether any living (`hp.value > 0`) `Monster` shares `actor.location`
+      (`HOSTILE_PRESENT`); returns `None` if neither applies. `battlefield.fled` is read only inside the
+      `IN_COMBAT` check's own exclusion of fled members — never as an independent condition.
 - [ ] 11.3 Implement (or document, per design.md's Open Questions) `_active_battlefield_for(actor)` as
       a caller-injectable lookup — the mechanism a future combat-command change threads through, since
       no canonical "which battlefield is this actor in" registry exists yet. A minimal, test-only
@@ -218,8 +219,11 @@
       what the tests need.
 - [ ] 11.4 Test `IN_COMBAT`: an active, non-fled, living roster member of an unresolved `Battlefield`
       is rejected; the same actor after `is_battle_over()` becomes `True` is not rejected on this basis.
-- [ ] 11.5 Test `TARGETED_BY_HOSTILE`: an actor present in `battlefield.fled` while the battle is
-      unresolved is rejected; the same actor once the battle concludes is not rejected on this basis.
+- [ ] 11.5 Test that fled `Battlefield` membership alone is not a reject condition: an actor present in
+      `battlefield.fled` (that `Battlefield`'s `is_battle_over()` still `False`), sharing no room with a
+      living `Monster`, returns `None` — proving `fled` is not read as a positive hostility signal
+      anywhere in this module (source-inspection check: `battlefield.fled` appears only inside the
+      `IN_COMBAT` check).
 - [ ] 11.6 Test `HOSTILE_PRESENT`: a living `Monster` sharing the actor's room (no `Battlefield` at all)
       rejects; a dead `Monster` in the room does not; an empty room does not.
 - [ ] 11.7 Test the safe case: no `Battlefield` membership and no living `Monster` present returns
