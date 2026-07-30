@@ -76,6 +76,27 @@ from the verdict computed when `resolve_overwhelm()` was first called, reporting
   (`None` for contested, or the other team's key for a reversed direction), distinct from
   `OverwhelmResult.overwhelming_team`, which always reports the verdict at entry
 
+### Requirement: A finite max_rounds safety cap is a named, tested outcome, not an implicit assumption
+`resolve_overwhelm(battlefield, action_provider, max_rounds)` SHALL stop calling `combat.run_round()`
+once `rounds_elapsed` reaches `max_rounds`, regardless of whether `classify_overwhelm()` still returns
+the original verdict, and SHALL report the resulting `OverwhelmResult` with `battle_over` reflecting
+`combat.is_battle_over()`'s true value at that point (not assumed `True`) and `total_seconds` equal to
+the honest `rounds_elapsed * 6` for however many rounds actually ran — never a flat, fixed charge
+regardless of `rounds_elapsed`.
+
+#### Scenario: Hitting max_rounds stops the loop and reports the true, unfinished state honestly
+- **WHEN** a fixture is constructed where `classify_overwhelm()` continues returning the same verdict
+  every round for longer than `max_rounds`
+- **THEN** `resolve_overwhelm()` stops calling `combat.run_round()` at exactly `max_rounds` rounds,
+  `OverwhelmResult.battle_over` is `False` (the encounter has not actually concluded), and
+  `OverwhelmResult.rounds_elapsed == max_rounds`
+
+#### Scenario: total_seconds is always the honest sum of rounds actually run, never a flat charge
+- **WHEN** `resolve_overwhelm()` concludes after any number of rounds — one, several, or exactly
+  `max_rounds` — for any of the golden fixtures this change defines
+- **THEN** `OverwhelmResult.total_seconds` equals `rounds_elapsed * 6` in every case, and no code path in
+  `resolve_overwhelm()` reports a fixed number regardless of `rounds_elapsed`
+
 ### Requirement: Reported time cost uses the identical rounds-times-six-seconds formula, unedited
 `OverwhelmResult.total_seconds` SHALL equal `rounds_elapsed * 6`, the identical formula
 `combat.run_battle()` already uses. No function in `world/rules/overwhelm.py` SHALL call

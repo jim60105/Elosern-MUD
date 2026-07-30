@@ -39,9 +39,9 @@ established for each other.
 **Goals:**
 - `world/rules/rulebook/overwhelm.yaml`: the `power_ratio_threshold` (100, per design doc §6.3), as
   tunable data, not a Python literal.
-- `classify_overwhelm(battlefield) -> str | None`: the combined signal — `effective_power()` ratio
-  **and** to-hit saturation, independently computed, OR-combined when they agree or only one fires,
-  falling back to "contested" when they disagree (D-3) — recomputed fresh every call, so a caller
+- `classify_overwhelm(battlefield) -> str | None`: three independent signals — `effective_power()`
+  ratio, to-hit saturation, and an estimated-round-count bound — combined so that overwhelm means
+  **decided and quick**, never merely decided (D-1) — recomputed fresh every call, so a caller
   invoking it at engage and again every round (design doc §6.3) gets a live answer each time.
 - `resolve_overwhelm(battlefield, action_provider, max_rounds) -> OverwhelmResult`: single-shot
   resolution, built by reusing change 9's own `run_round()` in a loop this change owns — never a
@@ -91,8 +91,33 @@ established for each other.
 
 ## Decisions
 
-### D-1. `classify_overwhelm()`: two independent signals, computed from data change 9 already exposes,
-combined by agreement — not by either one unconditionally overriding the other.
+### D-1. `classify_overwhelm()`: three independent signals — decided by ratio, decided by hit-rate
+saturation, and bounded by an estimated round count — because "decided" is not the same claim as
+"quick."
+
+**Why a third signal is needed at all — the case that forces it.** Signals 1 and 2 below establish
+that a fight's *outcome* is certain. Neither says anything about *how long* reaching that certain
+outcome takes. Change 9's damage formula floors every hit at `damage.floor` (1) — so a matchup where
+the ratio signal fires because one side has an enormous max-hp pool (say, 10,000) against an
+attacker whose damage per landed hit is small can be "decided" (the outcome is not in doubt) while
+still taking on the order of `10,000 / floor` rounds to actually finish. Two consequences follow, and
+they are really one problem: **(a) `resolve_overwhelm()`'s loop (D-3) has no lower bound on how many
+times it might call `run_round()` without this signal** — thousands of iterations inside a single
+function call is a real robustness hazard, not a hypothetical one; **(b) even setting robustness
+aside, a fight that takes thousands of rounds to conclude is a grind, not a curbstomp, and describing
+it as "overwhelm" misdescribes it** — at `round.seconds: 6` (dice-combat's own constant), a
+10,000-round resolution reports `total_seconds = 60,000` (≈16.7 hours) in one `OverwhelmResult`,
+which change 11's clock would then have to settle in a single leap, silently blowing through every
+scheduled event, quest deadline, and shop-hours boundary that would otherwise have fired along the
+way. A false "overwhelm" verdict on a slow-but-certain fight is exactly as much a lie as a false
+verdict on an uncertain one — it just lies about pacing instead of about the winner. **Decision:
+overwhelm means decided *and* bounded — a third, independent condition alongside the two signals
+below, not a robustness afterthought bolted onto the loop.**
+
+**Signal 1 and Signal 2, combined by agreement, still only establish *direction* — they are computed
+from data change 9 already exposes, combined by agreement, not by either one unconditionally
+overriding the other. Signal 3 (below) then decides whether that direction is fast enough to compress
+at all.**
 
 **Signal 1 — the power ratio (design doc §6.3's own formula).** Sum `effective_power()` (change 9,
 unmodified) across every living, non-fled member of each team, and compare:
@@ -205,11 +230,12 @@ conditions (rather than computing one `Δ` and assuming its negation covers the 
 what keeps this function correct once accuracy modifiers are in play, not just in the modifier-free
 case this section's arithmetic derivation used to state the boundary.
 
-**Combining the two signals — the rule, and the case that forces it to exist.**
+**Combining signals 1 and 2 — the rule, and the case that forces it to exist.** This step only decides
+*direction* (`_decided_direction()` below); Signal 3 (after the four cases) decides whether that
+direction is also fast enough to act on.
 
 ```python
-def classify_overwhelm(battlefield: Battlefield) -> str | None:
-    team_a, team_b = sorted(battlefield.teams)   # Battlefield: exactly two teams (change 9 D-6)
+def _decided_direction(battlefield: Battlefield, team_a: str, team_b: str) -> str | None:
     ratio_verdict = power_ratio_verdict(battlefield, team_a, team_b)
     rate_verdict = hit_rate_verdict(battlefield, team_a, team_b)
     if ratio_verdict is not None and rate_verdict is not None:
@@ -256,9 +282,126 @@ neither signal alone determines. **Decision: on disagreement, the fight is left 
 would not reproduce, which is the one failure this change cannot accept); a false negative here (an
 encounter that is in fact heavily one-sided over enough rounds, resolved the slow way) costs performance
 and pacing, not correctness. A golden test constructs exactly this matchup and asserts
-`classify_overwhelm()` returns `None`.
+`_decided_direction()` returns `None`.
 
-### D-2. `world/rules/rulebook/overwhelm.yaml`: the threshold as data, one key.
+**Signal 3 — an estimated-round-count bound, deliberately current-hp-sensitive, and deliberately
+biased to never underestimate how long a fight will take.** Signals 1 and 2 (combined above into
+`_decided_direction()`) establish that a fight's outcome is certain; neither says anything about how
+long reaching that certain outcome takes. Change 9's damage formula floors every hit at
+`damage.floor` (1) — so a matchup where the ratio signal fires because one side has an enormous
+max-hp pool (say, 10,000) against an attacker whose damage per landed hit is small is "decided" (the
+outcome is not in doubt) while still potentially taking on the order of `10,000 / floor` rounds to
+actually finish. This is one problem with two faces: **(a) `resolve_overwhelm()`'s loop (D-3) would
+have no lower bound on how many times it calls `run_round()` without this signal** — thousands of
+iterations inside a single function call is a real robustness hazard; **(b) even setting robustness
+aside, a fight that takes thousands of rounds to conclude is a grind, not a curbstomp, and calling it
+"overwhelm" misdescribes it** — at `round.seconds: 6` (dice-combat's own constant), a 10,000-round
+resolution reports `total_seconds = 60,000` (≈16.7 hours) in one `OverwhelmResult`, which change 11's
+clock would then have to settle in a single leap, silently blowing through every scheduled event,
+quest deadline, and shop-hours boundary that would otherwise have fired along the way. A false
+"overwhelm" verdict on a slow-but-certain fight is exactly as much a misrepresentation as a false
+verdict on an uncertain one — it lies about pacing instead of about the winner. **Decision: overwhelm
+means decided *and* bounded — a third, independent condition, not a robustness afterthought bolted
+onto the loop.**
+
+```python
+def _expected_damage_per_attack(attacker, defender) -> float:
+    """A deliberately conservative (never-overestimated) expected damage figure for one
+    attacker's one attack against one defender. Uses the ACTUAL to-hit probability (never
+    assumes 100%, so this also works for a ratio-only verdict where hits are not saturated)
+    and ONLY combat.py's base_multiplier (ignores the solid-hit and critical bonuses D-3 of
+    dice-combat's own design defines) and attacker.effective_value('atk_phys') as the
+    representative damage stat (a simplification -- this estimate does not know which skill
+    the real action_provider will choose each round; a magic-primary attacker would need
+    magic_level here instead, flagged as a scope-conscious approximation, not a claim about
+    which skill actually gets cast). Underestimating expected damage means this function's
+    caller (below) never underestimates the number of rounds needed -- the one direction of
+    error this signal cannot afford, since overestimating rounds only costs a missed
+    compression opportunity, while underestimating them would let a genuine grind through."""
+    atk_agi = _adjusted_agility(attacker)   # same helper D-1's Signal 2 already defines
+    def_agi = _adjusted_agility(defender)
+    hit_prob = max(0.0, min(1.0, (50 + (atk_agi - def_agi)) / 100))
+    atk_stat = attacker.skills.effective_value("atk_phys")
+    def_def = defender.skills.effective_value("defense")
+    base_dmg = max(
+        round(atk_stat * combat.COMBAT_YAML["damage"]["base_multiplier"]) - def_def,
+        combat.COMBAT_YAML["damage"]["floor"],
+    )
+    return hit_prob * base_dmg
+
+def estimated_rounds_to_conclude(
+    battlefield: Battlefield, overwhelming_team: str, overwhelmed_team: str,
+) -> float:
+    overwhelmed = _living_members(battlefield, overwhelmed_team)
+    overwhelming = _living_members(battlefield, overwhelming_team)
+    remaining_hp = sum(m.traits.hp.value for m in overwhelmed)   # CURRENT hp -- see below for why
+    if remaining_hp <= 0:
+        return 0.0
+    if not overwhelming or not overwhelmed:
+        return math.inf
+    # Conservative simplification: pool the overwhelmed side's total remaining hp against the
+    # overwhelming side's total expected damage per round against the single toughest
+    # remaining defender, rather than modelling target selection or focus-fire order -- an
+    # approximation of "how many rounds until the whole side is cleared," not a claim about
+    # exactly which defender dies on which round.
+    toughest = max(overwhelmed, key=lambda m: m.traits.hp.value)
+    dmg_per_round = sum(_expected_damage_per_attack(a, toughest) for a in overwhelming)
+    if dmg_per_round <= 0:
+        return math.inf
+    return remaining_hp / dmg_per_round
+```
+
+**Why this signal is allowed to read current hp, when D-4 explicitly required max hp for
+`effective_power()` and hard requirement 4 warns against reintroducing current-hp sensitivity.** D-4's
+max-hp discipline answers "how strong is this combatant, in general" — a question that must not
+flicker with mid-fight attrition, because the same underlying entity should not be judged more or less
+dangerous just because a fight has been going well or badly for them so far. `estimated_rounds_to_conclude()`
+answers a categorically different question: "given where this fight actually stands right
+now, how much longer does it have left" — which is *only* meaningful in terms of current, depleting
+hp; a max-hp version of this function would answer "how long would this take starting from full
+health," which is not the question a per-round-recomputed gate needs answered. Using current hp here
+is not a relapse into the mistake D-4 corrected — it is a different signal, answering a different
+question, for which current hp is the *correct* input, not an accidental one. This is also why Signal
+3 is not folded into Signal 1: `effective_power()`'s own ratio must stay attrition-blind for the
+reason D-4 gives; the round-bound estimate must not.
+
+**Calibration, against this project's own reference matchups.** `max_estimated_rounds` is this
+change's own invented placeholder (flagged for a future balance pass, the identical disclosure
+discipline changes 5/6/9 already used for their own invented numbers):
+
+| Matchup | remaining hp | conservative dmg/round | estimated rounds |
+|---|---|---|---|
+| elf (agility 92, `atk_phys` 88) vs. human elite (agility 9, defense 7, hp 120) — dice-combat D-4's own reference pair | 120 | 81 (hit_prob 1.0, saturated) | ≈1.5 |
+| the same elf vs. a 3-member low-tier monster party (illustrative stats within lore-world-data's low band — `atk_phys`/agility/defense ≈6, hp ≈90 each) | 270 (pooled) | 82 (vs. the toughest, hit_prob 1.0) | ≈3.3 |
+| an illustrative calamity-tier monster (`atk_phys` ≈100) vs. a 3-member human-elite party (hp 120 each) — design doc §6.3's "player is one-shot" | 360 (pooled) | 93 (hit_prob 1.0) | ≈3.9 |
+| the coordinator's own named grind: a 10,000-hp defender against a `damage.floor`-only (1 dmg/round) attacker | 10,000 | 1 | 10,000 |
+
+The three genuine curbstomps cluster at 1.5-3.9 rounds; the grind is four orders of magnitude past
+that. **Decision: `max_estimated_rounds: 5`** — comfortably above every real curbstomp this project's
+own reference data produces, comfortably below any matchup that is actually a slow attrition fight.
+
+**`classify_overwhelm()`, final form — decided direction, then bounded.**
+
+```python
+def classify_overwhelm(battlefield: Battlefield) -> str | None:
+    team_a, team_b = sorted(battlefield.teams)
+    decided = _decided_direction(battlefield, team_a, team_b)
+    if decided is None:
+        return None
+    overwhelmed_team = team_b if decided == team_a else team_a
+    est_rounds = estimated_rounds_to_conclude(battlefield, decided, overwhelmed_team)
+    if est_rounds > OVERWHELM_YAML["max_estimated_rounds"]:
+        return None   # decided, but a grind -- stays in the normal per-round turn loop
+    return decided
+```
+
+This changes nothing about how `resolve_overwhelm()` (D-3) behaves once it starts running — the round
+bound only affects *whether*, and *for how long*, `classify_overwhelm()` keeps agreeing to single-shot
+resolution; it introduces no new dice roll, no new mutation, and does not touch D-3's exact-equivalence
+proof, since `classify_overwhelm()` (all three signals) is still called only *between* `run_round()`
+calls, never during one.
+
+### D-2. `world/rules/rulebook/overwhelm.yaml`: two threshold keys, both data.
 
 ```yaml
 # world/rules/rulebook/overwhelm.yaml
@@ -267,11 +410,17 @@ power_ratio_threshold: 100   # design doc §6.3: "ratio >= 100 -> single-shot re
                                # power_ratio_verdict() -- see design.md D-1 for why this is not simply
                                # "<= 0.01" on one division. Do not add a second, separate constant for
                                # the reverse direction; it is the same number, checked the other way.
+max_estimated_rounds: 5        # design.md D-1's Signal 3: "decided" is not "quick". Calibrated against
+                               # dice-combat's own worked matchups (~1.5-3.9 rounds for genuine
+                               # curbstomps) vs. a floor-damage grind (~10,000 rounds) -- see the full
+                               # table in design.md D-1. An invented placeholder, like combat.yaml's
+                               # own damage-band constants, flagged for a future balance pass.
 ```
 
-No damage-band or agility-weight style placeholder numbers are needed here — `100` is design doc
-§6.3's own literal value, not this change's invention, and the hit-rate signal's `±50` boundary is
-D-2 of `dice-combat`'s own derived constant (`51`), not a second tunable this change introduces.
+`power_ratio_threshold` is design doc §6.3's own literal value, not this change's invention; the
+hit-rate signal's `±50` boundary is `dice-combat`'s own derived constant (`51`), not a second tunable
+this change introduces; `max_estimated_rounds` is this change's own placeholder, calibrated above and
+flagged for a future balance pass, exactly like `combat.yaml`'s own damage-band constants.
 
 ### D-3. `resolve_overwhelm()`: reuse change 9's `run_round()` verbatim; "single-shot" is a claim about
 the caller's experience and the output's shape, not about the underlying dice math.
@@ -306,7 +455,7 @@ class OverwhelmResult:
     battle_over: bool
 
 def resolve_overwhelm(
-    battlefield: Battlefield, action_provider, max_rounds: int = 50,
+    battlefield: Battlefield, action_provider, max_rounds: int = 12,
 ) -> OverwhelmResult:
     verdict = classify_overwhelm(battlefield)
     if verdict is None or combat.is_battle_over(battlefield):
@@ -342,6 +491,26 @@ themselves, under the same seed and the same starting `Battlefield` — because 
 the same order, consuming the same RNG stream (`classify_overwhelm()` never calls `roll_d100()`, so
 interleaving it between rounds does not perturb the sequence at all).
 
+**`max_rounds` is now a defensive backstop, not the primary bound — and its default is chosen to
+reflect that.** D-1's Signal 3 already stops the loop on its own: `classify_overwhelm()` is
+recomputed every round (line above), and its round-bound check means that if an encounter's actual
+progress ever falls behind the estimate that let it start (bad luck on a non-saturated ratio-only
+matchup, for instance), the very next recomputation sees `estimated_rounds_to_conclude()` grow past
+`max_estimated_rounds` and returns `None`, ending the loop through the ordinary
+classification-changed path — no special-casing needed. `max_rounds` exists purely as
+defense-in-depth for a case Signal 3's own approximation might miss (e.g., an entity somehow taking
+no damage at all despite a nonzero estimate, so `remaining_hp` never drops and the estimate never
+correctly renders as "grown too large"). Its default, `12`, is set to roughly 2-3× the calibrated
+`max_estimated_rounds` (5) — comfortably above any of this project's genuine curbstomps even
+accounting for normal roll variance, but nowhere near the scale (thousands of rounds) that would
+constitute a server-side hang. **Hitting `max_rounds` is a named, tested outcome**: the loop exits
+exactly as it would on any other classification change, `OverwhelmResult.battle_over` reports
+whatever `combat.is_battle_over()` actually returns (almost always `False` in this case), and
+`verdict_after` reports `classify_overwhelm()`'s most recent value — a caller that sees
+`battle_over=False` after `resolve_overwhelm()` returns is expected to fall back to the normal
+per-round turn loop for the remainder, identically to how it would handle any other unresolved
+encounter.
+
 **Why the loop stops on any classification change, not just a return to "contested."** If, mid-fight, a
 disguise drops and `effective_power()`'s ratio flips (or an active buff wears off and the hit-rate
 signal stops saturating), `classify_overwhelm()`'s next call reflects that immediately — this is design
@@ -360,6 +529,23 @@ continue — that is the "single-shot" the caller experiences. It is not a claim
 combat took only one round of real dice; for the concrete matchups this project's own calibration data
 defines, it typically does (see the golden test below), but that is a consequence of this project's
 actual stat bands, not a property this change's algorithm assumes or depends on for correctness.
+
+**`total_seconds` is always the honest sum of the rounds actually run, never a flat one-round charge —
+and Signal 3 is what keeps that honest sum small.** `OverwhelmResult.total_seconds = rounds * 6`
+(unchanged from D-3's own formula, above) reports exactly how much game time the encounter actually
+consumed, whether that is `6` (one round) or, in principle, `72` (twelve rounds, `max_rounds`'
+defensive ceiling). Flattening this to a fixed charge regardless of `rounds` was considered and
+rejected outright: it would silently misreport elapsed game time to change 11's clock the moment any
+overwhelm-classified fight took more than one round, which is a strictly worse failure mode than the
+one this whole revision addresses — not a rare edge case, but a routine one, since only this project's
+single most lopsided reference matchup (elf vs. human elite) happens to end in exactly one round.
+Signal 3 is what makes this honest-sum reporting safe to leave uncapped at the reporting layer: because
+`classify_overwhelm()` only allows single-shot resolution to begin, and to continue, while
+`estimated_rounds_to_conclude()` stays under `max_estimated_rounds`, the honestly-summed
+`total_seconds` an overwhelm resolution reports is itself bounded in practice to a handful of rounds
+(≈`5 × 6 = 30` seconds at the calibrated bound, never the ≈17-hour figure a 10,000-round grind would
+have produced under the pre-revision design) — the fix to the threshold and the fix to the reported
+time cost are the same fix, not two separate ones.
 
 **Golden proof that design doc §6.3's literal "ends in one round" language holds for this project's own
 reference matchup.** Using change 9's own D-4 worked table (elf, stats 88/92/90, max hp 10000, vs. human
@@ -448,8 +634,8 @@ decisive paragraph can render only the summary entry; one that wants blow-by-blo
 replay view) has every individual hit, in order, immediately available — the compression adds a coarse
 view on top of the full one, it does not replace it.
 
-### D-5. Golden fixed-seed tests: exact-equivalence, both overwhelm directions, and the four signal-
-combination cases.
+### D-5. Golden fixed-seed tests: exact-equivalence, both overwhelm directions, the signal-combination
+cases, and the round-bound signal.
 
 Per design doc §10 ("golden cases for both overwhelm and normal combat" — change 9's own golden tests
 (D-10) covered "normal" only, explicitly deferring "overwhelm" to this change):
@@ -478,6 +664,26 @@ Per design doc §10 ("golden cases for both overwhelm and normal combat" — cha
 - **Disagreement golden case** (D-1's tank-vs-duelist construction): asserts `classify_overwhelm()`
   returns `None` despite each individual signal, computed separately, returning a non-`None` (opposite)
   verdict.
+- **Bounded-curbstomp golden case** (the party-vs-low-tier-monsters row of D-1's calibration table): a
+  decided direction whose `estimated_rounds_to_conclude()` sits well under `max_estimated_rounds` —
+  asserts `classify_overwhelm()` accepts it, `resolve_overwhelm()` runs it to completion, and
+  `rounds_elapsed` stays within a small, asserted upper bound (not exactly 1, unlike the single-hit
+  fixture below — this case is chosen specifically to exercise a multi-round-but-still-bounded path).
+- **Excluded-grind golden case** (the coordinator's own named counterexample, D-1's calibration table):
+  a decided direction (ratio signal fires: an enormous max-hp gap) whose to-hit and damage numbers are
+  set so `estimated_rounds_to_conclude()` is far beyond `max_estimated_rounds` (e.g. a defender hp pool
+  and attacker damage output chosen so every hit lands at `damage.floor`) — asserts `classify_overwhelm()`
+  returns `None` despite `power_ratio_verdict()` alone returning a non-`None` verdict, proving the
+  round-bound signal, not just direction, gates the result; a companion assertion confirms
+  `resolve_overwhelm()` called directly on this same fixture returns immediately with zero rounds run,
+  the same "already contested" early exit as any other non-overwhelm battlefield.
+- **`max_rounds` safety-cap golden case**: a constructed fixture where `classify_overwhelm()`'s verdict
+  keeps returning the same team every round (so the loop does not exit via reclassification) for longer
+  than `max_rounds`, exercising the loop's `rounds < max_rounds` bound directly — asserts
+  `resolve_overwhelm()` stops at exactly `max_rounds` rounds, reports `battle_over` honestly (whatever
+  `combat.is_battle_over()` actually returns at that point, expected `False` for this fixture), and
+  reports `total_seconds == max_rounds * 6` — the honest sum for however far it actually got, never a
+  flat charge.
 
 ### D-6. Compressed `EventLog`s render through `render_plain_text()` with zero LLM calls — verified,
 not assumed.
@@ -524,13 +730,32 @@ function, no hidden state).
   change 9's actual implementation ever produces one — is dropped silently rather than crashing, and a
   test asserts this against change 9's real, landed `run_round()` output (not a mock), which is what
   actually settles the question once change 9's code exists to inspect.
-- **[Risk] `resolve_overwhelm()`'s `max_rounds` safety cap (default 50) means a pathological, near-
-  boundary matchup that never converges (e.g., both sides' damage output is smaller than the other's
-  regen, if regen exists by the time this runs) could exit mid-fight with `battle_over=False`.** →
-  Accepted; this mirrors change 9's own `run_battle()` signature and safety-cap discipline exactly (task
-  8.6), and `OverwhelmResult.battle_over` reports the true state honestly rather than assuming
-  completion — a caller that sees `battle_over=False` after `max_rounds` is expected to fall back to
-  per-round handling, the same as it would for any other unresolved encounter.
+- **[Risk] `estimated_rounds_to_conclude()`'s conservative approximations (base-multiplier-only damage,
+  a single pooled "toughest defender" target rather than modelled focus-fire order, `atk_phys` as the
+  one representative damage stat regardless of which skill the real `action_provider` picks) mean the
+  estimate can be wrong in either direction for an unusual matchup** — most safely wrong (an
+  overestimate, missing a genuine curbstomp) but conceivably wrong the other way if a real encounter's
+  actual damage output ends up *lower* than the conservative estimate predicts (e.g. an
+  `action_provider` that, in practice, never casts the attacker's highest-`atk_phys` skill). →
+  Accepted; every simplification in `_expected_damage_per_attack()`/`estimated_rounds_to_conclude()` is
+  named explicitly in D-1 rather than silently assumed, and — critically — a wrong estimate is caught
+  by the very next round's recomputation (D-3's "the loop stops on any classification change"), not
+  discovered only at the end: if real progress falls behind what the estimate promised,
+  `classify_overwhelm()` de-classifies the fight on the next round it is checked, and `max_rounds`
+  backstops the case where even that recomputation is somehow fooled. No single wrong estimate can
+  therefore compress a fight further than one round past when its true trajectory diverges from the
+  estimate that admitted it.
+- **[Risk] `resolve_overwhelm()`'s `max_rounds` safety cap (now 12, reduced from an earlier 50 once
+  Signal 3 made the round bound the primary mechanism rather than the only one) is still, in principle,
+  reachable if Signal 3's own estimate is fooled every round in a row** (e.g. a fixture engineered so
+  `estimated_rounds_to_conclude()` stays just under `max_estimated_rounds` at every single
+  recomputation despite no real progress) — such a fixture would exit mid-fight with
+  `battle_over=False` after 12 rounds (72 seconds of reported game time) rather than converging. →
+  Accepted as the deliberately named, tested defense-in-depth outcome D-3 describes; 12 rounds is a
+  finite, small, and honestly-reported bound regardless of cause, several orders of magnitude away from
+  the thousands-of-rounds hang this design revision exists to rule out, and `OverwhelmResult.battle_over
+  =False` is the same honest signal a caller already needs to handle for any other unresolved
+  encounter.
 - **[Risk] `compress_event_logs()` does not merge repeated attacker/target damage entries across
   rounds into a running total (Non-Goal)** — a Narrator reading the compressed output sees one
   `"damage"` entry per hit, not "N hits totaling M damage" per attacker/target pair, only the
@@ -563,7 +788,11 @@ concerns are operational:
   passed in by whatever orchestrates combat.
 - **Change 11 (`world-clock`, depends on 7, 9)** is expected to read `OverwhelmResult.total_seconds`
   the same way it is expected to read change 9's `BattleResult.total_seconds` — nothing in this change
-  calls `WorldClock.advance()` itself.
+  calls `WorldClock.advance()` itself. Because Signal 3 (D-1) bounds every overwhelm-classified
+  encounter to a handful of rounds, the value change 11 will ever see from this change is small by
+  construction (tens of seconds, not the tens-of-thousands a decided-but-unbounded grind could have
+  produced) — change 11 does not need its own defensive cap against an unreasonably large single
+  `total_seconds` value from this source.
 - **Change 18 (`narrator`, depends on 10, 17)** is expected to consume `OverwhelmResult.event_logs`
   directly; it may call `render_plain_text()` on each entry verbatim (D-6) as its own offline-
   degradation path, or write archetype-specific prose keyed on the new `"overwhelm_resolution"` kind's
@@ -588,3 +817,8 @@ concerns are operational:
   worked example and D-5's `PendingEffect.description` string, not confirmed against change 9's actual
   `_step7_build_event_log` output — left to the implementer to confirm against change 9's landed code,
   consistent with the verification discipline changes 1-9 already established (see Risks).
+- **`max_estimated_rounds` (5) and `max_rounds` (12) are both this change's own invented placeholders**,
+  calibrated against this project's own worked reference matchups (D-1) but not against real monster
+  AI behaviour (change 10b) or real player skill selection, neither of which exists yet. Whether 5
+  rounds is the right cutoff once real party compositions and monster movesets exist is left to a
+  future balance pass, the same disclosure this change already gives every other invented constant.

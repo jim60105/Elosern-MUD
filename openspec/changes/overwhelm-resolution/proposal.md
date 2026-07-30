@@ -18,12 +18,17 @@ over.
 
 ## What Changes
 
-- Add `world/rules/overwhelm.py`: `classify_overwhelm()`, combining change 9's `effective_power()`
-  ratio and its to-hit formula's saturation boundary as two independent, OR-combined signals (with an
-  explicit safety rule for the case where they disagree on direction), recomputed at engage and every
-  round.
-- Add `world/rules/rulebook/overwhelm.yaml`: the `power_ratio_threshold` (100, per design doc §6.3),
-  documented as data, not a hardcoded Python literal, per design doc D9's split.
+- Add `world/rules/overwhelm.py`: `classify_overwhelm()`, combining three independent signals — change
+  9's `effective_power()` ratio, its to-hit formula's saturation boundary, and a new estimated-round-
+  count bound — so that overwhelm means the fight is **decided and quick**, never merely decided. The
+  two "decided" signals are OR-combined (with an explicit safety rule for the case where they disagree
+  on direction); the round-bound signal then gates whether that decided direction is fast enough to
+  compress at all, since a fight can be certain in outcome while still being an attrition grind (e.g. a
+  huge-hp defender against damage floored at 1 per hit) rather than a curbstomp. Recomputed at engage
+  and every round.
+- Add `world/rules/rulebook/overwhelm.yaml`: `power_ratio_threshold` (100, per design doc §6.3) and
+  `max_estimated_rounds` (5, this change's own calibrated placeholder), both documented as data, not a
+  hardcoded Python literal, per design doc D9's split.
 - Add `resolve_overwhelm()`: a single-shot combat resolver that reuses change 9's `run_round()`
   verbatim — same dice stream, same formulas, same turn order — so that its outcome is exactly, not
   approximately, consistent with driving `run_round()` one round at a time. "Single-shot" describes
@@ -43,9 +48,11 @@ over.
 ## Capabilities
 
 ### New Capabilities
-- `overwhelm-threshold`: the combined ratio-and-hit-rate signal (`classify_overwhelm()`), the
-  `overwhelm.yaml` threshold data, and the round-by-round recomputation rule, including the documented
-  conflict-resolution rule for when the two signals disagree.
+- `overwhelm-threshold`: the three-signal `classify_overwhelm()` (power ratio, hit-rate saturation, and
+  an estimated-round-count bound), the `overwhelm.yaml` threshold data, and the round-by-round
+  recomputation rule, including the documented conflict-resolution rule for when the ratio and hit-rate
+  signals disagree, and the calibration proving the round bound admits genuine curbstomps while
+  excluding attrition grinds.
 - `single-shot-resolution`: `resolve_overwhelm()`'s reuse of change 9's `run_round()` for exact
   consistency with per-round resolution, its early-exit-on-reclassification behavior, and its
   `total_seconds` reporting (unchanged `rounds × 6` formula).
