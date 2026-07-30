@@ -102,8 +102,10 @@ flagged there as the starting point for change 7b's author.
   `AttributeProperty` (change 3, D-10) with a real handler mount, the identical replacement pattern
   changes 5/6 already used for `skills`/`equipment`/`buffs`. `server/conf/settings.py` (or wherever
   change 1 placed `TRAIT_CLASS_PATHS`) — adds `world.rules.sexual_state.OrderedLevelTrait`'s dotted
-  path. `world/rules/tests/test_combat_modifiers_self_arming.py` is not edited, but its one test's
-  reported outcome changes from skipped to passed as a direct consequence of this change existing.
+  path. `world/rules/tests/test_combat_modifiers.py` replaces its temporary ordered-value stand-in
+  and placeholder overwrite with the live handler; `test_combat_modifiers_self_arming.py` is not
+  edited, but its one test's reported outcome changes from skipped to passed as a direct consequence
+  of this change existing.
 - **Depends on**: change 6 (`buffs-rulebook`) for `world/rules/rulebook/schema.py`'s
   `Rule`/`load_rules()`/`evaluate_condition()` (imported for the self-arming test's own use of
   `evaluate_combat_modifiers()`, not reimplemented here) and `entity_active_buffs()` as the read-only

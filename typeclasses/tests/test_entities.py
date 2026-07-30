@@ -11,6 +11,7 @@ from typeclasses.npcs import NPC
 from typeclasses.objects import ObjectParent
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
+from world.rules.sexual_state import SexualState
 
 
 class LivingEntityTests(EvenniaTest):
@@ -23,11 +24,8 @@ class LivingEntityTests(EvenniaTest):
                 self.assertIsNotNone(entity.signals)
                 self.assertIsNone(entity.race)
                 self.assertIsNone(entity.subrace)
-                for seam in (
-                    "sexual",
-                    "relations",
-                    "persona",
-                ):
+                self.assertIsInstance(entity.sexual, SexualState)
+                for seam in ("relations", "persona"):
                     self.assertIsNone(getattr(entity, seam))
                 self.assertIsInstance(entity.buffs, BuffHandler)
                 self.assertIsInstance(entity.equipment, EquipmentHandler)

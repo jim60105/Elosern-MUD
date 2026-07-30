@@ -1,7 +1,6 @@
 """Tests named one-to-one with combat modifier rule IDs."""
 
 from pathlib import Path
-from types import SimpleNamespace
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -17,15 +16,6 @@ RULES = {
         Path(__file__).parents[1] / "rulebook" / "combat_modifiers.yaml"
     )
 }
-
-
-class OrderedStandIn:
-    def __init__(self, value):
-        self.value = value
-
-    def __ge__(self, other):
-        levels = ("平靜", "微興奮", "中等", "高度", "極限")
-        return levels.index(self.value) >= levels.index(other)
 
 
 class CombatModifierTests(EvenniaTest):
@@ -54,20 +44,20 @@ class CombatModifierTests(EvenniaTest):
 
     def test_rule_high_arousal_agility_accuracy_penalty(self):
         entity = self._entity()
-        entity.sexual = SimpleNamespace(
-            arousal=OrderedStandIn("高度"), climax_phase="未達"
-        )
+        entity.sexual.arousal.value = "高度"
         self.assertEqual(
             evaluate_combat_modifiers(entity), {"agility": "-20%", "accuracy": -15}
         )
         rule = RULES["high_arousal_agility_accuracy_penalty"]
-        self.assertFalse(evaluate_condition(rule.when, {"arousal": OrderedStandIn("中等")}))
-        self.assertTrue(evaluate_condition(rule.when, {"arousal": OrderedStandIn("極限")}))
+        entity.sexual.arousal.value = "中等"
+        self.assertFalse(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
+        entity.sexual.arousal.value = "極限"
+        self.assertTrue(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
         self.assertEqual(rule.then, {"agility": "-20%", "accuracy": -15})
 
     def test_rule_climax_in_progress_locks_actions(self):
         entity = self._entity()
-        entity.sexual = SimpleNamespace(arousal="平靜", climax_phase="進行中")
+        entity.sexual.climax_phase.value = "進行中"
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
     def test_multiple_rules_merge_and_query_is_pure(self):

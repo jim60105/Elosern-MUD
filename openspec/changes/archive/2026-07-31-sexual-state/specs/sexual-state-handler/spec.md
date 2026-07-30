@@ -70,20 +70,21 @@ level; any part accessed afterward that was never seeded SHALL default to `SENSI
 - **THEN** it returns an `OrderedLevelTrait` at level `"普通"`, and no exception is raised
 
 ### Requirement: virgin is a one-way flag; experience_types is an append-only set
-`SexualState.virgin` SHALL start `True` unless the baseline explicitly sets it `False`, and once any
-mechanism sets it `False`, no later mutation SHALL be able to set it back to `True`.
+`SexualState.virgin` SHALL start `True` unless the baseline explicitly sets it `False`, and once the
+`SexualState` public setter sets it `False`, no later mutation through that public setter SHALL be
+able to set it back to `True`.
 `SexualState.experience_types` SHALL start as the baseline's given set (or empty), and SHALL only
-ever grow — no mechanism SHALL remove an entry once added.
+ever grow through its public API — the handler SHALL expose no replacement or removal method.
 
 #### Scenario: virgin cannot be reversed once false
-- **WHEN** `entity.sexual.virgin` has been set to `False` by any means
+- **WHEN** `entity.sexual.virgin` has been set to `False` through its public setter
 - **THEN** every subsequent read of `entity.sexual.virgin` returns `False`, regardless of what any
-  later caller (a direct write, or a future rule once change 7b exists) attempts
+  later caller or future rule attempts through the same setter
 
 #### Scenario: experience_types only grows
 - **WHEN** `"陰道性交"` has been added to `entity.sexual.experience_types`
-- **THEN** it remains present in `entity.sexual.experience_types` for the lifetime of the entity, and
-  no function in this change's scope removes an entry from this set
+- **THEN** it remains present in `entity.sexual.experience_types`, and no public method on
+  `SexualState` replaces or removes an entry from this set
 
 ### Requirement: climax_phase can only move along its valid cycle, enforced by one guarded function
 `world/rules/sexual_state.py` SHALL provide `_apply_climax_phase_set(entity, target_level)`, the sole

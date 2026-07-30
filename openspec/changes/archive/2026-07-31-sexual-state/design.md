@@ -271,9 +271,8 @@ class SexualState:
     @virgin.setter
     def virgin(self, value: bool) -> None:
         if self.virgin is False:
-            return    # irreversible -- once false, every later write is a no-op,
-                       # never an exception; this is a data-integrity guard, not
-                       # a caller error
+            return    # irreversible through the public SexualState API -- once
+                       # false, later setter calls are no-ops, never exceptions
         self._entity.attributes.add("virgin", bool(value), category="sexual_state")
 
     @property
@@ -297,7 +296,9 @@ versa. `arousal`/`wetness`/`shame`/`exposure`/`climax_phase` are added at constr
 `sensitivity` is not one key but a lazily-populated sub-collection (D-3); `climax_today` is a plain
 `CounterTrait` (min 0, no max); `virgin` (`bool`) and `experience_types` (`frozenset[str]`) are
 **not** `TraitHandler` entries at all — they have no ordinal, gauge, or counter shape, and are stored
-directly as `entity.attributes` under the `sexual_state` category.
+directly as `entity.attributes` under the `sexual_state` category. Their one-way/append-only
+guarantees apply to `SexualState`'s sanctioned public mutators, the only route deterministic rule
+code may use; Evennia's low-level public attribute handler is outside this API contract.
 
 **Why the public property surface matters for the split.** Since change 7b is a separate change with
 its own author, `SexualState`'s public contract (`.arousal`, `.wetness`, ..., `.virgin`,

@@ -38,6 +38,9 @@ SERVERNAME = "evennia-skeleton"
 # Keep mutable SQLite state in the dedicated container volume.
 DATABASES["default"]["NAME"] = os.path.join(GAME_DIR, "server", "db", "evennia.db3")
 
+# Project-authored Evennia trait types.
+TRAIT_CLASS_PATHS = ["world.rules.sexual_state.OrderedLevelTrait"]
+
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.
