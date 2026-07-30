@@ -66,12 +66,21 @@
       apply/tick time — no per-buff Python subclass. Confirm the exact `BaseBuff` hook names
       (`at_apply`/`at_tick`/`at_remove` or the installed contrib's actual equivalents) against Evennia
       6.1.0 before wiring (task 1.3).
-- [ ] 4.3 Implement `_apply_rate_modifier(entity, rate_mod: dict) -> None` per design.md D-4: when
-      `rate_mod["target"]` is one of `entity.traits`' gauge keys (`hp`/`mp`/`sp`), applies the delta via
-      `TraitHandler`'s own Mod API (additive only, per change 3 D-7's `mod`-component boundary — confirm
-      the exact API against the installed contrib); when the target is not a known trait key (e.g.
-      `magic_level_growth`, or any future `SexualState` field), raises `NotImplementedError` naming the
-      owning change (change 7, or the unclaimed progression change) rather than silently no-op'ing.
+- [ ] 4.3 Implement `_apply_rate_modifier(entity, rate_mod: dict) -> None` per design.md D-4
+      (**fixed after review — was `NotImplementedError` for every non-trait target; now an explicit
+      no-op for `magic_level_growth` specifically**): when `rate_mod["target"]` is one of
+      `entity.traits`' gauge keys (`hp`/`mp`/`sp`), applies the delta via `TraitHandler`'s own Mod API
+      (additive only, per change 3 D-7's `mod`-component boundary — confirm the exact API against the
+      installed contrib); when `rate_mod["target"]` is in `_NO_OP_RATE_TARGETS` (currently exactly
+      `{"magic_level_growth"}`), returns immediately without applying anything — its value is consumed
+      by pull, through `growth_rate_multiplier()`/change 11b's `effective_magic_growth_multiplier()`,
+      never by push on tick; applying it here too would double-apply the conferred scale. Document this
+      directly in the function's docstring, naming `growth_rate_multiplier()`/change 11b as the actual
+      reader, so a future edit does not "fix" this back into an active modifier. When the target is
+      neither a known trait key nor in `_NO_OP_RATE_TARGETS` (e.g. a future `SexualState` field — no
+      buff targets one yet, per change 7/8's own artifacts), still raises `NotImplementedError` naming
+      the owning change, rather than silently no-op'ing an target this module has no documented reason
+      to ignore.
 - [ ] 4.4 Implement `entity_active_buffs(entity) -> set[str]` per design.md D-4: thin wrapper over
       `entity.buffs`'s own active-key accessor (confirm exact method name, e.g. `.all()`, against the
       installed contrib).
@@ -156,10 +165,20 @@
       one tick reduces `hp` by its configured delta; `paralysis`/`fear`: applying and then querying
       `entity_active_buffs()`/`blocks_action()` reflects presence with no rate/bounds/decay side effect;
       `conferred_growth_rate`: applying via `grant_conferred_growth_rate()` and reading back via
-      `growth_rate_multiplier()`); `entity.buffs` returns a `BuffHandler` instance and has no
-      bare-assignment form; a grep-based assertion that neither `buffs.py` nor `combat_modifiers.py`
-      assigns directly to `entity.buffs` or `entity.db.buffs`; a test asserting no buff definition in
-      `buffs.yaml` configures a combat-stat-multiplier-shaped key.
+      `growth_rate_multiplier()`, **and** ticking it via `tick_buffs()` per task 5.6a below);
+      `entity.buffs` returns a `BuffHandler` instance and has no bare-assignment form; a grep-based
+      assertion that neither `buffs.py` nor `combat_modifiers.py` assigns directly to `entity.buffs` or
+      `entity.db.buffs`; a test asserting no buff definition in `buffs.yaml` configures a
+      combat-stat-multiplier-shaped key.
+- [ ] 5.6a `world/rules/tests/test_buffs.py::test_conferred_growth_rate_tick_is_a_no_op` — **the
+      regression test for the reachability defect this review round fixed; kept as its own named test so
+      it cannot be quietly dropped or folded away.** Constructs an entity, applies
+      `grant_conferred_growth_rate(entity, source_key="elosia", scale=0.5)`, then calls `tick_buffs(entity)`
+      and asserts (a) it completes without raising `NotImplementedError` or any other exception, and (b)
+      `entity.traits.magic_level.value` is exactly unchanged before and after the call. This is the
+      concrete regression change 11's `buff_ticks` settlement stage and change 11b's
+      `effective_magic_growth_multiplier()` together made reachable — see design.md's Risks entry for
+      this defect.
 - [ ] 5.6 `world/rules/tests/test_conferred_growth_rate.py` (or folded into 5.5) — per design.md D-5/D-6:
       `grant_conferred_growth_rate(entity, source_key="elosia", scale=0.5)` followed by
       `growth_rate_multiplier(entity)` returns exactly `0.5`; an entity with no such buff returns `1.0`;

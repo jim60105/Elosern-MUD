@@ -366,18 +366,45 @@ class RulebookBuff(BaseBuff):
         if rate_mod:
             _apply_rate_modifier(self.owner, rate_mod)   # see below
 
+_NO_OP_RATE_TARGETS = frozenset({"magic_level_growth"})
+# Targets that intentionally do nothing on tick. magic_level_growth is
+# conferred_growth_rate's declared target (D-5), but its scale is consumed
+# by PULL, not push: change 11b's effective_magic_growth_multiplier() calls
+# growth_rate_multiplier(entity) directly, at the moment progression is
+# computed, folding in every active conferred_growth_rate buff's scale. There
+# is nothing for a per-tick write to do -- the buff is a standing marker, the
+# same way `paralysis`/`fear` are markers for combat_modifiers.yaml's
+# buff_active condition, except this one is also read by a pull-based query
+# instead of a condition. Fixed after review: an earlier draft of this design
+# treated any non-trait target as unimplemented and raised NotImplementedError
+# here, which was reasonable while nothing consumed growth_rate_multiplier()
+# and nothing ticked this buff outside combat -- change 11b (consumer) and
+# change 11's buff_ticks settlement stage (reachable on every non-combat
+# time-skip, not only inside the combat turn loop) both made this reachable,
+# turning an accepted risk into a crash. See Risks.
+
 def _apply_rate_modifier(entity, rate_mod: dict) -> None:
     """Applies a per-tick delta to rate_mod['target']. When the target is one
     of entity.traits' gauge keys (hp/mp/sp), this writes into StaticTrait/
     GaugeTrait's mod component (change 3 D-7: reserved for BuffHandler,
     additive only, never a multiplier) via TraitHandler's own Mod API --
     flagged for implementer verification against the installed contrib's
-    exact Mod/GaugeTrait interface. When the target is not a known trait key
-    (e.g. magic_level_growth, sexual-state fields once change 7 exists), this
-    function raises NotImplementedError with a message naming the owning
-    change (change 7 for sexual-state fields, change 11b
-    character-progression for magic_level_growth) rather than silently
-    no-op'ing."""
+    exact Mod/GaugeTrait interface. When the target is in
+    _NO_OP_RATE_TARGETS (currently just magic_level_growth), this function
+    returns immediately and applies nothing -- that target's value is read by
+    PULL, through growth_rate_multiplier(entity) (change 11b's
+    effective_magic_growth_multiplier(), at the moment progression is
+    computed), never by push on tick. Applying it here as well would
+    double-apply the conferred scale: once via this function's own delta, and
+    again every time change 11b folds growth_rate_multiplier() into its own
+    computation. When the target is neither a known trait key nor a
+    documented no-op (e.g. a sexual-state field, once a future buff names one
+    as its target per sexual-state's own docstring convention -- no such buff
+    exists yet, per that change's own Non-Goals), this function raises
+    NotImplementedError naming the owning change, rather than silently
+    no-op'ing an target this module has no documented reason to ignore."""
+    if rate_mod["target"] in _NO_OP_RATE_TARGETS:
+        return
     ...
 
 def entity_active_buffs(entity) -> set[str]:
@@ -543,13 +570,25 @@ silently wrong" discipline change 4's D-5 applied to its own skill-registry self
   here (poisoned/paralysis/fear/conferred_growth_rate) is fully expressible as rate/bounds/decay/marker
   data. A future buff needing bespoke behavior can subclass `RulebookBuff` directly — nothing in this
   design prevents that; it is simply not needed by today's seed set.
-- **[Risk] `_apply_rate_modifier()`'s `NotImplementedError` branch for non-trait targets (sexual-state
-  fields, `magic_level_growth`) means `poisoned`'s hp-rate modifier is the only rate modifier this change
-  can actually exercise end-to-end today; `conferred_growth_rate`'s own rate modifier has no real target
-  to write into yet.** → Accepted and stated directly in D-6: `growth_rate_multiplier()` is tested as a
-  pure query against buff state, independent of any trait/field it would eventually feed, which is the
-  complete and correct scope for a change whose progression consumer (change 11b,
-  `character-progression`) has not been proposed yet.
+- **[Risk — RESOLVED, was accepted] `_apply_rate_modifier()`'s `NotImplementedError` branch for
+  `magic_level_growth` was reachable and crashed once its preconditions actually held.** At authoring
+  time this was accepted as a placeholder: nothing consumed `growth_rate_multiplier()` and nothing
+  ticked `conferred_growth_rate` outside the combat turn loop, so the target being unimplemented was
+  inert. Two later changes independently made it reachable: change 11b (`character-progression`) built
+  a real, tested consumer (`effective_magic_growth_multiplier()`) that makes entities genuinely hold
+  this buff in play, and change 11 (`world-clock`) added a `buff_ticks` settlement stage that calls
+  `tick_buffs()` on every non-combat time advance, not only inside combat — the first time-skip by an
+  entity holding the buff raised. → **Fixed**: `magic_level_growth` is now an explicit, documented
+  no-op in `_apply_rate_modifier()` (`_NO_OP_RATE_TARGETS`, D-4) rather than an unimplemented case — its
+  scale is consumed exclusively by pull through `growth_rate_multiplier()`/
+  `effective_magic_growth_multiplier()`, verified directly against change 11b's actual implementation
+  (`world/rules/progression.py`'s `effective_magic_growth_multiplier()` calls
+  `growth_rate_multiplier(entity)` as a pure read, with no push-side counterpart expected). A regression
+  test (tasks.md 5.6a) asserts `tick_buffs()` on an entity holding an active `conferred_growth_rate`
+  buff completes without raising and leaves `magic_level` untouched. The sibling branch for a
+  sexual-state-field target remains a live, accepted risk — no buff targeting a sexual field exists yet
+  (change 7/8's own artifacts confirm this explicitly), so it stays a genuine `NotImplementedError` until
+  something makes it reachable the same way changes 11/11b did here.
 - **[Risk] `BuffHandler`'s exact accessor names (`all()`, `.add()`, the default `dbkey`) are assumed, not
   confirmed against a locally installed Evennia 6.1.0 package.** → Flagged for implementer verification
   throughout D-3/D-4/D-5, consistent with changes 1–5's identical discipline for every other
