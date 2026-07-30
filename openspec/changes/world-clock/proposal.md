@@ -19,11 +19,15 @@ sexual decay, and daily resets in a fixed, non-accidental order.
   `calendar: WorldDateTime` (a pure function of `tick`, never separately stored), with
   `advance(seconds, source) -> list[ScheduledEvent]` as the only way tick ever moves.
 - Add a fixed, ordered settlement-stage registry implementing design doc §6.5's exact order (HP/MP/SP
-  regen → buff durations → sexual state decay → daily resets → caravan arrivals → shop hours → quest
-  deadlines → NPC schedules), with a test that fails if any two stages are transposed.
+  regen → buff durations → sexual state decay → magic study → daily resets → caravan arrivals → shop
+  hours → quest deadlines → NPC schedules), with a test that fails if any two stages are transposed.
+  `magic_study` (change 11b's `accrue_magic_study()`) is one addition beyond §6.5 itself, inserted
+  between `sexual_decay` and `daily_resets` at the coordinator's request; its placement and gating are
+  independently verified in design.md D-3, not taken on faith.
 - Add `AdvanceSource` (`COMMAND` / `COMBAT` / `SKIP`) so a combat-sourced advance does not re-apply
-  buff ticks / sexual decay that change 9's `run_round()` already applied per round — the one
-  double-application bug this change's ordering authority exists to prevent.
+  buff ticks / sexual decay / magic study that change 9's `run_round()` already applied per round (or,
+  for magic study, should never apply mid-fight at all) — the one double-application bug this change's
+  ordering authority exists to prevent.
 - Register no-op, declared-seam stages for caravan arrivals, shop hours, quest deadlines, and NPC
   schedules (changes 12-16/19's future territory), plus an open `ScheduledEvent` source registry so
   those changes can attach without editing this change's code.
@@ -87,4 +91,7 @@ sexual decay, and daily resets in a fixed, non-accidental order.
 - Reads, without modifying: change 6's `tick_buffs()`, change 7's `decay_tick()`/
   `reset_daily_counters()`, change 9's `Battlefield`/`BattleResult`, change 10's `OverwhelmResult`,
   change 3's `Monster`/gauge traits.
+- Reads change 11b's `world.rules.progression.accrue_magic_study()` through a self-arming lazy import
+  (never a hard `import`, since change 11b depends on this change, not the reverse) — no edit to change
+  11b's own OpenSpec artifacts.
 - No database migration concerns (project is unreleased, zero users).

@@ -18,6 +18,11 @@
 - [ ] 1.4 Confirm change 8's landed `commands/action.py::CmdCast` implementation and its exact
       `ActionResult.success()` shape (`event_log`, `time_cost_seconds`) before adding the integration
       line in task 8.1.
+- [ ] 1.5 Confirm `world.rules.progression.accrue_magic_study(entities, seconds, source)`'s exact
+      signature against change 11b's landed implementation, if change 11b has landed by the time this
+      task runs — this change's own `_try_accrue_magic_study()` (task 7.2) must degrade to a no-op
+      rather than assume a signature that does not match, since change 11b depends on this change and
+      may not exist yet at this change's own implementation time.
 
 ## 2. Rulebook data (`world/rules/rulebook/clock.yaml`)
 
@@ -117,28 +122,55 @@
 ## 7. Settlement stage order and the combat double-tick gate (`world/rules/clock.py`)
 
 - [ ] 7.1 Implement `_STAGE_ORDER` as the exact tuple `("gauge_regen", "buff_ticks", "sexual_decay",
-      "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules")` per
-      design.md D-3/§6.5.
-- [ ] 7.2 Implement `_run_stages(clock, seconds, source, entities) -> list[ScheduledEvent]` per
-      design.md D-3: always calls `_settle_gauge_regen()`; calls `_settle_buffs_and_decay()` only when
-      `source is not AdvanceSource.COMBAT`; always calls `_settle_boundary_stages()` (task 9).
-- [ ] 7.3 Test the structural transposition check: assert `"buff_ticks"` appears strictly between
-      `"gauge_regen"` and `"sexual_decay"` in `_STAGE_ORDER`, and `"daily_resets"` appears strictly
-      after `"sexual_decay"` — a test that fails immediately if `_STAGE_ORDER` is ever edited to
-      violate either constraint.
-- [ ] 7.4 Test the arithmetic transposition check per design.md D-3's worked shape: construct a
+      "magic_study", "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines",
+      "npc_schedules")` per design.md D-3/§6.5 — `magic_study` is change 11b's addition, inserted
+      between `sexual_decay` and `daily_resets` at the coordinator's request.
+- [ ] 7.2 Implement `_try_accrue_magic_study(entities, seconds, source) -> None` per design.md D-3: a
+      self-arming wrapper mirroring change 9's `_try_sexual_decay()` exactly — lazily imports
+      `world.rules.progression.accrue_magic_study`, degrades to a silent no-op (never a crash) while
+      `world.rules.progression` does not exist, and calls it with the received `entities`/`seconds`/
+      `source` once it does. Do **not** hard-`import` `world.rules.progression` at module load time —
+      change 11b depends on this change, not the reverse, so a hard import would fail during this
+      change's own implementation.
+- [ ] 7.3 Implement `_run_stages(clock, seconds, source, entities) -> list[ScheduledEvent]` per
+      design.md D-3: always calls `_settle_gauge_regen()`; when `source is not AdvanceSource.COMBAT`,
+      calls `_settle_buffs_and_decay()` then `_try_accrue_magic_study(entities, seconds, source)` (in
+      that order, after the quantum loop completes — `magic_study` is closed-form, called once with
+      the full `seconds`, never chunked); always calls `_settle_boundary_stages()` (task 9).
+- [ ] 7.4 Test the structural transposition check: assert `"buff_ticks"` appears strictly between
+      `"gauge_regen"` and `"sexual_decay"` in `_STAGE_ORDER`, and `"magic_study"` appears strictly
+      between `"sexual_decay"` and `"daily_resets"` — a test that fails immediately if `_STAGE_ORDER`
+      is ever edited to violate either constraint.
+- [ ] 7.5 Test the arithmetic transposition check per design.md D-3's worked shape: construct a
       fixture entity whose `hp` starts within one regen-step of `max`, with an active `poisoned` buff;
       settle it once through the real, correctly-ordered `_run_stages()` and once through a
       deliberately-transposed variant (buff-tick applied before regen) built in the same test; assert
       the two final `hp` values differ, and assert the correctly-ordered result matches the specific
-      value design.md D-3's worked arithmetic predicts for the chosen fixture numbers.
-- [ ] 7.5 Test the combat double-tick gate: simulate an `N`-round `run_round()` sequence for a
+      value design.md D-3's worked arithmetic predicts for the chosen fixture numbers. Do **not**
+      attempt to extend this arithmetic proof to `magic_study` — design.md D-3 documents explicitly why
+      no such proof exists (no shared resource with either neighbor); the structural check (task 7.4)
+      is `magic_study`'s only mechanical safeguard, and that is the correct, complete answer, not a gap
+      to fill in later.
+- [ ] 7.6 Test the combat double-tick gate: simulate an `N`-round `run_round()` sequence for a
       `poisoned` combatant (each round already calling `tick_buffs()`/`decay_tick()` per change 9's own
       upkeep), then call `advance(N*6, AdvanceSource.COMBAT, entities)`; assert the combatant's `hp`
       reflects exactly `N` poison ticks' worth of damage, not `2N`.
-- [ ] 7.6 Test that `AdvanceSource.COMBAT` still applies gauge regen (task 5's stage runs regardless of
-      source) and that `AdvanceSource.COMMAND`/`AdvanceSource.SKIP` both run the full stage list
-      including `buff_ticks`/`sexual_decay`.
+- [ ] 7.7 Test that `AdvanceSource.COMBAT` still applies gauge regen (task 5's stage runs regardless of
+      source), that it never accrues magic-study XP (`entity.db.magic_xp` unchanged), and that
+      `AdvanceSource.COMMAND`/`AdvanceSource.SKIP` both run the full stage list including
+      `buff_ticks`/`sexual_decay`.
+- [ ] 7.8 Test `_try_accrue_magic_study()`'s self-arming behavior directly: (a) while
+      `world.rules.progression` is not importable, `advance()` (any `AdvanceSource`) completes with no
+      exception and no entity's `magic_xp`/`magic_level` changes; (b) once a stand-in
+      `world.rules.progression.accrue_magic_study` exists (a test fixture, or the real module once
+      change 11b lands), `advance(seconds, AdvanceSource.SKIP, entities)` calls it with exactly the
+      received `entities`/`seconds`/`source`.
+- [ ] 7.9 Test the two-gate composition explicitly: with the stand-in `accrue_magic_study` from task
+      7.8 in place, call `advance(seconds, AdvanceSource.COMMAND, entities)` and assert the stand-in
+      *is* invoked (the stage-level gate only excludes `COMBAT`) but produces no XP change (the
+      stand-in's own internal `source is not AdvanceSource.SKIP: return` gate no-ops) — proving the
+      stage-level gate and `accrue_magic_study()`'s own internal gate compose rather than contradict,
+      per design.md D-3's stated division of authority.
 
 ## 8. Boundary stages and the ScheduledEvent registry (`world/rules/clock.py`)
 
@@ -279,4 +311,16 @@
 - [ ] 13.5 Confirm no test or fixture added by this change relies on iterating one real second (or one
       real quantum) per unit of requested skip duration for a multi-hour skip — a complexity/call-count
       assertion guarding against a regression back toward per-second stepping.
-- [ ] 13.6 Run `openspec validate world-clock --strict` and confirm it passes.
+- [ ] 13.6 Confirm this change modifies no file authored by change 11b — `world/rules/progression.py`
+      is read only through the self-arming lazy import in `_try_accrue_magic_study()` (task 7.2), never
+      imported at module load time and never edited.
+- [ ] 13.7 Record, in the implementation notes (not fixed by this change), the latent risk design.md's
+      Risks section names: if the installed `BuffHandler`'s tick mechanism invokes `at_tick()` for a
+      permanent (`duration: null`) buff, `tick_buffs(entity)` will raise `NotImplementedError` for any
+      entity holding an active `conferred_growth_rate` buff, per change 6's own `_apply_rate_modifier()`
+      (change 6's own documented, accepted risk for a target it does not recognize,
+      `magic_level_growth`). Confirm this against the installed Evennia package during change 6's or
+      11b's own implementation, not this change's — this change's `_settle_buffs_and_decay()` merely
+      inherits an existing call site (`tick_buffs()`) that was already exercising this risk via change
+      9's `run_round()`; this task exists so the finding is not lost, not to fix it here.
+- [ ] 13.8 Run `openspec validate world-clock --strict` and confirm it passes.

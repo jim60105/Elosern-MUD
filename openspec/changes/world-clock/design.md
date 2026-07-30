@@ -57,10 +57,13 @@ hours → quest deadlines → NPC schedules) without inventing their data.
 - `world/rules/clock.py::WorldClock` — `tick: int` as the sole persisted driver of game time,
   `calendar: WorldDateTime` as a pure function of `tick`, `advance(seconds, source, entities) -> list[
   ScheduledEvent]` as the only way `tick` ever moves.
-- A fixed, ordered, tested settlement-stage registry implementing design doc §6.5's exact order, with
-  a transposition test that fails if any two stages swap.
+- A fixed, ordered, tested settlement-stage registry implementing design doc §6.5's exact order, plus
+  one addition beyond §6.5 itself — `magic_study` (change 11b's `accrue_magic_study()`), inserted
+  between `sexual_decay` and `daily_resets` at the coordinator's request, its placement independently
+  verified in D-3 — with a transposition test that fails if any two stages swap.
 - `AdvanceSource` (`COMMAND` / `COMBAT` / `SKIP`) so a combat-sourced advance does not re-run buff-tick/
-  sexual-decay that change 9's own per-round upkeep already applied.
+  sexual-decay/magic-study that change 9's own per-round upkeep already applied (or, for magic study,
+  should never apply during a fight at all).
 - Quantum-batched settlement for long jumps: no per-second iteration, an explicit early-exit once
   nothing remains to settle, and boundary-arithmetic (not iteration) for hourly/daily stages.
 - A concrete, simple, subtropical four-season calendar with no invented month names.
@@ -264,6 +267,7 @@ _STAGE_ORDER = (
     "gauge_regen",          # HP/MP/SP regen
     "buff_ticks",           # buff durations
     "sexual_decay",         # sexual state decay
+    "magic_study",          # ambient magic-study XP accrual — change 11b (character-progression)
     "daily_resets",         # climax_today, etc.
     "caravan_arrivals",     # declared seam — change 16
     "shop_hours",           # declared seam — change 16
@@ -272,15 +276,20 @@ _STAGE_ORDER = (
 )
 ```
 
-**Why `buff_ticks` and `sexual_decay` are skipped entirely when `source is AdvanceSource.COMBAT` — the
-one correctness bug this design exists to prevent.** Change 9's `run_round()` (D-9 of its own design)
-*already* calls `tick_buffs(entity)` and attempts `decay_tick(entity, ...)` once per round, for every
-living roster member, as part of combat's own per-round upkeep — this is not something this change
-adds, it is already-landed change-9 behavior. If `WorldClock.advance(total_seconds,
-AdvanceSource.COMBAT)` naively re-ran the full stage list including `buff_ticks`/`sexual_decay` for that
-same elapsed span, a poisoned combatant's hp would be debited twice for the identical six seconds — once
-inside `run_round()`'s own upkeep, once again inside this change's own settlement pass over the same
-interval. **Decision**: the settlement-stage registry gates `buff_ticks` and `sexual_decay` on
+**Why `buff_ticks`, `sexual_decay`, and `magic_study` are skipped entirely when `source is
+AdvanceSource.COMBAT` — the one correctness bug this design exists to prevent.** Change 9's
+`run_round()` (D-9 of its own design) *already* calls `tick_buffs(entity)` and attempts
+`decay_tick(entity, ...)` once per round, for every living roster member, as part of combat's own
+per-round upkeep — this is not something this change adds, it is already-landed change-9 behavior. If
+`WorldClock.advance(total_seconds, AdvanceSource.COMBAT)` naively re-ran the full stage list including
+`buff_ticks`/`sexual_decay` for that same elapsed span, a poisoned combatant's hp would be debited twice
+for the identical six seconds — once inside `run_round()`'s own upkeep, once again inside this change's
+own settlement pass over the same interval. `magic_study` (change 11b's `accrue_magic_study()`) joins
+this same gate for a different, independently-correct reason: fighting is not studying, and change 11b's
+own D-1 states this explicitly — an `AdvanceSource.COMBAT`-sourced advance must not silently accrue
+ambient study XP for the same handful of six-second rounds combat already accounts for through its own
+kill-XP path (`grant_combat_kill_xp()`, a separate, per-kill mechanism this change does not call).
+**Decision**: the settlement-stage registry gates `buff_ticks`, `sexual_decay`, and `magic_study` on
 `source is not AdvanceSource.COMBAT`; every other stage (`gauge_regen`, `daily_resets`, and the four
 declared-seam stages) always runs regardless of source, since none of those is applied anywhere inside
 combat's own turn loop today.
@@ -291,15 +300,70 @@ def _run_stages(clock: WorldClock, seconds: int, source: AdvanceSource, entities
     _settle_gauge_regen(entities, seconds)                                    # always
     if source is not AdvanceSource.COMBAT:
         _settle_buffs_and_decay(entities, seconds)                            # D-4's quantum loop
+        _try_accrue_magic_study(entities, seconds, source)                    # see below — self-arming
     events += _settle_boundary_stages(clock.tick, clock.tick + seconds)       # D-5's declared seams
     return events
 ```
 
+**Why `magic_study` is called through a self-arming lazy import, not a hard import — the reverse of
+`tick_buffs()`/`decay_tick()`'s treatment, and deliberately so.** Changes 6 and 7 (`tick_buffs()`,
+`decay_tick()`) are both transitive dependencies of this change (design doc §11: 11 depends on 7 and 9,
+and 9 transitively depends on 6 via 8) — they are guaranteed importable by the time this change is
+implemented, so `clock.py` imports them directly, exactly as written earlier in this document. Change
+11b (`character-progression`) is the opposite: **it depends on change 11**, not the reverse (roadmap:
+"11b, depends on 5, 6, 11"). A hard `from world.rules.progression import accrue_magic_study` at the top
+of `clock.py` would therefore fail at import time for the entire duration of this change's own
+implementation, since `world/rules/progression.py` does not exist until 11b lands — this change would be
+importing a module from a change that has not been built yet, inverting the roadmap's own dependency
+direction. **Decision**: `magic_study` is wired through the identical lazy-import, degrade-to-no-op,
+self-arm-once-real pattern change 9's own `_try_sexual_decay()` already established for
+`world.rules.sexual_transitions` (change 7b) before that module existed:
+
+```python
+def _try_accrue_magic_study(entities, seconds: int, source: "AdvanceSource") -> None:
+    """magic_study is NOT a hard dependency of this change -- change 11b
+    depends on change 11, not the reverse, so world.rules.progression may
+    not exist yet at the time this module is imported. Mirrors change 9's
+    own _try_sexual_decay() exactly: lazy import, degrade to a no-op (never
+    a crash) while the module doesn't exist, self-arm once it does. This
+    wrapper's only job is the import guard -- accrue_magic_study() already
+    gates itself to AdvanceSource.SKIP internally (see below); this
+    function does not duplicate that check."""
+    try:
+        from world.rules.progression import accrue_magic_study
+    except ImportError:
+        return
+    accrue_magic_study(entities, seconds, source)
+```
+
+This is also why `magic_study` is a bespoke, self-arming stage call rather than routed through D-5's
+`register_event_source()` registry: that registry's shape (`Callable[[int, int], list[ScheduledEvent]]`,
+a boundary-crossing query with no per-entity mutation) matches the four declared world-event seams, not
+a per-entity continuous accrual like `buff_ticks`/`sexual_decay`/`magic_study`. `magic_study` belongs
+structurally with the other two per-entity stages it is gated alongside, not with D-5's boundary stages.
+
+**Composing the two gates — which one is authoritative for what.** `accrue_magic_study()` (change
+11b's own code, unedited) already contains its own internal gate: `if source is not
+AdvanceSource.SKIP: return`. This change's stage-level gate (`source is not AdvanceSource.COMBAT`)
+therefore still lets the call through — and lets it execute its own no-op — for `AdvanceSource.COMMAND`.
+The two gates do not contradict; they answer different questions. **This change's stage-level gate is
+authoritative for whether the stage participates in settlement at all** — it decides, uniformly and
+without special-casing any one of the three combat-skipped stages, that `buff_ticks`/`sexual_decay`/
+`magic_study` are invoked for `COMMAND` and `SKIP` and never for `COMBAT`, matching the same rule this
+change already applies to the other two. **Change 11b's own internal gate is authoritative for whether
+the stage actually does anything once invoked** — it is the one place that knows "ambient study" means
+specifically downtime (`SKIP`), not an ordinary six-second command. Composed, the net observable
+behavior is exactly "magic study accrues only on `SKIP`" (matching 11b's own design and tests) — reached
+by two independently-justified, non-conflicting layers rather than by this change reaching into 11b's
+module to duplicate its `AdvanceSource.SKIP` check at the stage-runner level, which would blur which
+change owns that policy decision.
+
 **The transposition-sensitive test — proving the *order* is what it claims to be, not merely that
 each stage ran.** A test that only asserts "hp increased, some buff decremented, some sexual field
 decayed, `climax_today` reset" after one `advance()` call would still pass if two adjacent stages were
-swapped, because none of design doc §6.5's four built stages currently reads another built stage's
-*output* — they are independent effects on independent fields. Order-sensitivity therefore has to be
+swapped, because none of design doc §6.5's four built stages (nor `magic_study`, this change's own
+addition beyond §6.5) currently reads another built stage's *output* — they are independent effects on
+independent fields. Order-sensitivity therefore has to be
 constructed, not discovered incidentally, exactly as the task asks. **Decision**: construct a fixture
 where `gauge_regen`'s effective outcome depends on a *combat modifier* driven by `sexual_decay`'s
 *starting* value in a way that materially changes if decay runs before or after the modifier is read for
@@ -317,14 +381,48 @@ clamp, applying a flat `+2` before a flat `-5` accumulates a different intermedi
 reverse when *both* are re-derived per quantum against the then-current value rather than computed once
 against the starting value — see the worked arithmetic below). **A second assertion in the same test**
 directly inspects `_STAGE_ORDER` and fails if `"buff_ticks"` does not appear strictly before
-`"sexual_decay"` and strictly after `"gauge_regen"`, and if `"daily_resets"` does not appear strictly
-after `"sexual_decay"` — a structural check the arithmetic check alone cannot fully substitute for
-(two adjacent stages that happen not to interact arithmetically in a given fixture would still pass the
-arithmetic check if swapped; the structural check catches that case directly). **Together, these two
-assertions are what the task means by "fails if two stages are transposed"**: the structural assertion
-catches any transposition mechanically and immediately; the arithmetic assertion additionally proves the
-order has a real, executable consequence for at least the regen/buff pair, not just a documented
-convention nothing enforces.
+`"sexual_decay"` and strictly after `"gauge_regen"`, and if `"magic_study"` does not appear strictly
+between `"sexual_decay"` and `"daily_resets"` — a structural check the arithmetic check alone cannot
+fully substitute for (two adjacent stages that happen not to interact arithmetically in a given fixture
+would still pass the arithmetic check if swapped; the structural check catches that case directly).
+**Together, these two assertions are what the task means by "fails if two stages are transposed,"**
+now covering all four ordered stages the structural check can see: the structural assertion catches any
+transposition among `gauge_regen`/`buff_ticks`/`sexual_decay`/`magic_study`/`daily_resets` mechanically
+and immediately; the arithmetic assertion additionally proves the order has a real, executable
+consequence for at least the regen/buff pair, not just a documented convention nothing enforces.
+
+**Why the arithmetic proof is not, and cannot be, extended to `magic_study` — stated honestly rather
+than silently left as a gap.** The regen/buff arithmetic proof works because `gauge_regen` and
+`buff_ticks` both mutate the *same* resource (`entity.traits.hp`) in the *same* settlement pass, so their
+relative order changes the intermediate values a clamp can catch. `magic_study` (`accrue_magic_study()`,
+change 11b) reads `entity.race`, `entity.skills.owned_keys()`, and `entity.buffs` (via
+`growth_rate_multiplier()`), and writes only `entity.db.magic_xp`/`entity.traits.magic_level` — it
+shares **no** field with `sexual_decay` (which reads/writes `entity.sexual`'s ordered-level fields) or
+with `daily_resets` (which zeroes `entity.sexual.climax_today` only). Verified directly, not assumed:
+neither `decay_tick()`'s `DECAY_CONFIG` (change 7) nor `reset_daily_counters()` (change 7) touches
+`magic_xp`, `magic_level`, or anything `effective_magic_growth_multiplier()` reads; `magic_study`'s own
+computation likewise never reads a sexual-state field. **No fixture can be constructed where
+transposing `magic_study` against either neighbor produces a different final value for any field**,
+because non-commutativity requires a shared, order-sensitive resource, and none exists here. This is a
+real, checkable answer, not an unexamined gap: the structural test (above) is `magic_study`'s *only*
+mechanical safeguard against transposition, and that is the correct and complete answer given the
+stages' actual data dependencies — inventing an arithmetic proof here would mean fabricating a coupling
+that does not exist.
+
+**A coupling that does exist, verified while checking the above, and why it does not change
+`magic_study`'s placement.** `effective_magic_growth_multiplier()` reads `entity.buffs` (via change 6's
+`growth_rate_multiplier()`), so `magic_study` is not *fully* independent of `buff_ticks` — it depends on
+buff state `buff_ticks` might, in principle, change. In practice this is inert today:
+`conferred_growth_rate` (the only buff `growth_rate_multiplier()` folds in) has `duration: null` in
+`buffs.yaml` — a permanent buff, never expired or rate-modified in a way that changes its own `.scale` —
+so whether `magic_study` runs immediately after `buff_ticks` (as placed) or before it makes no observed
+difference to any golden test this change or change 11b defines today. Placing `magic_study`
+**after** `buff_ticks` (already true in `_STAGE_ORDER` above) is nonetheless the conservative, correct
+choice should a future finite-duration growth-rate-affecting buff ever be added: reading buff state after
+the interval's own buff-tick processing has completed reflects the settled state for that interval,
+not a stale pre-tick value. No repositioning is needed on account of this coupling — it argues for
+leaving `magic_study` exactly where change 11b requested, not for moving it. See Risks for a related,
+independently pre-existing concern this check surfaced.
 
 **Worked arithmetic for the regen/poison case (quantum = 10s, per D-4):** starting hp = 50, max = 200,
 regen rate = +2/quantum, poison = -5/quantum, both active for 3 quanta.
@@ -422,6 +520,19 @@ than an explicit elapsed-seconds argument, that mechanism must be bypassed or di
 reading it would let real wall-clock time leak into `entity.traits.hp` — exactly what D4 forbids).
 `_settle_gauge_regen()` writes `entity.traits.<key>.value` directly through the trait's own public
 setter, using only the `seconds` this change's own `advance()` call received as an argument.
+
+**`magic_study` (change 11b's `accrue_magic_study()`) needs no quantum loop for the identical reason.**
+Unlike `tick_buffs()`/`decay_tick()`, `accrue_magic_study(entities, seconds, source)` is documented
+(character-progression design.md D-2) as a closed-form multiplication —
+`hours = seconds / 3600; xp = hours * STUDY_BASE_XP_PER_HOUR * effective_magic_growth_multiplier(entity)`
+— over the *entire* elapsed `seconds` in one call, with no internal accumulator to cross interval
+boundaries correctly. It is called once per `advance()` call (via `_try_accrue_magic_study()`, above),
+after `_settle_buffs_and_decay()`'s quantum loop completes, using the full `seconds` value directly —
+the same `O(1)`-regardless-of-elapsed-time discipline `_settle_gauge_regen()` already established. This
+also means `magic_study` contributes **no new entry** to `SETTLEMENT_QUANTUM_SECONDS`'s GCD derivation
+below — a future reader should not assume every settlement-stage callable needs to participate in that
+computation; only the two whose own internal semantics are "one call = one interval's worth"
+(`tick_buffs()`, `decay_tick()`) do.
 
 **Why hourly/daily/etc. boundary stages (D-5) are not part of this quantum loop.** `caravan_arrivals`,
 `shop_hours`, `quest_deadlines`, `npc_schedules`, and `daily_resets` are boundary-crossing checks —
@@ -757,6 +868,33 @@ actual command that calls it in play.
   one-day scope cut for a single-player game with no roadmap item through change 16 needing distant-NPC
   simulation; named explicitly as an open question for whoever eventually needs it (plausibly change
   19's `NPC.schedule` consumer).
+- **[Risk] `magic_study`'s self-arming lazy import (D-3) means `world/rules/clock.py`'s own test suite
+  must exercise both states — before change 11b lands (`world.rules.progression` not importable,
+  `_try_accrue_magic_study()` a silent no-op) and after (import succeeds, the callable actually fires) —
+  and a regression that quietly breaks the import path (a typo in the module/function name) would show
+  up only as "study XP silently stops accruing," not as a crash.** → Mitigation: mirrors change 9's own
+  `_try_sexual_decay()` test discipline exactly — a guarded, `pytest.importorskip`-style test proves the
+  self-arming path fires once `world.rules.progression` is real, and a companion test proves the no-op
+  path is silent (no exception) while it is absent; both are named tasks (see tasks.md).
+- **[Risk] `effective_magic_growth_multiplier()` (change 11b) reads `entity.buffs` for an active
+  `conferred_growth_rate` buff, and that buff's own `buffs.yaml` entry declares a `rate` modifier
+  targeting `magic_level_growth` — a target change 6's own `_apply_rate_modifier()` does not recognize
+  as a known trait key. Change 6's own Risks section already documents this as accepted and unresolved
+  ("`conferred_growth_rate`'s own rate modifier has no real target to write into yet"). If the installed
+  `BuffHandler`'s tick mechanism invokes `at_tick()` for a permanent (`duration: null`) buff the same way
+  it does for a timed one, then `tick_buffs(entity)` — called unconditionally by this change's own
+  `_settle_buffs_and_decay()` for every entity in scope, and already called by change 9's `run_round()`
+  per combat round — would raise `NotImplementedError` for any entity holding an active
+  `conferred_growth_rate` buff, independent of whether `magic_study` runs at all.** → This is not a defect
+  this change introduces or can fix (fixing it means editing change 6's `_apply_rate_modifier()` or
+  giving `magic_level_growth` a real target, neither of which is this change's artifact to edit); it is
+  surfaced here, louder than change 6's own Risks section states it, because this change's own
+  `_settle_buffs_and_decay()` is now a second, independent call site (beyond change 9's `run_round()`)
+  that would trip it the moment change 11b's `grant_conferred_growth_rate()` is actually exercised in
+  play. Flagged explicitly for whoever implements change 6/11b to confirm against the installed Evennia
+  `BuffHandler`'s actual tick-invocation behavior for permanent buffs before either lands in production;
+  not a coupling between `magic_study` and its settlement-order neighbors (`sexual_decay`/`daily_resets`
+  remain unaffected either way), so it does not change `magic_study`'s requested placement.
 
 ## Migration Plan
 
@@ -793,6 +931,18 @@ none of `world/rules/clock.py`, `world/rules/skip_safety.py`, `world/rules/ruleb
 - Change 10b (`monster-behaviour`) or a later change may eventually give `evaluate_skip_safety()` a real
   disposition/aggro signal to replace the current "any monster present" rule — not required for this
   change to be correct today.
+- **Change 11b (`character-progression`) is integrated into `_STAGE_ORDER` here, at the coordinator's
+  direct request, carrying over the exact stage name, gate, and position change 11b's own design
+  specified** (`magic_study`, gated identically to `buff_ticks`/`sexual_decay` on `source is not
+  AdvanceSource.COMBAT`, positioned between `sexual_decay` and `daily_resets`) — verified independently
+  in D-3 rather than taken on faith: `magic_study` shares no field with `sexual_decay` or `daily_resets`
+  (so its position relative to them is order-neutral for correctness, per change 11b's own claim), and
+  the one real coupling this review surfaced (a latent dependency on `entity.buffs` via
+  `growth_rate_multiplier()`) argues for, not against, its requested placement after `buff_ticks`. Unlike
+  changes 6/7 (hard, transitive dependencies), change 11b **depends on** this change, so the call site
+  is wired through a self-arming lazy import (`_try_accrue_magic_study()`, D-3) — the same pattern
+  change 9 used for change 7b before it existed — rather than a hard `import` that would fail during
+  this change's own implementation. No edit was made to change 11b's own OpenSpec artifacts.
 
 ## Open Questions
 
