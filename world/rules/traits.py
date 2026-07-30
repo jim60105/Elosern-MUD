@@ -88,7 +88,7 @@ def _trait_config(values: dict[str, int], magic_cap: int) -> dict[str, dict[str,
     }
     config["guild_merit"] = {
         "trait_type": "counter",
-        "base": 0,
+        "base": values["guild_merit"],
         "min": 0,
         "max": None,
     }
@@ -136,6 +136,7 @@ def build_initial_traits_for_monster_tier(
         "agility": _resolve_band_position(tier.static_band.agility, position),
         "defense": _resolve_band_position(tier.static_band.defense, position),
         "magic_level": 0,
+        "guild_merit": 0,
     }
 
 

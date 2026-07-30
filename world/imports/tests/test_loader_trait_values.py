@@ -34,6 +34,13 @@ class LoaderTraitTests(EvenniaTest):
         self.assertEqual(entity.db.inventory, record["inventory"])
         self.assertEqual(entity.db.disguised_stats, record["disguised_stats"])
 
+    def test_explicit_nonzero_guild_merit_is_stored_literally(self):
+        record = example_record()
+        record["stats"]["guild_merit"] = 37
+        entity = instantiate_character(record)
+        self.assertEqual(entity.traits.guild_merit.base, 37)
+        self.assertEqual(entity.traits.guild_merit.value, 37)
+
     def test_explicit_player_typeclass_has_no_account_side_effect(self):
         entity = instantiate_character(example_record(), PlayerCharacter)
         self.assertIsInstance(entity, PlayerCharacter)
