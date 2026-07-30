@@ -1,0 +1,60 @@
+x-evennia-build: &evennia-build
+  context: .
+  dockerfile: Containerfile
+  args:
+    UID: ${CONTAINER_UID:-1001}
+    VERSION: ${VERSION:-EDGE}
+    RELEASE: ${RELEASE:-0}
+
+services:
+  evennia:
+    image: localhost/elosern-mud:${IMAGE_TAG:-edge}
+    build: *evennia-build
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+      - "4002:4002"
+    environment:
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.containers.internal:11434}
+      SD_WEBUI_BASE_URL: ${SD_WEBUI_BASE_URL:-http://host.containers.internal:7860}
+    security_opt:
+      - no-new-privileges
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,mode=1777
+    volumes:
+      - evennia-db:/app/server/db
+      - evennia-art:/app/world/art
+      - evennia-logs:/app/server/logs
+      - evennia-static:/app/server/.static
+      - evennia-media:/app/server/.media
+
+  # First run only: podman compose --profile bootstrap run --rm bootstrap
+  bootstrap:
+    profiles:
+      - bootstrap
+    image: localhost/elosern-mud:${IMAGE_TAG:-edge}
+    build: *evennia-build
+    entrypoint:
+      - /usr/local/bin/dumb-init
+      - --
+    command:
+      - /bin/sh
+      - -c
+      - evennia migrate --noinput && exec evennia createsuperuser
+    stdin_open: true
+    tty: true
+    security_opt:
+      - no-new-privileges
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,mode=1777
+    volumes:
+      - evennia-db:/app/server/db
+
+volumes:
+  evennia-db:
+  evennia-art:
+  evennia-logs:
+  evennia-static:
+  evennia-media:

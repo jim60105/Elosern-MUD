@@ -135,7 +135,7 @@ from-scratch engine.
 | `rules/buffs.py` | `evennia.contrib.rpg.buffs` — `BuffHandler`, `BaseBuff` | **Use directly.** Duration/tick/stacking are done |
 | `typeclasses/entities.py` | `evennia.contrib.base_systems.components` — `Component`, `ComponentHolderMixin`, `ComponentProperty` | **Use directly.** `QuestGiver` / `Merchant` / `GuildStaff` are project-authored `Component` subclasses; Evennia ships the base class, not these names |
 | Map · grid layer | `evennia.contrib.grid.xyzgrid` — `XYZRoom`, `XYZExit` (module `xyzgrid/xyzroom.py`) | **Use directly.** XYZRoom, ASCII maps, shortest path, FOV minimap |
-| Map · virtual layer | `evennia.contrib.grid.wilderness` — `WildernessMapProvider` (module `wilderness/wilderness.py`) | **Extend.** Subclass `WildernessMapProvider`; the contrib ships a worked example subclass, `PyramidMapProvider`, to model the override points on |
+| Map · virtual layer | `evennia.contrib.grid.wilderness` — `WildernessMapProvider` (module `wilderness/wilderness.py`) | **Extend.** Subclass `WildernessMapProvider`; its module documentation contains a `PyramidMapProvider` example, but no importable contrib class with that name ships. |
 | Map · instance layer | `evennia.prototypes.spawner` — **this is core Evennia, not a contrib module; do not look for it under `evennia.contrib`** | **Use directly.** `spawn(*prototypes, caller=None, **kwargs)` on SceneBuilder output |
 | `ai/client.py` | `evennia.contrib.rpg.llm` — `LLMClient` (module `llm.py` → `llm_client.py`; built on Twisted's `protocol.Protocol` / HTTP11 client factory) | **Subclass.** Keep the Twisted async skeleton; override payload for `/v1/chat/completions` |
 | `ai/npc_dialogue.py` | `evennia.contrib.rpg.llm` — `LLMNPC(DefaultCharacter)` (module `llm_npc.py`) | **Subclass.** Chat memory, prompt priority chain, thinking state are done |
@@ -143,14 +143,15 @@ from-scratch engine.
 | `rules/dice.py` | `evennia.contrib.rpg.dice` — `roll()` (module `dice.py`) | **Use directly** for the d100 roller — `roll(1, 100, ...)` or the string form `"1d100"` |
 | Front-end panel | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed) | **Configure + plugin.** Edit `goldenlayout_default_config.js`, add an OOB receiver |
 
-> **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (`pip install evennia`; requires
-> Python >=3.12, imports and CLI both verified in an isolated venv) — the version that was actually
+> **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (imports and CLI both verified in an
+> isolated uv environment; requires Python >=3.12) — the version that was actually
 > installed, superseding the unverified matrix that previously stood here (sourced from
-> `tmp/evennia.md`, a secondary research document). Three corrections were made against that
+> `tmp/evennia.md`, a secondary research document). Four corrections were made against that
 > document: (1) `evadventure` lives under `contrib.tutorials`, not `contrib.rpg`; (2) no
 > `OrderedLevelTrait` class exists anywhere in Evennia — `sexual_state.py` must author its own
 > ordered-level `Trait` subclass and register it via `settings.TRAIT_CLASS_PATHS`; (3)
-> `prototypes.spawner` is core Evennia, not a contrib module. Also confirmed accurate and unchanged:
+> `prototypes.spawner` is core Evennia, not a contrib module; (4) `PyramidMapProvider` is a
+> documentation example, not an importable class. Also confirmed accurate and unchanged:
 > default ports (telnet 4000, webserver 4001, websocket 4002, matching §9), the
 > `evennia --init <name>` project skeleton (`commands/`, `server/`, `typeclasses/`, `web/`,
 > `world/`), and all other module paths and class names in the table above. One operational nuance
@@ -267,7 +268,7 @@ Frozen at change 4 and handed to the import implementer.
 ```
 world/imports/
 ├── schema.py       CHARACTER_SCHEMA_V1 / WORLD_SCHEMA_V1
-├── validate.py     CLI: python -m world.imports.validate cards/*.json
+├── validate.py     CLI: uv run --locked -m world.imports.validate cards/*.json
 ├── loader.py       instantiate only after validation passes
 └── examples/       one valid reference card
 ```
@@ -572,7 +573,9 @@ any room referencing that archetype hits the cache
 **Worker contract** — the swap point:
 
 ```python
-ART_WORKER_CMD = ["python", "-m", "tools.art_worker"]
+import sys
+
+ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
 # stdin  ← [{archetype, scene_sentence, out_path}, …]
 # stdout → [{archetype, status, path, error}, …]
 ```

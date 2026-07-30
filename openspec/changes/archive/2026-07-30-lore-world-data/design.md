@@ -1,0 +1,647 @@
+## Context
+
+This is roadmap item #2 (design doc §11), depending on change 1 (`bootstrap-container-evennia`),
+which provides the Evennia project skeleton, the pinned Evennia 6.1.0 dependency, and the
+`world/lore/` empty-stub package. No code exists yet for this change's scope — `world/lore/` is
+currently an empty package per change 1's task 2.2.
+
+The source data is `tmp/story_settings/world_info.md`: free-form Traditional Chinese, YAML-shaped
+but not schema-validated, gitignored, and never committed. This change's job is narrow — convert
+that prose into frozen dataclasses per design doc §5.1 and D9 ("`world/lore/` is Python, not
+YAML"), and sync them idempotently into the DB, keyed by `key`. It does not implement any consumer
+of this data (combat overwhelm thresholds, import validation, quest reward checks) — those are
+changes 3, 4, 9, 10, and 16's jobs, each reading these registries rather than hardcoding numbers.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Typed, frozen-dataclass registries for every category design doc §5.1 names:
+  `RaceProfile`, `Element`, `MagicTier`, `RankTitle`, `Nation`, `GuildRank`, `MonsterTier`,
+  `Anchor`, plus a currency/price-table module — all derived faithfully from `world_info.md`.
+- A `StaticTier` registry (not named in §5.1, added when `world_info.md` was updated with tiered
+  human/beastfolk combat-strength distributions) recording the named power bands within each
+  race's `static_baseline`.
+- A `Subrace` registry (not named in §5.1, but required by the import contract's own reference
+  example, which already assumes `subrace: "ciaran"` resolves against something) covering the
+  three elf branches and the seven named beastfolk subspecies, including each beastfolk
+  subspecies' documented stat-distribution skew and 狐人's vital-band override.
+- An idempotent startup sync that mirrors every registry entry into the DB, keyed by `key`, safe
+  to run on every server start with no duplication.
+- A self-consistency test suite over the registries themselves (band contiguity, race power-gap
+  assertion, currency arithmetic, sync idempotency).
+
+**Non-Goals:**
+- No consumer logic. The overwhelm threshold (change 10), guild-rank reward *validation*
+  (change 16 / change 20's ScenarioDirector), and import range checks (change 4) are not
+  implemented here — only the data they will read.
+- No `LivingEntity`, `TraitHandler`, or any runtime entity state (change 3).
+- No monster loot tables, behaviour trees, or elemental resistances. `MonsterTier` (D-6b) carries
+  exactly the two numeric bands `world_info.md` specifies (physical stats, HP) so change 3 can
+  instantiate `Monster` entities without inventing numbers; everything else about how a monster
+  fights or what it drops belongs to the bestiary work in change 3 and later.
+- No Rooms, no `XYZRoom` grid entries for the anchors listed here — `Anchor` is pure lore data;
+  turning an anchor into a walkable room is change 12 (`map-anchor-grid`)'s job.
+- No YAML lore format. D9 is explicit that `world/lore/` is Python; this change does not introduce
+  a parallel YAML representation of any registry defined here.
+- No backward-compatibility, migration, or deprecation handling — the project is unreleased with
+  zero users, and `world/lore/` currently doesn't exist beyond an empty stub.
+- No sexual-state or character-level data of any kind (`sexual_baseline`, `persona`) — that is
+  change 7's scope per the task framing; this change models geography, races, nations, magic, the
+  economy, and monsters only.
+
+## Decisions
+
+### D-1. `RaceProfile` uses exactly the seven fields design doc §5.1 gives, no more.
+
+```python
+@dataclass(frozen=True)
+class RaceProfile:
+    key: str                    # "human" | "beastfolk" | "elf"
+    lifespan: tuple[int, int]
+    magic_cap: int
+    vital_baseline: Vitals
+    static_baseline: StaticBand
+    learning_multiplier: float
+    can_use_divine_arts: bool
+```
+
+Three entries only, matching §5.1 verbatim. Display names, population figures, and social-structure
+notes from `world_info.md` are deliberately **not** added as extra fields here — the task calls
+this "the load-bearing one" that every consumer reads magic numbers from, and the design doc gives
+an exact field list. Adding descriptive fields nobody reads risks the dataclass drifting from the
+contract other changes design against. `static_baseline` was added to §5.1 after a re-read of the
+sample character cards showed vital pools and static combat stats scale by different factors (see
+D-2b); it is covered here for field-count purposes and detailed separately since it needs its own
+reasoning. Values (excluding `static_baseline`, tabulated in D-2b):
+
+| key | lifespan | magic_cap | learning_multiplier | can_use_divine_arts |
+|---|---|---|---|---|
+| human | (60, 80) | 90 | 1.0 | False |
+| beastfolk | (50, 70) | 30 | 1.0 | False |
+| elf | (800, 1200) | 900 | 10.0 | True |
+
+`magic_cap` and `learning_multiplier` for elf are given directly in §5.1's own comment (90 / 30 /
+900 and 10.0). `learning_multiplier` for human and beastfolk has no number in either source
+document — **judgment call**: default both to `1.0` (the implicit baseline elf's 10x is measured
+against), documented here rather than silently invented.
+
+### D-2. `Vitals` stores a `(baseline, gifted_ceiling)` band per stat, not a single number.
+
+```python
+@dataclass(frozen=True)
+class Vitals:
+    hp: tuple[int, int]
+    mp: tuple[int, int]
+    sp: tuple[int, int]
+```
+
+§5.1's inline comment shorthands this as single numbers ("human 100 | elf 10000"), but
+`world_info.md` gives human and beastfolk each a baseline **and** a gifted ceiling ("100為基準，
+天賦者可達150-200"; beastfolk "150-200" HP/SP vs "30-50" MP). A `(min, max)` tuple per stat is the
+natural encoding both races share, and it is exactly the shape import range validation (design doc
+§5.3, "stats fall inside the race's plausible band → Warn") will want to read against.
+
+| race | hp | mp | sp |
+|---|---|---|---|
+| human | (100, 200) | (100, 200) | (100, 200) |
+| beastfolk | (150, 200) | (30, 50) | (150, 200) |
+| elf | (10000, 10000) | (10000, 10000) | (10000, 10000) |
+
+**Judgment call on elf**: `world_info.md` states elves don't perceive precise values below their
+own order of magnitude ("在這個位數之下他們感受不到零頭數值，故無準確數字意義"), so there is no
+documented gifted range to encode — a fixed `(10000, 10000)` is used as a canonical reference
+point, not a hard ceiling. This is intentionally consistent with the import contract's own
+reference example, which imports an elf with `hp: 10000` but `atk_phys: 88000` — i.e., individual
+elf stats are expected to exceed this baseline by orders of magnitude for prodigies, and the import
+check for out-of-band stats is a **warning**, not a rejection (§5.3), precisely because elf values
+are not meant to be tightly bounded.
+
+### D-2b. `StaticBand` mirrors `Vitals`' shape for `atk_phys`/`agility`/`defense`, and scales by a
+**different factor (~10×) than vital pools (~100×) — neither is derived from the other.**
+
+```python
+@dataclass(frozen=True)
+class StaticBand:
+    atk_phys: tuple[int, int]
+    agility: tuple[int, int]
+    defense: tuple[int, int]
+```
+
+This correction came from re-reading the sample character cards in `tmp/story_settings/character/`,
+which show human physical stats are single digits, not the double/triple digits an earlier draft of
+this design (and of design doc §5.1) assumed by loosely reusing the `Vitals` numbers for static
+combat stats too. `world_info.md` has since been updated with the full per-race distributions
+(supplied by the user after this design's first cut used only the two human sample cards, which
+under-represented the human ceiling — see below), which this section now reflects directly:
+
+```python
+Vitals(hp=..., mp=..., sp=...)      # ~100× human→elf
+StaticBand(atk_phys=..., agility=..., defense=...)  # ~10× human→elf
+```
+
+`RaceProfile.static_baseline` is the **species-wide floor-to-ceiling band** — the outer bound
+every individual of that race falls within, used for coarse import-range sanity checks (§5.3). The
+finer breakdown (adventurer-guild-correlated tiers within that band) is a separate registry,
+`StaticTier`/`STATIC_TIER_REGISTRY`, covered in D-2c. This is the "widen to species floor-to-ceiling
+and put the tiers in a separate structure" option: it keeps `StaticBand`'s shape unchanged
+(consistent with `Vitals`, and with every other registry's flat-band style) rather than making the
+type itself tier-aware, and it keeps `RaceProfile` answering exactly one question ("what's possible
+for this race") while `STATIC_TIER_REGISTRY` answers a different one ("what does a given power
+level look like").
+
+| race | atk_phys | agility | defense | source |
+|---|---|---|---|---|
+| human | (1, 22) | (1, 22) | (1, 22) | 平民 1 … 大劍豪(S級) 22 |
+| beastfolk | (4, 34) | (4, 34) | (4, 34) | 幼年與非戰鬥者 4 … 部族最強者/獸王級 34 |
+| elf | (70, 95) | (70, 95) | (70, 95) | 一般精靈 70-95; "精靈中的異數" exceed 95 (open, no hard
+  ceiling — same treatment as `vital_baseline`'s elf entry, D-2) |
+
+All three races now use one shared band across all three stats at the species level — `world_info.md`
+states the tiers as a single combined range ("此三項為全世界共通的絕對尺度") that `atk_phys`,
+`agility`, and `defense` are each independently drawn from, not three separately-ranged axes. Per-
+individual asymmetry (a character can be 8/9/7, not 8/8/8) is real and expected, but it happens
+*within* the shared band, not across three different bands — so `StaticBand`'s three fields are
+populated identically at the `RaceProfile` level. (`Subrace`-level asymmetry, e.g. 貓人 skewing
+toward `agility`, is a different and separate mechanism — see D-3.)
+
+**Constraint carried forward from design doc §5.1**: skill multipliers (×10 for 統御術's partial
+effect, ×100 for 身體強化, ×1000 for 身體超強化) are a third, independent layer applied at
+resolution time and are never baked into `static_baseline` or any stored stat. This change stores
+only base values; change 5 (`skills-equipment`) and change 9 (`dice-combat`) own multiplier
+application.
+
+### D-2c. `StaticTier` records the named power bands within each race's `static_baseline`.
+
+```python
+@dataclass(frozen=True)
+class StaticTier:
+    key: str                    # e.g. "human_elite", "beastfolk_city_apex"
+    race_key: str                # references RaceProfile.key
+    display_name_zh: str
+    order: int                   # ascending within the race, 1 = weakest
+    band: tuple[int, int | None] # shared across atk_phys/agility/defense; None = open upper bound
+    guild_rank_hint: str | None  # references GuildRank.key; None where world_info.md gives none
+    description: str             # English
+```
+
+`STATIC_TIER_REGISTRY: dict[str, StaticTier]` — populated for all three races (not just human and
+beastfolk) so the registry is uniform rather than leaving elf as a structural special case even
+though only human and beastfolk needed correcting this round:
+
+| key | race | order | band | guild rank | notes |
+|---|---|---|---|---|---|
+| `human_commoner` | human | 1 | (1, 5) | `None` | 平民與非戰鬥者; e.g. Violet 5/6/6 |
+| `human_adventurer` | human | 2 | (5, 9) | `"F"` | 一般冒險者 (F–D); hint stores the range's lower rank |
+| `human_elite` | human | 3 | (7, 14) | `"C"` | 精銳 (C–B); hint stores the range's lower rank; e.g. Lidzia 8/9/7 |
+| `human_veteran` | human | 4 | (14, 18) | `"A"` | 一流 |
+| `human_swordmaster` | human | 5 | (18, 22) | `"S"` | 大劍豪; fewer than 10 across the continent, the
+  absolute human ceiling |
+| `beastfolk_juvenile` | beastfolk | 1 | (4, 8) | `None` | 幼年與非戰鬥者 |
+| `beastfolk_warrior` | beastfolk | 2 | (10, 16) | `None` | 一般部族戰士; where most adult beastfolk fall |
+| `beastfolk_city_apex` | beastfolk | 3 | (18, 24) | `None` | 城級頂尖戰士 ("一城之頂"); several per
+  tribal city; overlaps `human_swordmaster` (18-22) — this overlap is the setting's explicit point,
+  not an error |
+| `beastfolk_tribal_apex` | beastfolk | 4 | (26, 34) | `None` | 部族最強者/獸王級; only a handful in
+  the entire species, e.g. 獸王雷克斯·銀牙 |
+| `elf_common` | elf | 1 | (70, 95) | `None` | 一般精靈; e.g. Yuka 88/92/90, Elosia 70/70/95 |
+| `elf_prodigy` | elf | 2 | (95, None) | `None` | 精靈中的異數; open-ended, same "no hard ceiling"
+  treatment as the elf `vital_baseline` |
+
+**This directly resolves the earlier draft's error**: that draft capped the human `static_baseline`
+ceiling at the elite sample card's value (8), which — combined with the coarse species-band
+comparison then in use — made a human S-rank adventurer (18-22) numerically impossible and
+understated the true human ceiling. `RaceProfile.static_baseline` now reflects the full species
+range (D-2b), and `STATIC_TIER_REGISTRY` preserves the granularity needed to place any given
+character correctly, including relative to `GuildRank` where `world_info.md` states the
+correlation.
+
+**No `guild_rank_hint` for beastfolk or elf tiers**: `world_info.md` correlates human tiers to
+guild ranks explicitly (F-D / C-B / A / S in the tier names themselves) but does not do so for
+beastfolk or elf — beastfolk adventurer-guild participation and rank distribution is not described
+in the source, and elves rarely leave their villages at all (§14, 特殊設定). Leaving these `None`
+is a direct transcription of what the source does and doesn't state, not an oversight.
+Because `guild_rank_hint` is deliberately a single `GuildRank.key`, the two multi-rank human bands
+store their lower bounds (`"F"` for F-D and `"C"` for C-B); the complete ranges remain in each
+tier's description.
+
+### D-3. `Subrace` is a new, generic registry — not folded into `RaceProfile`, and now carries the
+per-subspecies stat-distribution modifiers `world_info.md` documents.
+
+The task calls out that elves have three sub-branches and asks how subrace should be modelled.
+`RaceProfile` stays at exactly three entries (D-1), so subrace needs its own registry:
+
+```python
+@dataclass(frozen=True)
+class StatModifiers:
+    atk_phys: float = 0.0   # fractional delta, e.g. 0.40 = "+40%"
+    agility: float = 0.0
+    defense: float = 0.0
+
+@dataclass(frozen=True)
+class Subrace:
+    key: str                       # e.g. "ciaran", "wolfkin"
+    race_key: str                  # references RaceProfile.key
+    display_name_zh: str           # e.g. "基亞蘭族"
+    common_name_zh: str            # e.g. "黑暗精靈"
+    population: int | None         # None where world_info gives no figure
+    home_anchor_key: str | None    # references Anchor.key; elf branches only
+    affinity_elements: tuple[str, ...]  # references Element.key; empty if none documented
+    specialty: str                 # short English note, e.g. "excels at blade arts"
+    static_modifiers: StatModifiers        # per-subspecies distribution skew; see below
+    vital_overrides: dict[str, tuple[int, int]] | None = None  # overrides RaceProfile.vital_baseline
+```
+
+`SUBRACE_REGISTRY: dict[str, Subrace]` holds ten entries:
+
+- Elf branches (all three have a home village and documented elemental affinity):
+  `fionnen` (斐歐恩族/森林精靈, population 120, home `village_fionnen`, affinity `("light",)`),
+  `ciaran` (基亞蘭族/黑暗精靈, population 100, home `village_ciaran`, affinity `("fire", "dark")`),
+  `eolas` (伊歐拉斯族/幻童精靈, population 80, home `village_eolas`, affinity all eight elements
+  plus divine-arts access — encoded as the full `ELEMENT_REGISTRY` key tuple). None of the three
+  branches has a documented stat-distribution skew, so all three carry
+  `static_modifiers=StatModifiers()` (all zero) and `vital_overrides=None`.
+- Beastfolk subspecies (`race_key="beastfolk"`, `home_anchor_key=None` — `world_info.md` does not
+  tie any beastfolk subspecies to a specific settlement, only to Valhalla's territory generally,
+  and `population=None` for all seven since the source gives no per-subspecies count, only
+  qualitative rank like "最多"): `wolfkin` (狼人, most numerous, team combat), `catkin` (貓人,
+  agile, assassination/scouting), `bearkin` (熊人, strongest, heavy weapons), `rabbitkin` (兔人,
+  fastest, archery), `bovinekin` (牛人), `tigerkin` (虎人), `foxkin` (狐人) — the last three are
+  `world_info.md`'s "其他" catch-all, listed individually rather than as one combined "other" entry
+  so import validation (`subrace exists in the lore registry`, §5.3) can resolve any of them without
+  a special-cased fallback key. Their `static_modifiers` are now populated from `world_info.md`'s
+  「亞種數值傾向」 block — this is what gives `Subrace` "a real job beyond naming": a consumer
+  (change 3) reads a subspecies' modifiers to skew where, within the shared `beastfolk`
+  `static_baseline`/tier band, an individual of that subspecies is more likely to sit.
+
+`StatModifiers` values, straight from `world_info.md`'s 亞種數值傾向 block — all three axes are now
+stated explicitly for every subspecies, and the block itself asserts "三軸修正總和恆為零"
+(the three-axis correction mathematically sums to zero; tests use a `1e-12` absolute tolerance
+because these values are represented as binary `float`s):
+
+| subrace | atk_phys | agility | defense | sum | notes |
+|---|---|---|---|---|---|
+| `wolfkin` | 0.0 | 0.0 | 0.0 | 0.0 | 均衡型 — balanced, all three equal |
+| `catkin` | −0.10 | +0.40 | −0.30 | 0.0 | 擅暗殺偵查 |
+| `bearkin` | +0.45 | −0.40 | −0.05 | 0.0 | 力量最強，擅重型武器 |
+| `rabbitkin` | −0.35 | +0.50 | −0.15 | 0.0 | 速度最快，擅弓箭 |
+| `bovinekin` | −0.10 | −0.35 | +0.45 | 0.0 | 擅陣地戰 |
+| `tigerkin` | +0.35 | +0.10 | −0.45 | 0.0 | 高攻高速，紙糊防禦 |
+| `foxkin` | −0.05 | +0.15 | −0.10 | 0.0 | 體術平庸，改以魔力見長 — see the vital-override note below |
+
+**This corrects an earlier draft's error, not just fills in a gap.** An earlier version of this
+table left the third (then-unstated) axis at `0.0` for five subspecies, reasoning that no skew
+should be claimed where none was documented. That was the right call *given the source at the
+time* — but the source itself had an unconserved table: under the old two-axis figures, 虎人 netted
++20% total (no penalty on `atk_phys`) while 熊人 netted only +5%, making 虎人 strictly superior
+overall. The user supplied the missing third axis for every subspecies (`tmp/story_settings/
+world_info.md` corrected in place) and the totals now sum to exactly zero across all seven — no
+subspecies is stronger in aggregate, only differently distributed, matching the source's own stated
+invariant. `world/lore/tests/test_races.py` asserts this sum-to-zero property directly (tasks.md
+§9.1) so a future subspecies addition that isn't balanced fails a test immediately, rather than
+silently reintroducing a strictly-dominant subspecies the way the old table did.
+
+**狐人 also overrides its vital band**, not just static stats: `world_info.md` gives foxkin a raised
+MP ceiling (50-70) against the species `vital_baseline.mp` of (30, 50) — this is why `Subrace` needs
+`vital_overrides` in addition to `static_modifiers` (point 3 from the correction that prompted this
+decision). `vital_overrides={"mp": (50, 70)}` for `foxkin`; every other subrace leaves it `None`,
+meaning "use `RaceProfile.vital_baseline` unmodified." `vital_overrides` is a plain `dict[str,
+tuple[int, int]]` rather than a typed partial-`Vitals` structure, since only one subrace needs it
+for one field this round and a full typed partial adds ceremony with no current second use case;
+revisit if a second subrace ever needs to override `hp` or `sp` too.
+
+**狐人's `static_modifiers` already sum to zero on their own — the MP override is not double-dipping
+on top of an existing physical-stat advantage.** `world_info.md` states this explicitly ("體術平庸，
+改以魔力見長" — mediocre body, compensates with magical aptitude): foxkin's three physical axes are
+each slightly negative-to-modest (−5% / +15% / −10%, summing to zero like every other subspecies),
+and the raised MP ceiling is the *separate* trade — physical mediocrity compensated by a magic
+advantage, not a stacked bonus. The sum-to-zero test (above) therefore does not need a foxkin
+exemption: it is written as a plain, unconditional invariant over `static_modifiers` alone, and it
+passes for `foxkin` the same way it passes for the other six. `vital_overrides` is checked by a
+separate, independent assertion (already covered by the "foxkin overrides its MP band" scenario)
+that has no bearing on whether `static_modifiers` sums to zero.
+
+**Judgment call on required-ness**: the import contract's reference example only sets `subrace` for
+the elf record; human records presumably omit it. `subrace` is modelled as optional at the import
+layer (change 4's concern, not this change's), but *when present* it SHALL resolve in
+`SUBRACE_REGISTRY` and its `race_key` SHALL match the character's `race` — this cross-check is
+listed as a task for whichever change consumes it (change 4), not implemented here.
+
+### D-4. Registries are one module per lore category, mirroring §3.2's tree.
+
+```
+world/lore/
+├── __init__.py    re-exports every public registry and dataclass
+├── races.py        Vitals, StaticBand, RaceProfile, RACE_REGISTRY, StaticTier,
+│                    STATIC_TIER_REGISTRY, StatModifiers, Subrace, SUBRACE_REGISTRY
+├── elements.py      Element, ELEMENT_REGISTRY
+├── magic.py         MagicTier, MAGIC_TIER_REGISTRY, RankTitle, RANK_TITLE_REGISTRY
+├── nations.py        Nation, NATION_REGISTRY
+├── guild.py          GuildRank, GUILD_RANK_REGISTRY
+├── monsters.py       MonsterTier, MONSTER_TIER_REGISTRY
+├── anchors.py         AnchorKind, Anchor, ANCHOR_REGISTRY
+├── economy.py         COPPER_PER_SILVER, COPPER_PER_GOLD, to_copper(), PriceEntry, PRICE_TABLE
+├── sync.py            sync_all() — see D-8
+└── tests/             self-consistency tests, one module per lore module above
+```
+
+`races.py` and `magic.py` each hold two related dataclasses (`Vitals`+`RaceProfile`/`Subrace`, and
+`MagicTier`+`RankTitle`) rather than one file per dataclass, because they are read together by the
+same future consumers (entity trait scaling; magic-rank gating) and splitting them buys nothing.
+`anchors.py` depends on `nations.py` (a `Nation.capital_anchor_key` and an `Anchor.nation_key` are
+each other's forward/back reference) — resolved by keeping both as plain string keys with no
+circular import, validated by a test rather than by type-level referential integrity. `monsters.py`
+imports `StaticBand` from `races.py` (D-6b) — a plain type import, not a registry cross-reference,
+so it carries no circularity risk.
+
+### D-5. `MagicTier` bands are non-overlapping; the 90/91 seam is a resolved ambiguity.
+
+`world_info.md` writes 超級(71-90) directly followed by 究極(90級以上) — the boundary literally
+overlaps at 90. Two non-overlapping level bands can't both include 90.
+
+**Resolution**: 超級 keeps `level_max=90` (as literally stated), 究極 starts at `level_min=91`. This
+is a judgment call, not a literal transcription — documented here so a future reader of
+`world_info.md` doesn't "fix" the code to reintroduce the overlap. `MagicTier.level_max` is
+`int | None` (`None` for 究極, which is open-ended).
+
+```python
+@dataclass(frozen=True)
+class MagicTier:
+    key: str
+    display_name_zh: str
+    level_min: int
+    level_max: int | None
+    example_spells_zh: tuple[str, ...]
+    description: str   # English
+```
+
+| key | zh | band | example spells |
+|---|---|---|---|
+| apprentice | 初級 | 0–15 | 火球, 水箭, 風刃, 治癒術, 身體強化 |
+| intermediate | 中級 | 16–30 | 火焰風暴, 冰牆, 飛行術 |
+| advanced | 高級 | 31–70 | 熔岩術, 暴風雪, 高級治癒, 統御術 |
+| superior | 超級 | 71–90 | 龍炎術, 地震術, 神聖光輝 |
+| ultimate | 究極 | 91–None | (none documented — "人類幾乎不可能掌握") |
+
+`RankTitle` (學徒/術師/大師/賢者/主宰) is a separate, ordered registry with an `order: int` field
+(1–5) and an optional `unlocks_tier: str | None` referencing `MagicTier.key`, capturing
+`world_info.md`'s explicit tier-to-title mapping (術師→中級, 大師→高級; 賢者 and 主宰 map loosely
+to 超級/究極 since the source describes them by capability — "develops new magic" / "transcends
+formula" — rather than a level band).
+
+### D-6. `GuildRank` reward bands are converted at the corrected 1:100:10000 rate; every band is a
+strictly increasing, non-degenerate ten-fold ladder.
+
+`COPPER_PER_SILVER = 100`, `COPPER_PER_GOLD = 10000` (per design doc §5.1: "1 金 = 100 銀 =
+10000 銅"). **Note on the exchange rate itself**: an earlier draft of this design used the rate
+`1金=10銀=100銅`, which `world_info.md` stated at the time; that rate collapsed two of the seven
+reward bands (F, C) to single-point ranges and produced an internally inconsistent economy (a
+commoner's annual income undercutting their own annual food cost). The design doc has since been
+corrected upstream to `1金=100銀=10000銅`, with the full reasoning recorded there (§5.1) — this
+document does not restate it, only carries the corrected constants forward.
+
+Converting `world_info.md`'s reward table at the corrected rate:
+
+```python
+@dataclass(frozen=True)
+class GuildRank:
+    key: str              # "F".."S"
+    order: int            # 1..7
+    reward_min_copper: int
+    reward_max_copper: int | None   # None only for S (open-ended)
+    description: str      # English, task scope per world_info.md
+```
+
+| key | order | band (copper) | task scope |
+|---|---|---|---|
+| F | 1 | 10–100 | simple collection/escort tasks |
+| E | 2 | 100–500 | low-tier monster hunts |
+| D | 3 | 500–5,000 | dungeon party runs |
+| C | 4 | 5,000–50,000 | solo-capable adventurer |
+| B | 5 | 50,000–500,000 | high-difficulty commissions |
+| A | 6 | 500,000–5,000,000 | top-tier human combat strength |
+| S | 7 | 5,000,000–None | legendary; fewer than 10 across the continent |
+
+Every band is now strictly non-degenerate and each rank's ceiling equals the next rank's floor,
+forming a clean ten-fold ladder — this property is asserted directly by a test (tasks.md §9.5) so a
+future edit that reintroduces a wrong exchange rate is caught immediately rather than rediscovered
+by hand.
+
+The purchasing-power price table (`economy.py`'s `PRICE_TABLE`) is converted at the same corrected
+rate (e.g. 魔法藥劑 "50銅-5銀" → `(50, 500)`; 普通劍 "1-5銀" → `(100, 500)`), and is likewise
+non-degenerate throughout.
+
+### D-6b. `MonsterTier` carries physical-stat and HP bands, derived from the guild-rank
+correspondence `world_info.md` states — not invented.
+
+An earlier gap in this change: `MonsterTier` shipped purely qualitative (F-E / D-C / B-A / 災厄級,
+example monster names, no numbers). Change 3's author, needing concrete stats to instantiate
+`Monster` entities and lacking a source number, invented a 10⁰–10³ decade ladder — which would put
+a 災厄級 monster at 1000× a human, a ratio with no basis anywhere in `world_info.md` and wildly out
+of step with the elf ratio (~10×) this design spent three correction rounds pinning down precisely.
+
+**The numbers were derivable all along.** `world_info.md`'s own 怪物 section states monster tiers
+are defined by *which adventurer rank can handle them* — F-E for a novice solo, D-C needs a party
+stronger than one veteran, B-A matches or exceeds a human sword-master, 災厄級 exceeds human scale
+entirely. Once the adventurer physical bands existed (D-2c's `STATIC_TIER_REGISTRY`), the monster
+bands fall out of that correspondence, and the user has now written the derived numbers into
+`world_info.md` directly rather than leaving them for change 3 to invent:
+
+```python
+@dataclass(frozen=True)
+class MonsterTier:
+    key: str
+    display_name_zh: str
+    guild_rank_range: tuple[str, str]   # references GuildRank.key, e.g. ("F", "E")
+    static_band: StaticBand             # atk_phys/agility/defense, reuses the D-2b shape
+    hp_band: tuple[int, int]
+    example_monsters_zh: tuple[str, ...]
+    description: str                    # English
+```
+
+| key | guild ranks | static band | hp band | correspondence |
+|---|---|---|---|---|
+| `low` | F–E | (3, 8) | (50, 150) | overlaps `human_adventurer` (5-9), with 3-4 below its floor — one novice solo |
+| `mid` | D–C | (12, 20) | (200, 400) | exceeds `human_elite` (7-14) — needs a party |
+| `high` | B–A | (22, 35) | (400, 700) | at or above `human_swordmaster` (18-22) |
+| `calamity` | S+ | (60, 150) | (1200, 3000) | above `elf_common` (70-95) — beyond human scale |
+
+`static_band` reuses `StaticBand` (D-2b) rather than introducing a third shape, since it is the
+same three-axis concept (`atk_phys`/`agility`/`defense`) at a monster's scale rather than a race's.
+`hp_band` is a plain `tuple[int, int]`, not a full `Vitals` (which also carries `mp`/`sp`) —
+`world_info.md` only specifies HP for monsters ("大致為物理數值的 15-20 倍"), and MP/SP are not
+part of this change's scope (bestiary behavior, resistances, and loot are change 3's and later's
+concern, per the Non-Goals below).
+
+**災厄級's band deliberately overlaps and exceeds the elf band (70-95) — this is preserved, not
+"fixed."** `world_info.md` states this is intentional: 古龍 (ancient dragons) and 魔神 (demon gods)
+are explicitly not adversaries humans can face; the source's own legends about defeating them
+involve elves or age-of-gods figures. This is also the story's stated explanation for why fewer
+than ten S-rank adventurers exist on the entire continent — the same fact `GuildRank`'s `S` entry
+and `STATIC_TIER_REGISTRY["human_swordmaster"]` already record independently. The test suite
+(tasks.md §9.6) asserts this overlap-and-exceed relationship directly, so a future edit that
+"corrects" 災厄級 back into a human-scale band would fail immediately.
+
+**What this does *not* add**: no loot tables, no behaviour trees, no elemental resistances. Those
+are explicitly out of scope for this change (Non-Goals) and belong to whichever later change
+introduces `Monster(LivingEntity)` and its bestiary data — this decision adds exactly the two
+numeric bands `world_info.md` now specifies (physical stats, HP) and nothing else on the monster
+side.
+
+### D-7. `Anchor` and `Nation` cross-reference by string key, `AnchorKind` distinguishes the three
+anchor shapes.
+
+```python
+class AnchorKind(StrEnum):
+    CAPITAL = "capital"
+    ELVEN_VILLAGE = "elven_village"
+    DUNGEON = "dungeon"
+
+@dataclass(frozen=True)
+class Anchor:
+    key: str
+    kind: AnchorKind
+    display_name_zh: str
+    nation_key: str | None   # None for elven villages (neutral) and dungeons with no clear owner
+    population: int | None
+    floors: int | None       # dungeons only
+    description: str         # English
+```
+
+Nine anchors: three capitals (輝煌帝都/聖潔王都/咆哮王城, tied to their nation), three elven
+villages (翠綠森林村/暗影谷村/幽月谷村, `nation_key=None` — `world_info.md` explicitly states the
+central mountains housing them are "各國無法深入的中立地帶"), and three dungeons (永夜迷宮 80F,
+龍之巢穴 50F, 魔導遺跡 60F). **Judgment call on dungeon `nation_key`**: 龍之巢穴 is in "帝國東部"
+(Grandia) and 魔導遺跡 in "王國西部" (Altoria) — both get a `nation_key`. 永夜迷宮 sits in "北方大
+森林", which `world_info.md` describes as under Valhalla's *nominal* jurisdiction only ("獸王國擁
+有邊境名義管轄權，但實際難以掌控") — it is still given `nation_key="valhalla"` with that caveat in
+its `description`, rather than `None`, since a nominal claim is still a claim and `None` would erase
+that distinction from the data entirely.
+
+`StrEnum` matches the pattern design doc §6.2 already uses for `TargetSpec`, kept consistent rather
+than introducing a plain `str` or a different enum base.
+
+### D-8. Startup sync uses one Evennia `Script` row per lore entry, wired into the existing
+`at_server_start()` hook — no new Django model, no migration.
+
+```python
+# world/lore/sync.py
+def sync_all() -> None:
+    for category, registry in _ALL_REGISTRIES.items():   # dict[str, Mapping[str, Any]]
+        for key, entry in registry.items():
+            sync_one(category, key, entry)
+
+def sync_one(category: str, key: str, entry: Any) -> None:
+    script_key = f"lore:{category}:{key}"
+    matches = search_script(script_key)
+    script = matches[0] if matches else create_script(
+        "world.lore.sync.LoreRecord", key=script_key, persistent=True
+    )
+    script.db.category = category
+    script.db.fields = _db_safe(dataclasses.asdict(entry))
+```
+
+`LoreRecord` is a minimal `DefaultScript` subclass with no ticking/interval behavior — it exists
+purely as a persistent, queryable DB row. This reuses Evennia's own `ScriptDB` (core, already part
+of the change-1 skeleton) instead of adding a new Django app and migration, keeping this change's
+scope to a single working day. **Idempotency** comes from two properties working together:
+`search_script(script_key)` finds an existing row before creating one (no duplicates across
+restarts), and `sync_one` unconditionally overwrites `.db.fields` from the current Python registry
+(so the DB always mirrors code — consistent with D9's rationale that lore-as-Python is the single
+source of truth, and the DB copy is a queryable mirror of it, not a second authority).
+
+**Verified against Evennia 6.1.0 during implementation:** `search_script(*args, **kwargs)` returns
+a list of matching scripts, while `create_script(*args, **kwargs)` returns the created script.
+Despite the wrapper docstring mentioning an `exact` keyword, this version's
+`ScriptDBManager.search_script(ostring, obj=None, only_timed=False, typeclass=None)` does not accept
+it and already performs a case-insensitive exact-key lookup. The implementation therefore uses
+`search_script(script_key)` and selects `matches[0]`; the earlier
+`search_script(...) or create_script(...)` pseudocode would have attempted to write `.db`
+attributes on a list after the first sync.
+
+Evennia 6.1.0's Attribute serializer also cannot persist `StrEnum` instances directly: it treats
+the string-like enum as an iterable while reconstructing it. `_db_safe()` therefore recursively
+converts enum members in `asdict(entry)` to their stable `.value` strings before assignment.
+All non-enum fields retain their `asdict()` representation; for example, `Anchor.kind` is stored
+as `"capital"` while the Python registry remains typed as `AnchorKind.CAPITAL`.
+
+`sync_all()` is called from `at_server_start()` in `server/conf/at_server_startstop.py` — the hook
+file `evennia --init` scaffolds empty in change 1. This is the standard Evennia extension point for
+"run this once every time the server comes up," and requires no new settings or global-script
+registration. **Flagged for implementer verification** (same caution as change 1's contrib-matrix
+work): confirm the hook file path and function signature against the installed Evennia 6.1.0 before
+wiring the call in; this design assumes the conventional `evennia --init` scaffold, which change 1
+already produced.
+
+**Alternative considered**: Evennia's `settings.GLOBAL_SCRIPTS` mechanism (auto-creates persistent
+scripts at server start if missing). Rejected for this change because it is designed around a
+*small, fixed* number of named singleton scripts (e.g., one weather script), not a bulk
+get-or-create loop over ~70+ dynamically-keyed lore entries — bending it to that shape would need
+more scaffolding than the direct `at_server_start()` call for no behavioral benefit.
+
+## Risks / Trade-offs
+
+- **[Risk] The 90/91 magic-tier seam is a judgment call that could be read differently by a future
+  contributor skimming `world_info.md` fresh.** → Mitigation: recorded explicitly in this document
+  (D-5) with the reasoning, and the test suite (tasks.md §9.3) asserts the exact bands so any
+  accidental "correction" back toward the source's literal overlapping text fails a test
+  immediately.
+- **[Risk] A future edit could "correct" `MonsterTier["calamity"].static_band` back into a
+  human-scale range, on the reasoning that it looks like an outlier compared to the other three
+  tiers, erasing the deliberate above-elf overlap `world_info.md` states is intentional.** →
+  Mitigation: D-6b documents the narrative reason (古龍/魔神 are not human-scale threats; this is
+  also the story's own explanation for why fewer than ten S-rank adventurers exist), and
+  tasks.md §9.6 asserts the overlap-and-exceed relationship against `elf_common` directly, so a
+  "fix" back to human scale fails a test rather than silently passing review.
+- **[Risk] The guild-rank reward ladder silently regresses to a degenerate or non-monotonic shape
+  if the exchange-rate constants (`COPPER_PER_SILVER`, `COPPER_PER_GOLD`) are ever edited without
+  re-deriving every band.** → Mitigation: tasks.md §9.5 asserts the ladder is strictly increasing
+  and non-degenerate across all seven ranks — this is exactly the property whose violation caught
+  the earlier wrong exchange rate, so the test is written to keep catching it.
+- **[Risk] `Subrace` is new — not named in design doc §5.1 — so a future change could assume it
+  doesn't exist and re-derive subrace data ad hoc.** → Mitigation: the import contract's own
+  reference example already depends on a `subrace` registry existing (`"subrace": "ciaran"`), so
+  this is a completion of §5.1's implied contract, not a scope addition; call this out explicitly
+  when change 4 (`import-contract`) is proposed.
+- **[Risk] The `at_server_start()` hook assumption in D-8 could be wrong if change 1's actual
+  skeleton generation didn't scaffold that file as expected.** → Mitigation: task list includes an
+  explicit verification step before wiring in the call, mirroring change 1's own "verify before
+  trusting" discipline for Evennia APIs.
+- **[Risk] `vital_baseline` and `static_baseline` could be silently conflated or one re-derived
+  from the other by a future edit, re-introducing the exact error this correction fixed (an
+  earlier draft used `Vitals`-scale numbers for static combat stats).** → Mitigation: the two
+  fields are separate types on `RaceProfile` (D-2b), and tasks.md §9.1 asserts the ~8-10× static
+  ratio (measured against the `human_elite` tier, per `world_info.md`'s own worked comparison) and
+  the ~100× vital ratio as two independently-checked properties, not one derived from the other.
+- **[Risk] Comparing the elf `static_baseline` against the *species-wide* human `static_baseline`
+  ceiling (22, the S-rank swordmaster value) instead of the `human_elite` tier (7-14) would collapse
+  the ratio to ~3-4× and wrongly suggest the ~10× claim in `world_info.md` no longer holds.** →
+  Mitigation: the ratio test (tasks.md §9.1) explicitly reads `STATIC_TIER_REGISTRY["human_elite"]`,
+  not `RACE_REGISTRY["human"].static_baseline`, matching `world_info.md`'s own stated comparison
+  point ("對照人類精銳(7-14)約為8-10倍"); this distinction is called out in D-2c so a future reader
+  doesn't "simplify" the test back onto the wrong band.
+- **[Risk] A future edit could add or modify a beastfolk `StatModifiers` entry without keeping its
+  three axes summing to zero, silently reintroducing the strictly-dominant-subspecies imbalance an
+  earlier version of `world_info.md` itself had (虎人 net +20% vs. 熊人 net +5%, before the source
+  was corrected — see D-3).** → Mitigation: `test_races.py` (tasks.md §9.1) asserts every
+  subspecies' three `static_modifiers` sum to zero within `1e-12`, so any future imbalance — whether from
+  a source-data mistake or an implementation typo — fails immediately instead of being discovered
+  by hand.
+- **[Risk] Beastfolk subspecies population figures don't exist in `world_info.md`.** → Accepted:
+  `population=None` for all seven; no invented numbers. Any later change needing beastfolk
+  population breakdowns must get that data from a different source or an explicit design decision,
+  not from this change's registries.
+
+## Migration Plan
+
+Not applicable in the backward-compatibility sense — the project is unreleased with zero users, and
+`world/lore/` currently contains no code beyond change 1's empty stub. The only sequencing concern
+is operational: the very first server start after this change lands performs the initial sync
+(creating ~70+ `LoreRecord` rows); every subsequent start is a no-op overwrite of the same rows.
+
+## Open Questions
+
+- Should `Subrace` eventually move into design doc §5.1 itself, given the import contract already
+  assumes it exists? Left as an open question for whoever proposes change 4 — this design treats it
+  as a necessary completion of §5.1's implied contract, not a redesign of the approved document.
+- Exact `LoreRecord` script typeclass placement (`world/lore/sync.py` vs. a shared
+  `world/lore/scripts.py`) is left to the implementer; either satisfies this design.

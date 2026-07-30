@@ -1,0 +1,1 @@
+"""Declarative game rule tables."""

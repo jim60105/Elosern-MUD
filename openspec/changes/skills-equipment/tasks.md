@@ -166,10 +166,11 @@
 - [ ] 7.1 Run change 4's full `world/imports/tests/` suite and confirm
       `test_skill_registry_self_arming.py` (change 4's task 7.3a) is no longer reported as skipped —
       it now executes and passes, asserting an unknown skill key is rejected via `_check_skills()`.
-- [ ] 7.2 Run `python -m world.imports.validate world/imports/examples/example_character.json` (the
-      change-4 reference example) and confirm the degraded-mode banner naming `skill-registry` no
-      longer appears, since `world.skills.registry.SKILL_REGISTRY` is now importable — this is the
-      visible, operator-facing sign that change 4's validation has tightened from WARNING to REJECT
+- [ ] 7.2 Run
+      `uv run --locked -m world.imports.validate world/imports/examples/example_character.json`
+      (the change-4 reference example) and confirm the degraded-mode banner naming `skill-registry`
+      no longer appears, since `world.skills.registry.SKILL_REGISTRY` is now importable — this is
+      the visible, operator-facing sign that change 4's validation has tightened from WARNING to REJECT
       automatically, with no edit to change 4 itself.
 - [ ] 7.3 Confirm the change-4 reference example's `skills`/`passives` keys either resolve in this
       change's `SKILL_REGISTRY` or, if they do not (the reference example was authored against no
