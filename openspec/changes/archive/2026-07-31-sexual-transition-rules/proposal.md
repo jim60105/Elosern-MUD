@@ -45,17 +45,19 @@ non-`SexualState` field (`sp`, change 3's stamina gauge) — the only line in th
   ordered-level, the cyclic `climax_phase`, the part-keyed `sensitivity` dict, the plain-int
   `climax_today` counter, the one-way `virgin` flag, the append-only `experience_types` set, and —
   for the one field outside `SexualState`, `sp` — a `vital_gauge` kind writing through change 3's
-  `entity.traits.sp.value`), `_parse_delta()` (parses `"+1"`, `"-1"`, `"+1..+2"`, and `"-30..-20"`
+  `entity.traits.sp.current`, the gauge's public writable property), `_parse_delta()` (parses
+  `"+1"`, `"-1"`, `"+1..+2"`, and `"-30..-20"`
   same-sign range deltas), `_apply_then()` (the single dispatcher from a rule's opaque `then` dict to
   the correct mutation — routing every `climax_phase` write through change 7's
   `_apply_climax_phase_set()`, never writing the trait directly, and routing `climax_today` through
   change 7's `record_climax()`, never through `SexualState`'s private `TraitHandler`), `_build_
-  context()` (assembles `evaluate_condition()`'s context from `entity.sexual`'s live properties plus
-  the calling event's name and payload), and `apply_event(entity, event, **event_context)` — the
+  context()` (snapshots `entity.sexual` at the start of each pass and rejects payload collisions
+  with authoritative state keys), and `apply_event(entity, event, **event_context)` — the
   public entry point, running change 6's `evaluate_condition()` against every loaded rule in a
   fixed-point loop so one rule's effect (e.g. arousal reaching `極限`) can correctly trigger a second
   rule (`climax_gate`) within the same call, without ever re-firing a rule for a change that already
-  fully propagated.
+  fully propagated. Exhausting the defensive pass limit raises rather than returning partially
+  settled state as success.
 - Add `world/rules/tests/test_sexual_transitions.py`: one `test_rule_<id>()` per rule ID (25
   functions), plus `test_every_rule_id_has_a_test()` — a structural check, mirroring change 6's own
   D-7 discipline, that walks `sexual.yaml`'s loaded rule IDs and asserts a matching `test_rule_<id>`

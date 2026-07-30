@@ -90,7 +90,7 @@ FIELD_KINDS = {
     "climax_today":     "counter",                # plain int; entity.sexual.record_climax() (D-5)
     "virgin":           "flag_one_way",           # entity.sexual.virgin = False only
     "experience_types": "append_only_set",        # entity.sexual.add_experience_type(key) only
-    "sp":               "vital_gauge",            # entity.traits.sp.value -= N (D-8) -- the one
+    "sp":               "vital_gauge",            # entity.traits.sp.current -= N (D-8) -- the one
                                                      # field this table targets outside SexualState
 }
 ```
@@ -113,6 +113,8 @@ FIELD_KINDS = {
   the second and later calls simply no-op. No rule in this table conditions on `climax_phase`'s
   `field_changed` direction, since "up"/"down" is undefined for a cyclic field (change 7's D-4
   states this plainly); every `climax_phase` read in a `when` block uses `equals` or `gte` only.
+  `climax_gate` additionally carries `from: 未達`, checked before calling the shared guard, so the
+  guard's race-specific `餘韻 → 接近` seam is not activated generically by this table.
 - **`ordered_level_dict`** (`sensitivity`): `then` carries `delta` only (no `set` rule exists in
   `variable_rule.md` for sensitivity — every trigger is "frequent stimulation raises it," never "set
   to a specific level"). The target part is not in the rule at all; it comes from the *event*, via
@@ -135,12 +137,13 @@ FIELD_KINDS = {
   Write path: `entity.sexual.add_experience_type(add_value)` — change 7's documented sole mutator.
 - **`vital_gauge`** (`sp` — the one field outside `SexualState`, D-8): `then` carries `delta` only
   (a negative range, per D-8 — no rule in this table ever raises a vital gauge, only spends one).
-  Write path: `entity.traits.sp.value += delta` (delta already negative) — `entity.traits` is change
+  Write path: `entity.traits.sp.current += delta` (delta already negative) — `entity.traits` is change
   3's own `TraitHandler`, mounted independently of `entity.sexual`'s private one; reading/writing
   `entity.traits.<key>.value` is the exact, already-public contract change 3's design doc states
   every combat/resolution consumer uses ("Combat, resolution, and damage MUST read
-  `entity.traits.<key>.value`"), so this is not a new precedent, only this table's first use of an
-  existing one. `sp`'s own lower bound (0, per change 3's `TraitHandler` construction) clamps the
+  `entity.traits.<key>.value`"). Evennia's `GaugeTrait.value` is a read-only alias for `.current`,
+  so mutation uses that gauge's public writable property. `sp`'s own lower bound (0, per change 3's
+  `TraitHandler` construction) clamps the
   result — this table does not add a floor of its own, the same way `ordered_level` deltas rely on
   `OrderedLevelTrait`'s own clamp rather than reimplementing one.
 
@@ -193,16 +196,16 @@ establishes elsewhere in this project — every per-rule test exercising a range
 def _build_context(entity, event: str | None, changed: dict, event_context: dict) -> dict:
     return {
         "event": event,                       # None on every pass after the first
-        "arousal": entity.sexual.arousal,      # live OrderedLevelTrait -- gte/equals
-        "wetness": entity.sexual.wetness,      # work for free per change 7's D-1
-        "shame": entity.sexual.shame,
-        "exposure": entity.sexual.exposure,
-        "climax_phase": entity.sexual.climax_phase,
+        "arousal": snapshot(entity.sexual.arousal),  # immutable pass-start values
+        "wetness": snapshot(entity.sexual.wetness),
+        "shame": snapshot(entity.sexual.shame),
+        "exposure": snapshot(entity.sexual.exposure),
+        "climax_phase": snapshot(entity.sexual.climax_phase),
         "climax_today": entity.sexual.climax_today,
         "virgin": entity.sexual.virgin,
         "experience_types": entity.sexual.experience_types,
         "_changed": changed,                  # this pass's field_changed directions only
-        **event_context,                      # e.g. part="乳房" for a sensitivity event
+        **validated_event_context,            # rejects collisions with keys above
     }
 
 def apply_event(entity, event: str, *, rng=None, max_passes: int = 50, **event_context) -> dict:
@@ -223,10 +226,15 @@ def apply_event(entity, event: str, *, rng=None, max_passes: int = 50, **event_c
                     changed_this_pass[field] = direction
                     all_changes[field] = direction
         if not changed_this_pass:
-            break
+            return all_changes
         current_event = None   # only pass 1 sees the originating event
-    return all_changes
+    raise RuleConvergenceError
 ```
+
+Each pass evaluates against immutable pass-start values. Effects applied earlier in the YAML order
+therefore cannot change which later rules match in that same pass; their consequences become visible
+on the following pass. Event payload keys that collide with authoritative state, `event`, or
+`_changed` raise before mutation, while non-reserved payload such as `part` remains available.
 
 **Why `_changed` holds only the immediately-preceding pass's deltas, not every change accumulated
 across the whole call.** A field-changed-conditioned rule (`wetness_follows_arousal`) must fire
@@ -237,7 +245,8 @@ stopped changing two passes ago no longer matches, because `_changed` no longer 
 ordered-level field is bounded (`OrderedLevelTrait` clamps, per change 7's D-1), so even a cascade
 that walks a field to its ceiling converges in at most `len(levels) - 1` passes for that field, well
 under `max_passes`; `max_passes` is a defensive ceiling against a future rule author introducing a
-genuine two-rule oscillation, not a value this table's current 25 rules are expected to approach.
+genuine two-rule oscillation. Exhausting it raises `RuleConvergenceError` rather than presenting
+partially settled state as successful completion, and `max_passes` must be positive.
 
 **Why event-conditioned rules only fire on pass 1.** If `current_event` stayed set across every
 pass, an event rule would refire on every subsequent pass for the remaining lifetime of the
@@ -266,7 +275,7 @@ line and, where relevant, its D-7 resolution.
 | 6 | `wetness_up_on_direct_stimulus` | `event: direct_stimulus_applied` | `field: wetness, delta: "+1..+2"` | 「接受直接刺激時快速提升」— D-7's two-rule split, half 2 |
 | 7 | `wetness_max_on_climax` | `event: climax_ends` | `field: wetness, set: 泛濫` | 「高潮時達到「泛濫」」 |
 | 8 | `sensitivity_up_on_frequent_stimulation` | `event: frequent_stimulation` | `field: sensitivity, delta: "+1"` (part from event context) | 「頻繁刺激可逐步提升（長期變化）」(乳房.敏感度 and 私處.敏感度 identical wording — one generic, part-agnostic rule; named by this exact ID in change 7's own design.md D-3) |
-| 9 | `climax_gate` | `field: arousal, equals: 極限` | `field: climax_phase, set: 接近` | 「性喚起達至「極限」時轉為「接近」」— transcribed verbatim from design doc §6.4's own worked example (identical `id`) |
+| 9 | `climax_gate` | `field: arousal, equals: 極限` | `field: climax_phase, set: 接近, from: 未達` | 「性喚起達至「極限」時轉為「接近」」— the source restriction prevents generic use of the race-specific 餘韻 re-entry seam |
 | 10 | `climax_phase_critical_point_to_in_progress` | `field: climax_phase, equals: 接近, event: stimulus_applied` | `field: climax_phase, set: 進行中` | 「達臨界點時轉為「進行中」」— D-7's exact carried-forward resolution, transcribed as the literal `when` clause D-7 proposes |
 | 11 | `climax_phase_ends_to_afterglow` | `event: climax_ends` | `field: climax_phase, set: 餘韻` | 「高潮結束後轉為「餘韻」」(afterglow's own later decay to 未達 is change 7's `decay_tick`, not a rule here) |
 | 12 | `climax_today_increment_on_climax` | `event: climax_ends` | `field: climax_today, delta: "+1"` | 「每次達到高潮時+1」(elf multi-orgasm counting clause is not race-specific in its *counting* — every climax counts, always; only the *rate* of reaching another climax is race-specific and excluded per D-7) |
@@ -412,7 +421,7 @@ targeted at all.
 
 **Decision**: rule 25, `sp_cost_on_climax`, lives in `sexual.yaml` alongside the other 24, and
 `FIELD_KINDS` gains a fourth kind, `vital_gauge` (D-1), whose write path is
-`entity.traits.sp.value += delta` rather than anything on `SexualState`. The delta is expressed as
+`entity.traits.sp.current += delta` rather than anything on `SexualState`. The delta is expressed as
 `"-30..-20"` (D-2's extended range grammar) — `variable_rule.md`'s own `20~30`, applied as a cost
 rather than a gain, resolved by the same `rng.randint()` seam every other range delta in this table
 already uses.
@@ -467,10 +476,9 @@ named future owner rather than silently dropped.
   future rule addition should split out with a new event name, not retroactively guessed at now.
 - **[Risk] `max_passes=50` in `apply_event()`'s fixed-point loop is a defensive ceiling this table's
   current rules never approach (every ordered-level field converges in at most 4 passes by
-  construction), so it is untested against a genuine oscillation.** → Accepted; a test constructs two
-  synthetic, mutually-triggering rules against a throwaway rule list (not `sexual.yaml` itself) and
-  asserts the loop terminates at `max_passes` rather than hanging, proving the ceiling fires without
-  requiring `sexual.yaml` to contain a rule pair that oscillates.
+  construction).** → A test constructs synthetic mutually-triggering rules against a throwaway rule
+  list (not `sexual.yaml` itself) and asserts the loop raises `RuleConvergenceError` at the ceiling
+  rather than hanging or returning partially settled state as success.
 - **[Risk] Exposure's clothing-driven bullets (D-6.3) are left as an unowned integration point** —
   no roadmap item currently claims "wire clothing items to `entity.sexual.exposure`." → Accepted and
   named explicitly, the same "documented, not silently dropped" treatment change 7's own Open

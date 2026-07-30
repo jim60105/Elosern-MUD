@@ -18,10 +18,12 @@ non-empty `id`.
 
 ### Requirement: apply_event() is the single entry point, evaluating every rule to a fixed point
 `world/rules/sexual_transitions.py` SHALL expose `apply_event(entity, event, **event_context)`,
-running every loaded rule against a context built from `entity.sexual`'s live properties plus the
-given event name and payload. It SHALL re-evaluate rules across successive passes so that one rule's
+running every loaded rule against an immutable pass-start snapshot of `entity.sexual` plus the
+given event name and non-reserved payload. Payload SHALL NOT override authoritative state, `event`,
+or `_changed`. It SHALL re-evaluate rules across successive passes so that one rule's
 effect can satisfy a second rule's condition within the same call, continuing until a pass produces
-no field change, and SHALL evaluate any `event`-keyed condition only on the first pass.
+no field change, and SHALL evaluate any `event`-keyed condition only on the first pass. Exhausting
+a positive `max_passes` SHALL raise `RuleConvergenceError`; a non-positive limit SHALL be rejected.
 
 #### Scenario: A chained effect fires within one apply_event() call
 - **WHEN** `apply_event(entity, "extreme_stimulus_applied")` is called on an entity whose `arousal`
@@ -45,6 +47,19 @@ no field change, and SHALL evaluate any `event`-keyed condition only on the firs
 - **WHEN** `apply_event()` is called and a pass produces zero field changes
 - **THEN** the loop stops and `apply_event()` returns without requiring a fixed iteration count to be
   reached
+
+#### Scenario: Pass evaluation is independent of YAML order
+- **WHEN** a stimulus raises `arousal` to `極限` from a pass-start phase of `未達`
+- **THEN** `climax_gate` observes the raised arousal on the next pass and moves only to `接近`;
+  the original stimulus event is no longer present, so the phase does not also advance to `進行中`
+
+#### Scenario: Event payload cannot forge authoritative state
+- **WHEN** event context supplies `arousal`, `_changed`, or another reserved mechanical key
+- **THEN** `apply_event()` raises before applying any rule
+
+#### Scenario: A rule cycle fails loudly
+- **WHEN** synthetic rules continue producing changes through `max_passes`
+- **THEN** `apply_event()` raises `RuleConvergenceError` rather than returning partial settlement
 
 ### Requirement: Ordered-level field rules write through the field's own live trait object, never through a second write path
 Every rule targeting `arousal`, `wetness`, `shame`, or `exposure` SHALL apply its `delta` or `set`
@@ -92,6 +107,10 @@ function's no-op behavior for any transition outside its valid cycle.
 - **THEN** `entity.sexual.climax_phase.level` remains `"進行中"`, unchanged, because
   `_apply_climax_phase_set` no-ops the invalid edge
 
+#### Scenario: Generic climax gating does not use race-specific afterglow re-entry
+- **WHEN** `arousal` is `極限`, `climax_phase` is `餘韻`, and any event is applied
+- **THEN** `climax_gate` no-ops because its effect requires `from: 未達`
+
 #### Scenario: No source line in sexual_transitions.py writes climax_phase outside the guard
 - **WHEN** `world/rules/sexual_transitions.py` is inspected
 - **THEN** the only reference to `climax_phase`'s underlying value is the one call site invoking
@@ -134,8 +153,9 @@ change 7's sanctioned mutator for this field — and SHALL NOT read or write
   `entity.sexual.record_climax()`
 
 ### Requirement: The one rule targeting a vital gauge outside SexualState writes through change 3's entity.traits surface, never through SexualState
-`sp_cost_on_climax` SHALL apply its cost by mutating `entity.traits.sp.value` directly — change 3's
-own public `TraitHandler` contract — and SHALL NOT reach through `entity.sexual` to do so. The delta
+`sp_cost_on_climax` SHALL apply its cost by mutating `entity.traits.sp.current` directly — the
+public writable property of change 3's `GaugeTrait` (`.value` is its read-only alias) — and SHALL
+NOT reach through `entity.sexual` to do so. The delta
 SHALL resolve to a negative integer in the source's documented `20`–`30` range, applied as a
 subtraction.
 
@@ -146,7 +166,7 @@ subtraction.
 
 #### Scenario: The stamina cost never reaches through entity.sexual
 - **WHEN** `world/rules/sexual_transitions.py` is inspected
-- **THEN** the `vital_gauge`-kind branch of `_apply_then()` references `entity.traits.<field>.value`
+- **THEN** the `vital_gauge`-kind branch of `_apply_then()` references `entity.traits.<field>.current`
   only, with no reference to `entity.sexual` anywhere in that branch
 
 #### Scenario: The stamina cost respects the gauge's own floor
