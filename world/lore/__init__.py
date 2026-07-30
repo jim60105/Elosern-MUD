@@ -24,12 +24,23 @@ from .races import (
     Subrace,
     Vitals,
 )
+from .sexual_vocab import (
+    AROUSAL_LEVELS,
+    CLIMAX_PHASE_LEVELS,
+    EXPOSURE_LEVELS,
+    SENSITIVITY_LEVELS,
+    SHAME_LEVELS,
+    WETNESS_LEVELS,
+)
 
 __all__ = [
     "ANCHOR_REGISTRY",
+    "AROUSAL_LEVELS",
+    "CLIMAX_PHASE_LEVELS",
     "COPPER_PER_GOLD",
     "COPPER_PER_SILVER",
     "ELEMENT_REGISTRY",
+    "EXPOSURE_LEVELS",
     "GUILD_RANK_REGISTRY",
     "MAGIC_TIER_REGISTRY",
     "MONSTER_TIER_REGISTRY",
@@ -37,6 +48,8 @@ __all__ = [
     "PRICE_TABLE",
     "RACE_REGISTRY",
     "RANK_TITLE_REGISTRY",
+    "SENSITIVITY_LEVELS",
+    "SHAME_LEVELS",
     "STATIC_TIER_REGISTRY",
     "SUBRACE_REGISTRY",
     "Anchor",
@@ -54,5 +67,6 @@ __all__ = [
     "StatModifiers",
     "Subrace",
     "Vitals",
+    "WETNESS_LEVELS",
     "to_copper",
 ]

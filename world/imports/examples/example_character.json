@@ -1,0 +1,44 @@
+{
+  "record_type": "character",
+  "schema_version": 1,
+  "key": "ciaran_reference",
+  "display_name": "基亞蘭參考角色",
+  "age": 22,
+  "apparent_age": 22,
+  "race": "elf",
+  "subrace": "ciaran",
+  "stats": {
+    "hp": 10000,
+    "mp": 10000,
+    "sp": 10000,
+    "atk_phys": 88,
+    "agility": 84,
+    "defense": 76,
+    "magic_level": 120,
+    "guild_merit": 0
+  },
+  "disguised_stats": {
+    "atk_phys": 12,
+    "agility": 10
+  },
+  "skills": ["body_enhancement"],
+  "passives": ["elf_longevity"],
+  "equipment": {},
+  "inventory": [],
+  "sexual_baseline": {
+    "arousal": "平靜",
+    "wetness": "乾燥",
+    "virgin": true,
+    "sensitivity": {
+      "general": "普通"
+    }
+  },
+  "persona": {
+    "identity": "A reference adult Ciaran elf.",
+    "personality": "Calm and observant.",
+    "life_story": "A placeholder history for import validation.",
+    "habit": "Keeps careful field notes.",
+    "appearance": "Dark hair and practical traveling clothes.",
+    "social_connection": "Maintains ties with the Ciaran village."
+  }
+}
