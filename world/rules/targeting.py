@@ -166,12 +166,16 @@ def expand_target_shorthand(
         _rejection("target_spec_mismatch", f"{shorthand} requires a battlefield")
     if shorthand not in {"all-enemies", "all-allies", "all"}:
         _rejection("target_spec_mismatch", f"unknown shorthand {shorthand!r}")
-    roster = list(battlefield.roster)
+    roster = list(battlefield.roster.values())
     if shorthand == "all":
         return roster
-    wanted = Relation.ENEMY if shorthand == "all-enemies" else Relation.ALLY
+    wanted = (
+        {Relation.ENEMY}
+        if shorthand == "all-enemies"
+        else {Relation.SELF, Relation.ALLY}
+    )
     return [
         target
         for target in roster
-        if context.relation_to(actor, target) is wanted
+        if context.relation_to(actor, target) in wanted
     ]

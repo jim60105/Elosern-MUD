@@ -14,8 +14,8 @@ agility values are read through `SkillHandler.effective_value("agility")` (chang
   `(50 + 0) / 100` from design.md D-2's derivation
 
 #### Scenario: A cross-race agility gap saturates to a guaranteed outcome
-- **WHEN** a to-hit check is run with an attacker/defender effective-agility difference of 48 or more
-  in either direction (the smallest possible human/elf gap given `STATIC_TIER_REGISTRY`'s bands)
+- **WHEN** a to-hit check is run with an attacker/defender effective-agility difference of 50 or more
+  in either direction
 - **THEN** the hit rate is exactly 0% (attacker's agility deficit) or exactly 100% (attacker's agility
   surplus), with no roll capable of changing the outcome
 
@@ -94,13 +94,11 @@ value. This function SHALL NOT write to any entity attribute.
 - **THEN** both computations return the identical value — attrition is represented by the turn loop's
   own death check and the hp gauge itself, not by this function
 
-#### Scenario: effective_power still changes when effective_value changes mid-fight
-- **WHEN** `effective_power()` is computed for the same entity before and after a stat-multiplier skill
-  (e.g. 身體強化) becomes active, or before and after a disguise (`disguised_stats`) is dropped so a
-  true, higher stat is read
-- **THEN** the second computation differs from the first, satisfying design doc §6.3's "recomputed
-  every round... handles mid-fight power-tier shifts, such as dropping a disguise" — the shift this
-  requirement is actually about
+#### Scenario: effective_power changes when a true effective stat changes mid-fight
+- **WHEN** `effective_power()` is computed for the same entity before and after a stat-multiplier
+  skill (e.g. 身體強化) becomes active
+- **THEN** the second computation differs from the first; `disguised_stats` is never read because it
+  is display-only under architectural decision D2
 
 #### Scenario: A current-hp-driven ratio would misrepresent a saturated matchup — the case that ruled it
 out
@@ -142,25 +140,20 @@ time to pass.
 - **WHEN** `world/rules/combat.py`'s and `world/rules/dice.py`'s source is inspected
 - **THEN** neither file references `WorldClock` or calls anything named `advance()`
 
-### Requirement: Per-round upkeep ticks buffs unconditionally and self-arms sexual decay
+### Requirement: Per-round upkeep ticks buffs and advances sexual decay by the round duration
 `world/rules/combat.py`'s per-round upkeep SHALL call change 6's `tick_buffs(entity)` for every living
-roster member unconditionally (change 6 is a transitive dependency of this change via change 8).
-Sexual-state decay SHALL be attempted via a lazy import of `world.rules.sexual_transitions`, degrading
-to a no-op — never raising — while that module does not exist, and self-arming once it does.
+roster member unconditionally and SHALL call change 7's
+`world.rules.sexual_state.decay_tick(entity, round_seconds)` with the configured round duration.
 
 #### Scenario: Buff ticks run every round with no self-arming guard
 - **WHEN** a round completes with a poisoned combatant present
 - **THEN** `tick_buffs()` is called for that combatant exactly once, unconditionally, with no
   try/except around the call
 
-#### Scenario: Sexual decay is a no-op while sexual-transitions does not exist
-- **WHEN** a round completes and `world.rules.sexual_transitions` is not importable
-- **THEN** the round completes successfully with no exception raised, and no sexual-state field on any
-  entity is touched
-
-#### Scenario: Sexual decay fires once sexual-transitions exists (self-arming)
-- **WHEN** a round completes and `world.rules.sexual_transitions.decay_tick` is importable and callable
-- **THEN** it is called once per living roster member as part of that round's upkeep
+#### Scenario: Sexual decay accumulates exactly one round of elapsed time
+- **WHEN** a round completes for a living roster member
+- **THEN** `decay_tick` is called once for that entity with
+  `COMBAT_YAML["round"]["seconds"]`
 
 ### Requirement: actions_per_turn: 0 skips a combatant's turn before ActionResolver is called
 `world/rules/combat.py`'s `run_round()` SHALL read `evaluate_combat_modifiers(entity)` for each acting

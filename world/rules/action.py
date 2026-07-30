@@ -442,6 +442,8 @@ _ENTRY_TEMPLATES = {
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
     "sexual_transition": "{target} 的狀態發生了變化。",
     "trait_delta": "{target} 的能力值發生了變化。",
+    "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
+    "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
 }
 
 
@@ -467,6 +469,31 @@ def _entries_from_effect(
         data = {"buff_key": values[0]}
     elif kind == "sexual_transition":
         data = {"event": values[0]}
+    elif kind == "damage":
+        if len(values) != 3:
+            raise ValueError(
+                f"malformed damage pending effect {effect.description!r}"
+            )
+        raw_roll, hit_flag, amount = map(int, values)
+        roll_entry = EventEntry(
+            kind="roll",
+            actor=actor_key,
+            target=target,
+            data={"raw_roll": raw_roll, "hit": bool(hit_flag)},
+            text_template=_ENTRY_TEMPLATES["roll"],
+        )
+        if not hit_flag:
+            return (roll_entry,)
+        return (
+            roll_entry,
+            EventEntry(
+                kind="damage",
+                actor=actor_key,
+                target=target,
+                data={"amount": amount},
+                text_template=_ENTRY_TEMPLATES["damage"],
+            ),
+        )
     else:
         data = {}
     entry = EventEntry(

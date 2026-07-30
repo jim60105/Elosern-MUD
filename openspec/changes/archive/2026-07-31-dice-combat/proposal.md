@@ -31,8 +31,11 @@ re-derived against the real numbers rather than carried forward unexamined.
 - Implement `is_in_range()` for `BattlefieldActionContext` to the extent a coordinate-free battlefield
   model allows (engaged/not-engaged, melee-vs-ranged), explicitly deferring true positional range to
   change 12 (`map-anchor-grid`).
+- Extend change 8's pending-effect event conversion with the `"roll"` and `"damage"` records required
+  for combat, and correct its battlefield shorthand expansion to read entity values from the roster
+  mapping.
 - Report `rounds × 6 seconds` as a plain integer to whatever calls the turn loop; this change never
-  calls `WorldClock.advance()` (change 11 does not exist yet).
+  calls `WorldClock.advance()` (change 11 remains a later roadmap item).
 - Recalibrate and document the to-hit formula's defender-side constant in `rulebook/combat.yaml`,
   replacing the stale `60` with a value re-derived against changes 2/3's real stat bands, with the
   reasoning recorded where a future balance pass can find it.
@@ -53,14 +56,18 @@ re-derived against the real numbers rather than carried forward unexamined.
   modifiers exclusively through change 6's `evaluate_combat_modifiers()`.
 
 ### Modified Capabilities
-- None. `openspec/specs/` is empty (no earlier change has been archived yet).
+- `action-resolution-pipeline`: damage pending effects are converted into structured roll/damage
+  entries by the existing step-7 event-log builder.
+- `targeting-validation`: battlefield shorthand expansion reads live entity values from the
+  battlefield roster mapping before applying the unchanged validation pipeline.
 
 ## Impact
 
 - **New files**: `world/rules/dice.py`, `world/rules/combat.py`, `world/rules/rulebook/combat.yaml`,
   `world/rules/tests/` (new test modules for this change's scope).
-- **Modified files**: none. `damage:*` handlers register into change 8's already-open registry through
-  its own public `register_effect_handler()` function; no other change's file is edited.
+- **Modified files**: `world/rules/action.py` (combat event conversion only) and
+  `world/rules/targeting.py` (roster mapping values for shorthand expansion). The resolver pipeline,
+  validator ordering, and public effect registration seam remain unchanged.
 - **Depends on**: change 8 (`action-resolver`) for `ActionResolver.resolve()`, `ActionContext`,
   `register_effect_handler()`, `PendingEffect`, `SNAPSHOTTED_SURFACES`; change 5
   (`skills-equipment`) for `SkillHandler.effective_value()`; change 6 (`buffs-rulebook`) for

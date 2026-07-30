@@ -1,0 +1,18 @@
+to_hit:
+  # See dice-combat/design.md D-2: 51 gives exact parity 50% on inclusive 1..100.
+  defender_constant: 51
+
+damage:
+  # Invented placeholders pending the later combat-balance pass.
+  crit_multiplier: 2.0
+  solid_hit_margin: 40
+  solid_hit_multiplier: 1.5
+  base_multiplier: 1.0
+  floor: 1
+
+initiative:
+  # Invented tuning: a ten-point agility gap dominates all d100 jitter.
+  agility_weight: 10
+
+round:
+  seconds: 6

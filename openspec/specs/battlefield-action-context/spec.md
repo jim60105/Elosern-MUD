@@ -1,5 +1,8 @@
-## ADDED Requirements
+# battlefield-action-context Specification
 
+## Purpose
+TBD - created by archiving change dice-combat. Update Purpose after archive.
+## Requirements
 ### Requirement: BattlefieldActionContext conforms to change 8's ActionContext protocol
 `world/rules/combat.py` SHALL provide `Battlefield` (holding a two-team roster, `teams: dict[str,
 frozenset[str]]`, and live entity references keyed by entity key) and `BattlefieldActionContext`,
@@ -33,18 +36,19 @@ when they belong to different teams. `Battlefield` SHALL support exactly two tea
 - **WHEN** `relation_to(actor, actor)` is called
 - **THEN** it returns `Relation.SELF`
 
-### Requirement: is_present checks battlefield roster membership and fled status
+### Requirement: is_present checks canonical battlefield roster membership
 `BattlefieldActionContext.is_present(actor, target)` SHALL return `True` only if the target's entity
-key is a member of `battlefield.roster` and not present in `battlefield.fled`.
+key is a member of `battlefield.roster`. Fled status belongs to the subsequent range check so the
+four validations retain distinct, reachable rejection reasons.
 
-#### Scenario: A roster member who has not fled is present
-- **WHEN** `is_present(actor, target)` is called for a target still in `battlefield.roster` and not in
-  `battlefield.fled`
+#### Scenario: A roster member is present
+- **WHEN** `is_present(actor, target)` is called for a target in `battlefield.roster`
 - **THEN** it returns `True`
 
-#### Scenario: A fled combatant is not present
-- **WHEN** `is_present(actor, target)` is called for a target whose key is in `battlefield.fled`
-- **THEN** it returns `False`
+#### Scenario: A non-roster entity is not present
+- **WHEN** `is_present(actor, target)` is called for a target whose key is absent from
+  `battlefield.roster`
+- **THEN** it returns `False`, regardless of `battlefield.fled`
 
 ### Requirement: is_in_range checks fled status; melee-versus-ranged is explicitly not built
 `BattlefieldActionContext.is_in_range(actor, target, skill)` SHALL return `False` for any target whose
@@ -71,15 +75,17 @@ range/reach classification, and no coordinate system (change 12) exists yet.
 
 ### Requirement: Combat shortcuts read the two-team roster with no separate expansion path
 `context.battlefield.teams` SHALL be queryable by change 8's `expand_target_shorthand()` for
-`"all-enemies"`, `"all-allies"`, and `"all"` with no modification to `targeting.py`.
+`"all-enemies"`, `"all-allies"`, and `"all"` through the narrow mapping-value correction in
+`targeting.py`; no separate combat expansion path SHALL exist.
 
 #### Scenario: all-enemies expands to the opposing team's roster
 - **WHEN** `expand_target_shorthand(actor, context, "all-enemies")` is called with a
   `BattlefieldActionContext` wrapping a two-team `Battlefield`
-- **THEN** the resulting candidate list contains every entity key on the team that is not the actor's
+- **THEN** the resulting candidate list contains every entity on the team that is not the actor's
   own team
 
 #### Scenario: all-allies expands to the actor's own team, including the actor
 - **WHEN** `expand_target_shorthand(actor, context, "all-allies")` is called
-- **THEN** the resulting candidate list contains every entity key on the actor's own team, including
+- **THEN** the resulting candidate list contains every entity on the actor's own team, including
   the actor itself
+

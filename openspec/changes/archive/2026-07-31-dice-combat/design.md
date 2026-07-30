@@ -29,9 +29,10 @@ range. Changes 2 and 3 have since pinned down the real bands (`world/lore/races.
 this change's own file, re-deriving that constant against the real numbers — rather than carrying it
 forward unexamined — is this change's job, not a future balance pass's.
 
-No code exists yet for this change's scope. `world/rules/` currently holds `traits.py` (change 3),
-`rulebook/schema.py`/`combat_modifiers.py`/`buffs.py` (change 6), and `action.py`/`targeting.py`/
-`event_log.py` (change 8, once landed). Nothing named `dice.py` or `combat.py` exists, and
+No code exists yet for this change's new modules. `world/rules/` currently holds `traits.py` (change
+3), `rulebook/schema.py`/`combat_modifiers.py`/`buffs.py` (change 6), sexual-state and transition
+modules (changes 7/7b), and `action.py`/`targeting.py`/`event_log.py` (change 8). Nothing named
+`dice.py` or `combat.py` exists, and
 `rulebook/combat.yaml` does not exist.
 
 ## Goals / Non-Goals
@@ -47,8 +48,8 @@ No code exists yet for this change's scope. `world/rules/` currently holds `trai
 - Register `damage:*` effect handlers into change 8's registry via `register_effect_handler()`,
   declaring `surfaces=frozenset({"traits"})`.
 - `world/rules/combat.py`: `Battlefield`, `BattlefieldActionContext` (satisfying change 8's
-  `ActionContext` protocol), initiative ordering, the turn loop (including per-round buff ticks and a
-  self-arming sexual-decay hook), and end-of-encounter detection.
+  `ActionContext` protocol), initiative ordering, the turn loop (including per-round buff ticks and
+  elapsed-time sexual decay), and end-of-encounter detection.
 - A real, if coarse, `is_in_range()` for the battlefield — engaged-vs-not, not coordinates.
 - Round-based time reporting (`rounds × 6s`) as a plain integer, never a `WorldClock` call.
 - Fixed-seed golden tests: one normal (same-tier) exchange, one lopsided (cross-race) exchange.
@@ -69,11 +70,12 @@ No code exists yet for this change's scope. `world/rules/` currently holds `trai
 - **No AI behaviour tree.** `Monster.behaviour_tree` (change 3's declared, unbuilt seam) does not
   exist. This change's turn loop needs *some* action for a non-player combatant to take each round; it
   supplies a minimal, explicitly-labeled placeholder policy, not a real AI (see D-9).
-- **No changes to `SkillDef`, `ActionResolver`, `targeting.py`, or `event_log.py`.** This change adds
-  no field to change 5's `SkillDef` and no branch to change 8's resolver/targeting modules — every
-  combat-specific behavior (agility/accuracy modifier interpretation, `actions_per_turn` gating, the
-  to-hit/damage roll) lives in `world/rules/combat.py`, satisfying change 8's own no-combat-branching
-  tripwire by construction (this change never touches the scanned files).
+- **No changes to `SkillDef`, `ActionResolver.resolve()`, or `event_log.py`.** This change adds no
+  field to change 5's `SkillDef` and no combat branch to the resolver pipeline. It makes two narrow
+  integration edits discovered against the landed change-8 APIs: `action.py` learns to convert
+  damage pending-effect descriptions into open-string `"roll"`/`"damage"` entries, and
+  `targeting.py` expands a dict roster through `.values()` so validators receive entities rather
+  than keys. Combat math and turn policy remain in `world/rules/combat.py`.
 - No backward-compatibility, migration, or deprecation handling — the project is unreleased with zero
   users, and `world/rules/dice.py`/`combat.py`/`rulebook/combat.yaml` do not exist yet.
 
@@ -194,8 +196,8 @@ hit_rate(Δ) = clamp( (50 + Δ) / 100 ,  0.0 ,  1.0 )
 
 Same-tier and adjacent-tier fights now center on a genuine coin flip and range 28%–53% depending on the
 real agility gap; the two racial matchups remain fully, deliberately absolute — this is now a
-calibrated consequence (parity is a fair fight; a 48+ point gap, which is smaller than the smallest
-possible human-elf gap in the source bands, is unwinnable in either direction) rather than an
+calibrated consequence (parity is a fair fight; a 50+ point gap is unwinnable in either direction)
+rather than an
 inherited artifact.
 
 **No natural-roll auto-hit/auto-fumble override.** Considered and rejected: a common percentile-dice
@@ -314,12 +316,12 @@ favor of the one combatant mathematically incapable of connecting. That is not a
 function can wave away; it is the direct, mechanical consequence of letting a *depleting* resource
 drive a *power* comparison symmetrically in both directions.
 
-**What §6.3's "recomputed every round" actually protects, and why max hp still serves it.** The design
-doc's own example is not hp attrition — it is "such as dropping a disguise," i.e. a combatant's
-`effective_value()` output changing because a stat-multiplier skill (×100 身體強化, ×1000 身體超強化)
-activates or a disguise is dropped mid-fight. `effective_power()` is already fully sensitive to that:
-every stat in the sum is read through `effective_value()` at call time, so a mid-fight multiplier
-change is picked up on the very next recomputation with no additional mechanism needed. **Attrition is
+**What §6.3's "recomputed every round" protects, and why max hp still serves it.** A combatant's true
+`effective_value()` output can change because a stat-multiplier skill (×100 身體強化, ×1000
+身體超強化) activates. `effective_power()` is fully sensitive to that: every stat in the sum is read
+through `effective_value()` at call time, so a mid-fight multiplier change is picked up on the very
+next recomputation with no additional mechanism needed. `disguised_stats` remains display-only under
+architectural decision D2 and is never a combat input. **Attrition is
 already represented elsewhere** — by the turn loop's own death check (`entity.traits.hp.value <= 0`)
 and by the hp gauge itself, which the to-hit/damage math (D-2/D-3) already consumes directly. It does
 not need a second representation inside a power-tier scalar, and folding it in there actively breaks
@@ -330,8 +332,8 @@ term: it answers "how much punishment can this combatant's *kind* of body take,"
 how the current round happens to be going.
 
 **A finding for change 10, not a decision this change makes.** Because `effective_power()`'s ratio is
-now static across a fight except when `effective_value()` itself changes (a multiplier activating, a
-disguise dropping), it cannot by itself detect "this fight is already decided because one side is
+now static across a fight except when `effective_value()` itself changes (for example, a multiplier
+activating), it cannot by itself detect "this fight is already decided because one side is
 nearly dead but neither side's underlying stats changed." D-2's saturated hit rates (0%/100% at a ±50
 agility gap) are a second, independent, and cheaper signal of exactly that condition — no ratio
 computation needed, just the to-hit formula's own boundary. **Change 10's author should treat the power
@@ -355,10 +357,9 @@ roll and the hit/miss/magnitude decision inside the handler (step 5), never insi
 ```python
 # world/rules/combat.py
 def _handle_damage(actor, targets, effect_id, event_context) -> list["PendingEffect"]:
-    """effect_id shape: 'damage:<school>[:<element>]' where school is 'physical' or 'magic'.
-    This is this change's own convention for the 'damage:*' prefix change 8 declared and
-    refused to guess at -- change 8's own illustrative example ('damage:fire:magic') was not
-    authoritative; this is the actual, defined shape.
+    """effect_id shape: 'damage:<element>:<school>' where school is 'physical' or 'magic'.
+    This follows the concrete seed skills already landed by change 5, including
+    'damage:fire:magic' and 'damage:dark:physical'.
 
     The to-hit roll and the resulting hit/miss/damage number are computed HERE, in the pure
     staging step -- not inside the PendingEffect.apply() thunk -- per change 8's D-1: step 5
@@ -367,7 +368,7 @@ def _handle_damage(actor, targets, effect_id, event_context) -> list["PendingEff
     no entity state), so doing it here is compatible with that boundary; only entity.traits.hp
     ever gets WRITTEN, and only inside apply().
     """
-    school, *element = effect_id.split(":")[1:]
+    _, element, school = effect_id.split(":")
     stat_key = "atk_phys" if school == "physical" else "magic_level"
     pending = []
     for target in targets:
@@ -390,8 +391,7 @@ def _handle_damage(actor, targets, effect_id, event_context) -> list["PendingEff
             damage = max(round(atk_stat * multiplier) - def_def, COMBAT_YAML["damage"]["floor"])
         pending.append(PendingEffect(
             entity=target,
-            description=f"{actor.key} -> {target.key}: {'hit' if hit else 'miss'} ({damage} dmg)"
-                        f" [roll={raw_roll}]",
+            description=f"damage|{target.key}|{raw_roll}|{int(hit)}|{damage}",
             surfaces=frozenset(),   # stamped by register_effect_handler()'s caller (change 8 D-7)
             apply=(lambda t=target, d=damage: _apply_hp_delta(t, -d)) if hit else (lambda: None),
         ))
@@ -403,8 +403,11 @@ register_effect_handler("damage", _handle_damage, surfaces=frozenset({"traits"})
 `_apply_hp_delta(entity, delta)` writes through `entity.traits.hp.value += delta` — the same public
 accessor path every other change's mutator uses, so change 8's generic `_snapshot_entity_state()`
 (which already walks `entity.traits.all()`) covers it with no `SNAPSHOTTED_SURFACES` extension needed.
-This is the first real occupant of change 8's `damage:*` extension point; no edit to `action.py` is
-required — `register_effect_handler()` is a public function change 8 built exactly for this.
+This is the first real occupant of change 8's `damage:*` extension point.
+`action.py`'s existing `_entries_from_effect()` is extended to parse the structured
+`damage|target|roll|hit|amount` pending description into a `"roll"` entry and, on a hit, a `"damage"`
+entry. This is event conversion at the existing step-7 seam, not combat resolution inside
+`ActionResolver`.
 
 **A determinism note for the golden tests (D-10).** Because the roll happens at step 5, a request that
 is later rejected at step 6/7/8 (e.g. a malformed time-cost override) has already consumed one `roll_d100()`
@@ -435,7 +438,7 @@ class BattlefieldActionContext:
         self.battlefield = battlefield
 
     def is_present(self, actor, target) -> bool:
-        return target.key in self.battlefield.roster and target.key not in self.battlefield.fled
+        return target.key in self.battlefield.roster
 
     def relation_to(self, actor, target) -> Relation:
         if actor is target:
@@ -453,10 +456,11 @@ class BattlefieldActionContext:
 Two teams, not a general N-team model — every combat encounter design doc §6.2/§6.3 describes is
 adventurer(s)-versus-monster(s); a richer faction graph (three-way fights, environmental hazards as a
 "team") is not asked for anywhere in this change's dependency chain and would be speculative scope
-addition. `expand_target_shorthand()`'s `"all-enemies"`/`"all-allies"`/`"all"` (change 8, already
-built) read `battlefield.teams` through exactly this structure — no change to `targeting.py` is needed;
-it already expects `context.battlefield` to expose *some* roster, and this is that roster's concrete
-shape.
+addition. `expand_target_shorthand()`'s `"all-enemies"`/`"all-allies"`/`"all"` reads the roster
+through exactly this structure. The landed change-8 implementation used
+`list(battlefield.roster)`, which yields keys for a dict while its subsequent `relation_to()` call
+requires entities. This change corrects that seam to `list(battlefield.roster.values())`; shorthand
+semantics and validation are otherwise unchanged.
 
 ### D-7. `is_in_range()`: "engaged" (still an active roster member) is implementable today; melee-vs-
 ranged genuinely is not, and is named as the reason why.
@@ -532,8 +536,8 @@ agility alone would otherwise decide every fight identically round after round. 
 own judgment call (no source document specifies a weight), flagged the same way the damage-band
 constants (D-3) are, for a later balance pass.
 
-### D-9. Turn loop: per-round upkeep calls change 6's `tick_buffs()` directly (hard dependency) and a
-self-arming hook for sexual decay (not a hard dependency); `actions_per_turn: 0` is read from the
+### D-9. Turn loop: per-round upkeep calls change 6's `tick_buffs()` and change 7's
+`decay_tick(entity, elapsed_seconds)` directly; `actions_per_turn: 0` is read from the
 combat-modifier bundle at the turn-loop level, not inside `ActionResolver`.
 
 ```python
@@ -571,20 +575,13 @@ def _end_of_round_upkeep(battlefield: Battlefield) -> None:
         tick_buffs(entity)              # change 6's seam — HARD dependency (6 is transitively
                                           # required via change 8's own dependency on 6), called
                                           # directly, no self-arming needed
-        _try_sexual_decay(entity)       # self-arming — see below
-
-def _try_sexual_decay(entity) -> None:
-    """Sexual state decay/transitions are NOT a hard dependency of this change (design doc §11
-    lists this change's only dependency as change 8, and 7/7b are not transitively required by
-    8 either — change 8 itself self-arms around sexual_transitions for the identical reason).
-    Mirrors change 8's own sexual_event:* handler exactly: lazy import, degrade to a no-op
-    (not a crash) while world.rules.sexual_transitions doesn't exist, self-arm once it does."""
-    try:
-        from world.rules.sexual_transitions import decay_tick
-    except ImportError:
-        return
-    decay_tick(entity)
+        decay_tick(entity, COMBAT_YAML["round"]["seconds"])
 ```
+
+Changes 7/7b are already archived in the implementation order used by this repository, and the
+landed decay API belongs to `world.rules.sexual_state`, not `sexual_transitions`. Passing the
+configured six-second round duration lets its persistent accumulators settle the longer decay
+intervals deterministically without inventing a combat-specific decay rule.
 
 **Why `actions_per_turn: 0` is read here and not inside `ActionResolver`.** Change 6's
 `blocks_action(entity)` (a small, explicit `BLOCKING_BUFF_KEYS` set) already gates step 4 of
@@ -685,7 +682,7 @@ sequencing concerns are operational:
   `tick_buffs()`, `blocks_action()`).
 - **Change 5's seed skills whose `effects` reference an as-yet-undefined `damage:*`-shaped ID**
   (`fire_ball`, `wind_blade`, every weapon-art skill) now resolve against this change's concrete
-  convention (`damage:<school>[:<element>]`, D-5) with zero edit to change 5's own artifacts — this is
+  convention (`damage:<element>:<school>`, D-5) with zero edit to change 5's own artifacts — this is
   the identical "declare here, populate a real registration later" split change 8 itself used for the
   registry as a whole.
 - Change 10 (`overwhelm-resolution`) is expected to call this change's `effective_power()` for its own

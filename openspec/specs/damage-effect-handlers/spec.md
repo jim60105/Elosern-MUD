@@ -1,5 +1,8 @@
-## ADDED Requirements
+# damage-effect-handlers Specification
 
+## Purpose
+TBD - created by archiving change dice-combat. Update Purpose after archive.
+## Requirements
 ### Requirement: damage:* is registered into change 8's effect-handler registry, declaring the traits
 surface
 `world/rules/combat.py` SHALL call change 8's `register_effect_handler("damage", _handle_damage,
@@ -8,7 +11,8 @@ change performs, and it SHALL use change 8's public registration function — no
 `_EFFECT_HANDLERS` or `_EFFECT_HANDLER_SURFACES`.
 
 #### Scenario: A skill with a damage:* effect resolves once this change is imported
-- **WHEN** a `SkillDef` whose `effects` includes a `damage:physical` or `damage:magic:<element>`-shaped
+- **WHEN** a `SkillDef` whose `effects` includes a `damage:<element>:physical` or
+  `damage:<element>:magic`-shaped
   ID is resolved via `ActionResolver.resolve()` after `world/rules/combat.py` has been imported
 - **THEN** the action no longer rejects with `RejectReason.UNKNOWN_EFFECT_ID`
 
@@ -17,17 +21,18 @@ change performs, and it SHALL use change 8's public registration function — no
 - **THEN** it declares `surfaces=frozenset({"traits"})`, and this is a genuine subset of change 8's
   `SNAPSHOTTED_SURFACES` — no `UnsnapshottedSurfaceError` is raised at registration time
 
-### Requirement: damage:<school>[:<element>] is the defined convention for this prefix
-`_handle_damage` SHALL parse `effect_id` as `damage:<school>[:<element>]`, where `school` is either
-`"physical"` (reading `atk_phys`) or `"magic"` (reading `magic_level`) as the attacking stat, and
-`element` is an optional reference into `world.lore.elements.ELEMENT_REGISTRY`.
+### Requirement: damage:<element>:<school> is the defined convention for this prefix
+`_handle_damage` SHALL parse `effect_id` as `damage:<element>:<school>`, matching the change-5 seed
+registry, where `school` is either `"physical"` (reading `atk_phys`) or `"magic"` (reading
+`magic_level`) as the attacking stat, and `element` references
+`world.lore.elements.ELEMENT_REGISTRY`.
 
 #### Scenario: A physical damage effect reads atk_phys
-- **WHEN** `_handle_damage` processes an effect ID of `"damage:physical"`
+- **WHEN** `_handle_damage` processes an effect ID of `"damage:dark:physical"`
 - **THEN** the attacking stat is `SkillHandler.effective_value("atk_phys")` for the acting entity
 
 #### Scenario: A magic damage effect reads magic_level
-- **WHEN** `_handle_damage` processes an effect ID of `"damage:magic:fire"`
+- **WHEN** `_handle_damage` processes an effect ID of `"damage:fire:magic"`
 - **THEN** the attacking stat is `SkillHandler.effective_value("magic_level")` for the acting entity
 
 ### Requirement: The to-hit roll and damage number are computed during effect resolution, never inside
@@ -75,3 +80,4 @@ SHALL distinguish a poison-sourced adjustment from an arousal-sourced or fear-so
 - **WHEN** `_handle_damage`'s source is inspected
 - **THEN** it contains no conditional keyed on which `combat_modifiers.yaml` rule produced an
   `agility`/`accuracy` adjustment — only the bundle's output keys are read
+
