@@ -3,9 +3,10 @@
 ### Requirement: Behaviour parameters are data-driven, not hardcoded in Python
 `world/rules/rulebook/monster_behaviour.yaml` SHALL declare a `tier_default_archetype` mapping (one
 archetype key per `MonsterTier` registry key) and an `archetypes` table, where every entry declares
-`target_strategy`, `skill_choice`, and `prefer_area_when_multiple_enemies`. No balance-relevant value
-(which strategy an archetype uses, which archetype a tier defaults to) SHALL appear as a Python literal
-anywhere in `world/rules/monster_behaviour.py`.
+`target_strategy`, `skill_choice`, `prefer_area_when_multiple_enemies`, and `flee_hp_fraction`. No
+balance-relevant value (which strategy an archetype uses, which archetype a tier defaults to, at what hp
+fraction an archetype flees) SHALL appear as a Python literal anywhere in
+`world/rules/monster_behaviour.py`.
 
 #### Scenario: The tier default mapping covers every MonsterTier registry key
 - **WHEN** `MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]` is inspected
@@ -13,11 +14,12 @@ anywhere in `world/rules/monster_behaviour.py`.
   (`low`, `mid`, `high`, `calamity`), and every mapped value exists as a key in
   `MONSTER_BEHAVIOUR_YAML["archetypes"]`
 
-#### Scenario: Every archetype declares all three tunable parameters
+#### Scenario: Every archetype declares all four tunable parameters
 - **WHEN** every entry in `MONSTER_BEHAVIOUR_YAML["archetypes"]` is inspected
 - **THEN** each has a `target_strategy` value of `"lowest_hp"` or `"highest_effective_power"`, a
-  `skill_choice` value of `"first_owned"` or `"highest_expected_damage"`, and a boolean
-  `prefer_area_when_multiple_enemies`
+  `skill_choice` value of `"first_owned"` or `"highest_expected_damage"`, a boolean
+  `prefer_area_when_multiple_enemies`, and a `flee_hp_fraction` value that is either `None` or a float
+  strictly between `0.0` and `1.0`
 
 #### Scenario: No archetype or tier-mapping literal is hardcoded in Python
 - **WHEN** `world/rules/monster_behaviour.py`'s source is inspected
@@ -54,6 +56,37 @@ tier's other examples.
 - **WHEN** the `high` and `calamity` tier default archetypes' `target_strategy` values are inspected
 - **THEN** both are `highest_effective_power`, reflecting `world_info.md`'s framing of these tiers as at
   or beyond the human combat ceiling, with no reason to avoid the strongest available target
+
+### Requirement: flee_hp_fraction is calibrated per archetype against the same MonsterTier grounding,
+not a single shared value
+Each archetype's `flee_hp_fraction` SHALL be chosen relative to its tier's `world_info.md` framing, such
+that lower tiers flee at a higher current-hp fraction than higher tiers, and the calamity-tier default
+archetype SHALL never flee.
+
+#### Scenario: The low-tier default archetype flees at the highest hp fraction of the four
+- **WHEN** `MONSTER_BEHAVIOUR_YAML["archetypes"][MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]["low"]]
+  ["flee_hp_fraction"]` is compared against the `mid`, `high`, and `calamity` tier defaults' values
+- **THEN** it is greater than each of the others (treating the calamity tier's `None` as "never," i.e.
+  the strictest, lowest-eagerness-to-flee case)
+
+#### Scenario: flee eagerness decreases monotonically from low to high tier defaults
+- **WHEN** the `low`, `mid`, and `high` tier default archetypes' `flee_hp_fraction` values are sorted
+- **THEN** they strictly decrease in that tier order (`low` > `mid` > `high`), reflecting
+  `world_info.md`'s framing of decreasing self-preservation instinct and increasing combat confidence as
+  tier rises
+
+#### Scenario: The calamity-tier default archetype never flees
+- **WHEN** `MONSTER_BEHAVIOUR_YAML["archetypes"][MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]
+  ["calamity"]]["flee_hp_fraction"]` is inspected
+- **THEN** it is `None`, reflecting `world_info.md`'s framing of calamity-tier monsters (古龍/魔神/災獸) as
+  beyond the human combat ceiling entirely, with nothing at this project's reference scale to flee from
+
+#### Scenario: A named-example override archetype may set a flee threshold distinct from its tier default
+- **WHEN** the `tactical_caster` archetype's `flee_hp_fraction` is compared against the `brute` archetype's
+  (both valid for the `high` tier, per the `Monster.behaviour_tree` override mechanism)
+- **THEN** the two values differ, reflecting `tactical_caster`'s calculating nature versus `brute`'s
+  aggression, while both remain closer to `0.0` than the `low`/`mid` tier defaults — a "high"-tier
+  threshold in either case, not a cautious one
 
 ### Requirement: Monster.behaviour_tree resolves to a real archetype, defaulting from threat_tier
 `world/rules/monster_behaviour.py` SHALL provide `resolve_behaviour_profile(monster) ->

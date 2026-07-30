@@ -121,7 +121,8 @@ existing all-enemies shorthand
 `SINGLE`-targeted skill this turn based on `BehaviourProfile.prefer_area_when_multiple_enemies`, the
 count of living enemies, and which target-spec shapes the entity owns a matching damage skill for, before
 running target selection. An `AREA` decision SHALL use the `"all-enemies"` shorthand as its `targets`
-value rather than computing an explicit target list.
+value rather than computing an explicit target list. This decision SHALL only be reached when the flee
+check (below) has not already returned a `flee` `ActionRequest` for the acting monster this turn.
 
 #### Scenario: An archetype preferring area skills uses one when multiple enemies are present
 - **WHEN** the acting monster's profile has `prefer_area_when_multiple_enemies: true`, more than one
@@ -145,6 +146,55 @@ value rather than computing an explicit target list.
 - **WHEN** the acting `Monster` owns no `ACTIVE` skill whose `effects` include a `damage:`-prefixed ID
 - **THEN** `monster_behaviour_policy()` returns `None`, identically to change 9's own
   `default_attack_policy` behaviour for the same condition
+
+### Requirement: A flee decision is evaluated before the area-versus-single decision, per archetype threshold
+`world/rules/monster_behaviour.py` SHALL check, before deciding single-vs-area targeting, whether the
+acting monster's `BehaviourProfile.flee_hp_fraction` is not `None` and the entity's current `hp.value /
+hp.max` is at or below that fraction. When both hold, `monster_behaviour_policy()` SHALL return an
+`ActionRequest` invoking change 10c's innately-owned `flee` skill (`skill_key` equal to
+`world.rules.disengage.FLEE_SKILL_KEY`), targeting the acting entity itself, with a
+`BattlefieldActionContext` whose `event_context` contains `{"battlefield": battlefield}`, and SHALL NOT
+proceed to any target/skill selection for that turn. This check SHALL be stateless: it SHALL read only
+the entity's current hp and its resolved `BehaviourProfile`, with no persistent record of a prior flee
+attempt this encounter.
+
+#### Scenario: A monster at or below its flee threshold attempts to flee instead of attacking
+- **WHEN** `monster_behaviour_policy(entity, battlefield)` is called for a `Monster` whose
+  `hp.value / hp.max` is at or below its resolved `BehaviourProfile.flee_hp_fraction`
+- **THEN** the returned `ActionRequest` has `skill_key == disengage.FLEE_SKILL_KEY`, `targets == [entity]`,
+  and a `context` whose `event_context == {"battlefield": battlefield}`
+
+#### Scenario: A monster above its flee threshold does not attempt to flee
+- **WHEN** `monster_behaviour_policy(entity, battlefield)` is called for a `Monster` whose
+  `hp.value / hp.max` is strictly above its resolved `BehaviourProfile.flee_hp_fraction`
+- **THEN** the returned `ActionRequest`, if any, does not name `disengage.FLEE_SKILL_KEY` as its
+  `skill_key`
+
+#### Scenario: An archetype with flee_hp_fraction: None never attempts to flee regardless of hp
+- **WHEN** `monster_behaviour_policy(entity, battlefield)` is called for a `Monster` whose resolved
+  `BehaviourProfile.flee_hp_fraction` is `None`, at any current hp fraction including a value approaching
+  `0`
+- **THEN** the returned `ActionRequest` never names `disengage.FLEE_SKILL_KEY` as its `skill_key`
+
+#### Scenario: The flee check is stateless and re-evaluated fresh every turn
+- **WHEN** `monster_behaviour_policy(entity, battlefield)` is called for the same `Monster` on two
+  consecutive turns, its hp fraction remaining at or below its flee threshold on both calls, with no
+  intervening change to `battlefield.fled`
+- **THEN** both calls return a `flee` `ActionRequest` — the function retains no memory of the first
+  call's outcome and does not suppress or alter the second call's decision based on it
+
+#### Scenario: A successful or failed flee attempt is resolved entirely through ActionResolver
+- **WHEN** the `ActionRequest` returned by the flee branch is passed to `ActionResolver.resolve()`
+- **THEN** resolution proceeds through change 8's unmodified pipeline and change 10c's `disengage` effect
+  handler with no other code path in `world/rules/monster_behaviour.py` involved in determining success
+  or writing to `battlefield.fled`
+
+#### Scenario: The flee branch works unmodified inside change 10's compressed loop
+- **WHEN** `overwhelm.resolve_overwhelm(battlefield, monster_behaviour_policy, max_rounds)` is called on a
+  battlefield containing a `Monster` at or below its flee threshold
+- **THEN** the call completes without stalling or requiring interactive input, and a successful flee
+  during that resolution results in the fleeing entity's key appearing in `battlefield.fled` by the time
+  `resolve_overwhelm()` returns
 
 ### Requirement: A non-Monster entity is delegated to change 9's default_attack_policy unmodified
 `monster_behaviour_policy(entity, battlefield)` SHALL detect whether `entity` is a `Monster` by checking
@@ -180,3 +230,38 @@ roster, and that every choice is exactly reproducible under the fixture's seed.
 - **WHEN** the golden fixture is run twice under the identical fixed seed and starting battlefield state
 - **THEN** every `ActionRequest` `monster_behaviour_policy()` produces across both runs is identical in
   `skill_key` and `targets`
+
+### Requirement: Golden fixed-seed tests demonstrate each archetype's flee threshold firing at the right
+boundary and not above it
+`world/rules/tests/` SHALL contain, for each of the four `MonsterTier` default archetypes, a fixed-seed
+golden test asserting `monster_behaviour_policy()` returns a `flee` `ActionRequest` when the monster's hp
+fraction is at or below that archetype's `flee_hp_fraction`, and does not when the hp fraction is set
+just above it — with the `apex_predator` archetype asserted to never flee regardless of how low its hp
+fraction is set.
+
+#### Scenario: instinctive flees at its threshold and not just above it
+- **WHEN** an `instinctive`-archetype `Monster`'s hp fraction is set to exactly its `flee_hp_fraction` and,
+  separately, to a value one hp point above the fraction that would trigger it
+- **THEN** the first case returns a `flee` `ActionRequest` and the second does not
+
+#### Scenario: pack_hunter flees at its threshold and not just above it
+- **WHEN** a `pack_hunter`-archetype `Monster`'s hp fraction is set to exactly its `flee_hp_fraction` and,
+  separately, to a value one hp point above the fraction that would trigger it
+- **THEN** the first case returns a `flee` `ActionRequest` and the second does not
+
+#### Scenario: brute flees at its threshold and not just above it
+- **WHEN** a `brute`-archetype `Monster`'s hp fraction is set to exactly its `flee_hp_fraction` and,
+  separately, to a value one hp point above the fraction that would trigger it
+- **THEN** the first case returns a `flee` `ActionRequest` and the second does not
+
+#### Scenario: apex_predator never flees at any hp fraction
+- **WHEN** an `apex_predator`-archetype `Monster`'s hp fraction is set to its tier's lowest plausible
+  value (approaching `0`)
+- **THEN** `monster_behaviour_policy()` does not return a `flee` `ActionRequest`, consistent with its
+  `flee_hp_fraction` of `None`
+
+#### Scenario: Each archetype's flee golden test is reproducible under its fixed seed
+- **WHEN** each of the four archetypes' golden flee tests is run twice under its own fixed seed and
+  identical starting state
+- **THEN** the fire/no-fire outcome and the returned `ActionRequest` (when one is returned) are identical
+  across both runs

@@ -2,15 +2,18 @@
 
 - [ ] 1.1 Confirm `world/rules/` holds change 8's `action.py` (`ActionRequest`, `ActionResolver`),
       change 9's `combat.py` (`Battlefield`, `BattlefieldActionContext`, `effective_power`,
-      `default_attack_policy`) and `dice.py` (`roll_d100`), and change 10's `overwhelm.py`
-      (`resolve_overwhelm`); create `world/rules/monster_behaviour.py` and
-      `world/rules/rulebook/monster_behaviour.yaml` as new files.
+      `default_attack_policy`) and `dice.py` (`roll_d100`), change 10's `overwhelm.py`
+      (`resolve_overwhelm`), and change 10c's `disengage.py` (`FLEE_SKILL_KEY`); create
+      `world/rules/monster_behaviour.py` and `world/rules/rulebook/monster_behaviour.yaml` as new files.
 - [ ] 1.2 Confirm the exact import paths for `world.rules.combat.{Battlefield,
       BattlefieldActionContext, effective_power, default_attack_policy}`, `world.rules.dice.roll_d100`,
       `world.rules.action.{ActionRequest, ActionResolver}`, `world.rules.overwhelm.resolve_overwhelm`,
-      `world.skills.registry.{SkillDef, SkillKind, TargetSpec, SKILL_REGISTRY}`, and
-      `world.lore.monsters.MONSTER_TIER_REGISTRY` against how changes 2/5/8/9/10 actually landed — no
-      code in this change should assume an unconfirmed symbol name before this step.
+      `world.rules.disengage.FLEE_SKILL_KEY`, `world.skills.registry.{SkillDef, SkillKind, TargetSpec,
+      SKILL_REGISTRY}`, and `world.lore.monsters.MONSTER_TIER_REGISTRY` against how changes 2/5/8/9/10/10c
+      actually landed — no code in this change should assume an unconfirmed symbol name before this step.
+- [ ] 1.4 Confirm `world/rules/action.py`'s `ActionContext`/`BattlefieldActionContext` instances expose a
+      settable `event_context` attribute per change 10c's own D-3/D-7 convention, so the flee branch
+      (task 7.4) can populate `context.event_context = {"battlefield": battlefield}` correctly.
 - [ ] 1.3 Confirm `typeclasses/monsters.py`'s actual `Monster.threat_tier`/`Monster.behaviour_tree`
       attribute shapes and placeholder default values against how change 3 actually landed, so
       `resolve_behaviour_profile()`'s "unset" check (task 3.2) tests the real placeholder value, not an
@@ -23,20 +26,25 @@
       inline comment naming the `world_info.md` examples that justify each mapping (point to design.md
       D-1/D-2/D-3, do not restate the full derivation).
 - [ ] 2.2 Author the `archetypes` table per design.md D-2: `instinctive`, `pack_hunter`, `brute`,
-      `tactical_caster`, `apex_predator`, each declaring `target_strategy`, `skill_choice`, and
-      `prefer_area_when_multiple_enemies`.
+      `tactical_caster`, `apex_predator`, each declaring `target_strategy`, `skill_choice`,
+      `prefer_area_when_multiple_enemies`, and `flee_hp_fraction` (per design.md D-6:
+      `0.50`/`0.25`/`0.10`/`0.15`/`null` respectively), with an inline comment pointing to design.md D-6's
+      grounding table (do not restate the full derivation).
 - [ ] 2.3 Implement a small loader in `world/rules/monster_behaviour.py`
       (`MONSTER_BEHAVIOUR_YAML = yaml.safe_load(...)`), mirroring change 9's `COMBAT_YAML` and change
       10's `OVERWHELM_YAML` loader pattern exactly.
 - [ ] 2.4 Test: every `tier_default_archetype` value exists as a key in `archetypes`; every
       `MONSTER_TIER_REGISTRY` key has exactly one `tier_default_archetype` entry; no two tiers share the
       same default archetype; at least one `archetypes` entry is not any tier's default (the named-example
-      override slot, `tactical_caster`).
+      override slot, `tactical_caster`); every archetype's `flee_hp_fraction` is `None` or a float
+      strictly between `0.0` and `1.0`; the `low`/`mid`/`high` tier defaults' `flee_hp_fraction` values
+      strictly decrease in that order and the `calamity` tier default's is `None` (per the
+      `monster-behaviour-profile` capability's flee-threshold requirement).
 
 ## 3. Behaviour profile resolution (`world/rules/monster_behaviour.py`)
 
 - [ ] 3.1 Implement `BehaviourProfile` (frozen dataclass: `target_strategy: str`, `skill_choice: str`,
-      `prefer_area_when_multiple_enemies: bool`) per design.md D-2.
+      `prefer_area_when_multiple_enemies: bool`, `flee_hp_fraction: float | None`) per design.md D-2/D-6.
 - [ ] 3.2 Implement `resolve_behaviour_profile(monster) -> BehaviourProfile` per design.md D-1: reads
       `monster.behaviour_tree`, treating its change-3 placeholder ("unset") value as falsy; when set,
       looks it up directly in `MONSTER_BEHAVIOUR_YAML["archetypes"]`; when unset, looks up
@@ -88,21 +96,33 @@
 ## 7. The decision tree and action_provider entry point (`world/rules/monster_behaviour.py`)
 
 - [ ] 7.1 Implement `monster_behaviour_policy(entity, battlefield) -> ActionRequest | None` per
-      design.md D-2/D-5: delegates to `combat.default_attack_policy(entity, battlefield)` when `entity`
-      has no `threat_tier` attribute; otherwise finds living enemies (task 5.1, returning `None` if
-      empty), resolves the behaviour profile (task 3.2), splits owned damage skills (task 4.1) into
-      `SINGLE`/`AREA` groups, decides the area-vs-single shape per design.md D-2's exact rule (prefer
-      area when configured AND >1 living enemy AND an area skill is owned; OR fall back to area when no
-      single-target skill is owned at all), and builds the `ActionRequest` — `targets="all-enemies"` for
-      the area branch, `targets=[chosen_target]` for the single branch — with
-      `context=BattlefieldActionContext(battlefield)`. Returns `None` when no eligible damage skill
-      exists in either group.
+      design.md D-2/D-5/D-6: delegates to `combat.default_attack_policy(entity, battlefield)` when
+      `entity` has no `threat_tier` attribute; otherwise finds living enemies (task 5.1, returning `None`
+      if empty), resolves the behaviour profile (task 3.2), runs the flee check (task 7.4) and returns its
+      result immediately if it fires, otherwise splits owned damage skills (task 4.1) into `SINGLE`/`AREA`
+      groups, decides the area-vs-single shape per design.md D-2's exact rule (prefer area when configured
+      AND >1 living enemy AND an area skill is owned; OR fall back to area when no single-target skill is
+      owned at all), and builds the `ActionRequest` — `targets="all-enemies"` for the area branch,
+      `targets=[chosen_target]` for the single branch — with `context=BattlefieldActionContext(battlefield)`.
+      Returns `None` when no eligible damage skill exists in either group.
 - [ ] 7.2 Confirm (grep-based check, mirroring changes 9/10's own discipline) that
       `world/rules/monster_behaviour.py` contains no reference to `combat_modifiers`,
       `evaluate_combat_modifiers`, `actions_per_turn`, `entity.buffs`, or `entity.sexual` — the
       zeroed-actions gate is entirely change 9's `run_round()`'s job, never duplicated here.
 - [ ] 7.3 Confirm (grep-based check) that `world/rules/monster_behaviour.py` imports nothing from
       `world/ai/` and contains no reference to an LLM-client module or network call.
+- [ ] 7.4 Implement the flee check per design.md D-6: reads `entity.traits.hp.value`/`.max`; if
+      `profile.flee_hp_fraction is not None` and the current-hp fraction is at or below it, builds a
+      `BattlefieldActionContext(battlefield)`, sets `context.event_context = {"battlefield": battlefield}`,
+      and returns `ActionRequest(actor=entity, skill_key=disengage.FLEE_SKILL_KEY, targets=[entity],
+      context=context)`. Stateless — reads only current entity/battlefield state, stores nothing between
+      calls. Returns `None`-sentinel (i.e. does not fire) otherwise, letting the caller (task 7.1) proceed
+      to the area-vs-single branch.
+- [ ] 7.5 Confirm (grep-based check) that `world/rules/monster_behaviour.py` contains no persistent
+      per-entity or per-encounter flee-attempt bookkeeping (no new dict/set/attribute tracking "has this
+      entity already tried to flee") — the flee check (task 7.4) is the only place `flee_hp_fraction` is
+      read, and it is read fresh from `entity.traits.hp` on every call, per design.md D-6's stateless
+      resolution.
 
 ## 8. Tests
 
@@ -134,16 +154,36 @@
       zeroed-`actions_per_turn` fixture (reusing change 9's own `combat_modifiers`-driven test pattern)
       confirms `monster_behaviour_policy` is never invoked for that combatant's turn and an
       `"action_skipped"` entry appears instead.
+- [ ] 8.7 `world/rules/tests/test_monster_behaviour_flee.py` — per the flee-decision requirement: the flee
+      branch fires and returns the exact `ActionRequest` shape (task 7.4's assertions) when hp fraction is
+      at or below threshold; it does not fire, and normal target/skill selection proceeds instead, when hp
+      fraction is above threshold; `flee_hp_fraction: None` never fires regardless of hp; the check is
+      stateless (task 7.4's/7.5's determinism — two consecutive calls at the same low hp fraction both
+      return a `flee` request, with no suppression on the second call); resolving the returned request via
+      `ActionResolver.resolve()` reaches change 10c's `disengage` handler and, on success, adds the
+      entity's key to `battlefield.fled` with no other code in this module involved in that write.
+- [ ] 8.8 `world/rules/tests/test_monster_behaviour_flee_golden.py` — per the golden-flee-threshold
+      requirement: one fixed-seed test per archetype (`instinctive`, `pack_hunter`, `brute`,
+      `tactical_caster`, `apex_predator`) asserting the fire/no-fire boundary at exactly its
+      `flee_hp_fraction` and one hp point above it, `apex_predator` never firing, and reproducibility
+      across two runs under the same seed.
+- [ ] 8.9 Extend `test_monster_behaviour_integration.py` (task 8.6) with a compressed-loop flee case: a
+      `Monster` at or below its flee threshold inside `overwhelm.resolve_overwhelm(battlefield,
+      monster_behaviour_policy, max_rounds)` resolves without stalling, and a successful flee is reflected
+      in `battlefield.fled` by the time `resolve_overwhelm()` returns — per the flee-decision capability's
+      compressed-loop compatibility scenario.
 
 ## 9. Verification
 
 - [ ] 9.1 Run the full `world/rules/tests/` suite added by this change and confirm every test passes.
 - [ ] 9.2 Confirm this change modifies no file authored by any earlier change — `git diff --stat` against
       the pre-change tree shows only new files under `world/rules/monster_behaviour.py`,
-      `world/rules/rulebook/monster_behaviour.yaml`, and `world/rules/tests/`.
-- [ ] 9.3 Confirm change 9's own test suites (`test_golden_combat.py`, `test_initiative_and_turn_loop.py`)
-      and change 10's own test suites still pass unmodified — this change never edits `combat.py`,
-      `dice.py`, `overwhelm.py`, or either's `rulebook/*.yaml`.
+      `world/rules/rulebook/monster_behaviour.yaml`, and `world/rules/tests/`. In particular, confirm no
+      edit to `world/rules/disengage.py` (change 10c) — this change only imports `FLEE_SKILL_KEY` from it.
+- [ ] 9.3 Confirm change 9's own test suites (`test_golden_combat.py`, `test_initiative_and_turn_loop.py`),
+      change 10's own test suites, and change 10c's own test suites (including its `disengage` rollback
+      and golden escape/no-escape tests) still pass unmodified — this change never edits `combat.py`,
+      `dice.py`, `overwhelm.py`, `disengage.py`, or any of their `rulebook/*.yaml` files.
 - [ ] 9.4 Confirm change 8's own no-combat-branching tripwire suite (`test_no_combat_branching.py`) still
       passes unmodified — this change never touches `action.py`, `targeting.py`, or `event_log.py`.
 - [ ] 9.5 Run `openspec validate monster-behaviour --strict` and confirm it passes.

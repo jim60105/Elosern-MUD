@@ -9,10 +9,14 @@ left it `None` ever since. Without this change, the change-16 milestone's claim 
 game" is not true: every monster in the game, regardless of `MonsterTier`, fights identically and
 predictably, which is the exact gap change 9's own Risks section named this change to close.
 
-This change is scoped narrowly: it is monster **combat decision-making** only — which target to engage
-and which owned skill to cast, each round, expressed as an `ActionRequest` for change 8's
+This change is scoped narrowly: it is monster **combat decision-making** only — which target to engage,
+which owned skill to cast, and (per an amendment folded in after change 10c, `combat-disengage`, landed)
+when to attempt to flee instead — each round, expressed as an `ActionRequest` for change 8's
 `ActionResolver` to resolve exactly as it would any other actor's action. It does not invent loot,
-dialogue, scheduling, or any generative behaviour.
+dialogue, scheduling, or any generative behaviour, and it does not build the flee *mechanism* itself —
+change 10c owns the `flee` skill, its success formula, and `Battlefield.fled`'s writer; this change owns
+only the decision of when an archetype attempts it, the extension point change 10c's own design named
+this change to fill.
 
 ## What Changes
 
@@ -26,13 +30,24 @@ dialogue, scheduling, or any generative behaviour.
   input source wired up yet, for instance), the function delegates to change 9's own
   `default_attack_policy` unmodified — this change only changes monster decision quality, nothing else's.
 - Add `world/rules/rulebook/monster_behaviour.yaml`: the tier→archetype default mapping and every
-  archetype's tunable parameters (target strategy, skill-choice strategy, area-skill preference), as
-  data, per design doc D9 — no balance-relevant number is a Python literal.
-- A small, fully deterministic decision tree (Python structure, YAML-tuned leaves): decide
-  single-target vs. area-target this round, pick a target (or rely on `"all-enemies"` shorthand for
-  area), pick which owned `damage:*`-effect skill to cast. Any tie-break this tree needs (e.g. two
-  enemies at exactly equal hp) draws from change 9's seeded `dice.roll_d100()` wrapper, never Python's
-  `random` module directly, so golden fixed-seed tests can assert exact, reproducible decisions.
+  archetype's tunable parameters (target strategy, skill-choice strategy, area-skill preference, and —
+  per the amendment below — a per-archetype `flee_hp_fraction`), as data, per design doc D9 — no
+  balance-relevant number is a Python literal.
+- A small, fully deterministic decision tree (Python structure, YAML-tuned leaves): decide whether to
+  flee this round (per the amendment below), else decide single-target vs. area-target, pick a target
+  (or rely on `"all-enemies"` shorthand for area), pick which owned `damage:*`-effect skill to cast. Any
+  tie-break this tree needs (e.g. two enemies at exactly equal hp) draws from change 9's seeded
+  `dice.roll_d100()` wrapper, never Python's `random` module directly, so golden fixed-seed tests can
+  assert exact, reproducible decisions.
+- **Amendment (post-acceptance, following change 10c's landing)**: a per-archetype `flee_hp_fraction:
+  float | None` tunable and one new decision-tree branch, evaluated before the single-vs-area decision,
+  that returns an `ActionRequest` invoking change 10c's innately-owned `flee` skill (with
+  `event_context={"battlefield": battlefield}` populated, per that change's own required convention) once
+  the acting monster's current-hp fraction falls at or below its archetype's threshold. The check is
+  stateless — re-evaluated fresh every turn from current hp, with no "already attempted" memory — and the
+  four thresholds are calibrated per tier (史萊姆-tier `instinctive` flees earliest; 古龍-tier
+  `apex_predator` never flees), not a single shared number. See design.md D-6 for the full grounding and
+  for why re-evaluation (not persistence) is the resolution to change 10c's own deferred question.
 - Every decision is expressed as a single `ActionRequest` handed to `ActionResolver.resolve()` — this
   change adds no new effect handler, no new `RejectReason`, and no edit to
   `action.py`/`targeting.py`/`event_log.py`. It relies entirely on change 8's existing pipeline and
@@ -66,8 +81,9 @@ dialogue, scheduling, or any generative behaviour.
 - None. `openspec/specs/` is empty (no earlier change has been archived yet), and this change edits no
   file authored by any earlier change — it only reads change 2's `MONSTER_TIER_REGISTRY`, change 3's
   `Monster.threat_tier`/`behaviour_tree` attributes, change 5's `SkillDef`/`SKILL_REGISTRY`, change 8's
-  `ActionRequest`/`ActionResolver`, and change 9's `Battlefield`/`BattlefieldActionContext`/
-  `effective_power()`/`dice.roll_d100()`/`default_attack_policy`, all as their already-public surfaces.
+  `ActionRequest`/`ActionResolver`, change 9's `Battlefield`/`BattlefieldActionContext`/
+  `effective_power()`/`dice.roll_d100()`/`default_attack_policy`, and change 10c's
+  `disengage.FLEE_SKILL_KEY`, all as their already-public surfaces.
 
 ## Impact
 
@@ -80,9 +96,11 @@ dialogue, scheduling, or any generative behaviour.
   `effective_power()`, `dice.roll_d100()`, and `default_attack_policy` (the function this change
   supersedes for `Monster` entities specifically); change 10 (`overwhelm-resolution`) for
   `resolve_overwhelm()`'s `action_provider` contract, which this change's policy must satisfy without
-  modification; transitively, change 8 (`action-resolver`) for `ActionRequest`/`ActionResolver.resolve()`,
-  change 5 (`skills-equipment`) for `SkillDef`/`SkillHandler.effective_value()`, and change 2
-  (`lore-world-data`) for `MONSTER_TIER_REGISTRY`.
+  modification; **change 10c (`combat-disengage`)** for `FLEE_SKILL_KEY` and the `disengage`/
+  `INNATE_SKILL_KEYS` mechanism the flee branch invokes — read-only reuse, no edit to `disengage.py`;
+  transitively, change 8 (`action-resolver`) for `ActionRequest`/`ActionResolver.resolve()`, change 5
+  (`skills-equipment`) for `SkillDef`/`SkillHandler.effective_value()`, and change 2 (`lore-world-data`)
+  for `MONSTER_TIER_REGISTRY`.
 - **Consumers deferred to later changes**: none named by this change — `monster_behaviour_policy()` is
   itself a leaf consumer of changes 2/3/5/8/9/10's existing surfaces, not a new seam for anything else to
   build against. Whoever eventually wires up a live, player-input-driven combat command (not on the
