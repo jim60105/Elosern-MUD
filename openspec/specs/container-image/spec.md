@@ -6,21 +6,26 @@ Define the Podman container image and Compose deployment for the Evennia service
 
 ### Requirement: Multi-stage Containerfile
 The project SHALL provide a Podman-focused multi-stage `Containerfile`: a downloader stage that
-verifies the init binary, a builder stage that installs Python dependencies using
-architecture-scoped Buildah cache mounts, an application-layout stage that prepares the runtime
-tree and permissions, and a final stage that carries only the resulting virtual environment, init
-binary, and application code. Full `COPY --link` layer reuse SHALL target Podman 5.6 or later with
-Buildah 1.41 or later.
+verifies the init binary, a builder stage that installs the dependencies locked by `uv.lock` using
+`uv sync --locked` and architecture-scoped Buildah cache mounts, an application-layout stage that
+prepares the runtime tree and permissions, and a final stage that carries only the resulting
+virtual environment, init binary, and application code. Full `COPY --link` layer reuse SHALL
+target Podman 5.6 or later with Buildah 1.41 or later.
 
 #### Scenario: Builder artifacts do not reach the runtime image
 - **WHEN** the image is built with `podman build` from the `Containerfile`
-- **THEN** the final image contains no compiler toolchain, no pip download cache, and no build-only
+- **THEN** the final image contains no compiler toolchain, no uv download cache, and no build-only
   dependency that is not required to run `evennia start`
 
 #### Scenario: Repeated builds reuse the dependency layer
-- **WHEN** the image is rebuilt after only application code changed (no dependency file changed)
+- **WHEN** the image is rebuilt after only application code changed (neither `pyproject.toml` nor
+  `uv.lock` changed)
 - **THEN** the dependency-install step is reused from the Buildah layer cache, and its
-  architecture-scoped UV cache mount remains available if the step must execute again
+  architecture-scoped uv cache mount remains available if the step must execute again
+
+#### Scenario: Stale dependency metadata fails the image build
+- **WHEN** `pyproject.toml` and `uv.lock` disagree during an image build
+- **THEN** `uv sync --locked` fails instead of resolving or changing dependencies implicitly
 
 #### Scenario: Final artifacts use independent linked layers
 - **WHEN** a final-stage base or metadata instruction changes without changing the venv, init

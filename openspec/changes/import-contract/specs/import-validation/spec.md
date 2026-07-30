@@ -1,20 +1,21 @@
 ## ADDED Requirements
 
 ### Requirement: validate.py provides a CLI that validates one or more record files
-`world/imports/validate.py` SHALL be runnable as `python -m world.imports.validate <files...>`,
+`world/imports/validate.py` SHALL be runnable as
+`uv run --locked -m world.imports.validate <files...>`,
 accepting one or more JSON file paths (including shell-expanded globs such as `cards/*.json`),
 classifying each by its required `record_type` field as a character record or a world-info record,
 validating each against the corresponding schema and semantic rules, and printing a report naming,
 for every issue, which record, which field, and why.
 
 #### Scenario: A clean batch of files exits successfully
-- **WHEN** `python -m world.imports.validate` is run against a set of files that all pass every
-  reject-level check
+- **WHEN** `uv run --locked -m world.imports.validate` is run against a set of files that all
+  pass every reject-level check
 - **THEN** the process exits with status 0 and the report shows no rejections for any file
 
 #### Scenario: Any single rejection in the batch causes a non-zero exit
-- **WHEN** `python -m world.imports.validate` is run against a set of files where exactly one file
-  fails a reject-level check
+- **WHEN** `uv run --locked -m world.imports.validate` is run against a set of files where
+  exactly one file fails a reject-level check
 - **THEN** the process exits with a non-zero status, and the report identifies that specific file,
   the specific field that failed, and the reason
 

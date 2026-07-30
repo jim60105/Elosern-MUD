@@ -113,7 +113,8 @@
       a `degraded_checks: list[DegradedCheck]` field populated from task 4.6a's
       `collect_degraded_checks()`, and a way to retrieve the validated character records for
       `loader.py`'s use.
-- [ ] 4.10 Implement the `python -m world.imports.validate <files...>` CLI entry point: reads file
+- [ ] 4.10 Implement the
+      `uv run --locked -m world.imports.validate <files...>` CLI entry point: reads file
       arguments (glob-expanded by the shell before this process sees them), calls `validate_batch`.
       Per design.md D-5's "Degraded-mode banner": if `report.degraded_checks` is non-empty, print
       the banner block **first, before any per-record output**, naming every degraded check and its
@@ -246,8 +247,9 @@
 
 - [ ] 8.1 Run the full `world/imports/tests/` and `world/lore/tests/test_sexual_vocab.py` suites and
       confirm all tests pass.
-- [ ] 8.2 Run `python -m world.imports.validate world/imports/examples/example_character.json` from
-      a shell and confirm it exits 0, that the degraded-mode banner appears (since
+- [ ] 8.2 Run
+      `uv run --locked -m world.imports.validate world/imports/examples/example_character.json`
+      from a shell and confirm it exits 0, that the degraded-mode banner appears (since
       `world/skills/registry.py` does not exist in this repository yet) naming `skill-registry`
       before the per-record report, and that the per-record report itself is clean — matching what
       tasks 7.7 and 7.4a assert programmatically.

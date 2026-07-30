@@ -25,7 +25,23 @@ client at `http://localhost:4001`.
 `OLLAMA_BASE_URL` and `SD_WEBUI_BASE_URL` configure external services. They are not containerized
 by this project.
 
+## Develop locally
+
+Use uv `0.12.0` or newer. This checkout pins uv's interpreter selection to Python `3.13` in
+`.python-version`. Install the locked project dependencies with:
+
+```sh
+uv sync --locked
+```
+
+Use `uv add <package>` and `uv remove <package>` to change dependencies so that `pyproject.toml`
+and `uv.lock` stay synchronized. The `--locked` commands intentionally fail when those files
+disagree.
+
 ## Test
 
-Run the contrib matrix regression check with `python -m unittest discover tests` in an environment
-that installed `requirements.txt`.
+Run the contrib matrix regression check in the uv-managed environment:
+
+```sh
+uv run --locked -m unittest discover tests
+```

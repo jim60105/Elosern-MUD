@@ -43,10 +43,9 @@ ENV UV_LINK_MODE=copy \
 
 WORKDIR /build
 
-RUN uv venv "$VIRTUAL_ENV"
-COPY --chown=root:0 requirements.txt ./
+COPY --chown=root:0 pyproject.toml uv.lock ./
 RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
-    uv pip install --requirement requirements.txt
+    uv sync --locked --no-dev --no-install-project
 
 ########################################
 # Application layout stage

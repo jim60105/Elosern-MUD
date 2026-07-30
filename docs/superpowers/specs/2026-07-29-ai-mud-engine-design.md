@@ -143,8 +143,8 @@ from-scratch engine.
 | `rules/dice.py` | `evennia.contrib.rpg.dice` — `roll()` (module `dice.py`) | **Use directly** for the d100 roller — `roll(1, 100, ...)` or the string form `"1d100"` |
 | Front-end panel | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed) | **Configure + plugin.** Edit `goldenlayout_default_config.js`, add an OOB receiver |
 
-> **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (`pip install evennia`; requires
-> Python >=3.12, imports and CLI both verified in an isolated venv) — the version that was actually
+> **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (imports and CLI both verified in an
+> isolated uv environment; requires Python >=3.12) — the version that was actually
 > installed, superseding the unverified matrix that previously stood here (sourced from
 > `tmp/evennia.md`, a secondary research document). Four corrections were made against that
 > document: (1) `evadventure` lives under `contrib.tutorials`, not `contrib.rpg`; (2) no
@@ -268,7 +268,7 @@ Frozen at change 4 and handed to the import implementer.
 ```
 world/imports/
 ├── schema.py       CHARACTER_SCHEMA_V1 / WORLD_SCHEMA_V1
-├── validate.py     CLI: python -m world.imports.validate cards/*.json
+├── validate.py     CLI: uv run --locked -m world.imports.validate cards/*.json
 ├── loader.py       instantiate only after validation passes
 └── examples/       one valid reference card
 ```
@@ -573,7 +573,9 @@ any room referencing that archetype hits the cache
 **Worker contract** — the swap point:
 
 ```python
-ART_WORKER_CMD = ["python", "-m", "tools.art_worker"]
+import sys
+
+ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
 # stdin  ← [{archetype, scene_sentence, out_path}, …]
 # stdout → [{archetype, status, path, error}, …]
 ```

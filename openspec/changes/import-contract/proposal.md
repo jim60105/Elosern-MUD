@@ -40,7 +40,8 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
   its `sexual_baseline` enum constraints now; change 7 (`sexual-state`) is expected to import the
   same tuples for its ordered-level `Trait` subclass rather than redefining the ladder — see design
   doc D-6 for why this avoids a circular dependency between change 4 and change 7.
-- Add `world/imports/validate.py`: a CLI (`python -m world.imports.validate cards/*.json`)
+- Add `world/imports/validate.py`: a CLI
+  (`uv run --locked -m world.imports.validate cards/*.json`)
   implementing the design doc §5.3 reject/warn table exactly — `age`/`apparent_age`, `race`/
   `subrace` registry existence (including the `subrace.race_key == race` cross-check change 2's
   design.md flagged as an open item for this change), `skills` registry existence (pluggable —
