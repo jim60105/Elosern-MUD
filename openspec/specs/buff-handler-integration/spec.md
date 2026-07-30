@@ -1,5 +1,8 @@
-## ADDED Requirements
+# buff-handler-integration Specification
 
+## Purpose
+TBD - created by archiving change buffs-rulebook. Update Purpose after archive.
+## Requirements
 ### Requirement: entity.buffs is mounted as the real BuffHandler, replacing the change-3 placeholder
 `LivingEntity` SHALL mount `evennia.contrib.rpg.buffs.BuffHandler` as a read-only computed property named
 `entity.buffs`, replacing change 3's `None`-defaulting `AttributeProperty` placeholder. `entity.buffs`
@@ -50,8 +53,9 @@ sole purpose is being detectable as present (a marker buff).
 ### Requirement: A rate-of-change modifier can be conferred from one entity to another as a buff
 instance carrying a source and a scale
 `world/rules/buffs.py` SHALL provide `grant_conferred_growth_rate(entity, source_key, scale)`, which
-applies a `conferred_growth_rate` buff instance to `entity` via `BuffHandler.add()`, carrying the
-supplied `source_key` and `scale`. This function SHALL perform no ownership or resource check — it is a
+applies the single `RulebookBuff` class via `BuffHandler.add()`, using a source-qualified instance key
+and `to_cache` data carrying `definition_key="conferred_growth_rate"`, the supplied `source_key`, and
+the supplied `scale`. This function SHALL perform no ownership or resource check — it is a
 plain, unconditional data write, mirroring change 5's `grant_conferred()` for `ConferredSkillGrant`. The
 conferred growth-rate modifier SHALL NOT be represented as a new dataclass parallel to change 5's
 `ConferredSkillGrant`; it SHALL be represented as a `BuffHandler`-managed buff instance.

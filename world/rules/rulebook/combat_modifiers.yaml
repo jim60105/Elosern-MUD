@@ -1,0 +1,15 @@
+- id: poison_agility_penalty
+  when: {buff_active: poisoned}
+  then: {agility: "-10%"}
+- id: paralysis_locks_actions
+  when: {buff_active: paralysis}
+  then: {actions_per_turn: 0}
+- id: fear_agility_and_accuracy_penalty
+  when: {buff_active: fear}
+  then: {agility: "-15%", accuracy: -10}
+- id: high_arousal_agility_accuracy_penalty
+  when: {field: arousal, gte: 高度}
+  then: {agility: "-20%", accuracy: -15}
+- id: climax_in_progress_locks_actions
+  when: {field: climax_phase, equals: 進行中}
+  then: {actions_per_turn: 0}

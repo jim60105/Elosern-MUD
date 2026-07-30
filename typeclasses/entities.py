@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from evennia.contrib.base_systems.components import ComponentHolderMixin
+from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.contrib.rpg.traits import TraitHandler
 from evennia.objects.objects import DefaultCharacter
 from evennia.typeclasses.attributes import AttributeProperty
@@ -23,7 +24,6 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
 
     # Declared handler seams; their owning changes replace these placeholders.
     sexual: Any | None = AttributeProperty(default=None)  # sexual-state
-    buffs: Any | None = AttributeProperty(default=None)  # buffs-rulebook
     relations: Any | None = AttributeProperty(default=None)  # unassigned
     persona: Any | None = AttributeProperty(default=None)  # import-contract candidate
 
@@ -31,6 +31,11 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     def traits(self) -> TraitHandler:
         """Persistent deterministic trait storage."""
         return TraitHandler(self)
+
+    @lazy_property
+    def buffs(self) -> BuffHandler:
+        """Persistent status-effect handler."""
+        return BuffHandler(self)
 
     @lazy_property
     def equipment(self) -> EquipmentHandler:

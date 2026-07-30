@@ -19,12 +19,13 @@ own ad hoc mechanism.
 - Mount `evennia.contrib.rpg.buffs.BuffHandler` directly as `entity.buffs` on `LivingEntity`
   (`typeclasses/entities.py`), replacing change 3's placeholder `AttributeProperty` — the same
   handler-mount replacement pattern change 5 already used for `entity.skills`/`entity.equipment`.
-  `entity.buffs` **is** the handler; no raw payload is ever assigned to the bare `buffs` name. Duration,
-  tick, and stacking are the contrib's own job (§4: "use directly") — this change defines only the
-  setting's buff definitions and the glue connecting them to `TraitHandler` and the rulebook.
+  `entity.buffs` **is** the handler; no raw payload is ever assigned to the bare `buffs` name. The
+  contrib owns persistence, duration, and refresh. Deterministic ticking remains an explicit callable
+  for the future world clock; YAML `tick_interval` is persisted clock metadata rather than enabling a
+  second real-time scheduler.
 - Add `world/rules/rulebook/`: a small, shared declarative rule-engine skeleton (`schema.py` — `Rule`,
   a condition grammar covering event/field-threshold/field-changed/buff-presence checks, a YAML loader,
-  and a pure `evaluate()` function) that this change's own `combat_modifiers.yaml` table runs on, and
+  and a pure `evaluate_condition()` function) that this change's own `combat_modifiers.yaml` table runs on, and
   that change 7's future `sexual.yaml` is expected to import rather than reinvent. Every rule in a table
   this change owns carries an `id`; every `id` has exactly one named unit test (design doc §10).
 - Add `world/rules/rulebook/combat_modifiers.yaml` and `world/rules/combat_modifiers.py`: a seed table
@@ -43,7 +44,9 @@ own ad hoc mechanism.
   `conferred_growth_rate` — the mechanism inherited from change 5's D-6, modeling Elosia's partial
   magic-growth-rate conferral onto Violet as a buff instance carrying a `source_key` and a `scale`,
   applied via `entity.buffs.add(...)`, exposed through a pure query function,
-  `growth_rate_multiplier(entity)`, for change 11b (`character-progression`) to read.
+  `growth_rate_multiplier(entity)`, for change 11b (`character-progression`) to read. Evennia 6.1
+  requires `BuffHandler.add()` to receive a buff class, so definitions share one `RulebookBuff` class
+  and carry their logical definition/source data in the handler's persistent instance cache.
 - Declare, but do not build, three seams: the sexual state machine's own transitions (change 7), the
   `ActionResolver` step that checks a buff forbids an action and calls the cast-time 統御術-style grant
   creation (change 8), and the world clock's fixed settlement order that ticks buff durations relative to
@@ -53,7 +56,7 @@ own ad hoc mechanism.
 ## Capabilities
 
 ### New Capabilities
-- `rulebook-schema`: the shared condition grammar, YAML loader, `evaluate()` function, and the
+- `rulebook-schema`: the shared condition grammar, YAML loader, `evaluate_condition()` function, and the
   rule-ID-to-test-name discipline every rule table in the project must follow.
 - `buff-handler-integration`: `entity.buffs` mounted as the real `BuffHandler`, the setting's `BaseBuff`
   subclass(es) driven by `buffs.yaml`, the rate/bounds/decay modifier application against `TraitHandler`,
@@ -62,7 +65,7 @@ own ad hoc mechanism.
   one condition engine across buff-presence and sexual-field-threshold conditions with no branching.
 
 ### Modified Capabilities
-- None. `openspec/specs/` is currently empty (changes 1–5 have not been archived yet).
+- None.
 
 ## Impact
 

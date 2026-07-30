@@ -2,6 +2,7 @@
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from evennia.contrib.rpg.buffs import BuffHandler
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
@@ -24,11 +25,11 @@ class LivingEntityTests(EvenniaTest):
                 self.assertIsNone(entity.subrace)
                 for seam in (
                     "sexual",
-                    "buffs",
                     "relations",
                     "persona",
                 ):
                     self.assertIsNone(getattr(entity, seam))
+                self.assertIsInstance(entity.buffs, BuffHandler)
                 self.assertIsInstance(entity.equipment, EquipmentHandler)
                 self.assertIsInstance(entity.skills, SkillHandler)
                 self.assertEqual(entity.traits.all(), [])

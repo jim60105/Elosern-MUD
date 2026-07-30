@@ -1,0 +1,19 @@
+- key: poisoned
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  modifiers:
+    rate: {target: hp, delta: -5}
+- key: paralysis
+  duration: 30
+  stacking: refresh
+  modifiers: {}
+- key: fear
+  duration: 60
+  stacking: refresh
+  modifiers: {}
+- key: conferred_growth_rate
+  duration: null
+  stacking: unique_per_source
+  modifiers:
+    rate: {target: magic_level_growth, scale_from_source: true}

@@ -36,7 +36,7 @@ card actually narrates; none of their numeric or narrative content is authoritat
 - A resolved, justified answer to the three-consumer problem (sexual transitions, combat modifiers, buff
   effects) — see D-1 through D-4 below — that gives change 7 a concrete engine to import rather than
   reinvent, and gives change 9 a concrete query function to call.
-- `world/rules/rulebook/schema.py`: the shared condition grammar, YAML loader, and `evaluate()` function,
+- `world/rules/rulebook/schema.py`: the shared condition grammar, YAML loader, and `evaluate_condition()` function,
   with the rule-ID-to-test-name discipline design doc §10 requires built into the structure, not left to
   reviewer diligence.
 - `world/rules/rulebook/combat_modifiers.yaml` + `world/rules/combat_modifiers.py`: a seed table (poison,
@@ -72,8 +72,8 @@ card actually narrates; none of their numeric or narrative content is authoritat
   right number given buff state; wiring it into an XP-gain event is change 11b's job, not this change's
   (see Open Questions for the sequencing note this leaves).
 - No exhaustive status-effect catalogue. A representative seed set (poison, paralysis, fear, conferred
-  growth rate) exercises every modifier category (rate, bounds, decay, marker-only) at least once; this
-  is not a catalogue of every status effect the finished game will ever need.
+  growth rate) exercises rate and marker-only behavior while reserving the documented bounds/decay
+  vocabulary for later definitions; this is not an exhaustive catalogue.
 - No backward-compatibility, migration, or deprecation handling — the project is unreleased with zero
   users, and `world/rules/` currently contains only change 3's `traits.py`.
 
@@ -103,7 +103,7 @@ sexual transitions gain unused adjustment-bundle fields, or combat modifiers gai
 delta/irreversible-flag shape — both directions invent structure nobody needs.
 
 **Decision**: `world/rules/rulebook/schema.py` defines and exports exactly the shared `when` grammar
-(`Condition`, `evaluate_condition()`) plus the generic rule-loading/ID-discipline machinery
+(`Condition`, a mapping type alias, and `evaluate_condition()`) plus the generic rule-loading/ID-discipline machinery
 (`Rule` as `{id, when, then}` where `then` is an opaque `dict` this module never interprets), and this
 change's own `combat_modifiers.py` supplies the interpretation of `then` for its own table. Change 7 is
 expected to import `Condition`/`evaluate_condition()`/the loader for `sexual.yaml`, and supply its own
@@ -121,7 +121,7 @@ different mechanisms for "a timed thing that happens to an entity" (the contrib'
 tick scheduling, and a from-scratch condition-rule replaying itself every tick). **Decision**: `buffs.yaml`
 is a named-parameter table (buff key → its rate/bounds/decay configuration and contrib-facing tunables:
 duration, tick interval, stacking), not a `when`/`then` rule table, and does not run through
-`schema.py`'s `evaluate()` at all. `combat_modifiers.yaml` is the bridge between the two: its `when`
+`schema.py`'s `evaluate_condition()` at all. `combat_modifiers.yaml` is the bridge between the two: its `when`
 clause can name `buff_active: <key>` as a condition alongside `field`/`event` conditions, which is how
 "poison and paralysis sit in the same table as arousal thresholds, with no special-case branch" (design
 doc D8) is achieved — one evaluator, two condition *kinds*, zero `if is_sexual_debuff` anywhere in
@@ -158,6 +158,8 @@ class Rule:
     id: str
     when: dict
     then: dict            # opaque here; interpreted by the owning table's module
+
+Condition = dict[str, Any]
 
 def load_rules(path: Path) -> list[Rule]:
     """Loads a YAML list of {id, when, then} mappings. Raises if any `id` is
@@ -254,7 +256,7 @@ no branch anywhere distinguishes a buff-presence row from a sexual-field row.
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
 
 def _build_context(entity) -> dict:
-    context = {"active_buffs": set(entity.buffs.all().keys())}  # exact BuffHandler
+    context = {"active_buffs": entity_active_buffs(entity)}
                                                                   # accessor name
                                                                   # flagged for
                                                                   # implementer
@@ -342,9 +344,9 @@ action-forbidding check — not modifying any field's rate, bound, or decay dire
 
 ```python
 # world/rules/buffs.py
-"""BuffHandler mount and the setting's BaseBuff subclass(es), driven entirely by
-buffs.yaml -- per design doc S4, duration/tick/stacking are the contrib's job and
-are not reimplemented here."""
+"""BuffHandler mount and the setting's BaseBuff subclass, driven by buffs.yaml.
+The contrib owns persistence, duration, and refresh; deterministic ticking is
+an explicit future-clock seam, with tick_interval persisted as metadata."""
 
 class RulebookBuff(BaseBuff):
     """One concrete BaseBuff subclass, parameterized entirely by its buffs.yaml
@@ -360,8 +362,10 @@ class RulebookBuff(BaseBuff):
     rate/bounds/decay application below, per this project's established
     verify-before-trusting discipline (changes 1-5)."""
 
-    def at_tick(self):
-        definition = BUFF_DEFINITIONS[self.key]
+    tickrate = 0  # the future world clock invokes tick_buffs deterministically
+
+    def at_tick(self, initial=False, *args, **kwargs):
+        definition = BUFF_DEFINITIONS[self.definition_key]
         rate_mod = definition.modifiers.get("rate")
         if rate_mod:
             _apply_rate_modifier(self.owner, rate_mod)   # see below
@@ -386,10 +390,8 @@ _NO_OP_RATE_TARGETS = frozenset({"magic_level_growth"})
 def _apply_rate_modifier(entity, rate_mod: dict) -> None:
     """Applies a per-tick delta to rate_mod['target']. When the target is one
     of entity.traits' gauge keys (hp/mp/sp), this writes into StaticTrait/
-    GaugeTrait's mod component (change 3 D-7: reserved for BuffHandler,
-    additive only, never a multiplier) via TraitHandler's own Mod API --
-    flagged for implementer verification against the installed contrib's
-    exact Mod/GaugeTrait interface. When the target is in
+    GaugeTrait's current-value setter (additive only, never a multiplier);
+    the gauge clamps the result to its own bounds. When the target is in
     _NO_OP_RATE_TARGETS (currently just magic_level_growth), this function
     returns immediately and applies nothing -- that target's value is read by
     PULL, through growth_rate_multiplier(entity) (change 11b's
@@ -410,8 +412,8 @@ def _apply_rate_modifier(entity, rate_mod: dict) -> None:
 def entity_active_buffs(entity) -> set[str]:
     """Thin wrapper naming the exact BuffHandler accessor this change's other
     modules (combat_modifiers.py) read -- isolates the one place that needs
-    updating if the confirmed contrib API differs from BuffHandler.all()."""
-    return set(entity.buffs.all().keys())
+    updating if the confirmed contrib API differs from BuffHandler.all."""
+    return {buff.definition_key for buff in entity.buffs.all.values()}
 
 def blocks_action(entity) -> bool:
     """Declared seam for change 8's ActionResolver step 4 ('buffs forbidding
@@ -465,7 +467,16 @@ def grant_conferred_growth_rate(entity, source_key: str, scale: float) -> None:
     'casts' this conferral, analogous to 統御術's cast-time creation) is
     expected to call this after its own validation succeeds -- this function
     is the seam, not the cast."""
-    entity.buffs.add("conferred_growth_rate", source_key=source_key, scale=scale)
+    definition_key = "conferred_growth_rate"
+    entity.buffs.add(
+        RulebookBuff,
+        key=f"{definition_key}:{source_key}",
+        to_cache={
+            "definition_key": definition_key,
+            "source_key": source_key,
+            "scale": scale,
+        },
+    )
 
 def growth_rate_multiplier(entity) -> float:
     """Pure query, mirroring change 5's effective_value() discipline exactly:
@@ -477,8 +488,8 @@ def growth_rate_multiplier(entity) -> float:
     represent an entity's own base growth rate. Returns 1.0 (no modifier) if
     no growth-rate buff is active."""
     multiplier = 1.0
-    for buff in entity.buffs.all().values():           # exact accessor flagged
-        if buff.key == "conferred_growth_rate":          # for verification, D-4
+    for buff in entity.buffs.all.values():
+        if buff.definition_key == "conferred_growth_rate":
             multiplier *= buff.scale
     return multiplier
 ```
@@ -544,7 +555,8 @@ condition grammar and the effect vocabulary work today, independent of change 7.
 claim the rule will work against a *real* `SexualState`: a stub can be shaped however the test author
 likes, and proves the matcher, not the eventual integration. A separate, **self-arming integration
 test**, `test_high_arousal_rule_fires_once_sexual_state_exists()`
-(`pytest.importorskip("world.rules.sexual_state")`), is therefore also required, living in its own test
+(`unittest.skipUnless` around a guarded real `world.rules.sexual_state` import), is therefore also
+required, living in its own test
 module so it cannot be quietly folded into or dropped alongside the unit test: it skips — reported as
 skipped, not passed — for the entire lifetime of this change and until change 7 lands, at which point it
 starts asserting the rule fires against a genuinely live `entity.sexual`. A verification task confirms
@@ -589,11 +601,10 @@ silently wrong" discipline change 4's D-5 applied to its own skill-registry self
   sexual-state-field target remains a live, accepted risk — no buff targeting a sexual field exists yet
   (change 7/8's own artifacts confirm this explicitly), so it stays a genuine `NotImplementedError` until
   something makes it reachable the same way changes 11/11b did here.
-- **[Risk] `BuffHandler`'s exact accessor names (`all()`, `.add()`, the default `dbkey`) are assumed, not
-  confirmed against a locally installed Evennia 6.1.0 package.** → Flagged for implementer verification
-  throughout D-3/D-4/D-5, consistent with changes 1–5's identical discipline for every other
-  Evennia-contrib API assumption; design doc §4 confirms the classes exist and are usable directly, not
-  every method name.
+- **[Resolved] Evennia 6.1's exact API is verified.** `BuffHandler.all` is a property returning
+  `{instance_key: BaseBuff instance}`; `add()` requires a buff class, accepts `key=` for the stored
+  instance key and `to_cache=` for persistent instance data, and `BaseBuff.at_tick(initial, ...)` is the
+  tick hook. The implementation uses one class plus cached definition/source data.
 - **[Risk] Marker-only buffs (`paralysis`, `fear`) carry an empty `modifiers: {}` in `buffs.yaml`, which
   could look like a forgotten entry rather than a deliberate "presence-only" design to a future reader.**
   → Mitigation: D-4 documents the reasoning inline in the YAML's own comments and in this design doc;
@@ -631,8 +642,4 @@ operational:
   directly?** Left to change 7's own author to decide when `SexualState`'s concrete field API exists;
   this change's `NotImplementedError` branch names change 7 explicitly rather than guessing at its
   eventual interface.
-- **Exact `BuffHandler`/`BaseBuff` method and hook names** (`.all()`, `.add()`, `at_tick`, the default
-  `dbkey`) are left to the implementer to confirm against the installed Evennia 6.1.0
-  `evennia.contrib.rpg.buffs` source, consistent with the verification discipline changes 1–5 already
-  established — design doc §4 confirms the classes exist and are usable directly, but does not itself
-  pin every method signature.
+- **Exact `BuffHandler`/`BaseBuff` method and hook names** are resolved above and are no longer open.
