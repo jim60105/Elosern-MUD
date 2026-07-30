@@ -1,0 +1,1 @@
+"""Static world data package."""
