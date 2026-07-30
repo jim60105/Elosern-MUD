@@ -93,7 +93,7 @@ in either correction round.
 
 ## Decisions
 
-### D-1. `LivingEntity(ComponentHolderMixin, DefaultCharacter)`.
+### D-1. `LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter)`.
 
 Design doc §4's row for `typeclasses/entities.py` names `evennia.contrib.base_systems.components` —
 `Component`, `ComponentHolderMixin`, `ComponentProperty` — with the note that `QuestGiver` /
@@ -116,6 +116,11 @@ by changes 1 and 2 for any Evennia base-class or hook assumption: confirm `Defau
 monsters/NPCs don't need. Rejected because it would diverge from the `LLMNPC(DefaultCharacter)` base
 §4 already commits a later change to, forcing an awkward multiple-inheritance reconciliation in
 change 19 instead of a clean subclass.
+
+The generated project already routes all located typeclasses through its empty `ObjectParent`
+mixin so future common hooks can be added once. `LivingEntity` retains that seam between
+`ComponentHolderMixin` and `DefaultCharacter`; the installed Evennia 6.1.0 MRO and lifecycle hooks
+are covered by the integration tests.
 
 ### D-2. `Monster` gets its own file, `typeclasses/monsters.py` — a small, judgment-call extension
 to design doc §3.2's tree.
@@ -368,11 +373,11 @@ at resolution time by whichever module computes effective combat power (change 5
 resolution and/or change 9's combat math), reading `entity.traits.<key>.value` as an input and
 producing a separate, transient effective value for that one calculation.
 
-This change adds a regression test (tasks 6.3 and 7.5) asserting that `build_initial_traits()` /
-`build_initial_traits_for_monster_tier()` never return a static-trait value outside the exact
-`StaticBand`/`static_band` range for the race/tier being constructed — a value in the tens-of-
-thousands range (i.e., a skill multiplier accidentally baked in) fails this test immediately, since
-it falls far outside any documented band.
+This change adds regression tests (tasks 6.3 and 7.5) asserting that each pre-subrace static
+baseline stays inside the exact `StaticBand`/`static_band` range and each post-subrace result equals
+its documented fractional adjustment. A subrace modifier may legitimately cross the original band
+edge and is not clamped; a value in the tens of thousands (i.e., a baked-in skill multiplier) still
+fails immediately because it cannot equal that documented adjustment.
 
 **Alternative considered**: storing the skill-multiplied "effective" value directly in
 `entity.traits` and letting combat read it as-is. Rejected — this is exactly the error this
@@ -502,9 +507,9 @@ that its owning change hasn't designed yet.
 - **[Risk] A future reader could re-derive `atk_phys`/`agility`/`defense` from `vital_baseline`
   again, reintroducing the exact 100×-instead-of-10× error this correction fixed.** → Mitigation:
   D-4 documents the two independently-scaling axes explicitly, with the concrete human/elf numbers
-  from `world_info.md`, and the test suite (task 6.3) asserts every static trait value stays inside
-  `RaceProfile.static_baseline`'s own band — a value produced by any hp-derived ratio would fall far
-  outside that band and fail immediately.
+  from `world_info.md`, and the test suite (task 6.3) asserts every pre-subrace baseline stays
+  inside `RaceProfile.static_baseline`'s own band — a value produced by any hp-derived ratio would
+  fall far outside that band and fail immediately.
 - **[Risk] Applying `Subrace.static_modifiers` before the race baseline exists, or blending
   `vital_overrides` instead of replacing, would silently corrupt subrace-adjusted values.** →
   Mitigation: D-5 fixes and documents the exact order, and task 6.5 asserts the `foxkin` MP override
@@ -512,9 +517,8 @@ that its owning change hasn't designed yet.
   (`30`).
 - **[Risk] A future edit could store a skill-multiplied "effective" value directly into
   `entity.traits`, reintroducing the `88000`-instead-of-`88` error this correction fixed.** →
-  Mitigation: D-7's range-check regression test (tasks 6.3 and 7.5) asserts every constructed static
-  trait value stays inside its race's/tier's documented band; an accidentally-multiplied value
-  (three orders of magnitude larger) fails immediately.
+  Mitigation: D-7's regression tests (tasks 6.3 and 7.5) assert in-band baselines and exact
+  post-subrace fractional adjustments; an accidentally-multiplied value fails immediately.
 - **[Risk] A caller could request a `STATIC_TIER_REGISTRY` tier that belongs to a different race
   than the entity being constructed (e.g. `human_swordmaster` on an elf), silently producing a
   human-scale value on a race it was never documented for.** → Mitigation: `build_initial_traits()`

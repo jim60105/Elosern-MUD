@@ -1,10 +1,15 @@
-## ADDED Requirements
+## Purpose
+
+Define the shared living-entity typeclass hierarchy and its deferred integration seams.
+
+## Requirements
 
 ### Requirement: LivingEntity is the shared base for characters, NPCs, and monsters
 `typeclasses/entities.py` SHALL define a `LivingEntity` typeclass, mixing in
-`ComponentHolderMixin` (`evennia.contrib.base_systems.components`) and a Evennia character base,
-that is the common ancestor of `PlayerCharacter`, `NPC`, and `Monster`. No other typeclass in the
-project SHALL duplicate the trait-mounting or handler-declaration logic `LivingEntity` provides.
+`ComponentHolderMixin` (`evennia.contrib.base_systems.components`), the generated project's
+`ObjectParent` common-hook seam, and an Evennia character base, that is the common ancestor of
+`PlayerCharacter`, `NPC`, and `Monster`. No other typeclass in the project SHALL duplicate the
+trait-mounting or handler-declaration logic `LivingEntity` provides.
 
 #### Scenario: Every subclass inherits from LivingEntity
 - **WHEN** `PlayerCharacter`, `NPC`, and `Monster` are inspected
@@ -49,9 +54,9 @@ design doc §5.2 names for that class.
 
 #### Scenario: Monster exposes threat_tier, loot_table, and behaviour_tree
 - **WHEN** a `Monster` instance is created
-- **THEN** it has `threat_tier`, `loot_table`, and `behaviour_tree` attributes; `threat_tier` holds
-  a real `MonsterTier` key used to derive its trait values, while `loot_table` and
-  `behaviour_tree` are present but carry only a default placeholder value
+- **THEN** it has `threat_tier`, `loot_table`, and `behaviour_tree` attributes; `threat_tier`
+  defaults to `None` until a caller assigns a real `MonsterTier` key and explicitly populates
+  traits, while `loot_table` and `behaviour_tree` carry only default placeholder values
 
 ### Requirement: Non-trait LivingEntity handlers are declared seams, not implementations
 `LivingEntity` SHALL declare `sexual`, `buffs`, `equipment`, `skills`, `relations`, and `persona`

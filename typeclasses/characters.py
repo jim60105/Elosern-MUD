@@ -1,26 +1,17 @@
-"""
-Characters
+"""Player character typeclasses from design section 5.2 (entity-traits)."""
 
-Characters are (by default) Objects setup to be puppeted by Accounts.
-They are what you "see" in game. The Character class in this module
-is setup to be the "default" character type created by the default
-creation commands.
+from evennia.typeclasses.attributes import AttributeProperty
 
-"""
-
-from evennia.objects.objects import DefaultCharacter
-
-from .objects import ObjectParent
+from .entities import LivingEntity
 
 
-class Character(ObjectParent, DefaultCharacter):
-    """
-    The Character just re-implements some of the Object's methods and hooks
-    to represent a Character entity in-game.
+class PlayerCharacter(LivingEntity):
+    """A player-controlled living entity with deferred progression seams."""
 
-    See mygame/typeclasses/objects.py for a list of
-    properties and methods available on all Object child classes like this.
+    guild_rank: str | None = AttributeProperty(default=None)
+    quest_log: list = AttributeProperty(default=list)
+    wallet: int = AttributeProperty(default=0)
 
-    """
 
-    pass
+class Character(PlayerCharacter):
+    """Evennia's conventional default-character path."""

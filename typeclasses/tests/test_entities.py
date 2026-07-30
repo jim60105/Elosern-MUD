@@ -1,0 +1,61 @@
+"""Integration tests for the living-entity hierarchy."""
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.characters import PlayerCharacter
+from typeclasses.entities import LivingEntity
+from typeclasses.monsters import Monster
+from typeclasses.npcs import NPC
+from typeclasses.objects import ObjectParent
+
+
+class LivingEntityTests(EvenniaTest):
+    def test_every_subclass_instantiates_and_exposes_base_seams(self):
+        for typeclass in (LivingEntity, PlayerCharacter, NPC, Monster):
+            with self.subTest(typeclass=typeclass.__name__):
+                entity = create_object(typeclass, key=typeclass.__name__)
+                self.assertIsInstance(entity, ObjectParent)
+                self.assertIsNotNone(entity.components)
+                self.assertIsNotNone(entity.signals)
+                self.assertIsNone(entity.race)
+                self.assertIsNone(entity.subrace)
+                for seam in (
+                    "sexual",
+                    "buffs",
+                    "equipment",
+                    "skills",
+                    "relations",
+                    "persona",
+                ):
+                    self.assertIsNone(getattr(entity, seam))
+                self.assertEqual(entity.traits.all(), [])
+                self.assertIsNone(entity.db.disguised_stats)
+
+    def test_representative_entities_resolve_all_eight_traits(self):
+        player = create_object(PlayerCharacter, key="elf")
+        player.race = "elf"
+        player.subrace = "ciaran"
+        player.apply_race_baseline()
+
+        npc = create_object(NPC, key="foxkin")
+        npc.race = "beastfolk"
+        npc.subrace = "foxkin"
+        npc.apply_race_baseline()
+
+        monster = create_object(Monster, key="calamity")
+        monster.threat_tier = "calamity"
+        monster.apply_monster_tier()
+
+        expected = {
+            "hp",
+            "mp",
+            "sp",
+            "atk_phys",
+            "agility",
+            "defense",
+            "magic_level",
+            "guild_merit",
+        }
+        for entity in (player, npc, monster):
+            self.assertEqual(set(entity.traits.all()), expected)

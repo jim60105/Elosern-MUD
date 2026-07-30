@@ -1,16 +1,24 @@
 ## ADDED Requirements
 
 ### Requirement: LivingEntity mounts TraitHandler with the setting's eight-key trait set
-`LivingEntity` SHALL mount `evennia.contrib.rpg.traits.TraitHandler` as `entity.traits`, containing
-exactly eight traits with the trait types design doc §5.2 specifies: `hp`, `mp`, `sp` as
+`LivingEntity` SHALL mount `evennia.contrib.rpg.traits.TraitHandler` as `entity.traits`. Before a
+caller's explicit identity-population step, the handler SHALL be empty because `race`, `subrace`,
+or `threat_tier` is not known during generic Evennia object creation. After
+`apply_race_baseline()` or `apply_monster_tier()` succeeds, it SHALL contain exactly eight traits
+with the trait types design doc §5.2 specifies: `hp`, `mp`, `sp` as
 `GaugeTrait`; `atk_phys`, `agility`, `defense` as `StaticTrait`; `magic_level`, `guild_merit` as
 `CounterTrait`.
 
 #### Scenario: All eight traits are present with the correct type
-- **WHEN** `entity.traits` is inspected on any `LivingEntity` instance
+- **WHEN** `entity.traits` is inspected after a valid identity-population method succeeds
 - **THEN** it contains exactly the keys `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`,
   `magic_level`, `guild_merit`, and each resolves to an instance of the trait type design doc §5.2
   specifies for that key
+
+#### Scenario: A generically created entity is explicitly uninitialized
+- **WHEN** Evennia creates a `LivingEntity` before a caller assigns its race or threat tier
+- **THEN** `entity.traits` exists but is empty, and population fails clearly if invoked without
+  the required identity key
 
 #### Scenario: Gauge traits carry a max and a regen rate
 - **WHEN** `entity.traits.hp`, `entity.traits.mp`, or `entity.traits.sp` is inspected
@@ -159,10 +167,10 @@ band.
   own `static_band`/`hp_band` values are higher than `MONSTER_TIER_REGISTRY["low"]`'s — not because
   a multiplier was applied to derive one from the other
 
-#### Scenario: A Monster cannot be constructed without a resolvable threat_tier
-- **WHEN** a `Monster` is initialized with a `threat_tier` value that does not exist in
+#### Scenario: A Monster cannot be populated without a resolvable threat_tier
+- **WHEN** trait population is requested for a `Monster` whose `threat_tier` does not exist in
   `MONSTER_TIER_REGISTRY`
-- **THEN** initialization raises an error rather than silently defaulting to an arbitrary trait
+- **THEN** population raises an error rather than silently defaulting to an arbitrary trait
   scale
 
 #### Scenario: A Monster's mp, sp, and magic_level default to zero, not an invented value
@@ -208,16 +216,18 @@ no maximum, since no lore source specifies a merit cap.
 
 ### Requirement: Every stored static trait value is a base value, never a skill-multiplied value
 Every `atk_phys`/`agility`/`defense` value `world/rules/traits.py` derives or `TraitHandler` stores
-SHALL be a base value falling within the constructing race's or monster tier's documented
-`StaticBand`/`static_band` range. This change SHALL NOT apply, and SHALL NOT provide any mechanism
+SHALL be a base value. Its pre-subrace baseline SHALL fall within the constructing race's or
+monster tier's documented `StaticBand`/`static_band` range. Post-subrace values SHALL equal the
+documented fractional adjustment exactly; they MAY cross the original band edge and SHALL NOT be
+clamped. This change SHALL NOT apply, and SHALL NOT provide any mechanism
 that applies, a skill multiplier (×10/×100/×1000) to a value before it is stored in `entity.traits`.
 
-#### Scenario: A freshly constructed entity's static traits never exceed the documented band
+#### Scenario: Baselines stay in-band and subrace adjustments remain auditable
 - **WHEN** any `PlayerCharacter`, `NPC`, or `Monster` is constructed via this change's derivation
   functions
-- **THEN** every one of `entity.traits.atk_phys`, `agility`, `defense`'s base values falls within
-  the exact `StaticBand`/`static_band` range documented for that race/tier — none falls in a range
-  that would only be reachable by applying a ×10/×100/×1000 skill multiplier first
+- **THEN** each pre-subrace baseline is within the exact documented band, and each post-subrace
+  value equals `round(baseline * (1 + documented_delta))` rather than a value reachable only by
+  applying a ×10/×100/×1000 skill multiplier first
 
 #### Scenario: No module added by this change contains skill-multiplier application logic
 - **WHEN** `world/rules/traits.py` is inspected
