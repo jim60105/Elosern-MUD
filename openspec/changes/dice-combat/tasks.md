@@ -50,7 +50,9 @@
 
 - [ ] 5.1 Implement `effective_power(entity) -> float` per design.md D-4: sum of
       `entity.skills.effective_value()` for `atk_phys`/`agility`/`defense`/`magic_level`, multiplied by
-      `max(entity.traits.hp.value, 0)`. Confirm it assigns to no entity attribute (pure query, mirroring
+      `max(entity.traits.hp.max, 0)` — the race/tier hp ceiling, NOT `entity.traits.hp.value` (current
+      hp was considered and rejected; see design.md D-4's elf-at-1-hp counterexample against the
+      recalibrated to-hit formula). Confirm it assigns to no entity attribute (pure query, mirroring
       change 5's `effective_value()` and change 6's `evaluate_combat_modifiers()` discipline).
 - [ ] 5.2 Construct the four worked reference cases from design.md D-4 (human elite, elf, mid-tier
       monster, high-tier monster vs. sword-master) as fixtures reusable by both this task group's tests
@@ -127,8 +129,10 @@
 - [ ] 9.4 `world/rules/tests/test_effective_power.py` — per the `effective_power` requirement: reads
       through `effective_value()` (a multiplier-active fixture proves this); the elf/human-elite ratio
       is at least 100; the mid-tier-monster/human-elite ratio is greater than 1 but well below 100;
-      `effective_power()` strictly decreases as current hp drops (not at zero); a dead entity (`hp ==
-      0`) returns exactly `0`.
+      `effective_power()` is unchanged when only `entity.traits.hp.value` (current hp) changes; it does
+      change when an `effective_value()` output changes (a multiplier skill activating, a disguise
+      dropping); and the elf-at-low-current-hp counterexample from design.md D-4 — computed with `.max`
+      hp, the elf/human ratio does not flip toward the human.
 - [ ] 9.5 `world/rules/tests/test_battlefield_action_context.py` — per the `battlefield-action-context`
       capability: full protocol conformance; `relation_to()`'s three-way truth table over team
       membership; `is_present()`/`is_in_range()` both keyed on `battlefield.fled`; the out-of-range

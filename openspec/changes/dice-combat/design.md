@@ -254,8 +254,8 @@ the exact band edges are not.
 body-enhancement skill's ×100/×1000 apply at resolution time rather than needing to be baked into a
 stored stat (hard requirement 3).
 
-### D-4. `effective_power(entity) = (atk_phys + agility + defense + magic_level) × hp`, every stat read
-through `effective_value()`, `hp` read as the entity's **current** value.
+### D-4. `effective_power(entity) = (atk_phys + agility + defense + magic_level) × max_hp`, every stat
+read through `effective_value()`, `hp` read as the entity's **race/tier maximum**, not current.
 
 Design doc §5.1 is explicit about why `hp` must be an input: elves scale ~100× in vital pools but only
 ~10× in static combat stats, so a stat-only ratio would show "only" a 10× gap and fail to flag an
@@ -268,14 +268,14 @@ def effective_power(entity) -> float:
         entity.skills.effective_value(key)
         for key in ("atk_phys", "agility", "defense", "magic_level")
     )
-    hp = max(entity.traits.hp.value, 0)
-    return stats * hp
+    max_hp = max(entity.traits.hp.max, 0)
+    return stats * max_hp
 ```
 
 **Worked check against the task's own reference points**, confirming the function does what §5.1
 requires:
 
-| Entity | stats sum (via `effective_value`) | hp (current) | `effective_power` |
+| Entity | stats sum (via `effective_value`) | hp (max) | `effective_power` |
 |---|---|---|---|
 | human elite (Lidzia 8/9/7, magic ~40) | 64 | 120 | 7,680 |
 | elf (Yuka 88/92/90, magic ~250) | 520 | 10,000 | 5,200,000 |
@@ -295,13 +295,50 @@ numbers are illustrative of the function's *shape*, not a claim about where chan
 set its threshold — **this change does not implement the overwhelm check itself** (Non-Goal); it only
 proves `effective_power()` produces ratios that a `≥100`/`≤0.01` threshold can meaningfully act on.
 
-**Why `hp` is multiplied in, not added, and why current (not max) hp.** Addition would let a
-high-stat, near-death entity still read as powerful right up until it drops to zero — exactly the
-"can't flag the mismatch" problem restated. Multiplication means a fighter's power collapses toward
-zero as their own hp does, which is also why **current** hp (not the race/tier baseline) is used:
-design doc §6.3 says the overwhelm ratio is "recomputed every round" specifically to "handle mid-fight
-power-tier shifts" — a fight that turns because one side is nearly dead is exactly such a shift, and
-`effective_power()` needs to be sensitive to it, not frozen at whatever the combatant's starting hp was.
+**Why `hp` is multiplied in, not added.** Addition would let a high-stat, near-death entity still read
+as powerful right up until it drops to zero — exactly the "can't flag the mismatch" problem restated.
+Multiplication means a fighter's contribution to the ratio is genuinely bounded by their own
+durability, not just their offense.
+
+**Why max hp, not current hp — corrected during review, and the failure case that forced the
+correction.** An earlier draft of this function used **current** `entity.traits.hp.value`, reasoning
+that design doc §6.3's "recomputed every round" language meant the ratio should track live combat
+state, including hp attrition. That reading does not survive contact with this change's own
+recalibrated to-hit formula (D-2), and the counterexample is exact: take an elf reduced to 1 current hp
+against a full-health human elite. Current-hp `effective_power` gives the elf `(88+92+90+250) × 1 =
+520` and the human `(8+9+7+10) × 120 = 4,080` — a ratio that says the *human* overwhelms the *elf* by
+roughly 8×. But D-2's own saturation analysis says that human's hit rate against that elf is **0%,
+fully saturated** — the human cannot land a single blow, ever, regardless of the elf's hp. A
+current-hp-driven ratio would hand change 10 a signal telling it to resolve the fight, in one shot, in
+favor of the one combatant mathematically incapable of connecting. That is not a corner case this
+function can wave away; it is the direct, mechanical consequence of letting a *depleting* resource
+drive a *power* comparison symmetrically in both directions.
+
+**What §6.3's "recomputed every round" actually protects, and why max hp still serves it.** The design
+doc's own example is not hp attrition — it is "such as dropping a disguise," i.e. a combatant's
+`effective_value()` output changing because a stat-multiplier skill (×100 身體強化, ×1000 身體超強化)
+activates or a disguise is dropped mid-fight. `effective_power()` is already fully sensitive to that:
+every stat in the sum is read through `effective_value()` at call time, so a mid-fight multiplier
+change is picked up on the very next recomputation with no additional mechanism needed. **Attrition is
+already represented elsewhere** — by the turn loop's own death check (`entity.traits.hp.value <= 0`)
+and by the hp gauge itself, which the to-hit/damage math (D-2/D-3) already consumes directly. It does
+not need a second representation inside a power-tier scalar, and folding it in there actively breaks
+that scalar the way the elf-at-1-hp case shows. `entity.traits.hp.max` (a race/tier-scaled ceiling
+change 2/3 already establish, not something this function invents) is therefore the correct durability
+term: it answers "how much punishment can this combatant's *kind* of body take," which is the
+100×-vs-10× asymmetry §5.1 actually asks `effective_power()` to encode, without being contaminated by
+how the current round happens to be going.
+
+**A finding for change 10, not a decision this change makes.** Because `effective_power()`'s ratio is
+now static across a fight except when `effective_value()` itself changes (a multiplier activating, a
+disguise dropping), it cannot by itself detect "this fight is already decided because one side is
+nearly dead but neither side's underlying stats changed." D-2's saturated hit rates (0%/100% at a ±50
+agility gap) are a second, independent, and cheaper signal of exactly that condition — no ratio
+computation needed, just the to-hit formula's own boundary. **Change 10's author should treat the power
+ratio and the saturation state as two separate signals, not assume the ratio alone is sufficient** —
+this change hands over the finding and the saturation-boundary numbers (D-2); it does not decide how
+change 10 should combine them, since designing the overwhelm threshold itself is explicitly out of this
+change's scope (Non-Goals).
 
 **Why a flat sum of the four stats, not a weighted combination.** No source document weights
 `atk_phys`/`agility`/`defense`/`magic_level` against each other — `world_info.md`'s own "此三項為全世界
@@ -568,9 +605,10 @@ rule IDs or origins, only the bundle's output keys.
 `action_provider`: `default_attack_policy(entity, battlefield)`, which selects a living, non-fled enemy
 (the lowest-hp one, for a deterministic and testable choice) and returns an `ActionRequest` for
 whichever `damage:*`-effect skill the entity owns, or `None` if it owns none. This is explicitly a
-placeholder, not an AI — real monster behaviour is out of scope for every change proposed so far and
-remains unclaimed by any roadmap item; this function exists only so the turn loop has *something*
-concrete to call and this change's own tests can exercise a full round without a human at the keyboard.
+placeholder, not an AI — real monster behaviour is now owned by change 10b (`monster-behaviour`,
+depends on 9, 10), added to the roadmap specifically to replace it; this function exists only so the
+turn loop has *something* concrete to call and this change's own tests can exercise a full round
+without a human at the keyboard.
 
 ### D-10. Golden fixed-seed tests: one normal exchange, one lopsided exchange.
 
@@ -601,10 +639,17 @@ and that no call to anything resembling `WorldClock.advance()` occurs anywhere i
   the correct integer (exact 50% parity given d100's inclusive `1..100` range), and the golden test
   (D-10, case 1) asserts the literal parity hit rate a same-agility fixture produces, which would fail
   if the constant drifted to `50`.
-- **[Risk] `effective_power()`'s flat-sum-times-hp shape and D-3's damage-band constants are both this
-  change's own invented placeholders, not sourced from `world_info.md`.** → Documented explicitly in
-  D-3/D-4 as judgment calls, flagged for change 10/16's eventual balance pass — the same disclosure
+- **[Risk] `effective_power()`'s flat-sum-times-max-hp shape and D-3's damage-band constants are both
+  this change's own invented placeholders, not sourced from `world_info.md`.** → Documented explicitly
+  in D-3/D-4 as judgment calls, flagged for change 10/16's eventual balance pass — the same disclosure
   discipline changes 5 (D-4) and 6 (D-3) already established for their own invented numbers.
+- **[Risk] `effective_power()`'s ratio alone is not a sufficient signal for change 10's overwhelm
+  threshold** — using max hp (corrected in D-4 from an earlier current-hp draft) means the ratio is
+  static across a fight except when `effective_value()` itself changes, so it cannot by itself detect a
+  fight that is already decided purely because one side is nearly dead. → Not this change's to fix
+  (designing the threshold is change 10's job, Non-Goals) — handed to change 10 as an explicit finding
+  in D-4: the power ratio and D-2's saturated to-hit rates are two independent signals, and change 10's
+  author should consider both rather than the ratio alone.
 - **[Risk] `is_in_range()`'s "still active in the encounter" check (D-7) is a real improvement over an
   unconditional `True`, but it still does not distinguish melee from ranged, meaning a `弓術` skill and
   a dagger both have identical range semantics today.** → Accepted and named explicitly: the data
@@ -614,9 +659,10 @@ and that no call to anything resembling `WorldClock.advance()` occurs anywhere i
   two named owners of the real gap.
 - **[Risk] The placeholder `default_attack_policy` (D-9) is not a real AI and always targets the
   lowest-hp living enemy — a predictable, exploitable pattern if it were ever mistaken for production
-  monster behaviour.** → Accepted and named explicitly as a placeholder with no claimant elsewhere in
-  the roadmap; `Monster.behaviour_tree` remains an open seam (change 3's own unbuilt declaration),
-  not something this change resolves.
+  monster behaviour.** → Accepted and named explicitly as a placeholder. `Monster.behaviour_tree`
+  remains an open seam (change 3's own unbuilt declaration); the coordinator has since added change 10b
+  (`monster-behaviour`, depends on 9, 10) to the roadmap as its named owner — not something this change
+  resolves.
 - **[Risk] Rolling dice inside the effect handler (step 5) rather than inside `apply()` (D-5) means a
   request rejected at a later step still consumes a `roll_d100()` call from the RNG stream.** →
   Accepted; no entity state is affected (change 8's atomicity guarantee is untouched), and this is
@@ -643,7 +689,10 @@ sequencing concerns are operational:
   the identical "declare here, populate a real registration later" split change 8 itself used for the
   registry as a whole.
 - Change 10 (`overwhelm-resolution`) is expected to call this change's `effective_power()` for its own
-  threshold check and to compress the multi-round `EventLog`s `run_battle()` produces.
+  threshold check and to compress the multi-round `EventLog`s `run_battle()` produces. **Per D-4's
+  finding**: the power ratio should not be change 10's only signal — D-2's saturated to-hit rates are a
+  second, independent, and cheaper indicator that a fight is already decided; this change hands over
+  the finding and the saturation-boundary numbers, not an implementation.
 - Change 11 (`world-clock`) is expected to read `BattleResult.total_seconds` and decide how to advance;
   nothing in this change calls `WorldClock.advance()` itself.
 - Change 12 (`map-anchor-grid`) is expected to supply the coordinates that let `is_in_range()` (D-7)
@@ -661,6 +710,10 @@ sequencing concerns are operational:
   implementer to confirm against the installed Evennia 6.1.0 package, consistent with the verification
   discipline changes 1-8 already established; the golden tests' fallback (seeding `random` directly)
   does not depend on the answer.
-- **Whether `default_attack_policy` (D-9) should be replaced the moment `Monster.behaviour_tree` is
-  ever built, or coexist as a "no behaviour tree assigned" fallback** — left open since no roadmap item
-  has yet claimed `Monster.behaviour_tree`'s implementation.
+- **Resolved: change 10b (`monster-behaviour`, depends on 9, 10) owns replacing `default_attack_policy`
+  with real monster AI.** No longer unclaimed — the coordinator added change 10b to the roadmap
+  specifically because `Monster.behaviour_tree` has been an unbuilt seam since change 3, and the
+  change-16 milestone's "complete playable game" claim needs better than "always attack the lowest-hp
+  enemy." Whether change 10b replaces `default_attack_policy` outright or keeps it as a "no behaviour
+  tree assigned" fallback for entities it doesn't cover is change 10b's own design decision, not fixed
+  here.
