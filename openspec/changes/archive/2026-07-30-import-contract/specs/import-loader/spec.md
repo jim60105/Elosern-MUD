@@ -3,7 +3,9 @@
 ### Requirement: loader.py instantiates entities only after batch validation reports zero rejections
 `world/imports/loader.py` SHALL run full batch validation (reusing `world.imports.validate`'s
 functions, not a separate re-implementation) before constructing any entity, and SHALL raise
-without constructing anything if the batch contains any rejection anywhere.
+without constructing anything if the batch contains any rejection anywhere. Construction SHALL
+run in one database transaction so a later runtime failure rolls back earlier objects. The public
+`instantiate_character()` SHALL validate its single input before constructing it.
 
 #### Scenario: A batch with one rejecting record constructs nothing, not even the valid records
 - **WHEN** `load_batch()` is called with three files, one of which fails a reject-level check
@@ -14,6 +16,14 @@ without constructing anything if the batch contains any rejection anywhere.
 - **WHEN** `load_batch()` is called with files that all pass every reject-level check
 - **THEN** one entity is constructed per character record, and world-info records (if any are in
   the same batch) do not produce entities
+
+#### Scenario: A construction failure rolls back earlier entities
+- **WHEN** validation passes but construction of a later character raises
+- **THEN** every entity already created for that batch is rolled back
+
+#### Scenario: Direct construction cannot bypass validation
+- **WHEN** `instantiate_character()` receives an age-17 record
+- **THEN** it raises `ImportRejected` before creating an entity
 
 ### Requirement: Loaded trait values are the literal imported stats, merged onto the race floor for omitted keys, never re-derived or multiplied
 `loader.py` SHALL populate a constructed entity's `entity.traits` by starting from
@@ -31,11 +41,10 @@ multiplying, or otherwise deriving it from another field.
 - **THEN** the constructed entity's `entity.traits.guild_merit` value equals
   `race_floor(RACE_REGISTRY[record_race])["guild_merit"]`
 
-#### Scenario: No loaded trait value falls in a range only reachable via a skill multiplier
-- **WHEN** any valid character record is loaded
-- **THEN** every one of `entity.traits.atk_phys`, `agility`, `defense`'s resulting values falls
-  within the race's or subrace-adjusted documented range for that stat, never a value three orders
-  of magnitude larger that would only be reachable by baking in a x1000 skill multiplier
+#### Scenario: The loader never applies a skill multiplier
+- **WHEN** a warning-only out-of-band static value is loaded
+- **THEN** the resulting trait equals that literal imported value; the loader never multiplies or
+  scales it, while the validation warning remains visible
 
 ### Requirement: Non-trait record fields are stored verbatim into the seam attributes without interpretation
 `loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and

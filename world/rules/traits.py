@@ -27,6 +27,7 @@ def race_floor(race: RaceProfile) -> dict[str, int]:
         "agility": race.static_baseline.agility[0],
         "defense": race.static_baseline.defense[0],
         "magic_level": 0,
+        "guild_merit": 0,
     }
 
 

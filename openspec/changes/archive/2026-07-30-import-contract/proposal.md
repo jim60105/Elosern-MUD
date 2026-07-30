@@ -46,8 +46,9 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
   `subrace` registry existence (including the `subrace.race_key == race` cross-check change 2's
   design.md flagged as an open item for this change), `skills` registry existence (pluggable —
   see below), `disguised_stats ⊆ stats` keys, `sexual_baseline` shape (reject, not warn — it is
-  typed per §5.3, unlike the plausibility-only `stats` check), `stats` inside the race's
-  plausible band (warn), and `persona` type-only. Import is **all-or-nothing** across every file
+  typed per §5.3, unlike the plausibility-only `stats` check), physical/vital `stats` inside the
+  race's plausible band (warn), `magic_level` at or below the race's hard cap (reject above it),
+  and `persona` type-only. Import is **all-or-nothing** across every file
   given on one CLI invocation: any single rejection anywhere in the batch fails the whole batch,
   and the report names which record, which field, and why. Whenever any check is running in
   degraded mode (currently: skill-key validation when the skill registry is unavailable — see
@@ -63,13 +64,14 @@ conflict explicitly (see design.md D-5) rather than leaving it for the implement
   implement skill effects, equipment slots, or the sexual state machine.
 - Add `world/imports/examples/example_character.json`: one valid, schema-compliant reference card
   — an adult (age 22, apparent_age 22) elf with a subrace, base-value stats using the `×1000`
-  notation correctly (base value stored, multiplier documented in a sibling comment field, never
-  baked in), a disguised-stats subset, and a fully-typed `sexual_baseline`. Covered by a permanent
+  notation correctly (base value stored and never baked in), a disguised-stats subset, and a
+  fully-typed `sexual_baseline`. Covered by a permanent
   test asserting it always validates cleanly.
 - **Resolves the change-5 ordering conflict** (design doc D-5): `skills`-key validation resolves
   the registry via a plain Python import of a forward-declared module path
   (`world.skills.registry.SKILL_REGISTRY`) that change 5 is expected to create. Until that module
-  exists, the import fails and the check degrades to a **warning**; once change 5 lands, the same
+  exists, the batch records the check as degraded and the CLI prints a prominent
+  **degraded-validation banner**; once change 5 lands, the same
   code starts rejecting unknown skill keys automatically, with no code change here. **No dependency
   on change 5 is added; design doc §11's dependency graph is unchanged.** A self-arming test
   (skipped while the registry is absent, active the moment it is importable) asserts an unknown

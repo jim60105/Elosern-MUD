@@ -228,42 +228,45 @@ contract frozen and handed off *before* waiting on change 5's completion.
    roadmap's stated parallel-track intent for changes 4–6, delays the "contract frozen, implementer
    can start" milestone by an entire change, and change 4 does not otherwise need anything change 5
    builds (`SkillHandler`, equipment slots) — only the *existence* of a key name.
-2. **Make skill-key validation pluggable, degrading to a warning until the registry exists.**
+2. **Make skill-key validation pluggable, recording degraded enforcement until the registry
+   exists.**
    Chosen.
 
 ```python
 def _resolve_skill_registry() -> Mapping[str, Any] | None:
     """Change 5 (skills-equipment) is expected to expose SKILL_REGISTRY at
     world.skills.registry. Until that module exists, this returns None and
-    every skill-key check below degrades from REJECT to WARNING (see D-5).
+    skill-key enforcement is reported through BatchReport.degraded_checks
+    and the CLI banner (see D-5).
     No code change is needed here once change 5 lands -- the import for a
     card with a bad skill key starts failing automatically, with no edit to
     this file, the moment world/skills/registry.py exists and exports
     SKILL_REGISTRY."""
     try:
-        from world.skills.registry import SKILL_REGISTRY
-    except ImportError:
+        module = importlib.import_module("world.skills.registry")
+    except ModuleNotFoundError as error:
+        if error.name not in {"world.skills", "world.skills.registry"}:
+            raise
         return None
-    return SKILL_REGISTRY
+    return module.SKILL_REGISTRY
 
-def _check_skills(record: dict) -> tuple[list[Issue], list[Issue]]:
+def _check_skills(record: dict) -> list[Issue]:
     rejections: list[Issue] = []
-    warnings: list[Issue] = []
     registry = _resolve_skill_registry()
+    if registry is None:
+        return rejections
     for key in (*record["skills"], *record["passives"]):
-        if registry is None:
-            warnings.append(Issue(
-                "skills", f"cannot verify {key!r} -- skill registry "
-                "(change 5, skills-equipment) is not available yet"))
-        elif key not in registry:
+        if key not in registry:
             rejections.append(Issue("skills", f"{key!r} not found in skill registry"))
-    return rejections, warnings
+    return rejections
 ```
 
 This is a genuine, self-upgrading pluggability mechanism, not a permanent softening: the check
-promotes itself from WARNING to REJECT the moment `world/skills/registry.py::SKILL_REGISTRY`
+promotes itself from explicitly degraded to REJECT the moment
+`world/skills/registry.py::SKILL_REGISTRY`
 exists on the Python path, with zero edits to this file. A test simulates both states with the
-import mocked — one run mocked to fail (asserts WARNING), one mocked to succeed and contain a
+import mocked — one run mocked to fail (asserts a batch-level degraded check), one mocked to
+succeed and contain a
 known-bad key (asserts REJECT) — so the degrade/promote *logic* itself is covered in isolation, not
 just one branch of it. This mocked test is necessary but not sufficient — see the two additions
 below, both added on review because a mock proves the logic works, not that anyone will ever notice
@@ -319,15 +322,22 @@ rejected only after weighing this risk explicitly. **Decision**: a second, separ
 *real* import, not a mock:
 
 ```python
-def test_skill_registry_rejects_unknown_key_once_available():
-    pytest.importorskip("world.skills.registry")  # skip -- change 5 not landed yet
+try:
     from world.skills.registry import SKILL_REGISTRY
+except ImportError:
+    SKILL_REGISTRY = None
+
+@unittest.skipUnless(SKILL_REGISTRY is not None, "skill registry has not landed yet")
+def test_skill_registry_rejects_unknown_key_once_available():
     assert "definitely_not_a_real_skill_xyz" not in SKILL_REGISTRY
-    rejections, _ = _check_skills({"skills": ["definitely_not_a_real_skill_xyz"], "passives": []})
-    assert rejections  # must reject, not warn, once the registry genuinely exists
+    rejections = _check_skills({"skills": ["definitely_not_a_real_skill_xyz"], "passives": []})
+    assert rejections  # must reject once the registry genuinely exists
 ```
 
-This test is a no-op (skipped) for the entire lifetime of this change's own review and everything
+The guarded import plus `unittest.skipUnless` is deliberate: this repository's Evennia test
+command uses unittest discovery, where module-level `pytest.importorskip()` is reported as an
+import error instead of a skip. This test is a no-op (skipped) for the entire lifetime of this
+change's own review and everything
 up to the moment change 5 lands — the same "no-op today, tripwire tomorrow" pattern change 3's D-9
 already used for its disguise-boundary source scan. Once `world/skills/registry.py` exists on the
 Python path with real content, this test stops skipping and starts asserting the promotion actually
@@ -455,14 +465,13 @@ def _check_stats_band(record: dict, race: RaceProfile, subrace: Subrace | None) 
         value = record["stats"].get(key)
         if value is not None and not (band[0] <= value <= band[1]):
             warnings.append(Issue("stats." + key, f"{value} outside {race.key}'s {key} band {band}"))
-    magic_level = record["stats"].get("magic_level")
-    if magic_level is not None and not (0 <= magic_level <= race.magic_cap):
-        warnings.append(Issue("stats.magic_level", f"{magic_level} exceeds {race.key}'s magic_cap {race.magic_cap}"))
     return warnings
 ```
 
 Every band comes from `world.lore.races.RACE_REGISTRY`/`Subrace.vital_overrides` — no literal
-number is written in `validate.py`. `guild_merit` has no lore-defined band (change 3: starts at 0
+number is written in `validate.py`. `magic_level` above `race.magic_cap` is rejected separately:
+the cap is a hard mechanical maximum, and accepting a higher value would let Evennia silently
+clamp the imported counter. `guild_merit` has no lore-defined band (change 3: starts at 0
 with no maximum) and is not band-checked. This is a **warning only** per §5.3: "prodigies
 legitimately exceed it" — an elf with `atk_phys: 120` (above the documented 70–95 `elf_common`
 band) is flagged, not rejected, consistent with `STATIC_TIER_REGISTRY["elf_prodigy"]`'s
@@ -493,15 +502,17 @@ def load_batch(paths: list[Path], typeclass: type = NPC) -> list[LivingEntity]:
     report = validate_batch(paths)          # runs schema.py + validate.py's checks over every file
     if not report.all_valid:                # any rejection anywhere in the batch
         raise ImportRejected(report)        # nothing is instantiated -- not even the clean records
-    return [
-        instantiate_character(record, typeclass)
-        for record in report.character_records
-    ]
+    with transaction.atomic():
+        return [
+            _instantiate_validated_character(record, typeclass)
+            for record in report.character_records
+        ]
 ```
 
 `ImportRejected` carries the full `BatchReport` (every record's rejections and warnings), so a
 caller can print the same "which record, which field, why" detail the CLI does, without re-running
-validation.
+validation. The public `instantiate_character()` also calls `validate_character()` before
+construction, so direct callers cannot bypass the adult gate or other rejection checks.
 
 ### D-12. `loader.py` writes literal imported stat values into `entity.traits`, merged onto
 `race_floor()` for any keys the card omits — never re-derived, never skill-multiplied.
@@ -522,9 +533,9 @@ def _resolve_trait_values(record: dict) -> dict[str, int]:
 
 This is the one place this change writes to `entity.traits`, and it never applies a ×10/×100/×1000
 skill multiplier — the same boundary change 3's D-7 established is carried forward unchanged. A
-test (task 6.4) asserts that for every valid record, `entity.traits.<key>.value` after loading
-equals exactly the imported `stats[<key>]` when present, and the race floor otherwise — never a
-scaled or multiplied value.
+test asserts that `entity.traits.<key>.value` after loading equals exactly the imported
+`stats[<key>]` when present, including warning-only physical prodigies, and the race floor
+otherwise — never a value scaled or multiplied by the loader.
 
 ### D-13. `loader.py` populates change 5/6/7's declared seam attributes with raw, uninterpreted,
 already-shape-validated data — and adds one new raw attribute, `entity.db.inventory`, with no
@@ -642,7 +653,7 @@ itself never looks like it's probing the edge), `race: "elf"`,
 `subrace: "ciaran"` (exercising the subrace cross-check, D-10), `stats` with all eight keys set
 (exercising both the literal-value path and the "every key present" case for `loader.py`'s merge
 logic, D-12), `disguised_stats` a proper subset of `stats`' keys, `skills`/`passives` non-empty
-(exercising the pluggable check, D-5, in its degraded/warning state as authored — no
+(exercising the pluggable check, D-5, in its explicitly degraded state as authored — no
 `world/skills/registry.py` exists yet), a fully-typed `sexual_baseline` with `arousal`, `virgin`,
 and `sensitivity` set (matching §5.3's own example shape) plus `wetness` set to demonstrate an
 optional field passing validation, and an opaque `persona` with the six sub-keys §5.2's

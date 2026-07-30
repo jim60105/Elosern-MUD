@@ -1,5 +1,8 @@
-## ADDED Requirements
+# import-validation Specification
 
+## Purpose
+TBD - created by archiving change import-contract. Update Purpose after archive.
+## Requirements
 ### Requirement: validate.py provides a CLI that validates one or more record files
 `world/imports/validate.py` SHALL be runnable as
 `uv run --locked -m world.imports.validate <files...>`,
@@ -85,11 +88,12 @@ also present in `stats`, naming the offending key(s).
 - **WHEN** a character record's `disguised_stats` keys are all also present in `stats`
 - **THEN** this check produces no rejection
 
-### Requirement: stats outside the race's plausible band produce a warning, never a rejection
+### Requirement: physical and vital stats outside plausible bands warn; magic above its cap rejects
 `validate.py` SHALL compare each present `stats` value against the corresponding band from
-`world.lore.races.RACE_REGISTRY[race].vital_baseline`/`static_baseline`/`magic_cap` (adjusted for
+`world.lore.races.RACE_REGISTRY[race].vital_baseline`/`static_baseline` (adjusted for
 `Subrace.vital_overrides` when a subrace with an override is present), and SHALL emit a warning —
-never a rejection — for any value outside that band.
+never a rejection — for any value outside that plausible band. `RaceProfile.magic_cap` is a hard
+mechanical maximum instead: `magic_level` above it SHALL be rejected before Evennia can clamp it.
 
 #### Scenario: A stat value outside the race's band produces a warning, not a rejection
 - **WHEN** a human character record has `"stats": {"atk_phys": 50, ...}` (above the human
@@ -108,6 +112,10 @@ never a rejection — for any value outside that band.
   50-70)
 - **THEN** no warning is produced for `stats.mp`, since the override band is what is checked
 
+#### Scenario: Magic above the race cap is rejected
+- **WHEN** an elf record has `stats.magic_level` greater than its registry `magic_cap`
+- **THEN** the record is rejected on `stats.magic_level`
+
 ### Requirement: sexual_baseline shape violations are rejections
 `validate.py` SHALL treat any `sexual_baseline` that fails `CHARACTER_SCHEMA_V1`'s structural
 constraints (missing required fields, or any level value outside its vocabulary) as a rejection,
@@ -118,17 +126,19 @@ distinct from the warning-only stats-band check.
 - **THEN** the record is rejected, naming the `sexual_baseline.shame` field — this does not appear
   in the report as a warning
 
-### Requirement: skills and passives are checked against a pluggable skill registry that degrades to a warning when the registry is unavailable
+### Requirement: skills and passives use a pluggable registry with explicit degraded-state reporting
 `validate.py` SHALL attempt to resolve a skill registry from `world.skills.registry.SKILL_REGISTRY`.
-When that module is not importable, every key in `skills` and `passives` SHALL produce a warning
-stating the registry is unavailable, never a rejection. When the module is importable, every key in
+When that module is not importable, the batch SHALL record `skill-registry` in
+`degraded_checks`, and the CLI SHALL expose it through the mandatory degraded-validation banner.
+Individual skill keys SHALL produce neither warnings nor rejections because no registry exists
+against which to judge them. When the module is importable, every key in
 `skills` or `passives` not found in the resolved registry SHALL produce a rejection.
 
-#### Scenario: Skill keys are warnings when the registry module does not exist
+#### Scenario: Skill validation is explicitly degraded when the registry module does not exist
 - **WHEN** `world.skills.registry` is not importable (as is the case for this change, since change
   5 has not been implemented) and a character record's `skills` includes `"fire_mastery"`
-- **THEN** a warning is produced naming `fire_mastery` and stating the registry is unavailable, and
-  this does not cause rejection
+- **THEN** the batch names `skill-registry` in `degraded_checks`, the CLI banner states why the
+  check is unavailable, and the record receives no per-key warning or rejection
 
 #### Scenario: An unknown skill key is a rejection once the registry is available
 - **WHEN** `world.skills.registry.SKILL_REGISTRY` is importable and does not contain the key
@@ -144,7 +154,9 @@ stating the registry is unavailable, never a rejection. When the module is impor
 Alongside the mocked-import test of the degrade/promote logic, the test suite SHALL include a test
 that checks whether `world.skills.registry.SKILL_REGISTRY` is genuinely importable in the current
 environment — skipping itself while it is not — and, once it genuinely is, asserts that an unknown
-skill key is rejected. This test SHALL NOT be satisfiable by a mock; it exists so that change 5
+skill key is rejected. The skip SHALL use a guarded real import with `unittest.skipUnless`, so
+Evennia's unittest discovery reports a skip instead of a module import error. This test SHALL NOT
+be satisfiable by a mock; it exists so that change 5
 cannot be considered complete while its registry leaves skill-key validation permanently lenient.
 
 #### Scenario: The self-arming test skips while the registry does not genuinely exist
@@ -176,3 +188,4 @@ Every rejection or warning `validate.py` reports SHALL include the record's `key
 - **WHEN** a character record with `"key": "example_npc"` fails the age gate
 - **THEN** the reported issue names `example_npc` (or its file path), the field `age`, and states
   the value found and the required minimum
+
