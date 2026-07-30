@@ -1,25 +1,30 @@
-## ADDED Requirements
+# event-log-compression Specification
 
-### Requirement: compress_event_logs drops roll-kind entries and preserves every other entry verbatim
+## Purpose
+TBD - created by archiving change overwhelm-resolution. Update Purpose after archive.
+## Requirements
+### Requirement: compress_event_logs drops redundant hit rolls and preserves miss and damage records
 `world/rules/overwhelm.py` SHALL provide `compress_event_logs(raw_logs, overwhelming_team,
 overwhelmed_team, rounds) -> tuple[EventLog, ...]`. For every input `EventLog`, every `EventEntry`
-whose `kind` equals `"roll"` SHALL be removed; every other `EventEntry` SHALL be preserved unchanged,
-in its original order, via `dataclasses.replace()` on the parent `EventLog` (never a live mutation of a
-frozen instance). `world/rules/event_log.py`'s `EventEntry`/`EventLog` dataclass definitions SHALL NOT
-be modified.
+whose `kind` equals `"roll"` and whose `data["hit"]` is truthy SHALL be removed because its successful
+outcome is duplicated by a paired `"damage"` entry. A `"roll"` entry whose `data["hit"]` is false
+SHALL be retained because the landed action pipeline emits no damage entry for a miss. Every other
+`EventEntry` SHALL be preserved unchanged, in its original order, via `dataclasses.replace()` on the
+parent `EventLog` (never a live mutation of a frozen instance). `world/rules/event_log.py`'s
+`EventEntry`/`EventLog` dataclass definitions SHALL NOT be modified.
 
-#### Scenario: A roll-kind entry is removed
+#### Scenario: A successful roll-kind entry is removed
 - **WHEN** `compress_event_logs()` processes an `EventLog` containing an `EventEntry` with
-  `kind="roll"`
+  `kind="roll"` and `data["hit"] is True`
 - **THEN** the returned, corresponding `EventLog`'s `entries` does not contain that entry
 
-#### Scenario: A damage-kind entry survives unchanged, including on a miss
-- **WHEN** `compress_event_logs()` processes an `EventLog` containing an `EventEntry` with
-  `kind="damage"` recording a miss (`data["hit"] is False`)
+#### Scenario: A miss roll survives unchanged
+- **WHEN** `compress_event_logs()` processes an `EventLog` containing a `kind="roll"` entry with
+  `data["hit"] is False`
 - **THEN** the returned `EventLog`'s `entries` contains that exact entry, unchanged
 
 #### Scenario: An EventLog left with no entries after filtering is dropped from the result
-- **WHEN** every `EventEntry` in a given input `EventLog` has `kind == "roll"`
+- **WHEN** every `EventEntry` in a given input `EventLog` is a successful `kind == "roll"` entry
 - **THEN** that `EventLog` does not appear in `compress_event_logs()`'s returned tuple
 
 #### Scenario: No edit to event_log.py's dataclasses
@@ -32,12 +37,11 @@ compressed encounter
 `compress_event_logs()` SHALL prepend exactly one new `EventLog` whose single `EventEntry` has
 `kind="overwhelm_resolution"`, `actor` equal to `overwhelming_team`, `target` equal to
 `overwhelmed_team`, and `data` containing at least `rounds`, `hits` (count of `"damage"`-kind entries
-with a truthy `hit` field across the filtered input), and `total_damage` (sum of `"damage"`-kind
-entries' `amount` field where `hit` is truthy).
+across the filtered input), and `total_damage` (sum of those entries' `amount` fields).
 
 #### Scenario: The summary entry's data reflects the actual filtered hits and damage
 - **WHEN** `compress_event_logs()` processes input logs containing three `"damage"`-kind entries with
-  `hit=True` and amounts 10, 15, and 5, plus one with `hit=False`
+  amounts 10, 15, and 5, plus one retained miss-roll entry
 - **THEN** the summary entry's `data["hits"] == 3` and `data["total_damage"] == 30`
 
 #### Scenario: The summary entry carries no additional time cost
@@ -66,7 +70,7 @@ attributable hit/miss/damage record to only the aggregate summary.
 - **WHEN** the total `EventEntry` count across `compress_event_logs()`'s returned tuple is compared
   against the total `EventEntry` count across its `raw_logs` input
 - **THEN** the compressed count is less than or equal to the input count minus the number of
-  `"roll"`-kind entries removed, plus exactly one (the summary entry)
+  redundant successful `"roll"`-kind entries removed, plus exactly one (the summary entry)
 
 ### Requirement: A compressed EventLog renders through render_plain_text with no LLM involvement
 Every `EventLog` `compress_event_logs()` returns, including the summary entry, SHALL render correctly
@@ -88,3 +92,4 @@ from any `world/ai/` module.
 #### Scenario: Rendering is a pure, repeatable function of the compressed log
 - **WHEN** `render_plain_text()` is called twice on the same compressed `EventLog`
 - **THEN** both calls return byte-identical output
+

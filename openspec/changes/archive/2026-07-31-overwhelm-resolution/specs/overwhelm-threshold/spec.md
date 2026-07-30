@@ -104,7 +104,7 @@ direction SHALL be `None`. When both return `None`, the decided direction SHALL 
 ### Requirement: A decided direction is further gated by an estimated-round-count bound — overwhelm
 means decided AND quick, not merely decided
 `world/rules/overwhelm.py` SHALL provide `estimated_rounds_to_conclude(battlefield, overwhelming_team,
-overwhelmed_team) -> float`, a conservative (never-underestimated) estimate of how many more rounds it
+overwhelmed_team) -> float`, a calibrated estimate of how many more rounds it
 would take the overwhelming team to reduce the overwhelmed team's **current**, not max, total hp to
 zero, using each attacker's actual to-hit probability and only `combat.COMBAT_YAML["damage"]
 ["base_multiplier"]` (never the solid-hit or critical bonus), without calling `roll_d100()`.
@@ -152,7 +152,7 @@ sequence relative to other calls.
 
 #### Scenario: Recomputation after a mid-fight power-tier shift changes the verdict
 - **WHEN** `classify_overwhelm(battlefield)` is called, a combatant's `effective_value()` output then
-  changes (e.g. a disguise drops, revealing higher true stats, or an agility-multiplying buff expires),
+  changes (e.g. a stat-multiplying skill activates or an agility-multiplying buff expires),
   and `classify_overwhelm(battlefield)` is called again on the same battlefield object
 - **THEN** the second call reflects the changed state and may return a different result than the first,
   with no special reset or invalidation step required between the two calls
@@ -168,7 +168,7 @@ sequence relative to other calls.
 #### Scenario: A round whose real progress falls behind the round-bound estimate self-corrects on the next call
 - **WHEN** `classify_overwhelm()` returns a decided direction because `estimated_rounds_to_conclude()`
   was within bound, one round of real combat resolution then produces less progress than the estimate
-  assumed (e.g. the overwhelming side's actual rolls miss more often than the estimate's conservative
+  assumed (e.g. the overwhelming side's actual actions deal less damage than the calibrated heuristic
   hit-probability figure predicted), and `classify_overwhelm()` is called again on the resulting
   battlefield state
 - **THEN** the second call's `estimated_rounds_to_conclude()` reflects the reduced progress and may now

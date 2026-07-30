@@ -10,7 +10,7 @@ compression, naming this change as the owner by number in its own Non-Goals and 
 **The handoff this change exists to close.** Change 9's design.md D-4 records a finding, not a
 decision: `effective_power(entity) = (atk_phys + agility + defense + magic_level) × max_hp` produces a
 ratio that is "static across a fight except when `effective_value()` itself changes" (a stat-multiplier
-skill activating, a disguise dropping) — by design, so that hp attrition cannot cause a spurious flip
+skill activating or a combat buff expiring) — by design, so that hp attrition cannot cause a spurious flip
 (the elf-at-1-hp counterexample D-4 works through in full: a current-hp-driven ratio would have told a
 consumer the *human* overwhelms the *elf* by ≈8×, while D-2's own saturated to-hit rates say the human's
 hit chance against that elf is 0%, exactly backwards). Because the ratio cannot see hp attrition, D-4
@@ -49,9 +49,10 @@ established for each other.
   identical to driving `run_round()` one round at a time under the same seed. Stops the moment
   `classify_overwhelm()` re-evaluates to a different verdict than the one it started with, handing
   control back rather than silently continuing under a stale classification.
-- `compress_event_logs(logs, ...) -> tuple[EventLog, ...]`: drops `"roll"`-kind entries (raw d100
-  values, needed by no downstream consumer once the paired `"damage"`-kind entry already records
-  hit/miss and amount), keeps every other entry verbatim, and prepends one new `"overwhelm_resolution"`
+- `compress_event_logs(logs, ...) -> tuple[EventLog, ...]`: drops successful `"roll"`-kind entries
+  once the paired `"damage"` entry records the hit and amount, retains miss-roll entries because the
+  landed action pipeline emits no damage entry for a miss, keeps every other entry verbatim, and
+  prepends one new `"overwhelm_resolution"`
   summary entry — the exact kind name change 8's own design.md predicted for this change.
 - Golden, fixed-seed tests: exact consistency between single-shot and per-round resolution on the same
   seed (attacker-overwhelm direction); the same for reverse overwhelm (design doc §6.3's "player is
@@ -284,8 +285,8 @@ encounter that is in fact heavily one-sided over enough rounds, resolved the slo
 and pacing, not correctness. A golden test constructs exactly this matchup and asserts
 `_decided_direction()` returns `None`.
 
-**Signal 3 — an estimated-round-count bound, deliberately current-hp-sensitive, and deliberately
-biased to never underestimate how long a fight will take.** Signals 1 and 2 (combined above into
+**Signal 3 — an estimated-round-count heuristic, deliberately current-hp-sensitive and bounded by a
+separate hard safety cap.** Signals 1 and 2 (combined above into
 `_decided_direction()`) establish that a fight's outcome is certain; neither says anything about how
 long reaching that certain outcome takes. Change 9's damage formula floors every hit at
 `damage.floor` (1) — so a matchup where the ratio signal fires because one side has an enormous
@@ -306,21 +307,17 @@ onto the loop.**
 
 ```python
 def _expected_damage_per_attack(attacker, defender) -> float:
-    """A deliberately conservative (never-overestimated) expected damage figure for one
+    """A base-attack heuristic for one
     attacker's one attack against one defender. Uses the ACTUAL to-hit probability (never
     assumes 100%, so this also works for a ratio-only verdict where hits are not saturated)
     and ONLY combat.py's base_multiplier (ignores the solid-hit and critical bonuses D-3 of
     dice-combat's own design defines) and attacker.effective_value('atk_phys') as the
-    representative damage stat (a simplification -- this estimate does not know which skill
-    the real action_provider will choose each round; a magic-primary attacker would need
-    magic_level here instead, flagged as a scope-conscious approximation, not a claim about
-    which skill actually gets cast). Underestimating expected damage means this function's
-    caller (below) never underestimates the number of rounds needed -- the one direction of
-    error this signal cannot afford, since overestimating rounds only costs a missed
-    compression opportunity, while underestimating them would let a genuine grind through."""
-    atk_agi = _adjusted_agility(attacker)   # same helper D-1's Signal 2 already defines
-    def_agi = _adjusted_agility(defender)
-    hit_prob = max(0.0, min(1.0, (50 + (atk_agi - def_agi)) / 100))
+    representative damage stat. This estimate cannot know which skill or non-action an arbitrary
+    action_provider will choose, so it is a calibrated admission heuristic rather than a guaranteed
+    upper bound; resolve_overwhelm()'s 12-round cap remains the hard robustness bound."""
+    required_roll = math.ceil(_required_roll(attacker, defender))
+    successful_rolls = max(0, 101 - max(1, required_roll))
+    hit_prob = min(successful_rolls, 100) / 100
     atk_stat = attacker.skills.effective_value("atk_phys")
     def_def = defender.skills.effective_value("defense")
     base_dmg = max(
@@ -369,7 +366,7 @@ reason D-4 gives; the round-bound estimate must not.
 change's own invented placeholder (flagged for a future balance pass, the identical disclosure
 discipline changes 5/6/9 already used for their own invented numbers):
 
-| Matchup | remaining hp | conservative dmg/round | estimated rounds |
+| Matchup | remaining hp | heuristic dmg/round | estimated rounds |
 |---|---|---|---|
 | elf (agility 92, `atk_phys` 88) vs. human elite (agility 9, defense 7, hp 120) — dice-combat D-4's own reference pair | 120 | 81 (hit_prob 1.0, saturated) | ≈1.5 |
 | the same elf vs. a 3-member low-tier monster party (illustrative stats within lore-world-data's low band — `atk_phys`/agility/defense ≈6, hp ≈90 each) | 270 (pooled) | 82 (vs. the toughest, hit_prob 1.0) | ≈3.3 |
@@ -512,7 +509,7 @@ per-round turn loop for the remainder, identically to how it would handle any ot
 encounter.
 
 **Why the loop stops on any classification change, not just a return to "contested."** If, mid-fight, a
-disguise drops and `effective_power()`'s ratio flips (or an active buff wears off and the hit-rate
+an active stat multiplier changes `effective_power()`'s ratio (or a buff wears off and the hit-rate
 signal stops saturating), `classify_overwhelm()`'s next call reflects that immediately — this is design
 doc §6.3's "recomputed every round... handles mid-fight power-tier shifts, such as dropping a disguise,"
 now with a concrete consumer. Stopping on *any* change (not only a drop to `None`) also covers the rarer
@@ -558,7 +555,8 @@ general, not-hardcoded-to-one-round algorithm produces the design doc's stated c
 the numbers this project actually calibrated (dice-combat D-4), while remaining correct — not merely
 "usually correct" — for any future matchup where a single round does not suffice.
 
-### D-4. `compress_event_logs()`: drop `"roll"`-kind entries, keep everything else, add one summary
+### D-4. `compress_event_logs()`: drop redundant hit-roll entries, preserve miss rolls and damage,
+add one summary
 entry — "fewer, coarser entries" without losing "who hit whom, for how much."
 
 **Reconciling two requirements that sound like they pull in opposite directions.** Change 8's design.md
@@ -568,22 +566,25 @@ task brief insists just as explicitly that "a full `EventLog` is still produced 
 much, where," and that compression "means computing the whole exchange at once, not omitting it." These
 are reconciled by distinguishing what each `EventEntry.kind` change 9 emits actually carries: per
 change 9's own Non-Goals, every resolved attack produces **two** new kinds, `"roll"` and `"damage"`.
-`"roll"` records the mechanical fact — the raw `d100` integer — which by itself tells no one anything
-about what happened (a `73` is meaningless without also knowing the threshold it was compared against
-and the resulting hit/miss). `"damage"` records the narratively load-bearing fact `_handle_damage`
-already assembles per target either way (D-5's own `PendingEffect.description`: `"{actor} -> {target}:
-{'hit' if hit else 'miss'} ({damage} dmg) [roll={raw_roll}]"` — hit **and** miss both produce this,
-never only hits). Dropping `"roll"` entries and keeping `"damage"` entries therefore satisfies both
-requirements simultaneously: strictly fewer entries (every `"roll"` entry disappears), while "who hit
-whom, for how much" survives untouched, because that fact was never encoded in the `"roll"` entry to
-begin with — it already lived in `"damage"`.
+The landed action pipeline resolves the open question differently from the earlier planning
+assumption: a hit emits a `"roll"` entry followed by a `"damage"` entry, while a miss emits only a
+`"roll"` entry with `data["hit"] is False`; a `"damage"` entry carries `amount` and has no `hit`
+field. Compression therefore drops only hit-roll entries, whose result is duplicated by the following
+damage entry, and retains miss-roll entries as the sole record that the attack occurred and missed.
+This remains strictly smaller for successful exchanges without erasing narratively load-bearing facts.
 
 ```python
 def compress_event_logs(
     raw_logs: list[EventLog], overwhelming_team: str, overwhelmed_team: str, rounds: int,
 ) -> tuple[EventLog, ...]:
     filtered = tuple(
-        dataclasses.replace(log, entries=tuple(e for e in log.entries if e.kind != "roll"))
+        dataclasses.replace(
+            log,
+            entries=tuple(
+                e for e in log.entries
+                if e.kind != "roll" or not e.data.get("hit", False)
+            ),
+        )
         for log in raw_logs
     )
     filtered = tuple(log for log in filtered if log.entries)   # an all-roll log (none observed in
@@ -592,11 +593,11 @@ def compress_event_logs(
                                                                   # defensively) contributes nothing
     hits = sum(
         1 for log in filtered for e in log.entries
-        if e.kind == "damage" and e.data.get("hit")
+        if e.kind == "damage"
     )
     total_damage = sum(
         e.data.get("amount", 0) for log in filtered for e in log.entries
-        if e.kind == "damage" and e.data.get("hit")
+        if e.kind == "damage"
     )
     summary = EventLog(
         actor=overwhelming_team, skill_key="overwhelm_resolution", targets=(overwhelmed_team,),
@@ -604,8 +605,8 @@ def compress_event_logs(
             kind="overwhelm_resolution", actor=overwhelming_team, target=overwhelmed_team,
             data={"rounds": rounds, "hits": hits, "total_damage": total_damage},
             text_template=(
-                "{actor} 以壓倒性的力量在 {data[rounds]} 回合內壓制了 {target}，"
-                "命中 {data[hits]} 次，造成共 {data[total_damage]} 點傷害。"
+                "{actor} 與 {target} 在壓倒性態勢判定下交戰 {data[rounds]} 回合；"
+                "雙方共命中 {data[hits]} 次，造成 {data[total_damage]} 點傷害。"
             ),
         ),),
         time_cost_seconds=0,   # the real time cost is already fully accounted for by `filtered`'s own
@@ -719,23 +720,16 @@ function, no hidden state).
   the real per-round dice do not actually guarantee, which is the one failure this change is designed
   to never produce. Documented explicitly rather than silently resolved by picking one signal to always
   win.
-- **[Risk] `compress_event_logs()`'s assumption that every `"damage"`-kind `EventEntry` change 9
-  produces carries both hit and miss outcomes (never a bare `"roll"` entry standing alone with no
-  paired `"damage"` entry) is inferred from change 9's design.md D-5, not confirmed against change 9's
-  actual landed implementation** (change 9 is a sibling roadmap item; its own `EventEntry` construction
-  code inside `_step7_build_event_log`'s consumption of `PendingEffect.description` is not fully
-  specified at the design-document level). → Flagged for implementer verification, consistent with
-  changes 1-9's established discipline for every cross-change interface assumption; the defensive `if
-  log.entries` filter in `compress_event_logs()` (D-4) means an all-`"roll"`, no-`"damage"` log — if
-  change 9's actual implementation ever produces one — is dropped silently rather than crashing, and a
-  test asserts this against change 9's real, landed `run_round()` output (not a mock), which is what
-  actually settles the question once change 9's code exists to inspect.
-- **[Risk] `estimated_rounds_to_conclude()`'s conservative approximations (base-multiplier-only damage,
+- **[Resolved interface risk] The landed action pipeline was inspected before implementation.** A hit
+  produces a `"roll"` entry with `data["hit"] is True` and a `"damage"` entry with `data["amount"]`;
+  a miss produces only a `"roll"` entry with `data["hit"] is False`. D-4 and the delta spec were
+  corrected to preserve miss rolls and drop only redundant hit rolls.
+- **[Risk] `estimated_rounds_to_conclude()`'s heuristic approximations (base-multiplier-only damage,
   a single pooled "toughest defender" target rather than modelled focus-fire order, `atk_phys` as the
   one representative damage stat regardless of which skill the real `action_provider` picks) mean the
   estimate can be wrong in either direction for an unusual matchup** — most safely wrong (an
   overestimate, missing a genuine curbstomp) but conceivably wrong the other way if a real encounter's
-  actual damage output ends up *lower* than the conservative estimate predicts (e.g. an
+  actual damage output ends up *lower* than the heuristic predicts (e.g. an
   `action_provider` that, in practice, never casts the attacker's highest-`atk_phys` skill). →
   Accepted; every simplification in `_expected_damage_per_attack()`/`estimated_rounds_to_conclude()` is
   named explicitly in D-1 rather than silently assumed, and — critically — a wrong estimate is caught
@@ -812,11 +806,9 @@ concerns are operational:
   this change has access to describes a tank/duelist-shaped archetype concretely enough to design a
   third state around. Left to a future balance pass if the disagreement case turns out to be common in
   practice once real monster/skill data (change 10b onward) exists to check it against.
-- **Exact shape of `EventEntry.data` for the `"damage"` kind** (specifically, whether `data["hit"]` and
-  `data["amount"]` are the real key names change 9's landed implementation uses) is inferred from D-4's
-  worked example and D-5's `PendingEffect.description` string, not confirmed against change 9's actual
-  `_step7_build_event_log` output — left to the implementer to confirm against change 9's landed code,
-  consistent with the verification discipline changes 1-9 already established (see Risks).
+- **Exact shape of `EventEntry.data` for the `"damage"` kind** is resolved: the landed implementation
+  uses `data["amount"]`; hit/miss is carried by the preceding `"roll"` entry, and misses have no
+  `"damage"` entry.
 - **`max_estimated_rounds` (5) and `max_rounds` (12) are both this change's own invented placeholders**,
   calibrated against this project's own worked reference matchups (D-1) but not against real monster
   AI behaviour (change 10b) or real player skill selection, neither of which exists yet. Whether 5

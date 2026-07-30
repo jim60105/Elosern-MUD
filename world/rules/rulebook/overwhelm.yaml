@@ -1,0 +1,7 @@
+# See overwhelm-resolution/design.md D-1. Both directions use independent
+# divisions against this same threshold; there is no reciprocal constant.
+power_ratio_threshold: 100
+
+# See overwhelm-resolution/design.md D-1's calibration table. Overwhelm means
+# a decided and quick encounter, rather than a long deterministic grind.
+max_estimated_rounds: 5

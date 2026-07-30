@@ -34,9 +34,10 @@ over.
   approximately, consistent with driving `run_round()` one round at a time. "Single-shot" describes
   the caller's experience (one call resolves the encounter to completion) and the output's shape
   (a compressed `EventLog` set), not a shortcut around the underlying combat math.
-- Add `compress_event_logs()`: an `EventLog`-shape-preserving compression that drops purely mechanical
-  `"roll"`-kind entries (the raw d100 value, needed for nothing downstream) while keeping every
-  `"damage"`-kind entry (who hit whom, for how much, every round) verbatim, and prepends one
+- Add `compress_event_logs()`: an `EventLog`-shape-preserving compression that drops successful
+  `"roll"`-kind entries whose outcome is duplicated by a paired `"damage"` entry, while retaining
+  miss-roll entries (the landed action pipeline's only miss record) and every `"damage"` entry
+  (who hit whom, for how much, every round) verbatim, and prepends one
   `"overwhelm_resolution"`-kind summary entry — the exact kind name change 8's own design anticipated.
   No edit to change 8's `EventLog`/`EventEntry` dataclasses.
 - Golden, fixed-seed tests proving: (1) single-shot and per-round resolution reach byte-identical
