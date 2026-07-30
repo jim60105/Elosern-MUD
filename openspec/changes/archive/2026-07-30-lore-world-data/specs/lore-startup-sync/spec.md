@@ -11,7 +11,8 @@ category and the entry's own `key`.
 #### Scenario: Every registry entry produces a DB record
 - **WHEN** `sync_all()` runs against a fresh database with no existing lore records
 - **THEN** one persistent record exists for every entry across all eleven registries, and each
-  record's stored fields match the corresponding frozen dataclass instance's fields
+  record's stored fields match the corresponding frozen dataclass instance's fields, with enum
+  members represented by their stable string `.value` for Evennia Attribute serialization
 
 #### Scenario: A record's key is derived from category and entry key
 - **WHEN** the DB record for, say, `RACE_REGISTRY["elf"]` is inspected after `sync_all()` runs

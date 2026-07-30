@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the typed, immutable world-lore registries used as the code-side source of truth for races, magic, nations, guilds, monsters, locations, and economy.
+
+## Requirements
 
 ### Requirement: RaceProfile encodes the three-race power gap
 `world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields
@@ -37,7 +41,7 @@ exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
 `world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`,
-`display_name_zh`, `order`, `band`, `guild_rank_hint`, and `description`, and a module-level
+`display_name_zh`, `order`, `band: tuple[int, int | None]`, `guild_rank_hint`, and `description`, and a module-level
 `STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers,
 and two elf tiers.
 
@@ -58,7 +62,12 @@ and two elf tiers.
 - **WHEN** every `StaticTier` entry is inspected
 - **THEN** `guild_rank_hint` is a non-`None` `GuildRank` key for every human tier above 平民 (F-D,
   C-B, A, S), and `None` for every beastfolk and elf tier, since `world_info.md` does not state a
-  guild-rank correlation for those two races
+  guild-rank correlation for those two races; the single-key hints are the lower bound of each
+  documented band (`"F"`, `"C"`, `"A"`, and `"S"` respectively)
+
+#### Scenario: An open-ended top tier is representable
+- **WHEN** `STATIC_TIER_REGISTRY["elf_prodigy"]` is inspected
+- **THEN** its `band` is `(95, None)`, where `None` records the source's lack of a hard ceiling
 
 ### Requirement: Subrace registry covers elf branches and beastfolk subspecies with stat modifiers
 `world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`,
@@ -94,13 +103,14 @@ a module-level `SUBRACE_REGISTRY: dict[str, Subrace]` containing the three elf b
   block exactly (e.g. `catkin.static_modifiers == StatModifiers(atk_phys=-0.10, agility=0.40,
   defense=-0.30)`), and `wolfkin.static_modifiers == StatModifiers()` (balanced, all zero)
 
-#### Scenario: Every beastfolk subspecies' static_modifiers sum to exactly zero
+#### Scenario: Every beastfolk subspecies' static_modifiers sum to zero
 - **WHEN** every one of the seven beastfolk `SUBRACE_REGISTRY` entries' `static_modifiers` is
   inspected
-- **THEN** `atk_phys + agility + defense == 0.0` for every entry, with no exemption for `foxkin` —
+- **THEN** `abs(atk_phys + agility + defense) <= 1e-12` for every entry, with no exemption for `foxkin` —
   its physical-axis modifiers alone already sum to zero (`-0.05 + 0.15 + -0.10 == 0.0`); its
   separate MP vital-band override (below) is a different, independently-checked mechanism and is
-  not required to make this sum work
+  not required to make this sum work; the tolerance accounts only for binary `float`
+  representation of the documented decimal percentages
 
 #### Scenario: Foxkin overrides its MP vital band above the species baseline
 - **WHEN** `SUBRACE_REGISTRY["foxkin"]` is inspected
@@ -216,7 +226,8 @@ names from `world_info.md`.
 #### Scenario: Each monster tier's static band is beatable by the guild rank that handles it
 - **WHEN** each `MonsterTier` entry's `static_band` is compared against the corresponding
   `StaticTier` band from `STATIC_TIER_REGISTRY`
-- **THEN** `low`'s band falls inside `human_adventurer`'s band (a novice handles it solo); `mid`'s
+- **THEN** `low`'s band overlaps `human_adventurer`'s band, with its 3-4 range below the
+  adventurer floor (a novice still handles it solo); `mid`'s
   band exceeds `human_elite`'s band (stronger than one veteran, needs a party); `high`'s band
   reaches or exceeds `human_swordmaster`'s band (matches or exceeds the human ceiling); and
   `calamity`'s band exceeds `elf_common`'s band (beyond human scale entirely) — this

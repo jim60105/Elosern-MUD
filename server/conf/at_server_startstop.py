@@ -30,7 +30,9 @@ def at_server_start():
     This is called every time the server starts up, regardless of
     how it was shut down.
     """
-    pass
+    from world.lore.sync import sync_all
+
+    sync_all()
 
 
 def at_server_stop():

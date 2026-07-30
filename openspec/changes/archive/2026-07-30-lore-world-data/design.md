@@ -179,7 +179,7 @@ class StaticTier:
     race_key: str                # references RaceProfile.key
     display_name_zh: str
     order: int                   # ascending within the race, 1 = weakest
-    band: tuple[int, int]        # shared across atk_phys/agility/defense, per D-2b
+    band: tuple[int, int | None] # shared across atk_phys/agility/defense; None = open upper bound
     guild_rank_hint: str | None  # references GuildRank.key; None where world_info.md gives none
     description: str             # English
 ```
@@ -191,8 +191,8 @@ though only human and beastfolk needed correcting this round:
 | key | race | order | band | guild rank | notes |
 |---|---|---|---|---|---|
 | `human_commoner` | human | 1 | (1, 5) | `None` | 平民與非戰鬥者; e.g. Violet 5/6/6 |
-| `human_adventurer` | human | 2 | (5, 9) | `"F"`–`"D"` | 一般冒險者 |
-| `human_elite` | human | 3 | (7, 14) | `"C"`–`"B"` | 精銳; e.g. Lidzia 8/9/7 |
+| `human_adventurer` | human | 2 | (5, 9) | `"F"` | 一般冒險者 (F–D); hint stores the range's lower rank |
+| `human_elite` | human | 3 | (7, 14) | `"C"` | 精銳 (C–B); hint stores the range's lower rank; e.g. Lidzia 8/9/7 |
 | `human_veteran` | human | 4 | (14, 18) | `"A"` | 一流 |
 | `human_swordmaster` | human | 5 | (18, 22) | `"S"` | 大劍豪; fewer than 10 across the continent, the
   absolute human ceiling |
@@ -220,6 +220,9 @@ guild ranks explicitly (F-D / C-B / A / S in the tier names themselves) but does
 beastfolk or elf — beastfolk adventurer-guild participation and rank distribution is not described
 in the source, and elves rarely leave their villages at all (§14, 特殊設定). Leaving these `None`
 is a direct transcription of what the source does and doesn't state, not an oversight.
+Because `guild_rank_hint` is deliberately a single `GuildRank.key`, the two multi-rank human bands
+store their lower bounds (`"F"` for F-D and `"C"` for C-B); the complete ranges remain in each
+tier's description.
 
 ### D-3. `Subrace` is a new, generic registry — not folded into `RaceProfile`, and now carries the
 per-subspecies stat-distribution modifiers `world_info.md` documents.
@@ -272,7 +275,8 @@ class Subrace:
 
 `StatModifiers` values, straight from `world_info.md`'s 亞種數值傾向 block — all three axes are now
 stated explicitly for every subspecies, and the block itself asserts "三軸修正總和恆為零"
-(the three-axis correction always sums to zero):
+(the three-axis correction mathematically sums to zero; tests use a `1e-12` absolute tolerance
+because these values are represented as binary `float`s):
 
 | subrace | atk_phys | agility | defense | sum | notes |
 |---|---|---|---|---|---|
@@ -456,7 +460,7 @@ class MonsterTier:
 
 | key | guild ranks | static band | hp band | correspondence |
 |---|---|---|---|---|
-| `low` | F–E | (3, 8) | (50, 150) | inside `human_adventurer` (5-9) — one novice solo |
+| `low` | F–E | (3, 8) | (50, 150) | overlaps `human_adventurer` (5-9), with 3-4 below its floor — one novice solo |
 | `mid` | D–C | (12, 20) | (200, 400) | exceeds `human_elite` (7-14) — needs a party |
 | `high` | B–A | (22, 35) | (400, 700) | at or above `human_swordmaster` (18-22) |
 | `calamity` | S+ | (60, 150) | (1200, 3000) | above `elf_common` (70-95) — beyond human scale |
@@ -528,11 +532,12 @@ def sync_all() -> None:
 
 def sync_one(category: str, key: str, entry: Any) -> None:
     script_key = f"lore:{category}:{key}"
-    script = search_script(script_key) or create_script(
-        "world.lore.sync.LoreRecord", key=script_key, persistent=True,
+    matches = search_script(script_key)
+    script = matches[0] if matches else create_script(
+        "world.lore.sync.LoreRecord", key=script_key, persistent=True
     )
     script.db.category = category
-    script.db.fields = dataclasses.asdict(entry)
+    script.db.fields = _db_safe(dataclasses.asdict(entry))
 ```
 
 `LoreRecord` is a minimal `DefaultScript` subclass with no ticking/interval behavior — it exists
@@ -543,6 +548,21 @@ scope to a single working day. **Idempotency** comes from two properties working
 restarts), and `sync_one` unconditionally overwrites `.db.fields` from the current Python registry
 (so the DB always mirrors code — consistent with D9's rationale that lore-as-Python is the single
 source of truth, and the DB copy is a queryable mirror of it, not a second authority).
+
+**Verified against Evennia 6.1.0 during implementation:** `search_script(*args, **kwargs)` returns
+a list of matching scripts, while `create_script(*args, **kwargs)` returns the created script.
+Despite the wrapper docstring mentioning an `exact` keyword, this version's
+`ScriptDBManager.search_script(ostring, obj=None, only_timed=False, typeclass=None)` does not accept
+it and already performs a case-insensitive exact-key lookup. The implementation therefore uses
+`search_script(script_key)` and selects `matches[0]`; the earlier
+`search_script(...) or create_script(...)` pseudocode would have attempted to write `.db`
+attributes on a list after the first sync.
+
+Evennia 6.1.0's Attribute serializer also cannot persist `StrEnum` instances directly: it treats
+the string-like enum as an iterable while reconstructing it. `_db_safe()` therefore recursively
+converts enum members in `asdict(entry)` to their stable `.value` strings before assignment.
+All non-enum fields retain their `asdict()` representation; for example, `Anchor.kind` is stored
+as `"capital"` while the Python registry remains typed as `AnchorKind.CAPITAL`.
 
 `sync_all()` is called from `at_server_start()` in `server/conf/at_server_startstop.py` — the hook
 file `evennia --init` scaffolds empty in change 1. This is the standard Evennia extension point for
@@ -603,7 +623,7 @@ more scaffolding than the direct `at_server_start()` call for no behavioral bene
   three axes summing to zero, silently reintroducing the strictly-dominant-subspecies imbalance an
   earlier version of `world_info.md` itself had (虎人 net +20% vs. 熊人 net +5%, before the source
   was corrected — see D-3).** → Mitigation: `test_races.py` (tasks.md §9.1) asserts every
-  subspecies' three `static_modifiers` sum to exactly `0.0`, so any future imbalance — whether from
+  subspecies' three `static_modifiers` sum to zero within `1e-12`, so any future imbalance — whether from
   a source-data mistake or an implementation typo — fails immediately instead of being discovered
   by hand.
 - **[Risk] Beastfolk subspecies population figures don't exist in `world_info.md`.** → Accepted:
