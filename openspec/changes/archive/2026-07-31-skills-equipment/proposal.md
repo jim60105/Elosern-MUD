@@ -24,9 +24,10 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   mirroring the forward-declaration pattern change 2 → change 4 already established for `Subrace`
   and change 4 → this change already established for `SKILL_REGISTRY` itself. Add the frozen
   `SkillDef` dataclass with exactly the seven fields design doc §5.2 gives (`key`, `kind`,
-  `target_spec`, `cost`, `usable_out_of_combat`, `element`, `effects`) — no field added or dropped.
+  `target_spec`, `cost`, `usable_out_of_combat`, `element`, `effects`) — no field added or dropped;
+  its dict/list fields reject nested mutation so registry definitions remain genuinely immutable.
   Add `SKILL_REGISTRY: dict[str, SkillDef]` at the exact forward-declared path
-  (`world.skills.registry.SKILL_REGISTRY`), seeded with a representative set (~24 entries, not an
+  (`world.skills.registry.SKILL_REGISTRY`), seeded with a representative set (~27 entries, not an
   exhaustive catalogue) spanning every skill category inventoried from the five sample character
   cards: stat multipliers (身體強化 ×100, 身體超強化 ×1000, 基礎身體強化), elemental mastery (火/暗/
   風/光之主宰, tied to change 2's `RankTitle` 主宰 rank), direct spells (火球術, 風刃術, 飛行術),
@@ -46,21 +47,24 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   module multiplies and stores a trait value, and every value `effective_value()` can produce for a
   freshly-constructed entity's base falls in the exact same base-value band change 3 already checks —
   the multiplied *return* value is expected to exceed it; the *stored* trait must not.
+  Duplicate active keys are idempotent, and contradictory duplicate effects for one trait raise.
 - Add the 統御術 (dominion art) data model: a frozen `ConferredSkillGrant` dataclass (`source_key`,
   `skill_key`, `trait_keys`, `scale`) stored in a new, additive attribute (`entity.db.skill_grants`,
   requiring no edit to change 3's typeclass, mirroring change 4's D-13 treatment of
   `entity.db.inventory`, and kept separate from `entity.db.skills`'s import-populated shape). `Skill
   Handler.effective_value()` folds in any conferred grants at the documented scale (Violet's card: a
-  partial ×10 grant from Elosia's ×100 身體強化). The *casting* of 統御術 — i.e., an entity actually
+  partial ×10 grant derived from Elosia's ×100 身體強化 and a fractional `scale=0.1`). The *casting*
+  of 統御術 — i.e., an entity actually
   creating a grant on another entity through gameplay — is declared as a seam for change 8's
   `ActionResolver` (effect-resolution step); this change builds the data shape and the read-side
-  computation, not the cast-time write path. The analogous partial magic-growth-rate grant
+  computation plus a deterministic-core persistence primitive under `world/rules/`, not the
+  cast-time validation path. The analogous partial magic-growth-rate grant
   (Elosia → Violet) is a rate-of-change concept and is assigned to change 6 (`buffs-rulebook`) per
   design doc §6.4 ("buffs modify exactly three things — rate of change, clamped bounds, and decay
   rate") — named as its owner, not left as an unresolved seam, though not built here since
   `BuffHandler` does not exist yet.
-- Wire 狀態偽裝 as a registered `SkillDef` whose effect resolution (a small, directly-callable
-  function, not routed through any rulebook engine) can only ever set `entity.db.disguised_stats`
+- Wire 狀態偽裝 as a registered `SkillDef` whose deterministic-core write primitive in
+  `world/rules/skill_effects.py` can only ever set `entity.db.disguised_stats`
   (change 3's D-8 storage) — it contains no code path that reads or writes `entity.traits`, so it
   structurally cannot violate decision D2 regardless of when change 8 wires it up.
 - Add `world/skills/equipment.py`: an `EquipmentSlot` `StrEnum` (`WEAPON_MAIN`, `WEAPON_OFF`,
@@ -69,22 +73,17 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   weapon or a dual-wielded pair, one body armor slot, a small list of accessories). `EquipmentHandler`
   is mounted directly as `entity.equipment` — per design doc §5.2 — replacing change 3's placeholder,
   reading its backing data from the new private `entity.db.equipment` attribute, and providing
-  `.equip()`/`.unequip()`/`.slot_contents()`. Plain module-level functions
-  (`add_item`/`remove_item`/`list_items`) operate directly on `entity.db.inventory`, the raw
-  attribute change 4's D-13 already established with no seam declaration required.
+  `.slot_contents()`. Mutating equipment and inventory operations live in
+  `world/rules/equipment.py`; the skills package retains only read-side handlers/helpers.
 - Replace the `skills`/`equipment` placeholder `AttributeProperty` declarations in
   `typeclasses/entities.py` with real handler mounts (`entity.skills`/`entity.equipment` themselves
   return `SkillHandler`/`EquipmentHandler` instances, the same way `entity.traits` returns a
   `TraitHandler`), per change 3's own D-10, which explicitly anticipates this change replacing the
   placeholder "the same way `traits` is mounted."
-- **Names a required one-line adjustment to change 4's `loader.py`** (not made by this change): its
-  `instantiate_character()` currently bare-assigns `entity.skills = {...}` / `entity.equipment =
-  {...}`, which breaks once those names become read-only handler-returning properties. The fix
-  targets the new private storage location instead: `entity.db.skills = {...}` /
-  `entity.db.equipment = {...}`. This touches zero external contract surface — `CHARACTER_SCHEMA_V1`,
-  `validate.py`, and the reference example are all unaffected, since what is actually frozen is the
-  on-disk JSON schema, not `loader.py`'s private internals. Recorded in design.md's Migration Plan for
-  the coordinator to carry into change 4.
+- Verify change 4's landed `loader.py` integration: `instantiate_character()` already writes the
+  imported shapes to `entity.db.skills` / `entity.db.equipment`, the private storage locations the
+  new read-only handlers consume. This touches zero external contract surface — `CHARACTER_SCHEMA_V1`,
+  `validate.py`, and the reference example remain frozen and unchanged.
 - Add a verification task confirming change 4's `test_skill_registry_self_arming.py` now runs
   (not skipped) and passes once `world.skills.registry.SKILL_REGISTRY` exists — the acceptance
   criterion for the cross-change contract this change fulfills.
@@ -96,9 +95,10 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
   forward-declared path, seeded with a representative cross-category skill set.
 - `skill-handler`: `SkillHandler`, the resolution-time-only multiplier boundary, the 統御術 partial
   conferral data model and read-side computation, the 狀態偽裝/D2 compliance guarantee, and the
-  declared `ActionResolver` seam (no combat-state branching anywhere in this module).
+  declared `ActionResolver` seam (no persistent writes or combat-state branching in `world/skills/`).
 - `equipment-inventory`: `EquipmentSlot`, `EquipmentHandler` (mounted as `entity.equipment`), and the
-  inventory helper functions, compatible with change 4's `entity.db.inventory` write pattern.
+  read-side inventory helper plus deterministic-core equipment/inventory operations, compatible with
+  change 4's private storage pattern.
 
 ### Modified Capabilities
 - None. `openspec/specs/` is currently empty (changes 1–4 have not been archived yet).
@@ -106,17 +106,16 @@ honor operationally, not just document: skill multipliers (×10/×100/×1000, pe
 ## Impact
 
 - **New files**: `world/skills/__init__.py`, `world/skills/registry.py`, `world/skills/handler.py`,
-  `world/skills/equipment.py`, `world/skills/tests/`.
-- **Modified files**: `typeclasses/entities.py` — replaces the `skills`/`equipment` placeholder
+  `world/skills/equipment.py`, `world/skills/tests/`, `world/rules/skill_effects.py`, and
+  `world/rules/equipment.py`.
+- **Modified files**: `typeclasses/entities.py` replaces the `skills`/`equipment` placeholder
   `AttributeProperty` declarations (change 3, D-10) with real handler mounts (`entity.skills`/
   `entity.equipment` return `SkillHandler`/`EquipmentHandler` instances), per that change's own
-  anticipation of this exact replacement.
-- **Required follow-up in change 4** (named here, not made by this change — see design.md D-10 and
-  Migration Plan): `world/imports/loader.py`'s `instantiate_character()` needs its two bare-assignment
-  lines (`entity.skills = ...` / `entity.equipment = ...`) retargeted to `entity.db.skills = ...` /
-  `entity.db.equipment = ...`. This is an internal `loader.py` adjustment only — `CHARACTER_SCHEMA_V1`,
-  `validate.py`, and the reference example (the actual frozen, externally-depended-on contract) are
-  untouched.
+  anticipation of this exact replacement. `typeclasses/tests/test_entities.py` updates change 3's
+  forward-seam regression to expect those two handlers while preserving the remaining `None` seams.
+- **Verified change 4 integration** (see design.md D-10): `world/imports/loader.py` already writes
+  imported skill and equipment data to `entity.db.skills` / `entity.db.equipment`, so the frozen
+  schema, validator, and reference example require no change.
 - **Depends on**: change 3 (`entity-traits`) for `LivingEntity`, the `skills`/`equipment` seam
   attributes, and the base-value trait boundary (D-7). Transitively on change 2
   (`lore-world-data`) for `ELEMENT_REGISTRY`/`RANK_TITLE_REGISTRY`.

@@ -9,6 +9,9 @@ from evennia.objects.objects import DefaultCharacter
 from evennia.typeclasses.attributes import AttributeProperty
 from evennia.utils import lazy_property
 
+from world.skills.equipment import EquipmentHandler
+from world.skills.handler import SkillHandler
+
 from .objects import ObjectParent
 
 
@@ -21,8 +24,6 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     # Declared handler seams; their owning changes replace these placeholders.
     sexual: Any | None = AttributeProperty(default=None)  # sexual-state
     buffs: Any | None = AttributeProperty(default=None)  # buffs-rulebook
-    equipment: Any | None = AttributeProperty(default=None)  # skills-equipment
-    skills: Any | None = AttributeProperty(default=None)  # skills-equipment
     relations: Any | None = AttributeProperty(default=None)  # unassigned
     persona: Any | None = AttributeProperty(default=None)  # import-contract candidate
 
@@ -30,6 +31,16 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     def traits(self) -> TraitHandler:
         """Persistent deterministic trait storage."""
         return TraitHandler(self)
+
+    @lazy_property
+    def equipment(self) -> EquipmentHandler:
+        """Persistent equipment-slot handler."""
+        return EquipmentHandler(self)
+
+    @lazy_property
+    def skills(self) -> SkillHandler:
+        """Imported skill ownership and effective-value handler."""
+        return SkillHandler(self)
 
     def at_object_creation(self) -> None:
         """Initialize storage without guessing a race or threat tier."""

@@ -8,10 +8,12 @@ from typeclasses.entities import LivingEntity
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.objects import ObjectParent
+from world.skills.equipment import EquipmentHandler
+from world.skills.handler import SkillHandler
 
 
 class LivingEntityTests(EvenniaTest):
-    def test_every_subclass_instantiates_and_exposes_base_seams(self):
+    def test_every_subclass_instantiates_and_exposes_handlers_and_remaining_seams(self):
         for typeclass in (LivingEntity, PlayerCharacter, NPC, Monster):
             with self.subTest(typeclass=typeclass.__name__):
                 entity = create_object(typeclass, key=typeclass.__name__)
@@ -23,12 +25,12 @@ class LivingEntityTests(EvenniaTest):
                 for seam in (
                     "sexual",
                     "buffs",
-                    "equipment",
-                    "skills",
                     "relations",
                     "persona",
                 ):
                     self.assertIsNone(getattr(entity, seam))
+                self.assertIsInstance(entity.equipment, EquipmentHandler)
+                self.assertIsInstance(entity.skills, SkillHandler)
                 self.assertEqual(entity.traits.all(), [])
                 self.assertIsNone(entity.db.disguised_stats)
 

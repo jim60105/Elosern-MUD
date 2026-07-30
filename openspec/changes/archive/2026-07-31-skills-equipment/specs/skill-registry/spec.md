@@ -23,7 +23,8 @@ as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and sy
 ### Requirement: SkillDef carries exactly the seven fields design doc §5.2 specifies
 `world/skills/registry.py` SHALL define a frozen `SkillDef` dataclass with exactly the fields `key`,
 `kind`, `target_spec`, `cost`, `usable_out_of_combat`, `element`, and `effects` — no additional field
-added and none of these dropped.
+added and none of these dropped. Its `cost` and `effects` collections SHALL reject mutation so
+registry definitions remain immutable beyond the dataclass's top level.
 
 #### Scenario: Every SKILL_REGISTRY entry exposes exactly the seven documented fields
 - **WHEN** any `SkillDef` instance in `SKILL_REGISTRY` is inspected via `dataclasses.fields()`
@@ -45,6 +46,10 @@ added and none of these dropped.
 #### Scenario: cost is a mapping of resource key to non-negative integer
 - **WHEN** any `SkillDef.cost` is inspected
 - **THEN** it is a `dict[str, int]` (possibly empty) whose values are all non-negative integers
+
+#### Scenario: Nested skill-definition collections reject mutation
+- **WHEN** a caller tries to alter a registry entry's `cost` dict or `effects` list
+- **THEN** the operation raises and the process-wide registry definition remains unchanged
 
 ### Requirement: SkillKind and TargetSpec are forward-declared for change 8 to import
 `world/skills/registry.py` SHALL define `SkillKind` (`ACTIVE`, `PASSIVE`) and `TargetSpec` (`NONE`,

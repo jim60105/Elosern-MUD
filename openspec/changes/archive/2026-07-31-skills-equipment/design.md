@@ -101,10 +101,13 @@ world/skills/
 ├── __init__.py     re-exports SkillDef, SkillKind, TargetSpec, SKILL_REGISTRY, SkillHandler,
 │                    EquipmentSlot, EquipmentHandler
 ├── registry.py      SkillKind, TargetSpec, SkillDef, SKILL_REGISTRY (seed data)
-├── handler.py        SkillHandler, ConferredSkillGrant, effective_value(), the D2-compliant
-│                     狀態偽裝 effect function
-├── equipment.py       EquipmentSlot, EquipmentHandler, add_item/remove_item/list_items
+├── handler.py        SkillHandler, ConferredSkillGrant, effective_value() (read-only)
+├── equipment.py      EquipmentSlot, EquipmentHandler, list_items (read-only)
 └── tests/              one module per file above, plus a cross-change contract test
+
+world/rules/
+├── skill_effects.py  deterministic grant/disguise write primitives for change 8's resolver
+└── equipment.py      deterministic equip/unequip/inventory write operations
 ```
 
 Design doc §3.2 spells out the package's contents in one line — "registry (SkillDef definitions) ·
@@ -151,43 +154,20 @@ put a placeholder file's shape on the record before change 8 has any say in it. 
 here (for change 8 to reuse) is no different from change 2 authoring `Subrace` for change 4 to
 complete.
 
-### D-3. `SkillDef` carries design doc §5.2's seven fields plus one added by review.
+### D-3. `SkillDef` carries exactly design doc §5.2's seven fields.
 
 ```python
-class FactionConstraint(StrEnum):
-    ANY = "any"              # anyone present — the default
-    ALLY = "ally"
-    ENEMY = "enemy"
-    SELF_ONLY = "self_only"
-
 @dataclass(frozen=True)
 class SkillDef:
     key: str
     kind: SkillKind
     target_spec: TargetSpec
-    faction_constraint: FactionConstraint = FactionConstraint.ANY
     cost: dict[str, int]              # e.g. {"mp": 20, "sp": 5}; {} for most PASSIVE skills
     usable_out_of_combat: bool
     element: Element | None            # world.lore.elements.ELEMENT_REGISTRY entry, or None
     effects: list[str]                  # opaque effect IDs; see D-5 for the one convention this
                                           # change itself interprets
 ```
-
-`faction_constraint` is the eighth field, added during review. Change 8 initially placed it on
-`ActionRequest` — decided per cast by the caller — on the reading that §5.2's seven fields were
-frozen. They are not; §5.2 is a design document, not an external contract like
-`CHARACTER_SCHEMA_V1`. And putting the constraint on the request is semantically wrong: which
-factions a skill may legally target is a property of the skill, not of whoever invokes it. On the
-request, a caller could declare a fireball `ALLY`-only, or a heal `ENEMY`-only, and the resolver
-would have no basis to object.
-
-It defaults to `ANY`, which preserves §6.2's rule that out of combat, with no hostility model
-present, `SINGLE` may target anyone present. Only skills that genuinely restrict their targets set
-anything else, and `SELF_ONLY` is the one value that is redundant with `target_spec=SELF` — kept for
-the case of an `AREA` skill that may only cover the caster.
-
-Change 8 owns validating this field; this change owns declaring it and populating it across the seed
-set.
 
 `element` references a real `Element` instance from change 2's `ELEMENT_REGISTRY` (not a bare string
 key), matching design doc §5.2's literal type. `cost` and `effects` are transcribed verbatim from
@@ -197,10 +177,15 @@ couple of this change's own seed skills (see D-5) would be marginally more self-
 — the task instruction is explicit that the field list is verbatim, and any felt need for an eighth
 field is reported rather than silently added (see Risks).
 
+The field types remain exactly `dict` and `list` as §5.2 specifies, but seed construction uses
+mutation-blocking subclasses. This preserves `isinstance(cost, dict)` / `isinstance(effects, list)`
+while preventing a consumer from mutating process-wide balance data through a frozen dataclass's
+nested collection.
+
 ### D-4. `SKILL_REGISTRY` is seeded with a representative set spanning every category the task
 inventories, not an exhaustive transcription of the five sample cards.
 
-Twenty-four entries, chosen to give each category from the task at least one concrete, inspectable
+Twenty-seven entries, chosen to give each category from the task at least one concrete, inspectable
 `SkillDef`:
 
 | category | seed keys |
@@ -211,7 +196,7 @@ Twenty-four entries, chosen to give each category from the task at least one con
 | weapon arts | `dual_wield_style`, `light_sword_style`, `shadow_slash`, `flash_step` |
 | display-only | `status_disguise` |
 | conferral | `dominion_art` (統御術) |
-| passives | `defense_instinct`, `blade_art_mastery`, `extreme_endurance`, `magic_circle_comprehension`, `precise_mana_control`, `retainer_martial_training`, `guardian_instinct` |
+| passives | `defense_instinct`, `blade_art_mastery`, `extreme_endurance`, `magic_circle_comprehension`, `precise_mana_control`, `retainer_martial_training`, `guardian_instinct`, `elf_longevity` |
 | per-character unique passive | `reincarnation_boon_elosia`, `reincarnation_boon_yuka`, `reincarnation_boon_yuna` |
 
 **Multiplier skills** (`body_enhancement*`) carry their multiplier inside `effects`, using the one
@@ -272,7 +257,7 @@ class SkillHandler:
     def _raw(self) -> dict:
         # entity.db.skills is the private raw-storage attribute (see D-10),
         # distinct from entity.skills itself -- which IS this handler,
-        # per design doc S5.2. Change 4's loader (once adjusted per D-10)
+        # per design doc S5.2. Change 4's landed loader
         # writes {"active": [...], "passive": [...]} to entity.db.skills.
         # Default to the same shape for an entity never populated by the
         # import loader.
@@ -287,10 +272,11 @@ class SkillHandler:
         returns a DERIVED number -- this function never assigns to
         entity.traits.<anything>.base or .mod. Combines every owned skill's
         matching stat_multiply effect (multiplicative) and every conferred
-        grant at its own scale (see D-6)."""
+        source skill's matching multiplier at the grant's fractional scale
+        (see D-6)."""
         base = getattr(self.entity.traits, trait_key).value
         multiplier = 1.0
-        for key in self._raw.get("active", []):
+        for key in dict.fromkeys(self._raw.get("active", [])):
             skill = SKILL_REGISTRY.get(key)
             if skill is None:
                 continue
@@ -299,8 +285,15 @@ class SkillHandler:
                 if parsed and parsed[0] == trait_key:
                     multiplier *= parsed[1]
         for grant in self.conferred_grants():
-            if trait_key in grant.trait_keys:
-                multiplier *= grant.scale
+            if trait_key not in grant.trait_keys:
+                continue
+            source_skill = SKILL_REGISTRY.get(grant.skill_key)
+            if source_skill is None:
+                continue
+            for effect_id in source_skill.effects:
+                parsed = _parse_stat_multiply(effect_id)
+                if parsed and parsed[0] == trait_key:
+                    multiplier *= parsed[1] * grant.scale
         return round(base * multiplier)
 ```
 
@@ -313,12 +306,17 @@ an entity with a known base value and a known active multiplier skill, asserting
 unchanged afterward — the same "derived, not written back" property change 3's D-7 tests for
 construction-time values, now tested for resolution-time computation too.
 
+Duplicate occurrences of one active key are treated idempotently so a malformed-but-schema-valid
+import cannot square a multiplier. Within one `SkillDef`, more than one `stat_multiply` effect for
+the same trait is contradictory and raises rather than inventing whether the grant scale applies
+once or per effect.
+
 **Why multiplicative combination across multiple owned multiplier skills, even though no sample card
 shows a character stacking two multiplier tiers at once**: an entity could, in principle, register
 both `body_enhancement` and `body_enhancement_extreme` as active simultaneously (nothing in this
 change's registry shape prevents it), and this function must produce *some* well-defined answer
 rather than picking one arbitrarily or raising. Multiplicative combination is the same rule already
-used for combining a skill's multiplier with a conferred grant's `scale` — one uniform rule, not two.
+used for combining an owned multiplier with a scaled source multiplier — one uniform rule, not two.
 Whether stacking should be *allowed* at the character-authoring or import-validation level is a
 different, later question (change 8/9's territory), not this function's job to police.
 
@@ -353,25 +351,25 @@ Evennia attribute-store attribute, not a declared seam). `SkillHandler` gains:
     def conferred_grants(self) -> list[ConferredSkillGrant]:
         return self.entity.db.skill_grants or []
 
-    def grant_conferred(self, source_key: str, skill_key: str, trait_keys: tuple[str, ...], scale: float) -> None:
-        """Records a grant. This is a plain data write -- it does not check
-        that source_key currently owns skill_key, does not check resources,
-        and is not itself the 'casting' of 統御術. Change 8's ActionResolver
-        effect-resolution step is expected to call this after its own
-        ownership/resource/target validation succeeds."""
-        self.entity.db.skill_grants = [*(self.entity.db.skill_grants or []), ConferredSkillGrant(source_key, skill_key, trait_keys, scale)]
+# world/rules/skill_effects.py
+def record_conferred_grant(entity, source_key, skill_key, trait_keys, scale) -> None:
+    """Deterministic-core persistence primitive called after resolver checks."""
+    entity.db.skill_grants = [
+        *(entity.db.skill_grants or []),
+        ConferredSkillGrant(source_key, skill_key, trait_keys, scale),
+    ]
 ```
 
-`effective_value()` (D-5) folds every matching grant's `scale` into its multiplier product. This
-**is** built by this change — the data shape and the read-side computation are concrete and tested
+`effective_value()` (D-5) folds each matching source-skill multiplier times the grant's fractional
+`scale` into its multiplier product. This **is** built by this change — the data shape and the
+read-side computation are concrete and tested
 (construct an entity with a `ConferredSkillGrant(scale=0.1, trait_keys=("atk_phys","agility",
 "defense"))`, assert `effective_value("atk_phys")` reflects the ×10, not the source's ×100).
 
 **What is deliberately deferred**: the actual *casting* of 統御術 during play — entity A selects
-entity B as a target, `ActionResolver` validates the interaction, and only then is
-`grant_conferred()` called with the right arguments — is change 8's job per this change's Non-Goals.
-`grant_conferred()` exists now as the seam change 8 will call into, not as something this change's own
-code path invokes autonomously.
+entity B as a target and `ActionResolver` validates the interaction — is change 8's job per this
+change's Non-Goals. `record_conferred_grant()` is only the deterministic-core persistence primitive
+that change 8 will call after validation; `world/skills/` remains read-only.
 
 **What is out of scope entirely, not merely deferred — and now has a named owner**: Violet's card also
 narrates a partial *magic-growth-rate* effect from Elosia's 轉生特典 ("魔法成長百倍增幅" → Violet's
@@ -394,23 +392,23 @@ from buffs; giving 統御術 its own small, additive data model keeps this chang
 gives change 6 a clean later option to reimplement conferral as a buff if that turns out to be the
 better long-term home — nothing here forecloses that.
 
-### D-7. 狀態偽裝's effect resolution touches `entity.db.disguised_stats` and nothing else —
-structurally, not just by convention.
+### D-7. 狀態偽裝's deterministic-core write touches `entity.db.disguised_stats` and nothing else.
 
 ```python
+# world/rules/skill_effects.py
 def apply_disguise_effect(entity, overrides: dict[str, int]) -> None:
     """The ENTIRE effect-resolution body for the status_disguise SkillDef.
     Sets change 3's D-8 storage convention directly. Contains no reference to
     entity.traits anywhere in this function -- there is no code path by which
     activating this skill could write a true trait value, satisfying D2
     (disguise is a pure display layer) by construction, not by discipline."""
-    entity.db.disguised_stats = overrides
+    entity.db.disguised_stats = dict(overrides)
 ```
 
 This is the entire function. A test asserts (a) calling it changes `entity.db.disguised_stats` and
 leaves every `entity.traits.<key>.value` unchanged, and (b) — mirroring change 3's D-9 source-scanning
-tripwire exactly — that `world/skills/handler.py` contains no reference to `entity.traits` inside or
-near this function's definition. Because change 3 already built `get_display_value()` and the
+tripwire exactly — that the write function contains no reference to `entity.traits`. Because change
+3 already built `get_display_value()` and the
 `disguised_stats` storage, this change adds no new storage mechanism; it only registers 狀態偽裝 as a
 `SkillDef` and supplies the one-line effect function that uses change 3's existing accessor
 correctly. **Verification against D2**: the effect function has no parameter and no code path that
@@ -454,7 +452,7 @@ class EquipmentHandler:
     def _raw(self) -> dict:
         # entity.db.equipment is the private raw-storage attribute (see D-10),
         # distinct from entity.equipment itself -- which IS this handler, per
-        # design doc S5.2. Change 4's loader (once adjusted per D-10) writes
+        # design doc S5.2. Change 4's landed loader writes
         # the imported equipment dict to entity.db.equipment verbatim. This
         # change is the first to define its canonical inner shape (change 4's
         # schema only required `type: object`, per its own Non-Goals deferring
@@ -463,10 +461,12 @@ class EquipmentHandler:
             "weapon_main": None, "weapon_off": None, "armor": None, "accessories": [],
         }
 
-    def equip(self, slot: EquipmentSlot, item_key: str) -> None: ...
-    def unequip(self, slot: EquipmentSlot) -> str | None: ...
     def slot_contents(self, slot: EquipmentSlot) -> str | list[str] | None: ...
 ```
+
+`world/rules/equipment.py` owns `equip_item()` and `unequip_item()`. Both replace the complete
+private equipment snapshot after validation; the handler above is query-only. This separation keeps
+the `world/skills/` package outside the architecture's single-writer core.
 
 **This change defines the canonical `entity.db.equipment` dict shape going forward** — change 4's
 `CHARACTER_SCHEMA_V1.equipment` property only requires `{"type": "object"}` (its own Non-Goals defer
@@ -476,9 +476,10 @@ slot shape here explicitly: "equipment slot logic — change 5's job"). A card's
 eventually structurally check this shape is an open question this change does not resolve (change 4
 is frozen and not edited by this change).
 
-### D-9. Inventory stays a flat list of item-key strings — no capacity, weight, or stacking model.
+### D-9. Inventory stays a flat list of item-key strings — writes remain in the deterministic core.
 
 ```python
+# world/rules/equipment.py
 def add_item(entity, item_key: str) -> None:
     entity.db.inventory = [*(entity.db.inventory or []), item_key]
 
@@ -489,14 +490,16 @@ def remove_item(entity, item_key: str) -> None:
         items.remove(item_key)
     entity.db.inventory = items
 
+# world/skills/equipment.py
 def list_items(entity) -> list[str]:
     return entity.db.inventory or []
 ```
 
 `entity.db.inventory` is exactly the raw attribute change 4's D-13 already established (`entity.db
 .inventory = record["inventory"]`, a raw list, "no seam attribute declaration required from any other
-change"). These three functions are the entire inventory surface this change builds — no weight
-limit, no stacking, no item-definition registry (an "item" is just a string key here; what that key
+change"). These three functions are the entire inventory surface this change builds, but only the
+read query lives under `world/skills/`; mutations stay under `world/rules/`. There is no weight
+limit, stacking, or item-definition registry (an "item" is just a string key here; what that key
 means — a weapon's stats, a potion's effect — belongs to whichever later change needs item
 definitions, not named against any roadmap item yet). Sizing this any richer would not fit the
 one-day budget and would guess at a system no roadmap item has claimed.
@@ -544,18 +547,7 @@ change 4 already used for `entity.db.inventory` (D-13). `SkillHandler`/`Equipmen
 write these private attributes internally (D-5, D-8); nothing outside the handler classes is expected
 to touch them directly.
 
-**Required one-line adjustment to change 4's `loader.py` — named here, not made here.** Change 4's
-`instantiate_character()` currently writes:
-
-```python
-entity.skills = {"active": record["skills"], "passive": record["passives"]}
-entity.equipment = record["equipment"]
-```
-
-This was correct against change 3's placeholder `AttributeProperty`, but breaks against this change's
-read-only property (assigning to a property with no setter raises `AttributeError`). The fix is a
-two-line adjustment, targeting the private storage location this change now owns instead of the
-public property name:
+**Change 4 integration check.** Its landed `instantiate_character()` already writes:
 
 ```python
 entity.db.skills = {"active": record["skills"], "passive": record["passives"]}
@@ -563,10 +555,8 @@ entity.db.equipment = record["equipment"]
 ```
 
 **This does not touch `CHARACTER_SCHEMA_V1`, `validate.py`, the reference example, or anything an
-external import author depends on** — only two lines inside `loader.py`'s private write path. Per
-this change's own scope boundary (no other change's artifacts are modified by this change), this
-adjustment is named here for the coordinator to carry into change 4's `loader.py` (its task 5.2), not
-made directly by this change.
+external import author depends on. This change verifies those existing private-storage writes remain
+compatible with the new read-only handlers.
 
 **Alternative considered (superseded)**: the parallel `skill_handler`/`equipment_handler`-suffixed
 properties from this design's earlier draft. Rejected on review — it left `entity.skills` holding a
@@ -579,16 +569,15 @@ split indefinitely.
 ### D-11. No combat-state branching anywhere in `world/skills/` — the `ActionResolver` seam is
 declared, not built.
 
-Design doc §5.2 states plainly: "A skill does not know whether it is in combat." Every function this
-change adds (`effective_value()`, `grant_conferred()`, `apply_disguise_effect()`, `equip()`, the
-inventory helpers) takes an entity (and, where relevant, a trait key or item key) and nothing that
+Design doc §5.2 states plainly: "A skill does not know whether it is in combat." Every read function
+under `world/skills/` takes an entity (and, where relevant, a trait key or slot) and nothing that
 resembles a combat-state flag, turn-order position, or `ActionResolver` context object. A regression
 test inspects every public callable in `world/skills/handler.py` and `world/skills/equipment.py` via
 `inspect.signature()` and asserts no parameter name matches `in_combat`/`combat_state`/`turn`/
 `is_combat`, and a plain source-text check asserts the module bodies contain no conditional branching
-on such a concept. This mirrors change 3's D-9 tripwire style (a deliberately simple, string/signature
--level check) rather than a heavier static-analysis tool, consistent with this change's one-day
-budget.
+on such a concept across every production module in the package. A second AST tripwire rejects
+persistent-state assignments and imports from `world.rules`, preserving the single-writer dependency
+direction.
 
 ## Risks / Trade-offs
 
@@ -641,14 +630,10 @@ budget.
   change replaces it with a real handler mounted the same way `traits` is mounted above") — this
   change's edit is precisely the replacement change 3 asked for, not a redesign of anything change 3
   built; `entity.traits`'s own mounting is left completely untouched.
-- **[Risk] Change 4's `loader.py` bare-assigns to `entity.skills`/`entity.equipment`, which raises
-  `AttributeError` once those names become read-only properties (D-10), and this change cannot edit
-  change 4 to fix it directly.** → Mitigation: named explicitly in D-10 as a required, minimal
-  two-line adjustment (`entity.db.skills = ...` / `entity.db.equipment = ...` instead of the bare
-  attribute) for the coordinator to carry into change 4's `loader.py` (its task 5.2). The adjustment
-  touches zero external contract surface — `CHARACTER_SCHEMA_V1`, `validate.py`, and the reference
-  example are all completely unaffected — so it carries no risk to the frozen schema handoff, only to
-  an internal, never-externally-observed implementation line.
+- **[Risk] The new read-only handlers require change 4's loader to write private storage rather than
+  assign to `entity.skills`/`entity.equipment`.** → Mitigation: the landed loader already writes
+  `entity.db.skills`/`entity.db.equipment`; cross-change tests verify imports still populate both
+  handlers without changing the frozen JSON contract.
 
 ## Migration Plan
 
@@ -657,13 +642,9 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 
 - This change must land after change 3 (needs `LivingEntity` and the `skills`/`equipment` seam
   attributes importable).
-- **Change 4's `loader.py` needs its own one-line adjustment landed alongside this change** (D-10):
-  `instantiate_character()`'s two lines that currently bare-assign
-  `entity.skills = {...}`/`entity.equipment = {...}` must instead target
-  `entity.db.skills = {...}`/`entity.db.equipment = {...}`. This is a private-implementation-detail
-  change inside a file this change does not itself edit — named here for the coordinator to apply to
-  change 4 directly. Nothing about `CHARACTER_SCHEMA_V1` or any artifact handed to an external import
-  author changes.
+- Change 4's landed loader already targets `entity.db.skills`/`entity.db.equipment`; verify that
+  integration against the new handlers. Nothing about `CHARACTER_SCHEMA_V1` or any artifact handed
+  to an external import author changes.
 - This change should land in a way that change 4's already-written self-arming test
   (`test_skill_registry_self_arming.py`) transitions from skipped to passing the moment
   `world.skills.registry.SKILL_REGISTRY` is importable with genuine content.
@@ -677,7 +658,9 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 - **Should a listed "active" vs. "passive" skill key (the two arrays change 4's loader already
   separates) be cross-checked against that key's own `SkillDef.kind`?** Not part of change 4's frozen
   reject/warn table, and not built here since it would require editing change 4's frozen validator.
-  Left open for a future revision of the import contract, not this change's job.
+  Left open for a future revision of the import contract, not this change's job. This handler only
+  applies multiplier effects from the active array and treats duplicate active keys idempotently, so
+  malformed ownership cannot compound a multiplier while that stricter validation remains deferred.
 - **Exact evadventure `WieldLocation` enum member names and `EquipmentHandler` method signatures**
   (D-8) are left to the implementer to confirm against the installed Evennia 6.1.0, the same
   verification discipline changes 1–4 already established for their own Evennia-API assumptions —
