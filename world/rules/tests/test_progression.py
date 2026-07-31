@@ -1,0 +1,337 @@
+"""Regression tests for deterministic character progression."""
+
+from unittest.mock import patch
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
+from world.rules.action import (
+    ActionRequest,
+    ActionResolver,
+    CommitFailed,
+    PendingEffect,
+    _commit,
+)
+from world.rules.buffs import grant_conferred_growth_rate
+from world.rules.buffs import _add_buff
+from world.rules.clock import AdvanceSource, WorldClock
+from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
+from world.rules.progression import (
+    COMBAT_KILL_XP_TABLE,
+    MAGIC_XP_PER_LEVEL,
+    SKILL_PRACTICE_XP_PER_USE,
+    accrue_magic_study,
+    effective_magic_growth_multiplier,
+    grant_combat_kill_xp,
+    grant_skill_practice_xp,
+    skill_proficiency_level,
+)
+import world.rules.progression as progression
+
+
+class ProgressionTests(EvenniaTest):
+    def _character(self, key: str, race: str = "human") -> PlayerCharacter:
+        entity = create_object(PlayerCharacter, key=key)
+        entity.race = race
+        entity.apply_race_baseline()
+        return entity
+
+    def _monster(self, key: str, tier: str = "low") -> Monster:
+        monster = create_object(Monster, key=key)
+        monster.threat_tier = tier
+        monster.apply_monster_tier()
+        return monster
+
+    def test_multiplier_combines_race_owned_passive_and_conferred_buff(self):
+        entity = self._character("elosia", "elf")
+        entity.db.skills = {
+            "active": [],
+            "passive": ["reincarnation_boon_elosia"],
+        }
+        grant_conferred_growth_rate(entity, "source", 0.5)
+        self.assertEqual(effective_magic_growth_multiplier(entity), 500.0)
+
+    def test_multiplier_applies_race_and_passive_sources_independently(self):
+        elf = self._character("race-multiplier", "elf")
+        self.assertEqual(effective_magic_growth_multiplier(elf), 10.0)
+
+        passive = self._character("passive-multiplier")
+        passive.db.skills = {
+            "active": [],
+            "passive": ["reincarnation_boon_elosia"],
+        }
+        self.assertEqual(effective_magic_growth_multiplier(passive), 100.0)
+
+    def test_conferred_growth_changes_study_xp(self):
+        baseline = self._character("baseline")
+        conferred = self._character("conferred")
+        grant_conferred_growth_rate(conferred, "elosia", 0.5)
+        accrue_magic_study([baseline, conferred], 3600, AdvanceSource.SKIP)
+        self.assertEqual(conferred.db.magic_xp, baseline.db.magic_xp * 0.5)
+
+    def test_missing_race_and_growth_sources_return_identity_multiplier(self):
+        monster = self._monster("identity")
+        self.assertEqual(effective_magic_growth_multiplier(monster), 1.0)
+
+    def test_study_requires_skip_source_and_world_clock_invokes_it(self):
+        entity = self._character("student")
+        accrue_magic_study([entity], 3600, AdvanceSource.COMMAND)
+        accrue_magic_study([entity], 3600, AdvanceSource.COMBAT)
+        self.assertIsNone(entity.db.magic_xp)
+        WorldClock().advance(3600, AdvanceSource.SKIP, [entity])
+        self.assertEqual(entity.db.magic_xp, 1.0)
+
+    def test_long_skip_uses_closed_form_study_xp(self):
+        entity = self._character("long-skip")
+        accrue_magic_study([entity], 28800, AdvanceSource.SKIP)
+        self.assertEqual(entity.db.magic_xp, 8.0)
+
+    def test_magic_level_is_capped_and_surplus_is_discarded(self):
+        entity = self._character("elf", "elf")
+        entity.db.magic_xp = MAGIC_XP_PER_LEVEL * 10000
+        grant_combat_kill_xp(entity, "low")
+        self.assertEqual(entity.traits.magic_level.value, 900)
+        self.assertEqual(entity.db.magic_xp, 0.0)
+
+    def test_monster_magic_level_never_grows(self):
+        monster = self._monster("monster")
+        grant_combat_kill_xp(monster, "low")
+        self.assertEqual(monster.traits.magic_level.value, 0)
+        self.assertEqual(monster.db.magic_xp, 0.0)
+
+    def test_magic_xp_at_cap_is_discarded_on_later_grants(self):
+        entity = self._character("capped-elf", "elf")
+        entity.traits.magic_level.current = entity.traits.magic_level.max
+        grant_combat_kill_xp(entity, "low")
+        self.assertEqual(entity.traits.magic_level.value, 900)
+        self.assertEqual(entity.db.magic_xp, 0.0)
+
+    def test_kill_xp_table_is_ordered_and_unknown_tier_does_not_write(self):
+        self.assertLess(COMBAT_KILL_XP_TABLE["low"], COMBAT_KILL_XP_TABLE["mid"])
+        self.assertLess(COMBAT_KILL_XP_TABLE["mid"], COMBAT_KILL_XP_TABLE["high"])
+        self.assertLess(COMBAT_KILL_XP_TABLE["high"], COMBAT_KILL_XP_TABLE["calamity"])
+        entity = self._character("unknown-tier")
+        with self.assertRaises(KeyError):
+            grant_combat_kill_xp(entity, "unknown")
+        self.assertIsNone(entity.db.magic_xp)
+
+    def test_growth_rate_conferral_rejects_invalid_scales(self):
+        entity = self._character("invalid-scale")
+        for scale in (-1, float("nan"), float("inf"), True):
+            with self.subTest(scale=scale):
+                with self.assertRaises(ValueError):
+                    grant_conferred_growth_rate(entity, "source", scale)
+        self.assertFalse(entity.buffs.all)
+
+    def test_skill_practice_is_race_scaled_and_independent_of_conferred_growth(self):
+        entity = self._character("practitioner", "elf")
+        grant_conferred_growth_rate(entity, "elosia", 0.5)
+        grant_skill_practice_xp(entity, "shadow_slash", uses=3)
+        self.assertEqual(
+            entity.db.skill_proficiency["shadow_slash"],
+            3 * SKILL_PRACTICE_XP_PER_USE * 10,
+        )
+        self.assertEqual(entity.traits.magic_level.value, 0)
+        self.assertIsNone(entity.db.magic_xp)
+        self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 0)
+
+    def test_proficiency_query_is_pure(self):
+        entity = self._character("query")
+        entity.db.skill_proficiency = {"shadow_slash": 151.0}
+        before = dict(entity.db.skill_proficiency)
+        self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 3)
+        self.assertEqual(skill_proficiency_level(entity, "never_practiced"), 0)
+        self.assertEqual(entity.db.skill_proficiency, before)
+
+    def test_magic_xp_grants_preserve_skill_proficiency(self):
+        entity = self._character("separate-progression")
+        entity.db.skill_proficiency = {"shadow_slash": 25.0}
+        before = dict(entity.db.skill_proficiency)
+        accrue_magic_study([entity], 3600, AdvanceSource.SKIP)
+        grant_combat_kill_xp(entity, "low")
+        self.assertEqual(entity.db.skill_proficiency, before)
+
+    def test_action_commit_restores_progression_attributes_on_failure(self):
+        entity = self._character("atomic")
+        effects = [
+            PendingEffect(
+                entity,
+                "practice",
+                frozenset({"progression"}),
+                lambda: grant_skill_practice_xp(entity, "shadow_slash"),
+            ),
+            PendingEffect(
+                entity,
+                "failure",
+                frozenset({"progression"}),
+                lambda: (_ for _ in ()).throw(RuntimeError("injected")),
+            ),
+        ]
+        with self.assertRaises(CommitFailed):
+            _commit(effects)
+        self.assertIsNone(entity.db.skill_proficiency)
+        self.assertIsNone(entity.db.magic_xp)
+
+    def test_successful_combat_action_awards_practice_and_kill_xp_once(self):
+        actor = self._character("fighter")
+        actor.db.skills = {"active": ["shadow_slash"], "passive": []}
+        monster = self._monster("goblin")
+        monster.traits.hp.current = 1
+        battlefield = Battlefield(
+            {"party": frozenset({"fighter"}), "foes": frozenset({"goblin"})},
+            {"fighter": actor, "goblin": monster},
+        )
+        request = ActionRequest(
+            actor,
+            "shadow_slash",
+            [monster],
+            BattlefieldActionContext(battlefield),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            logs = run_round(
+                battlefield,
+                lambda entity, _: request if entity is actor else None,
+            )
+        self.assertTrue(logs)
+        self.assertEqual(actor.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        self.assertEqual(
+            actor.db.skill_proficiency["shadow_slash"],
+            SKILL_PRACTICE_XP_PER_USE,
+        )
+
+    def test_area_shorthand_awards_each_newly_defeated_monster_once(self):
+        actor = self._character("area-fighter")
+        actor.db.skills = {"active": ["wind_blade"], "passive": []}
+        first, second, corpse = (
+            self._monster("first"),
+            self._monster("second"),
+            self._monster("corpse"),
+        )
+        first.traits.hp.current = second.traits.hp.current = 1
+        corpse.traits.hp.current = 0
+        battlefield = Battlefield(
+            {
+                "party": frozenset({"area-fighter"}),
+                "foes": frozenset({"first", "second", "corpse"}),
+            },
+            {
+                "area-fighter": actor,
+                "first": first,
+                "second": second,
+                "corpse": corpse,
+            },
+        )
+        request = ActionRequest(
+            actor,
+            "wind_blade",
+            "all-enemies",
+            BattlefieldActionContext(battlefield),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            run_round(
+                battlefield,
+                lambda entity, _: request if entity is actor else None,
+            )
+        self.assertEqual(actor.db.magic_xp, 2 * COMBAT_KILL_XP_TABLE["low"])
+
+    def test_duplicate_area_targets_award_one_kill_only(self):
+        actor = self._character("duplicate-fighter")
+        actor.db.skills = {"active": ["wind_blade"], "passive": []}
+        monster = self._monster("duplicate-goblin")
+        monster.traits.hp.current = 1
+        battlefield = Battlefield(
+            {"party": frozenset({"duplicate-fighter"}), "foes": frozenset({"duplicate-goblin"})},
+            {"duplicate-fighter": actor, "duplicate-goblin": monster},
+        )
+        request = ActionRequest(
+            actor,
+            "wind_blade",
+            [monster, monster],
+            BattlefieldActionContext(battlefield),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            run_round(
+                battlefield,
+                lambda entity, _: request if entity is actor else None,
+            )
+        self.assertEqual(actor.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+
+    def test_non_monster_target_never_awards_kill_xp(self):
+        actor = self._character("player-fighter")
+        actor.db.skills = {"active": ["shadow_slash"], "passive": []}
+        target = self._character("tiered-player")
+        target.threat_tier = "low"
+        target.traits.hp.current = 1
+        battlefield = Battlefield(
+            {"party": frozenset({"player-fighter"}), "foes": frozenset({"tiered-player"})},
+            {"player-fighter": actor, "tiered-player": target},
+        )
+        request = ActionRequest(
+            actor,
+            "shadow_slash",
+            [target],
+            BattlefieldActionContext(battlefield),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            run_round(
+                battlefield,
+                lambda entity, _: request if entity is actor else None,
+            )
+        self.assertIsNone(actor.db.magic_xp)
+
+    def test_invalid_legacy_multiplier_rolls_back_combat_action(self):
+        actor = self._character("rollback-fighter")
+        actor.db.skills = {"active": ["shadow_slash"], "passive": []}
+        monster = self._monster("rollback-goblin")
+        monster.traits.hp.current = 1
+        _add_buff(
+            actor,
+            "conferred_growth_rate",
+            instance_key="conferred_growth_rate:invalid",
+            source_key="invalid",
+            scale=-1,
+        )
+        battlefield = Battlefield(
+            {"party": frozenset({"rollback-fighter"}), "foes": frozenset({"rollback-goblin"})},
+            {"rollback-fighter": actor, "rollback-goblin": monster},
+        )
+        request = ActionRequest(
+            actor,
+            "shadow_slash",
+            [monster],
+            BattlefieldActionContext(battlefield),
+        )
+        initial_sp = actor.traits.sp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(monster.traits.hp.value, 1)
+        self.assertEqual(actor.traits.sp.value, initial_sp)
+        self.assertIsNone(actor.db.magic_xp)
+        self.assertIsNone(actor.db.skill_proficiency)
+
+    def test_calibration_anchors(self):
+        violet = self._character("violet")
+        accrue_magic_study([violet], 11680 * 3600, AdvanceSource.SKIP)
+        self.assertIn(violet.traits.magic_level.value, {19, 20})
+
+        ordinary_human = self._character("ordinary-human")
+        accrue_magic_study([ordinary_human], 29200 * 3600, AdvanceSource.SKIP)
+        self.assertGreaterEqual(ordinary_human.traits.magic_level.value, 30)
+        self.assertLessEqual(ordinary_human.traits.magic_level.value, 50)
+
+        elosia = self._character("calibration-elosia", "elf")
+        elosia.db.skills = {
+            "active": [],
+            "passive": ["reincarnation_boon_elosia"],
+        }
+        accrue_magic_study([elosia], 524 * 3600, AdvanceSource.SKIP)
+        self.assertIn(elosia.traits.magic_level.value, {873, 874})
+        self.assertLess(elosia.traits.magic_level.value, 900)
+
+    def test_divine_arts_remain_outside_progression_scope(self):
+        self.assertFalse(
+            any("divine" in name for name in vars(progression))
+        )

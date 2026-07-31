@@ -1,0 +1,75 @@
+- id: arousal_up_on_stimulus
+  when: {event: stimulus_applied}
+  then: {field: arousal, delta: "+1..+2"}
+- id: arousal_up_on_sustained_stimulus
+  when: {event: sustained_stimulus_applied}
+  then: {field: arousal, delta: "+1"}
+- id: arousal_extreme_stimulus_to_max
+  when: {event: extreme_stimulus_applied}
+  then: {field: arousal, set: 極限}
+- id: arousal_reset_after_climax
+  when: {event: climax_ends}
+  then: {field: arousal, set: 微興奮}
+- id: wetness_follows_arousal
+  when: {field_changed: arousal, direction: up}
+  then: {field: wetness, delta: "+1"}
+- id: wetness_up_on_direct_stimulus
+  when: {event: direct_stimulus_applied}
+  then: {field: wetness, delta: "+1..+2"}
+- id: wetness_max_on_climax
+  when: {event: climax_ends}
+  then: {field: wetness, set: 泛濫}
+- id: sensitivity_up_on_frequent_stimulation
+  when: {event: frequent_stimulation}
+  then: {field: sensitivity, delta: "+1"}
+- id: climax_gate
+  when: {field: arousal, equals: 極限}
+  then: {field: climax_phase, set: 接近, from: 未達}
+- id: climax_phase_critical_point_to_in_progress
+  when: {field: climax_phase, equals: 接近, event: stimulus_applied}
+  then: {field: climax_phase, set: 進行中}
+- id: climax_phase_ends_to_afterglow
+  when: {event: climax_ends}
+  then: {field: climax_phase, set: 餘韻}
+- id: climax_today_increment_on_climax
+  when: {event: climax_ends}
+  then: {field: climax_today, delta: "+1"}
+- id: virginity_once
+  when: {event: first_vaginal_penetration}
+  then: {field: virgin, set: false, irreversible: true}
+- id: experience_vaginal_added
+  when: {event: first_vaginal_penetration}
+  then: {field: experience_types, add: 陰道性交}
+- id: experience_masturbation_added
+  when: {event: masturbation_climax}
+  then: {field: experience_types, add: 自慰}
+- id: experience_lesbian_added
+  when: {event: penetrative_sex_with_female}
+  then: {field: experience_types, add: 女女性愛}
+- id: experience_titfuck_added
+  when: {event: breast_sex_performed}
+  then: {field: experience_types, add: 乳交}
+- id: experience_watched_added
+  when: {event: watched_during_activity}
+  then: {field: experience_types, add: 被觀看}
+- id: experience_exposure_added
+  when: {event: public_exposure}
+  then: {field: experience_types, add: 露出}
+- id: experience_interspecies_added
+  when: {event: sexual_activity_with_nonhuman}
+  then: {field: experience_types, add: 異種性愛}
+- id: shame_up_on_exposure_increase
+  when: {field_changed: exposure, direction: up}
+  then: {field: shame, delta: "+1"}
+- id: shame_up_on_public_sexual_activity
+  when: {event: public_sexual_activity}
+  then: {field: shame, delta: "+1"}
+- id: shame_up_on_watched
+  when: {event: watched_during_activity}
+  then: {field: shame, delta: "+1"}
+- id: exposure_up_on_clothing_damaged
+  when: {event: clothing_damaged_in_combat}
+  then: {field: exposure, delta: "+1"}
+- id: sp_cost_on_climax
+  when: {event: climax_ends}
+  then: {field: sp, delta: "-30..-20"}

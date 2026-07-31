@@ -1,0 +1,17 @@
+# world_info.md: the climate has four distinct but mild seasons.
+seconds_per_hour: 3600
+hours_per_day: 24
+days_per_season: 90
+seasons_per_year: 4
+season_names: ["春季", "夏季", "秋季", "冬季"]
+dayparts:
+  midnight: 0
+  dawn: 6
+  noon: 12
+  dusk: 18
+command_defaults:
+  move: 30
+  converse: 60
+  cast: 6 # Documentation only; CmdCast uses ActionResult.time_cost_seconds.
+max_settlement_quanta: 4320 # Placeholder pending a future balance pass.
+max_sleep_seconds: 43200 # Placeholder pending a future balance pass.

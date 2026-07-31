@@ -27,6 +27,7 @@ class TraitIntegrationTests(EvenniaTest):
             self.assertIsInstance(trait, GaugeTrait)
             self.assertIsNotNone(trait.max)
             self.assertIsNotNone(trait.rate)
+            self.assertIsNone(trait._data["last_update"])
         for key in STATIC_KEYS:
             trait = getattr(entity.traits, key)
             self.assertIsInstance(trait, StaticTrait)

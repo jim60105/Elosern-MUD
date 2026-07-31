@@ -1,0 +1,32 @@
+tier_default_archetype:
+  low: instinctive        # See design.md D-1/D-2/D-3: 史萊姆, 哥布林, 巨鼠.
+  mid: pack_hunter        # See design.md D-1/D-2/D-3: 狼型魔獸, 食人魔, 地龍.
+  high: brute             # See design.md D-1/D-2/D-3: 雙頭龍, 魔法生物, 巨魔.
+  calamity: apex_predator # See design.md D-1/D-2/D-3: 古龍, 魔神, 災獸.
+
+archetypes:
+  instinctive:
+    target_strategy: lowest_hp
+    skill_choice: first_owned
+    prefer_area_when_multiple_enemies: false
+    flee_hp_fraction: 0.35
+  pack_hunter:
+    target_strategy: lowest_hp
+    skill_choice: highest_expected_damage
+    prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: 0.20
+  brute:
+    target_strategy: highest_effective_power
+    skill_choice: highest_expected_damage
+    prefer_area_when_multiple_enemies: false
+    flee_hp_fraction: 0.10
+  tactical_caster:
+    target_strategy: highest_effective_power
+    skill_choice: highest_expected_damage
+    prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: 0.25
+  apex_predator:
+    target_strategy: highest_effective_power
+    skill_choice: highest_expected_damage
+    prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: null

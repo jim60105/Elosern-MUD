@@ -12,6 +12,7 @@ from evennia.utils import lazy_property
 
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
+from world.rules.sexual_state import SexualState
 
 from .objects import ObjectParent
 
@@ -23,7 +24,6 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     subrace: str | None = AttributeProperty(default=None)
 
     # Declared handler seams; their owning changes replace these placeholders.
-    sexual: Any | None = AttributeProperty(default=None)  # sexual-state
     relations: Any | None = AttributeProperty(default=None)  # unassigned
     persona: Any | None = AttributeProperty(default=None)  # import-contract candidate
 
@@ -36,6 +36,11 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     def buffs(self) -> BuffHandler:
         """Persistent status-effect handler."""
         return BuffHandler(self)
+
+    @lazy_property
+    def sexual(self) -> SexualState:
+        """Persistent deterministic sexual-state handler."""
+        return SexualState(self)
 
     @lazy_property
     def equipment(self) -> EquipmentHandler:

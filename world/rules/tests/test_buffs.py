@@ -92,15 +92,23 @@ class BuffIntegrationTests(EvenniaTest):
         _add_buff(entity, "poisoned")
         _add_buff(entity, "paralysis")
         grant_conferred_growth_rate(entity, "temporary", 0.5)
-        for buff in entity.buffs.all.values():
-            buff.duration = 1
-            buff.start -= 2
+        for key in ("poisoned", "paralysis"):
+            entity.buffs.all[key].remaining_seconds = 0
         hp = entity.traits.hp.value
-        self.assertEqual(entity_active_buffs(entity), set())
+        self.assertEqual(entity_active_buffs(entity), {"conferred_growth_rate"})
         self.assertFalse(blocks_action(entity))
-        self.assertEqual(growth_rate_multiplier(entity), 1.0)
+        self.assertEqual(growth_rate_multiplier(entity), 0.5)
         tick_buffs(entity)
         self.assertEqual(entity.traits.hp.value, hp)
+
+    def test_buff_expiry_uses_explicit_game_seconds(self):
+        entity = self._entity()
+        _add_buff(entity, "poisoned")
+        self.assertEqual(entity.buffs.all["poisoned"].duration, -1)
+        tick_buffs(entity, 290)
+        self.assertIn("poisoned", entity_active_buffs(entity))
+        tick_buffs(entity, 10)
+        self.assertNotIn("poisoned", entity_active_buffs(entity))
 
     def test_yaml_tick_interval_is_persisted_as_clock_metadata(self):
         entity = self._entity()

@@ -7,6 +7,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
 from world.lore.races import RACE_REGISTRY
 from world.rules.traits import STATIC_KEYS
 from world.skills import handler
@@ -23,7 +24,7 @@ class SkillHandlerTests(EvenniaTest):
     def test_handler_reads_private_storage_and_has_no_bare_assignment(self):
         entity = self._entity()
         entity.db.skills = None
-        self.assertEqual(entity.skills.owned_keys(), [])
+        self.assertEqual(entity.skills.owned_keys(), ["flee"])
         with self.assertRaises(AttributeError):
             entity.skills = {"active": [], "passive": []}
 
@@ -33,8 +34,21 @@ class SkillHandlerTests(EvenniaTest):
         }
         self.assertEqual(
             entity.skills.owned_keys(),
-            ["fire_ball", "defense_instinct"],
+            ["fire_ball", "defense_instinct", "flee"],
         )
+
+    def test_flee_is_innate_for_bare_monster_and_not_combat_gated(self):
+        monster = create_object(Monster, key="bare monster")
+        monster.db.skills = None
+        before = monster.skills.owned_keys()
+        monster.db.current_battlefield = object()
+        after = monster.skills.owned_keys()
+        self.assertEqual(before, ["flee"])
+        self.assertEqual(after, before)
+
+    def test_skill_handler_has_no_rules_dependency(self):
+        source = inspect.getsource(handler)
+        self.assertNotIn("world.rules", source)
 
     def test_effective_value_multiplies_without_mutating_base(self):
         entity = self._entity()

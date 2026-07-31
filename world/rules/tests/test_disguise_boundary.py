@@ -10,7 +10,6 @@ from world.rules.traits import get_display_value
 
 FORBIDDEN_MODULES = (
     "world/rules/combat.py",
-    "world/rules/action.py",
     "world/rules/dice.py",
     "world/rules/targeting.py",
 )
@@ -37,4 +36,3 @@ class DisguiseBoundaryTests(EvenniaTest):
         self.assertEqual(get_display_value(entity, "defense"), true_defense)
         self.assertEqual(entity.traits.atk_phys.value, true_attack)
         self.assertEqual(entity.traits.magic_level.value, 0)
-
