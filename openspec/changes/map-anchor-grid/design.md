@@ -210,7 +210,18 @@ exists yet at that XYZ.
 **`XYZExit` (same module) — coordinate-aware exit; `.xyz` (source) and `.xyz_destination` properties,
 `.create()` mirrors `XYZRoom.create()`'s shape.** Used directly (per design doc §4's original "Use
 directly" call, reconfirmed) — this change adds no project-owned `Exit` subclass, since neither
-`scene_archetype` nor `anchor_key` is an exit concern.
+`scene_archetype` nor `anchor_key` is an exit concern, and the contrib class itself is unmodified and
+remains directly usable elsewhere. **Amended 2026-08-01 (change `map-movement-clock`, roadmap item
+13b):** "remains directly usable elsewhere" no longer describes the state of this project once that
+change lands. It adds a `("*", "*", "*")` wildcard link-prototype override to this change's own
+`ALTORIA_CAPITAL_MAP_DATA["prototypes"]`, so all twelve of the sample city's links — the only
+`xyzgrid` map anywhere in the current roadmap — spawn as `typeclasses.exits.CostedXYZExit`
+(`MovementCostMixin` composed with `XYZExit`, unmodified in every other respect) instead of the bare
+contrib class. `XYZExit` itself is still unmodified and still directly importable/usable — nothing
+about the contrib class changes — but there is no longer an "elsewhere" in this project where a bare
+`XYZExit` is actually instantiated. See `openspec/changes/map-movement-clock/design.md` D-4/D-9 for
+the full mechanics and why this is expressed as a delta spec against `sample-city-altoria` rather than
+an edit to this change's own implementation files.
 
 **Idempotency of the spawn step itself, verified by reading the actual spawn implementation
 (`xymap.py::XYMap.spawn_nodes`, `xymap_legend.py::MapNode.spawn`/`spawn_links`), not merely asserted
