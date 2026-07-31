@@ -689,7 +689,16 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 |---|---|---|---|
 | 12 | `map-anchor-grid` | 2, 3 | Anchor sync, xyzgrid grid layer, one sample city |
 | 13 | `map-wilderness` | 12 | `WildernessMapProvider`, terrain description |
-| 14 | `map-instance` | 12 | Instance TTL reclamation, promotion of named rooms |
+| 14 | `map-instance` | 12, 13 | Instance TTL reclamation, promotion of named rooms |
+
+> **Amended 2026-08-01.** Change 14's `Depends on` cell was `12`; it is now `12, 13`. Change 14's own
+> design (`openspec/changes/map-instance/design.md`) adopts change 13's `SceneArchetypeMixin` for its
+> `InstanceRoom` typeclass rather than inventing a fourth, independent `scene_archetype` seam — the
+> resolution change 13's own design document explicitly anticipated by name ("a future `InstanceRoom`
+> can each adopt [`SceneArchetypeMixin`] independently of sharing `XYZRoom` as a common ancestor").
+> That makes change 13 a real implementation prerequisite for change 14, not merely a sibling sharing
+> change 12 as a common dependency, and this table is corrected to say so rather than leaving every
+> future reader to rediscover the gap from change 14's own design document alone.
 
 ### Phase 4 — Quests and economy
 
