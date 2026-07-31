@@ -19,20 +19,6 @@ This is roadmap item #10b (design doc §11), depending on change 9 (`dice-combat
   carr[ying] only a default placeholder value" — with no owner named until the coordinator added this
   change to the roadmap specifically to fill it.
 
-**Amendment — change 10c (`combat-disengage`) has since landed and supplies the flee mechanism.** This
-change's own first-round design named fleeing a Non-Goal on the grounds that no dependency ever writes
-to `Battlefield.fled`. Change 10c closed that gap: it added a `flee` `SkillDef` (`target_spec=SELF`,
-`faction_constraint=SELF_ONLY`, `effects=["disengage:self"]`) castable by *any* `LivingEntity` via its
-own `INNATE_SKILL_KEYS` extension to `SkillHandler.owned_keys()` (no bestiary/import data needed), a
-`disengage` effect handler that is `Battlefield.fled`'s first-ever writer, and a flee-success formula
-that reuses dice-combat's own recalibrated to-hit constant (`51`) and agility-difference arithmetic
-verbatim, comparing the fleeing entity's adjusted agility against the fastest living, non-fled opposing
-combatant's. Change 10c's own design.md D-7 named this change, by number, as the owner of *when* a
-monster chooses to attempt this — "a policy question 10b's own author must resolve, not answered here"
-— and specified the exact extension shape (a per-archetype `flee_hp_fraction` tunable and one new branch
-in `monster_behaviour_policy()`, evaluated before the existing single-vs-area decision). This amendment
-is that follow-up.
-
 **What already exists for this change to build on, unmodified.** `world/rules/combat.py` (change 9,
 public): `Battlefield` (two teams, `roster`, `fled`), `BattlefieldActionContext`, `effective_power(entity)
 -> float`, `default_attack_policy(entity, battlefield) -> ActionRequest | None`, and `world/rules/dice.py`'s
@@ -44,19 +30,16 @@ caller supplies with no inspection of its identity. `world/rules/action.py` (cha
 `MONSTER_TIER_REGISTRY: dict[str, MonsterTier]` with `static_band`/`hp_band`/`example_monsters_zh`.
 `typeclasses/monsters.py` (change 3, public): `Monster.threat_tier: str | None` (a real `MonsterTier`
 key) and `Monster.behaviour_tree` (declared, defaulting to a placeholder value this change treats as
-"unset"). `world/rules/disengage.py` (change 10c, public): `FLEE_SKILL_KEY` (`"flee"`) and the fact that
-every `LivingEntity` owns it innately — this change only needs the key and the knowledge that
-`ActionResolver.resolve()` will accept it given a correctly-populated `event_context`; it does not read
-`disengage.py`'s success-formula internals at all.
+"unset").
 
 **No code exists yet for this change's own scope.** Nothing named `world/rules/monster_behaviour.py` or
 `world/rules/rulebook/monster_behaviour.yaml` exists.
 
 **What this change explicitly does not touch.** `action.py`, `targeting.py`, `event_log.py` (change 8's
 scanned, no-combat-branching modules), `combat.py`, `dice.py`, `rulebook/combat.yaml` (change 9),
-`overwhelm.py`, `rulebook/overwhelm.yaml` (change 10), `disengage.py` (change 10c). This change is purely
-additive against all of their existing public surfaces, matching the discipline changes 8/9/10/10c
-already established for each other.
+`overwhelm.py`, `rulebook/overwhelm.yaml` (change 10). This change is purely additive against all of
+their existing public surfaces, matching the discipline changes 8/9/10 already established for each
+other.
 
 ## Goals / Non-Goals
 
@@ -76,15 +59,10 @@ already established for each other.
   `resolve_overwhelm()` — no edit to either module.
 - Deterministic tie-breaking through change 9's seeded `dice.roll_d100()`, never Python's `random`
   module, so a fixed seed reproduces an exact decision sequence for golden tests.
-- A per-archetype `flee_hp_fraction: float | None` tunable and one new decision-tree branch, evaluated
-  before the single-vs-area decision, that returns an `ActionRequest` invoking change 10c's `flee` skill
-  when the acting monster's current-hp fraction is at or below its archetype's threshold — the concrete
-  answer to change 10c's own D-7 hand-off, calibrated per tier against the identical `world_info.md`
-  grounding this change's other tunables already use.
-- Golden, fixed-seed tests: one per archetype showing a materially different decision on an identical
-  battlefield; a seeded tie-break reproducibility test; a non-`Monster`-entity delegation test; an
-  integration test proving this policy works unmodified inside both `run_round()` and
-  `resolve_overwhelm()`; one flee-threshold golden test per archetype.
+- Golden, fixed-seed tests covering all four tier-default archetypes on an identical battlefield and
+  showing the required low-versus-calamity target difference; a seeded tie-break reproducibility test;
+  a non-`Monster`-entity delegation test; an integration test proving this policy works unmodified
+  inside both `run_round()` and `resolve_overwhelm()`.
 
 **Non-Goals:**
 - **No LLM, no generative layer, no call into `world/ai/`.** Hard requirement 1. A source-scan test
@@ -106,12 +84,15 @@ already established for each other.
   baselines (most monsters at 普通 sensitivity, `shame` clamped to 無) to whichever change builds the
   bestiary/spawn data — not named on the roadmap yet, and not this change. This change's decision tree
   never reads or writes `entity.sexual`.
-- **No flee/disengage *mechanism*.** Change 10c (`combat-disengage`) owns the `flee` `SkillDef`, the
-  `disengage` effect handler, the agility-based success formula, and `Battlefield.fled`'s writer. This
-  change consumes that mechanism (D-6) — deciding *when* a monster attempts it — but does not build, alter,
-  or duplicate any part of it: no new effect ID, no new `RejectReason`, no reimplementation of the
-  success check. If a future change ever replaces or extends the flee mechanism itself, this change's own
-  code needs no edit beyond the one `skill_key`/`event_context` shape D-6 already documents.
+- **No flee/disengage mechanic.** Design doc §6.3 lists "flee" as one of three ways a combat encounter
+  ends, but no change in this change's dependency chain (8, 9, or 10) ever adds an entity key to
+  `Battlefield.fled` — the field is declared and *checked* (`is_present()`, `is_in_range()`) but nothing
+  populates it anywhere in the built system. Building a flee-execution mechanic (a new effect ID, a new
+  handler, a decision for when a monster "chooses" to disengage) would require inventing a capability no
+  dependency owns or has scoped, which is a materially different, larger problem than "which owned skill
+  does this monster cast this round." Named explicitly in Risks and Open Questions, not silently
+  dropped — downstream change 10c (`combat-disengage`) is the named mechanism owner, and change 10d
+  (`monster-flee-decision`, depending on 10b and 10c) owns the later archetype-driven policy branch.
 - **No buff/support/conferral skill usage by monsters.** The decision tree selects only from owned
   `ACTIVE` skills whose `effects` include a `damage:`-prefixed ID, mirroring change 9's own
   `default_attack_policy` scope exactly. No named `world_info.md` monster example calls for monster-cast
@@ -199,38 +180,30 @@ archetypes:
     target_strategy: lowest_hp
     skill_choice: first_owned
     prefer_area_when_multiple_enemies: false
-    flee_hp_fraction: 0.50               # see D-6 — flees early; no combat discipline to override it
   pack_hunter:                          # mid tier default
     target_strategy: lowest_hp
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
-    flee_hp_fraction: 0.25               # see D-6 — a losing hunt is abandoned, not fought to the end
   brute:                                # high tier default
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: false
-    flee_hp_fraction: 0.10               # see D-6 — only as an absolute last resort
   tactical_caster:                      # named-example override for 魔法生物 within "high"
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
-    flee_hp_fraction: 0.15               # see D-6 — calculates the odds and disengages slightly sooner
-                                          # than the brute default, but still a "high"-tier threshold
   apex_predator:                        # calamity tier default
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
-    flee_hp_fraction: null               # see D-6 — never flees; an apex threat has nothing to flee from
 ```
 
 ```python
 @dataclass(frozen=True)
 class BehaviourProfile:
-    target_strategy: str              # "lowest_hp" | "highest_effective_power"
-    skill_choice: str                  # "first_owned" | "highest_expected_damage"
+    target_strategy: str    # "lowest_hp" | "highest_effective_power"
+    skill_choice: str        # "first_owned" | "highest_expected_damage"
     prefer_area_when_multiple_enemies: bool
-    flee_hp_fraction: float | None    # see D-6 — hp/max fraction at or below which this archetype
-                                        # attempts to flee instead of attacking; None means never
 
 def monster_behaviour_policy(entity, battlefield) -> "ActionRequest | None":
     if not hasattr(entity, "threat_tier"):
@@ -245,23 +218,6 @@ def monster_behaviour_policy(entity, battlefield) -> "ActionRequest | None":
         return None
 
     profile = resolve_behaviour_profile(entity)
-
-    # Flee check -- D-6. Evaluated before the single-vs-area decision, exactly as change 10c's own
-    # D-7 hand-off specified. Stateless: reads current hp fresh every call, no memory of a prior
-    # failed attempt this encounter (see D-6 for why).
-    hp = entity.traits.hp
-    if (
-        profile.flee_hp_fraction is not None
-        and hp.max > 0
-        and hp.value / hp.max <= profile.flee_hp_fraction
-    ):
-        context = BattlefieldActionContext(battlefield)
-        context.event_context = {"battlefield": battlefield}   # required by disengage's handler, per
-                                                                  # change 10c's own D-3/D-7
-        return ActionRequest(
-            actor=entity, skill_key=disengage.FLEE_SKILL_KEY, targets=[entity], context=context,
-        )
-
     owned_damage_skills = _owned_damage_skills(entity)
     single_skills = [s for s in owned_damage_skills if s.target_spec is TargetSpec.SINGLE]
     area_skills = [s for s in owned_damage_skills if s.target_spec is TargetSpec.AREA]
@@ -293,9 +249,11 @@ def monster_behaviour_policy(entity, battlefield) -> "ActionRequest | None":
 `_living_enemies(battlefield, entity)` mirrors change 10's own `_living_members()` helper exactly: the
 entity's own team via `battlefield.team_of(entity.key)`, the other team's roster keys, filtered to
 `hp.value > 0` and not in `battlefield.fled`. `_owned_damage_skills(entity)` reads
-`entity.skills.owned_keys()`, resolves each key through `SKILL_REGISTRY`, and keeps `SkillKind.ACTIVE`
-entries whose `effects` contain at least one `damage:`-prefixed ID — the identical ownership/prefix
-reasoning change 9's `default_attack_policy` already uses, made explicit and reusable here.
+`entity.skills.owned_keys()`, resolves each key through `SKILL_REGISTRY`, and keeps affordable
+`SkillKind.ACTIVE` entries whose `effects` contain at least one `damage:`-prefixed ID — the identical
+ownership, resource, and prefix reasoning change 9's `default_attack_policy` already uses, made
+explicit and reusable here. Filtering before the area-versus-single decision lets an unaffordable area
+skill fall back to an affordable single skill instead of producing a resolver rejection every round.
 
 **Why "single-vs-area" is decided before target/skill selection, not after.** Deciding the shape of the
 action first means target selection (D-3) only ever runs for the `SINGLE` branch — an `AREA` skill's
@@ -303,8 +261,7 @@ targets are the `"all-enemies"` shorthand change 8 already built (`expand_target
 function never computes an area target list itself, and never risks disagreeing with `ActionResolver`'s
 own `AREA`-filtering semantics (change 8 D-5: dead/fled candidates silently dropped, empty-after-filter
 rejects). Reusing the shorthand is simpler and more correct than re-deriving the same roster this change
-already has access to. The flee check (D-6) sits one level above even this decision — a monster that
-decides to flee never reaches the single-vs-area branch at all this turn.
+already has access to.
 
 ### D-3. Target selection and skill selection: two named strategies each, both readable from change 9's
 `effective_power()` and change 5's `effective_value()` with no new stat computation invented.
@@ -423,88 +380,6 @@ this project's existing preference for duck-typed, capability-based checks over 
 `typeclasses/` from `world/rules/` (the same shape change 6's `combat_modifiers.py` already uses for
 `entity.sexual` before change 7 exists).
 
-### D-6. Flee decision: per-archetype `flee_hp_fraction`, checked before the single-vs-area decision,
-stateless — re-evaluated fresh every turn, with no memory of a prior failed attempt.
-
-Change 10c built the mechanism (a `flee` `SkillDef`, an agility-saturating success formula, and
-`Battlefield.fled`'s writer) and left this change, by name, the decision of *when* a monster attempts it.
-Two things need resolving: the per-archetype threshold values, and whether the check is re-evaluated
-every turn or remembered across turns.
-
-**The four thresholds, and why they differ.** `flee_hp_fraction` is the current-hp-to-max-hp ratio at or
-below which an archetype attempts to flee instead of attacking — grounded in the same `world_info.md`
-tier framing every other tunable in this change already uses, not picked as one number for all four:
-
-| Archetype | `flee_hp_fraction` | Grounding |
-|---|---|---|
-| `instinctive` (低階: 史萊姆/哥布林/巨鼠) | `0.50` | `world_info.md` frames these as the tier "初級冒險者能處理的" — unsophisticated, no combat culture, no reason to fight past a clearly losing position. A scavenger/vermin-tier creature bolts at the first real sign of danger; this is the highest (most eager-to-flee) threshold of the four, matching the `instinctive` archetype's own no-sophistication theme (D-2/D-3: `skill_choice: first_owned`). |
-| `pack_hunter` (中階: 狼型魔獸/食人魔/地龍) | `0.25` | `world_info.md`: "需數人組隊" — still a coordinated predator, not a coward, but a pack that canonically breaks off a hunt turning against it rather than fighting to annihilation. Lower than `instinctive`'s threshold because a pack hunter has more confidence (and more `skill_choice: highest_expected_damage`/`prefer_area_when_multiple_enemies` sophistication) than a mindless low-tier creature, but still meaningfully self-preserving, unlike the two tiers above it. |
-| `brute` (高階 default: 雙頭龍/巨魔) | `0.10` | `world_info.md`: "與人類頂尖戰力相當" — at or near the human ceiling, aggressive and confident; flees only as a near-death last resort rather than out of any real fear of a party it can usually match. |
-| `tactical_caster` (高階 override: 魔法生物) | `0.15` | Same tier as `brute`, but this archetype's whole premise (D-1) is a *calculating* nature, not raw aggression — a construct or magical intelligence that weighs the odds retreats slightly sooner than a brute fighting on instinct/pride, while remaining a "high"-tier, rarely-fleeing threshold, not a cautious one. |
-| `apex_predator` (災厄級: 古龍/魔神/災獸) | `null` (never flees) | `world_info.md`'s own words: "已超出人類尺度... 傳說中討伐牠們的都是精靈或神代人物" — a calamity-tier being has nothing at this project's scale to flee *from*. This also composes cleanly with D-4's own logic elsewhere in this project (dice-combat D-2's saturation): a party capable of threatening an apex predator at all is already an exceptional case this project's own reference bands do not expect, so a flee threshold here would be tuning against a matchup the lore does not anticipate. |
-
-The ordering (`instinctive` > `pack_hunter` > `tactical_caster` > `brute` > `apex_predator`=never) is the
-real content of this table — each value is chosen relative to its neighbours along the same tier
-progression the rest of this change's tunables already use, not derived from a formula (mirroring the
-disclosure discipline changes 5/6/9/10/10c already apply to their own invented placeholder constants).
-
-**Re-evaluation, resolved: stateless, checked fresh every turn — no "already attempted" memory.**
-`monster_behaviour_policy()` is a pure function of `entity`/`battlefield` state, called once per round for
-whichever combatant is acting (change 9's `run_round()`); it holds no state of its own between calls. The
-flee check therefore naturally re-evaluates every single time this entity's turn comes up, using
-whatever `hp.value`/`hp.max` currently are at that moment — there is no separate "have I already tried
-this encounter" flag anywhere.
-
-**Why this is the right choice, not merely the easy one.** Two alternatives were considered and rejected:
-1. **A persistent "already attempted, now committed to fighting" flag**, so a `pack_hunter` that fails once
-   settles back into attacking rather than repeatedly trying to flee. Rejected: it requires new state
-   somewhere — either a `Monster`-level attribute (an edit to `typeclasses/monsters.py`, which this
-   change has otherwise gone out of its way to avoid touching) or an ephemeral per-encounter dict keyed by
-   entity (a second piece of mutable bookkeeping this change would own and have to reason about
-   rollback/consistency for, alongside `Battlefield.fled` which change 10c already built and snapshots).
-   Given no `world_info.md` passage asks for "tries exactly once," inventing persistent retry-memory would
-   be speculative scope for a marginal behavioural refinement.
-2. **A probability-based retry** (e.g., re-roll whether to attempt again each turn), which would need a
-   second invented constant per archetype with no lore grounding, compounding rather than resolving the
-   coordinator's concern.
-   
-Instead, **the archetype-differentiation the coordinator asked for is expressed entirely through where
-the threshold sits, not through a second stateful mechanism.** A `pack_hunter`'s low threshold (`0.25`)
-means it rarely enters the "below threshold" state in the first place, and when it does, it is already
-close enough to death that a handful of retry attempts (succeed, die, or the fight ends) resolves quickly
-one way or another — a `pack_hunter` "keeps trying" in exactly the same sense a cornered animal does, but
-starts trying much later and typically has fewer remaining turns in which to do it, which is the
-observable difference in play the coordinator was asking this design to produce. This keeps the
-mechanism identical across all four archetypes (stateless, re-evaluated every turn) while still making a
-`pack_hunter` and an `instinctive` creature behave visibly differently — the threshold *is* the
-behavioural knob, not an additional persistence rule layered on top of it.
-
-**A failed attempt costs the whole turn, exactly as change 10c's own D-1 establishes** — this change adds
-nothing on top of that; a monster that fails to flee this round has simply spent its action, identically
-to a missed attack, and will decide fresh again next round if it is still alive and still at or below its
-threshold.
-
-**Wiring the request correctly.** `flee`'s effect handler (change 10c D-3) requires
-`event_context["battlefield"]` to be populated by whoever constructs the `ActionRequest` — this change's
-flee branch sets `context.event_context = {"battlefield": battlefield}` on the `BattlefieldActionContext`
-it builds, exactly as change 10c's own D-7 prescribes for any future `action_provider` caller.
-`targets=[entity]` matches `flee`'s `TargetSpec.SELF` (which resolves to `[actor]` regardless, per
-action-resolver D-5, but is spelled out explicitly here rather than relying on that resolution silently).
-No other part of the decision tree changes: `_choose_target()`/`_choose_skill()` (D-3) are never called
-on a turn where the flee branch fires.
-
-**Compatibility with change 10's compressed loop — confirmed, not merely assumed.** `resolve_overwhelm()`
-calls `combat.run_round()` in a loop with no player input (change 10 D-3); `classify_overwhelm()` never
-calls `action_provider` at all (change 10 D-1), so the flee branch cannot perturb classification.
-Returning a `flee` `ActionRequest` is mechanically identical, from `run_round()`'s perspective, to
-returning an attack `ActionRequest` — one synchronous `ActionResolver.resolve()` call, one `EventLog`, no
-blocking, no interactive prompt. A successful flee adds the entity's key to `battlefield.fled`, which
-`team_effective_power()`/`hit_rate_verdict()` (change 10, unmodified) already exclude correctly on the
-very next `classify_overwhelm()` call — this change's flee branch introduces no new interaction with
-change 10's loop beyond what an ordinary action already has. A failed flee simply consumes the turn and
-changes nothing else, identical in shape to a missed attack for the loop's own bookkeeping
-(`rounds_elapsed`, `total_seconds`).
-
 ## Risks / Trade-offs
 
 - **[Risk] `Monster.behaviour_tree`'s override mechanism (D-1) is only as good as whatever assigns it —
@@ -517,28 +392,16 @@ changes nothing else, identical in shape to a missed attack for the loop's own b
   is set, not to build the system that sets it — the identical "declare/consume vs. populate" split
   change 5's `ConferredSkillGrant`/`grant_conferred()` already used relative to change 8's cast-time
   write path.
-- **[Risk] The stateless, re-evaluated-every-turn flee check (D-6) means a monster below its threshold
-  keeps attempting to flee every subsequent turn until it escapes or dies, with no "gives up and commits
-  to fighting" behaviour for any archetype.** A `pack_hunter` that fails its first flee attempt tries
-  again next turn exactly like an `instinctive` creature would, differing only in *when* it started
-  (lower threshold) and therefore how many turns it likely has left to keep trying. → Accepted and named
-  explicitly in D-6: adding real "tried once, now fighting on" memory would require new persistent state
-  this change has deliberately avoided introducing (either a `Monster`-level attribute or a second,
-  ad hoc per-encounter bookkeeping structure alongside `Battlefield.fled`), for a behavioural refinement
-  no `world_info.md` passage specifically calls for. The per-archetype threshold values are the
-  behavioural differentiator, not a second persistence mechanism.
-- **[Risk] The four `flee_hp_fraction` values (D-6) are this change's own invented placeholders, ordered
-  correctly relative to each other but not derived from any numeric formula in `world_info.md`.** →
-  Disclosed explicitly, the identical discipline changes 5/6/9/10/10c already used for their own invented
-  constants (damage-band multipliers, the overwhelm round bound, etc.) — flagged for a future balance
-  pass once real party compositions and monster movesets exist to test against.
-- **[Risk] `apex_predator`'s `flee_hp_fraction: null` means a calamity-tier monster facing a genuinely
-  overwhelming party (an edge case `world_info.md` does not anticipate but this project's own mechanics do
-  not forbid) fights to the death with no escape valve at all.** → Accepted; this is the deliberate,
-  lore-grounded consequence of calamity-tier monsters having, by design, nothing at this project's
-  reference scale to flee from (D-6's own table) — not an oversight. If a future balance pass finds this
-  produces an unsatisfying outcome in an engineered edge case, revisiting this one value is a data-only
-  change to `monster_behaviour.yaml`, not a structural one.
+- **[Risk] No flee/disengage behaviour exists, so every monster fights to the death or until the
+  encounter otherwise ends (wipe or `max_rounds`/round-bound exit).** A calamity-tier monster at 5% hp
+  still presses the attack exactly as it did at 100% hp, which may read oddly for lower tiers that
+  `world_info.md` does not frame as suicidally aggressive (a 巨鼠 fighting to the death is less plausible
+  than a 古龍 doing so). → Accepted; building flee requires an execution mechanism (a `Battlefield.fled`
+  writer) that does not exist anywhere in this change's dependency chain (change 9/10 declare and check
+  the field but never populate it) — inventing one here would be a materially larger, unscoped addition
+  to change 8's effect-handler registry or change 9's turn loop, neither of which this change is
+  chartered to extend. Downstream change 10c owns that execution mechanism; named change 10d
+  (`monster-flee-decision`) adds the policy branch after 10c lands.
 - **[Risk] `highest_expected_damage`'s target-aware defense subtraction, when comparing `SINGLE` skills,
   assumes the same target already chosen by `_choose_target()` — it does not jointly optimize target and
   skill together.** A monster could in principle do slightly better by picking a *different* target for a
@@ -570,11 +433,9 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 sequencing concerns are operational:
 
 - This change must land after change 9 (`dice-combat`, for `Battlefield`, `BattlefieldActionContext`,
-  `effective_power()`, `dice.roll_d100()`, `default_attack_policy`), change 10
-  (`overwhelm-resolution`, for `resolve_overwhelm()`'s `action_provider` contract), and change 10c
-  (`combat-disengage`, for `FLEE_SKILL_KEY` and the `disengage`/`INNATE_SKILL_KEYS` mechanism the flee
-  branch invokes), and transitively after change 8 (`action-resolver`) and change 5
-  (`skills-equipment`), matching design doc §11 exactly.
+  `effective_power()`, `dice.roll_d100()`, `default_attack_policy`) and change 10
+  (`overwhelm-resolution`, for `resolve_overwhelm()`'s `action_provider` contract), and transitively after
+  change 8 (`action-resolver`) and change 5 (`skills-equipment`), matching design doc §11 exactly.
 - Whoever eventually assigns `Monster.behaviour_tree` values to concrete monster instances (a
   bestiary/spawn system, not on the roadmap under any number yet) needs no edit to this change's code —
   `resolve_behaviour_profile()` already treats any string matching an `archetypes` key as a valid
@@ -584,12 +445,16 @@ sequencing concerns are operational:
   only needs to compose it with a real input source for player turns (e.g. `lambda e, b:
   monster_behaviour_policy(e, b) if hasattr(e, "threat_tier") else player_input_queue.get(e)`), a
   one-line composition this change's own D-5 delegation already anticipates.
-- If change 10c's own `flee` `SkillDef`/`disengage` handler ever changes shape (a new required
-  `event_context` key, a renamed `FLEE_SKILL_KEY`), only this change's D-6 flee branch needs a matching
-  edit — no other part of the decision tree reads anything from change 10c.
+- Change 10c (`combat-disengage`) builds the flee-execution mechanism and `Battlefield.fled` writer
+  after this change lands. Change 10d (`monster-flee-decision`, depends on 10b and 10c) then extends
+  this decision tree with an archetype-driven flee branch without reversing the roadmap dependency.
 
 ## Open Questions
 
+- **Resolved downstream: monster flee decisions belong to change 10d.** They are not built here
+  (Non-Goals), because no dependency this change has access to provides the execution mechanism.
+  Change 10c supplies that mechanism; change 10d then owns the archetype thresholds, top-of-turn
+  decision, and retry-by-next-turn behavior.
 - **Should monsters ever choose a buff/support skill over a damage skill?** Not built here (Non-Goals) —
   no named `world_info.md` example calls for it, and modelling "when to buff vs. attack" is a materially
   larger AI problem than the one-day budget for tier-grounded target/skill selection. Left to a future
@@ -601,9 +466,3 @@ sequencing concerns are operational:
   roadmap under any number. This change guarantees the override is correctly *consumed* the moment it is
   set; deciding which future change *sets* it is left to whoever eventually builds monster
   spawning/prototyping (plausibly change 21, `scene-builder`, or an unassigned bestiary change).
-- **Should the flee check (D-6) eventually gain real "tried once, now committed to fighting" persistence
-  for a subset of archetypes, rather than staying purely threshold-driven?** Not built here — resolved in
-  D-6 as a stateless, re-evaluated-every-turn check, on the grounds that no `world_info.md` passage asks
-  for it and that adding persistence would require new state this change has otherwise avoided. Left to a
-  future balance pass if playtesting finds a `pack_hunter`'s repeated flee attempts while cornered reads
-  as less "disciplined" than intended.

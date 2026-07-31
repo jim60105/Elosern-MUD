@@ -1,0 +1,108 @@
+"""Decision-tree and structural boundary tests."""
+
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+from world.rules.combat import Battlefield
+from world.rules.monster_behaviour import monster_behaviour_policy
+
+from .combat_fixtures import FakeEntity, FakeGauge
+
+
+class FakeMonster(FakeEntity):
+    def __init__(
+        self,
+        key,
+        *,
+        threat_tier="low",
+        behaviour_tree=None,
+        **kwargs,
+    ):
+        super().__init__(key, **kwargs)
+        self.threat_tier = threat_tier
+        self.behaviour_tree = behaviour_tree
+        self.traits.mp = FakeGauge(100, 100)
+        self.traits.sp = FakeGauge(100, 100)
+
+
+def _field(actor, enemies):
+    entities = [actor, *enemies]
+    return Battlefield(
+        {
+            "monsters": frozenset({actor.key}),
+            "party": frozenset(enemy.key for enemy in enemies),
+        },
+        {entity.key: entity for entity in entities},
+    )
+
+
+class MonsterBehaviourPolicyTests(unittest.TestCase):
+    def test_area_preference_and_single_enemy_suppression(self):
+        actor = FakeMonster(
+            "actor",
+            threat_tier="mid",
+            owned=["fire_ball", "wind_blade"],
+        )
+        enemies = [FakeEntity("one"), FakeEntity("two")]
+        request = monster_behaviour_policy(actor, _field(actor, enemies))
+        self.assertEqual(request.skill_key, "wind_blade")
+        self.assertEqual(request.targets, "all-enemies")
+        request = monster_behaviour_policy(actor, _field(actor, enemies[:1]))
+        self.assertEqual(request.skill_key, "fire_ball")
+        self.assertEqual(request.targets, enemies[:1])
+
+    def test_area_fallback_and_no_eligible_skill(self):
+        actor = FakeMonster("actor", owned=["wind_blade"])
+        actor.traits.mp = FakeGauge(24, 24)
+        enemy = FakeEntity("enemy")
+        request = monster_behaviour_policy(actor, _field(actor, [enemy]))
+        self.assertEqual(request.targets, "all-enemies")
+        actor.skills._owned = ["flight"]
+        self.assertIsNone(monster_behaviour_policy(actor, _field(actor, [enemy])))
+
+    def test_non_monster_delegates_but_monster_does_not(self):
+        actor = FakeEntity("actor")
+        field = _field(actor, [FakeEntity("enemy")])
+        sentinel = object()
+        with patch(
+            "world.rules.monster_behaviour.combat.default_attack_policy",
+            return_value=sentinel,
+        ) as default:
+            self.assertIs(monster_behaviour_policy(actor, field), sentinel)
+            default.assert_called_once_with(actor, field)
+        monster = FakeMonster("monster", owned=[])
+        field = _field(monster, [FakeEntity("enemy-two")])
+        with patch(
+            "world.rules.monster_behaviour.combat.default_attack_policy"
+        ) as default:
+            self.assertIsNone(monster_behaviour_policy(monster, field))
+            default.assert_not_called()
+
+    def test_unaffordable_preference_falls_back_to_affordable_skill(self):
+        actor = FakeMonster(
+            "actor",
+            threat_tier="mid",
+            owned=["wind_blade", "shadow_slash"],
+        )
+        actor.traits.mp = FakeGauge(0, 24)
+        actor.traits.sp = FakeGauge(18, 18)
+        enemies = [FakeEntity("one"), FakeEntity("two")]
+        request = monster_behaviour_policy(actor, _field(actor, enemies))
+        self.assertEqual(request.skill_key, "shadow_slash")
+        self.assertNotEqual(request.targets, "all-enemies")
+
+    def test_source_has_no_forbidden_dependencies(self):
+        source = (
+            Path(__file__).parents[1] / "monster_behaviour.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in (
+            "combat_modifiers",
+            "evaluate_combat_modifiers",
+            "actions_per_turn",
+            "entity.buffs",
+            "entity.sexual",
+            "world.ai",
+            "random.choice",
+        ):
+            self.assertNotIn(forbidden, source)
