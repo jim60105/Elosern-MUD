@@ -39,7 +39,10 @@ SERVERNAME = "evennia-skeleton"
 DATABASES["default"]["NAME"] = os.path.join(GAME_DIR, "server", "db", "evennia.db3")
 
 # Project-authored Evennia trait types.
-TRAIT_CLASS_PATHS = ["world.rules.sexual_state.OrderedLevelTrait"]
+TRAIT_CLASS_PATHS = [
+    "world.rules.sexual_state.OrderedLevelTrait",
+    "world.rules.traits.DeterministicGaugeTrait",
+]
 
 
 ######################################################################

@@ -7,6 +7,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 from commands.action import CmdCast, REJECTION_MESSAGES
 from world.rules.action import RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.clock import WorldClock
 
 
 class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -18,15 +19,21 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             "passive": [],
         }
         self.char1.db.disguised_stats = {"atk_phys": 1}
-        self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
+        clock = WorldClock()
+        with patch("commands.action.get_world_clock", return_value=clock):
+            self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
+        self.assertEqual(clock.tick, 6)
 
     def test_unknown_skill_renders_named_rejection(self):
         self.char1.db.skills = {"active": [], "passive": []}
-        self.call(
-            CmdCast(),
-            "definitely_missing",
-            REJECTION_MESSAGES[RejectReason.UNKNOWN_SKILL],
-        )
+        clock = WorldClock()
+        with patch("commands.action.get_world_clock", return_value=clock):
+            self.call(
+                CmdCast(),
+                "definitely_missing",
+                REJECTION_MESSAGES[RejectReason.UNKNOWN_SKILL],
+            )
+        self.assertEqual(clock.tick, 0)
 
     def test_missing_skill_argument_renders_usage(self):
         self.call(CmdCast(), "", "用法：cast")

@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from evennia.contrib.rpg.traits import GaugeTrait
+
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import (
     RACE_REGISTRY,
@@ -15,6 +17,27 @@ GAUGE_KEYS = ("hp", "mp", "sp")
 STATIC_KEYS = ("atk_phys", "agility", "defense")
 COUNTER_KEYS = ("magic_level", "guild_merit")
 TRAIT_KEYS = GAUGE_KEYS + STATIC_KEYS + COUNTER_KEYS
+
+
+class DeterministicGaugeTrait(GaugeTrait):
+    """GaugeTrait variant whose rate is settled only by the rules engine."""
+
+    trait_type = "gauge"
+
+    @staticmethod
+    def validate_input(cls, trait_data):
+        """Disable Evennia's wall-clock rate timer while retaining its API."""
+        trait_data = GaugeTrait.validate_input(cls, trait_data)
+        trait_data["last_update"] = None
+        return trait_data
+
+    def _update_current(self, current):
+        """Read stored state without applying elapsed real time."""
+        return self._enforce_boundaries(current)
+
+    def _check_and_start_timer(self, value):
+        """Keep the public setter deterministic."""
+        return value
 
 
 def race_floor(race: RaceProfile) -> dict[str, int]:

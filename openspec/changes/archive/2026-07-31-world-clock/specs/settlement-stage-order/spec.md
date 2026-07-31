@@ -110,11 +110,14 @@ quantum rather than once per second. The settlement loop SHALL stop iterating qu
 configured floor, and SHALL additionally stop at a configured defensive cap
 (`MAX_SETTLEMENT_QUANTA`) regardless of remaining work.
 
-#### Scenario: An 8-hour skip with no active buffs or elevated sexual state settles in one quantum
+Any final partial quantum from a command or combat-adjacent duration SHALL still be passed to the
+per-entity accumulators once. It is never discarded merely because it is smaller than the quantum.
+
+#### Scenario: An 8-hour skip with no active buffs or elevated sexual state exits before a quantum
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called for an entity with no active buffs
   and every sexual field already at its vocabulary floor
-- **THEN** `tick_buffs()`/`decay_tick()` are each called exactly once (the check-and-exit quantum), not
-  2,880 times
+- **THEN** neither `tick_buffs()` nor `decay_tick()` is called, because there is no work to settle and
+  the loop exits before its first quantum
 
 #### Scenario: A short-lived buff ticks correctly through its own duration, then the loop exits early
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called for an entity with a `poisoned`
@@ -123,11 +126,29 @@ configured floor, and SHALL additionally stop at a configured defensive cap
   duration at the derived quantum size, and no further quanta are processed once the buff has expired
   and every sexual field is at its floor
 
-#### Scenario: Adding an interval not divisible by the derived quantum fails loudly at startup
-- **WHEN** a future `buffs.yaml` or `DECAY_CONFIG` entry declares a `tick_interval`/`interval_seconds`
-  not evenly divisible by the currently-derived `SETTLEMENT_QUANTUM_SECONDS`
-- **THEN** a startup assertion raises, naming the offending interval, rather than silently misaligning
-  future accumulator crossings
+#### Scenario: A six-second command preserves partial elapsed time
+- **WHEN** two command-sourced advances of six seconds each occur while settlement work is active
+- **THEN** both six-second portions reach buff and sexual-state accumulators; no elapsed game seconds are
+  lost because they are smaller than the ten-second quantum
+
+#### Scenario: A non-positive configured interval fails loudly at startup
+- **WHEN** a future `buffs.yaml` or `DECAY_CONFIG` entry declares a non-positive `tick_interval` or
+  `interval_seconds`
+- **THEN** a startup assertion raises, naming the offending interval rather than creating an invalid
+  quantum loop
+
+### Requirement: Gauge and buff elapsed time is deterministic
+The clock change SHALL disable the stock GaugeTrait wall-clock timer and SHALL make rulebook buff
+expiration and tick accumulation consume explicit elapsed game seconds. Reading a gauge or buff outside
+an `advance()` or combat round SHALL NOT advance it.
+
+Timed rulebook buffs SHALL use an indefinitely-lived Evennia handler entry and persist their remaining
+game seconds separately, so the handler cannot schedule real-time cleanup.
+
+#### Scenario: Real time passing does not regenerate or expire game state
+- **WHEN** a gauge has a positive regen rate or a timed buff is active, and no deterministic settlement
+  receives elapsed seconds
+- **THEN** reading the gauge or active-buff query leaves its state unchanged
 
 #### Scenario: A permanently active fixture is bounded by the defensive quantum cap
 - **WHEN** every entity in scope has continuously active settlement work for longer than

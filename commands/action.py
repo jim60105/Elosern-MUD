@@ -8,6 +8,7 @@ from world.rules.action import (
     RejectReason,
 )
 from world.rules.combat import BattlefieldActionContext
+from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import render_plain_text
 from world.rules.targeting import RoomActionContext
@@ -76,6 +77,11 @@ class CmdCast(Command):
             )
         )
         if result.outcome == "success":
+            get_world_clock().advance(
+                result.time_cost_seconds,
+                AdvanceSource.COMMAND,
+                [self.caller],
+            )
             self.caller.msg(render_plain_text(result.event_log))
         else:
             self.caller.msg(REJECTION_MESSAGES.get(result.reason, "這項行動無法完成。"))

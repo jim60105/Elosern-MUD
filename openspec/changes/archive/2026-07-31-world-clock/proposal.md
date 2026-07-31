@@ -84,13 +84,16 @@ sexual decay, and daily resets in a fixed, non-accidental order.
 ## Impact
 
 - New modules: `world/rules/clock.py`, `world/rules/skip_safety.py`, `world/rules/rulebook/clock.yaml`
-  (calendar/quantum/command-default constants), `commands/skip.py`.
+  (calendar/quantum/command-default constants), `commands/skip.py`; registers the three skip commands
+  in the character command set.
 - Touches change 8's `commands/action.py::CmdCast` (adds one `WorldClock.advance()` call after a
   successful resolve — an implementation-level integration edit, not an edit to change 8's own
   OpenSpec artifacts).
-- Reads, without modifying: change 6's `tick_buffs()`, change 7's `decay_tick()`/
-  `reset_daily_counters()`, change 9's `Battlefield`/`BattleResult`, change 10's `OverwhelmResult`,
-  change 3's `Monster`/gauge traits.
+- Updates change 3's gauge-trait registration and change 6's buff bookkeeping so their elapsed-time
+  behavior is driven by supplied game seconds rather than wall-clock reads. This is required for D4:
+  `WorldClock` must remain the sole source of elapsed game time. It otherwise reads change 7's
+  `decay_tick()`/`reset_daily_counters()`, change 9's `Battlefield`/`BattleResult`, and change 10's
+  `OverwhelmResult`.
 - Reads change 11b's `world.rules.progression.accrue_magic_study()` through a self-arming lazy import
   (never a hard `import`, since change 11b depends on this change, not the reverse) — no edit to change
   11b's own OpenSpec artifacts.

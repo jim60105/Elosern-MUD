@@ -444,6 +444,16 @@ where the non-commutativity is real, not accidentally cancelled out.
 ### D-4. Quantum-batched settlement: `rest 8h` is one `advance()` call, and the per-quantum stages
 early-exit the moment nothing is left to settle.
 
+**Predecessor correction discovered during implementation.** Evennia's stock `GaugeTrait` advances a
+nonzero `rate` from `time()` whenever its value is read, and the initial change-6 buff wrapper likewise
+used `time.time()` to decide expiration. Either behavior violates D4 before `WorldClock` can settle a
+single entity. This change therefore registers a `DeterministicGaugeTrait` with the same public gauge
+surface but no automatic timer, and changes rulebook buffs to persist remaining game seconds and tick
+accumulators, with the handler itself always configured non-expiring so it cannot schedule real-time
+cleanup. `WorldClock` supplies every full quantum and any final partial quantum, so a six-second command
+is accumulated rather than discarded; combat supplies its per-round seconds explicitly. This is a
+correction to the inherited implementation, not a second time source or a compatibility layer.
+
 **Why per-second stepping is unacceptable and what replaces it.** `decay_tick(entity, elapsed_seconds)`
 and `tick_buffs(entity)` are each documented (changes 6/7) as "one call = one tick's worth" — the
 accumulator lives *inside* the callable (change 7's own `entity.attributes`-backed accumulator; change
@@ -469,15 +479,17 @@ special-casing per field.
 ```python
 def _settle_buffs_and_decay(entities, seconds: int) -> None:
     quanta, remainder = divmod(seconds, SETTLEMENT_QUANTUM_SECONDS)
-    # `remainder` (always 0 while every configured interval divides the quantum's own GCD-derived
-    # value, per the startup assertion above) is intentionally not separately special-cased.
     for _ in range(quanta):
         if not any(_has_settlement_work(e) for e in entities):
-            break   # early exit: no active buff and every sexual field already at its floor,
-                     # for every entity in scope -- further quanta are provable no-ops
+            break   # early exit before a no-op quantum: no active buff and every sexual field
+                     # is already at its floor for every entity in scope.
         for entity in entities:
             tick_buffs(entity)
             decay_tick(entity, SETTLEMENT_QUANTUM_SECONDS)
+    if remainder and any(_has_settlement_work(e) for e in entities):
+        for entity in entities:
+            tick_buffs(entity, remainder)
+            decay_tick(entity, remainder)
 
 def _has_settlement_work(entity) -> bool:
     """True if this entity has anything left for a quantum to do -- an active

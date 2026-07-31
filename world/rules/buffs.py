@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-import time
 from typing import Any
 
 import yaml
@@ -100,13 +99,14 @@ def _add_buff(
     cache = {
         "definition_key": definition_key,
         "tick_interval": definition.tick_interval,
+        "remaining_seconds": definition.duration,
+        "tick_elapsed_seconds": 0,
         **data,
     }
-    duration = -1 if definition.duration is None else definition.duration
     entity.buffs.add(
         RulebookBuff,
         key=instance_key or definition_key,
-        duration=duration,
+        duration=-1,
         to_cache=cache,
     )
 
@@ -117,14 +117,16 @@ def entity_active_buffs(entity) -> set[str]:
 
 
 def _active_buff_instances(entity) -> tuple[RulebookBuff, ...]:
-    """Return unpaused, unexpired buff instances with positive stacks."""
-    now = time.time()
+    """Return unpaused game-time-unexpired buff instances with positive stacks."""
     return tuple(
         buff
         for buff in entity.buffs.all.values()
         if not buff.paused
         and buff.stacks > 0
-        and (buff.duration < 0 or now - buff.start < buff.duration)
+        and (
+            getattr(buff, "remaining_seconds", None) is None
+            or buff.remaining_seconds > 0
+        )
     )
 
 
@@ -153,7 +155,24 @@ def growth_rate_multiplier(entity) -> float:
     return multiplier
 
 
-def tick_buffs(entity) -> None:
-    """Apply exactly one explicit rate tick to every active buff."""
+def tick_buffs(entity, elapsed_seconds: int | None = None) -> None:
+    """Settle rulebook buffs from explicit game seconds, never wall time.
+
+    Even finite rulebook durations use Evennia's non-expiring handler mode;
+    ``remaining_seconds`` is the sole authority for expiry.
+    """
+    if elapsed_seconds is not None and elapsed_seconds < 0:
+        raise ValueError("elapsed_seconds must be non-negative")
     for buff in _active_buff_instances(entity):
-        buff.at_tick(initial=False)
+        interval = getattr(buff, "tick_interval", None)
+        elapsed = interval if elapsed_seconds is None else elapsed_seconds
+        remaining = getattr(buff, "remaining_seconds", None)
+        applied_elapsed = elapsed if remaining is None else min(elapsed, remaining)
+        if interval is not None:
+            accumulated = buff.tick_elapsed_seconds + applied_elapsed
+            while accumulated >= interval:
+                buff.at_tick(initial=False)
+                accumulated -= interval
+            buff.tick_elapsed_seconds = accumulated
+        if remaining is not None:
+            buff.remaining_seconds = max(0, remaining - elapsed)

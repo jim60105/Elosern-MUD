@@ -332,7 +332,7 @@ def _end_of_round_upkeep(battlefield: Battlefield) -> None:
     for key, entity in battlefield.roster.items():
         if key in battlefield.fled or _stored_hp(entity) <= 0:
             continue
-        tick_buffs(entity)
+        tick_buffs(entity, seconds)
         decay_tick(entity, seconds)
 
 
