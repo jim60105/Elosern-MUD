@@ -5,8 +5,8 @@ This is roadmap item #10c (design doc §11), depending on changes 9 (`dice-comba
 the owner of the one thing they refused to build:
 
 - Change 9's `Battlefield` (D-6) declares `fled: set[str] = field(default_factory=set)` and reads it in
-  `is_present()`/`is_in_range()` (both treat a fled key as "not a valid target") and in `run_round()`'s
-  own initiative loop (`key in battlefield.fled` skips that combatant's turn). **Nothing in change 9
+  `is_in_range()` (a fled key is out of range) and in `run_round()`'s own initiative loop (`key in
+  battlefield.fled` skips that combatant's turn). **Nothing in change 9
   adds a key to it.**
 - Change 10's `team_effective_power()`/`hit_rate_verdict()` both filter `key not in battlefield.fled`
   when aggregating a team, and its Migration Plan states plainly that `fled` is populated "once change
@@ -23,8 +23,9 @@ the owner of the one thing they refused to build:
   entity has genuinely, mechanically succeeded at leaving the fight — never as a "flee attempted" or
   "flee in progress" marker.
 
-**What already exists for this change to build on, unmodified.** `world/rules/combat.py` (change 9,
-public): `Battlefield` (`teams`, `roster`, `fled`), `BattlefieldActionContext`, `effective_power()`,
+**What already exists for this change to build on without changing its combat mechanics.**
+`world/rules/combat.py` (change 9, public): `Battlefield` (`teams`, `roster`, `fled`),
+`BattlefieldActionContext`, `effective_power()`,
 `COMBAT_YAML["to_hit"]["defender_constant"]` (51 — the recalibrated to-hit constant, dice-combat D-2),
 `dice.roll_d100()`, `run_round()` (already skips fled/dead combatants' turns), `is_battle_over()`.
 `world/rules/overwhelm.py` (change 10, public): `classify_overwhelm()`, `resolve_overwhelm()` — both
@@ -36,16 +37,24 @@ registry.py`/`handler.py` (change 5, public): `SkillDef`, `SkillKind`, `TargetSp
 monster_behaviour.py` (change 10b, public): `monster_behaviour_policy()` — a complete, drop-in
 `action_provider`, with no flee branch.
 
-**No code exists yet for this change's own scope.** Nothing named `world/rules/disengage.py` exists.
+`world/rules/disengage.py` is this change's new owner for the `flee` definition and effect handler.
 
-**What this change explicitly does not touch.** `world/rules/combat.py`, `world/rules/overwhelm.py`,
-`world/rules/monster_behaviour.py`, `world/rules/targeting.py`, `world/rules/event_log.py`, and every
+**What this change explicitly does not behaviorally alter.** The existing combat mechanics in
+`world/rules/combat.py` (`run_round()`, targeting methods, damage resolution, and overwhelm inputs),
+`world/rules/overwhelm.py`, `world/rules/monster_behaviour.py`, `world/rules/targeting.py`,
+`world/rules/event_log.py`, and every
 `rulebook/*.yaml` file another change already owns (`combat.yaml`, `overwhelm.yaml`,
 `monster_behaviour.yaml`). This change is additive against all of their existing public surfaces —
-except for two small, named, additive edits to already-landed *implementation* files (not OpenSpec
-artifacts) belonging to changes 5 and 8, detailed in D-3 and D-5 below, matching the identical
+except for small, named, additive edits to already-landed *implementation* files (not OpenSpec
+artifacts) belonging to changes 5, 8, and 9, plus `CmdCast`'s active-context handoff, detailed below,
+matching the identical
 "downstream change touches upstream code" pattern every change in this roadmap already uses (change 9
 registering into change 8's effect registry; change 11 adding one line to `CmdCast`).
+
+Combat's module footer imports `world.rules.disengage` as its production composition-root registration
+step. The import has no combat behavior beyond loading the `flee` `SkillDef` and effect handler. This
+avoids making registration depend on a test module, a command module, or downstream change 10d's import
+order.
 
 ## Goals / Non-Goals
 
@@ -92,7 +101,7 @@ registering into change 8's effect registry; change 11 adding one line to `CmdCa
 - **No new debuff/buff mechanism.** A failed flee attempt costs exactly what a missed attack already
   costs — a spent turn, nothing more. A supplementary "vulnerable for one round" penalty was considered
   and rejected for this change's scope (D-4) rather than silently omitted.
-- **No changes to `run_round()`, `resolve_overwhelm()`, `classify_overwhelm()`, `is_battle_over()`, or
+- **No behavioral changes to `run_round()`, `resolve_overwhelm()`, `classify_overwhelm()`, `is_battle_over()`, or
   any `rulebook/*.yaml` file another change owns.** Every one of these already treats a fled combatant
   correctly (skipped in turn order, excluded from team-power sums, excluded from hit-rate saturation
   checks) — this change's only job is populating the set they already all read correctly.
@@ -133,9 +142,9 @@ D-5: "the one legitimate short-circuit, not a bypass") — a flee skill built th
 of the four validations, contradicting the hard requirement that fleeing is targeted and validated like
 any other action. `SELF` resolves to `[actor]` and, per action-resolver's own D-5, "still runs all four
 validations against the actor... uniformity over cleverness": presence (the actor must still be an
-active `Battlefield` roster member — rejects a second flee attempt by an already-fled entity with
-`TARGET_NOT_PRESENT`), alive (`TARGET_DEAD` — a corpse cannot flee), range (`is_in_range()`, trivially
-true for a live, non-fled self), and faction (`SELF_ONLY` accepts only `Relation.SELF`, which
+active `Battlefield` roster member), alive (`TARGET_DEAD` — a corpse cannot flee), range
+(`is_in_range()` rejects an already-fled actor with `TARGET_OUT_OF_RANGE`), and faction (`SELF_ONLY`
+accepts only `Relation.SELF`, which
 `relation_to(actor, actor)` always returns). This is not decorative: an actor at 0 hp or already in
 `battlefield.fled` genuinely cannot cast `flee` again, for free, through the identical mechanism that
 already stops them casting anything else — no new check invented.
@@ -225,10 +234,14 @@ def _handle_disengage(actor, targets, effect_id, event_context) -> list[PendingE
             "flee: event_context missing required 'battlefield' key",
         )
     success, detail = _attempt_flee(actor, battlefield)   # D-4 — the pure roll, no mutation
-    description = (
-        f"{actor.key} attempts to flee: succeeds" if success
-        else f"{actor.key} attempts to flee: fails"
-    )
+    description = "|".join((
+        "disengage_attempt",
+        str(actor.key),
+        str(int(success)),
+        "none" if detail["roll"] is None else str(detail["roll"]),
+        f"{detail['actor_agility']:g}",
+        "none" if detail["pursuer_agility"] is None else f"{detail['pursuer_agility']:g}",
+    ))
     return [PendingEffect(
         entity=battlefield,             # see D-5 — deliberately a Battlefield, not a LivingEntity
         description=description,
@@ -247,6 +260,11 @@ mutation is a zero-argument thunk that only ever runs inside `_commit()`. A fail
 (`lambda: None`) is a genuine no-op, mirroring dice-combat D-5's own miss-case `apply=(lambda: None)` —
 not a special case, the same pattern already in production for a different effect kind.
 
+The pipe-delimited description is the existing action resolver's structured staging seam. The
+`disengage_attempt` parser emits `success`, `roll`, `actor_agility`, and `pursuer_agility` into the
+`EventEntry`; `_logged_targets()` reads the actor key from that description because the effect owner is
+the keyless `Battlefield`, not a `LivingEntity`.
+
 **Why `event_context["battlefield"]` is a required key, not read from `request.context.battlefield`
 directly.** Effect handlers registered into action-resolver's registry receive exactly `(actor,
 targets, effect_id, event_context)` — a plain dict, not the full `ActionContext` (action-resolver D-7).
@@ -259,6 +277,12 @@ for populating `event_context={"battlefield": battlefield}`, exactly as 統御�
 for populating its own three keys. A missing key rejects with `EFFECT_RESOLUTION_FAILED`, naming the
 problem — not a crash, not a silent no-op, mirroring D-7's own established failure mode for a missing
 required key.
+
+`BattlefieldActionContext` binds this key to its own battlefield at construction and rejects a supplied
+different object. `CmdCast` consumes a caller's non-persistent `ndb.action_context` when combat has
+installed one; otherwise it keeps using `RoomActionContext`. Thus `cast flee` reaches the ordinary
+resolver with a matching combat context, without adding a dedicated command or allowing an effect to
+stage a mutation in a battlefield that targeting did not validate.
 
 **Why the returned `PendingEffect.entity` is the `Battlefield`, not the fleeing actor.** The only state
 this effect can possibly mutate is `Battlefield.fled` — a fact about the encounter, not about the
@@ -518,8 +542,9 @@ ActionRequest(
 
 The constructor supplies `event_context["battlefield"]` (D-3) for `ActionResolver.resolve()`'s
 effect-resolution step to read. This is a complete, already-functional capability the moment this
-change lands — no change to `combat.py` or `overwhelm.py` is needed for a decision to flee to execute;
-change 10d owns the missing decision branch in `monster_behaviour_policy()`.
+change lands. No change to combat's existing turn, targeting, damage, or overwhelm behavior is needed
+for a decision to flee to execute; change 10d owns the missing decision branch in
+`monster_behaviour_policy()`.
 
 **What change 10d extends in 10b's `monster_behaviour.yaml` and
 `monster_behaviour_policy()`:**

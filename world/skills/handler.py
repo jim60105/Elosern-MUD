@@ -7,6 +7,10 @@ from typing import Any
 from .registry import SKILL_REGISTRY
 
 
+# Change 10c grants universal actions that must not depend on imported skill data.
+INNATE_SKILL_KEYS: frozenset[str] = frozenset({"flee"})
+
+
 @dataclass(frozen=True)
 class ConferredSkillGrant:
     """A fractional grant of one source entity's multiplier skill."""
@@ -44,7 +48,11 @@ class SkillHandler:
 
     def owned_keys(self) -> list[str]:
         """Return active and passive owned skill keys in stored order."""
-        return [*self._raw.get("active", []), *self._raw.get("passive", [])]
+        return [
+            *self._raw.get("active", []),
+            *self._raw.get("passive", []),
+            *INNATE_SKILL_KEYS,
+        ]
 
     def effective_value(self, trait_key: str) -> int:
         """Return a derived multiplied value without mutating stored traits."""

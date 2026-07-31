@@ -72,9 +72,11 @@ class BattlefieldActionContext:
         event_context: dict[str, Any] | None = None,
     ):
         self.battlefield = battlefield
-        self.event_context = (
-            {} if event_context is None else dict(event_context)
-        )
+        self.event_context = {} if event_context is None else dict(event_context)
+        supplied = self.event_context.get("battlefield", battlefield)
+        if supplied is not battlefield:
+            raise ValueError("event_context battlefield must match context battlefield")
+        self.event_context["battlefield"] = battlefield
 
     def is_present(self, actor: Any, target: Any) -> bool:
         return target.key in self.battlefield.roster
@@ -390,3 +392,7 @@ def run_battle(
         total_seconds=rounds * int(COMBAT_YAML["round"]["seconds"]),
         completed=is_battle_over(battlefield),
     )
+
+
+# Combat is the production composition root for combat-owned effect handlers.
+from world.rules import disengage as _disengage  # noqa: E402,F401

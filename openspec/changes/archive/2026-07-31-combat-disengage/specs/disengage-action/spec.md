@@ -13,11 +13,21 @@ pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and 
 - **THEN** the value is `"flee"` and importing the module has registered both the skill definition
   and disengage effect handler before the policy's request can be resolved
 
+#### Scenario: Combat startup registers disengage without a downstream import
+- **WHEN** a production process imports `world.rules.combat` before any test module or change 10d code
+- **THEN** `SKILL_REGISTRY` contains `"flee"` and the `disengage` effect handler is registered
+
 #### Scenario: flee is cast identically to any other skill, through CmdCast
 - **WHEN** a player issues `cast flee` while a `BattlefieldActionContext` is the active context for
   their `ActionRequest`
 - **THEN** `ActionResolver.resolve()` is invoked with `skill_key="flee"`, and no code path other than
   `ActionResolver.resolve()` applies any effect, deducts any resource, or emits an `EventLog` for it
+
+#### Scenario: A battlefield context cannot stage a flee in another battlefield
+- **WHEN** `BattlefieldActionContext` receives an `event_context` whose `"battlefield"` object is not
+  the context's own battlefield
+- **THEN** construction rejects the mismatch before action resolution, and a matching context always
+  exposes its own battlefield in `event_context`
 
 #### Scenario: flee targets the actor and runs all four targeting validations
 - **WHEN** `resolve()` processes a `flee` request
@@ -27,7 +37,7 @@ pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and 
 #### Scenario: A dead or already-fled actor cannot cast flee
 - **WHEN** `resolve()` processes a `flee` request for an actor whose `hp.value` is `0`, or for an actor
   whose key is already in `battlefield.fled`
-- **THEN** the action rejects with `RejectReason.TARGET_DEAD` or `RejectReason.TARGET_NOT_PRESENT`
+- **THEN** the action rejects with `RejectReason.TARGET_DEAD` or `RejectReason.TARGET_OUT_OF_RANGE`
   respectively, via the identical, unmodified targeting validations every other `SELF`-targeted skill
   uses — no new rejection reason is introduced for this case
 
@@ -129,7 +139,7 @@ unhandled exception.
   with no exception escaping and no entity state mutated
 
 ### Requirement: A fled entity is immediately excluded from targeting, turn order, and team-power
-aggregation, with zero code change to combat.py or overwhelm.py
+aggregation through existing combat and overwhelm mechanics
 Once `battlefield.fled` contains an entity's key, `world.rules.combat.BattlefieldActionContext.
 is_present()`/`is_in_range()`, `world.rules.combat.run_round()`'s turn-order loop, and
 `world.rules.overwhelm.team_effective_power()`/`hit_rate_verdict()` SHALL all treat that entity as no
@@ -138,8 +148,8 @@ longer part of the encounter, using their existing, unmodified implementations.
 #### Scenario: A fled entity is skipped by run_round's initiative loop
 - **WHEN** `combat.run_round(battlefield, action_provider)` is called on a battlefield where one roster
   member's key is in `battlefield.fled`
-- **THEN** that member takes no action that round, and no code in `world/rules/combat.py` is modified
-  to produce this behavior
+- **THEN** that member takes no action that round, using `run_round()`'s existing fled-member filter;
+  this change does not modify that function to produce the behavior
 
 #### Scenario: A fled entity contributes zero to its team's power aggregate
 - **WHEN** `overwhelm.team_effective_power(battlefield, team_key)` is computed for a team containing one

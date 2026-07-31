@@ -119,7 +119,7 @@ EffectHandler = Callable[
     list[PendingEffect],
 ]
 SNAPSHOTTED_SURFACES = frozenset(
-    {"traits", "sexual", "buffs", "skill_grants"}
+    {"traits", "sexual", "buffs", "skill_grants", "battlefield"}
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
 _EFFECT_HANDLER_SURFACES: dict[str, frozenset[str]] = {}
@@ -444,6 +444,7 @@ _ENTRY_TEMPLATES = {
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
+    "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
 }
 
 
@@ -494,6 +495,22 @@ def _entries_from_effect(
                 text_template=_ENTRY_TEMPLATES["damage"],
             ),
         )
+    elif kind == "disengage_attempt":
+        if len(values) != 4:
+            raise ValueError(
+                f"malformed disengage pending effect {effect.description!r}"
+            )
+        success_flag, raw_roll, actor_agility, pursuer_agility = values
+        data = {
+            "success": bool(int(success_flag)),
+            "roll": None if raw_roll == "none" else int(raw_roll),
+            "actor_agility": float(actor_agility),
+            "pursuer_agility": (
+                None
+                if pursuer_agility == "none"
+                else float(pursuer_agility)
+            ),
+        }
     else:
         data = {}
     entry = EventEntry(
@@ -553,7 +570,7 @@ def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
     for effect in pending:
         if effect.description.startswith("resource_spend|"):
             continue
-        key = _entity_key(effect.entity)
+        key = effect.description.split("|", 2)[1]
         if key not in targets:
             targets.append(key)
     return tuple(targets)
@@ -654,6 +671,26 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     entity.__dict__.pop("sexual", None)
 
 
+def _is_battlefield_like(obj: Any) -> bool:
+    """Return whether an object exposes the encounter state this resolver owns."""
+    return hasattr(obj, "fled") and hasattr(obj, "roster")
+
+
+def _snapshot_touched(obj: Any) -> dict[str, Any]:
+    """Snapshot either a battlefield mutation surface or entity state."""
+    if _is_battlefield_like(obj):
+        return {"fled": frozenset(obj.fled)}
+    return _snapshot_entity_state(obj)
+
+
+def _restore_touched(obj: Any, snapshot: dict[str, Any]) -> None:
+    """Restore an object through the same shape-based snapshot dispatch."""
+    if _is_battlefield_like(obj):
+        obj.fled = set(snapshot["fled"])
+        return
+    _restore_entity_state(obj, snapshot)
+
+
 def _commit(pending: list[PendingEffect]) -> None:
     for effect in pending:
         unsupported = effect.surfaces - SNAPSHOTTED_SURFACES
@@ -662,9 +699,15 @@ def _commit(pending: list[PendingEffect]) -> None:
                 RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE,
                 f"{effect.description}: {sorted(unsupported)}",
             )
-    touched = list(dict.fromkeys(effect.entity for effect in pending))
+    touched: list[Any] = []
+    touched_ids: set[int] = set()
+    for effect in pending:
+        identity = id(effect.entity)
+        if identity not in touched_ids:
+            touched.append(effect.entity)
+            touched_ids.add(identity)
     snapshots = {
-        id(entity): _snapshot_entity_state(entity)
+        id(entity): _snapshot_touched(entity)
         for entity in touched
     }
     try:
@@ -673,7 +716,7 @@ def _commit(pending: list[PendingEffect]) -> None:
                 effect.apply()
     except Exception as error:
         for entity in touched:
-            _restore_entity_state(entity, snapshots[id(entity)])
+            _restore_touched(entity, snapshots[id(entity)])
         raise CommitFailed(RejectReason.COMMIT_FAILED, str(error)) from error
 
 

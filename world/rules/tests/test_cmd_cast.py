@@ -1,9 +1,12 @@
 """Command-level tests for the resolver's out-of-combat caller."""
 
+from unittest.mock import patch
+
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from commands.action import CmdCast, REJECTION_MESSAGES
 from world.rules.action import RejectReason
+from world.rules.combat import Battlefield, BattlefieldActionContext
 
 
 class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -30,3 +33,21 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
 
     def test_rejection_message_table_covers_every_reason(self):
         self.assertEqual(set(REJECTION_MESSAGES), set(RejectReason))
+
+    def test_flee_uses_active_battlefield_context(self):
+        self.char1.race = "human"
+        self.char2.race = "human"
+        for entity in (self.char1, self.char2):
+            entity.apply_race_baseline()
+            entity.db.skills = {"active": [], "passive": []}
+        field = Battlefield(
+            {
+                "party": frozenset({self.char1.key}),
+                "foes": frozenset({self.char2.key}),
+            },
+            {self.char1.key: self.char1, self.char2.key: self.char2},
+        )
+        self.char1.ndb.action_context = BattlefieldActionContext(field)
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            self.call(CmdCast(), "flee", "Char 嘗試脫離戰鬥。")
+        self.assertIn(self.char1.key, field.fled)

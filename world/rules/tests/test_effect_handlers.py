@@ -56,7 +56,15 @@ class EffectRegistryTests(unittest.TestCase):
         self.assertEqual(applied, [])
         self.assertEqual(
             SNAPSHOTTED_SURFACES,
-            frozenset({"traits", "sexual", "buffs", "skill_grants"}),
+            frozenset(
+                {
+                    "traits",
+                    "sexual",
+                    "buffs",
+                    "skill_grants",
+                    "battlefield",
+                }
+            ),
         )
 
     def test_sexual_handler_rejects_cleanly_when_module_is_unavailable(self):

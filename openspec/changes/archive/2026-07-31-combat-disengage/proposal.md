@@ -2,7 +2,7 @@
 
 Design doc §6.3 lists "flee" as one of three ways a combat encounter ends (wipe / flee / special
 condition), and `Battlefield.fled` has existed as a declared field since change 9 (`dice-combat`) —
-read by `is_present()`/`is_in_range()` (both treat a fled key as "no longer a valid target") and by
+read by `is_in_range()` (which treats a fled key as no longer targetable) and by
 change 10's team-power aggregation (a fled member contributes nothing) and change 11's skip-safety
 gate (`IN_COMBAT` excludes fled members by definition). **No change writes to it.** Change 10b
 (`monster-behaviour`) explicitly declined to build it, naming fleeing "an execution mechanism, not a
@@ -66,10 +66,13 @@ going to lose, can I leave."
   to `resolve()`'s eight steps, `RejectReason`, or the no-combat-branching tripwire's scanned tokens.
 - **Additive edit to `world/skills/handler.py`** (change 5's implementation): `SkillHandler.owned_keys()`
   gains `INNATE_SKILL_KEYS` in its return value — one line.
-- **Read-only reuse, zero edits**: `world/rules/combat.py` (`COMBAT_YAML["to_hit"]["defender_constant"]`,
-  `dice.roll_d100()`, `Battlefield`), `world/rules/overwhelm.py`, `world/rules/monster_behaviour.py`,
+- **Read-only reuse of existing mechanics**: `world/rules/combat.py`'s `COMBAT_YAML["to_hit"]
+  ["defender_constant"]`, `dice.roll_d100()`, `Battlefield`, `run_round()`, and targeting methods;
+  `world/rules/overwhelm.py`; `world/rules/monster_behaviour.py`;
   `world/rules/rulebook/combat.yaml`, `world/rules/rulebook/overwhelm.yaml`,
-  `world/rules/rulebook/monster_behaviour.yaml`.
+  and `world/rules/rulebook/monster_behaviour.yaml`. This change adds only combat's composition-root
+  registration import and `BattlefieldActionContext`'s event-context identity guard; it does not alter
+  the listed mechanics' flee-related behavior.
 - **Named downstream change 10d** (not built here): a nullable `flee_hp_fraction` tunable per
   archetype in `monster_behaviour.yaml`, and one new branch in `monster_behaviour_policy()` evaluated
   before its existing attack-selection logic. Change 10d depends on this change's completed resolver

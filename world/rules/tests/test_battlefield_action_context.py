@@ -30,6 +30,17 @@ class BattlefieldActionContextTests(unittest.TestCase):
         self.assertTrue(self.context.is_present(self.actor, self.enemy))
         self.assertFalse(self.context.is_in_range(self.actor, self.enemy, object()))
 
+    def test_event_context_cannot_reference_a_different_battlefield(self):
+        other = Battlefield(
+            {"a": frozenset({"actor"}), "b": frozenset({"enemy"})},
+            {"actor": self.actor, "enemy": self.enemy},
+        )
+        with self.assertRaisesRegex(ValueError, "must match"):
+            BattlefieldActionContext(
+                self.battlefield,
+                event_context={"battlefield": other},
+            )
+
     def test_shorthand_expands_mapping_values(self):
         self.assertEqual(
             expand_target_shorthand(self.actor, self.context, "all-enemies"),

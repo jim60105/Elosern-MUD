@@ -7,6 +7,8 @@ from world.rules.action import (
     ActionResolver,
     RejectReason,
 )
+from world.rules.combat import BattlefieldActionContext
+from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import render_plain_text
 from world.rules.targeting import RoomActionContext
 
@@ -46,21 +48,31 @@ class CmdCast(Command):
             if target is None:
                 return
             targets.append(target)
+        active_context = self.caller.ndb.action_context
+        if active_context is not None:
+            context = active_context
+        else:
+            context = RoomActionContext(
+                self.caller.location,
+                {
+                    "disguise": dict(
+                        self.caller.db.disguised_stats or {}
+                    )
+                }
+                if skill_key == "status_disguise"
+                else {},
+            )
+        if (
+            skill_key == FLEE_SKILL_KEY
+            and isinstance(context, BattlefieldActionContext)
+        ):
+            context = BattlefieldActionContext(context.battlefield)
         result = ActionResolver.resolve(
             ActionRequest(
                 actor=self.caller,
                 skill_key=skill_key,
                 targets=targets,
-                context=RoomActionContext(
-                    self.caller.location,
-                    {
-                        "disguise": dict(
-                            self.caller.db.disguised_stats or {}
-                        )
-                    }
-                    if skill_key == "status_disguise"
-                    else {},
-                ),
+                context=context,
             )
         )
         if result.outcome == "success":
