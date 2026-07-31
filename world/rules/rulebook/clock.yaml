@@ -13,5 +13,6 @@ command_defaults:
   move: 30
   converse: 60
   cast: 6 # Documentation only; CmdCast uses ActionResult.time_cost_seconds.
+  wilderness_move: 9000 # 10 km/cell / 4 km/h = 2.5h = 9000s (map-wilderness D-5).
 max_settlement_quanta: 4320 # Placeholder pending a future balance pass.
 max_sleep_seconds: 43200 # Placeholder pending a future balance pass.

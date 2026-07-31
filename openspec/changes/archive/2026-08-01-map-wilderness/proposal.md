@@ -65,7 +65,11 @@ the loop on movement's clock cost that change 12 explicitly deferred.
   already exists) and idempotently ensures the one `WildernessGateExit` exists at North Gate **with
   its `db.anchor_key` set to `"capital_altoria"`** — omitting that assignment leaves the gate exit
   present but crashing on first use (`WILDERNESS_ENTRY_REGISTRY[None]` raises `KeyError`), a defect an
-  earlier draft of this change had and a rubber-duck review caught before implementation. Wired into
+  earlier draft of this change had and a rubber-duck review caught before implementation. It also
+  re-runs `mapprovider.at_prepare_room()` for every room already registered in the script's
+  `db.rooms`, so a server restart restores each retained room's deterministic description/archetype
+  (the contrib itself restores only the non-persistent script/coordinates links), and it heals a
+  mis-keyed project gate while leaving a same-key non-project exit alone. Wired into
   `server/conf/at_server_startstop.py::at_server_start()` immediately after change 12's `sync_grid()`
   call.
 - Extend `rulebook/clock.yaml::command_defaults` with one new key, `wilderness_move: 9000` (2.5

@@ -17,6 +17,8 @@ from .magic import MAGIC_TIER_REGISTRY, RANK_TITLE_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
 from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
+from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
 class LoreRecord(DefaultScript):
@@ -35,6 +37,8 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "monster_tiers": MONSTER_TIER_REGISTRY,
     "anchors": ANCHOR_REGISTRY,
     "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
+    "wilderness_regions": WILDERNESS_REGION_REGISTRY,
+    "wilderness_entries": WILDERNESS_ENTRY_REGISTRY,
     "prices": PRICE_TABLE,
 }
 

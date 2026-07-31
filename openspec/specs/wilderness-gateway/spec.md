@@ -1,4 +1,13 @@
-## ADDED Requirements
+## Purpose
+
+The concrete, bidirectional connection between the grid layer and the wilderness/Virtual layer: the
+`WILDERNESS_ENTRY_REGISTRY` linking a grid-placed anchor to one wilderness coordinate, the two exit
+typeclasses (`WildernessGateExit` for grid→wilderness, `WildernessReturnExit` for wilderness→grid and
+ordinary wilderness steps), the `wilderness_move` clock cost that every successful wilderness step
+charges, and the idempotent `sync_wilderness()` provisioning wired into server startup.
+
+## Requirements
+
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to one wilderness coordinate
 `world/lore/wilderness_entry.py` SHALL define a frozen `WildernessEntryPoint` dataclass (`anchor_key:
@@ -125,6 +134,14 @@ crossing would cost nothing — contradicting the whole point of wiring wilderne
   example, the target coordinate is invalid, or the traverser's `at_pre_move` vetoes)
 - **THEN** `get_world_clock().tick` is unchanged
 
+#### Scenario: A return to a missing grid room does not advance the clock
+- **WHEN** the special-cased return branch resolves no grid room for the entry's anchor (e.g. the gate
+  exit `sync_wilderness()` provisioned has been deleted, so `_grid_room_for_anchor` returns `None`) or
+  the resulting `move_to()` fails its pre-move veto
+- **THEN** `WildernessReturnExit.at_traverse` returns `False`, the traverser's location is unchanged,
+  and `get_world_clock().tick` is unchanged — a failed return is never reported as a successful,
+  clock-charged step
+
 ### Requirement: Leaving the wilderness through WildernessReturnExit triggers ordinary cleanup
 When a traversing object leaves a `TerrainRoom` through `WildernessReturnExit`'s grid-routing branch,
 the wilderness's own per-object bookkeeping (`itemcoordinates` entry removal, room recycling into
@@ -136,9 +153,14 @@ the wilderness's own per-object bookkeeping (`itemcoordinates` entry removal, ro
 - **THEN** the character no longer appears as a key in the `WildernessScript`'s
   `itemcoordinates` mapping
 
-#### Scenario: A vacated wilderness room is recycled, not leaked
+#### Scenario: A vacated wilderness room is not leaked, and is reused on a later return
 - **WHEN** a character who was alone in a `TerrainRoom` returns to the grid via `WildernessReturnExit`
-- **THEN** that room object is added to the `WildernessScript`'s `unused_rooms` list
+- **THEN** the vacated room is not orphaned: it remains owned by the `WildernessScript` (either
+  recycled into `unused_rooms` when the contrib's recycling condition is met, or retained in
+  `db.rooms` keyed by its coordinates for an account-character `move_to()`-driven departure, which
+  the contrib does not recycle because the departing account is still in the room's contents when
+  `_destroy_room` runs), and re-entering the same coordinates later reuses that same room object
+  rather than spawning a new one
 
 ### Requirement: sync_wilderness() idempotently provisions the wilderness map and the one grid-side gate
 `world/maps/bootstrap.py::sync_wilderness()` SHALL call `create_wilderness(name=WILDERNESS_NAME,
@@ -167,6 +189,21 @@ SHALL NOT raise. `sync_wilderness()` SHALL be distinct in name and module role f
 - **WHEN** `sync_wilderness()` is called twice in succession
 - **THEN** exactly one `WildernessScript` keyed `WILDERNESS_NAME` exists, and the North Gate room still
   has exactly one `WildernessGateExit`
+
+#### Scenario: A restarted server restores deterministic room descriptions
+- **WHEN** a wilderness room that was retained in `WildernessScript.db.rooms` (e.g. a player's current
+  or vacated room) loses its non-persistent `ndb.active_desc`/`scene_archetype` across a server
+  restart, and `sync_wilderness()` runs again
+- **THEN** each room still registered in the script's `db.rooms` has `ndb.active_desc` and
+  `scene_archetype` re-computed from its current coordinates via the provider's `at_prepare_room()` —
+  the deterministic terrain description survives a restart
+
+#### Scenario: A mis-keyed project gate is healed, a foreign same-key exit is left alone
+- **WHEN** the North Gate's `WildernessGateExit` has a wrong `db.anchor_key`, and `sync_wilderness()`
+  runs again
+- **THEN** the existing `WildernessGateExit`'s `db.anchor_key` is corrected to `"capital_altoria"`
+  with no new exit spawned; and if a non-`WildernessGateExit` with the same key exists there, it is
+  left in place and no second gate is created atop it
 
 #### Scenario: A missing North Gate degrades gracefully
 - **WHEN** `sync_wilderness()` runs against a database where the `capital_altoria` North Gate room

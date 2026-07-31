@@ -4,7 +4,7 @@ Room
 Rooms are simple containers that has no location of their own.
 
 """
-
+from evennia.contrib.grid.wilderness.wilderness import WildernessRoom
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
@@ -21,21 +21,25 @@ class Room(ObjectParent, DefaultRoom):
 
     See mygame/typeclasses/objects.py for a list of
     properties and methods available on all Objects.
+
     """
 
     pass
 
 
-class GridRoom(XYZRoom):
+class SceneArchetypeMixin:
+    """The design doc D10/§8 seam: which SceneArchetype (change 22, unbuilt) a
+    room's scene art should use. Not validated against any registry here -- see
+    change 12's own GridRoom docstring for why (no SceneArchetype registry
+    exists yet)."""
+
+    scene_archetype: str | None = AttributeProperty(default=None)
+
+
+class GridRoom(SceneArchetypeMixin, XYZRoom):
     """A room on the xyzgrid layer (design doc D3's 'Grid' layer)."""
 
-    # Forward-declared seam for design doc D10/§8 (change 22, art-queue).
-    # Unresolved against any registry here -- no SceneArchetype registry exists
-    # yet. Mirrors the treatment already given to NPC.schedule and
-    # Monster.behaviour_tree (change 3): the attribute exists so change 22 has
-    # somewhere to read from and write validation against; nothing here
-    # enforces a value.
-    scene_archetype: str | None = AttributeProperty(default=None)
+    pass
 
 
 class AnchorRoom(GridRoom):
@@ -46,3 +50,14 @@ class AnchorRoom(GridRoom):
     """
 
     anchor_key: str | None = AttributeProperty(default=None)
+
+
+class TerrainRoom(SceneArchetypeMixin, WildernessRoom):
+    """A room on the wilderness/Virtual layer (design doc D3). Unlike GridRoom,
+    TerrainRoom instances are pooled and reused across many different (x, y)
+    coordinates over their lifetime (WildernessScript._create_room() recycles
+    unused rooms) -- see map-wilderness design.md D-3 for why scene_archetype
+    must be re-set on every at_prepare_room() call, not merely defaulted once.
+    """
+
+    pass

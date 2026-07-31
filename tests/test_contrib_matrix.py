@@ -35,7 +35,14 @@ MATRIX_IMPORTS = {
     "xyzgrid xymap": ("evennia.contrib.grid.xyzgrid.xymap", ("XYMap",)),
     "wilderness": (
         "evennia.contrib.grid.wilderness.wilderness",
-        ("WildernessMapProvider",),
+        (
+            "WildernessMapProvider",
+            "WildernessRoom",
+            "WildernessExit",
+            "WildernessScript",
+            "create_wilderness",
+            "enter_wilderness",
+        ),
     ),
     "prototype spawner": ("evennia.prototypes.spawner", ("spawn",)),
     "llm client": ("evennia.contrib.rpg.llm.llm_client", ("LLMClient",)),

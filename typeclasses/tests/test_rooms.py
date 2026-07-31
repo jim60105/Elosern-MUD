@@ -1,9 +1,17 @@
-"""Integration tests for the grid room typeclasses (map-anchor-grid)."""
+"""Integration tests for the grid and terrain room typeclasses (map-anchor-grid, map-wilderness)."""
 
+from evennia.contrib.grid.wilderness.wilderness import WildernessRoom
+from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
-from typeclasses.rooms import AnchorRoom, GridRoom, Room
+from typeclasses.rooms import (
+    AnchorRoom,
+    GridRoom,
+    Room,
+    SceneArchetypeMixin,
+    TerrainRoom,
+)
 
 
 class GridRoomTypeclassTests(EvenniaTest):
@@ -37,3 +45,29 @@ class GridRoomTypeclassTests(EvenniaTest):
         self.assertNotIsInstance(room, GridRoom)
         self.assertFalse(hasattr(room, "scene_archetype"))
         self.assertFalse(hasattr(room, "anchor_key"))
+
+
+class SceneArchetypeTests(EvenniaTest):
+    def test_mixin_is_in_both_room_mros(self):
+        self.assertIn(SceneArchetypeMixin, GridRoom.__mro__)
+        self.assertIn(SceneArchetypeMixin, TerrainRoom.__mro__)
+        self.assertNotIn("scene_archetype", GridRoom.__dict__)
+
+    def test_terrain_room_mro_excludes_xyzroom(self):
+        self.assertIn(WildernessRoom, TerrainRoom.__mro__)
+        self.assertNotIn(XYZRoom, TerrainRoom.__mro__)
+
+    def test_terrain_room_defaults_scene_archetype_to_none(self):
+        room = create_object(TerrainRoom, key="terrain_room")
+        self.assertIsNone(room.scene_archetype)
+        room.scene_archetype = "arbitrary_string"
+        self.assertEqual(room.scene_archetype, "arbitrary_string")
+
+    def test_grid_and_terrain_rooms_share_identical_attribute_contract(self):
+        grid = create_object(GridRoom, key="grid_room")
+        terrain = create_object(TerrainRoom, key="terrain_room_2")
+        self.assertIsNone(grid.scene_archetype)
+        self.assertIsNone(terrain.scene_archetype)
+        grid.scene_archetype = "western_hills_valleys_plains"
+        terrain.scene_archetype = "western_hills_valleys_plains"
+        self.assertEqual(grid.scene_archetype, terrain.scene_archetype)

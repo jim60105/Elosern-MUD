@@ -63,6 +63,28 @@ class LoreSyncTests(EvenniaTest):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].db.fields, expected)
 
+    def test_wilderness_registry_records_are_mirrored_and_idempotent(self):
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+
+        sync_all()
+        for key in WILDERNESS_REGION_REGISTRY:
+            matches = search_script(f"lore:wilderness_regions:{key}")
+            self.assertEqual(len(matches), 1)
+            self.assertEqual(matches[0].db.category, "wilderness_regions")
+        entry_records = search_script("lore:wilderness_entries:capital_altoria")
+        self.assertEqual(len(entry_records), 1)
+        self.assertEqual(entry_records[0].db.category, "wilderness_entries")
+
+        sync_all()
+        total_wilderness = (
+            len(WILDERNESS_REGION_REGISTRY) + len(WILDERNESS_ENTRY_REGISTRY)
+        )
+        self.assertEqual(
+            ScriptDB.objects.filter(db_key__startswith="lore:wilderness_").count(),
+            total_wilderness,
+        )
+
     def test_sync_one_updates_existing_record(self):
         entry = RACE_REGISTRY["human"]
         sync_one("test_races", entry.key, entry)

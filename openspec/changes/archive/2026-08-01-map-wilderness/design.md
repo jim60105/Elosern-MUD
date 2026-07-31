@@ -598,8 +598,10 @@ back and returning via the special-cased branch advances it once more; and the f
 trip (1 entry + 3 out + 3 back + 1 return) advances the clock by exactly `8 × 9,000 = 72,000` seconds
 — asserted directly in the probe, not eyeballed. The return exit is reachable, typed correctly, routes
 back to the original grid room object (not a copy); and leaving a wilderness room through either path
-correctly triggers the contrib's own cleanup (`itemcoordinates` entry removed, room recycled into
-`unused_rooms`) with no manual bookkeeping required on this change's part.
+correctly triggers the contrib's own cleanup (`itemcoordinates` entry removed, vacated room not
+orphaned) with no manual bookkeeping required on this change's part. (The precise recycling behavior
+differs between the two paths and is recorded below in this same Verification section's corrected
+account.)
 
 **Why the round trip is built now, not deferred.** An entrance with no return path is a trap, not a
 gateway — a player who walks north from the sample city and can never walk back is a strictly worse
@@ -660,11 +662,19 @@ discipline change 12's own D-5 modeled for `add_maps()`/`reload()`).** `create_w
 idempotency check (`if WildernessScript.objects.filter(db_key=name).exists(): return`) means that on
 every server start *after* the first, this function does **not** re-run `mapprovider=
 ElosernWildernessMapProvider()` — the already-pickled instance from the first boot is what the
-`WildernessScript` keeps using. If a future balance pass edits `region_for_coordinates()`'s bounds or
-`WILDERNESS_KM_PER_CELL`, a running server will not pick up the change until the `WildernessScript` is
-deleted and `sync_wilderness()` runs again (an `evennia py` one-liner, or a future migration script —
-out of scope here). This is the wilderness-layer analogue of change 12's own `add_maps()`/`reload()`
-sequencing finding: a real, checked API behavior, not a hypothetical.
+`WildernessScript` keeps using. Because `ElosernWildernessMapProvider` is a module-level class with no
+instance state, unpickling resolves it by module/class reference, so method and module-level code
+changes (e.g. `terrain_description()`'s arithmetic, `WILDERNESS_KM_PER_CELL`) **do** take effect on a
+fresh server start — the class itself is re-imported — and a running server needs no script deletion to
+pick up a code change. What genuinely does *not* survive a restart is the **non-persistent**
+`room.ndb.active_desc`/`scene_archetype` on rooms retained in `script.db.rooms`: the contrib's own
+`WildernessScript.at_server_start()` restores only the `ndb.wildernessscript`/`ndb.active_coordinates`
+links, and a later `move_obj()` to an existing coord reuses the retained room without calling
+`at_prepare_room()` again. `sync_wilderness()` therefore re-runs `mapprovider.at_prepare_room()`
+for every room already in `script.db.rooms` on each call (an implementation detail the rubber-duck
+review of this change surfaced), restoring the deterministic description and archetype after a server
+restart. This is the wilderness-layer analogue of change 12's own `add_maps()`/`reload()` sequencing
+finding: a real, checked API behavior, not a hypothetical.
 
 ### D-8. `command_defaults.move: 30` — **superseded 2026-08-01, no longer an open gap.**
 
@@ -689,11 +699,12 @@ change 12's) and why `converse: 60` remains unwired and out of scope even after 
 
 ## Risks / Trade-offs
 
-- **[Risk] `create_wilderness()`'s pickled `mapprovider` does not pick up code changes after first
-  boot (D-7).** → **Mitigation**: named explicitly above; out of scope to solve generally in this
-  change (no migration tooling exists yet for any registry in this project), but the failure mode
-  (stale terrain logic surviving a code update until the script is manually recreated) is documented
-  so a future balance-pass change does not rediscover it as a mystery.
+- **[Risk] a server restart leaves retained wilderness rooms with a stale or missing
+  `scene_archetype`/description (D-7).** → **Mitigation**: resolved — `sync_wilderness()` re-runs
+  `mapprovider.at_prepare_room()` for every room already in the script's `db.rooms` on each call,
+  restoring the deterministic `ndb.active_desc`/`scene_archetype` after a restart (see D-7's corrected
+  account; code-only changes to the provider are already picked up by class re-import, so no script
+  deletion is needed for a balance pass).
 - **[Risk] `region_for_coordinates()`'s rectangular partition is a schematic approximation, not a
   literal map.** A player who walks in a straight line will cross region boundaries at exact integer
   lines, not organic ones. → **Mitigation**: accepted — `world_info.md` supplies no coordinate data to
@@ -786,9 +797,17 @@ documentation-only example, `PyramidMapProvider`):
   intermediate steps (proving `exit_typeclass` wiring reaches every room the map creates, not just the
   one at the registered coordinate); the final return moved the character back to the exact original
   grid-room object (`char1.location` identity-equal to the room created before entry, not a lookalike).
-  Cleanup was re-confirmed unchanged by the fix: after the return, the wilderness's own
-  `itemcoordinates` no longer tracked that character and its vacated room was recycled into
-  `unused_rooms`.
+  Cleanup was re-confirmed by the corrected probe: after the return, the wilderness's own
+  `itemcoordinates` no longer tracked that character, and its vacated room was **not orphaned** —
+  verified directly rather than assumed, an earlier draft's "recycled into `unused_rooms`" claim
+  proved too strong for an account-character `move_to()`-driven departure: `_destroy_room()` runs
+  from `WildernessRoom.at_object_leave()`, which `move_to()` fires *before* the departing account is
+  removed from `room.contents`, so the `has_account` guard declines to recycle and the room stays
+  retained in `db.rooms` keyed by its coordinates. It is still correctly re-used (not leaked) on a
+  later return to those coordinates: re-entering `(60, 100)` handed the character back the identical
+  room object (`id` 49 in the probe) rather than spawning a fresh one. The delta spec's cleanup
+  scenario was corrected to match this real, verified behavior (see
+  `specs/wilderness-gateway/spec.md`).
 - **The gate exit's movement-hook sequence (Fix 5)**: re-verified with the corrected
   `WildernessGateExit` that calls `at_pre_move`/announces/`at_post_move` before advancing the clock
   (matching the stock `WildernessExit.at_traverse()`'s own sequence) — a default `EvenniaTest` character
