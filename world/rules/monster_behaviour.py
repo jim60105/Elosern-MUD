@@ -1,6 +1,8 @@
 """Deterministic, rulebook-driven monster combat decisions."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from numbers import Real
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +11,7 @@ import yaml
 from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.disengage import FLEE_SKILL_KEY
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
@@ -17,10 +20,26 @@ from world.skills.registry import (
 )
 
 
-MONSTER_BEHAVIOUR_YAML = yaml.safe_load(
-    (Path(__file__).parent / "rulebook" / "monster_behaviour.yaml").read_text(
-        encoding="utf-8"
+class MonsterBehaviourConfigError(ValueError):
+    """Raised when monster behaviour tuning violates its rulebook contract."""
+
+
+def _configuration_error(detail: str) -> MonsterBehaviourConfigError:
+    return MonsterBehaviourConfigError(
+        f"invalid monster behaviour rulebook: {detail}"
     )
+
+
+def _load_rulebook(path: Path) -> Any:
+    """Load YAML while preserving the stable rulebook-error contract."""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        raise _configuration_error("could not parse YAML") from error
+
+
+MONSTER_BEHAVIOUR_YAML = _load_rulebook(
+    Path(__file__).parent / "rulebook" / "monster_behaviour.yaml"
 )
 
 
@@ -31,12 +50,94 @@ class BehaviourProfile:
     target_strategy: str
     skill_choice: str
     prefer_area_when_multiple_enemies: bool
+    flee_hp_fraction: float | None
 
 
-BEHAVIOUR_PROFILES = {
-    key: BehaviourProfile(**values)
-    for key, values in MONSTER_BEHAVIOUR_YAML["archetypes"].items()
-}
+_PROFILE_FIELDS = frozenset(
+    {
+        "target_strategy",
+        "skill_choice",
+        "prefer_area_when_multiple_enemies",
+        "flee_hp_fraction",
+    }
+)
+_TARGET_STRATEGIES = frozenset({"lowest_hp", "highest_effective_power"})
+_SKILL_CHOICES = frozenset({"first_owned", "highest_expected_damage"})
+
+
+def _load_behaviour_profiles(
+    rulebook: Any,
+) -> dict[str, BehaviourProfile]:
+    """Validate rulebook tuning and build immutable behaviour profiles."""
+    if not isinstance(rulebook, Mapping):
+        raise _configuration_error("rulebook must be a mapping")
+    archetypes = rulebook.get("archetypes")
+    defaults = rulebook.get("tier_default_archetype")
+    if not isinstance(archetypes, Mapping):
+        raise _configuration_error("archetypes must be a mapping")
+    if not isinstance(defaults, Mapping):
+        raise _configuration_error("tier_default_archetype must be a mapping")
+
+    profiles: dict[str, BehaviourProfile] = {}
+    for key, values in archetypes.items():
+        if not isinstance(key, str) or not isinstance(values, Mapping):
+            raise _configuration_error("each archetype must be a named mapping")
+        if set(values) != _PROFILE_FIELDS:
+            raise _configuration_error(
+                f"archetype {key!r} must declare exactly {sorted(_PROFILE_FIELDS)}"
+        )
+        target_strategy = values["target_strategy"]
+        if (
+            not isinstance(target_strategy, str)
+            or target_strategy not in _TARGET_STRATEGIES
+        ):
+            raise _configuration_error(
+                f"archetype {key!r} has unknown target_strategy {target_strategy!r}"
+        )
+        skill_choice = values["skill_choice"]
+        if (
+            not isinstance(skill_choice, str)
+            or skill_choice not in _SKILL_CHOICES
+        ):
+            raise _configuration_error(
+                f"archetype {key!r} has unknown skill_choice {skill_choice!r}"
+            )
+        prefer_area = values["prefer_area_when_multiple_enemies"]
+        if type(prefer_area) is not bool:
+            raise _configuration_error(
+                f"archetype {key!r} has non-boolean area preference"
+            )
+        flee_fraction = values["flee_hp_fraction"]
+        if flee_fraction is not None and (
+            isinstance(flee_fraction, bool)
+            or not isinstance(flee_fraction, Real)
+            or not 0 <= flee_fraction <= 1
+        ):
+            raise _configuration_error(
+                f"archetype {key!r} has invalid flee_hp_fraction"
+            )
+        profiles[key] = BehaviourProfile(
+            target_strategy=target_strategy,
+            skill_choice=skill_choice,
+            prefer_area_when_multiple_enemies=prefer_area,
+            flee_hp_fraction=(
+                None if flee_fraction is None else float(flee_fraction)
+            ),
+        )
+
+    for tier, archetype_key in defaults.items():
+        if (
+            not isinstance(tier, str)
+            or not isinstance(archetype_key, str)
+            or archetype_key not in profiles
+        ):
+            raise _configuration_error(
+                f"tier default {tier!r} references unknown archetype {archetype_key!r}"
+            )
+    return profiles
+
+
+BEHAVIOUR_PROFILES = _load_behaviour_profiles(MONSTER_BEHAVIOUR_YAML)
 
 
 def resolve_behaviour_profile(monster: Any) -> BehaviourProfile:
@@ -97,6 +198,17 @@ def _living_enemies(
         and key not in battlefield.fled
         and combat._stored_hp(battlefield.roster[key]) > 0
     ]
+
+
+def _should_flee(entity: Any, profile: BehaviourProfile) -> bool:
+    """Return whether stored true HP has reached this profile's flee boundary."""
+    threshold = profile.flee_hp_fraction
+    maximum = combat._max_hp(entity)
+    return (
+        threshold is not None
+        and maximum > 0
+        and combat._stored_hp(entity) / maximum <= threshold
+    )
 
 
 def _choose_target(
@@ -167,6 +279,16 @@ def monster_behaviour_policy(
     if not enemies:
         return None
     profile = resolve_behaviour_profile(entity)
+    if _should_flee(entity, profile):
+        return ActionRequest(
+            actor=entity,
+            skill_key=FLEE_SKILL_KEY,
+            targets=[entity],
+            context=BattlefieldActionContext(
+                battlefield,
+                event_context={"battlefield": battlefield},
+            ),
+        )
     damage_skills = _owned_damage_skills(entity)
     single_skills = [
         skill

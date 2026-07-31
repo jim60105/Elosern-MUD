@@ -9,19 +9,24 @@ archetypes:
     target_strategy: lowest_hp
     skill_choice: first_owned
     prefer_area_when_multiple_enemies: false
+    flee_hp_fraction: 0.35
   pack_hunter:
     target_strategy: lowest_hp
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: 0.20
   brute:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: false
+    flee_hp_fraction: 0.10
   tactical_caster:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: 0.25
   apex_predator:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
+    flee_hp_fraction: null

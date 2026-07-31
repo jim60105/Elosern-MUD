@@ -1,5 +1,6 @@
 """Combat-loop integration for the monster action provider."""
 
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -9,10 +10,16 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.rules.action import ActionResolver
-from world.rules.combat import Battlefield, run_round
+from world.rules.combat import Battlefield, _max_hp, _stored_hp, run_round
+from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import EventLog
 from world.rules.monster_behaviour import monster_behaviour_policy
-from world.rules.overwhelm import OverwhelmResult, resolve_overwhelm
+from world.rules.overwhelm import (
+    OverwhelmResult,
+    classify_overwhelm,
+    resolve_overwhelm,
+    team_effective_power,
+)
 
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import FakeMonster
@@ -148,3 +155,172 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTest):
         ):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
+
+
+class MonsterFleeResolverIntegrationTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.monster = create_object(Monster, key="flee-monster")
+        self.monster.threat_tier = "low"
+        self.monster.apply_monster_tier()
+        self.monster.db.skills = {"active": [], "passive": []}
+        self.monster.traits.hp.current = 1
+
+        self.target = create_object(PlayerCharacter, key="flee-target")
+        self.target.race = "human"
+        self.target.apply_race_baseline()
+        self.target.db.skills = {"active": [], "passive": []}
+        self.field = Battlefield(
+            {
+                "monsters": frozenset({self.monster.key}),
+                "party": frozenset({self.target.key}),
+            },
+            {self.monster.key: self.monster, self.target.key: self.target},
+        )
+
+    def _assert_flee_preconditions(self):
+        self.assertEqual(self.monster.threat_tier, "low")
+        self.assertLessEqual(
+            _stored_hp(self.monster) / _max_hp(self.monster),
+            0.35,
+        )
+
+    def test_generated_flee_request_is_registered_and_resolves(self):
+        self._assert_flee_preconditions()
+        request = monster_behaviour_policy(self.monster, self.field)
+        self.assertEqual(request.skill_key, FLEE_SKILL_KEY)
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertIn(self.monster.key, self.field.fled)
+        self.assertEqual(result.event_log.entries[0].kind, "disengage_attempt")
+
+    def test_run_round_successful_flee_removes_monster_from_combat(self):
+        self._assert_flee_preconditions()
+        with (
+            patch(
+                "world.rules.combat.roll_initiative",
+                return_value=[self.monster.key, self.target.key],
+            ),
+            patch("world.rules.disengage.roll_d100", return_value=100),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs = run_round(self.field, monster_behaviour_policy)
+        self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
+        self.assertTrue(logs[0].entries[0].data["success"])
+        self.assertIn(self.monster.key, self.field.fled)
+        self.assertEqual(
+            team_effective_power(self.field, "monsters"),
+            0,
+        )
+
+    def test_run_round_failed_flee_costs_turn_without_attack(self):
+        self._assert_flee_preconditions()
+        before = self.target.traits.hp.current
+        with (
+            patch(
+                "world.rules.combat.roll_initiative",
+                return_value=[self.monster.key, self.target.key],
+            ),
+            patch("world.rules.disengage.roll_d100", return_value=1),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            logs = run_round(self.field, monster_behaviour_policy)
+        self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
+        self.assertFalse(logs[0].entries[0].data["success"])
+        self.assertNotIn(self.monster.key, self.field.fled)
+        self.assertEqual(self.target.traits.hp.current, before)
+
+    def test_overwhelm_uses_policy_without_a_flee_branch(self):
+        self.target.race = "elf"
+        self.target.apply_race_baseline()
+        self._assert_flee_preconditions()
+        self.assertEqual(classify_overwhelm(self.field), "party")
+        source = (
+            Path(__file__).parents[1] / "overwhelm.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("FLEE_SKILL_KEY", source)
+        with (
+            patch(
+                "world.rules.combat.roll_initiative",
+                return_value=[self.monster.key, self.target.key],
+            ),
+            patch(
+                "world.rules.disengage._attempt_flee",
+                return_value=(
+                    True,
+                    {
+                        "roll": 100,
+                        "actor_agility": 10.0,
+                        "pursuer_agility": 10.0,
+                    },
+                ),
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            result = resolve_overwhelm(
+                self.field,
+                monster_behaviour_policy,
+                max_rounds=1,
+        )
+        self.assertTrue(result.battle_over)
+        self.assertIn(self.monster.key, self.field.fled)
+        self.assertEqual(result.verdict_after, "party")
+
+    def test_tier_default_and_override_decisions_have_fixed_outcomes(self):
+        cases = (
+            ("low", None, FLEE_SKILL_KEY),
+            ("mid", None, FLEE_SKILL_KEY),
+            ("high", None, FLEE_SKILL_KEY),
+            ("calamity", None, "fire_ball"),
+            ("high", "tactical_caster", FLEE_SKILL_KEY),
+        )
+        for index, (tier, override, expected_skill) in enumerate(cases):
+            with self.subTest(tier=tier, override=override):
+                monster = create_object(Monster, key=f"golden-monster-{index}")
+                monster.threat_tier = tier
+                monster.behaviour_tree = override
+                monster.apply_monster_tier()
+                monster.db.skills = {"active": ["fire_ball"], "passive": []}
+                monster.traits.mp.base = 100
+                monster.traits.mp.current = 100
+                monster.traits.hp.current = 1
+                target = create_object(
+                    PlayerCharacter,
+                    key=f"golden-target-{index}",
+                )
+                target.race = "human"
+                target.apply_race_baseline()
+                target.db.skills = {"active": [], "passive": []}
+                battlefield = Battlefield(
+                    {
+                        "monsters": frozenset({monster.key}),
+                        "party": frozenset({target.key}),
+                    },
+                    {monster.key: monster, target.key: target},
+                )
+                request = monster_behaviour_policy(monster, battlefield)
+                self.assertEqual(request.skill_key, expected_skill)
+                if expected_skill == FLEE_SKILL_KEY:
+                    with patch(
+                        "world.rules.disengage.roll_d100",
+                        return_value=100,
+                    ):
+                        result = ActionResolver.resolve(request)
+                    self.assertEqual(result.outcome, "success")
+                    self.assertTrue(result.event_log.entries[0].data["success"])
+                    self.assertIn(monster.key, battlefield.fled)
+                else:
+                    with (
+                        patch(
+                            "world.rules.combat.evaluate_combat_modifiers",
+                            return_value={},
+                        ),
+                        patch("world.rules.combat.roll_d100", return_value=100),
+                    ):
+                        result = ActionResolver.resolve(request)
+                    self.assertEqual(result.outcome, "success")
+                    self.assertNotIn(monster.key, battlefield.fled)

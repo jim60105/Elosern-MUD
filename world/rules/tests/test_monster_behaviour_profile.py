@@ -25,6 +25,7 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                     "target_strategy",
                     "skill_choice",
                     "prefer_area_when_multiple_enemies",
+                    "flee_hp_fraction",
                 },
             )
             self.assertIn(
@@ -38,6 +39,10 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
             self.assertIsInstance(
                 values["prefer_area_when_multiple_enemies"],
                 bool,
+            )
+            self.assertTrue(
+                values["flee_hp_fraction"] is None
+                or 0.0 <= values["flee_hp_fraction"] <= 1.0
             )
 
     def test_unset_profile_defaults_for_every_tier(self):
