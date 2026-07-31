@@ -95,7 +95,13 @@ change 12 left it.
 - **No change to the grid layer's own movement-clock posture.** `rulebook/clock.yaml`'s existing
   `move: 30`/`converse: 60` entries remain exactly as inert as change 11 and change 12 left them; this
   change adds a new, separate `wilderness_move` key and wires only wilderness traversal to it — see
-  D-5 for why the two are not unified under one constant.
+  D-5 for why the two are not unified under one constant. **Amended 2026-08-01 (change
+  `map-movement-clock`, roadmap item 13b):** this Non-Goal held for this change's own scope at the
+  time it was written, but is no longer the state of the world after `map-movement-clock` lands —
+  that change wires `move: 30` to grid/Limbo-bridge/instance-room traversal and, since it depends on
+  this change, folds this change's own `wilderness_move` wiring (D-6) onto the identical shared
+  `world.rules.movement.charge_movement()` function grid movement now uses too. See this design's own
+  D-8 for the corrected account.
 - No backward-compatibility, migration, or deprecation handling — the project is unreleased with zero
   users.
 
@@ -482,7 +488,15 @@ directly. This change's `WildernessGateExit` follows the identical shape for the
 `at_traverse()` fully overridden to call `wilderness.enter_wilderness(traversing_object, coordinates=
 WILDERNESS_ENTRY_REGISTRY["capital_altoria"].wilderness_xy, name=WILDERNESS_NAME)` and, on success,
 `get_world_clock().advance(CLOCK_YAML["command_defaults"]["wilderness_move"], AdvanceSource.COMMAND,
-[traversing_object])`.
+[traversing_object])`. **Amended 2026-08-01 (change `map-movement-clock`):** the code samples below
+still show this inline `get_world_clock().advance()` call because that is what this change (`map-
+wilderness`) itself builds and tests. `map-movement-clock` (roadmap item 13b, depending on this
+change) replaces both inline calls with `world.rules.movement.charge_movement(traversing_object,
+"wilderness_move")` — a same-behavior, same-cost, same-success-only-condition edit to this change's
+own already-written call sites, folding them onto the identical shared function grid and instance-room
+movement now use too. See that change's own design.md D-1/D-9 for why folding this change's bespoke
+wiring into a shared mechanism, while this change is still unimplemented, was judged worth doing
+rather than leaving two independent movement-clock mechanisms in the codebase.
 
 ```python
 # typeclasses/exits.py
@@ -652,24 +666,26 @@ deleted and `sync_wilderness()` runs again (an `evennia py` one-liner, or a futu
 out of scope here). This is the wilderness-layer analogue of change 12's own `add_maps()`/`reload()`
 sequencing finding: a real, checked API behavior, not a hypothetical.
 
-### D-8. Documented, not solved: `command_defaults.move: 30` still has no consumer, and no roadmap
-item after this one is scoped to give it one.
+### D-8. `command_defaults.move: 30` — **superseded 2026-08-01, no longer an open gap.**
 
-This change wires `wilderness_move` (D-5) but deliberately leaves the grid layer's `move: 30` exactly
-as inert as change 11 declared it and change 12 declined to wire it. Scanning the roadmap (design doc
-§11, items 14-23: `map-instance`, `quest-runtime`, `guild-economy`, `llm-client`, `narrator`,
-`npc-dialogue`, `scenario-director`, `scene-builder`, `art-queue`, `webclient-panel`), no future change
-is scoped to wire grid movement to `WorldClock` either — `move: 30` is not a transitional gap waiting
-for its owner, it is, as things currently stand, a **permanent gap by omission**: grid-layer movement
-(walking between the sample city's thirteen rooms, and any future grid content) will never cost game
-time under the current roadmap, while every wilderness step now does. Whether that asymmetry is
-acceptable — grid space is small enough that "free" movement is harmless, versus it being an
-inconsistency a future design pass should close — is a product decision above this change's charter
-(roadmap item 13, `WildernessMapProvider, terrain description`) to make. **This change does not wire
-`move: 30`, and does not propose which future change should.** This note exists so the gap is a
-visible, recorded open decision the next person to touch map layers or the clock can pick up
-deliberately, rather than an implicit omission someone has to rediscover by reading every change's
-Non-Goals section.
+**This section originally documented, not solved, a gap**: as written by this change, it stated that
+`command_defaults.move: 30` had no consumer, and that scanning the roadmap (design doc §11, items
+14-23) found no future change scoped to give it one — a "permanent gap by omission" this change's own
+charter (roadmap item 13, `WildernessMapProvider, terrain description`) did not ask it to close, left
+as a visible, recorded open decision for whoever touched map layers or the clock next.
+
+**That claim is now false, and is corrected here rather than left to mislead a future reader.** The
+project owner asked for exactly the small, inserted roadmap change this note anticipated, and it
+exists: `map-movement-clock` (roadmap item 13b, depending on this change and change 12). It wires
+`move: 30` to every `typeclasses.exits.Exit`/`typeclasses.exits.CostedXYZExit` traversal by a
+`PlayerCharacter` — covering intra-city grid steps, the Limbo↔grid bridge, and (automatically, with
+no code change of its own) change 14's instance-room doorways — through one shared
+`world.rules.movement.charge_movement()` function. It also folds this change's own `wilderness_move`
+wiring (D-6) onto that same function, so the codebase ends up with one movement-cost mechanism, not
+two parallel ones. `move: 30` is, as of `map-movement-clock`, a real, consumed cost, not a
+still-open decision. See `openspec/changes/map-movement-clock/design.md` for the full reasoning,
+including why it depends on this change specifically (it edits this change's own artifacts, not just
+change 12's) and why `converse: 60` remains unwired and out of scope even after this correction.
 
 ## Risks / Trade-offs
 

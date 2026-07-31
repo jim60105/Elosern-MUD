@@ -689,6 +689,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 |---|---|---|---|
 | 12 | `map-anchor-grid` | 2, 3 | Anchor sync, xyzgrid grid layer, one sample city |
 | 13 | `map-wilderness` | 12 | `WildernessMapProvider`, terrain description |
+| 13b | `map-movement-clock` | 12, 13 | Wire `command_defaults.move: 30` to real grid/Limbo-bridge/instance-room exit traversal through one shared `world.rules.movement.charge_movement()` function, folding change 13's own bespoke `wilderness_move` wiring onto the same mechanism |
 | 14 | `map-instance` | 12, 13 | Instance TTL reclamation, promotion of named rooms |
 
 > **Amended 2026-08-01.** Change 14's `Depends on` cell was `12`; it is now `12, 13`. Change 14's own
@@ -699,6 +700,21 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 > That makes change 13 a real implementation prerequisite for change 14, not merely a sibling sharing
 > change 12 as a common dependency, and this table is corrected to say so rather than leaving every
 > future reader to rediscover the gap from change 14's own design document alone.
+
+> **Added 2026-08-01: roadmap item 13b, `map-movement-clock`.** Change 13's own design.md D-8 recorded
+> `command_defaults.move: 30` as a "permanent gap by omission" — no roadmap item was scoped to wire it,
+> and change 13 built its own separate `wilderness_move` mechanism rather than a shared one. The
+> project owner asked for a small, inserted change to close that gap. It is **not** labeled "12b":
+> it depends on change 12 (for the grid layer's `XYZExit` instances and the Limbo bridge) **and**
+> change 13 (it edits change 13's own `design.md` and files a `MODIFIED wilderness-gateway` delta
+> spec, folding change 13's bespoke `wilderness_move` wiring onto the same shared
+> `world.rules.movement.charge_movement()` function grid movement now uses), so "13b" — positioned
+> immediately after its later, real dependency — is the accurate label, matching this project's own
+> existing idiom for small changes depending on the item immediately before them (`7b`, `10c`, `10d`,
+> `11b`). It does **not** depend on change 14: instance-room doorways inherit the movement cost
+> automatically, with no edit to change 14's own artifacts, because they already traverse
+> `typeclasses.exits.Exit`, the class `map-movement-clock` retrofits. `converse: 60` remains unwired
+> after this change, exactly as every prior change left it — no roadmap item claims it.
 
 ### Phase 4 — Quests and economy
 
