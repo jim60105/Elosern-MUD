@@ -11,11 +11,10 @@ the owner of the one thing they refused to build:
 - Change 10's `team_effective_power()`/`hit_rate_verdict()` both filter `key not in battlefield.fled`
   when aggregating a team, and its Migration Plan states plainly that `fled` is populated "once change
   10c lands." **Nothing in change 10 adds a key to it either.**
-- Change 10b's own Non-Goals name this exactly: "no dependency this change has access to provides the
-  execution mechanism... a future change (unassigned) is the right owner once a flee-execution
-  mechanism exists anywhere in the dependency chain for a behaviour tree to call into," and its Open
-  Questions ask "should a flee/disengage decision be added once some future change builds a
-  `Battlefield.fled` writer?" — deferred to this change by name.
+- Change 10b's own Non-Goals name this exactly: no dependency it has supplies a flee-execution
+  mechanism. This change is the named mechanism owner; downstream change 10d
+  (`monster-flee-decision`, depends on 10b and 10c) is the named owner of the archetype decision once
+  this writer exists.
 - Change 11 (`world-clock`), landed after all three, went further: its D-6 explicitly **rejected**
   reading `fled` as a danger signal for its skip-safety gate, reasoning that `fled` means "got away
   safely" — the opposite of "in danger" — and stated this in writing specifically so "change 10c's own
@@ -255,7 +254,7 @@ This is the same convention 統御術's own handler already uses for its cast-sp
 (`confer_skill_key`/`confer_scale`/`confer_trait_keys`, all read from `event_context`) — this change
 follows the identical, already-established convention rather than inventing a second way for a handler
 to reach caller-supplied data. Whatever constructs the `ActionRequest` for a flee attempt — a future
-top-level combat command, or `monster_behaviour_policy()`'s eventual flee branch (D-7) — is responsible
+top-level combat command, or change 10d's `monster_behaviour_policy()` flee branch (D-7) — is responsible
 for populating `event_context={"battlefield": battlefield}`, exactly as 統御術's caller is responsible
 for populating its own three keys. A missing key rejects with `EFFECT_RESOLUTION_FAILED`, naming the
 problem — not a crash, not a silent no-op, mirroring D-7's own established failure mode for a missing
@@ -499,8 +498,8 @@ here as future scope for whichever change first has both a room graph and a reas
 physical consequences — plausibly change 12's own author, or a later balance pass — not built,
 approximated, or guessed at in this change.
 
-### D-7. The extension point for change 10b, and precisely what its archetype table would need — named
-as a follow-up, not built here, not an edit to 10b's artifacts.
+### D-7. The extension point consumed by change 10d, and precisely what its archetype table needs —
+named downstream scope, not built here
 
 **The extension point this mechanism exposes today.** Any `action_provider` — `monster_behaviour_policy()`
 included — can choose to flee for the entity it is deciding for by returning:
@@ -510,19 +509,20 @@ ActionRequest(
     actor=entity,
     skill_key="flee",
     targets=[entity],
-    context=BattlefieldActionContext(battlefield),
+    context=BattlefieldActionContext(
+        battlefield,
+        event_context={"battlefield": battlefield},
+    ),
 )
 ```
 
-with the caller separately populating `context.event_context = {"battlefield": battlefield}` (D-3) for
-`ActionResolver.resolve()`'s effect-resolution step to read. This is a complete, already-functional
-capability the moment this change lands — no change to `monster_behaviour.py`, `combat.py`, or
-`overwhelm.py` is needed for a *decision* to flee to actually execute correctly; only a decision-making
-caller choosing to construct this request is missing, and that caller is change 10b's (or a future
-change's) to write.
+The constructor supplies `event_context["battlefield"]` (D-3) for `ActionResolver.resolve()`'s
+effect-resolution step to read. This is a complete, already-functional capability the moment this
+change lands — no change to `combat.py` or `overwhelm.py` is needed for a decision to flee to execute;
+change 10d owns the missing decision branch in `monster_behaviour_policy()`.
 
-**What change 10b's `monster_behaviour.yaml` and `monster_behaviour_policy()` would need, stated
-precisely for the coordinator to carry forward:**
+**What change 10d extends in 10b's `monster_behaviour.yaml` and
+`monster_behaviour_policy()`:**
 1. **A new per-archetype tunable**, e.g. `flee_hp_fraction: float | None` in each `archetypes` entry —
    the fraction of current-to-max hp at or below which that archetype attempts to flee instead of
    attacking, with `None` (or an unreachable value) meaning "this archetype never flees." A single
@@ -531,20 +531,20 @@ precisely for the coordinator to carry forward:**
    same "structure in code, tuning in data" discipline change 10b's own D-2 already established for
    `target_strategy`/`skill_choice`.
 2. **One new branch in `monster_behaviour_policy()`, evaluated before its existing single-vs-area
-   decision**: if `entity.traits.hp.value / entity.traits.hp.max <= profile.flee_hp_fraction` (guarded
-   against `None`), return the `ActionRequest` shape shown above instead of proceeding to target/skill
-   selection. This slots into change 10b's own decision tree at the same point its existing
+   decision**: use change 10d D-2's stored combat accessors
+   (`combat._stored_hp(entity) / combat._max_hp(entity)`) and return the `ActionRequest` shape shown
+   above when the guarded fraction is at or below the profile threshold, instead of proceeding to
+   target/skill selection. This slots into change 10b's own decision tree at the same point its existing
    area-vs-single check already sits (10b's own D-2: "single-vs-area is decided before target/skill
    selection"), as one more decision made *before* that one, not a replacement for it.
-3. **A policy question 10b's own author must resolve, not answered here**: whether `flee_hp_fraction`
-   should be checked once at the top of a monster's turn (this change's own recommendation, since it
-   mirrors the existing "decide shape, then act" structure exactly) or interleaved with target/skill
-   selection in some other way. This design takes no position beyond naming the tunable and the natural
-   insertion point.
+3. **Check timing owned by change 10d**: `flee_hp_fraction` is checked once at the top of a monster's
+   decision, after confirming an enemy remains and before attack target/skill selection. This mirrors
+   the existing "decide shape, then act" structure and avoids consuming attack tie-break dice on a
+   flee turn.
 
-This is reported to the coordinator as the concrete shape of a follow-up amendment to change 10b — this
-change does not edit `monster_behaviour.yaml`, `monster_behaviour.py`, or any of change 10b's OpenSpec
-artifacts to add it.
+This is the dependency contract carried into change 10d. This change does not edit
+`monster_behaviour.yaml` or `monster_behaviour.py`; 10d owns those additions after both prerequisites
+land.
 
 ## Risks / Trade-offs
 
@@ -605,9 +605,8 @@ Not applicable in the backward-compatibility sense — the project is unreleased
   `SNAPSHOTTED_SURFACES` constant plus the snapshot/restore dispatch functions in `world/rules/action.py`
   (D-5). Neither touches those changes' OpenSpec artifacts (proposal/design/specs/tasks) — only their
   implementation output, the same pattern change 11 already used for `commands/action.py::CmdCast`.
-- **Named follow-up for change 10b** (D-7): a `flee_hp_fraction` tunable and one new decision-tree
-  branch in `monster_behaviour_policy()`. Not built here; reported to the coordinator as a precise,
-  carriable amendment.
+- **Named downstream change 10d** (D-7): a `flee_hp_fraction` tunable and one new decision-tree
+  branch in `monster_behaviour_policy()`. Not built here; change 10d depends on this change and 10b.
 - **Named seam for changes 12-14** (D-6): a real room-relocation consequence of fleeing, once a room/
   exit topology exists. Not built here.
 - Change 11 (`world-clock`) is not edited by this change and does not need to be — its own D-6 already
@@ -616,11 +615,9 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 
 ## Open Questions
 
-- **Should `flee_hp_fraction` (D-7) vary the *check timing* — top-of-turn only, versus re-evaluated
-  mid-decision if a monster's hp changes between its own turn and the moment it would otherwise act?**
-  Not resolved here; this change only names the tunable and the natural insertion point, leaving the
-  exact mechanics to change 10b's own author, consistent with this change's charter (mechanism, not
-  decision).
+- **Resolved downstream: change 10d checks `flee_hp_fraction` once per monster decision.** It runs
+  after confirming an enemy remains and before attack selection. This change retains its charter of
+  mechanism rather than decision.
 - **Should a future balance pass add a supplementary failed-flee penalty beyond the opportunity cost
   this change relies on?** Not built here (Risks); left to whoever revisits combat balance once real
   monster movesets and party compositions exist (change 16's territory, mirroring every other invented

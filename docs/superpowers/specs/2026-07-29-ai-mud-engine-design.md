@@ -383,6 +383,14 @@ Overwhelm **compresses** combat, it does not skip it: a full EventLog is still p
 Narrator can write the corresponding prose. Recomputing every round handles mid-fight power-tier
 shifts, such as dropping a disguise.
 
+Monster flight is deliberately split across three ordered rules-core changes. Change 10b
+(`monster-behaviour`) chooses targets and attack skills but does not invent a disengage mechanism.
+Change 10c (`combat-disengage`) provides the universal `flee` skill, resolves its agility contest
+through `ActionResolver`, and is the sole writer of `Battlefield.fled`, but makes no monster-policy
+choice. Change 10d (`monster-flee-decision`) then adds YAML-tuned archetype HP thresholds and makes
+`monster_behaviour_policy()` emit the same resolver-ready `flee` `ActionRequest`. The policy never
+mutates state or decides whether the attempt succeeds.
+
 ### 6.4 Sexual state machine
 
 ```python
@@ -670,7 +678,8 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 | 9 | `dice-combat` | 8 | d100 resolution, damage, initiative, turn loop |
 | 10 | `overwhelm-resolution` | 9 | Overwhelm threshold, single-shot resolution, EventLog compression |
 | 10b | `monster-behaviour` | 9, 10 | Monster combat AI. `Monster.behaviour_tree` has been an unbuilt seam since change 3; change 9 supplies only a labelled placeholder that attacks the lowest-hp enemy. The change-16 milestone claims a complete playable game, which needs monsters that fight sensibly. |
-| 10c | `combat-disengage` | 9, 10, 10b | Fleeing and disengagement for players and monsters. §6.3 lists flee as a valid combat ending, but `Battlefield.fled` is declared and read across changes 8, 9 and 10 and **written by none of them** — surfaced by change 10b, which correctly declined it as an execution mechanism outside its decision-making charter. Without it the only exits from a fight are victory and death, which is harsh in a world where an elf can one-shot the player. |
+| 10c | `combat-disengage` | 9, 10, 10b | Universal fleeing and disengagement execution for players and monsters. §6.3 lists flee as a valid combat ending, but `Battlefield.fled` is declared and read across changes 8, 9 and 10 and **written by none of them** — surfaced by change 10b, which correctly declined it as an execution mechanism outside its decision-making charter. This change supplies the resolver path and writer, not the monster decision policy. |
+| 10d | `monster-flee-decision` | 10b, 10c | Archetype-driven monster flee decisions. Adds YAML-tuned current/max HP thresholds to 10b's profiles and emits 10c's innate `flee` action through `ActionResolver`; it neither resolves success nor mutates `Battlefield.fled` directly. |
 | 11 | `world-clock` | 7, 9 | Clock, scheduled events, time-skip commands, safety gate |
 | 11b | `character-progression` | 5, 6, 11 | XP, magic-level growth, skill improvement, and the consumer for conferred growth-rate multipliers. §3.2 lists `rules/progression` but no change owned it; surfaced by change 6, which built `growth_rate_multiplier()` with nothing to call it. Guild merit and rank remain change 16's. |
 

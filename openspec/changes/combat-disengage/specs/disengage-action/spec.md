@@ -1,11 +1,17 @@
 ## ADDED Requirements
 
 ### Requirement: flee is a SkillDef resolved through the unmodified ActionResolver pipeline
-`world/rules/disengage.py` SHALL register a `flee` `SkillDef` into `world.skills.registry.SKILL_REGISTRY`
-with `kind=SkillKind.ACTIVE`, `target_spec=TargetSpec.SELF`, `faction_constraint=
+`world/rules/disengage.py` SHALL declare `FLEE_SKILL_KEY = "flee"` and register a `SkillDef` under that
+key into `world.skills.registry.SKILL_REGISTRY` with `kind=SkillKind.ACTIVE`,
+`target_spec=TargetSpec.SELF`, `faction_constraint=
 FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`, and `effects=["disengage:self"]`.
 Casting it SHALL go through `ActionResolver.resolve()`'s complete eight-step pipeline with no new
 pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and no dedicated command.
+
+#### Scenario: Downstream policy imports the canonical key and registration owner
+- **WHEN** change 10d imports `FLEE_SKILL_KEY` from `world.rules.disengage`
+- **THEN** the value is `"flee"` and importing the module has registered both the skill definition
+  and disengage effect handler before the policy's request can be resolved
 
 #### Scenario: flee is cast identically to any other skill, through CmdCast
 - **WHEN** a player issues `cast flee` while a `BattlefieldActionContext` is the active context for

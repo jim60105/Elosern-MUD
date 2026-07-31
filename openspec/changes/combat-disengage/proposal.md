@@ -13,7 +13,8 @@ going to lose, can I leave."
 
 ## What Changes
 
-- Add exactly one new `SkillDef` (`flee`) to change 5's `SKILL_REGISTRY`, `target_spec=SELF`,
+- Add canonical `FLEE_SKILL_KEY = "flee"` and exactly one new `SkillDef` under that key to change
+  5's `SKILL_REGISTRY`, `target_spec=SELF`,
   `faction_constraint=SELF_ONLY`, `usable_out_of_combat=False`, `cost={}` — castable through the
   unmodified `ActionResolver.resolve()` pipeline, the unmodified out-of-combat/in-combat gate (D-3 of
   `action-resolver`), and the unmodified four-validation targeting path (`TargetSpec.SELF` still runs
@@ -37,8 +38,8 @@ going to lose, can I leave."
 - No change to `run_round()`, `resolve_overwhelm()`, `classify_overwhelm()`, or any monster-behaviour
   file. Fleeing is only ever expressed as an `ActionRequest` an `action_provider` chooses to return —
   the same seam `monster_behaviour_policy()` already fills for attacks. A concrete extension point
-  (and exactly what `monster_behaviour.yaml` would need) is specified for change 10b as a **named
-  follow-up**, not built here.
+  (and exactly what `monster_behaviour.yaml` needs) is consumed by named downstream change 10d
+  (`monster-flee-decision`, depends on 10b and 10c), not built here.
 
 ## Capabilities
 
@@ -58,7 +59,7 @@ going to lose, can I leave."
 ## Impact
 
 - **New file**: `world/rules/disengage.py` — the `flee` `SkillDef` registration, the `disengage`
-  effect handler, the flee-success formula, and the `INNATE_SKILL_KEYS` constant.
+  effect handler, flee-success formula, and canonical `FLEE_SKILL_KEY` consumed by change 10d.
 - **Additive edit to `world/rules/action.py`** (change 8's implementation, not its OpenSpec artifacts):
   `SNAPSHOTTED_SURFACES` gains `"battlefield"`; the commit-time snapshot/restore dispatch gains a
   duck-typed branch for a Battlefield-shaped object alongside the existing per-entity path. No change
@@ -69,10 +70,10 @@ going to lose, can I leave."
   `dice.roll_d100()`, `Battlefield`), `world/rules/overwhelm.py`, `world/rules/monster_behaviour.py`,
   `world/rules/rulebook/combat.yaml`, `world/rules/rulebook/overwhelm.yaml`,
   `world/rules/rulebook/monster_behaviour.yaml`.
-- **Named follow-up for change 10b** (not built here, not an edit to its artifacts): a
-  `flee_hp_threshold`-shaped tunable per archetype in `monster_behaviour.yaml`, and one new branch in
-  `monster_behaviour_policy()` evaluated before its existing attack-selection logic. Reported to the
-  coordinator, not authored.
+- **Named downstream change 10d** (not built here): a nullable `flee_hp_fraction` tunable per
+  archetype in `monster_behaviour.yaml`, and one new branch in `monster_behaviour_policy()` evaluated
+  before its existing attack-selection logic. Change 10d depends on this change's completed resolver
+  path and `Battlefield.fled` writer.
 - **Seam for changes 12-14**: fleeing removes a combatant from the `Battlefield`'s active contest only
   — it does not relocate the entity's Evennia room location, since no room/exit topology exists yet to
   relocate it to. A real "flee to an adjacent room" mechanic is named as future scope once map layers

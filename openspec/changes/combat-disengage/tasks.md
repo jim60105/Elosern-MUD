@@ -10,7 +10,7 @@
       `Battlefield` roster member (no combat-state dependency).
 - [ ] 1.5 Test: `world/skills/handler.py` has no import from `world.rules.*`; `world/rules/
       disengage.py` imports `INNATE_SKILL_KEYS` from `world.skills.handler`.
-- [ ] 1.6 Create `world/rules/disengage.py`; register the `flee` `SkillDef`
+- [ ] 1.6 Create `world/rules/disengage.py`; declare `FLEE_SKILL_KEY = "flee"` and register its `SkillDef`
       (`target_spec=SELF`, `faction_constraint=SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`,
       `effects=["disengage:self"]`) into `world.skills.registry.SKILL_REGISTRY`.
 - [ ] 1.7 Test: casting `flee` outside combat (`ActionContext.battlefield is None`) rejects with
