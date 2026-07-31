@@ -1,4 +1,11 @@
-## ADDED Requirements
+## Purpose
+
+Define the idempotent grid bootstrap that instantiates real, walkable xyzgrid rooms and exits at
+server start, distinct from the `LoreRecord` data-mirror `sync_all()`, plus the Limbo-bridging exit
+pair and the `evennia xyzgrid` CLI registration.
+
+## Requirements
+
 
 ### Requirement: sync_grid() is distinct from sync_all() and instantiates real rooms and exits
 `world/maps/bootstrap.py` SHALL provide a `sync_grid()` function, distinct in name and module from
@@ -8,9 +15,10 @@
 
 #### Scenario: sync_grid produces real, puppetable-adjacent room objects
 - **WHEN** `sync_grid()` runs against an empty database
-- **THEN** thirteen `GridRoom`/`AnchorRoom` instances and twelve `XYZExit` instances exist in the
-  database for the `capital_altoria` map, each queryable via ordinary Evennia object search — not
-  `LoreRecord` Scripts
+- **THEN** thirteen `GridRoom`/`AnchorRoom` instances and twenty-four `XYZExit` instances exist in
+  the database for the `capital_altoria` map, each queryable via ordinary Evennia object search —
+  not `LoreRecord` Scripts. The twenty-four directed exits reflect the twelve map links spawning
+  one exit per travel direction.
 
 #### Scenario: sync_all's own behavior is unaffected
 - **WHEN** `sync_all()` runs
@@ -42,8 +50,8 @@ city to exist after a fresh container boot.
 - **WHEN** the Evennia server starts against a fresh, migrated, empty database (as
   `docker-entrypoint.sh`'s `evennia migrate --noinput` followed by `evennia start --log` would
   produce)
-- **THEN** the `capital_altoria` sample city's thirteen rooms and twelve intra-city exits exist before
-  the server accepts player connections, with no separate command having been issued
+- **THEN** the `capital_altoria` sample city's thirteen rooms and twenty-four intra-city exits exist
+  before the server accepts player connections, with no separate command having been issued
 
 #### Scenario: at_server_start calls sync_grid after sync_all, not before
 - **WHEN** `server/conf/at_server_startstop.py::at_server_start()` is inspected
@@ -89,5 +97,5 @@ warning and skip creating the bridging exit pair, and SHALL NOT raise.
 
 #### Scenario: A missing Limbo degrades gracefully, without preventing the rest of sync_grid from running
 - **WHEN** `sync_grid()` runs against a database with no object keyed `"Limbo"`
-- **THEN** the sample city's thirteen rooms and twelve intra-city exits are still spawned, no bridging
-  exit is created, and `sync_grid()` does not raise
+- **THEN** the sample city's thirteen rooms and twenty-four intra-city exits are still spawned, no
+  bridging exit is created, and `sync_grid()` does not raise

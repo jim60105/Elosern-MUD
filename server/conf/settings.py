@@ -44,6 +44,14 @@ TRAIT_CLASS_PATHS = [
     "world.rules.traits.DeterministicGaugeTrait",
 ]
 
+# xyzgrid contrib: make the `evennia xyzgrid` CLI and its map prototypes
+# available (map-anchor-grid).
+EXTRA_LAUNCHER_COMMANDS["xyzgrid"] = "evennia.contrib.grid.xyzgrid.launchcmd.xyzcommand"
+
+# "world.prototypes" is already the settings_default entry; re-list it so the
+# contrib's module is appended without duplicating the project module.
+PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototypes"]
+
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

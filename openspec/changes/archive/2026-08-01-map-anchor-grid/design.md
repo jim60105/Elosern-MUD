@@ -511,6 +511,20 @@ change 13's decision, exercised on data change 13 owns.
   the likely resolution is a small, standalone `SceneArchetypeMixin` (or equivalent plain-attribute
   contract) that `GridRoom`, a future `WildernessRoom` subclass, and a future `InstanceRoom` can each
   adopt independently of sharing `XYZRoom` as a common ancestor.
+- **[Known limitation, surfaced by the implementation-phase rubber-duck review] `MapNode.
+  spawn_links()` reconciles exits by key set, not by destination.** Read directly from the installed
+  Evennia 6.1.0 `xymap_legend.py`: `spawn_links()` computes the symmetric difference between the
+  map's declared directional exit keys at a node and the exits that already exist there, and only
+  creates/deletes exits whose *key* is missing/extra — the subsequent prototype batch-update
+  (`exact=False`) refreshes Attributes, not the exit's `destination`. A future map edit that keeps a
+  directional key (e.g. `north`) at a node but points it at a *different* target node would therefore
+  leave the old exit's `destination` untouched, silently diverging from the declared `MAPSTR`.
+  → **Accepted here, deliberately**: this change scopes the sample city to a fixed thirteen-room,
+  twelve-link topology (D-6) that no roadmap change through 14 rewires, so no reconciliation logic is
+  added to `sync_grid()` now. A future change that edits an already-landed map's connectivity must
+  either reconcile every spawned `XYZExit`'s destination against the parsed `XYMap`, or tear down and
+  respawn the affected map via the contrib's documented remove/rebuild flow (design.md D-4), and
+  should add an integration test for the "same key, changed destination" case before doing so.
 
 ## xyzgrid API — verification summary (for the record)
 

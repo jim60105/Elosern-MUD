@@ -6,6 +6,7 @@ from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
 from evennia.utils.test_resources import EvenniaTest
 
+from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.lore.sync import _ALL_REGISTRIES, _db_safe, sync_all, sync_one
 
@@ -47,6 +48,20 @@ class LoreSyncTests(EvenniaTest):
         self.assertEqual(elf[0].db.fields["lifespan"], (800, 1200))
         capital = search_script("lore:anchors:capital_grandia")
         self.assertEqual(capital[0].db.fields["kind"], "capital")
+
+    def test_anchor_placements_record_is_mirrored_and_idempotent(self):
+        expected = _db_safe(asdict(ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]))
+
+        sync_all()
+        records = search_script("lore:anchor_placements:capital_altoria")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].db.category, "anchor_placements")
+        self.assertEqual(records[0].db.fields, expected)
+
+        sync_all()
+        records = search_script("lore:anchor_placements:capital_altoria")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].db.fields, expected)
 
     def test_sync_one_updates_existing_record(self):
         entry = RACE_REGISTRY["human"]

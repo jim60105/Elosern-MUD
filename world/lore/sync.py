@@ -9,6 +9,7 @@ from evennia.utils.create import create_script
 from evennia.utils.search import search_script
 
 from .anchors import ANCHOR_REGISTRY
+from .anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from .economy import PRICE_TABLE
 from .elements import ELEMENT_REGISTRY
 from .guild import GUILD_RANK_REGISTRY
@@ -33,6 +34,7 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "guild_ranks": GUILD_RANK_REGISTRY,
     "monster_tiers": MONSTER_TIER_REGISTRY,
     "anchors": ANCHOR_REGISTRY,
+    "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
     "prices": PRICE_TABLE,
 }
 

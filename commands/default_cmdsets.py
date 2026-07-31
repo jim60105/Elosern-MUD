@@ -15,6 +15,7 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 """
 
 from evennia import default_cmds
+from evennia.contrib.grid.xyzgrid.commands import XYZGridCmdSet
 
 from commands.action import CmdCast
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
@@ -38,6 +39,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdRest)
         self.add(CmdSleep)
         self.add(CmdWaitUntil)
+        self.add(XYZGridCmdSet)
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

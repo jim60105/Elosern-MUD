@@ -28,6 +28,11 @@ MATRIX_IMPORTS = {
         ("Component", "ComponentHolderMixin", "ComponentProperty"),
     ),
     "xyzgrid": ("evennia.contrib.grid.xyzgrid.xyzroom", ("XYZRoom", "XYZExit")),
+    "xyzgrid runtime": (
+        "evennia.contrib.grid.xyzgrid.xyzgrid",
+        ("XYZGrid", "get_xyzgrid"),
+    ),
+    "xyzgrid xymap": ("evennia.contrib.grid.xyzgrid.xymap", ("XYMap",)),
     "wilderness": (
         "evennia.contrib.grid.wilderness.wilderness",
         ("WildernessMapProvider",),

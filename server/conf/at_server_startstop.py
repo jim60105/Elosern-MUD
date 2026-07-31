@@ -31,8 +31,10 @@ def at_server_start():
     how it was shut down.
     """
     from world.lore.sync import sync_all
+    from world.maps.bootstrap import sync_grid
 
     sync_all()
+    sync_grid()
 
 
 def at_server_stop():
