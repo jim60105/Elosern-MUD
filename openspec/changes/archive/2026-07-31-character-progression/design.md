@@ -44,16 +44,15 @@ only the `魔法等級` (magic level) lines, which are progression data, not com
 - `world/rules/progression.py`: magic-level growth from a documented combination of ambient study time
   and combat-kill experience, all funneled through one multiplier function,
   `effective_magic_growth_multiplier(entity)`, that folds together `RaceProfile.learning_multiplier`
-  (change 2), a self-multiplier read from the entity's own owned passive skills (this change's own
-  `magic_growth_multiplier:<N>` effect-ID convention), and change 6's `growth_rate_multiplier(entity)`
+   (change 2), a self-multiplier read from the entity's own owned passive skills via change 5's existing
+   `growth_rate:magic:<N>` effect-ID convention, and change 6's `growth_rate_multiplier(entity)`
   (conferred buffs) — **the concrete consumer change 6 was built for.**
 - A hard ceiling: `magic_level` never exceeds `RaceProfile.magic_cap` (or `0` for a `Monster`, which has
   no race). Every multiplier accelerates *rate*, never raises this ceiling.
 - Skill proficiency (`entity.db.skill_proficiency`) as a second, independent counter — practice-driven,
   scaled only by `RaceProfile.learning_multiplier`, structurally separate from `magic_level`.
-- A settlement-stage-shaped callable, `accrue_magic_study(entities, seconds, source)`, ready for change
-  11's stage registry to invoke — and a precise, non-code-editing specification of exactly where it
-  needs to slot into change 11's fixed `_STAGE_ORDER`.
+- A settlement-stage-shaped callable, `accrue_magic_study(entities, seconds, source)`, consumed by
+  change 11's existing `magic_study` stage between `sexual_decay` and `daily_resets`.
 - Fully deterministic, golden-value regression tests — no randomness appears anywhere in this module's
   formulas, so "fixed-seed" is vacuous here; the equivalent discipline is fixed, hand-computed expected
   values for fixed inputs.
@@ -67,11 +66,9 @@ only the `魔法等級` (magic level) lines, which are progression data, not com
   path or attachment point beyond noting the seam is reusable.
 - No new player-facing command. Ambient study reuses change 11's already-built `rest`/`sleep`/`wait`
   commands (via their shared `AdvanceSource.SKIP`) rather than inventing a `study` command — see D-2.
-- No edit to change 11's OpenSpec artifacts. This change's own settlement-stage-shaped callable is built
-  and tested standalone (mirroring change 6's own treatment of `tick_buffs(entity)` before change 11
-  existed to call it); the exact stage name, gate, and position change 11 needs are specified in this
-  design (D-2) and in the proposal's Impact section, for the coordinator to carry into change 11
-  directly — not made here.
+- No edit to change 11's OpenSpec artifacts. The completed world-clock implementation already owns the
+  `magic_study` stage and imports this change's callable lazily; this change verifies that integration
+  without moving clock ownership into the progression module.
 - No edit to change 5's, change 6's, or change 3's OpenSpec artifacts. This change reads
   `SKILL_REGISTRY`/`entity.skills.owned_keys()` (change 5), `growth_rate_multiplier()`/`entity.buffs`
   (change 6), and `entity.traits.magic_level`/`RACE_REGISTRY` (changes 2/3) without modifying any of
@@ -181,16 +178,12 @@ with no other action") more precisely than a duration heuristic could.
 function — the concrete consumer of change 6's `growth_rate_multiplier()`.
 
 ```python
-MAGIC_GROWTH_MULTIPLIER_PREFIX = "magic_growth_multiplier:"  # this change's own convention,
-                                                                # mirroring change 5's D-5
-                                                                # stat_multiply:<trait>:<multiplier>
-                                                                # exactly, for a magic-growth-rate
-                                                                # self-multiplier instead of a
-                                                                # combat-stat multiplier
+MAGIC_GROWTH_MULTIPLIER_PREFIX = "growth_rate:magic:"  # Existing change 5 convention for
+                                                          # reincarnation-boon magic growth.
 
 def _self_magic_growth_multiplier(entity) -> float:
     """Scans entity.skills.owned_keys() for a PASSIVE skill whose SkillDef.effects
-    includes a 'magic_growth_multiplier:<N>' entry -- this change's own
+    includes a 'growth_rate:magic:<N>' entry -- change 5's existing
     convention for a 'reincarnation boon'-style self multiplier (Elosia's
     own passive, change 5's reincarnation_boon_elosia). Multiplicative
     combination across matches, mirroring change 5's own effective_value()
@@ -220,7 +213,7 @@ def effective_magic_growth_multiplier(entity) -> float:
 `growth_rate_multiplier(entity)` is imported directly from change 6's `world/rules/buffs.py` — this is
 the literal, concrete call site change 6's design.md named this change as owning. A regression test
 constructs an entity with `race="human"` (`learning_multiplier=1.0`), no owned
-`magic_growth_multiplier:` skill, and an active `conferred_growth_rate` buff at `scale=0.5` (created via
+`growth_rate:magic:` skill, and an active `conferred_growth_rate` buff at `scale=0.5` (created via
 change 6's `grant_conferred_growth_rate(entity, source_key="elosia", scale=0.5)`), then asserts
 `effective_magic_growth_multiplier(entity) == 0.5` and that `accrue_magic_study()` grants exactly half
 the XP it would grant the same entity with no buff active — proving hard requirement 1 (change 6's
@@ -239,16 +232,18 @@ built and tested it for.
 conferred grant's `scale` multiplies in too) — one uniform combination rule across every multiplier this
 project has, not a second rule invented here.
 
-**Flagged for coordination**: change 5's `reincarnation_boon_elosia`/`_yuka`/`_yuna` `SkillDef` entries'
-exact `effects` strings are **not pinned** by change 5's own artifacts — change 5's tasks.md only
-requires "each with a distinct `effects` entry." This change's own tests construct a synthetic
-`SkillDef` fixture carrying `magic_growth_multiplier:100` to prove `_self_magic_growth_multiplier()`
-works correctly, independent of whatever exact string change 5's implementation actually assigns to
-Elosia's passive. If change 5's real seed data does not use this convention for her entry, this
-function will silently return `1.0` for her self-multiplier component (though her overall growth still
-benefits from `growth_rate_multiplier()` if she is ever the *source* of a conferral elsewhere, and her
-own multiplier would then need change 5's implementation — not its artifacts — adjusted to match this
-convention). See Risks.
+Change 5's implemented `reincarnation_boon_elosia` already uses `growth_rate:magic:100`; this change
+adopts that established convention and verifies it with both the real registry entry and a synthetic
+passive-skill fixture.
+
+### D-3a. Growth values are finite and non-negative before they can mutate progression.
+
+`grant_conferred_growth_rate()` rejects booleans, non-numeric values, negative values, NaN, and infinity
+before persisting a buff. `effective_magic_growth_multiplier()` and the magic-XP accumulator repeat the
+finite, non-negative validation defensively, so manually injected or persisted invalid state cannot lower
+a character's level through negative floor division or poison the accumulator with NaN. A deferred
+combat-kill award runs inside ActionResolver's existing snapshot and transaction boundary; validation
+failure restores damage, resource spend, skill practice, and both progression attributes.
 
 ### D-4. Magic-level cap enforcement: closed-form, O(1), and a hard ceiling — rate accelerates, the
 cap never moves.
@@ -279,7 +274,7 @@ def _apply_level_ups(entity) -> None:
     levels_gained = int(xp // MAGIC_XP_PER_LEVEL)
     new_level = min(cap, current + levels_gained)
     entity.db.magic_xp = 0.0 if new_level >= cap else xp - levels_gained * MAGIC_XP_PER_LEVEL
-    magic.value = new_level
+    magic.current = new_level
 ```
 
 A test constructs an elf entity (`magic_cap = 900`) with `entity.db.magic_xp` set to an enormous value
@@ -448,13 +443,6 @@ instruction not to build quest content.
   evidence than either alone, but neither removes the underlying invented-assumption risk. Flagged for a
   future balance pass, the same discipline every other change's invented numeric constant already
   carries.
-- **[Risk] Change 5's `reincarnation_boon_elosia` `SkillDef.effects` string is not pinned by change 5's
-  own artifacts, so `_self_magic_growth_multiplier()`'s `magic_growth_multiplier:` convention may not
-  match whatever string change 5's actual implementation assigns her.** → Mitigation: D-3 documents this
-  explicitly and tests the interpretation function against a synthetic fixture rather than change 5's
-  real seed data; named as a coordination item for the coordinator to verify once change 5 is
-  implemented (adjust change 5's implementation, not its artifacts, to use this convention) — mirroring
-  skills-equipment's own D-10 precedent for its required one-line adjustment to change 4's `loader.py`.
 - **[Risk] The divine-arts (神之秘法) 30-fold casual-vs-dedicated anchor cannot be verified against any
   code this change builds**, since no numeric divine-arts trait exists anywhere in the entity model. →
   Accepted and stated plainly (D-5); building such a trait is entity-traits' (change 3, frozen) scope, not
@@ -473,13 +461,9 @@ instruction not to build quest content.
   calibrate against, unlike `magic_level`'s two concrete anchors. → Accepted and stated explicitly: these
   two constants are pure placeholders, flagged for change 9's eventual balance pass once
   `skill_proficiency_level()` actually feeds into a combat formula (not built by this change, per D-6).
-- **[Risk] This change's settlement-stage integration (D-2) cannot be verified end-to-end today**, since
-  change 11's `_STAGE_ORDER` does not include a `magic_study` entry and this change does not edit change
-  11's artifacts to add one. → Accepted per the task's explicit instruction; `accrue_magic_study()` is
-  tested standalone (constructed entities, explicit `seconds`/`source` arguments, no `WorldClock`
-  present), mirroring exactly how change 6 tested `tick_buffs()` before change 11 existed to call it. The
-  proposal's Impact section names the exact stage/gate/position for the coordinator to carry into change
-  11 directly.
+- **[Risk] World clock imports progression lazily so its fallback still permits the clock to run before
+  this module exists.** → Mitigation: this change supplies the module and verifies that a `SKIP` advance
+  invokes real progression while `COMMAND` and `COMBAT` produce no study XP.
 
 ## Migration Plan
 
@@ -489,37 +473,21 @@ Not applicable in the backward-compatibility sense — the project is unreleased
 - This change must land after change 5 (`SKILL_REGISTRY`/`entity.skills`), change 6
   (`growth_rate_multiplier()`/`entity.buffs`), and change 11 (`AdvanceSource` enum) are all importable —
   matching design doc §11 exactly.
-- **Change 11 needs one addition this change does not make directly**: a new settlement stage,
-  `magic_study`, in `world/rules/clock.py`'s `_STAGE_ORDER`, positioned between `sexual_decay` and
-  `daily_resets`, calling this change's `accrue_magic_study(entities, seconds, source)`. Reasoning for
-  this exact position: `magic_study` must be skipped for `AdvanceSource.COMBAT` for the same reason
-  `buff_ticks`/`sexual_decay` are (D-1/D-2) — ambient study is a downtime concept, not something that
-  happens mid-fight — so it belongs grouped with those two combat-skipped stages rather than with the
-  always-on `gauge_regen`/`daily_resets`/world-event stages. It has no computed interaction with either
-  `buff_ticks` or `sexual_decay` (independent fields, no shared resource, unlike change 11's own
-  regen/poison transposition-test pair), so its position *within* the combat-skipped group is
-  order-neutral for correctness; placing it last among the three (immediately before `daily_resets`)
-  groups "the three quiet per-entity accruals" together and reads as a natural close to the per-entity
-  portion of settlement before the world-event seams begin. This is named here, in this change's own
-  design, for the coordinator to apply directly to change 11's `design.md`/`specs/settlement-stage-order/
-  spec.md`/`tasks.md` — not made by this change, per the task's explicit instruction.
-- **Two thin integration edits to already-built implementation files, not their OpenSpec artifacts** —
-  the same "downstream change touches upstream code" pattern change 11 already used on
-  `commands/action.py::CmdCast`: a call to `grant_combat_kill_xp()` wherever a future combat-completion
-  consumer resolves a kill, and a call to `grant_skill_practice_xp()` wherever a future
-  `ActionResolver` integration resolves a successful skill use. Neither call site exists yet (changes 8/9/
-  10's own combat/action code is not itself edited by this change beyond naming these two integration
-  points) — this change only guarantees the two callables exist with the documented signatures, exactly
-  the same "guarantee the callable, not the call site" discipline change 6 used for
-  `grant_conferred_growth_rate()`/`growth_rate_multiplier()` before this change existed to call them.
+- Change 11 already owns `magic_study` in `world/rules/clock.py`, between `sexual_decay` and
+  `daily_resets`. It invokes this module only for non-combat advances, and this callable independently
+  accepts XP only from `AdvanceSource.SKIP`.
+- This change modifies existing rules implementation, not upstream OpenSpec artifacts: ActionResolver
+  stages one practice-XP grant for each successful active-skill action and one deferred combat-kill check
+  per unique, resolved, initially living tiered `Monster` target in its atomic commit. The latter is the
+  narrow, documented exception to ActionResolver's caller-neutral combat-state rule because only a
+  battlefield context can establish a combat kill.
 
 ## Open Questions
 
 - **Should quest-completion rewards (change 15, not yet proposed) reuse `grant_combat_kill_xp()`'s exact
   shape, or need their own function?** This change names the reuse as plausible (D-7) but does not decide
   it, since change 15 does not exist yet to have an opinion.
-- **Exact `CounterTrait` attribute names** (`.value`/`.max` vs. some other accessor) are left to the
-  implementer to confirm against the installed Evennia 6.1.0 `evennia.contrib.rpg.traits` package,
-  consistent with the verification discipline every prior change in this project has already established.
+- **Verified `CounterTrait` accessors:** `.value` is the bounded read-only derived value, `.current` is
+  the persistent mutable current value, and `.max` is the configured ceiling.
 - **Should a future change give skill proficiency an upper bound?** No lore source specifies one; left
   unbounded (D-6) until a concrete need (a balance pass, or a UI display cap) surfaces one.

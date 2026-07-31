@@ -1,6 +1,7 @@
 """BuffHandler integration for design sections 5.2 and 6.4."""
 
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -137,12 +138,16 @@ def blocks_action(entity) -> bool:
 
 def grant_conferred_growth_rate(entity, source_key: str, scale: float) -> None:
     """Persist an unconditional source-qualified growth-rate conferral."""
+    if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+        raise ValueError("growth-rate scale must be a finite non-negative number")
+    if not isfinite(scale) or scale < 0:
+        raise ValueError("growth-rate scale must be a finite non-negative number")
     _add_buff(
         entity,
         "conferred_growth_rate",
         instance_key=f"conferred_growth_rate:{source_key}",
         source_key=source_key,
-        scale=scale,
+        scale=float(scale),
     )
 
 

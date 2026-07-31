@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal
 
 from django.db import transaction
 
+from typeclasses.monsters import Monster
 from world.rules.buffs import (
     _add_buff,
     blocks_action,
@@ -14,6 +15,7 @@ from world.rules.buffs import (
     grant_conferred_growth_rate,
 )
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.progression import grant_combat_kill_xp, grant_skill_practice_xp
 from world.rules.skill_effects import (
     apply_disguise_effect,
     record_conferred_grant,
@@ -23,6 +25,7 @@ from world.rules.targeting import (
     expand_target_shorthand,
     resolve_targets,
 )
+from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 
 
@@ -119,7 +122,7 @@ EffectHandler = Callable[
     list[PendingEffect],
 ]
 SNAPSHOTTED_SURFACES = frozenset(
-    {"traits", "sexual", "buffs", "skill_grants", "battlefield"}
+    {"traits", "sexual", "buffs", "skill_grants", "progression", "battlefield"}
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
 _EFFECT_HANDLER_SURFACES: dict[str, frozenset[str]] = {}
@@ -435,6 +438,49 @@ def _step6_resource_deduction(
     return pending
 
 
+def _step6_skill_practice(actor: Any, skill: SkillDef) -> PendingEffect:
+    """Stage one practice award inside the action's transactional commit."""
+    return PendingEffect(
+        actor,
+        f"skill_practice|{_entity_key(actor)}|{skill.key}",
+        frozenset({"progression"}),
+        lambda: grant_skill_practice_xp(actor, skill.key),
+    )
+
+
+def _step6_combat_kill_xp(
+    request: ActionRequest,
+    targets: list[Any],
+) -> list[PendingEffect]:
+    """Stage one post-damage kill award per initially living tiered monster."""
+    if request.context.battlefield is None:
+        return []
+    pending: list[PendingEffect] = []
+    seen: set[int] = set()
+    for target in targets:
+        if id(target) in seen:
+            continue
+        seen.add(id(target))
+        if not isinstance(target, Monster):
+            continue
+        tier_key = target.threat_tier
+        if tier_key not in MONSTER_TIER_REGISTRY or _stored_trait_value(target.traits.hp) <= 0:
+            continue
+        pending.append(
+            PendingEffect(
+                request.actor,
+                f"combat_kill_xp|{_entity_key(target)}|{tier_key}",
+                frozenset({"progression"}),
+                lambda target=target, tier_key=tier_key: (
+                    grant_combat_kill_xp(request.actor, tier_key)
+                    if _stored_trait_value(target.traits.hp) <= 0
+                    else None
+                ),
+            )
+        )
+    return pending
+
+
 _ENTRY_TEMPLATES = {
     "resource_spend": "{actor} 消耗了資源。",
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
@@ -445,6 +491,8 @@ _ENTRY_TEMPLATES = {
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
     "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
+    "skill_practice": "{actor} 累積了技能熟練度。",
+    "combat_kill_xp": "",
 }
 
 
@@ -511,6 +559,8 @@ def _entries_from_effect(
                 else float(pursuer_agility)
             ),
         }
+    elif kind == "combat_kill_xp":
+        return ()
     else:
         data = {}
     entry = EventEntry(
@@ -568,7 +618,7 @@ def _step7_build_event_log(
 def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
     targets: list[str] = []
     for effect in pending:
-        if effect.description.startswith("resource_spend|"):
+        if effect.description.startswith(("resource_spend|", "combat_kill_xp|")):
             continue
         key = effect.description.split("|", 2)[1]
         if key not in targets:
@@ -628,6 +678,8 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
         ),
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
+        "magic_xp": _attribute_snapshot(entity, "magic_xp"),
+        "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
     }
 
 
@@ -662,6 +714,8 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     )
     _restore_attribute(entity, "buffs", snapshot["buffs"])
     _restore_attribute(entity, "skill_grants", snapshot["skill_grants"])
+    _restore_attribute(entity, "magic_xp", snapshot["magic_xp"])
+    _restore_attribute(entity, "skill_proficiency", snapshot["skill_proficiency"])
     entity.traits.trait_data = entity.attributes.get(
         "traits",
         default={},
@@ -732,6 +786,8 @@ class ActionResolver:
             _step4_capability(request.actor)
             pending = _step5_effect_resolution(request, skill, targets)
             pending += _step6_resource_deduction(request.actor, skill)
+            pending.append(_step6_skill_practice(request.actor, skill))
+            pending += _step6_combat_kill_xp(request, targets)
             event_log = _step7_build_event_log(request, skill, pending)
             time_cost = _step8_time_cost(request, skill)
             event_log = replace(event_log, time_cost_seconds=time_cost)

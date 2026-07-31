@@ -62,6 +62,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "sexual",
                     "buffs",
                     "skill_grants",
+                    "progression",
                     "battlefield",
                 }
             ),

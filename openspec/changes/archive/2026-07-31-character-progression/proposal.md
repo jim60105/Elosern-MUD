@@ -20,8 +20,8 @@ project increases it, and `growth_rate_multiplier()` returns a number nothing ev
     change 11's `settle_combat_result()`) calls once per kill.
   - Every magic-XP gain is scaled by `effective_magic_growth_multiplier(entity)`, which multiplies
     three independent sources: `RaceProfile.learning_multiplier` (change 2), a self-multiplier read
-    from the entity's own owned passive skills via a new `magic_growth_multiplier:<N>` effect-ID
-    convention (mirroring change 5's `stat_multiply:` convention, for "reincarnation boon"-style
+  from the entity's own owned passive skills via change 5's existing `growth_rate:magic:<N>` effect-ID
+  convention (for "reincarnation boon"-style
     passives such as Elosia's), and change 6's `growth_rate_multiplier(entity)` (conferred buffs).
   - `magic_level` is hard-capped at `RaceProfile.magic_cap` (or a `Monster`'s tier-driven cap of `0`):
     the multiplier accelerates *rate*, never the ceiling. Surplus XP at the cap is discarded, not
@@ -39,10 +39,9 @@ project increases it, and `growth_rate_multiplier()` returns a number nothing ev
 - `world/rules/rulebook/progression.yaml` — every invented rate constant in one place (XP-per-level,
   XP-per-study-hour, per-tier combat-kill XP, XP-per-skill-level, XP-per-practice), following the
   project's "recompute/derive from data, flag invented numbers" convention.
-- Two thin integration edits to already-built implementation files (not their OpenSpec artifacts),
-  mirroring the "downstream change touches upstream code" pattern change 11 already used on
-  `commands/action.py::CmdCast`: a call to `grant_combat_kill_xp()` where a kill is resolved, and a
-  call to `grant_skill_practice_xp()` where a skill cast succeeds.
+- Integrate `grant_skill_practice_xp()` and deferred `grant_combat_kill_xp()` checks into ActionResolver's
+  atomic commit. The combat check evaluates unique, resolved, initially living tiered targets only after
+  damage is committed, so each newly defeated monster grants XP exactly once.
 - **Not built**: guild merit/rank (change 16's), quests (change 15's), a new player-facing command
   (study/training reuses world-clock's existing `rest`/`sleep`/`wait` commands instead), and any edit
   to change 11's own settlement-stage artifacts — this proposal names exactly what change 11 needs (a
@@ -59,8 +58,8 @@ project increases it, and `growth_rate_multiplier()` returns a number nothing ev
   scaled only by `RaceProfile.learning_multiplier`.
 
 ### Modified Capabilities
-- None. `openspec/specs/` is currently empty (no prior change has been archived yet), so there is no
-  existing capability spec to amend.
+- `action-resolution-pipeline`: permit its otherwise caller-neutral pipeline to stage tiered monster
+  kill XP only when a battlefield-backed context resolved a `Monster` target from positive HP to zero.
 
 ## Impact
 
@@ -73,12 +72,13 @@ project increases it, and `growth_rate_multiplier()` returns a number nothing ev
   `magic_cap`, change 3's `entity.traits.magic_level` (`CounterTrait`), change 5's `SKILL_REGISTRY`/
   `entity.skills.owned_keys()`, change 6's `growth_rate_multiplier(entity)`/`entity.buffs`, change 11's
   `AdvanceSource` enum.
-- **Named, not made, integration requirement for change 11**: a new settlement stage,
-  `magic_study`, gated the same way `buff_ticks`/`sexual_decay` are (`source is not
-  AdvanceSource.COMBAT`) plus an internal no-op unless `source is AdvanceSource.SKIP`, inserted
-  between `sexual_decay` and `daily_resets` in change 11's fixed `_STAGE_ORDER`. This proposal does
-  not edit change 11's artifacts; see design.md for the exact rationale and position, to be carried
-  into change 11 by the coordinator.
+- **Existing world-clock integration**: change 11 has already added its `magic_study` stage between
+  `sexual_decay` and `daily_resets`. It lazily imports and calls this change's
+  `accrue_magic_study(entities, seconds, source)` after the combat gate; this change supplies the
+  callable and verifies SKIP-only accrual end to end.
+- Growth-rate scales and calculated magic-growth multipliers must be finite and non-negative. Invalid
+  persisted legacy state fails before a progression write and, when invoked through ActionResolver,
+  rolls the full action back.
 - **Named, not built**: guild merit/rank progression (change 16), quest reward XP (change 15 — the
   attachment point is declared, not populated), and any change to the map layers or generative layer.
 - No database migration concerns — the project is unreleased with zero users.

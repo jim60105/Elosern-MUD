@@ -101,8 +101,11 @@ state it held before `resolve()` was called.
 
 ### Requirement: Neither ActionResolver nor targeting branches on combat state
 `world/rules/action.py` and `world/rules/targeting.py` SHALL contain no conditional that distinguishes
-combat from non-combat behavior other than the single, explicitly marked `usable_out_of_combat` gate.
-Combat-vs-non-combat behavior SHALL be expressed entirely through which concrete `ActionContext`
+combat from non-combat behavior other than the single, explicitly marked `usable_out_of_combat` gate and
+the deferred tiered-monster kill-XP staging check. That check MAY inspect whether the caller supplied a
+battlefield-backed context solely to stage `grant_combat_kill_xp()` for each unique, resolved `Monster`
+target that was initially alive and is reduced to zero HP during the action's atomic commit. All other
+combat-vs-non-combat behavior SHALL be expressed entirely through which concrete `ActionContext`
 implementation the caller supplies.
 
 #### Scenario: A source scan finds no undeclared combat-state branch
@@ -110,6 +113,12 @@ implementation the caller supplies.
   scanned for the literal tokens `in_combat`, `is_combat`, `combat_state`, and
   `isinstance(context, Battlefield`
 - **THEN** none of the tokens appear anywhere in these three files
+
+#### Scenario: A battlefield action stages tiered Monster kill XP only
+- **WHEN** a battlefield-backed action reduces a resolved `Monster` with a known `threat_tier` from
+  positive HP to zero
+- **THEN** the action stages exactly one deferred combat-kill XP effect for that target, while a
+  non-Monster target with the same `threat_tier` receives no kill-XP effect
 
 #### Scenario: No public callable takes a combat-shaped parameter
 - **WHEN** every public callable in `action.py`, `targeting.py`, and `event_log.py` has its signature
@@ -172,4 +181,3 @@ run any action whose staged effects declare a surface outside that same set.
 - **WHEN** `resolve()` is called for the same skill, guarded by
   `pytest.importorskip("world.rules.sexual_transitions")`, once that module is importable
 - **THEN** `resolve()` succeeds and the target's `entity.sexual` reflects `apply_event()`'s effect
-

@@ -57,3 +57,16 @@ recorded practice, with no upper bound enforced by this function.
 #### Scenario: skill_proficiency_level performs no write
 - **WHEN** `skill_proficiency_level(entity, skill_key)` is called any number of times
 - **THEN** `entity.db.skill_proficiency` is unchanged before and after every call
+
+### Requirement: Successful active-skill resolution records one practice grant atomically
+`ActionResolver` SHALL stage `grant_skill_practice_xp(actor, skill_key)` after every successful active
+skill resolution. The action rollback snapshot SHALL cover `magic_xp` and `skill_proficiency`, so a failed
+later pending effect restores their pre-action values along with every other action surface.
+
+#### Scenario: A successful active skill gains one practice increment
+- **WHEN** an active skill resolves successfully through `ActionResolver`
+- **THEN** the actor's proficiency for that skill increases by one scaled practice increment
+
+#### Scenario: A failed action records no practice progress
+- **WHEN** an action is rejected or its atomic commit fails
+- **THEN** the actor's `skill_proficiency` state is unchanged
