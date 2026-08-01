@@ -45,6 +45,7 @@ These were settled during design. Do not relitigate them inside a change.
 | D9 | **`world/lore/` is Python; `world/rules/rulebook/` is YAML.** | Lore is a versioned single source of truth that deserves code review. Balance numbers are data that should be tunable without touching Python. |
 | D10 | **Scene art is keyed by archetype, not by room.** A tavern in the capital and a tavern in a border town share one image. | GPU cost scales with scene *kinds*, not room count. Style stays consistent for free. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
+| D12 | **Guild advancement requires cumulative merit plus a nonlethal combat examination; shops use finite stock and clock-driven restocking.** Every registrant starts at F, regardless of displayed power. | Preserves the world's stated merit-plus-exam progression, gives Phase 4 a real combat milestone, and makes the reserved caravan/shop clock stages meaningful. |
 
 ---
 
@@ -103,8 +104,8 @@ mygame/
 │   │                                   consumed by change 7 — frozen with the contract)
 │   ├── rules/           primary deterministic engine (see §3.1's amended invariant:
 │   │                    world/maps/ and world/quests/ also apply state directly)
-│   │                    dice · combat · action · targeting · clock
-│   │                    traits · sexual_state · buffs · progression
+│   │                    dice · combat · combat_session · action · targeting · clock
+│   │                    traits · sexual_state · buffs · progression · guild · economy
 │   │                    rulebook/   declarative rule tables (YAML)
 │   ├── skills/          registry (SkillDef definitions) · handler · equipment
 │   │                    Own package rather than under lore/ or rules/, because
@@ -323,6 +324,53 @@ world/imports/
 
 Import is **all-or-nothing**. Failure reports which record, which field, and why. No partial import.
 
+### 5.4 Guild and economy contract
+
+Every adventurer registers at **F rank**. Registration stores the branch, world tick, and one
+historical snapshot of all displayed traits through `get_display_value()`; it never derives rank from
+that snapshot. This is the guild-registration consumer permitted by D2. Board eligibility, rewards,
+merit thresholds, examinations, and combat use canonical guild state and true traits only.
+
+Guild quest economics wrap the deterministic quest definition rather than moving quest state into an
+NPC or command:
+
+```python
+@dataclass(frozen=True)
+class QuestReward:
+    copper: int
+    items: tuple[ItemQuantity, ...]
+    merit: int
+
+@dataclass(frozen=True)
+class GuildQuestOffer:
+    definition_key: str
+    issuer_branch_key: str
+    reward: QuestReward
+```
+
+Offer registration validates the quest, branch, item keys, and copper against that quest rank's
+`GuildRank` band. Completed quest records remain quest-owned history. Reward claims are keyed by the
+deterministic quest ID, so each acceptance can be paid exactly once. Turn-in preflights and atomically
+commits wallet, inventory, ACQUIRE progress, guild merit, and claim identity.
+
+ACQUIRE progress is emitted only by a successfully committed deterministic inventory delta. Import
+population is initial state, not acquisition; removal never reverses progress; and there is no public
+"item acquired" assertion that a caller can forge.
+
+Rank promotion from F through S has two gates: cumulative `guild_merit` meets the next rank's YAML
+threshold, then the candidate defeats that rank's guild examiner. The examination is ordinary
+ActionResolver combat with a nonlethal terminal policy: a lethal crossing floors HP at 1 and records a
+knockout. It grants no ordinary kill XP, loot, DEFEAT progress, or protected-entity failure. Passing
+advances exactly one rank; failing or fleeing leaves rank and merit unchanged. Every examination starts
+through the same deterministic `start_guild_exam()` API, whether requested by a player command or a
+future validated NPC intent.
+
+Shops use immutable item/shop definitions and persistent finite integer stock. Buy and sell settle exact
+integer copper, repeated item keys, ACQUIRE progress, and stock in one transaction. Opening state is
+derived from the player-driven clock. `caravan_arrivals` replenishes stock to its cap before
+`shop_hours` emits the corresponding opening event; multi-day skips use boundary arithmetic rather than
+per-second iteration.
+
 ---
 
 ## 6. Rules Engine
@@ -405,6 +453,17 @@ choice. Change 10d (`monster-flee-decision`) then adds YAML-tuned archetype HP t
 `monster_behaviour_policy()` emit the same resolver-ready `flee` `ActionRequest`. The policy never
 mutates state or decides whether the attempt succeeds.
 
+> **Added 2026-08-01 (change `guild-economy`).** Change 16 supplies the missing player-facing combat
+> session. `engage` persists participant dbrefs and waits for a player-selected action; one valid action
+> drives one complete initiative round while NPCs use the existing behavior policy. A side-effect-free
+> preflight rejects invalid input before any initiative action; invalidation caused by an earlier turn
+> still consumes the already-started round. Overwhelm classification runs at engage but waits for the
+> first selected action before compressed resolution. Active combat blocks movement, persists across
+> disconnect/reconnect, and exposes explicit forfeit cleanup. Combat time accumulates in the session and
+> settles once at battle end. The zero-cost `basic_attack` joins `flee` as an innate LivingEntity skill,
+> but still passes through ActionResolver. Examination sessions use this identical path with the
+> nonlethal policy from §5.4.
+
 ### 6.4 Sexual state machine
 
 ```python
@@ -483,6 +542,11 @@ quest deadlines → NPC schedules.
 Explicit skips are gated: reject or shorten if the player is in combat, targeted by a hostile, or
 in an unsafe location. Otherwise players will `sleep 8h` in front of a monster.
 
+Change 16 registers the concrete `caravan_arrivals` and `shop_hours` sources. Caravan settlement mutates
+finite merchant stock at configured daily boundaries; shop-hours settlement emits open/close events and
+stores no redundant boolean. Their relative order in the table above is load-bearing: a caravan due at
+opening replenishes stock before the shop accepts a trade.
+
 ---
 
 ## 7. Generative Layer
@@ -541,10 +605,26 @@ rendering. This is an acceptance criterion.
 }
 ```
 
-Intent whitelist: `give_item` / `take_item` / `offer_quest` / `adjust_relation` / `reveal_lore` /
-`none`. The engine verifies the NPC actually holds the item and may issue the quest. **Illegal
-intent is discarded while the speech is kept** — the NPC said something it could not do, but the
-world was not changed. That is the accepted failure mode.
+Intent whitelist: `give_item` / `take_item` / `offer_quest` / `request_guild_exam` /
+`adjust_relation` / `reveal_lore` / `none`. The engine verifies the NPC actually holds the item, may
+issue the quest, or is an eligible GuildExaminer. **Illegal intent is discarded while the speech is
+kept** — the NPC said something it could not do, but the world was not changed. That is the accepted
+failure mode.
+
+The examination intent has exactly one payload field:
+
+```jsonc
+{
+  "speech": "你的功績已足夠。準備接受升級考核吧。",
+  "intent": { "kind": "request_guild_exam", "target_rank": "E" }
+}
+```
+
+Change 19 may extract this intent, but it has no elevated authority. It passes the speaking NPC, player,
+and requested rank to change 16's deterministic `start_guild_exam(..., requested_by="npc_intent")`.
+That API rechecks co-location, GuildExaminer component and branch, exact next rank, true cumulative merit,
+and absence of active combat/examination. The AI cannot choose examiner stats, waive a gate, promote the
+player, or start combat directly. A failed check discards only the intent and preserves `speech`.
 
 NPC prompts are injected with `disguised_stats`, so NPCs genuinely underestimate a disguised elf.
 The narrative payoff falls out of D2 for free.
@@ -735,7 +815,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 | # | Change | Depends on | Content |
 |---|---|---|---|
 | 15 | `quest-runtime` | 11, 14 | Quest entity, stage progression, completion and failure |
-| 16 | `guild-economy` | 15 | Guild ranks, merit, reward settlement, shops and prices |
+| 16 | `guild-economy` | 15 | F-rank registration, quest board/turn-in, atomic copper/item/merit rewards, ACQUIRE inventory progress, player combat sessions and innate basic attack, mandatory nonlethal rank exams, finite-stock shops, prices, opening hours, and caravan restocking |
 
 ### Phase 5 — Generative layer
 
