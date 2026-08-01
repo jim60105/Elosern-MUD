@@ -276,6 +276,17 @@ class RealCombatEquivalenceTests(EvenniaTest):
 
     @staticmethod
     def _logs(logs):
+        def _data(item):
+            # Normalize stable dbref identity to the entry's team-relative
+            # target label so exact-equivalence holds across separately created
+            # battlefields (quest-runtime: target_defeated carries target_id).
+            rows = []
+            for key, value in item.data.items():
+                if key == "target_id":
+                    value = None if item.target is None else item.target.split("-")[0]
+                rows.append((key, value))
+            return tuple(sorted(rows))
+
         return [
             (
                 log.actor.split("-")[0],
@@ -286,7 +297,7 @@ class RealCombatEquivalenceTests(EvenniaTest):
                         None
                         if item.target is None
                         else item.target.split("-")[0],
-                        tuple(sorted(item.data.items())),
+                        _data(item),
                     )
                     for item in log.entries
                 ),

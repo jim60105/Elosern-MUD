@@ -156,11 +156,14 @@ completed or failed definitions may be accepted again. The deterministic quest I
 UUID.
 
 Every interactive operation parses all records it touches before writing a replacement list. Invalid
-records raise a named `QuestDataError` without a partial write. Deadline settlement catches that error
-at the character boundary, records a diagnostic, and continues with other characters without changing
-the malformed owner's records or pins. Startup always registers definitions before the clock source; an
-active record whose definition is absent is reported as `QuestDataError` rather than silently
-interpreted against different content.
+records raise a named `QuestDataError` without a partial write. An active record must reference a known
+definition whose stage index is in range and still matches, must carry progress within the current
+objective's quantity, and must not share its deterministic quest ID with another record; a terminal
+record must be final (no runtime bindings, and a `FAILED` reason when failed). Deadline settlement
+catches that error at the character boundary, records a diagnostic, and continues with other characters
+without changing the malformed owner's records or pins. Startup always registers definitions before the
+clock source; an active record whose definition is absent is reported as `QuestDataError` rather than
+silently interpreted against different content.
 
 ### D-3. Stage targets and generated instances are bound to records, not definitions
 
@@ -237,7 +240,9 @@ all route through helpers that follow the same order:
 2. Compute the complete replacement record and required pin delta without writes.
 3. Enter `transaction.atomic()` and apply pin delta plus one replacement quest-log assignment.
 4. On an exception, restore the pre-operation attribute values so Evennia's in-process attribute cache
-   agrees with the database rollback.
+   agrees with the database rollback. Restore is best-effort: if re-writing the pre-operation value
+   itself fails, the attribute cache is invalidated so the next read repopulates from the rolled-back
+   database rather than serving a stale value.
 
 Action-caused transitions use the same replacement computation but expose it as `PendingEffect` values,
 allowing `ActionResolver` to own the surrounding transaction and snapshot restoration. A quest-log

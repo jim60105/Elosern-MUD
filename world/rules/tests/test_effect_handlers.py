@@ -64,6 +64,8 @@ class EffectRegistryTests(unittest.TestCase):
                     "skill_grants",
                     "progression",
                     "battlefield",
+                    "quest_log",
+                    "instance_pin",
                 }
             ),
         )

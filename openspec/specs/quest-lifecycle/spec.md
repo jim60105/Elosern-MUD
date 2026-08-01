@@ -1,5 +1,10 @@
-## ADDED Requirements
+# quest-lifecycle Specification
 
+## Purpose
+Persistent deterministic per-character quest records and their lifecycle operations — accept, abandon,
+stage binding, completion, and failure — with every multi-attribute write atomic and cache-consistent.
+
+## Requirements
 ### Requirement: QuestRecord is JSON-safe persisted state with three stored states
 `world/quests/runtime.py` SHALL define `QuestState` values `IN_PROGRESS`, `COMPLETED`, and `FAILED`, and a
 frozen `QuestRecord` containing `quest_id`, `definition_key`, `state`, `stage_index`, `stage_progress`,
@@ -18,10 +23,13 @@ Unaccepted SHALL be represented by absence, and abandonment SHALL use `FAILED` w
 
 ### Requirement: Every lifecycle operation validates before replacing the quest log
 Every public lifecycle operation SHALL parse and validate every quest-log entry it touches before any
-write. A malformed record, unknown active definition, stale stage, or invalid state transition SHALL
-raise a named `QuestDataError` or `QuestTransitionError` and SHALL leave the complete quest log and all
-instance pins unchanged. A successful operation SHALL persist one replacement quest-log list rather than
-mutating a nested dict in place.
+write. A malformed record, unknown active definition, stale stage, out-of-range stage index, progress
+exceeding the objective quantity, or invalid state transition SHALL raise a named `QuestDataError` or
+`QuestTransitionError` and SHALL leave the complete quest log and all instance pins unchanged. An active
+record SHALL reference a known definition whose stage index is in range and still matches, and SHALL
+carry progress within the current objective's quantity. A terminal record SHALL be final: no runtime
+bindings may remain, and a `FAILED` record SHALL carry its reason. A successful operation SHALL persist
+one replacement quest-log list rather than mutating a nested dict in place.
 
 #### Scenario: Malformed persisted data fails without a partial write
 - **WHEN** a quest log contains one malformed dict and an operation targets a different valid record
@@ -31,6 +39,10 @@ mutating a nested dict in place.
 - **WHEN** an active record references a definition absent from `QUEST_DEFINITION_REGISTRY`
 - **THEN** lifecycle access raises `QuestDataError` naming the missing key instead of silently skipping
   or reinterpreting the record
+
+#### Scenario: Duplicate quest ids are rejected
+- **WHEN** a quest log contains two records with the same deterministic quest ID
+- **THEN** every lifecycle operation raises `QuestDataError` before it mutates any record or pin
 
 ### Requirement: accept_quest creates one deterministic active record
 `accept_quest(actor, definition_key)` SHALL reject an unknown definition and reject when the actor
