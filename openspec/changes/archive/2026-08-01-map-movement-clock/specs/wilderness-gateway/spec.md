@@ -87,8 +87,41 @@ charges (`movement-cost-charging` capability).
   example, the target coordinate is invalid, or the traverser's `at_pre_move` vetoes)
 - **THEN** `get_world_clock().tick` is unchanged
 
+#### Scenario: A return to a missing grid room does not advance the clock
+- **WHEN** the special-cased return branch resolves no grid room for the entry's anchor (e.g. the gate
+  exit `sync_wilderness()` provisioned has been deleted, so `_grid_room_for_anchor` returns `None`) or
+  the resulting `move_to()` fails its pre-move veto
+- **THEN** `WildernessReturnExit.at_traverse` returns `False`, the traverser's location is unchanged,
+  and `get_world_clock().tick` is unchanged — a failed return is never reported as a successful,
+  clock-charged step
+
 #### Scenario: Both branches charge through the shared charge_movement function
 - **WHEN** `typeclasses/exits.py::WildernessReturnExit.at_traverse` is inspected
 - **THEN** both its special-cased return branch and its `super().at_traverse()` fallback branch call
   `world.rules.movement.charge_movement(traversing_object, "wilderness_move")`, and neither calls
   `world.rules.clock.get_world_clock().advance()` directly
+
+### Requirement: wilderness_move is a new, distinct clock cost, not a reuse of the grid's move constant
+`world/rules/rulebook/clock.yaml::command_defaults` SHALL include a new key, `wilderness_move: 9000`
+(seconds), distinct from the existing `move: 30` entry. No code in this change SHALL read `move` for
+wilderness traversal, and no code from change 12 (grid traversal) SHALL be modified to read
+`wilderness_move`.
+
+**Amended 2026-08-01 (change `map-movement-clock`):** the previous wording asserted that intra-city
+grid traversal "remains unwired to the clock" — a statement `map-movement-clock` makes false, since it
+wires every intra-city link to charge `command_defaults.move` through `CostedXYZExit` (the
+`sample-city-altoria` capability). The distinctness claim that is this requirement's real subject is
+unchanged: wilderness steps pay `wilderness_move`, grid steps pay `move`, and the two lineages never
+read each other's constant. The amended scenario below asserts exactly that.
+
+#### Scenario: wilderness_move is present and distinct from move
+- **WHEN** `world/rules/rulebook/clock.yaml` is inspected after this change lands
+- **THEN** `command_defaults.wilderness_move == 9000` and `command_defaults.move == 30` (unchanged
+  from change 11)
+
+#### Scenario: Grid traversal is unaffected
+- **WHEN** a character traverses an intra-city `CostedXYZExit` created by change 12's `sync_grid()`
+  with this change's `("*", "*", "*")` wildcard prototype override
+- **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`, and
+  no grid-traversal code reads `wilderness_move` — grid traversal is unaffected by the wilderness
+  cost, charging the ordinary `move` cost instead

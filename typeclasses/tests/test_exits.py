@@ -1,4 +1,6 @@
-"""Integration tests for the wilderness gateway exits (map-wilderness)."""
+"""Integration tests for the wilderness gateway exits (map-wilderness, map-movement-clock)."""
+
+import inspect
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit
 from evennia.utils.create import create_object
@@ -161,3 +163,21 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertFalse(result)
         self.assertIs(self.char1.location, wilderness_location)
         self.assertEqual(self._tick(), before)
+
+
+class WildernessClockChargeSourceTests(EvenniaTest):
+    """Source-inspection: the wilderness wiring goes through charge_movement
+    (map-movement-clock task 5.4), never an inline get_world_clock().advance."""
+
+    def test_gate_exit_uses_charge_movement_not_inline_advance(self):
+        source = inspect.getsource(WildernessGateExit.at_traverse)
+        self.assertIn("charge_movement(traversing_object, \"wilderness_move\")", source)
+        self.assertNotIn("get_world_clock().advance", source)
+
+    def test_return_exit_both_branches_use_charge_movement(self):
+        source = inspect.getsource(WildernessReturnExit.at_traverse)
+        self.assertEqual(
+            source.count("charge_movement(traversing_object, \"wilderness_move\")"),
+            2,
+        )
+        self.assertNotIn("get_world_clock().advance", source)

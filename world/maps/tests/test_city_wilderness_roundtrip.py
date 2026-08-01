@@ -64,13 +64,22 @@ class CityWildernessRoundTripTests(EvenniaTest):
         self.assertTrue(self.char1.location.return_appearance(self.char1))
         self.assertEqual(self.char1.location.location_name, "西部丘陵與谷地")
 
-    def test_intra_city_grid_traversal_does_not_advance_clock(self):
-        # wilderness-gateway spec scenario: grid traversal stays unwired to the
-        # clock, exactly as change 12 left it -- only wilderness steps charge.
+    def test_intra_city_grid_traversal_advances_clock_by_move(self):
+        # map-movement-clock: intra-city exits are CostedXYZExit and each
+        # successful step charges the ordinary move cost -- the wilderness-
+        # gateway "grid traversal stays unwired" posture was deliberately
+        # retired by that change.
+        from typeclasses.exits import CostedXYZExit
+        from world.rules.clock import CLOCK_YAML
+
         south_gate = GridRoom.objects.filter_xyz(xyz=(2, 0, "capital_altoria")).first()
         self.char1.location = south_gate
         city_exit = [e for e in south_gate.exits if e.destination.key == "南大道"][0]
+        self.assertIsInstance(city_exit, CostedXYZExit)
         before = get_world_clock().tick
         city_exit.at_traverse(self.char1, city_exit.destination)
         self.assertEqual(self.char1.location.key, "南大道")
-        self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(
+            get_world_clock().tick,
+            before + CLOCK_YAML["command_defaults"]["move"],
+        )

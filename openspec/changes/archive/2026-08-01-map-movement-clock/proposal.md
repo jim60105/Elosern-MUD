@@ -57,7 +57,9 @@ wilderness wiring into it rather than leaving it a permanent, parallel special c
   the shared function instead of duplicating it. Change 13 is committed but unimplemented, so this
   edits its own `design.md` (D-5, D-6, D-8, and the "No change to the grid layer's own
   movement-clock posture" Non-Goal) directly, and this change also files a `MODIFIED wilderness-gateway`
-  delta spec updating the two clock-charging requirements to name the shared function.
+  delta spec updating the two clock-charging requirements to name the shared function, plus the
+  "wilderness_move is a new, distinct clock cost" requirement's "Grid traversal is unaffected"
+  scenario (see the "Grid traversal now charges" amendment below).
 - File a `MODIFIED world-clock` delta spec against the archived `openspec/specs/world-clock/spec.md`,
   replacing "move and converse command-default time costs are declared as rulebook data only" with a
   requirement that `move` is now consumed by ordinary exit traversal (no bespoke `move` command is
@@ -83,7 +85,11 @@ wilderness wiring into it rather than leaving it a permanent, parallel special c
   ("A successful traversal advances the world clock..." and "Every successful WildernessReturnExit
   traversal advances the clock...") now name `world.rules.movement.charge_movement()` as the
   mechanism instead of an inline `get_world_clock().advance()` call. Observable behavior (cost,
-  success-only condition, `AdvanceSource.COMMAND`) is unchanged.
+  success-only condition, `AdvanceSource.COMMAND`) is unchanged. The "wilderness_move is a new,
+  distinct clock cost" requirement's "Grid traversal is unaffected" scenario is amended: intra-city
+  grid traversal now charges `move` via `CostedXYZExit` (this change's own wiring), so the old
+  assertion that it "remains unwired to the clock" is retired, while the requirement's real subject —
+  grid steps never read `wilderness_move`, wilderness steps never read `move` — is preserved.
 - `sample-city-altoria` (change 12, pending): the sample city's twelve intra-city exits now spawn as
   `CostedXYZExit` instead of the bare contrib `XYZExit`, via one wildcard map-data prototype override.
   The room/exit topology, count, and connectivity this capability already specifies are unchanged.

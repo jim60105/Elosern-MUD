@@ -8,17 +8,35 @@ for allowing Characters to traverse the exit to its destination.
 """
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit, enter_wilderness
+from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.objects.objects import DefaultExit
 
 from .objects import ObjectParent
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import WILDERNESS_NAME
-from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
-
-WILDERNESS_MOVE_SECONDS = CLOCK_YAML["command_defaults"]["wilderness_move"]
 
 
-class Exit(ObjectParent, DefaultExit):
+class MovementCostMixin:
+    """Charges WorldClock for a successful, player-driven exit traversal.
+
+    Hooks ``at_post_traverse`` — which Evennia's stock ``DefaultExit.at_traverse``
+    calls only from its successful-``move_to()`` branch — rather than inspecting
+    ``at_traverse``'s own return value, which is ``None`` in both branches
+    (map-movement-clock design.md D-2). A locked exit never reaches this hook
+    (the access check runs first), and a vetoed ``at_pre_move`` aborts before it
+    (design.md D-6); neither needs a guard here.
+    """
+
+    movement_cost_key: str = "move"
+
+    def at_post_traverse(self, traversing_object, source_location, **kwargs):
+        super().at_post_traverse(traversing_object, source_location, **kwargs)
+        from world.rules.movement import charge_movement
+
+        charge_movement(traversing_object, self.movement_cost_key)
+
+
+class Exit(MovementCostMixin, ObjectParent, DefaultExit):
     """
     Exits are connectors between rooms. Exits are normal Objects except
     they defines the `destination` property and overrides some hooks
@@ -30,6 +48,16 @@ class Exit(ObjectParent, DefaultExit):
     """
 
     pass
+
+
+class CostedXYZExit(MovementCostMixin, XYZExit):
+    """An xyzgrid exit that charges the ordinary ``move`` cost on traversal.
+
+    Every coordinate tag, ``.xyz``/``.xyz_destination`` property, and
+    ``.create()`` behavior is inherited from the contrib ``XYZExit`` unchanged;
+    this class adds only the movement-cost hook (map-movement-clock design.md
+    D-3).
+    """
 
 
 def _grid_room_for_anchor(anchor_key: str):
@@ -79,9 +107,9 @@ class WildernessGateExit(Exit):
             exclude=[traversing_object],
         )
         traversing_object.at_post_move(None)
-        get_world_clock().advance(
-            WILDERNESS_MOVE_SECONDS, AdvanceSource.COMMAND, [traversing_object]
-        )
+        from world.rules.movement import charge_movement
+
+        charge_movement(traversing_object, "wilderness_move")
         return True
 
 
@@ -108,16 +136,16 @@ class WildernessReturnExit(WildernessExit):
                     return False
                 if not traversing_object.move_to(grid_room, quiet=False):
                     return False
-                get_world_clock().advance(
-                    WILDERNESS_MOVE_SECONDS, AdvanceSource.COMMAND, [traversing_object]
-                )
+                from world.rules.movement import charge_movement
+
+                charge_movement(traversing_object, "wilderness_move")
                 return True
         # ORDINARY wilderness movement -- every coordinate/direction that is not
         # a registered gateway. Not free: a successful step still pays
         # wilderness_move; only the routing decision is gated.
         result = super().at_traverse(traversing_object, target_location)
         if result:
-            get_world_clock().advance(
-                WILDERNESS_MOVE_SECONDS, AdvanceSource.COMMAND, [traversing_object]
-            )
+            from world.rules.movement import charge_movement
+
+            charge_movement(traversing_object, "wilderness_move")
         return result

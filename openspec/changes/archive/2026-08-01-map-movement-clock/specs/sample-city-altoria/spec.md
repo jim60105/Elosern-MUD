@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: The sample city's twelve intra-city exits spawn as CostedXYZExit, not the bare contrib XYZExit
-`world/maps/altoria_capital.py::ALTORIA_CAPITAL_MAP_DATA["prototypes"]` SHALL include exactly one
+`world/maps/altoria_capital.py::XYMAP_DATA["prototypes"]` SHALL include exactly one
 wildcard link-prototype override, `("*", "*", "*"): {"prototype_parent": "xyz_exit", "typeclass":
 "typeclasses.exits.CostedXYZExit"}`, so that every one of the sample city's twelve intra-city links
 spawns as `typeclasses.exits.CostedXYZExit` (the `movement-cost-charging` capability) instead of the

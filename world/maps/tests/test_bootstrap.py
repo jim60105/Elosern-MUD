@@ -30,9 +30,12 @@ class GridBootstrapTests(EvenniaTest):
         return GridRoom.objects.all_family().count()
 
     def _count_city_exits(self):
+        # all_family() counts CostedXYZExit (map-movement-clock) as well as bare
+        # XYZExit, so this stays a count of intra-city exits after the wildcard
+        # prototype override changes their exact typeclass.
         from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 
-        return XYZExit.objects.all().count()
+        return XYZExit.objects.all_family().count()
 
     def _bridging_exits(self):
         limbo = search_object("Limbo", exact=True)

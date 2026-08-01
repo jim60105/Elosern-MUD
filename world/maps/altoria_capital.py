@@ -92,7 +92,15 @@ PROTOTYPES = {
 XYMAP_DATA = {
     "zcoord": "capital_altoria",
     "map": MAPSTR,
-    "prototypes": PROTOTYPES,
+    "prototypes": {
+        **PROTOTYPES,
+        # map-movement-clock: every intra-city link spawns as CostedXYZExit so
+        # grid steps charge the ordinary move cost (movement-cost-charging).
+        ("*", "*", "*"): {
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    },
 }
 
 XYMAP_DATA_LIST = [XYMAP_DATA]

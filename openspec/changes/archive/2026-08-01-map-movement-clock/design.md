@@ -254,7 +254,7 @@ full path-matrix machinery for a two-node graph): a `"prototypes": {("*", "*", "
 resolves both directions' link prototypes to the overridden `typeclass` — confirmed on two
 independent links in the parsed map, not just the first one encountered.
 
-**Consequence for change 12.** `world/maps/altoria_capital.py::ALTORIA_CAPITAL_MAP_DATA["prototypes"]`
+**Consequence for change 12.** `world/maps/altoria_capital.py::XYMAP_DATA["prototypes"]`
 needs exactly one added entry:
 ```python
 ("*", "*", "*"): {"prototype_parent": "xyz_exit", "typeclass": "typeclasses.exits.CostedXYZExit"},
@@ -442,6 +442,20 @@ contract is a delta against it, not a silent in-place rewrite of someone else's 
 requirement text — this half of the rule is unchanged from the earlier draft and was already applied
 correctly to both changes.
 
+**Amendment, applied during this change's own implementation (2026-08-01): the `wilderness-gateway`
+delta files a third `MODIFIED` requirement, not two.** The two clock-charging requirements are not the
+only ones this change's decisions make false: the archived main spec's "wilderness_move is a new,
+distinct clock cost, not a reuse of the grid's move constant" requirement contains a "Grid traversal
+is unaffected" scenario asserting intra-city traversal leaves `tick` unchanged. Wiring `move: 30` onto
+intra-city exits (D-4) makes that scenario false, so the `wilderness-gateway` delta in this change's
+own `specs/` directory also MODIFIES that requirement — preserving its real subject (grid never reads
+`wilderness_move`, wilderness never reads `move`) while retiring the retired "remains unwired" claim.
+This was caught by re-verifying every current main-spec scenario this change touches, rather than
+trusting the earlier "two clock-charging requirements" summary; the delta's MODIFIED blocks are
+checked against the current main spec by `openspec archive`'s own scenario-matching (a MODIFIED block
+that omits an existing scenario aborts the archive), so the delta must restate the full requirement,
+existing scenarios included.
+
 ### D-10. Roadmap position and name: `map-movement-clock`, positioned after change 13, not "12b."
 
 The owner's own suggested label, "12b," was offered as an example, not a mandate, and the task that
@@ -508,11 +522,11 @@ depend on 13b, and nothing about its own artifacts changes.
 ## Verification
 
 Everything below was checked against the installed `evennia==6.1.0` package and this project's own
-`world/rules/clock.py`, via `uv run --locked evennia test --settings settings.py
-tmp.probe_movement_clock` (`EvenniaTest`-based; a bare `django.setup()` script is insufficient for
-`evennia.contrib.grid.xyzgrid.xymap.XYMap.parse()`'s own `flatten_prototype()`/prototype-validation
-call path, which needs a real test database — confirmed by hitting `OperationalError: no such table:
-scripts_scriptdb` when first tried outside `EvenniaTest`). Twelve tests, all passing:
+ `world/rules/clock.py`, via `uv run --locked evennia test --settings settings.py
+ tmp.probe_movement_clock` (`EvenniaTest`-based; a bare `django.setup()` script is insufficient for
+ `evennia.contrib.grid.xyzgrid.xymap.XYMap.parse()`'s own `flatten_prototype()`/prototype-validation
+ call path, which needs a real test database — confirmed by hitting `OperationalError: no such table:
+ scripts_scriptdb` when first tried outside `EvenniaTest`). Eleven tests, all passing:
 
 - `DefaultExit.at_traverse` returns `None` in both the success and failure branch (D-2).
 - `MovementCostMixin` hooking `at_post_traverse` charges exactly once on a successful traversal, for a
@@ -538,9 +552,10 @@ scripts_scriptdb` when first tried outside `EvenniaTest`). Twelve tests, all pas
   process, and a same-process re-fetch of the same object still returns the old class — Evennia's
   idmapper cache, not the DB row, is what's stale (D-4).
 
-Probe file: `tmp/probe_movement_clock/test_probe.py` (twelve tests, all passing as of this design;
-left in place per instructions, not part of the shipped suite — `tmp/` mirrors change 14's own
-`tmp/probe_instance/` precedent for scratch, unshipped verification code).
+Probe file: `tmp/probe_movement_clock/test_probe.py` (eleven tests, all passing as of this design and
+re-verified during implementation; left in place per instructions, not part of the shipped suite —
+`tmp/` mirrors change 14's own `tmp/probe_instance/` precedent for scratch, unshipped verification
+code).
 
 This supersedes nothing in the top-level design doc's §4 Contrib Reuse Matrix — `XYZExit`'s "Use
 directly" call is reconfirmed (a project subclass now exists for the sample city specifically, and the
@@ -550,3 +565,34 @@ narrow, since-superseded claim in change 12's own `design.md` D-4 addendum (not 
 doc): that document's "remains directly usable elsewhere" line was true when change 12 first wrote it
 and is no longer true once this change lands — see D-9 above and the matching amendment this change
 adds to change 12's own D-4.
+
+**Post-implementation rubber-duck review (2026-08-01), and why none of its findings changed the
+code.** The review surfaced one 🔴 finding (the D-4 retype limitation: a second `sync_grid()` run
+does not retype already-loaded `XYZExit` objects in the current process, so intra-city exits stay
+free until a fresh process/DB) and one 🟡 finding (wilderness failure-path charging not covered by
+behavioral tests). Both were evaluated against the full context and **accepted as already-resolved by
+this change's own design** rather than triggering new code:
+
+- The 🔴 retype finding is D-4's documented, deliberate consequence — the design's stated fallback
+  for this zero-user, unreleased project is "discard the dev database" so `sync_grid()` takes the
+  `Typeclass.create()` branch and spawns every exit fresh as `CostedXYZExit` (design.md D-4
+  "Fallback"; AGENTS.md: no migrations/back-compat layers for an unreleased project). It is not a
+  defect to fix in code; the shipped test suite runs against fresh test databases and green-tested
+  the `Typeclass.create()` path (task 4.2) while task 4.2b deliberately *asserts* the retype
+  limitation as a regression guard, exactly as D-4 scoped it.
+- The 🟡 wilderness-failure finding is already covered behaviorally, not merely by source
+  inspection: change 13's landed `typeclasses/tests/test_exits.py` suite (re-run unmodified, all
+  passing) asserts clock-unchanged for `enter_wilderness()` returning `False`
+  (`test_failed_enter_wilderness_does_not_advance_clock`), a return to a missing gate
+  (`test_failed_return_to_missing_gate_does_not_advance_clock`), and a vetoed return
+  (`test_vetoed_return_move_does_not_advance_clock`), plus the gate's `at_pre_move` veto
+  (`test_vetoed_at_pre_move_blocks_gate_traversal_entirely`). The only behavior this change added to
+  those paths is swapping an inline `advance()` for the identical-cost `charge_movement()` call
+  (D-1); the success-only condition is unchanged, and the source-inspection tests added by task 5.4
+  pin the charge call sites directly.
+- The review's 🟢 suggestion (a self-looping plain `Exit` — `destination` pointing at its own room —
+  would charge `move` on a "move" that doesn't change location) targets no real exit in this
+  project: the only self-looping exit is `WildernessGateExit`, which fully overrides `at_traverse`
+  and never reaches `MovementCostMixin.at_post_traverse` at all, and `sync_grid()`'s bridging exits
+  plus the sample city's `CostedXYZExit` links all have real destinations. Noted for a future change
+  that adds an arbitrary self-loop exit; not a code change here.
