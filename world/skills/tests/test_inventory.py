@@ -1,5 +1,7 @@
 """Integration tests for flat item-key inventory helpers."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -14,6 +16,7 @@ from world.skills.equipment import (
 
 
 class InventoryTests(EvenniaTest):
+    @covers_requirement("equipment-inventory::inventory-remains-a-flat-list-of-item-key-strings-behind-one-deterministic-planning-boundary")
     def test_helpers_tolerate_none_and_remove_one_match(self):
         entity = create_object(PlayerCharacter, key="inventory tester")
         entity.db.inventory = None

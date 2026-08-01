@@ -1,5 +1,7 @@
 """Regression tests for the display-only disguise boundary."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 
 from evennia.utils.create import create_object
@@ -49,6 +51,7 @@ class DisguiseEffectTests(EvenniaTest):
             before_other_state,
         )
 
+    @covers_requirement("skill-handler::the-\u72c0\u614b\u507d\u88dd-skill-s-effect-resolution-can-only-ever-touch-disguised-stats-never-entity-traits")
     def test_effect_source_has_no_trait_or_display_accessor(self):
         source = inspect.getsource(apply_disguise_effect)
         self.assertNotIn("entity.traits", source)

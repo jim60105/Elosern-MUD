@@ -1,9 +1,12 @@
+from tools.spec_traceability import covers_requirement
+
 from unittest import TestCase
 
 from world.lore import sexual_vocab
 
 
 class SexualVocabularyTests(TestCase):
+    @covers_requirement("sexual-vocabulary::world-lore-sexual-vocab-py-defines-the-six-ordered-level-name-vocabularies-from-design-doc-s6-4")
     def test_all_vocabularies_match_the_design_in_order(self):
         self.assertEqual(sexual_vocab.AROUSAL_LEVELS, ("平靜", "微興奮", "中等", "高度", "極限"))
         self.assertEqual(sexual_vocab.WETNESS_LEVELS, ("乾燥", "微濕", "濕潤", "大量", "泛濫"))

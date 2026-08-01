@@ -1,5 +1,7 @@
 """Atomic shop trade tests (tasks 9.1-9.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -67,6 +69,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         tick = hour * 3600
         return WorldClock(tick)
 
+    @covers_requirement("shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically")
     def test_successful_purchase_uses_integer_copper(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             result = buy(self.player, self.merchant_npc, "meal", 2)
@@ -114,6 +117,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(parse_merchant_stock(self.merchant)["healing_potion"], 5)
 
+    @covers_requirement("shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained")
     def test_unknown_or_unsellable_item_rejected(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError):
@@ -182,6 +186,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
 
 
 class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTest):
+    @covers_requirement("shop-economy::merchant-stock-is-finite-persistent-repeated-item-quantity-state")
     def test_malformed_stock_fails_closed(self):
         from typeclasses.components import Merchant as MerchantComponent
 

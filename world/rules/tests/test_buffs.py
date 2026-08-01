@@ -1,5 +1,7 @@
 """Integration tests for rulebook-backed Evennia buffs."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -25,6 +27,7 @@ class BuffIntegrationTests(EvenniaTest):
         entity.traits.hp.rate = 0
         return entity
 
+    @covers_requirement("buff-handler-integration::buff-tick-is-exposed-as-a-plain-callable-with-no-settlement-order-invented")
     def test_buff_poisoned(self):
         entity = self._entity()
         _add_buff(entity, "poisoned")
@@ -32,6 +35,7 @@ class BuffIntegrationTests(EvenniaTest):
         tick_buffs(entity)
         self.assertEqual(entity.traits.hp.value, before - 5)
 
+    @covers_requirement("buff-handler-integration::a-declared-unbuilt-seam-exists-for-buff-forbidden-actions")
     def test_buff_paralysis(self):
         entity = self._entity()
         _add_buff(entity, "paralysis")
@@ -44,6 +48,8 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertIn("fear", entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
+    @covers_requirement("buff-handler-integration::growth-rate-multiplier-is-a-pure-query-folding-every-active-conferred-growth-rate")
+    @covers_requirement("buff-handler-integration::a-rate-of-change-modifier-can-be-conferred-from-one-entity-to-another-as-a-buff")
     def test_buff_conferred_growth_rate(self):
         entity = self._entity()
         grant_conferred_growth_rate(entity, "elosia", 0.5)
@@ -51,6 +57,7 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertEqual((buff.source_key, buff.scale), ("elosia", 0.5))
         self.assertEqual(growth_rate_multiplier(entity), 0.5)
 
+    @covers_requirement("buff-handler-integration::the-conferred-growth-rate-buff-s-tick-is-a-documented-no-op-consumed-by-pull-rather")
     def test_conferred_growth_rate_tick_is_a_no_op(self):
         entity = self._entity()
         grant_conferred_growth_rate(entity, "elosia", 0.5)
@@ -64,6 +71,7 @@ class BuffIntegrationTests(EvenniaTest):
         with self.assertRaises(AttributeError):
             entity.buffs = {}
 
+    @covers_requirement("buff-handler-integration::buff-definitions-configure-a-subset-of-rate-of-change-clamped-bounds-and-decay-rate")
     def test_no_multiplier_shaped_buff_modifier(self):
         forbidden = {"atk_phys_multiplier", "agility_multiplier", "defense_multiplier"}
         for definition in BUFF_DEFINITIONS.values():

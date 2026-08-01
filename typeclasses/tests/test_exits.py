@@ -1,5 +1,7 @@
 """Integration tests for the wilderness gateway exits (map-wilderness, map-movement-clock)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit
@@ -36,6 +38,7 @@ class WildernessGatewayExitTests(EvenniaTest):
     def _tick(self):
         return get_world_clock().tick
 
+    @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_gate_exit_places_traverser_at_entry_coordinate_and_advances_clock(self):
         before = self._tick()
         self.gate.at_traverse(self.char1, self.north_gate)
@@ -56,6 +59,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, original_location)
         self.assertEqual(self._tick(), before)
 
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-uses-terrainroom-and-wildernessreturnexit")
     def test_eight_directional_exits_are_wilderness_return_exits(self):
         from typeclasses.rooms import TerrainRoom
 
@@ -64,6 +68,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         for exit_obj in self.char1.location.exits:
             self.assertIsInstance(exit_obj, WildernessReturnExit)
 
+    @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-exactly-one-registered-coordinate-and-direction-pair-back-to-the-grid")
     def test_south_from_entry_returns_to_exact_grid_room(self):
         from typeclasses.rooms import TerrainRoom
 

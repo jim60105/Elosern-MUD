@@ -1,5 +1,7 @@
 """Guild offer board access and reward settlement tests (tasks 6.1-6.8)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -162,6 +164,7 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTest):
                 with self.assertRaises(GuildOfferError):
                     register_guild_offer(_offer(self.test_definition.key, copper=out, items=()))
 
+    @covers_requirement("guild-quest-board::guildquestoffer-is-immutable-and-validated-against-quest-guild-item-and-branch-registries")
     def test_s_rank_open_upper_bound_is_honored(self):
         s_rank = GUILD_RANK_REGISTRY["S"]
         s_definition = register(
@@ -198,6 +201,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
             ["introductory_hunt"],
         )
 
+    @covers_requirement("guild-quest-board::guild-boards-expose-only-local-rank-eligible-offers")
     def test_true_exceptional_power_does_not_bypass_rank(self):
         e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier="low")),)))
         register_guild_offer(_offer(e_definition.key, copper=100))
@@ -220,6 +224,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
         self.assertEqual(record.definition_key, "introductory_hunt")
 
+    @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
     def test_over_rank_direct_acceptance_is_rejected_before_quest_mutation(self):
         e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier="low")),)))
         register_guild_offer(_offer(e_definition.key, copper=100))
@@ -296,6 +301,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
             snapshot,
         )
 
+    @covers_requirement("quest-reward-settlement::completed-guild-quests-may-be-claimed-exactly-once-per-quest-id")
     def test_later_acceptance_has_independent_claim_identity(self):
         first = self._complete(1)
         turn_in_quest(self.player, self.staff, first)
@@ -319,6 +325,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
             turn_in_quest(other, self.staff, quest_id)
         self.assertEqual(ctx.exception.args[0], RewardClaim.UNREGISTERED)
 
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-and-claim-transaction")
     def test_reward_item_advances_another_acquire_quest_atomically(self):
         from world.quests.tests._fixtures import acquire as _acquire
 

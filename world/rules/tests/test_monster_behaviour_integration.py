@@ -1,5 +1,7 @@
 """Combat-loop integration for the monster action provider."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -46,6 +48,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
             {"monster": self.monster, "enemy": self.enemy},
         )
 
+    @covers_requirement("monster-action-policy::monster-behaviour-policy-is-a-complete-drop-in-action-provider")
     def test_run_round_resolves_policy_request(self):
         log = EventLog("monster", "shadow_slash", ("enemy",), (), 6)
         result = type(
@@ -101,6 +104,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
         self.assertEqual(observed[0].skill_key, "shadow_slash")
         self.assertEqual(observed[0].targets, [self.enemy])
 
+    @covers_requirement("monster-action-policy::a-monster-with-zero-actions-per-turn-is-skipped-by-the-existing-gate-with-no")
     def test_zero_actions_gate_never_calls_policy(self):
         with (
             patch(
@@ -233,6 +237,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTest):
         self.assertNotIn(self.monster.key, self.field.fled)
         self.assertEqual(self.target.traits.hp.current, before)
 
+    @covers_requirement("monster-flee-policy::existing-combat-orchestration-resolves-monster-flee-through-the-sole-writer")
     def test_overwhelm_uses_policy_without_a_flee_branch(self):
         self.target.race = "elf"
         self.target.apply_race_baseline()

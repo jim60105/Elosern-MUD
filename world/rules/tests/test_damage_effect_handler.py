@@ -1,5 +1,7 @@
 """Damage handler staging and event conversion tests."""
 
+from tools.spec_traceability import covers_requirement
+
 from copy import deepcopy
 import unittest
 from unittest.mock import patch
@@ -27,12 +29,15 @@ from .combat_fixtures import FakeEntity
 
 
 class DamageEffectHandlerTests(unittest.TestCase):
+    @covers_requirement("damage-effect-handlers::damage-is-registered-into-change-8-s-effect-handler-registry-declaring-the-traits")
+    @covers_requirement("action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its")
     def test_registration_declares_exactly_the_traits_surface(self):
         self.assertEqual(
             _EFFECT_HANDLER_SURFACES["damage"],
             frozenset({"traits"}),
         )
 
+    @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
     def test_physical_damage_is_staged_before_apply(self):
         actor = FakeEntity("actor", atk_phys=20, agility=10)
         target = FakeEntity("target", hp=100, agility=10, defense=5)
@@ -69,6 +74,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
             pending.apply()
             self.assertEqual(roller.call_count, 1)
 
+    @covers_requirement("damage-effect-handlers::damage-element-school-is-the-defined-convention-for-this-prefix")
     def test_invalid_school_and_element_reject_during_staging(self):
         actor = FakeEntity("actor")
         target = FakeEntity("target")
@@ -77,6 +83,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _handle_damage(actor, [target], "damage:fire:nope", {})
 
+    @covers_requirement("damage-effect-handlers::combat-modifiers-apply-uniformly-regardless-of-origin")
     def test_modifier_bundle_changes_hit_math_without_origin_branch(self):
         actor = FakeEntity("actor", agility=10)
         target = FakeEntity("target", agility=10)
@@ -132,6 +139,8 @@ class DamageResolverIntegrationTests(EvenniaTest):
             ["roll", "damage"],
         )
 
+    @covers_requirement("damage-effect-handlers::the-to-hit-roll-and-damage-number-are-computed-during-effect-resolution-never-inside")
+    @covers_requirement("action-resolution-pipeline::the-pipeline-executes-design-doc-6-1-s-eight-steps-in-order-each-rejecting-with-a")
     def test_late_rejection_leaves_hp_untouched_after_roll(self):
         before = self.target.traits.hp.value
         SKILL_TIME_OVERRIDES["fire_ball"] = -1

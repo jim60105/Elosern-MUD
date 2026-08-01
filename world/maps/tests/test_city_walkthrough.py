@@ -1,5 +1,7 @@
 """End-to-end walkthrough of the capital_altoria sample city (map-anchor-grid)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
@@ -36,6 +38,7 @@ class SampleCityWalkthroughTests(EvenniaTest):
 
         self.assertTrue(plaza.return_appearance(self.char1))
 
+    @covers_requirement("sample-city-altoria::the-sample-city-connects-to-the-rest-of-the-world-through-exactly-one-bridging-exit")
     def test_every_room_is_reachable_from_south_gate(self):
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         seen = {south_gate}

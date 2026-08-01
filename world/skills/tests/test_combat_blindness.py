@@ -1,5 +1,7 @@
 """Tripwires keeping skills and equipment independent of combat state."""
 
+from tools.spec_traceability import covers_requirement
+
 import ast
 import inspect
 from pathlib import Path
@@ -13,6 +15,7 @@ _COMBAT_CONCEPTS = _FORBIDDEN_PARAMETERS | {"action_resolver", "turn_scheduler"}
 
 
 class CombatBlindnessTests(unittest.TestCase):
+    @covers_requirement("skill-handler::world-skills-is-read-only-and-does-not-branch-on-combat-state")
     def test_public_callable_signatures_have_no_combat_state_parameter(self):
         for module in (handler, equipment):
             for _, value in inspect.getmembers(module):

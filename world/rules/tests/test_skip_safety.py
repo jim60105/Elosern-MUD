@@ -1,5 +1,7 @@
 """Tests for the explicit time-skip safety boundary."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -22,6 +24,9 @@ def actor(key, hp=10, contents=()):
 
 
 class SkipSafetyTests(unittest.TestCase):
+    @covers_requirement("skip-safety-gate::a-safe-actor-s-skip-is-unconditionally-allowed", "skip-safety-gate::evaluate-skip-safety-rejects-a-skip-when-the-actor-is-actively-in-combat")
+    @covers_requirement("skip-safety-gate::fled-battlefield-membership-is-not-by-itself-a-reject-condition")
+    @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")
     def test_active_battlefield_rejects_but_fled_actor_does_not(self):
         first, second = actor("first"), actor("second")
         field = Battlefield(
@@ -33,6 +38,7 @@ class SkipSafetyTests(unittest.TestCase):
         field.fled.add("first")
         self.assertIsNone(evaluate_skip_safety(first))
 
+    @covers_requirement("skip-safety-gate::evaluate-skip-safety-rejects-a-skip-when-a-living-monster-shares-the-actor-s-location")
     def test_living_monster_in_location_rejects(self):
         player = actor("player")
         monster = actor("monster")

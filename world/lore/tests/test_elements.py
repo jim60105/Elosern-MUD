@@ -1,11 +1,14 @@
 """Self-consistency checks for the element registry."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.elements import ELEMENT_REGISTRY
 
 
 class ElementRegistryTests(unittest.TestCase):
+    @covers_requirement("lore-registries::element-registry-covers-the-eight-documented-elements")
     def test_exactly_eight_distinct_elements(self):
         self.assertEqual(len(ELEMENT_REGISTRY), 8)
         self.assertEqual(

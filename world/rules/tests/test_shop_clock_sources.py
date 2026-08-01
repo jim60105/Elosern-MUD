@@ -1,5 +1,7 @@
 """Shop-hours and caravan clock-source tests (tasks 10.1-10.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -71,6 +73,7 @@ class ShopHoursArithmeticTests(unittest.TestCase):
             [(20 * self.HOUR, "open"), (self.DAY + 8 * self.HOUR, "close")],
         )
 
+    @covers_requirement("shop-economy::opening-status-is-clock-derived-and-emits-ordered-boundary-events")
     def test_multi_boundary_skip_emits_each_transition(self):
         ticks = _boundary_ticks(
             "shop",
@@ -123,6 +126,7 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTest):
         self.assertEqual(self.merchant.merchant_stock["healing_potion"], 5)
         self.assertEqual(self.merchant.last_restock_day, 1)
 
+    @covers_requirement("shop-economy::caravan-arrivals-restock-once-per-crossed-merchant-day-up-to-cap")
     def test_multi_day_skip_catches_up_deterministically(self):
         self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
         self.merchant.last_restock_day = 0
@@ -168,6 +172,7 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTest):
 
 
 class StageOrderAndRegistrationTests(ClockRegistryIsolation, EvenniaTest):
+    @covers_requirement("settlement-stage-order::caravan-arrivals-shop-hours-quest-deadlines-and-npc-schedules-are-declared")
     def test_caravan_precedes_shop_hours_in_stage_order(self):
         self.assertLess(
             _STAGE_ORDER.index("caravan_arrivals"),

@@ -1,5 +1,7 @@
 """Self-consistency checks for the wilderness terrain registry (map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.nations import NATION_REGISTRY
@@ -20,6 +22,7 @@ EXPECTED_KEYS = {
 
 
 class WildernessRegionRegistryTests(unittest.TestCase):
+    @covers_requirement("wilderness-terrain::wilderness-region-registry-covers-exactly-the-seven-world-info-md-terrain-regions")
     def test_registry_has_exactly_seven_entries_with_unique_names(self):
         self.assertEqual(set(WILDERNESS_REGION_REGISTRY), EXPECTED_KEYS)
         names = [region.display_name_zh for region in WILDERNESS_REGION_REGISTRY.values()]

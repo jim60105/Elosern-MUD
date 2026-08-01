@@ -15,4 +15,21 @@ package = false
 required-version = ">=0.12.0"
 
 [dependency-groups]
-dev = []
+dev = [
+    "coverage>=7.15.2",
+]
+
+[tool.coverage.run]
+branch = true
+source = [
+    "commands",
+    "server",
+    "typeclasses",
+    "web",
+    "world",
+]
+
+[tool.coverage.report]
+fail_under = 90
+omit = ["*/tests/*"]
+show_missing = true

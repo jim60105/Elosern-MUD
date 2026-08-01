@@ -1,5 +1,7 @@
 """Full-suite round trip: lore sync, grid city, wilderness, and back (map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -28,6 +30,7 @@ class CityWildernessRoundTripTests(EvenniaTest):
     def _exit(self, direction):
         return [e for e in self.char1.location.exits if e.key == direction][0]
 
+    @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
     def test_full_round_trip_leaves_no_leaked_bookkeeping(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
@@ -64,6 +67,7 @@ class CityWildernessRoundTripTests(EvenniaTest):
         self.assertTrue(self.char1.location.return_appearance(self.char1))
         self.assertEqual(self.char1.location.location_name, "西部丘陵與谷地")
 
+    @covers_requirement("movement-cost-charging::typeclasses-exits-exit-and-costedxyzexit-both-carry-movementcostmixin-with", "wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     def test_intra_city_grid_traversal_advances_clock_by_move(self):
         # map-movement-clock: intra-city exits are CostedXYZExit and each
         # successful step charges the ordinary move cost -- the wilderness-

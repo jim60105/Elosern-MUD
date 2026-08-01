@@ -1,5 +1,7 @@
 """Tests for action-driven quest progress and protected-entity failure (6.1-6.4)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -115,6 +117,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
     def _records(self):
         return [to_storage(record) for record in read_records(self.player)]
 
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_player_defeat_advances_matching_tier_objective(self):
         accept_quest(self.player, self.tier_hunt.key)
         first = self._monster("a")
@@ -175,6 +178,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["objective_target_ids"], [])
         self.assertEqual(room.db.pin_reasons, [])
 
+    @covers_requirement("quest-progress-tracking::stage-completion-advances-exactly-once-and-releases-obsolete-runtime-bindings")
     def test_terminal_records_ignore_later_matching_events(self):
         record = accept_quest(self.player, self.bound_hunt.key)
         bound = self._monster("done")
@@ -251,6 +255,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["objective_target_ids"], [])
         self.assertEqual(stored["protected_entity_ids"], [])
 
+    @covers_requirement("quest-failure-conditions::defeat-of-an-exact-protected-entity-fails-its-active-quests-atomically")
     def test_commit_fault_rolls_back_death_and_quest_failure_together(self):
         record = accept_quest(self.player, self.escort_quest.key)
         guard = self._npc("guard-rollback")

@@ -1,5 +1,7 @@
 """Exact calibration checks for the linear to-hit formula."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -20,6 +22,7 @@ class ToHitCalibrationTests(unittest.TestCase):
             hits = sum(_to_hit(attacker, defender, roll)[0] for roll in range(1, 101))
         return hits / 100
 
+    @covers_requirement("overwhelm-threshold::a-decided-direction-is-computed-by-combining-the-ratio-and-hit-rate-signals-by")
     def test_parity_is_exactly_fifty_percent(self):
         self.assertEqual(self.hit_rate(9, 9), 0.5)
 
@@ -33,6 +36,7 @@ class ToHitCalibrationTests(unittest.TestCase):
         self.assertEqual(self.hit_rate(9, 92), 0.0)
         self.assertEqual(self.hit_rate(92, 70), 0.72)
 
+    @covers_requirement("combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60")
     def test_fifty_point_gap_saturates_and_natural_100_does_not_override(self):
         self.assertEqual(self.hit_rate(60, 10), 1.0)
         self.assertEqual(self.hit_rate(10, 60), 0.0)

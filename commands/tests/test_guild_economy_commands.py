@@ -1,5 +1,7 @@
 """Command-level tests for guild, combat, and economy commands (tasks 11.1-11.4)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -120,6 +122,7 @@ class EconomyCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest
             "plain_sword": 1,
         }
 
+    @covers_requirement("shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant")
     def test_stock_buy_sell_flow(self):
         with patch("world.rules.economy.get_world_clock") as clock:
             clock.return_value.tick = 12 * 3600

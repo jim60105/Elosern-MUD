@@ -1,5 +1,7 @@
 """Self-consistency checks for race, tier, and subrace registries."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
@@ -39,6 +41,7 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertFalse(beastfolk.can_use_divine_arts)
         self.assertTrue(elf.can_use_divine_arts)
 
+    @covers_requirement("lore-registries::raceprofile-encodes-the-three-race-power-gap")
     def test_starting_magic_averages_are_cap_safe(self):
         self.assertEqual(
             {key: race.starting_magic_level for key, race in RACE_REGISTRY.items()},
@@ -82,6 +85,7 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertEqual([tier.order for tier in tiers], [1, 2, 3, 4, 5])
         self.assertEqual(tiers[-1].band[1], RACE_REGISTRY["human"].static_baseline.atk_phys[1])
 
+    @covers_requirement("lore-registries::statictier-registry-records-named-power-bands-within-each-race-s-static-baseline")
     def test_guild_rank_hints_only_appear_on_correlated_human_tiers(self):
         expected = {
             "human_commoner": None,
@@ -118,6 +122,7 @@ class RaceRegistryTests(unittest.TestCase):
         for key, modifiers in expected.items():
             self.assertEqual(SUBRACE_REGISTRY[key].static_modifiers, modifiers)
 
+    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-and-beastfolk-subspecies-with-stat-modifiers")
     def test_beastfolk_modifiers_sum_to_zero(self):
         for key in BEASTFOLK_SUBRACES:
             modifiers = SUBRACE_REGISTRY[key].static_modifiers

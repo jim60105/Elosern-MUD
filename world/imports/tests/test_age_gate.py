@@ -1,5 +1,7 @@
 """Permanent regression guard: never delete or loosen the adult age gate."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest import TestCase
 
 from world.imports.tests.helpers import example_record
@@ -20,6 +22,8 @@ class AgeGateTests(TestCase):
             {issue.field for issue in validate_character(record).rejections},
         )
 
+    @covers_requirement("import-schema::character-schema-v1-rejects-any-record-where-age-or-apparent-age-is-below-18")
+    @covers_requirement("import-reference-example::one-valid-adult-compliant-reference-character-card-exists-and-stays-valid")
     def test_exactly_18_passes_the_age_gate(self):
         record = example_record()
         record["age"] = record["apparent_age"] = 18

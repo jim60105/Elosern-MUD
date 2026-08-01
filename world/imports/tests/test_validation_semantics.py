@@ -1,3 +1,5 @@
+from tools.spec_traceability import covers_requirement
+
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -13,6 +15,7 @@ from world.imports.validate import (
 
 
 class SemanticValidationTests(TestCase):
+    @covers_requirement("import-validation::disguised-stats-keys-must-be-a-subset-of-stats-keys")
     def test_disguised_stats_must_be_subset(self):
         record = example_record()
         record["disguised_stats"]["charisma"] = 1
@@ -43,11 +46,13 @@ class SemanticValidationTests(TestCase):
         self.assertTrue(report.rejections)
         self.assertFalse(report.warnings)
 
+    @covers_requirement("import-validation::the-cli-prints-a-prominent-banner-whenever-any-check-is-running-in-degraded-mode")
     def test_skill_check_degrades_once_at_batch_level(self):
         with patch("world.imports.validate._resolve_skill_registry", return_value=None):
             self.assertFalse(_check_skills({"skills": ["unknown"], "passives": []}))
             self.assertEqual(collect_degraded_checks()[0].name, "skill-registry")
 
+    @covers_requirement("import-validation::race-and-subrace-must-resolve-in-the-lore-registries-with-subrace-cross-checked-against-race", "import-validation::skills-and-passives-use-a-pluggable-registry-with-explicit-degraded-state-reporting")
     def test_skill_check_rejects_unknown_once_registry_exists(self):
         record = {"skills": ["known", "unknown"], "passives": ["passive"]}
         with patch(

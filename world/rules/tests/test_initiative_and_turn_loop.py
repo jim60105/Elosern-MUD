@@ -1,5 +1,7 @@
 """Initiative dominance and per-round upkeep tests."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -27,11 +29,13 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         with patch("world.rules.combat.roll_d100", side_effect=[1, 100]):
             self.assertEqual(roll_initiative(battlefield), ["fast", "slow"])
 
+    @covers_requirement("combat-resolution::initiative-order-is-agility-dominant-with-d100-jitter")
     def test_small_gap_can_be_reordered(self):
         battlefield = self.battlefield(gap=9)
         with patch("world.rules.combat.roll_d100", side_effect=[1, 100]):
             self.assertEqual(roll_initiative(battlefield), ["slow", "fast"])
 
+    @covers_requirement("combat-resolution::actions-per-turn-0-skips-a-combatant-s-turn-before-actionresolver-is-called")
     def test_action_lock_skips_resolver_and_upkeep_runs(self):
         battlefield = self.battlefield()
         with (

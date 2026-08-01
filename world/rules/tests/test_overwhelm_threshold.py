@@ -1,5 +1,7 @@
 """Tests for deterministic overwhelm classification signals."""
 
+from tools.spec_traceability import covers_requirement
+
 import math
 import unittest
 from unittest.mock import patch
@@ -55,6 +57,7 @@ class PowerRatioTests(unittest.TestCase):
         giant.traits.hp.value = 0
         self.assertEqual(team_effective_power(mixed, "first"), effective_power(ally))
 
+    @covers_requirement("overwhelm-threshold::classify-overwhelm-is-a-pure-query-recomputable-every-round-with-no-stale-state")
     def test_living_member_power_ignores_current_hp(self):
         entity = FakeEntity("entity", hp=100, max_hp=100)
         field = battlefield([entity], [FakeEntity("other")])

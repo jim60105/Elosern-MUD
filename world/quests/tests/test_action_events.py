@@ -1,5 +1,7 @@
 """Tests for stable action events and the event-effect planner seam (5.1-5.4)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -165,6 +167,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTest):
             result = ActionResolver.resolve(request)
         return record, result
 
+    @covers_requirement("action-resolution-pipeline::event-effect-planners-are-registered-deterministic-and-idempotent-by-name")
     def test_repeated_quest_planner_registration_does_not_duplicate_progress(self):
         register_event_effect_planner("quest", quest_event_effect_planner)
         record, result = self._resolve_lethal(self._monster("double"))

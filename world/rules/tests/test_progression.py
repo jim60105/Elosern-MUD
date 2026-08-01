@@ -1,5 +1,7 @@
 """Regression tests for deterministic character progression."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -44,6 +46,7 @@ class ProgressionTests(EvenniaTest):
         monster.apply_monster_tier()
         return monster
 
+    @covers_requirement("magic-level-progression::effective-magic-growth-multiplier-combines-race-self-and-conferred-multipliers")
     def test_multiplier_combines_race_owned_passive_and_conferred_buff(self):
         entity = self._character("elosia", "elf")
         entity.db.skills = {
@@ -75,6 +78,7 @@ class ProgressionTests(EvenniaTest):
         monster = self._monster("identity")
         self.assertEqual(effective_magic_growth_multiplier(monster), 1.0)
 
+    @covers_requirement("magic-level-progression::world-clock-and-combat-integration-use-the-progression-seams-exactly-once")
     def test_study_requires_skip_source_and_world_clock_invokes_it(self):
         entity = self._character("student")
         accrue_magic_study([entity], 3600, AdvanceSource.COMMAND)
@@ -83,6 +87,7 @@ class ProgressionTests(EvenniaTest):
         WorldClock().advance(3600, AdvanceSource.SKIP, [entity])
         self.assertEqual(entity.db.magic_xp, 1.0)
 
+    @covers_requirement("magic-level-progression::accrue-magic-study-grants-magic-xp-only-for-skip-sourced-elapsed-time")
     def test_long_skip_uses_closed_form_study_xp(self):
         entity = self._character("long-skip")
         accrue_magic_study([entity], 28800, AdvanceSource.SKIP)
@@ -95,6 +100,7 @@ class ProgressionTests(EvenniaTest):
         self.assertEqual(entity.traits.magic_level.value, 900)
         self.assertEqual(entity.db.magic_xp, 0.0)
 
+    @covers_requirement("magic-level-progression::magic-level-never-exceeds-the-entity-s-race-driven-cap-regardless-of-xp-surplus")
     def test_monster_magic_level_never_grows(self):
         monster = self._monster("monster")
         grant_combat_kill_xp(monster, "low")
@@ -108,6 +114,7 @@ class ProgressionTests(EvenniaTest):
         self.assertEqual(entity.traits.magic_level.value, 900)
         self.assertEqual(entity.db.magic_xp, 0.0)
 
+    @covers_requirement("magic-level-progression::grant-combat-kill-xp-awards-magic-xp-scaled-by-monster-tier-and-the-entity-s-growth-multiplier")
     def test_kill_xp_table_is_ordered_and_unknown_tier_does_not_write(self):
         self.assertLess(COMBAT_KILL_XP_TABLE["low"], COMBAT_KILL_XP_TABLE["mid"])
         self.assertLess(COMBAT_KILL_XP_TABLE["mid"], COMBAT_KILL_XP_TABLE["high"])
@@ -125,6 +132,7 @@ class ProgressionTests(EvenniaTest):
                     grant_conferred_growth_rate(entity, "source", scale)
         self.assertFalse(entity.buffs.all)
 
+    @covers_requirement("skill-proficiency-tracking::grant-skill-practice-xp-scales-only-by-race-learning-multiplier-never-by-conferred-growth-rate-buffs")
     def test_skill_practice_is_race_scaled_and_independent_of_conferred_growth(self):
         entity = self._character("practitioner", "elf")
         grant_conferred_growth_rate(entity, "elosia", 0.5)
@@ -137,6 +145,7 @@ class ProgressionTests(EvenniaTest):
         self.assertIsNone(entity.db.magic_xp)
         self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 0)
 
+    @covers_requirement("skill-proficiency-tracking::skill-proficiency-level-is-a-pure-unbounded-derived-query")
     def test_proficiency_query_is_pure(self):
         entity = self._character("query")
         entity.db.skill_proficiency = {"shadow_slash": 151.0}
@@ -145,6 +154,7 @@ class ProgressionTests(EvenniaTest):
         self.assertEqual(skill_proficiency_level(entity, "never_practiced"), 0)
         self.assertEqual(entity.db.skill_proficiency, before)
 
+    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-level")
     def test_magic_xp_grants_preserve_skill_proficiency(self):
         entity = self._character("separate-progression")
         entity.db.skill_proficiency = {"shadow_slash": 25.0}
@@ -174,6 +184,7 @@ class ProgressionTests(EvenniaTest):
         self.assertIsNone(entity.db.skill_proficiency)
         self.assertIsNone(entity.db.magic_xp)
 
+    @covers_requirement("skill-proficiency-tracking::successful-active-skill-resolution-records-one-practice-grant-atomically")
     def test_successful_combat_action_awards_practice_and_kill_xp_once(self):
         actor = self._character("fighter")
         actor.db.skills = {"active": ["shadow_slash"], "passive": []}
@@ -281,6 +292,7 @@ class ProgressionTests(EvenniaTest):
             )
         self.assertIsNone(actor.db.magic_xp)
 
+    @covers_requirement("magic-level-progression::magic-growth-values-are-finite-and-non-negative")
     def test_invalid_legacy_multiplier_rolls_back_combat_action(self):
         actor = self._character("rollback-fighter")
         actor.db.skills = {"active": ["shadow_slash"], "passive": []}

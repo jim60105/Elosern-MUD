@@ -1,5 +1,7 @@
 """Self-consistency checks for wilderness entry points (map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
@@ -13,6 +15,7 @@ class WildernessEntryRegistryTests(unittest.TestCase):
         self.assertEqual(entry.anchor_key, "capital_altoria")
         self.assertEqual(entry.wilderness_xy, (60, 100))
 
+    @covers_requirement("wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-one-wilderness-coordinate")
     def test_every_entrys_anchor_key_exists_in_anchor_placement_registry(self):
         for entry in WILDERNESS_ENTRY_REGISTRY.values():
             self.assertIn(entry.anchor_key, ANCHOR_PLACEMENT_REGISTRY)

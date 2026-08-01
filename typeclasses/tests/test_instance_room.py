@@ -1,5 +1,7 @@
 """Integration tests for the InstanceRoom typeclass (map-instance, tasks 2.4-2.8)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.grid.wilderness.wilderness import WildernessRoom
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils.create import create_object
@@ -17,6 +19,8 @@ class InstanceRoomTypeclassTests(EvenniaTest):
         self.assertNotIn(WildernessRoom, InstanceRoom.__mro__)
         self.assertFalse(hasattr(InstanceRoom, "xyz"))
 
+    @covers_requirement("instance-room-typeclass::instanceroom-carries-no-coordinate-and-adopts-scenearchetypemixin")
+    @covers_requirement("grid-room-typeclasses::instanceroom-is-not-forward-declared-by-this-change")
     def test_scene_archetype_seam_matches_sibling_rooms(self):
         room = create_object(InstanceRoom, key="instance")
         self.assertIsNone(room.scene_archetype)
@@ -37,6 +41,7 @@ class InstanceRoomTypeclassTests(EvenniaTest):
         self.assertEqual(room.db.owned_entities, [])
         self.assertIsNone(room.db.origin_room)
 
+    @covers_requirement("instance-room-typeclass::instanceroom-persists-expire-tick-named-interacted-pin-reasons-owned-entities-and-origin-room")
     def test_six_attributes_persist_across_refetch(self):
         room = create_object(InstanceRoom, key="persist")
         room.db.expire_tick = 12345
@@ -53,6 +58,7 @@ class InstanceRoomTypeclassTests(EvenniaTest):
         self.assertEqual(refetched.db.owned_entities, [self.obj1])
         self.assertEqual(refetched.db.origin_room, self.room1)
 
+    @covers_requirement("instance-room-typeclass::at-object-receive-sets-interacted-to-true-the-first-time-a-playercharacter-enters")
     def test_at_object_receive_sets_interacted_for_player_only(self):
         room = create_object(InstanceRoom, key="receive")
 
@@ -73,6 +79,7 @@ class InstanceRoomTypeclassTests(EvenniaTest):
         room.at_object_receive(self.char1, self.room1)
         self.assertTrue(room.db.interacted)
 
+    @covers_requirement("instance-room-typeclass::at-object-delete-refuses-deletion-while-a-playercharacter-is-present-or-the-room-is-pinned")
     def test_deletion_refused_while_pinned(self):
         room = create_object(InstanceRoom, key="pinned")
         room.db.pin_reasons = ["quest:1:stage:0"]

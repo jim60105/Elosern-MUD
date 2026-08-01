@@ -1,5 +1,7 @@
 """Action-pipeline and landed-combat integration for fleeing."""
 
+from tools.spec_traceability import covers_requirement
+
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -61,6 +63,7 @@ class DisengageResolverIntegrationTests(EvenniaTest):
         self.assertFalse(skill.usable_out_of_combat)
         self.assertIn(FLEE_SKILL_KEY, self.actor.skills.owned_keys())
 
+    @covers_requirement("disengage-action::flee-is-a-skilldef-resolved-through-the-unmodified-actionresolver-pipeline")
     def test_out_of_combat_dead_and_already_fled_rejections(self):
         outside = ActionRequest(
             self.actor,

@@ -1,5 +1,7 @@
 """Regression tests for the display-only disguise boundary."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 
 from evennia.utils.create import create_object
@@ -16,6 +18,7 @@ FORBIDDEN_MODULES = (
 
 
 class DisguiseBoundaryTests(EvenniaTest):
+    @covers_requirement("disguised-stats-boundary::combat-resolution-and-damage-modules-never-call-the-disguise-accessor")
     def test_forbidden_rules_modules_do_not_read_disguise_layer(self):
         root = Path(__file__).resolve().parents[3]
         for relative_path in FORBIDDEN_MODULES:
@@ -25,6 +28,7 @@ class DisguiseBoundaryTests(EvenniaTest):
                 self.assertNotIn("disguised_stats", source, relative_path)
                 self.assertNotIn("get_display_value", source, relative_path)
 
+    @covers_requirement("disguised-stats-boundary::disguised-stats-is-stored-separately-from-traithandler", "disguised-stats-boundary::get-display-value-is-the-single-sanctioned-accessor-for-a-possibly-disguised-stat")
     def test_accessor_changes_display_without_changing_true_values(self):
         entity = create_object(PlayerCharacter, key="disguised")
         entity.race = "elf"

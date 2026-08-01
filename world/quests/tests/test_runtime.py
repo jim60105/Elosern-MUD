@@ -1,5 +1,7 @@
 """Tests for persisted quest records and lifecycle operations (tasks 3.1-3.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 import json
 import unittest
 from unittest.mock import patch
@@ -42,6 +44,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         with self._tick(tick):
             return accept_quest(self.player, registered.key)
 
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
     def test_record_round_trips_through_json(self):
         original = from_storage(
             {
@@ -119,6 +122,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             definition_for(record)
         self.assertIn("no_such_definition", str(caught.exception))
 
+    @covers_requirement("quest-lifecycle::every-lifecycle-operation-validates-before-replacing-the-quest-log")
     def test_malformed_log_fails_any_operation_without_partial_write(self):
         registered = register(quest("malformed_neighbor"))
         accept_quest(self.player, registered.key)
@@ -155,6 +159,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             accept_quest(self.player, registered.key)
         self.assertEqual(self.player.db.quest_log, before)
 
+    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
     def test_terminal_quest_may_be_retried_deterministically(self):
         registered = register(quest("retryable"))
         record = accept_quest(self.player, registered.key)

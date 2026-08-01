@@ -1,5 +1,7 @@
 """Integration tests for MovementCostMixin exit charging (map-movement-clock)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -41,6 +43,7 @@ class MovementCostExitTests(EvenniaTest):
         self.assertIs(self.char1.location, self.room1)
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement("movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value")
     def test_vetoed_at_pre_move_leaves_location_and_clock_unchanged(self):
         exit_obj = create_object(Exit, key="veto", location=self.room1, destination=self.room2)
         self.char1.at_pre_move = lambda *a, **k: False
@@ -65,6 +68,7 @@ class MovementCostExitTests(EvenniaTest):
         self.assertIs(self.char1.location, room_b)
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
+    @covers_requirement("movement-cost-charging::movement-charges-only-for-a-playercharacter-traverser-never-for-an-autonomous-npc")
     def test_npc_traversal_moves_but_does_not_advance_clock(self):
         exit_obj = create_object(Exit, key="npc_door", location=self.room1, destination=self.room2)
         npc = create_object(NPC, key="npc", location=self.room1)
@@ -79,6 +83,7 @@ class MovementCostExitTests(EvenniaTest):
         self.assertIs(self.char1.location, self.room2)
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement("movement-cost-charging::movement-never-charges-through-a-teleport-spawn-or-non-exit-relocation")
     def test_quiet_relocation_style_move_to_does_not_advance_clock(self):
         before = get_world_clock().tick
         self.char1.move_to(self.room2, quiet=True)

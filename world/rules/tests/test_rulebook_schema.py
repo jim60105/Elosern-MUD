@@ -1,5 +1,7 @@
 """Unit tests for the shared declarative condition grammar."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -56,11 +58,14 @@ class RulebookSchemaTests(TestCase):
             evaluate_condition(combined, {"level": 4, "active_buffs": {"fear"}})
         )
 
+    @covers_requirement("rulebook-schema::evaluate-condition-is-the-one-shared-matcher-for-event-field-threshold", "rulebook-schema::every-rule-carries-a-required-unique-id")
     def test_missing_context_is_false_and_unknown_key_raises(self):
         self.assertFalse(evaluate_condition({"field": "level", "gte": 3}, {}))
         with self.assertRaisesRegex(ValueError, "unknown"):
             evaluate_condition({"unknown": "x"}, {})
 
+    @covers_requirement("rulebook-schema::schema-py-documents-itself-as-the-shared-engine-for-every-rulebook-table-not-a", "sexual-vocabulary::the-module-documents-itself-as-the-single-canonical-source-for-this-vocabulary")
+    @covers_requirement("sexual-transition-rulebook::the-stamina-action-efficiency-threshold-has-no-row-in-sexual-yaml-and-is-named-for-change-6")
     def test_docstring_names_future_sexual_table(self):
         from world.rules.rulebook import schema
 

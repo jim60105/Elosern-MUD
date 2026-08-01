@@ -1,5 +1,7 @@
 """Tests for monster and generic sexual-state defaults."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -9,6 +11,7 @@ from world.rules.sexual_state import SexualState
 
 
 class MonsterSexualBaselineTests(EvenniaTest):
+    @covers_requirement("sexual-state-handler::sensitivity-is-a-lazily-populated-dict-keyed-by-body-part-defaulting-unseen-parts-to-\u666e\u901a")
     def test_monster_uses_floors_lazy_sensitivity_and_shame_clamp(self):
         state = create_object(Monster, key="monster baseline").sexual
         self.assertEqual(

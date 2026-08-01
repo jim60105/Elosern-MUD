@@ -1,5 +1,7 @@
 """Tests for effect registration and commit safety."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import replace
 import unittest
 from unittest.mock import patch
@@ -42,6 +44,7 @@ class EffectRegistryTests(unittest.TestCase):
                 frozenset({"inventory"}),
             )
 
+    @covers_requirement("action-resolution-pipeline::resolution-is-atomic-a-failure-at-any-step-leaves-zero-state-mutated", "targeting-validation::single-and-area-target-specs-filter-candidates-differently")
     def test_commit_surface_gate_runs_before_any_mutation(self):
         applied = []
         effect = PendingEffect(

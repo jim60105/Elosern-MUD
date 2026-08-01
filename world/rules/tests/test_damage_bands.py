@@ -1,5 +1,7 @@
 """Damage band and floor tests."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -20,6 +22,7 @@ class DamageBandTests(unittest.TestCase):
             _roll_multiplier(100, 0), damage["crit_multiplier"]
         )
 
+    @covers_requirement("combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a")
     def test_floor_shape_does_not_apply_to_a_miss(self):
         actor = FakeEntity("actor", atk_phys=1, agility=10)
         target = FakeEntity("target", hp=100, defense=99, agility=10)

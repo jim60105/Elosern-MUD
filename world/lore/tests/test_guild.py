@@ -1,11 +1,14 @@
 """Self-consistency checks for guild reward bands."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.guild import GUILD_RANK_REGISTRY
 
 
 class GuildRegistryTests(unittest.TestCase):
+    @covers_requirement("lore-registries::guildrank-registry-provides-ordered-reward-bands-in-copper")
     def test_rank_order_and_reward_ladder(self):
         ranks = sorted(GUILD_RANK_REGISTRY.values(), key=lambda rank: rank.order)
         self.assertEqual([rank.key for rank in ranks], ["F", "E", "D", "C", "B", "A", "S"])

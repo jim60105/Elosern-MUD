@@ -1,5 +1,7 @@
 """Tests for loss-aware overwhelm EventLog compression."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.rules.event_log import EventEntry, EventLog, render_plain_text
@@ -23,6 +25,8 @@ def entry(kind, *, hit=None, amount=None):
 
 
 class CompressionTests(unittest.TestCase):
+    @covers_requirement("event-log-compression::compress-event-logs-drops-redundant-hit-rolls-and-preserves-miss-and-damage-records")
+    @covers_requirement("event-log-compression::a-full-record-of-who-hit-whom-for-how-much-is-preserved-alongside-the-summary", "event-log-compression::compress-event-logs-prepends-one-overwhelm-resolution-summary-entry-aggregating-the")
     def test_drops_redundant_hit_roll_but_preserves_miss_and_damage(self):
         hit_roll = entry("roll", hit=True)
         miss_roll = entry("roll", hit=False)
@@ -56,6 +60,7 @@ class CompressionTests(unittest.TestCase):
         result = compress_event_logs([log], "elves", "humans", 1)
         self.assertEqual(len(result), 1)
 
+    @covers_requirement("event-log-compression::a-compressed-eventlog-renders-through-render-plain-text-with-no-llm-involvement")
     def test_damage_attribution_and_rendering_are_preserved(self):
         damage_one = entry("damage", amount=10)
         damage_two = entry("damage", amount=15)

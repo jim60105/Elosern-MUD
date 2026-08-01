@@ -1,5 +1,7 @@
 """Persistent combat-session and preflight tests (tasks 7.1-7.12)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -53,6 +55,7 @@ def _monster(key="goblin", hp=100, atk=10):
 
 
 class InnateSkillTests(EvenniaTest):
+    @covers_requirement("universal-action-ownership::innate-skill-keys-makes-flee-and-basic-attack-ownable-by-every-livingentity-regardless-of-import-or-spawn-data")
     def test_no_skill_entity_owns_both_innate_actions(self):
         player = _player()
         player.db.skills = None
@@ -178,6 +181,7 @@ class EngageTests(EvenniaTest):
             engage(self.player, dead)
         self.assertEqual(ctx.exception.args[0], SessionReason.TARGET_DEAD)
 
+    @covers_requirement("player-combat-session::engage-creates-one-persistent-local-combat-session")
     def test_active_session_blocks_another_engagement(self):
         engage(self.player, self.monster)
         second = _monster("second")
@@ -186,6 +190,7 @@ class EngageTests(EvenniaTest):
             engage(self.player, second)
         self.assertEqual(ctx.exception.args[0], SessionReason.ALREADY_IN_COMBAT)
 
+    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
     def test_engage_alone_never_runs_a_round(self):
         result = engage(self.player, self.monster)
         self.assertEqual(result["record"].rounds_elapsed, 0)
@@ -205,6 +210,7 @@ class PlayerRoundTests(EvenniaTest):
         self.monster = _monster("goblin", hp=100)
         self.monster.location = self.room
 
+    @covers_requirement("player-combat-session::one-preflight-valid-player-action-drives-one-complete-ordinary-combat-round")
     def test_invalid_cast_preserves_round_before_initiative(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -241,6 +247,7 @@ class PlayerRoundTests(EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_in_active_session(self.player))
 
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     def test_terminal_victory_settles_rounds_once_and_clears(self):
         self.monster.traits.hp.base = 1
         self.monster.traits.hp.current = 1
@@ -298,6 +305,7 @@ class SessionPersistenceTests(EvenniaTest):
         self.assertEqual(restored.session_id, session_id)
         self.assertEqual(restored.rounds_elapsed, 0)
 
+    @covers_requirement("player-combat-session::startup-restores-valid-sessions-and-terminates-invalid-references-safely")
     def test_deleted_enemy_does_not_strand_player(self):
         engage(self.player, self.monster)
         self.monster.delete()
@@ -305,6 +313,7 @@ class SessionPersistenceTests(EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_in_active_session(self.player))
 
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_exit_traversal_is_blocked_during_combat(self):
         engage(self.player, self.monster)
         other = create_object(Room, key="elsewhere")
@@ -350,6 +359,7 @@ class PreflightSideEffectTests(EvenniaTest):
         self.assertEqual((self.monster.traits.hp.current, before[1]), before)
         self.assertIsNone(result.event_log)
 
+    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-side-effect-free-preflight-for-player-combat-input")
     def test_successful_preflight_does_not_roll_or_stage(self):
         engage(self.player, self.monster)
         from world.rules.action import _EVENT_EFFECT_PLANNERS
@@ -384,6 +394,7 @@ class CommandSessionTests(QuestRegistryIsolation, EvenniaCommandTestMixin, Evenn
         self.monster = _monster("cmd goblin")
         self.monster.location = self.room1
 
+    @covers_requirement("world-clock::cmdcast-advances-command-time-only-outside-a-persistent-combat-session")
     def test_active_session_cast_does_not_advance_command_time(self):
         from world.rules.combat_session import engage
 

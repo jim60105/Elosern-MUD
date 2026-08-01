@@ -1,5 +1,7 @@
 """Unit tests for deterministic quest definitions (tasks 2.1-2.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
@@ -41,6 +43,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
             register(explicit)
         self.assertNotIn("indices", QUEST_DEFINITION_REGISTRY)
 
+    @covers_requirement("quest-blueprint::quest-classifications-and-objective-mechanics-are-separate-closed-vocabularies")
     def test_valid_objective_shapes_register(self):
         quests = (
             quest("tier", stages=(QuestStage(0, defeat(tier="low")),)),
@@ -154,6 +157,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
         register(quest("anchor-valid", stages=(QuestStage(0, reach(anchor_locator())),)))
         self.assertIn("anchor-valid", QUEST_DEFINITION_REGISTRY)
 
+    @covers_requirement("quest-blueprint::destinations-distinguish-permanent-locations-from-future-bound-instances")
     def test_lore_known_but_unplaced_anchor_is_rejected(self):
         self.assertNotIn("village_fionnen", ANCHOR_PLACEMENT_REGISTRY)
         unplaced = QuestDefinition(
@@ -207,6 +211,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestDefinitionError):
             register(candidate)
 
+    @covers_requirement("quest-blueprint::registration-validates-every-runtime-critical-objective-field")
     def test_deadline_none_has_one_meaning_and_invalid_values_rejected(self):
         register(quest("no-deadline", deadline_hours=None))
         self.assertIsNone(QUEST_DEFINITION_REGISTRY["no-deadline"].deadline_hours)
@@ -261,6 +266,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
         self.assertIsInstance(registered.stages, tuple)
         self.assertIsInstance(registered.stages[0].objective.destination.xyz, tuple)
 
+    @covers_requirement("quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime")
     def test_registered_definition_is_distinct_from_future_ai_blueprint(self):
         # The runtime registry is keyed by QuestDefinition values only; no
         # AI proposal contract can be attached to a registered entry.
@@ -271,6 +277,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
 
 
 class CatalogTests(QuestRegistryIsolation, unittest.TestCase):
+    @covers_requirement("quest-blueprint::the-hand-written-catalog-is-idempotent-and-provides-an-offline-quest")
     def test_catalog_declares_an_offline_defeat_hunt(self):
         from world.quests.catalog import INTRODUCTORY_HUNT, register_catalog
 

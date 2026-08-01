@@ -1,5 +1,7 @@
 """Self-consistency checks for currency and purchasing power."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.economy import PRICE_TABLE, PriceEntry, to_copper
@@ -7,6 +9,7 @@ from world.lore.guild import GUILD_RANK_REGISTRY
 
 
 class EconomyRegistryTests(unittest.TestCase):
+    @covers_requirement("lore-registries::currency-is-an-integer-count-of-\u9285-with-no-floats-in-the-money-path")
     def test_conversion(self):
         self.assertEqual(to_copper(gold=1), 10_000)
         self.assertEqual(to_copper(silver=1), 100)

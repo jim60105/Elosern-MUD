@@ -1,5 +1,7 @@
 """Skill, enemy, and tie-break selection tests."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -52,6 +54,7 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
         field.fled.add("alive")
         self.assertEqual(_living_enemies(field, actor), [])
 
+    @covers_requirement("monster-action-policy::target-selection-differs-by-archetype-and-is-deterministic-under-a-fixed-seed")
     def test_target_strategies_and_seeded_tie_break(self):
         actor = FakeEntity("actor")
         weak = FakeEntity("weak", hp=20, max_hp=100, atk_phys=2)

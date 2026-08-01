@@ -1,5 +1,7 @@
 """Determinism and offline-boundary tests for monster decisions."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 import random
 import unittest
@@ -16,6 +18,7 @@ from .test_monster_behaviour_policy import FakeMonster, _field
 
 
 class MonsterBehaviourDeterminismTests(unittest.TestCase):
+    @covers_requirement("monster-action-policy::no-llm-or-generative-layer-involvement-anywhere-in-monster-decision-making")
     def test_unchanged_state_produces_identical_requests_without_roll(self):
         monster = FakeMonster(
             "monster",
