@@ -1,5 +1,7 @@
 """Integration tests for named action-pipeline rejections."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import replace
 from copy import deepcopy
 from unittest.mock import patch
@@ -40,6 +42,7 @@ class ActionPipelineRejectionTests(EvenniaTest):
     def test_unknown_skill(self):
         self.assertIs(self.resolve("missing").reason, RejectReason.UNKNOWN_SKILL)
 
+    @covers_requirement("action-resolution-pipeline::actionresolver-is-the-sole-entry-point-for-every-skill-invocation")
     def test_passive_skill(self):
         original = SKILL_REGISTRY["status_disguise"]
         SKILL_REGISTRY["status_disguise"] = replace(original, kind=SkillKind.PASSIVE)

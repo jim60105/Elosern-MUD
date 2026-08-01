@@ -1,5 +1,7 @@
 """Rulebook coverage and monster profile resolution."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.monsters import MONSTER_TIER_REGISTRY
@@ -11,6 +13,7 @@ from world.rules.monster_behaviour import (
 
 
 class MonsterBehaviourProfileTests(unittest.TestCase):
+    @covers_requirement("monster-behaviour-profile::behaviour-parameters-are-data-driven-not-hardcoded-in-python", "monster-behaviour-profile::behaviour-tiers-are-grounded-in-monstertier-and-named-world-info-md-examples-not")
     def test_rulebook_covers_distinct_tier_defaults_and_override(self):
         defaults = MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]
         archetypes = MONSTER_BEHAVIOUR_YAML["archetypes"]
@@ -45,6 +48,7 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                 or 0.0 <= values["flee_hp_fraction"] <= 1.0
             )
 
+    @covers_requirement("monster-behaviour-profile::monster-behaviour-tree-resolves-to-a-real-archetype-defaulting-from-threat-tier")
     def test_unset_profile_defaults_for_every_tier(self):
         for tier, archetype in MONSTER_BEHAVIOUR_YAML[
             "tier_default_archetype"

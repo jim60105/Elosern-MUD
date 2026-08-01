@@ -2,6 +2,8 @@
 quest_deadlines-before-instance_reclamation existence-differs proof
 (map-instance tasks 8.4-8.7, 9.1-9.2)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -66,6 +68,7 @@ class InstanceStageWiringTests(EvenniaTest):
             events,
         )
 
+    @covers_requirement("instance-reclamation::reclaim-due-instances-is-registered-as-the-instance-reclamation-event-source-at-server-start")
     def test_server_start_registers_instance_reclamation(self):
         at_server_start()
         self.assertIs(clock_module._EVENT_SOURCES["instance_reclamation"], reclaim_due_instances)

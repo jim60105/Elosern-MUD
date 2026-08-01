@@ -2,23 +2,46 @@
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from commands.skip import (
+    CmdRest,
     DurationParseError,
     _parse_duration,
     _render_skip_summary,
     _seconds_to_full_regen,
 )
-from world.rules.clock import ScheduledEvent
+from tools.spec_traceability import covers_requirement
+from world.rules.clock import AdvanceSource, ScheduledEvent
 
 
 class SkipCommandHelperTests(unittest.TestCase):
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-exactly-that")
+    def test_rest_advances_by_the_exact_explicit_duration(self):
+        caller = SimpleNamespace(msg=Mock())
+        clock = Mock()
+        clock.advance.return_value = []
+        command = CmdRest()
+        command.caller = caller
+        command.args = "1h"
+
+        with (
+            patch("commands.skip.evaluate_skip_safety", return_value=None) as safety,
+            patch("commands.skip.get_world_clock", return_value=clock),
+        ):
+            command.func()
+
+        safety.assert_called_once_with(caller)
+        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, [caller])
+        caller.msg.assert_called_once_with("時間經過了 3600 秒。")
+
     def test_duration_parser_accepts_explicit_units_only(self):
         self.assertEqual(_parse_duration("1h"), 3600)
         self.assertEqual(_parse_duration("30m"), 1800)
         with self.assertRaises(DurationParseError):
             _parse_duration("tomorrow")
 
+    @covers_requirement("time-skip-commands::every-time-skip-command-reports-the-events-that-came-due", "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum")
     def test_sleep_uses_slowest_regen_and_summary_mentions_daily_reset(self):
         entity = SimpleNamespace(
             traits=SimpleNamespace(

@@ -1,5 +1,7 @@
 """Tests for the ordered-level Evennia trait."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.rpg.traits import TraitHandler
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -33,6 +35,7 @@ class OrderedLevelTraitTests(EvenniaTest):
         trait.value = 20
         self.assertEqual((trait.value, trait.level), (4, "極限"))
 
+    @covers_requirement("ordered-level-trait::comparison-operators-accept-a-raw-vocabulary-string-another-orderedleveltrait-or-a-bare-ordinal", "ordered-level-trait::orderedleveltrait-s-level-property-returns-the-current-chinese-label")
     def test_all_comparisons_accept_label_trait_and_ordinal(self):
         trait = self._trait("中等")
         peer = self._trait(2)
@@ -54,6 +57,7 @@ class OrderedLevelTraitTests(EvenniaTest):
         self.assertGreaterEqual(trait, 1)
         self.assertLessEqual(trait, 3)
 
+    @covers_requirement("ordered-level-trait::orderedleveltrait-is-a-from-scratch-trait-subclass-storing-a-bounded-ordinal-into-a-fixed-vocabulary-tuple")
     def test_invalid_or_crossed_bounds_are_rejected(self):
         trait = self._trait("中等")
         with self.assertRaisesRegex(ValueError, "min"):
@@ -65,6 +69,7 @@ class OrderedLevelTraitTests(EvenniaTest):
         with self.assertRaisesRegex(ValueError, "min"):
             trait.min = 2
 
+    @covers_requirement("ordered-level-trait::an-unrecognized-level-string-raises-rather-than-silently-failing")
     def test_invalid_label_raises_and_condition_uses_native_comparison(self):
         trait = self._trait("高度")
         with self.assertRaisesRegex(ValueError, "高渡"):

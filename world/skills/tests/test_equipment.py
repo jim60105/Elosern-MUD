@@ -1,5 +1,7 @@
 """Integration tests for equipment slots."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -16,6 +18,7 @@ class EquipmentHandlerTests(EvenniaTest):
     def _entity(self):
         return create_object(PlayerCharacter, key="equipment tester")
 
+    @covers_requirement("equipment-inventory::equipmentslot-defines-four-slots-sized-to-the-sample-cards-own-equipment-shapes")
     def test_enum_and_dual_wield_slots_are_independent(self):
         self.assertEqual(
             set(EquipmentSlot.__members__),
@@ -33,6 +36,7 @@ class EquipmentHandlerTests(EvenniaTest):
             "right_blade",
         )
 
+    @covers_requirement("equipment-inventory::equipmenthandler-is-mounted-directly-as-entity-equipment")
     def test_handler_tolerates_empty_storage_and_is_read_only(self):
         entity = self._entity()
         for empty in (None, {}):
@@ -64,6 +68,7 @@ class EquipmentHandlerTests(EvenniaTest):
             ["crescent_earring"],
         )
 
+    @covers_requirement("equipment-inventory::accessory-is-a-bounded-multi-item-slot")
     def test_accessories_are_capped_and_unequip_returns_last(self):
         entity = self._entity()
         for index in range(ACCESSORY_MAX_SLOTS):

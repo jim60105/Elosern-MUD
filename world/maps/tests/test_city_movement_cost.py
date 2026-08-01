@@ -1,5 +1,7 @@
 """Integration tests for wiring CostedXYZExit into the sample city (map-movement-clock)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
@@ -80,6 +82,7 @@ class SampleCityCostedExitTests(EvenniaTest):
         self.assertEqual(self.char1.location.key, "南大道")
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
+    @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
         sync_grid()
         limbo = self.room2

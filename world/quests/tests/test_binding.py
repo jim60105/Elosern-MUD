@@ -1,5 +1,7 @@
 """Tests for runtime instance and entity binding (tasks 4.1-4.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -65,6 +67,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def _room(self, key: str = "bind-room") -> InstanceRoom:
         return create_object(InstanceRoom, key=key)
 
+    @covers_requirement("quest-lifecycle::bind-stage-runtime-attaches-only-current-stage-instance-and-entity-identities")
     def test_runtime_binding_stores_identities_and_pins_instance(self):
         room = self._room()
         first = self._monster("first")
@@ -194,6 +197,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         room_fresh = InstanceRoom.objects.get(id=room.id)
         self.assertEqual(room_fresh.db.pin_reasons, [])
 
+    @covers_requirement("quest-lifecycle::multi-attribute-lifecycle-writes-are-atomic-and-cache-consistent")
     def test_quest_log_failure_restores_an_already_written_pin(self):
         room = self._room()
         monster = self._monster("log-rollback")
@@ -250,6 +254,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.db.quest_log, before_log)
         self.assertEqual(room.db.pin_reasons, [])
 
+    @covers_requirement("quest-lifecycle::abandon-quest-fails-only-an-active-quest-and-releases-its-runtime-binding")
     def test_abandonment_releases_exact_pin(self):
         room = self._room()
         monster = self._monster("release")

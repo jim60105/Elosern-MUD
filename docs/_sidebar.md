@@ -8,3 +8,6 @@
 
 - 專案設計
   - [引擎架構設計](/superpowers/specs/2026-07-29-ai-mud-engine-design)
+
+- Developer guides
+  - [OpenSpec test traceability](/development/spec-test-traceability)

@@ -1,5 +1,7 @@
 """Triggerable nonlethal guild examination tests (tasks 8.1-8.8)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
@@ -122,6 +124,8 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
 
         write_counter_trait(self.player, "guild_merit", amount)
 
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
     def test_command_trigger_starts_an_eligible_exam(self):
         self._give_merit(50)
         record = start_guild_exam(
@@ -183,6 +187,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
             start_guild_exam(self.player, far, "E")
         self.assertEqual(ctx.exception.args[0], ExamReason.REMOTE_EXAMINER)
 
+    @covers_requirement("guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination")
     def test_threshold_alone_does_not_promote(self):
         self._give_merit(50)
         self.assertEqual(self.player.guild_rank, "F")
@@ -259,6 +264,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         record2 = start_guild_exam(self.player, self.examiner, "E")
         self.assertEqual(record2.exam_id, f"{self.player.pk}:E:2")
 
+    @covers_requirement("guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate")
     def test_replayed_settlement_cannot_promote_twice(self):
         from world.rules.combat_session import read_session
 
@@ -279,6 +285,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.guild_rank, "F")
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
 
+    @covers_requirement("guild-rank-exams::examination-combat-is-nonlethal-and-grants-no-ordinary-defeat-rewards")
     def test_candidate_knockout_is_nonfatal_but_fails(self):
         # Make the examiner overwhelmingly strong so its basic_attack floors
         # the candidate's HP at 1 and knocks it out; the exam fails without a
@@ -317,6 +324,7 @@ class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTest):
             )
         )
 
+    @covers_requirement("guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles")
     def test_every_rank_profile_stays_inside_its_lore_band(self):
         from world.rules.guild_config import validate_exam_profiles
 

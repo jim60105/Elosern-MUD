@@ -1,5 +1,7 @@
 """Tests for quest ACQUIRE objectives and inventory planning (tasks 5.3-5.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import replace
 
 from evennia.utils.create import create_object
@@ -161,6 +163,7 @@ class AcquireProgressTests(QuestRegistryIsolation, EvenniaTest):
         # The inventory is still there as initial state.
         self.assertEqual(list_items(self.player), ["healing_potion", "healing_potion"])
 
+    @covers_requirement("quest-reward-settlement::acquire-is-a-closed-inventory-backed-quest-objective")
     def test_one_addition_advances_multiple_quests_without_surplus_carry(self):
         second = register(
             quest("acquire2", stages=(
@@ -185,6 +188,7 @@ class AcquireProgressTests(QuestRegistryIsolation, EvenniaTest):
         add_item(self.player, "healing_potion")
         self.assertEqual(list_items(self.player), ["healing_potion"])
 
+    @covers_requirement("equipment-inventory::inventory-plans-compose-with-larger-atomic-operations")
     def test_fault_rolls_back_inventory_and_quest_together(self):
         self._accept()
         before_inventory = list(self.player.db.inventory or [])
@@ -208,6 +212,7 @@ class AcquireProgressTests(QuestRegistryIsolation, EvenniaTest):
 
 
 class ImportNonProgressionTests(QuestRegistryIsolation, EvenniaTest):
+    @covers_requirement("quest-reward-settlement::import-population-is-not-gameplay-acquisition")
     def test_imported_items_do_not_auto_complete_a_later_quest(self):
         from world.imports.loader import instantiate_character
         from world.imports.tests.helpers import example_record

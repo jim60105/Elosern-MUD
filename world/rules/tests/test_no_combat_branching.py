@@ -1,5 +1,7 @@
 """Structural tripwires against combat-specific resolver branches."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 from pathlib import Path
 import unittest
@@ -8,6 +10,8 @@ from world.rules import action, event_log, targeting
 
 
 class NoCombatBranchingTests(unittest.TestCase):
+    @covers_requirement("action-resolution-pipeline::neither-actionresolver-nor-targeting-branches-on-combat-state")
+    @covers_requirement("battlefield-commit-surface::the-no-combat-branching-tripwire-remains-unaffected-by-the-battlefield-surface-addition")
     def test_no_forbidden_combat_state_tokens(self):
         root = Path(__file__).resolve().parents[3]
         for relative in (

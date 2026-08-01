@@ -1,5 +1,7 @@
 """Self-arming integration coverage owned by the later sexual-state change."""
 
+from tools.spec_traceability import covers_requirement
+
 import importlib
 import unittest
 
@@ -22,6 +24,7 @@ class SexualStateLandingTests(EvenniaTest):
         SEXUAL_STATE_MODULE is not None,
         "world.rules.sexual_state has not landed yet",
     )
+    @covers_requirement("combat-modifier-table::sexual-field-rules-degrade-to-inert-until-entity-sexual-is-real-then-self-arm", "sexual-state-handler::change-6-s-self-arming-combat-modifier-test-fires-once-entity-sexual-is-real")
     def test_high_arousal_rule_fires_once_sexual_state_exists(self):
         entity = create_object(PlayerCharacter, key="sexual-state integration")
         self.assertIsNotNone(entity.sexual)

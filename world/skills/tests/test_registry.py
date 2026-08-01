@@ -1,5 +1,7 @@
 """Contract tests for the skill registry."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import fields
 import unittest
 
@@ -41,6 +43,7 @@ class SkillRegistryTests(unittest.TestCase):
                 self.assertIn(skill.element, ELEMENT_REGISTRY.values())
             self.assertIsInstance(skill.faction_constraint, FactionConstraint)
 
+    @covers_requirement("skill-registry::skillkind-and-targetspec-are-forward-declared-for-change-8-to-import")
     def test_enums_have_only_the_forward_declared_members(self):
         self.assertEqual(set(SkillKind.__members__), {"ACTIVE", "PASSIVE"})
         self.assertEqual(
@@ -62,6 +65,7 @@ class SkillRegistryTests(unittest.TestCase):
             }
         )
 
+    @covers_requirement("skill-registry::the-seed-registry-spans-every-skill-category-inventoried-from-the-sample-cards")
     def test_seed_set_spans_every_required_category(self):
         for key in (
             "body_enhancement",
@@ -115,6 +119,7 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertGreaterEqual(len(boons), 3)
         self.assertEqual(len({tuple(skill.effects) for skill in boons}), len(boons))
 
+    @covers_requirement("skill-registry::skilldef-carries-the-action-resolver-s-skill-owned-faction-constraint")
     def test_definition_collections_are_deeply_immutable(self):
         fire_ball = SKILL_REGISTRY["fire_ball"]
         with self.assertRaises(TypeError):

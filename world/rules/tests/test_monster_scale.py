@@ -1,5 +1,7 @@
 """Regression tests for direct monster-tier construction."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from evennia.utils.create import create_object
@@ -14,6 +16,7 @@ from world.rules.traits import (
 
 
 class MonsterScaleTests(unittest.TestCase):
+    @covers_requirement("entity-trait-scales::monster-trait-baselines-read-monstertier-static-band-and-hp-band-directly-never-a-derived-multiplier")
     def test_floor_values_are_direct_registry_reads(self):
         low = build_initial_traits_for_monster_tier("low")
         calamity = build_initial_traits_for_monster_tier("calamity")

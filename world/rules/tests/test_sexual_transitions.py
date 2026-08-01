@@ -1,5 +1,7 @@
 """One-to-one rule and invariant tests for sexual transitions."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 from pathlib import Path
 from unittest.mock import patch
@@ -52,6 +54,7 @@ class SexualTransitionTests(EvenniaTest):
         self.assertEqual(entity.sexual.arousal.value, 2)
         self.assertIn((1, 2), rng.calls)
 
+    @covers_requirement("sexual-transition-rulebook::ordered-level-field-rules-write-through-the-field-s-own-live-trait-object-never-through-a-second-write-path")
     def test_rule_arousal_up_on_sustained_stimulus(self):
         entity = self._entity()
         apply_event(entity, "sustained_stimulus_applied")
@@ -86,6 +89,7 @@ class SexualTransitionTests(EvenniaTest):
         apply_event(entity, "climax_ends", rng=FixedRng(-25))
         self.assertEqual(entity.sexual.wetness.level, "泛濫")
 
+    @covers_requirement("sexual-transition-rulebook::sensitivity-rules-target-the-body-part-supplied-by-the-triggering-event-not-a-fixed-part-named-in-the-rule")
     def test_rule_sensitivity_up_on_frequent_stimulation(self):
         entity = self._entity()
         apply_event(entity, "frequent_stimulation", part="乳房")
@@ -96,6 +100,7 @@ class SexualTransitionTests(EvenniaTest):
         with self.assertRaises(KeyError):
             apply_event(entity, "frequent_stimulation")
 
+    @covers_requirement("sexual-transition-rulebook::race-specific-behavior-and-narrative-only-fields-have-no-row-in-sexual-yaml")
     def test_rule_climax_gate(self):
         entity = self._entity()
         apply_event(entity, "extreme_stimulus_applied")
@@ -211,6 +216,7 @@ class SexualTransitionTests(EvenniaTest):
         }
         self.assertEqual(actual, expected)
 
+    @covers_requirement("sexual-transition-rulebook::field-kinds-covers-exactly-the-fields-targeted-by-sexual-yaml-structurally-enforced")
     def test_field_kinds_covers_every_targetable_field(self):
         self.assertEqual(
             set(FIELD_KINDS),
@@ -226,6 +232,7 @@ class SexualTransitionTests(EvenniaTest):
         entity.sexual.virgin = True
         self.assertFalse(entity.sexual.virgin)
 
+    @covers_requirement("sexual-transition-rulebook::virgin-and-experience-types-rules-are-irreversible-and-append-only-end-to-end-through-apply-event")
     def test_experience_types_only_grows(self):
         entity = self._entity()
         apply_event(entity, "masturbation_climax")
@@ -244,6 +251,7 @@ class SexualTransitionTests(EvenniaTest):
         self.assertNotIn("._traits.climax_phase", source)
         self.assertIn("_apply_climax_phase_set(entity, then[\"set\"])", source)
 
+    @covers_requirement("sexual-transition-rulebook::climax-today-increments-through-sexualstate-record-climax-never-through-sexualstate-s-private-handler")
     def test_climax_today_never_touches_private_traits(self):
         source = inspect.getsource(sexual_transitions)
         self.assertNotIn("entity.sexual._traits", source)
@@ -295,6 +303,7 @@ class SexualTransitionTests(EvenniaTest):
         ):
             self.assertNotIn(excluded, serialized)
 
+    @covers_requirement("sexual-transition-rulebook::the-one-rule-targeting-a-vital-gauge-outside-sexualstate-writes-through-change-3-s-entity-traits-surface-never-through-sexualstate")
     def test_sp_cost_never_reaches_through_entity_sexual(self):
         source = inspect.getsource(_apply_then)
         branch = source.rsplit("    else:\n", 1)[1]
@@ -317,6 +326,7 @@ class SexualTransitionTests(EvenniaTest):
         self.assertEqual(entity.sexual.arousal.level, "極限")
         self.assertEqual(entity.sexual.climax_phase.level, "接近")
 
+    @covers_requirement("sexual-transition-rulebook::sexual-yaml-loads-through-change-6-s-shared-rule-loader-with-no-second-parser")
     def test_yaml_order_does_not_change_pass_matching(self):
         expected = self._entity()
         expected.sexual.arousal.value = "高度"
@@ -335,6 +345,7 @@ class SexualTransitionTests(EvenniaTest):
             expected.sexual.climax_phase.level,
         )
 
+    @covers_requirement("sexual-transition-rulebook::every-climax-phase-targeting-rule-routes-exclusively-through-change-7-s--apply-climax-phase-set")
     def test_climax_gate_does_not_apply_from_afterglow(self):
         entity = self._entity()
         entity.sexual.arousal.value = "極限"
@@ -342,6 +353,7 @@ class SexualTransitionTests(EvenniaTest):
         apply_event(entity, "unrelated_event")
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
 
+    @covers_requirement("sexual-transition-rulebook::apply-event-is-the-single-entry-point-evaluating-every-rule-to-a-fixed-point")
     def test_event_context_cannot_override_authoritative_state(self):
         entity = self._entity()
         with self.assertRaisesRegex(ValueError, "reserved keys"):

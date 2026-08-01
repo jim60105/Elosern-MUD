@@ -1,5 +1,7 @@
 """Self-consistency checks for nations and capital anchors."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
@@ -14,6 +16,7 @@ class NationRegistryTests(unittest.TestCase):
             self.assertEqual(anchor.kind, AnchorKind.CAPITAL)
             self.assertEqual(anchor.nation_key, nation.key)
 
+    @covers_requirement("lore-registries::nation-registry-covers-the-three-states")
     def test_territory_shares_leave_neutral_land(self):
         total = sum(nation.territory_share for nation in NATION_REGISTRY.values())
         self.assertGreaterEqual(total, 0.85)

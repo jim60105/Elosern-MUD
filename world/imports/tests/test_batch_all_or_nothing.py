@@ -1,3 +1,5 @@
+from tools.spec_traceability import covers_requirement
+
 import json
 import tempfile
 from pathlib import Path
@@ -26,6 +28,8 @@ class BatchTests(EvenniaTest):
         path.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         return path
 
+    @covers_requirement("import-validation::import-validation-is-all-or-nothing-across-a-batch-of-files")
+    @covers_requirement("import-validation::every-reported-issue-names-the-record-the-field-and-the-reason", "import-validation::validate-py-provides-a-cli-that-validates-one-or-more-record-files")
     def test_one_bad_record_fails_batch_but_reports_every_file(self):
         bad = example_record()
         bad["age"] = 17
@@ -73,6 +77,7 @@ class BatchTests(EvenniaTest):
         self.assertFalse(report.all_valid)
         self.assertTrue(all(item.rejections for item in report.records))
 
+    @covers_requirement("import-loader::loader-py-instantiates-entities-only-after-batch-validation-reports-zero-rejections")
     def test_construction_failure_rolls_back_earlier_entities(self):
         second = example_record()
         second["key"] = "second_reference"

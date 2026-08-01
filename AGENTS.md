@@ -129,6 +129,35 @@ Main specs describe the current contract. Active changes contain proposed
 deltas; archived changes are historical evidence and must not be treated as the
 current source over `openspec/specs/`.
 
+## OpenSpec test traceability
+
+Every requirement in a direct main capability spec at
+`openspec/specs/<capability>/spec.md` must have at least one substantively
+matching unit or integration test. Active and archived change specs are outside
+the current-contract index. Read
+`docs/development/spec-test-traceability.md` before adding or changing a main
+requirement or its tests.
+
+- Obtain canonical requirement IDs with
+  `uv run --locked python -m tools.spec_traceability list`; do not construct IDs
+  manually.
+- Import `covers_requirement` from `tools.spec_traceability` and apply it to the
+  discoverable `test_*` function or method whose assertions establish the
+  requirement. Arguments must be literal IDs.
+- Run `uv run --locked python -m tools.spec_traceability check` while editing.
+  Before handoff, run both required test entry points with the same
+  `OPENSPEC_TEST_EVIDENCE` path, then run the verifier's `verify --evidence`
+  mode.
+- An annotation is a traceability claim, not a substitute for a behavior test.
+  Never associate an unrelated, skipped, placeholder, or assertion-free test.
+  There is no waiver or allowlist for an uncovered main requirement.
+- When a genuine gap is found, keep it visible in the deterministic JSON report
+  and add the missing test in the behavior change that owns the requirement.
+  Do not enable or weaken the required CI workflow to bypass the gap.
+- The final coverage gate measures branches in exactly `commands`, `server`,
+  `typeclasses`, `web`, and `world`, omits only `*/tests/*`, combines the full
+  Evennia and top-level regression data files, and requires at least 90%.
+
 ## Container behavior
 
 Use Podman Compose for container workflows (`podman compose build` and

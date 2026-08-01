@@ -1,5 +1,7 @@
 """Pure and Evennia-backed tests for deterministic player activation."""
 
+from tools.spec_traceability import covers_requirement
+
 from copy import deepcopy
 import unittest
 
@@ -33,6 +35,7 @@ def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int
 
 
 class StartingProfileTests(unittest.TestCase):
+    @covers_requirement("player-stat-allocation::custom-starting-stats-require-one-exact-finite-allocation-budget")
     def test_exact_budget_and_foxkin_override(self):
         human = resolve_starting_profile("human")
         self.assertEqual(human.budget, 181)
@@ -71,6 +74,7 @@ class CharacterActivationTests(EvenniaTest):
         values.update(overrides)
         return CharacterCreationRequest(**values)
 
+    @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
     def test_activation_persists_identity_traits_and_empty_mechanical_state(self):
         old_id, old_location = self.character.id, self.character.location
         result = activate_player_character(
@@ -89,6 +93,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(self.character.location, old_location)
         self.assertIn(self.character, self.account.characters)
 
+    @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
     def test_catkin_static_modifiers_apply_once_after_allocation(self):
         allocations = balanced_allocations("beastfolk", "catkin")
         request = self.request(
@@ -118,6 +123,7 @@ class CharacterActivationTests(EvenniaTest):
             self.assertEqual(calls, [])
             self.assertEqual(self.character.traits.all(), [])
 
+    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
     def test_age_name_subrace_and_invalid_sampler_rejections_are_non_mutating(self):
         requests = (
             self.request(age=17),
@@ -137,6 +143,7 @@ class CharacterActivationTests(EvenniaTest):
                     sampler=lambda low, high, value=sample: value,
                 )
 
+    @covers_requirement("player-stat-allocation::starting-magic-level-is-sampled-from-a-race-owned-average-band")
     def test_preset_activation_uses_the_same_magic_sampler(self):
         result = activate_player_character(
             self.account, self.character,
@@ -165,6 +172,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(self.character.db.magic_xp, 9)
         self.assertEqual(dict(self.character.traits.trait_data), before_traits)
 
+    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
     def test_every_observable_write_failure_restores_the_complete_shell(self):
         stages = (
             "identity", "traits", "age", "apparent_age", "race", "subrace",

@@ -1,5 +1,7 @@
 """Tests for partial skill conferral."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 
 from evennia.objects.models import ObjectDB
@@ -19,6 +21,7 @@ class ConferredSkillTests(EvenniaTest):
         entity.db.skills = {"active": [], "passive": []}
         return entity
 
+    @covers_requirement("skill-handler::a-skill-can-confer-a-scaled-down-partial-effect-of-another-entity-s-skill-\u7d71\u5fa1\u8853")
     def test_fractional_grant_scales_the_source_skill_multiplier(self):
         entity = self._entity()
         entity.traits.atk_phys.base = 60

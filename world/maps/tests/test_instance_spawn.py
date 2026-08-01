@@ -1,6 +1,8 @@
 """Integration tests for the instance prototype whitelist, spawn_instance_room,
 and the rulebook TTL data (map-instance tasks 3.3-3.4, 4.4-4.9, 6.2)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.prototypes import prototypes as prototypes_module
@@ -37,6 +39,7 @@ class InstancePrototypeWhitelistTests(EvenniaTest):
         self.assertEqual(prototype["prototype_key"], "instance_room")
         self.assertEqual(prototype["typeclass"], "typeclasses.rooms.InstanceRoom")
 
+    @covers_requirement("instance-spawn::instance-room-is-a-module-prototype-resolving-to-prototype-key-instance-room")
     def test_whitelist_has_exactly_one_entry(self):
         self.assertEqual(INSTANCE_PROTOTYPE_WHITELIST, ("instance_room",))
 
@@ -81,6 +84,7 @@ class InstanceSpawnTests(EvenniaTest):
         mock_spawn.assert_not_called()
         self.assertEqual(InstanceRoom.objects.all().count(), before)
 
+    @covers_requirement("instance-spawn::spawn-instance-room-validates-prototype-parent-against-the-whitelist-before-spawning")
     def test_spawn_rejects_typeclass_override_before_spawning(self):
         before = InstanceRoom.objects.all().count()
         override = dict(WHITELISTED_PROTOTYPE)
@@ -223,6 +227,7 @@ class InstanceSpawnTests(EvenniaTest):
         for exit_obj in forward + backward:
             self.assertIs(type(exit_obj), Exit)
 
+    @covers_requirement("instance-spawn::spawn-instance-room-sets-expire-tick-named-and-origin-room-and-creates-a-bidirectional-attach-exit")
     def test_character_can_walk_in_and_back_via_ordinary_traversal(self):
         room = spawn_instance_room(
             self.origin_room,
@@ -237,6 +242,7 @@ class InstanceSpawnTests(EvenniaTest):
         self.char1.move_to(backward.destination)
         self.assertIs(self.char1.location, self.origin_room)
 
+    @covers_requirement("instance-spawn::spawn-instance-room-rejects-an-instanceroom-as-origin-room")
     def test_nested_instance_origin_is_rejected_before_spawning(self):
         inner = spawn_instance_room(
             self.origin_room,
@@ -270,6 +276,7 @@ class InstanceSpawnTests(EvenniaTest):
 
 
 class InstanceYamlTests(EvenniaTest):
+    @covers_requirement("instance-reclamation::default-ttl-seconds-is-declared-rulebook-data")
     def test_default_ttl_seconds_matches_independent_arithmetic(self):
         self.assertEqual(INSTANCE_YAML["default_ttl_seconds"], 345600)
         self.assertEqual(
@@ -305,6 +312,7 @@ class PinApiRyTests(EvenniaTest):
         register_owned_entity(self.room, self.obj1)
         self.assertNotIn(self.obj2, self.room.db.owned_entities)
 
+    @covers_requirement("instance-reclamation::pin-instance-room-and-unpin-instance-room-are-reason-keyed-reference-holders")
     def test_unpinning_absent_reason_does_not_raise(self):
         pin_instance_room(self.room, "quest:1:stage:0")
         from world.maps.instance import unpin_instance_room

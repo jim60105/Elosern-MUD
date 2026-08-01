@@ -1,5 +1,7 @@
 """Tests for deadline settlement and startup registration (tasks 8.1-8.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 import unittest
 from unittest.mock import patch
@@ -78,6 +80,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(self._records()[0]["state"], "in_progress")
         self.assertEqual(events, [])
 
+    @covers_requirement("quest-failure-conditions::due-active-quests-fail-and-release-their-current-instance-pin")
     def test_no_deadline_quest_never_expires(self):
         self._accept(self.open.key)
         self.assertEqual(self._records()[0]["deadline_tick"], None)
@@ -134,6 +137,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].payload["character_id"], good.pk)
 
+    @covers_requirement("quest-failure-conditions::quest-deadline-settlement-is-registered-from-the-server-startup-composition-root")
     def test_repeated_startup_registration_is_idempotent(self):
         self._accept(self.due.key)
         sync_quest_runtime()
@@ -168,6 +172,7 @@ class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
         self.player.apply_race_baseline()
         self.hours = 3600
 
+    @covers_requirement("quest-failure-conditions::deadline-failure-precedes-instance-reclamation-in-one-clock-advance")
     def test_due_room_is_unpinned_and_reclaimed_in_one_advance(self):
         from world.quests.definitions import QuestStage
 

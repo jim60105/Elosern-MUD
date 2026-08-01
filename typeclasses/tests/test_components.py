@@ -1,5 +1,7 @@
 """Source tests proving service components delegate all state writes (task 3.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import ast
 import inspect
 import unittest
@@ -23,6 +25,7 @@ class ComponentModuleSourceTests(unittest.TestCase):
         "disguised_stats",
     )
 
+    @covers_requirement("guild-registration::guild-service-components-are-capability-adapters-not-state-writers")
     def test_components_define_only_capability_markers_and_service_data(self):
         source = inspect.getsource(components_module)
         tree = ast.parse(source)

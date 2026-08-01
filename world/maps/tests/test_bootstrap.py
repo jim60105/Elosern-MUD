@@ -1,5 +1,7 @@
 """Integration tests for idempotent grid and wilderness bootstrap (map-anchor-grid, map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 
 from evennia.utils.create import create_object
@@ -47,6 +49,8 @@ class GridBootstrapTests(EvenniaTest):
             if exit_obj.location in targets or exit_obj.destination in targets
         ]
 
+    @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
+    @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
     def test_sync_grid_creates_thirteen_rooms_and_twenty_six_exits(self):
         create_object(Room, key="Limbo", location=None)
         sync_grid()
@@ -105,6 +109,7 @@ class GridBootstrapTests(EvenniaTest):
         south_gate = GridRoom.objects.get(db_key="南門")
         self.assertEqual(south_gate.db.desc, "A rebuilt southern gate.")
 
+    @covers_requirement("scene-archetype-mixin::gridroom-is-retrofitted-onto-scenearchetypemixin-without-changing-its-contract")
     def test_anchor_room_matches_placement_registry_after_sync(self):
         create_object(Room, key="Limbo", location=None)
         sync_grid()
@@ -160,6 +165,8 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(self._count_city_exits(), 24)
         self.assertEqual(len(self._bridging_exits()), 0)
 
+    @covers_requirement("grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all")
+    @covers_requirement("grid-room-sync::the-evennia-xyzgrid-cli-remains-available-but-is-not-required-for-boot", "lore-startup-sync::sync-runs-automatically-at-evennia-server-start")
     def test_at_server_start_calls_sync_grid_after_sync_all(self):
         source = inspect.getsource(at_server_start)
         self.assertLess(source.index("sync_all()"), source.index("sync_grid()"))
@@ -242,6 +249,7 @@ class WildernessBootstrapTests(EvenniaTest):
         self.assertIn("grid.spawn()", source)
         self.assertNotIn("sync_wilderness", source)
 
+    @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-the-one-grid-side-gate")
     def test_at_server_start_calls_sync_wilderness_after_sync_grid(self):
         source = inspect.getsource(at_server_start)
         self.assertLess(source.index("sync_grid()"), source.index("sync_wilderness()"))

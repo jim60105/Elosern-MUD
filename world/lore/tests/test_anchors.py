@@ -1,5 +1,7 @@
 """Self-consistency checks for geographic anchors."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from collections import Counter
 
@@ -15,6 +17,7 @@ class AnchorRegistryTests(unittest.TestCase):
             {AnchorKind.CAPITAL: 3, AnchorKind.ELVEN_VILLAGE: 3, AnchorKind.DUNGEON: 3},
         )
 
+    @covers_requirement("lore-registries::anchor-registry-covers-capitals-elven-villages-and-known-dungeons")
     def test_dungeon_floor_counts(self):
         self.assertEqual(ANCHOR_REGISTRY["dungeon_eternal_night"].floors, 80)
         self.assertEqual(ANCHOR_REGISTRY["dungeon_dragon_nest"].floors, 50)

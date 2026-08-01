@@ -1,5 +1,7 @@
 """Self-consistency checks for monster threat bands."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.guild import GUILD_RANK_REGISTRY
@@ -41,6 +43,7 @@ class MonsterRegistryTests(unittest.TestCase):
         self.assertLessEqual(calamity[0], elf_common[1])
         self.assertGreater(calamity[1], elf_common[1])
 
+    @covers_requirement("lore-registries::monstertier-registry-has-physical-stat-and-hp-bands-derived-from-guild-rank")
     def test_calamity_overlaps_and_exceeds_elf_species_band(self):
         calamity = MONSTER_TIER_REGISTRY["calamity"].static_band.atk_phys
         elf = RACE_REGISTRY["elf"].static_baseline.atk_phys

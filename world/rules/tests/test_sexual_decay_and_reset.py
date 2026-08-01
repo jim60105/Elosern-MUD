@@ -1,5 +1,7 @@
 """Tests for clock-independent decay and daily reset callables."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 
 from evennia.utils.create import create_object
@@ -57,6 +59,7 @@ class SexualDecayAndResetTests(EvenniaTest):
         self.assertEqual(entity.sexual.climax_today, 0)
         self.assertEqual(entity.sexual.arousal.level, before)
 
+    @covers_requirement("sexual-state-handler::decay-tick-and-reset-daily-counters-are-exposed-as-plain-callables-with-no-settlement-order-invented")
     def test_module_has_no_clock_or_settlement_policy(self):
         source = inspect.getsource(sexual_state)
         self.assertNotIn("WorldClock", source)

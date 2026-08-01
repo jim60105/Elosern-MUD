@@ -1,5 +1,7 @@
 """Tests for max-hp-scaled effective combat power."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from evennia.utils.create import create_object
@@ -37,6 +39,7 @@ class EffectivePowerTests(unittest.TestCase):
         self.assertGreater(ratio, 1)
         self.assertLess(ratio, 100)
 
+    @covers_requirement("combat-resolution::effective-power-combines-four-effective-stats-multiplied-by-max-hp", "overwhelm-threshold::a-decided-direction-is-further-gated-by-an-estimated-round-count-bound-overwhelm", "overwhelm-threshold::the-hit-rate-signal-detects-to-hit-saturation-without-rolling-dice-checked-over-every", "overwhelm-threshold::the-power-ratio-signal-is-computed-from-team-summed-effective-power-checked-in-both")
     def test_current_hp_does_not_change_power_but_effective_stats_do(self):
         entity = FakeEntity("entity", hp=100, max_hp=100)
         before = effective_power(entity)
@@ -47,6 +50,7 @@ class EffectivePowerTests(unittest.TestCase):
 
 
 class EffectivePowerIntegrationTests(EvenniaTest):
+    @covers_requirement("damage-effect-handlers::damage-reads-every-stat-through-effective-value-never-raw-entity-traits")
     def test_real_skill_handler_multiplier_changes_power_not_stored_trait(self):
         entity = create_object(PlayerCharacter, key="power")
         entity.race = "human"

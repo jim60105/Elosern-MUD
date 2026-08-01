@@ -1,5 +1,7 @@
 """Integration tests for skill ownership and effective trait values."""
 
+from tools.spec_traceability import covers_requirement
+
 import ast
 import inspect
 
@@ -21,6 +23,7 @@ class SkillHandlerTests(EvenniaTest):
         entity.apply_race_baseline()
         return entity
 
+    @covers_requirement("skill-handler::skillhandler-is-mounted-directly-as-entity-skills")
     def test_handler_reads_private_storage_and_has_no_bare_assignment(self):
         entity = self._entity()
         entity.db.skills = None
@@ -37,6 +40,7 @@ class SkillHandlerTests(EvenniaTest):
             ["fire_ball", "defense_instinct", "flee", "basic_attack"],
         )
 
+    @covers_requirement("universal-action-ownership::innate-ownership-is-unconditional-and-not-combat-gated")
     def test_flee_is_innate_for_bare_monster_and_not_combat_gated(self):
         monster = create_object(Monster, key="bare monster")
         monster.db.skills = None
@@ -46,10 +50,12 @@ class SkillHandlerTests(EvenniaTest):
         self.assertEqual(before, ["flee", "basic_attack"])
         self.assertEqual(after, before)
 
+    @covers_requirement("universal-action-ownership::world-skills-does-not-depend-on-world-rules-to-define-innate-ownership")
     def test_skill_handler_has_no_rules_dependency(self):
         source = inspect.getsource(handler)
         self.assertNotIn("world.rules", source)
 
+    @covers_requirement("skill-handler::effective-value-is-the-sole-resolution-time-multiplier-application-point-and-never-writes-to-entity-traits")
     def test_effective_value_multiplies_without_mutating_base(self):
         entity = self._entity()
         entity.db.skills = {

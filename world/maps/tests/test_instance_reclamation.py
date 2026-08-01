@@ -1,6 +1,8 @@
 """Integration tests for reclaim_due_instances routing and entity resolution
 (map-instance tasks 7.4-7.14)."""
 
+from tools.spec_traceability import covers_requirement
+
 import json
 from unittest.mock import patch
 
@@ -41,6 +43,7 @@ class ReclaimRoutingTests(EvenniaTest):
             events,
         )
 
+    @covers_requirement("instance-reclamation::reclaim-due-instances-defers-only-rooms-with-a-playercharacter-present-or-an-active-pin")
     def test_pinned_due_room_defers_identically_to_player_present(self):
         room = _due_room("pinned_due")
         room.db.pin_reasons = [BLOCKING_PIN]
@@ -65,6 +68,7 @@ class ReclaimRoutingTests(EvenniaTest):
             events,
         )
 
+    @covers_requirement("instance-reclamation::reclaim-due-instances-promotes-rooms-that-are-both-named-and-interacted")
     def test_named_and_interacted_due_room_is_promoted_not_deleted(self):
         room = _due_room("promotable", named=True, interacted=True)
         npc = create_object(NPC, key="resident")
@@ -120,6 +124,7 @@ class ReclaimRoutingTests(EvenniaTest):
             events,
         )
 
+    @covers_requirement("instance-reclamation::reclaim-due-instances-deletes-rooms-that-are-due-unblocked-and-not-promotable")
     def test_unnamed_unoccupied_due_room_is_reclaimed(self):
         room = _due_room("plain_due")
         events = reclaim_due_instances(0, 100)
@@ -189,6 +194,8 @@ class ReclaimRoutingTests(EvenniaTest):
             settings.DEFAULT_HOME,
         )
 
+    @covers_requirement("instance-reclamation::reclaim-due-instances-despawns-owned-entities-and-relocates-unowned-ones-before-reclaiming-a-room")
+    @covers_requirement("instance-reclamation::register-owned-entity-marks-an-entity-for-despawn-not-relocation-on-reclaim")
     def test_reclaimed_room_clears_entities_before_own_delete(self):
         # Both a registered and an unregistered NPC have left the room's
         # contents by the time the room's own delete runs -- observed by the

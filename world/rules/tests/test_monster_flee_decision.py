@@ -1,5 +1,7 @@
 """Rulebook-backed monster flee-policy tests."""
 
+from tools.spec_traceability import covers_requirement
+
 from copy import deepcopy
 import os
 from pathlib import Path
@@ -25,6 +27,7 @@ from .test_monster_behaviour_policy import FakeMonster, _field
 
 
 class MonsterFleeProfileTests(unittest.TestCase):
+    @covers_requirement("monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold")
     def test_shipped_thresholds_and_tier_defaults_are_valid(self):
         self.assertEqual(
             {
@@ -205,6 +208,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
         _, _, _, apex = self._request(hp=1, threat_tier="calamity")
         self.assertEqual(apex.skill_key, "fire_ball")
 
+    @covers_requirement("monster-flee-policy::the-policy-checks-current-to-maximum-true-hp-at-an-inclusive-boundary")
     def test_non_positive_maximum_does_not_divide_or_choose_flee(self):
         monster, _, _, _ = self._request(hp=1)
         monster.traits.hp = FakeGauge(0, 1)
@@ -213,6 +217,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
         request = monster_behaviour_policy(monster, _field(monster, [enemy]))
         self.assertEqual(request.skill_key, "fire_ball")
 
+    @covers_requirement("monster-flee-policy::flee-selection-has-priority-over-attack-selection-without-consuming-decision-dice")
     def test_flee_precedes_skill_selection_and_consumes_no_policy_roll(self):
         monster = FakeMonster("monster", hp=20, max_hp=100, owned=["flight"])
         enemies = [FakeEntity("first"), FakeEntity("second")]
@@ -229,6 +234,8 @@ class MonsterFleePolicyTests(unittest.TestCase):
         battlefield.fled.add(enemy.key)
         self.assertIsNone(monster_behaviour_policy(monster, battlefield))
 
+    @covers_requirement("monster-flee-policy::a-flee-decision-is-a-complete-actionresolver-request-and-never-a-state-mutation")
+    @covers_requirement("monster-flee-policy::monster-flee-decisions-remain-deterministic-offline-and-yaml-tuned")
     def test_request_shape_and_policy_purity(self):
         monster, _, battlefield, request = self._request(hp=35)
         monster.traits.hp._data["last_regen_at"] = 123
@@ -269,6 +276,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
             snapshot,
         )
 
+    @covers_requirement("monster-flee-policy::flee-tuning-follows-existing-tier-defaults-and-instance-overrides")
     def test_all_tier_defaults_and_override_have_reproducible_decisions(self):
         cases = {
             "low": (35, FLEE_SKILL_KEY),

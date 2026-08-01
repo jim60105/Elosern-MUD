@@ -1,5 +1,7 @@
 """Focused deterministic tests for player-driven world time."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 import sys
 from types import SimpleNamespace
@@ -45,6 +47,8 @@ class Entity:
 
 
 class ClockTests(unittest.TestCase):
+    @covers_requirement("world-clock::worldclock-persists-exactly-one-integer-every-calendar-field-is-derived-from-it")
+    @covers_requirement("world-clock::the-calendar-is-a-subtropical-four-mild-season-year-with-no-invented-month-names")
     def test_calendar_is_derived_from_tick(self):
         self.assertEqual(
             WorldDateTime.from_tick(0),
@@ -54,6 +58,7 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(WorldDateTime.from_tick(86400 * 90).season_index, 1)
         self.assertEqual(WorldDateTime.from_tick(86400 * 360).year, 1)
 
+    @covers_requirement("time-skip-commands::wait-until-daypart-computes-seconds-to-the-next-occurrence-of-a-named-daypart")
     def test_daypart_is_strictly_future(self):
         calendar = WorldDateTime(0, 0, 1, 2, 30, 0)
         self.assertEqual(seconds_until_daypart(calendar, "dawn"), 12600)
@@ -61,11 +66,13 @@ class ClockTests(unittest.TestCase):
         with self.assertRaises(DaypartError):
             seconds_until_daypart(calendar, "tea")
 
+    @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")
     def test_regen_is_closed_form_and_clamped(self):
         entity = Entity()
         _settle_gauge_regen([entity], 28800)
         self.assertEqual(entity.traits.hp.current, 100)
 
+    @covers_requirement("settlement-stage-order::long-jumps-settle-in-quanta-not-per-second-steps-with-an-early-exit-once-nothing")
     def test_no_work_exits_before_a_quantum(self):
         entity = Entity()
         with (
@@ -76,6 +83,7 @@ class ClockTests(unittest.TestCase):
         tick.assert_not_called()
         decay.assert_not_called()
 
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
     def test_quantum_loop_honors_defensive_cap(self):
         entity = Entity()
         with (
@@ -118,6 +126,7 @@ class ClockTests(unittest.TestCase):
         events = clock.advance(2, AdvanceSource.COMBAT, [entity])
         self.assertEqual([event.kind for event in events], ["daily_reset", "caravan"])
 
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-magic-study-are-skipped-for-combat-sourced-advances", "settlement-stage-order::hourly-and-daily-boundary-stages-fire-by-tick-boundary-arithmetic-never-by-iterating")
     def test_command_runs_per_quantum_stages(self):
         entity = Entity()
         clock = WorldClock()
@@ -125,6 +134,7 @@ class ClockTests(unittest.TestCase):
             clock.advance(10, AdvanceSource.COMMAND, [entity])
         settle.assert_called_once_with((entity,), 10)
 
+    @covers_requirement("settlement-stage-order::magic-study-is-invoked-through-a-self-arming-lazy-import-and-its-own-internal")
     def test_magic_study_lazy_import_self_arms(self):
         calls = []
         module = SimpleNamespace(
@@ -152,6 +162,8 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(left, right)
         self.assertEqual(untouched.traits.hp.current, 10)
 
+    @covers_requirement("world-clock::settle-combat-result-is-the-sanctioned-call-site-for-combat-sourced-advances")
+    @covers_requirement("world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry")
     def test_settle_combat_result_uses_combat_source(self):
         clock = WorldClock()
         result = SimpleNamespace(total_seconds=18)
@@ -159,6 +171,7 @@ class ClockTests(unittest.TestCase):
             settle_combat_result(result, [])
         self.assertEqual(clock.tick, 18)
 
+    @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-magic-study")
     def test_stage_order_is_fixed(self):
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
         self.assertLess(_STAGE_ORDER.index("buff_ticks"), _STAGE_ORDER.index("sexual_decay"))
@@ -167,6 +180,7 @@ class ClockTests(unittest.TestCase):
 
 
 class WorldClockPersistenceTests(EvenniaTest):
+    @covers_requirement("settlement-stage-order::scheduledevent-is-a-plain-json-compatible-record-with-no-live-entity-references", "world-clock::tick-is-persisted-via-a-non-repeating-script-used-purely-as-an-attribute-container")
     def test_singleton_persists_only_tick(self):
         from world.rules.clock import get_world_clock
 

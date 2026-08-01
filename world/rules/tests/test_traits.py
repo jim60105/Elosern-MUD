@@ -1,5 +1,7 @@
 """Pure construction and Evennia integration tests for entity traits."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.rpg.traits import CounterTrait, GaugeTrait, StaticTrait
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -16,6 +18,7 @@ class TraitIntegrationTests(EvenniaTest):
         entity.apply_race_baseline()
         return entity
 
+    @covers_requirement("entity-trait-scales::guild-merit-starts-at-zero-with-no-upper-bound", "entity-trait-scales::livingentity-mounts-traithandler-with-the-setting-s-eight-key-trait-set")
     def test_all_eight_traits_have_the_required_types_and_properties(self):
         entity = self._entity("human")
         self.assertEqual(set(entity.traits.all()), {
@@ -43,6 +46,7 @@ class TraitIntegrationTests(EvenniaTest):
                 self.assertLessEqual(lower, getattr(entity.traits, key).base)
                 self.assertLessEqual(getattr(entity.traits, key).base, upper)
 
+    @covers_requirement("entity-trait-scales::every-stored-static-trait-value-is-a-base-value-never-a-skill-multiplied-value")
     def test_every_subrace_is_the_exact_documented_post_baseline_adjustment(self):
         from world.lore.races import SUBRACE_REGISTRY
 

@@ -1,5 +1,7 @@
 """Focused tests for the shared movement-cost charging function (map-movement-clock)."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -18,6 +20,7 @@ class ChargeMovementTests(EvenniaTest):
         self.room1.save()
         self.npc = create_object(NPC, key="npc", location=self.room1)
 
+    @covers_requirement("movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function")
     def test_charge_movement_advances_clock_by_move_cost(self):
         before = get_world_clock().tick
         charge_movement(self.char1, "move")
@@ -51,4 +54,3 @@ class ChargeMovementTests(EvenniaTest):
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],
         )
-

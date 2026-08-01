@@ -1,5 +1,7 @@
 """Decision-tree and structural boundary tests."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -52,6 +54,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         self.assertEqual(request.skill_key, "fire_ball")
         self.assertEqual(request.targets, enemies[:1])
 
+    @covers_requirement("monster-action-policy::area-versus-single-target-shape-is-decided-before-target-skill-selection-reusing-the")
     def test_area_fallback_and_no_eligible_skill(self):
         actor = FakeMonster("actor", owned=["wind_blade"])
         actor.traits.mp = FakeGauge(24, 24)
@@ -61,6 +64,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         actor.skills._owned = ["flight"]
         self.assertIsNone(monster_behaviour_policy(actor, _field(actor, [enemy])))
 
+    @covers_requirement("monster-action-policy::a-non-monster-entity-is-delegated-to-change-9-s-default-attack-policy-unmodified")
     def test_non_monster_delegates_but_monster_does_not(self):
         actor = FakeEntity("actor")
         field = _field(actor, [FakeEntity("enemy")])
@@ -79,6 +83,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
             self.assertIsNone(monster_behaviour_policy(monster, field))
             default.assert_not_called()
 
+    @covers_requirement("monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected")
     def test_unaffordable_preference_falls_back_to_affordable_skill(self):
         actor = FakeMonster(
             "actor",

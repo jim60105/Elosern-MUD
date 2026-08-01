@@ -1,5 +1,7 @@
 """Fixed-input golden decisions across monster tiers."""
 
+from tools.spec_traceability import covers_requirement
+
 import random
 import unittest
 
@@ -25,6 +27,7 @@ class MonsterBehaviourGoldenTests(unittest.TestCase):
         )
         return request.skill_key, tuple(target.key for target in request.targets)
 
+    @covers_requirement("monster-action-policy::golden-fixed-seed-tests-demonstrate-distinct-reproducible-behaviour-across-monstertiers")
     def test_low_and_calamity_choose_distinct_reproducible_targets(self):
         random.seed(730)
         tiers = ("low", "mid", "high", "calamity")

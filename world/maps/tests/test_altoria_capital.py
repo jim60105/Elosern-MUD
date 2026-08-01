@@ -1,5 +1,7 @@
 """Parsing and topology checks for the capital_altoria sample city."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from evennia.contrib.grid.xyzgrid.xymap import XYMap
@@ -63,6 +65,7 @@ class AltoriaCapitalMapTests(unittest.TestCase):
         self.assertEqual(len(nodes), 13)
         self.assertEqual(len(edges), 12)
 
+    @covers_requirement("sample-city-altoria::exactly-one-room-is-the-anchorroom-at-the-central-plaza")
     def test_only_central_plaza_is_an_anchor_room(self):
         for coordinate, prototype in PROTOTYPES.items():
             with self.subTest(coordinate=coordinate):

@@ -1,5 +1,7 @@
 """Fixed-seed golden combat behavior."""
 
+from tools.spec_traceability import covers_requirement
+
 import random
 import unittest
 from unittest.mock import patch
@@ -18,6 +20,7 @@ from .combat_fixtures import FakeEntity
 
 
 class GoldenCombatTests(unittest.TestCase):
+    @covers_requirement("combat-resolution::golden-fixed-seed-tests-cover-a-normal-exchange-and-a-lopsided-exchange")
     def test_normal_exchange_has_fixed_roll_and_damage_sequence(self):
         attacker = FakeEntity("a", atk_phys=12, agility=9)
         defender = FakeEntity("b", hp=200, defense=7, agility=9)
@@ -39,6 +42,7 @@ class GoldenCombatTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement("combat-resolution::per-round-upkeep-ticks-buffs-and-advances-sexual-decay-by-the-round-duration", "combat-resolution::the-turn-loop-reports-elapsed-time-as-rounds-times-6-seconds-and-never-advances-a-clock", "single-shot-resolution::reported-time-cost-uses-the-identical-rounds-times-six-seconds-formula-unedited")
     def test_lopsided_exchange_saturates_and_time_is_round_based(self):
         elf = FakeEntity("elf", hp=10000, agility=92)
         human = FakeEntity("human", hp=120, agility=9)
@@ -110,6 +114,7 @@ class GoldenResolverBattleTests(EvenniaTest):
             for log in result.event_logs
         ]
 
+    @covers_requirement("single-shot-resolution::a-golden-fixed-seed-case-demonstrates-single-round-completion-for-this-project-s-own")
     def test_fixed_seed_full_battle_is_reproducible_through_resolver(self):
         first = self._battlefield("one")
         random.seed(730)

@@ -1,5 +1,7 @@
 """Evennia integration checks for idempotent lore synchronization."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import asdict, replace
 
 from evennia.scripts.models import ScriptDB
@@ -49,6 +51,7 @@ class LoreSyncTests(EvenniaTest):
         capital = search_script("lore:anchors:capital_grandia")
         self.assertEqual(capital[0].db.fields["kind"], "capital")
 
+    @covers_requirement("anchor-placement::anchor-placement-registry-is-mirrored-into-lorerecord-scripts-idempotently")
     def test_anchor_placements_record_is_mirrored_and_idempotent(self):
         expected = _db_safe(asdict(ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]))
 
@@ -63,6 +66,8 @@ class LoreSyncTests(EvenniaTest):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].db.fields, expected)
 
+    @covers_requirement("lore-startup-sync::every-lore-registry-entry-is-mirrored-into-the-db-keyed-by-key", "wilderness-terrain::wilderness-region-registry-is-mirrored-into-lorerecord-scripts-idempotently")
+    @covers_requirement("lore-startup-sync::a-code-side-change-to-a-registry-is-reflected-on-the-next-sync")
     def test_wilderness_registry_records_are_mirrored_and_idempotent(self):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
         from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
@@ -85,6 +90,7 @@ class LoreSyncTests(EvenniaTest):
             total_wilderness,
         )
 
+    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits", "grid-room-sync::sync-grid-is-idempotent-across-repeated-calls-and-server-starts", "lore-startup-sync::sync-is-idempotent-across-repeated-server-starts")
     def test_sync_one_updates_existing_record(self):
         entry = RACE_REGISTRY["human"]
         sync_one("test_races", entry.key, entry)

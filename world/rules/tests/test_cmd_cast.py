@@ -1,5 +1,7 @@
 """Command-level tests for the resolver's out-of-combat caller."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
@@ -11,6 +13,7 @@ from world.rules.clock import WorldClock
 
 
 class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
+    @covers_requirement("action-resolution-pipeline::every-production-skill-path-receives-registered-event-effect-planning-automatically")
     def test_successful_stock_disguise_cast_renders_event(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()

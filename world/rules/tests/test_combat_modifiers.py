@@ -1,5 +1,7 @@
 """Tests named one-to-one with combat modifier rule IDs."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 
 from evennia.utils.create import create_object
@@ -42,6 +44,7 @@ class CombatModifierTests(EvenniaTest):
             evaluate_combat_modifiers(entity), {"agility": "-15%", "accuracy": -10}
         )
 
+    @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no", "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module")
     def test_rule_high_arousal_agility_accuracy_penalty(self):
         entity = self._entity()
         entity.sexual.arousal.value = "高度"
@@ -60,6 +63,7 @@ class CombatModifierTests(EvenniaTest):
         entity.sexual.climax_phase.value = "進行中"
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
+    @covers_requirement("combat-modifier-table::evaluate-combat-modifiers-is-a-pure-query-that-never-writes-to-entity-state")
     def test_multiple_rules_merge_and_query_is_pure(self):
         entity = self._entity()
         _add_buff(entity, "poisoned")
@@ -75,5 +79,6 @@ class CombatModifierTests(EvenniaTest):
             before, {key: getattr(entity.traits, key).value for key in entity.traits.all()}
         )
 
+    @covers_requirement("buff-handler-integration::entity-buffs-is-mounted-as-the-real-buffhandler-replacing-the-change-3-placeholder")
     def test_no_state_returns_empty_and_sexual_rules_are_inert(self):
         self.assertEqual(evaluate_combat_modifiers(self._entity()), {})

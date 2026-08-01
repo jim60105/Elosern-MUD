@@ -1,5 +1,7 @@
 """Tests for room-driven quest progress (tasks 7.1-7.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from unittest.mock import patch
 
@@ -97,6 +99,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["state"], "completed")
         self.assertEqual(stored["quest_id"], record.quest_id)
 
+    @covers_requirement("quest-progress-tracking::room-arrival-drives-reach-and-escort-through-supported-persistent-room-hooks")
     def test_grid_arrival_uses_exact_xyz_identity(self):
         definition = register(
             quest(
@@ -233,6 +236,7 @@ class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):
         exit_obj = [e for e in self.char1.location.exits if e.key == direction][0]
         exit_obj.at_traverse(self.char1, self.char1.location)
 
+    @covers_requirement("quest-progress-tracking::wilderness-rooms-do-not-advertise-an-arrival-hook-that-normal-traversal-bypasses")
     def test_wilderness_entry_and_step_do_not_invoke_observation(self):
         with patch(
             "world.quests.room_observation.observe_room_entry",

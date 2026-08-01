@@ -1,5 +1,7 @@
 """Guild registration and local service-host resolution tests (tasks 4.1-4.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 from unittest.mock import patch
 
@@ -44,6 +46,7 @@ class GuildRegistrationTests(EvenniaTest):
     def _register(self, **kwargs):
         return register_adventurer(self.player, **kwargs)
 
+    @covers_requirement("guild-registration::registration-grants-f-rank-and-records-one-displayed-stat-snapshot")
     def test_undisguised_character_registers_at_f_with_true_snapshot(self):
         record = self._register(staff=self.staff)
         self.assertEqual(self.player.guild_rank, "F")
@@ -125,6 +128,7 @@ class GuildRegistrationTests(EvenniaTest):
             register_adventurer(npc, staff=self.staff)
         self.assertEqual(ctx.exception.args[0], RegistrationReason.NOT_A_PLAYER)
 
+    @covers_requirement("guild-registration::registration-access-is-local-idempotent-and-strict-about-persisted-data")
     def test_partial_membership_fails_closed(self):
         self.player.guild_rank = "F"
         self.player.db.guild_registration = {
@@ -170,6 +174,7 @@ class ServiceHostResolutionTests(EvenniaTest):
         with self.assertRaises(GuildServiceError):
             resolve_local_service_host(self.player, GuildStaff)
 
+    @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_host_in_another_room_is_not_local(self):
         other = create_object(Room, key="other")
         _attach_staff(create_object(NPC, key="far staff", location=other))
@@ -178,6 +183,7 @@ class ServiceHostResolutionTests(EvenniaTest):
 
 
 class RegistrationBoundaryScanTests(EvenniaTest):
+    @covers_requirement("disguised-stats-boundary::disguised-stats-keys-are-readable-by-exactly-three-consumers-including-implemented-guild-registration")
     def test_get_display_value_docstring_names_exactly_three_consumers(self):
         doc = inspect.getdoc(get_display_value).lower()
         self.assertIn("look", doc)

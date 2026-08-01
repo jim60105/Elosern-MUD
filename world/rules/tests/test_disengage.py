@@ -1,5 +1,7 @@
 """Pure tests for disengagement odds, staging, and event conversion."""
 
+from tools.spec_traceability import covers_requirement
+
 from pathlib import Path
 import random
 import unittest
@@ -41,6 +43,7 @@ def _field(actor, *pursuers):
 
 
 class DisengageFormulaTests(unittest.TestCase):
+    @covers_requirement("disengage-action::the-disengage-effect-handler-computes-flee-success-from-the-same-agility-difference")
     def test_parity_is_about_half_over_fixed_seed_trials(self):
         actor = FakeEntity("actor", agility=10)
         field = _field(actor, FakeEntity("pursuer", agility=10))
@@ -122,6 +125,7 @@ class DisengageFormulaTests(unittest.TestCase):
 
 
 class DisengageStagingTests(unittest.TestCase):
+    @covers_requirement("battlefield-commit-surface::snapshotted-surfaces-gains-a-battlefield-surface-covering-battlefield-fled")
     def test_handler_registration_uses_battlefield_surface(self):
         self.assertIn("battlefield", SNAPSHOTTED_SURFACES)
         self.assertEqual(
@@ -135,6 +139,7 @@ class DisengageStagingTests(unittest.TestCase):
                 frozenset({"inventory"}),
             )
 
+    @covers_requirement("disengage-action::a-missing-battlefield-reference-in-event-context-is-a-named-rejection-not-a-crash")
     def test_missing_battlefield_is_named_rejection(self):
         actor = FakeEntity("actor")
         with self.assertRaises(RejectedAction) as caught:
@@ -145,6 +150,7 @@ class DisengageStagingTests(unittest.TestCase):
         )
         self.assertIn("battlefield", caught.exception.detail)
 
+    @covers_requirement("disengage-action::a-successful-flee-adds-the-fleeing-entity-s-key-to-battlefield-fled-a-failed-attempt")
     def test_success_and_failure_stage_expected_mutations_and_entries(self):
         actor = FakeEntity("actor", agility=10)
         field = _field(actor, FakeEntity("pursuer", agility=10))
@@ -185,6 +191,7 @@ class DisengageStagingTests(unittest.TestCase):
         success.apply()
         self.assertIn(actor.key, field.fled)
 
+    @covers_requirement("battlefield-commit-surface::a-commit-failure-rolls-back-a-battlefield-mutation-exactly-as-it-rolls-back-an-entity")
     def test_mixed_surface_commit_rolls_back_battlefield(self):
         actor = FakeEntity("actor")
         field = _field(actor, FakeEntity("pursuer"))
@@ -207,6 +214,7 @@ class DisengageStagingTests(unittest.TestCase):
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(field.fled, set())
 
+    @covers_requirement("battlefield-commit-surface::a-battlefield-shaped-object-is-snapshotted-and-restored-by-shape-not-by-explicit")
     def test_action_module_uses_shape_dispatch_without_combat_import(self):
         source = (
             Path(__file__).parents[1] / "action.py"

@@ -1,3 +1,5 @@
+from tools.spec_traceability import covers_requirement
+
 from unittest import TestCase
 
 from world.imports.tests.helpers import example_record
@@ -17,6 +19,7 @@ class DispatchTests(TestCase):
         self.assertEqual(classify_record(record), "character")
         self.assertIn("age", {issue.field for issue in validate_character(record).rejections})
 
+    @covers_requirement("import-schema::both-schemas-require-an-explicit-record-type-discriminator-not-implicit-field-sniffing")
     def test_invalid_discriminators_name_both_valid_values(self):
         for value in ("missing", None, "npc"):
             raw = {} if value == "missing" else {"record_type": value}

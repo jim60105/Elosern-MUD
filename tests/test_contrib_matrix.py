@@ -1,5 +1,7 @@
 """Regression checks for the contrib reuse matrix in the design document."""
 
+from tools.spec_traceability import covers_requirement
+
 import importlib
 import os
 import unittest
@@ -65,6 +67,7 @@ MATRIX_IMPORTS = {
 
 
 class ContribMatrixTests(unittest.TestCase):
+    @covers_requirement("contrib-matrix-verification::automated-regression-check-against-matrix-drift", "contrib-matrix-verification::contrib-reuse-matrix-is-verified-against-the-installed-evennia-version")
     def test_matrix_imports_and_attributes(self):
         for row, (module_path, names) in MATRIX_IMPORTS.items():
             with self.subTest(row=row):

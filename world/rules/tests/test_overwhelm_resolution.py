@@ -1,5 +1,7 @@
 """Tests for bounded single-call overwhelm resolution."""
 
+from tools.spec_traceability import covers_requirement
+
 import random
 import unittest
 from unittest.mock import patch
@@ -77,6 +79,7 @@ def damage_log(amount: int) -> EventLog:
 
 
 class ResolutionTests(unittest.TestCase):
+    @covers_requirement("single-shot-resolution::single-shot-resolution-is-exactly-consistent-with-per-round-resolution-under-the-same")
     def test_single_round_completion_and_time(self):
         field = battlefield()
 
@@ -128,6 +131,7 @@ class ResolutionTests(unittest.TestCase):
         self.assertIsNone(result.verdict_after)
         self.assertFalse(result.battle_over)
 
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-resolves-an-overwhelm-classified-encounter-by-reusing-run-round")
     def test_contested_and_finished_battles_do_not_run_round(self):
         contested = Battlefield(
             {
@@ -164,6 +168,7 @@ class ResolutionTests(unittest.TestCase):
             )
         runner.assert_not_called()
 
+    @covers_requirement("single-shot-resolution::a-finite-max-rounds-safety-cap-is-a-named-tested-outcome-not-an-implicit-assumption")
     def test_max_rounds_is_honest_safety_cap(self):
         field = battlefield()
         with (
@@ -327,6 +332,7 @@ class RealCombatEquivalenceTests(EvenniaTest):
         self.assertTrue(is_battle_over(resolved))
         self.assertEqual(rounds, 1)
 
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-stops-the-moment-classify-overwhelm-s-verdict-changes")
     def test_real_combat_exact_equivalence_in_first_team_direction(self):
         self._assert_direction_is_exact(strong_first=True)
 

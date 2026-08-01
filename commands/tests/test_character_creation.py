@@ -1,5 +1,7 @@
 """Integration tests for the pending character command boundary."""
 
+from tools.spec_traceability import covers_requirement
+
 from unittest.mock import Mock, patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
@@ -17,6 +19,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         super().setUp()
         self.account.at_post_create_character(self.char1)
 
+    @covers_requirement("player-character-creation::newly-registered-accounts-have-an-inert-pending-player-character")
     def test_pending_gate_is_replace_and_blocks_world_commands(self):
         gate = CharacterCreationCmdSet(self.char1)
         self.assertEqual(gate.mergetype, "Replace")

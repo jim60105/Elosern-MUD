@@ -1,11 +1,14 @@
 """Regression tests for the wilderness_move clock constant (map-wilderness D-5)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.rules.clock import CLOCK_YAML
 
 
 class WildernessClockCostTests(unittest.TestCase):
+    @covers_requirement("wilderness-gateway::wilderness-move-is-a-new-distinct-clock-cost-not-a-reuse-of-the-grid-s-move-constant")
     def test_wilderness_move_is_declared_and_distinct_from_move(self):
         defaults = CLOCK_YAML["command_defaults"]
         self.assertEqual(defaults["wilderness_move"], 9000)

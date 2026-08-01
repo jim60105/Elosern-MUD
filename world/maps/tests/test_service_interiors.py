@@ -1,5 +1,7 @@
 """Integration tests for permanent Altoria service interiors (task 3.2, sample-city spec)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTest
@@ -56,6 +58,7 @@ class ServiceInteriorTests(EvenniaTest):
         self.assertIn(guild_exterior, {exit_obj.destination for exit_obj in guild_hall.exits})
         self.assertIn(store_exterior, {exit_obj.destination for exit_obj in general_store.exits})
 
+    @covers_requirement("sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached")
     def test_grid_topology_is_unchanged(self):
         sync_service_interiors()
         self.assertEqual(self._count_grid_rooms(), 13)

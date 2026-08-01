@@ -1,5 +1,7 @@
 """Tests for the public SexualState handler surface."""
 
+from tools.spec_traceability import covers_requirement
+
 from copy import deepcopy
 
 from evennia.utils.create import create_object
@@ -10,6 +12,7 @@ from world.rules.sexual_state import SexualState
 
 
 class SexualStateTests(EvenniaTest):
+    @covers_requirement("sexual-state-handler::entity-sexual-is-mounted-as-the-real-sexualstate-handler-replacing-the-change-3-placeholder", "sexual-state-handler::sexualstate-is-constructed-from-entity-db-sexual-when-a-raw-baseline-is-present")
     def test_handler_mounts_and_preserves_complete_raw_baseline(self):
         entity = create_object(PlayerCharacter, key="baseline")
         baseline = {
@@ -36,6 +39,7 @@ class SexualStateTests(EvenniaTest):
         self.assertEqual(entity.sexual.experience_types, frozenset({"陰道性交"}))
         self.assertEqual(entity.db.sexual, baseline)
 
+    @covers_requirement("sexual-state-handler::monster-entities-without-an-imported-baseline-default-to-\u666e\u901a-sensitivity-with-shame-clamped-to-\u7121")
     def test_optional_fields_default_without_mutating_baseline(self):
         entity = create_object(PlayerCharacter, key="partial baseline")
         baseline = {"arousal": "微興奮", "virgin": True, "sensitivity": {}}
@@ -43,6 +47,7 @@ class SexualStateTests(EvenniaTest):
         self.assertEqual(entity.sexual.wetness.level, "乾燥")
         self.assertEqual(entity.db.sexual, baseline)
 
+    @covers_requirement("sexual-state-handler::virgin-is-a-one-way-flag-experience-types-is-an-append-only-set")
     def test_virgin_is_one_way_and_experience_is_append_only(self):
         state = create_object(PlayerCharacter, key="flags").sexual
         state.virgin = False

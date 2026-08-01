@@ -1,5 +1,7 @@
 """Tests for the deterministic terrain model and bounded map provider (map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 import unittest
 
@@ -31,12 +33,14 @@ class TerrainModelTests(unittest.TestCase):
                 reached.add(region_for_coordinates(x, y))
         self.assertEqual(reached, set(WILDERNESS_REGION_REGISTRY))
 
+    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
     def test_central_mountain_band_spans_full_y(self):
         for x in (100, 123):
             self.assertEqual(region_for_coordinates(x, 0), "central_mountains")
             self.assertEqual(region_for_coordinates(x, 149), "central_mountains")
             self.assertEqual(region_for_coordinates(x, 189), "central_mountains")
 
+    @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
     def test_capital_altoria_entry_resolves_to_western_hills_valleys(self):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
@@ -73,16 +77,19 @@ class MapProviderTests(EvenniaTest):
         self.assertFalse(self.provider.is_valid_coordinates(None, (-1, 0)))
         self.assertFalse(self.provider.is_valid_coordinates(None, (224, 0)))
 
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
     def test_bound_area_matches_continent_size(self):
         side_km = (WILDERNESS_MAX_X + 1) * WILDERNESS_KM_PER_CELL
         area = side_km * side_km
         self.assertAlmostEqual(area, 5_000_000, delta=5_000_000 * 0.01)
 
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_get_location_name_matches_region_registry(self):
         for x, y in ((60, 100), (111, 189), (200, 30), (0, 220)):
             expected = WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].display_name_zh
             self.assertEqual(self.provider.get_location_name((x, y)), expected)
 
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_enter_wilderness_prepares_terrain_room(self):
         from evennia.contrib.grid.wilderness.wilderness import (
             WildernessScript,

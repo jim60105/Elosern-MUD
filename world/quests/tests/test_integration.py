@@ -1,5 +1,7 @@
 """Offline runtime path, cross-change contract, and source-guard tests (9.1-9.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 import unittest
 from pathlib import Path
@@ -72,6 +74,7 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTest):
     # NOTE: this API-level seam is NOT a player-command acceptance test. Change
     # 16 must supply player-facing accept, combat entry, and turn-in before the
     # player-playable Phase-4 milestone can be claimed (design.md Open Questions).
+    @covers_requirement("quest-progress-tracking::change-15-exposes-a-deterministic-no-ai-completion-seam-for-phase-4")
     def test_hand_written_hunt_completes_without_ai_or_manual_progress(self):
         record = accept_quest(self.player, "introductory_hunt")
         self.assertIs(record.state, QuestState.IN_PROGRESS)

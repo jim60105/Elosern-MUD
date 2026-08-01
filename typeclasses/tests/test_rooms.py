@@ -1,5 +1,7 @@
 """Integration tests for the grid and terrain room typeclasses (map-anchor-grid, map-wilderness)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.grid.wilderness.wilderness import WildernessRoom
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils.create import create_object
@@ -27,6 +29,7 @@ class GridRoomTypeclassTests(EvenniaTest):
         refetched = GridRoom.objects.get(id=room.id)
         self.assertEqual(refetched.scene_archetype, "tavern_interior")
 
+    @covers_requirement("grid-room-typeclasses::anchorroom-is-a-gridroom-carrying-the-anchor-key-seam")
     def test_anchor_room_inherits_grid_room_behavior(self):
         anchor, errors = AnchorRoom.create(key="test", xyz=(8, 8, "test_map"))
         self.assertEqual(errors, [])
@@ -57,12 +60,14 @@ class SceneArchetypeTests(EvenniaTest):
         self.assertIn(WildernessRoom, TerrainRoom.__mro__)
         self.assertNotIn(XYZRoom, TerrainRoom.__mro__)
 
+    @covers_requirement("grid-room-typeclasses::gridroom-is-a-coordinate-aware-room-carrying-the-scene-archetype-seam", "scene-archetype-mixin::scenearchetypemixin-is-the-single-shared-scene-archetype-seam")
     def test_terrain_room_defaults_scene_archetype_to_none(self):
         room = create_object(TerrainRoom, key="terrain_room")
         self.assertIsNone(room.scene_archetype)
         room.scene_archetype = "arbitrary_string"
         self.assertEqual(room.scene_archetype, "arbitrary_string")
 
+    @covers_requirement("scene-archetype-mixin::terrainroom-adopts-the-identical-mixin")
     def test_grid_and_terrain_rooms_share_identical_attribute_contract(self):
         grid = create_object(GridRoom, key="grid_room")
         terrain = create_object(TerrainRoom, key="terrain_room_2")

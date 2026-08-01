@@ -1,5 +1,7 @@
 """Integration tests for guild-economy service content sync (tasks 3.3-3.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTest
@@ -57,6 +59,7 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTest):
     def _guild_hall(self):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
 
+    @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
     def test_fresh_sync_creates_one_guild_and_one_merchant_host(self):
         sync_service_content()
         guild_host = self._guild_host()

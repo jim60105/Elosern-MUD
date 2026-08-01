@@ -1,5 +1,7 @@
 """Tests for shared target validation."""
 
+from tools.spec_traceability import covers_requirement
+
 from dataclasses import replace
 import unittest
 
@@ -77,6 +79,7 @@ class TargetingTests(unittest.TestCase):
         request = ActionRequest(actor, skill.key, [present, absent], RoomActionContext(room))
         self.assertEqual(resolve_targets(request, skill, [present, absent]), [present])
 
+    @covers_requirement("targeting-validation::out-of-combat-targeting-has-no-hostility-model", "targeting-validation::target-resolution-runs-four-ordered-validations")
     def test_single_reports_presence_before_later_checks(self):
         room = object()
         actor = _Entity("actor", room)
@@ -106,6 +109,7 @@ class TargetingTests(unittest.TestCase):
             resolve_targets(request, skill, [item])
         self.assertIs(caught.exception.reason, RejectReason.TARGET_DEAD)
 
+    @covers_requirement("targeting-validation::factionconstraint-is-read-from-skilldef-not-declared-by-the-caller")
     def test_context_polymorphism_changes_relation_not_skill_policy(self):
         room = object()
         actor = _Entity("actor", room)
