@@ -38,6 +38,16 @@ Use `uv add <package>` and `uv remove <package>` to change dependencies so that 
 and `uv.lock` stay synchronized. The `--locked` commands intentionally fail when those files
 disagree.
 
+## Preview documentation
+
+Start the Docsify documentation site from the project root:
+
+```sh
+uv run --locked python -m http.server --directory docs 3000
+```
+
+Then open `http://localhost:3000` in a browser.
+
 ## Test
 
 Run the contrib matrix regression check in the uv-managed environment:
