@@ -31,13 +31,20 @@ def at_server_start():
     how it was shut down.
     """
     from world.lore.sync import sync_all
-    from world.maps.bootstrap import sync_grid, sync_wilderness
+    from world.maps.bootstrap import (
+        sync_grid,
+        sync_service_interiors,
+        sync_wilderness,
+    )
     from world.quests.bootstrap import sync_quest_runtime
+    from world.rules.guild_economy import sync_guild_economy
 
     sync_all()
     sync_grid()
     sync_wilderness()
+    sync_service_interiors()
     sync_quest_runtime()
+    sync_guild_economy()
 
 
 def at_server_stop():

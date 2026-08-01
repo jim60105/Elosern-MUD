@@ -58,6 +58,14 @@ def escort(destination: RoomLocator | None = None) -> QuestObjective:
     )
 
 
+def acquire(item_key: str, quantity: int = 1) -> QuestObjective:
+    return QuestObjective(
+        kind=ObjectiveKind.ACQUIRE,
+        quantity=quantity,
+        item_key=item_key,
+    )
+
+
 def anchor_locator() -> RoomLocator:
     return RoomLocator(DestinationKind.ANCHOR, anchor_key="capital_altoria")
 

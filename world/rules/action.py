@@ -515,6 +515,7 @@ _ENTRY_TEMPLATES = {
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
     "target_defeated": "{actor} 擊敗了 {target}。",
+    "target_knocked_out": "{actor} 擊倒了 {target}。",
     "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
     "skill_practice": "{actor} 累積了技能熟練度。",
     "combat_kill_xp": "",
@@ -618,11 +619,15 @@ def _defeated_entry(
     amount: int,
     projected: dict[int, float],
     defeated_ids: set[int],
+    nonlethal: bool = False,
 ) -> EventEntry | None:
-    """Emit one ``target_defeated`` entry on the first lethal HP crossing.
+    """Emit one ``target_defeated`` or ``target_knocked_out`` crossing entry.
 
     Pending damage is applied in order over shared projected HP, so two damage
     effects against one target neither use stale HP nor duplicate the defeat.
+    Under a nonlethal policy a positive-to-non-positive crossing emits a
+    ``target_knocked_out`` identity instead of ``target_defeated``, giving
+    kill-credit/quest/loot consumers no defeat entry to observe.
     """
     if amount <= 0:
         return None
@@ -641,15 +646,20 @@ def _defeated_entry(
     if dbref in defeated_ids:
         return None
     defeated_ids.add(dbref)
+    kind = "target_knocked_out" if nonlethal else "target_defeated"
+    data: dict[str, Any] = {"target_id": int(dbref)}
+    if not nonlethal:
+        data["monster_tier"] = getattr(entity, "threat_tier", None)
     return EventEntry(
-        kind="target_defeated",
+        kind=kind,
         actor=actor_key,
         target=str(entity.key),
-        data={
-            "target_id": int(dbref),
-            "monster_tier": getattr(entity, "threat_tier", None),
-        },
-        text_template=_ENTRY_TEMPLATES["target_defeated"],
+        data=data,
+        text_template=(
+            _ENTRY_TEMPLATES["target_knocked_out"]
+            if nonlethal
+            else _ENTRY_TEMPLATES["target_defeated"]
+        ),
     )
 
 
@@ -662,6 +672,7 @@ def _step7_build_event_log(
         entries: list[EventEntry] = []
         projected: dict[int, float] = {}
         defeated_ids: set[int] = set()
+        nonlethal = bool(_event_context(request).get("nonlethal", False))
         for effect in pending:
             entries.extend(
                 _entries_from_effect(
@@ -678,6 +689,7 @@ def _step7_build_event_log(
                 int(parts[4]),
                 projected,
                 defeated_ids,
+                nonlethal=nonlethal,
             )
             if defeated is not None:
                 entries.append(defeated)
@@ -903,6 +915,34 @@ def _commit(pending: list[PendingEffect]) -> None:
 
 class ActionResolver:
     """The sole state-writing gateway for skill invocation."""
+
+    @staticmethod
+    def preflight(request: ActionRequest) -> ActionResult:
+        """Side-effect-free validation of one action before initiative.
+
+        Runs the deterministic checks that never roll, stage effects, emit an
+        ``EventLog``, mutate state, or advance world time: skill ownership,
+        resource availability, target resolution, action capability, effect
+        handler availability, and time-cost metadata. Returns the same named
+        rejection categories as ``resolve()`` for those checks. A successful
+        preflight does not guarantee the state survives earlier initiative
+        actions; final resolution must still run the complete pipeline.
+        """
+        try:
+            skill = _step1_ownership(request)
+            _step2_resource_check(request.actor, skill)
+            _step3_targeting(request, skill)
+            _step4_capability(request.actor)
+            for effect_id in skill.effects:
+                if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:
+                    raise RejectedAction(
+                        RejectReason.UNKNOWN_EFFECT_ID,
+                        effect_id,
+                    )
+            _step8_time_cost(request, skill)
+        except RejectedAction as rejection:
+            return ActionResult.rejected(rejection.reason, rejection.detail)
+        return ActionResult.success(None, None)
 
     @staticmethod
     def resolve(request: ActionRequest) -> ActionResult:

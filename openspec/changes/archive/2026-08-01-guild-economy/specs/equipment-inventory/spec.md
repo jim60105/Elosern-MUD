@@ -5,8 +5,10 @@ The read-only `world/skills/equipment.py` SHALL define `list_items(entity)`. The
 `world/rules/equipment.py` SHALL define `plan_inventory_delta(entity, additions=(), removals=())`,
 `apply_inventory_plan(plan)`, and convenience `add_item(entity, item_key)` / `remove_item(entity,
 item_key)` operations over `entity.db.inventory`, the same flat repeated-key list populated by the import
-loader. Gameplay mutations SHALL validate item keys and positive integer quantities and SHALL use the
-planner. Import construction MAY populate the initial raw list without emitting acquisition progress.
+loader. Gameplay mutations SHALL validate item keys structurally (each key is a non-empty string, so
+unregistered but syntactically valid keys like `iron_ore` remain acceptable — see the appending
+scenario) and SHALL validate positive integer quantities, and SHALL use the planner. Import
+construction MAY populate the initial raw list without emitting acquisition progress.
 
 #### Scenario: add_item appends through an inventory plan
 - **WHEN** `entity.db.inventory` is `["healing_potion"]` and `add_item(entity, "iron_ore")` is called

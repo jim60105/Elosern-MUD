@@ -140,6 +140,25 @@ def apply_quest_log_replacement(
         raise
 
 
+def apply_quest_log_delta(
+    actor: Any,
+    new_records: list[Any],
+    pin_operations: Iterable[tuple[Any, tuple[str, ...], tuple[str, ...]]] = (),
+) -> None:
+    """Apply a quest-log replacement inside the CALLER's transaction.
+
+    Performs no nested transaction and no snapshot/restore of its own: the
+    surrounding operation (an inventory plan, reward settlement, or shop
+    purchase) has already snapshotted every surface it owns and will restore
+    them together on failure. Callers must pass this only between their own
+    ``transaction.atomic()`` enter and exit.
+    """
+    from world.quests.runtime import to_storage
+
+    actor.db.quest_log = [to_storage(record) for record in new_records]
+    _apply_pin_operations(pin_operations)
+
+
 def pending_effects_for_transition(
     actor: Any,
     new_records: list[Any],

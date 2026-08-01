@@ -248,22 +248,30 @@ class QuestSourceGuardTests(unittest.TestCase):
         self.assertNotIn("prototype", source.lower())
         self.assertNotIn("spawn(", source)
 
-    def test_no_acquire_progress_entry_point_defined(self):
+    def test_no_public_acquire_progress_forge_entry_point(self):
         import world.quests as quests_package
         import pkgutil
 
+        # Change 16 adds the internal `acquire` module that computes progress
+        # from committed inventory plans (guild-economy D-5). There must be no
+        # PUBLIC caller-facing "acquire something" assertion API: the only
+        # accepted entry point is `compute_acquire_replacement(entity,
+        # additions)`, which requires a positive committed plan additions
+        # argument and is consumed by the equipment planner.
         for module_info in pkgutil.walk_packages(
             quests_package.__path__,
             prefix="world.quests.",
         ):
-            module = __import__(module_info.name, fromlist=["*"])
-            for name in dir(module):
-                if "acquire" in name.lower() and not name.startswith("_"):
-                    self.fail(f"{module_info.name} defines an acquire entry point {name!r}")
-        source = "\n".join(
-            path.read_text(encoding="utf-8") for path in QUESTS_ROOT.glob("world/quests/*.py")
-        )
-        self.assertNotIn("acquire", source.lower())
+            if not module_info.name.startswith("world.quests.tests"):
+                module = __import__(module_info.name, fromlist=["*"])
+                for name in dir(module):
+                    if name.startswith("_") or name == "compute_acquire_replacement":
+                        continue
+                    if "acquire" in name.lower():
+                        self.fail(
+                            f"{module_info.name} exposes a caller-facing "
+                            f"acquire entry point {name!r}"
+                        )
 
 
 if __name__ == "__main__":

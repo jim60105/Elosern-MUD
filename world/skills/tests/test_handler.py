@@ -24,7 +24,7 @@ class SkillHandlerTests(EvenniaTest):
     def test_handler_reads_private_storage_and_has_no_bare_assignment(self):
         entity = self._entity()
         entity.db.skills = None
-        self.assertEqual(entity.skills.owned_keys(), ["flee"])
+        self.assertEqual(entity.skills.owned_keys(), ["flee", "basic_attack"])
         with self.assertRaises(AttributeError):
             entity.skills = {"active": [], "passive": []}
 
@@ -34,7 +34,7 @@ class SkillHandlerTests(EvenniaTest):
         }
         self.assertEqual(
             entity.skills.owned_keys(),
-            ["fire_ball", "defense_instinct", "flee"],
+            ["fire_ball", "defense_instinct", "flee", "basic_attack"],
         )
 
     def test_flee_is_innate_for_bare_monster_and_not_combat_gated(self):
@@ -43,7 +43,7 @@ class SkillHandlerTests(EvenniaTest):
         before = monster.skills.owned_keys()
         monster.db.current_battlefield = object()
         after = monster.skills.owned_keys()
-        self.assertEqual(before, ["flee"])
+        self.assertEqual(before, ["flee", "basic_attack"])
         self.assertEqual(after, before)
 
     def test_skill_handler_has_no_rules_dependency(self):

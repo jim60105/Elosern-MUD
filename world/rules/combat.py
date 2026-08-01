@@ -64,19 +64,29 @@ class Battlefield:
 
 
 class BattlefieldActionContext:
-    """Targeting context backed by one active battlefield."""
+    """Targeting context backed by one active battlefield.
+
+    ``nonlethal`` carries a deterministic knockout policy for examination
+    combat: a lethal HP crossing floors the target at 1 HP and emits
+    ``target_knocked_out`` instead of ``target_defeated`` before any
+    event-effect planner observes the result (guild-economy D-7).
+    """
 
     def __init__(
         self,
         battlefield: Battlefield,
         event_context: dict[str, Any] | None = None,
+        nonlethal: bool = False,
     ):
         self.battlefield = battlefield
+        self.nonlethal = nonlethal
         self.event_context = {} if event_context is None else dict(event_context)
         supplied = self.event_context.get("battlefield", battlefield)
         if supplied is not battlefield:
             raise ValueError("event_context battlefield must match context battlefield")
         self.event_context["battlefield"] = battlefield
+        if nonlethal:
+            self.event_context["nonlethal"] = True
 
     def is_present(self, actor: Any, target: Any) -> bool:
         return target.key in self.battlefield.roster
@@ -199,6 +209,24 @@ def _apply_hp_delta(entity: Any, delta: int) -> None:
         trait.value = _stored_trait_value(trait) + delta
 
 
+def _apply_hp_delta_nonlethal(entity: Any, delta: int) -> None:
+    """Apply damage with a knockout floor: a lethal crossing stops at 1 HP.
+
+    The projection applies the ordinary delta, then any positive-to-zero-or-
+    below crossing is clamped to 1 instead of reaching zero, so the target is
+    knocked out rather than defeated (guild-economy D-7).
+    """
+    trait = entity.traits.hp
+    current = _stored_trait_value(trait)
+    projected = current + delta
+    if current > 0 and projected <= 0:
+        projected = 1
+    if hasattr(trait, "current"):
+        trait.current = projected
+    else:
+        trait.value = projected
+
+
 def _noop() -> None:
     """Commit-time no-op for a staged miss."""
 
@@ -212,6 +240,7 @@ def _handle_damage(
     """Stage d100 hit and damage results; commit only the computed hp delta."""
     _, school = _parse_damage_effect(effect_id)
     attack_key = "atk_phys" if school == "physical" else "magic_level"
+    nonlethal = bool(event_context.get("nonlethal", False))
     pending: list[PendingEffect] = []
     for target in targets:
         raw_roll = roll_d100()
@@ -225,6 +254,15 @@ def _handle_damage(
                 round(attack * multiplier) - defense,
                 int(COMBAT_YAML["damage"]["floor"]),
             )
+        apply = (
+            lambda target=target, amount=amount: (
+                _apply_hp_delta_nonlethal(target, -amount)
+                if nonlethal
+                else _apply_hp_delta(target, -amount)
+            )
+            if hit
+            else _noop
+        )
         pending.append(
             PendingEffect(
                 entity=target,
@@ -232,13 +270,7 @@ def _handle_damage(
                     f"damage|{target.key}|{raw_roll}|{int(hit)}|{amount}"
                 ),
                 surfaces=frozenset(),
-                apply=(
-                    lambda target=target, amount=amount: _apply_hp_delta(
-                        target, -amount
-                    )
-                )
-                if hit
-                else _noop,
+                apply=apply,
             )
         )
     return pending

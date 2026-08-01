@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.maps.altoria_capital import XYMAP_DATA_LIST
 
@@ -31,6 +32,7 @@ class ObjectiveKind(StrEnum):
     DEFEAT = "defeat"
     REACH = "reach"
     ESCORT = "escort"
+    ACQUIRE = "acquire"
 
 
 class DestinationKind(StrEnum):
@@ -74,6 +76,7 @@ class QuestObjective:
     monster_tier: str | None = None
     destination: RoomLocator | None = None
     requires_bound_targets: bool = False
+    item_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -179,6 +182,22 @@ def _validate_objective(
         if objective.monster_tier is not None or objective.requires_bound_targets:
             _reject(definition, "ESCORT objective cannot declare defeat selectors")
         _validate_destination(definition, objective.destination, ObjectiveKind.ESCORT)
+    elif objective.kind is ObjectiveKind.ACQUIRE:
+        if (
+            objective.monster_tier is not None
+            or objective.destination is not None
+            or objective.requires_bound_targets
+        ):
+            _reject(
+                definition,
+                "ACQUIRE objective cannot declare defeat selectors, a destination, "
+                "or bound-target requirements",
+            )
+        item_key = objective.item_key
+        if not isinstance(item_key, str) or not item_key:
+            _reject(definition, "ACQUIRE objective requires exactly one known item_key")
+        if item_key not in ITEM_REGISTRY:
+            _reject(definition, f"ACQUIRE objective references unknown item {item_key!r}")
     else:
         _reject(definition, f"unknown ObjectiveKind {objective.kind!r}")
 

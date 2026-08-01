@@ -184,7 +184,11 @@ plan_inventory_delta(entity, additions=(), removals=()) -> InventoryPlan
 apply_inventory_plan(plan) -> None
 ```
 
-The planner validates known item keys, positive quantities, and sufficient removals. It asks the quest
+The planner validates item keys structurally (each key is a non-empty string, so unregistered but
+syntactically valid keys such as the spec scenario's `iron_ore` remain acceptable), positive quantities,
+and sufficient removals. Known-item identity is enforced at the boundaries that reference the lore
+registry — ACQUIRE objective definitions, rewards, and shop offers validate against `ITEM_REGISTRY` —
+while the flat inventory itself remains an open repeated-key list. The planner asks the quest
 runtime to compute progress only from the plan's positive additions. Shop purchases and reward claims
 include that replacement quest log in their surrounding transaction. `add_item()` and `remove_item()`
 remain convenience wrappers over the same planner, so no deterministic inventory producer can omit the
@@ -389,9 +393,9 @@ production entry point.
 
 ## Risks / Trade-offs
 
-- **[Risk] Change 16 depends on change 15 artifacts that are proposed but not yet implemented.** → Keep
-  all integration through the published quest APIs and begin implementation only after change 15 passes
-  strict verification.
+- **[Risk] Change 16 depends on change 15 artifacts that were proposed when this design was drafted.** →
+  Change 15 has since been implemented and archived; all integration stays through the published quest
+  APIs, and this implementation began only after change 15 passed strict verification.
 - **[Risk] Persistent combat sessions refer to deleted or moved entities.** → Store dbrefs, validate room
   and liveness on every action/startup, and terminate invalid sessions with a diagnostic and clock-safe
   cleanup.

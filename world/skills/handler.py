@@ -7,8 +7,13 @@ from typing import Any
 from .registry import SKILL_REGISTRY
 
 
-# Change 10c grants universal actions that must not depend on imported skill data.
-INNATE_SKILL_KEYS: frozenset[str] = frozenset({"flee"})
+# Change 10c/16 grant universal actions that must not depend on imported skill data.
+INNATE_SKILL_KEYS: frozenset[str] = frozenset({"flee", "basic_attack"})
+# Deterministic append order for the innate set (frozenset iteration order is
+# not guaranteed, and combat/report consumers rely on stable ordering).
+INNATE_SKILL_ORDER: tuple[str, ...] = ("flee", "basic_attack")
+if set(INNATE_SKILL_ORDER) != set(INNATE_SKILL_KEYS):
+    raise RuntimeError("INNATE_SKILL_ORDER must name exactly the innate keys")
 
 
 @dataclass(frozen=True)
@@ -51,7 +56,7 @@ class SkillHandler:
         return [
             *self._raw.get("active", []),
             *self._raw.get("passive", []),
-            *INNATE_SKILL_KEYS,
+            *INNATE_SKILL_ORDER,
         ]
 
     def effective_value(self, trait_key: str) -> int:

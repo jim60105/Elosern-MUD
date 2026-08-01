@@ -18,6 +18,17 @@ from evennia import default_cmds
 from evennia.contrib.grid.xyzgrid.commands import XYZGridCmdSet
 
 from commands.action import CmdCast
+from commands.combat import CmdCombatForfeit, CmdEngage, CmdGuildExam
+from commands.economy import CmdBuy, CmdInventory, CmdSell, CmdShopStock
+from commands.guild import (
+    CmdGuildAbandon,
+    CmdGuildAccept,
+    CmdGuildList,
+    CmdGuildLog,
+    CmdGuildMerit,
+    CmdGuildRegister,
+    CmdGuildTurnIn,
+)
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 
 
@@ -39,6 +50,20 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdRest)
         self.add(CmdSleep)
         self.add(CmdWaitUntil)
+        self.add(CmdEngage)
+        self.add(CmdCombatForfeit)
+        self.add(CmdGuildExam)
+        self.add(CmdGuildRegister)
+        self.add(CmdGuildList)
+        self.add(CmdGuildAccept)
+        self.add(CmdGuildLog)
+        self.add(CmdGuildAbandon)
+        self.add(CmdGuildTurnIn)
+        self.add(CmdGuildMerit)
+        self.add(CmdShopStock)
+        self.add(CmdBuy)
+        self.add(CmdSell)
+        self.add(CmdInventory)
         self.add(XYZGridCmdSet)
 
 
