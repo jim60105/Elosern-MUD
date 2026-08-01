@@ -131,6 +131,14 @@ def _body_multiplier(key: str, multiplier: float) -> SkillDef:
 SKILL_REGISTRY: dict[str, SkillDef] = {
     skill.key: skill
     for skill in (
+        _skill(
+            "basic_attack",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            element="fire",
+            faction_constraint=FactionConstraint.ENEMY,
+            effects=["damage:fire:physical"],
+        ),
         _body_multiplier("body_enhancement", 100),
         _body_multiplier("body_enhancement_extreme", 1000),
         _body_multiplier("body_enhancement_basic", 1.2),

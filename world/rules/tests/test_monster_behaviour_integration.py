@@ -271,11 +271,14 @@ class MonsterFleeResolverIntegrationTests(EvenniaTest):
         self.assertEqual(result.verdict_after, "party")
 
     def test_tier_default_and_override_decisions_have_fixed_outcomes(self):
+        # The calamity apex predator has no magic level, so the innate
+        # physical `basic_attack` is its highest-expected-damage choice over a
+        # zero-magic `fire_ball` (deliberate second-innate update, task 7.13).
         cases = (
             ("low", None, FLEE_SKILL_KEY),
             ("mid", None, FLEE_SKILL_KEY),
             ("high", None, FLEE_SKILL_KEY),
-            ("calamity", None, "fire_ball"),
+            ("calamity", None, "basic_attack"),
             ("high", "tactical_caster", FLEE_SKILL_KEY),
         )
         for index, (tier, override, expected_skill) in enumerate(cases):

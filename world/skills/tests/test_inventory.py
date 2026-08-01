@@ -34,7 +34,7 @@ class InventoryTests(EvenniaTest):
         self.assertEqual(list_items(entity), ["healing_potion"])
         self.assertEqual(
             entity.skills.owned_keys(),
-            [*record["skills"], *record["passives"], "flee"],
+            [*record["skills"], *record["passives"], "flee", "basic_attack"],
         )
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.ACCESSORY),

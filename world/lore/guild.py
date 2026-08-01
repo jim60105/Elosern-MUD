@@ -12,6 +12,15 @@ class GuildRank:
     description: str
 
 
+@dataclass(frozen=True)
+class GuildBranch:
+    """A named guild branch locale (guild-economy D-3 validation identity)."""
+
+    key: str
+    display_name_zh: str
+    anchor_key: str | None = None
+
+
 GUILD_RANK_REGISTRY: dict[str, GuildRank] = {
     "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks."),
     "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts."),
@@ -20,4 +29,12 @@ GUILD_RANK_REGISTRY: dict[str, GuildRank] = {
     "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions."),
     "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments."),
     "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale."),
+}
+
+GUILD_BRANCH_REGISTRY: dict[str, GuildBranch] = {
+    "guild_branch_altoria": GuildBranch(
+        "guild_branch_altoria",
+        "埃洛西恩冒險者公會 阿爾托利亞分會",
+        "capital_altoria",
+    ),
 }

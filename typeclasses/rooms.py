@@ -9,6 +9,8 @@ from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
 
+from world.quests.room_observation import QuestObservableRoomMixin
+
 from .objects import ObjectParent
 
 
@@ -36,8 +38,13 @@ class SceneArchetypeMixin:
     scene_archetype: str | None = AttributeProperty(default=None)
 
 
-class GridRoom(SceneArchetypeMixin, XYZRoom):
-    """A room on the xyzgrid layer (design doc D3's 'Grid' layer)."""
+class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, XYZRoom):
+    """A room on the xyzgrid layer (design doc D3's 'Grid' layer).
+
+    Adopts ``QuestObservableRoomMixin`` so a ``PlayerCharacter`` entering a grid
+    room advances matching REACH/ESCORT stages (quest-runtime D-5). Every
+    ``AnchorRoom`` inherits the hook through this class.
+    """
 
     pass
 
@@ -58,12 +65,17 @@ class TerrainRoom(SceneArchetypeMixin, WildernessRoom):
     coordinates over their lifetime (WildernessScript._create_room() recycles
     unused rooms) -- see map-wilderness design.md D-3 for why scene_archetype
     must be re-set on every at_prepare_room() call, not merely defaulted once.
+
+    Deliberately does NOT adopt ``QuestObservableRoomMixin``: the installed
+    wilderness contrib assigns ``.location`` directly on its ordinary entry and
+    stepping path, so advertising an arrival hook here would create a silently
+    unreachable objective (quest-runtime D-5).
     """
 
     pass
 
 
-class InstanceRoom(SceneArchetypeMixin, DefaultRoom):
+class InstanceRoom(SceneArchetypeMixin, QuestObservableRoomMixin, DefaultRoom):
     """A room on the Instance layer (design doc D3) -- ephemeral, TTL-bounded,
     spawned through core evennia.prototypes.spawner.spawn(), never through
     xyzgrid. Carries no (x, y, z) of any kind; reachability is a plain Evennia

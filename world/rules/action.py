@@ -122,12 +122,36 @@ EffectHandler = Callable[
     list[PendingEffect],
 ]
 SNAPSHOTTED_SURFACES = frozenset(
-    {"traits", "sexual", "buffs", "skill_grants", "progression", "battlefield"}
+    {
+        "traits",
+        "sexual",
+        "buffs",
+        "skill_grants",
+        "progression",
+        "battlefield",
+        "quest_log",
+        "instance_pin",
+    }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
 _EFFECT_HANDLER_SURFACES: dict[str, frozenset[str]] = {}
+_EVENT_EFFECT_PLANNERS: dict[str, Callable[[ActionRequest, "EventLog"], list[PendingEffect]]] = {}
 DEFAULT_CAST_SECONDS = 6
 SKILL_TIME_OVERRIDES: dict[str, int] = {}
+
+
+def register_event_effect_planner(
+    name: str,
+    planner: Callable[[ActionRequest, "EventLog"], list[PendingEffect]],
+) -> None:
+    """Register or replace one event-effect planner by name (idempotent).
+
+    Planners derive additional ``PendingEffect`` values from a completed
+    ``EventLog``; they never write while planning. Re-registering the same name
+    replaces the earlier planner rather than duplicating progress on every
+    server start.
+    """
+    _EVENT_EFFECT_PLANNERS[name] = planner
 
 
 def register_effect_handler(
@@ -490,6 +514,8 @@ _ENTRY_TEMPLATES = {
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
+    "target_defeated": "{actor} 擊敗了 {target}。",
+    "target_knocked_out": "{actor} 擊倒了 {target}。",
     "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
     "skill_practice": "{actor} 累積了技能熟練度。",
     "combat_kill_xp": "",
@@ -587,20 +613,86 @@ def _entries_from_effect(
     )
 
 
+def _defeated_entry(
+    actor_key: str,
+    entity: Any,
+    amount: int,
+    projected: dict[int, float],
+    defeated_ids: set[int],
+    nonlethal: bool = False,
+) -> EventEntry | None:
+    """Emit one ``target_defeated`` or ``target_knocked_out`` crossing entry.
+
+    Pending damage is applied in order over shared projected HP, so two damage
+    effects against one target neither use stale HP nor duplicate the defeat.
+    Under a nonlethal policy a positive-to-non-positive crossing emits a
+    ``target_knocked_out`` identity instead of ``target_defeated``, giving
+    kill-credit/quest/loot consumers no defeat entry to observe.
+    """
+    if amount <= 0:
+        return None
+    trait = getattr(entity, "traits", None)
+    hp = getattr(trait, "hp", None)
+    if hp is None:
+        return None
+    dbref = getattr(entity, "pk", None)
+    if dbref is None:
+        return None
+    identity = id(entity)
+    current = projected.get(identity, _stored_trait_value(hp))
+    projected[identity] = current - amount
+    if not (current > 0 and projected[identity] <= 0):
+        return None
+    if dbref in defeated_ids:
+        return None
+    defeated_ids.add(dbref)
+    kind = "target_knocked_out" if nonlethal else "target_defeated"
+    data: dict[str, Any] = {"target_id": int(dbref)}
+    if not nonlethal:
+        data["monster_tier"] = getattr(entity, "threat_tier", None)
+    return EventEntry(
+        kind=kind,
+        actor=actor_key,
+        target=str(entity.key),
+        data=data,
+        text_template=(
+            _ENTRY_TEMPLATES["target_knocked_out"]
+            if nonlethal
+            else _ENTRY_TEMPLATES["target_defeated"]
+        ),
+    )
+
+
 def _step7_build_event_log(
     request: ActionRequest,
     skill: SkillDef,
     pending: list[PendingEffect],
 ) -> EventLog:
     try:
-        entries = tuple(
-            entry
-            for effect in pending
-            for entry in _entries_from_effect(
-                _entity_key(request.actor),
-                effect,
+        entries: list[EventEntry] = []
+        projected: dict[int, float] = {}
+        defeated_ids: set[int] = set()
+        nonlethal = bool(_event_context(request).get("nonlethal", False))
+        for effect in pending:
+            entries.extend(
+                _entries_from_effect(
+                    _entity_key(request.actor),
+                    effect,
+                )
             )
-        )
+            if not effect.description.startswith("damage|"):
+                continue
+            parts = effect.description.split("|")
+            defeated = _defeated_entry(
+                _entity_key(request.actor),
+                effect.entity,
+                int(parts[4]),
+                projected,
+                defeated_ids,
+                nonlethal=nonlethal,
+            )
+            if defeated is not None:
+                entries.append(defeated)
     except Exception as error:
         raise RejectedAction(
             RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
@@ -610,7 +702,7 @@ def _step7_build_event_log(
         actor=_entity_key(request.actor),
         skill_key=skill.key,
         targets=_logged_targets(pending),
-        entries=entries,
+        entries=tuple(entries),
         time_cost_seconds=0,
     )
 
@@ -730,19 +822,62 @@ def _is_battlefield_like(obj: Any) -> bool:
     return hasattr(obj, "fled") and hasattr(obj, "roster")
 
 
-def _snapshot_touched(obj: Any) -> dict[str, Any]:
-    """Snapshot either a battlefield mutation surface or entity state."""
-    if _is_battlefield_like(obj):
-        return {"fled": frozenset(obj.fled)}
-    return _snapshot_entity_state(obj)
+_ENTITY_SURFACES = frozenset({"traits", "sexual", "buffs", "skill_grants", "progression"})
 
 
-def _restore_touched(obj: Any, snapshot: dict[str, Any]) -> None:
-    """Restore an object through the same shape-based snapshot dispatch."""
+def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
+    """Snapshot the aggregated declared surfaces of one touched object."""
     if _is_battlefield_like(obj):
-        obj.fled = set(snapshot["fled"])
+        return {"battlefield": frozenset(obj.fled)}
+    snapshot: dict[str, Any] = {}
+    if surfaces & _ENTITY_SURFACES:
+        snapshot["entity"] = _snapshot_entity_state(obj)
+    if "quest_log" in surfaces:
+        snapshot["quest_log"] = _attribute_snapshot(obj, "quest_log")
+    if "instance_pin" in surfaces:
+        snapshot["instance_pin"] = _attribute_snapshot(obj, "pin_reasons")
+    return snapshot
+
+
+def _restore_touched(
+    obj: Any,
+    snapshot: dict[str, Any],
+    surfaces: frozenset[str],
+) -> None:
+    """Restore an object's aggregated declared surfaces by shape."""
+    if _is_battlefield_like(obj):
+        obj.fled = set(snapshot.get("battlefield", frozenset(obj.fled)))
         return
-    _restore_entity_state(obj, snapshot)
+    if "entity" in snapshot:
+        _restore_entity_state(obj, snapshot["entity"])
+    if "quest_log" in surfaces and "quest_log" in snapshot:
+        _restore_attribute(obj, "quest_log", snapshot["quest_log"])
+    if "instance_pin" in surfaces and "instance_pin" in snapshot:
+        _restore_attribute(obj, "pin_reasons", snapshot["instance_pin"])
+
+
+def _restore_touched_best_effort(
+    obj: Any,
+    snapshot: dict[str, Any],
+    surfaces: frozenset[str],
+) -> None:
+    """Restore one touched object without letting a second failure escape.
+
+    After a commit failure the database is rolled back; if restoring the
+    pre-operation value also raises, invalidating Evennia's attribute cache
+    leaves the next read consistent with persistence instead of serving a
+    stale value.
+    """
+    from evennia.utils.logger import log_warn
+
+    try:
+        _restore_touched(obj, snapshot, surfaces)
+    except Exception as error:
+        try:
+            obj.attributes.reset_cache()
+        except Exception:
+            pass
+        log_warn(f"action commit could not restore {obj}: {error}")
 
 
 def _commit(pending: list[PendingEffect]) -> None:
@@ -755,13 +890,17 @@ def _commit(pending: list[PendingEffect]) -> None:
             )
     touched: list[Any] = []
     touched_ids: set[int] = set()
+    surfaces_of: dict[int, frozenset[str]] = {}
     for effect in pending:
         identity = id(effect.entity)
+        surfaces_of[identity] = surfaces_of.get(identity, frozenset()) | frozenset(
+            effect.surfaces
+        )
         if identity not in touched_ids:
             touched.append(effect.entity)
             touched_ids.add(identity)
     snapshots = {
-        id(entity): _snapshot_touched(entity)
+        id(entity): _snapshot_touched(entity, surfaces_of[id(entity)])
         for entity in touched
     }
     try:
@@ -770,12 +909,40 @@ def _commit(pending: list[PendingEffect]) -> None:
                 effect.apply()
     except Exception as error:
         for entity in touched:
-            _restore_touched(entity, snapshots[id(entity)])
+            _restore_touched_best_effort(entity, snapshots[id(entity)], surfaces_of[id(entity)])
         raise CommitFailed(RejectReason.COMMIT_FAILED, str(error)) from error
 
 
 class ActionResolver:
     """The sole state-writing gateway for skill invocation."""
+
+    @staticmethod
+    def preflight(request: ActionRequest) -> ActionResult:
+        """Side-effect-free validation of one action before initiative.
+
+        Runs the deterministic checks that never roll, stage effects, emit an
+        ``EventLog``, mutate state, or advance world time: skill ownership,
+        resource availability, target resolution, action capability, effect
+        handler availability, and time-cost metadata. Returns the same named
+        rejection categories as ``resolve()`` for those checks. A successful
+        preflight does not guarantee the state survives earlier initiative
+        actions; final resolution must still run the complete pipeline.
+        """
+        try:
+            skill = _step1_ownership(request)
+            _step2_resource_check(request.actor, skill)
+            _step3_targeting(request, skill)
+            _step4_capability(request.actor)
+            for effect_id in skill.effects:
+                if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:
+                    raise RejectedAction(
+                        RejectReason.UNKNOWN_EFFECT_ID,
+                        effect_id,
+                    )
+            _step8_time_cost(request, skill)
+        except RejectedAction as rejection:
+            return ActionResult.rejected(rejection.reason, rejection.detail)
+        return ActionResult.success(None, None)
 
     @staticmethod
     def resolve(request: ActionRequest) -> ActionResult:
@@ -789,6 +956,21 @@ class ActionResolver:
             pending.append(_step6_skill_practice(request.actor, skill))
             pending += _step6_combat_kill_xp(request, targets)
             event_log = _step7_build_event_log(request, skill, pending)
+            try:
+                for planner in _EVENT_EFFECT_PLANNERS.values():
+                    for effect in planner(request, event_log):
+                        if not isinstance(effect, PendingEffect):
+                            raise TypeError(
+                                "event-effect planner returned a non-PendingEffect value",
+                            )
+                        pending.append(effect)
+            except RejectedAction:
+                raise
+            except Exception as error:
+                raise RejectedAction(
+                    RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
+                    f"event-effect planner failed: {error}",
+                ) from error
             time_cost = _step8_time_cost(request, skill)
             event_log = replace(event_log, time_cost_seconds=time_cost)
         except RejectedAction as rejection:

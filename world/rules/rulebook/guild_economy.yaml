@@ -1,0 +1,122 @@
+# Tunable guild-economy balance data (guild-economy D-1/D-8).
+# All money values are integer copper. Strictly increasing E-through-S merit
+# thresholds, exam opponent profiles, and per-shop price/hour/stock values are
+# joined to immutable lore identities by the catalog loader in
+# world/rules/guild_config.py.
+
+# Cumulative true `guild_merit` required to be eligible for each rank's exam.
+merit_thresholds:
+  E: 50
+  D: 150
+  C: 400
+  B: 900
+  A: 2000
+  S: 5000
+
+# Hand-written quest rewards, joined to quest definitions by definition_key.
+quest_rewards:
+  - definition_key: introductory_hunt
+    reward:
+      copper: 50
+      items:
+        - item_key: healing_potion
+          quantity: 2
+      merit: 25
+
+# Guild examination opponent profiles, keyed by the target rank. Physical stats
+# must lie inside the required StaticTier band and every skill key must exist.
+exam_profiles:
+  E:
+    static_tier: human_adventurer
+    hp: 100
+    mp: 100
+    sp: 100
+    atk_phys: 8
+    agility: 8
+    defense: 7
+    magic_level: 10
+    skills:
+      - basic_attack
+  D:
+    static_tier: human_adventurer
+    hp: 110
+    mp: 100
+    sp: 100
+    atk_phys: 9
+    agility: 9
+    defense: 8
+    magic_level: 12
+    skills:
+      - basic_attack
+  C:
+    static_tier: human_elite
+    hp: 130
+    mp: 110
+    sp: 110
+    atk_phys: 12
+    agility: 12
+    defense: 11
+    magic_level: 20
+    skills:
+      - basic_attack
+  B:
+    static_tier: human_elite
+    hp: 145
+    mp: 110
+    sp: 110
+    atk_phys: 14
+    agility: 14
+    defense: 13
+    magic_level: 25
+    skills:
+      - basic_attack
+  A:
+    static_tier: human_veteran
+    hp: 170
+    mp: 120
+    sp: 120
+    atk_phys: 17
+    agility: 17
+    defense: 16
+    magic_level: 30
+    skills:
+      - basic_attack
+  S:
+    static_tier: human_swordmaster
+    hp: 200
+    mp: 120
+    sp: 120
+    atk_phys: 20
+    agility: 20
+    defense: 19
+    magic_level: 35
+    skills:
+      - basic_attack
+
+# Per-shop opening/closing/restock hours and exact integer offer rules. The
+# shop records a restock_hour even when its interval is same-day; hours are in
+# CLOCK_YAML["seconds_per_hour"] units relative to the world-day boundary.
+shops:
+  - shop_key: altoria_general_store
+    open_hour: 8
+    close_hour: 20
+    restock_hour: 6
+    offers:
+      - item_key: meal
+        buy_copper: 10
+        sell_copper: 5
+        max_stock: 20
+        initial_stock: 20
+        restock_quantity: 5
+      - item_key: healing_potion
+        buy_copper: 100
+        sell_copper: 50
+        max_stock: 5
+        initial_stock: 3
+        restock_quantity: 2
+      - item_key: plain_sword
+        buy_copper: 250
+        sell_copper: 100
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1

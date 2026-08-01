@@ -57,13 +57,24 @@ and resolution and fails if either symbol appears in any of them.
 - **THEN** the boundary regression test fails, identifying which forbidden module contains the
   violation
 
-### Requirement: disguised_stats keys are documented as readable by exactly three consumers
-The docstring of `get_display_value` (and this change's specification) SHALL name exactly three
-permitted call sites — appearance rendering (`look`), guild registration records, and appraisal
-items — and no others. This change SHALL NOT implement any of the three consumers; it documents the
-contract they must follow when a later change builds them.
+### Requirement: disguised_stats keys are readable by exactly three consumers, including implemented guild registration
+The docstring of `get_display_value` and this specification SHALL name exactly three permitted call
+sites: appearance rendering (`look`), guild registration records, and appraisal items. Guild registration
+SHALL now call the accessor once per documented trait key to persist a historical displayed-stat
+snapshot. Appearance and appraisal MAY remain deferred. No other guild operation, including board
+eligibility, reward settlement, merit checks, examiner profile selection, combat, or promotion, SHALL
+call the accessor or read `disguised_stats`.
 
-#### Scenario: The accessor's documentation names exactly the three permitted consumers
+#### Scenario: Accessor documentation still names exactly three consumers
 - **WHEN** `get_display_value`'s docstring is inspected
 - **THEN** it names appearance rendering (`look`), guild registration records, and appraisal items
-  as the only permitted callers, and states that combat, resolution, and damage must not call it
+  as the only permitted callers and states that combat, resolution, and damage must not call it
+
+#### Scenario: Registration is the only implemented guild caller
+- **WHEN** guild and economy source modules are scanned for `get_display_value` or `disguised_stats`
+- **THEN** only the registration snapshot path contains the sanctioned accessor call and no module reads
+  the raw disguise mapping directly
+
+#### Scenario: Promotion uses canonical state
+- **WHEN** a registered actor changes or clears disguise before a guild examination
+- **THEN** merit eligibility, examiner stats, combat, and promotion outcomes are unchanged

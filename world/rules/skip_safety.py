@@ -20,6 +20,11 @@ def register_active_battlefield(battlefield: Battlefield) -> None:
     _BATTLEFIELDS.update({key: battlefield for key in battlefield.roster})
 
 
+def unregister_active_battlefield(entity: Any) -> None:
+    """Remove one combatant's transient battlefield lookup on settlement."""
+    _BATTLEFIELDS.pop(str(entity.key), None)
+
+
 def _active_battlefield_for(actor: Any) -> Battlefield | None:
     return _BATTLEFIELDS.get(str(actor.key))
 
