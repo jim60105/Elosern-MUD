@@ -39,6 +39,7 @@ _STAGE_ORDER = (
     "shop_hours",
     "quest_deadlines",
     "npc_schedules",
+    "instance_reclamation",
 )
 _EVENT_SOURCES: dict[str, Callable[[int, int], list["ScheduledEvent"]]] = {}
 

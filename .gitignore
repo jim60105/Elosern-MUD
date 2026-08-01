@@ -61,3 +61,4 @@ env/
 *.sqlite3
 server/logs/
 .env
+/server/.cache

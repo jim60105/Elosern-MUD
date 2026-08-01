@@ -18,6 +18,11 @@ evennia._init()
 
 
 MATRIX_IMPORTS = {
+    # Every row here is a *contrib* symbol this project reuses (design doc §4).
+    # Project-authored symbols (e.g. world.rules.movement.charge_movement,
+    # typeclasses.exits.MovementCostMixin/CostedXYZExit from map-movement-clock)
+    # are deliberately absent: they are the project's own code, verified by the
+    # project's own test suite, not contrib reuse to guard against drift.
     "traits": (
         "evennia.contrib.rpg.traits",
         ("TraitHandler", "Trait", "StaticTrait", "CounterTrait", "GaugeTrait"),
@@ -28,9 +33,21 @@ MATRIX_IMPORTS = {
         ("Component", "ComponentHolderMixin", "ComponentProperty"),
     ),
     "xyzgrid": ("evennia.contrib.grid.xyzgrid.xyzroom", ("XYZRoom", "XYZExit")),
+    "xyzgrid runtime": (
+        "evennia.contrib.grid.xyzgrid.xyzgrid",
+        ("XYZGrid", "get_xyzgrid"),
+    ),
+    "xyzgrid xymap": ("evennia.contrib.grid.xyzgrid.xymap", ("XYMap",)),
     "wilderness": (
         "evennia.contrib.grid.wilderness.wilderness",
-        ("WildernessMapProvider",),
+        (
+            "WildernessMapProvider",
+            "WildernessRoom",
+            "WildernessExit",
+            "WildernessScript",
+            "create_wilderness",
+            "enter_wilderness",
+        ),
     ),
     "prototype spawner": ("evennia.prototypes.spawner", ("spawn",)),
     "llm client": ("evennia.contrib.rpg.llm.llm_client", ("LLMClient",)),

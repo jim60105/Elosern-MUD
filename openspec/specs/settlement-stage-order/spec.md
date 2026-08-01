@@ -6,19 +6,20 @@ Define the deterministic order and execution rules for world-clock settlement st
 
 
 ### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, magic study,
-daily resets, then the four declared world-event seams
+daily resets, then the five declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `magic_study`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
-`npc_schedules` — matching design doc §6.5's four built stages plus `magic_study` (change 11b's
-`accrue_magic_study()`, inserted between `sexual_decay` and `daily_resets`), and SHALL execute every
-`advance()` call's stages in this order with no configuration or call-site override capable of
-changing it.
+`npc_schedules`, `instance_reclamation` — matching design doc §6.5's four built stages plus
+`magic_study` (change 11b's `accrue_magic_study()`, inserted between `sexual_decay` and
+`daily_resets`) plus `instance_reclamation` (change 14's `reclaim_due_instances()`, appended after
+`npc_schedules` as the final stage), and SHALL execute every `advance()` call's stages in this order
+with no configuration or call-site override capable of changing it.
 
-#### Scenario: The stage order is exactly the fixed sequence, including magic_study
+#### Scenario: The stage order is exactly the fixed sequence, including magic_study and instance_reclamation
 - **WHEN** the settlement stage sequence is inspected
 - **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "magic_study", "daily_resets",
-  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules")`, in that order, with no
-  duplicate or missing entry
+  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "instance_reclamation")`, in
+  that order, with no duplicate or missing entry
 
 #### Scenario: Transposing any of the four ordered stages is mechanically detected
 - **WHEN** a test asserts `"buff_ticks"` appears strictly before `"sexual_decay"` and strictly after
@@ -45,6 +46,34 @@ resource with its neighbors
 - **THEN** no field is written by both `magic_study` and either neighbor, so the structural check above
   is `magic_study`'s only mechanical safeguard against transposition — this is a verified property, not
   an unexamined gap
+
+#### Scenario: instance_reclamation running after quest_deadlines and npc_schedules reclaims within
+one advance() call; running before either leaves the room existing for one extra call
+- **WHEN** a test registers a synthetic `quest_deadlines` source that, when its deadline comes due
+  within `(start_tick, end_tick]`, calls `unpin_instance_room()` on a target `InstanceRoom`, and that
+  room is simultaneously due for TTL reclamation, unoccupied, unnamed, and pinned by exactly the
+  reason the synthetic source releases
+- **THEN** under the declared order (`quest_deadlines` before `instance_reclamation`), a single
+  `advance()` call across both boundaries results in the room no longer existing; a test that
+  constructs the transposed order (`instance_reclamation` before `quest_deadlines`) in isolation shows
+  the same single `advance()` call leaves the room still existing, deferred, requiring a second call —
+  an existence-differs proof, not merely a differently-ordered but equivalent outcome
+
+#### Scenario: instance_reclamation position is not itself proof against every possible transposition,
+and this is a stated, not silent, limitation
+- **WHEN** `instance_reclamation`'s data dependencies are inspected (reads/writes `InstanceRoom.db.
+  expire_tick`/`named`/`interacted`/`pin_reasons`/`owned_entities`, none of which any other stage reads
+  or writes) against `caravan_arrivals`/`shop_hours`/`npc_schedules`, none of which has a registered
+  source in this project's shipped codebase as of this change (and `npc_schedules`, once
+  `instance_reclamation`'s own occupancy check was corrected during rubber-duck review to gate on
+  `PlayerCharacter` rather than any `LivingEntity`, no longer has any concrete releasing mechanism this
+  design depends on either — see design.md D-3's own correction note)
+- **THEN** the transposition proof above is the sole mechanical safeguard for `instance_reclamation`'s
+  position relative to `quest_deadlines` specifically; its position relative to `caravan_arrivals`/
+  `shop_hours`/`npc_schedules` (all three still unregistered, no-op seams, and none with a concrete
+  releasing story this design leans on) has no equivalent proof and is justified by "last, so nothing
+  after it could still need the room" reasoning alone (design.md D-3), not by an arithmetic
+  counter-example against any of the three
 
 ### Requirement: buff_ticks, sexual_decay, and magic_study are skipped for combat-sourced advances
 `world/rules/clock.py`'s settlement stage runner SHALL skip the `buff_ticks`, `sexual_decay`, and
@@ -218,5 +247,3 @@ key-only, serializable data.
 - **WHEN** any `ScheduledEvent` returned by `advance()` is inspected
 - **THEN** its `payload` contains only plain, JSON-compatible values — no live `LivingEntity` or
   `Battlefield` reference
-
-sed: -e 表示式 #1，字元 2: 未預期的「,」

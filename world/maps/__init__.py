@@ -1,0 +1,1 @@
+"""Sample city map data for map-anchor-grid."""
