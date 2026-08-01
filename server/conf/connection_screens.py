@@ -33,6 +33,9 @@ CONNECTION_SCREEN = """
  If you need to create an account, type (without the <>'s):
       |wcreate <username> <password>|n
 
+ New accounts must create an adult character before entering the world.
+ After login, use |wcharacter|n to choose a preset or start custom creation.
+
  If you have spaces in your username, enclose it in quotes.
  Enter |whelp|n for more info. |wlook|n will re-show this screen.
 |b==============================================================|n""".format(

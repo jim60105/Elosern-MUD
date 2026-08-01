@@ -28,6 +28,7 @@ class RaceProfile:
     key: str
     lifespan: tuple[int, int]
     magic_cap: int
+    starting_magic_level: int
     vital_baseline: Vitals
     static_baseline: StaticBand
     learning_multiplier: float
@@ -82,6 +83,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         key="human",
         lifespan=(60, 80),
         magic_cap=90,
+        starting_magic_level=30,
         vital_baseline=Vitals(hp=(100, 200), mp=(100, 200), sp=(100, 200)),
         static_baseline=_static_band(1, 22),
         learning_multiplier=1.0,
@@ -91,6 +93,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         key="beastfolk",
         lifespan=(50, 70),
         magic_cap=30,
+        starting_magic_level=10,
         vital_baseline=Vitals(hp=(150, 200), mp=(30, 50), sp=(150, 200)),
         static_baseline=_static_band(4, 34),
         learning_multiplier=1.0,
@@ -100,6 +103,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         key="elf",
         lifespan=(800, 1200),
         magic_cap=900,
+        starting_magic_level=300,
         vital_baseline=Vitals(
             hp=(10000, 10000), mp=(10000, 10000), sp=(10000, 10000)
         ),

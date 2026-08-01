@@ -6,8 +6,8 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 
 ### Requirement: RaceProfile encodes the three-race power gap
 `world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields
-`key`, `lifespan`, `magic_cap`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and
-`can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
+`key`, `lifespan`, `magic_cap`, `starting_magic_level`, `vital_baseline`, `static_baseline`,
+`learning_multiplier`, and `can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
 exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 
 #### Scenario: Registry has exactly the three documented races
@@ -38,6 +38,11 @@ exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 #### Scenario: magic_cap ordering matches the documented gap
 - **WHEN** the three races' `magic_cap` values are compared
 - **THEN** `beastfolk.magic_cap < human.magic_cap < elf.magic_cap`, matching 30 / 90 / 900
+
+#### Scenario: Starting magic averages are immutable and cap-safe
+- **WHEN** the three races' `starting_magic_level` values are inspected
+- **THEN** they are respectively 30, 10, and 300 for human, beastfolk, and elf,
+  each is an integer greater than zero and no greater than that race's `magic_cap`
 
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
 `world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`,

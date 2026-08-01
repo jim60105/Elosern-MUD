@@ -90,7 +90,9 @@ def build_initial_traits(
     return values
 
 
-def _trait_config(values: dict[str, int], magic_cap: int) -> dict[str, dict[str, Any]]:
+def trait_config_for_values(
+    values: dict[str, int], magic_cap: int
+) -> dict[str, dict[str, Any]]:
     """Convert raw base values to Evennia 6.1 ``TraitHandler.add`` kwargs."""
     config: dict[str, dict[str, Any]] = {}
     for key in GAUGE_KEYS:
@@ -118,6 +120,11 @@ def _trait_config(values: dict[str, int], magic_cap: int) -> dict[str, dict[str,
     return config
 
 
+def _trait_config(values: dict[str, int], magic_cap: int) -> dict[str, dict[str, Any]]:
+    """Retain the existing internal construction entry point."""
+    return trait_config_for_values(values, magic_cap)
+
+
 def initial_trait_config(
     race_key: str,
     subrace_key: str | None = None,
@@ -125,7 +132,7 @@ def initial_trait_config(
 ) -> dict[str, dict[str, Any]]:
     """Return race construction data ready for ``TraitHandler.add``."""
     values = build_initial_traits(race_key, subrace_key, tier)
-    return _trait_config(values, RACE_REGISTRY[race_key].magic_cap)
+    return trait_config_for_values(values, RACE_REGISTRY[race_key].magic_cap)
 
 
 def _resolve_band_position(
@@ -168,7 +175,7 @@ def initial_trait_config_for_monster_tier(
 ) -> dict[str, dict[str, Any]]:
     """Return monster construction data ready for ``TraitHandler.add``."""
     values = build_initial_traits_for_monster_tier(tier_key, position)
-    return _trait_config(values, 0)
+    return trait_config_for_values(values, 0)
 
 
 def get_display_value(entity: Any, trait_key: str) -> int:

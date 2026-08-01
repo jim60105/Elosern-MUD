@@ -136,6 +136,11 @@ class Account(DefaultAccount):
 
     """
 
+    def at_post_create_character(self, character, **kwargs) -> None:
+        """Preserve Evennia ownership setup, then gate the new shell."""
+        super().at_post_create_character(character, **kwargs)
+        character.creation_pending = True
+
     pass
 
 

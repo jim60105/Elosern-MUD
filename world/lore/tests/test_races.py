@@ -39,6 +39,16 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertFalse(beastfolk.can_use_divine_arts)
         self.assertTrue(elf.can_use_divine_arts)
 
+    def test_starting_magic_averages_are_cap_safe(self):
+        self.assertEqual(
+            {key: race.starting_magic_level for key, race in RACE_REGISTRY.items()},
+            {"human": 30, "beastfolk": 10, "elf": 300},
+        )
+        for race in RACE_REGISTRY.values():
+            self.assertIs(type(race.starting_magic_level), int)
+            self.assertGreater(race.starting_magic_level, 0)
+            self.assertLessEqual(race.starting_magic_level, race.magic_cap)
+
     def test_vital_pool_scale_is_independent(self):
         human_ceiling = RACE_REGISTRY["human"].vital_baseline.hp[1]
         elf_floor = RACE_REGISTRY["elf"].vital_baseline.hp[0]

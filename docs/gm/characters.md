@@ -92,3 +92,18 @@ characters = load_batch(
 ```
 
 請不要改用 `create_object()` 略過角色卡驗證。若需要建立服務 NPC，請使用既有的啟動同步程序或在受測試的內容程式中附加對應元件；公會服務人員需要 `GuildStaff` 元件，商人需要 `Merchant` 元件。
+# Player character registration
+
+New accounts receive one inert, account-owned character shell. The player must
+activate that shell before world commands become available. `character` lists
+the two supported modes:
+
+- `character preset <key>` selects a shipped adult character.
+- `character create` prompts for a name, actual age, apparent age, race,
+  optional compatible subrace, and six stat allocations.
+
+Both ages must be at least 18. Custom allocations must remain inside the
+selected lore bands and spend the exact displayed budget. Magic level is not a
+player input; activation samples it inside ±10% of the selected race's average.
+After activation, ordinary commands such as `look`, `inventory`, and `rest 5s`
+become available.

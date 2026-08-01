@@ -15,6 +15,9 @@ class SubclassTests(EvenniaTest):
         self.assertIsNone(first.guild_rank)
         self.assertEqual(first.quest_log, [])
         self.assertEqual(first.wallet, 0)
+        self.assertIsNone(first.age)
+        self.assertIsNone(first.apparent_age)
+        self.assertFalse(first.creation_pending)
         first.quest_log.append("quest")
         self.assertEqual(second.quest_log, [])
 
@@ -30,4 +33,3 @@ class SubclassTests(EvenniaTest):
         self.assertIsNone(monster.behaviour_tree)
         with self.assertRaisesRegex(ValueError, "threat_tier"):
             monster.apply_monster_tier()
-
