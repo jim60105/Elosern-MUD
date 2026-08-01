@@ -61,9 +61,12 @@ These were settled during design. Do not relitigate them inside a change.
 │  Narrator           NPCDialogue               │  emits proposals only
 └───────────────────────────────────────────────┘
               ↓ every proposal passes guardrail ↓
-┌─ Deterministic Core  (world/rules/) ─────────┐
-│  ActionResolver  Combat  Dice  Clock          │  SOLE WRITER
-│  Traits  SexualState  Buffs  Quest  Economy   │
+┌─ Deterministic Core ──────────────────────────┐
+│  world/rules/    ActionResolver  Combat  Dice │  SOLE WRITERS
+│                  Clock  Traits  SexualState   │
+│                  Buffs  Economy               │
+│  world/maps/     map layers, instance TTL     │
+│  world/quests/   quest runtime                │
 └───────────────────────────────────────────────┘
               ↓
         Django ORM / SQLite
@@ -71,7 +74,17 @@ These were settled during design. Do not relitigate them inside a change.
 
 **Invariant.** No module under `world/ai/` may import a state-mutating API. This is enforced by
 module dependency direction and checked in CI with an import-linter contract. The generative layer
-changes the world by exactly one route: emit a schema-valid proposal, let `world/rules/` apply it.
+changes the world by exactly one route: emit a schema-valid proposal, let the deterministic core
+apply it.
+
+> **Amended 2026-08-01 (change `quest-runtime`).** The deterministic core is `world/rules/` plus the
+> sibling packages that own one persistent subsystem's data directly: `world/maps/` (since change 14,
+> `map-instance`) and `world/quests/` (since change 15). `world/skills/` and `world/lore/` are not on
+> that list — they stay read-only and route any mutation back through `world/rules/`; for example
+> `world/skills/equipment.py` only reads `entity.db.equipment`, while `world/rules/equipment.py`
+> writes it. The enforced invariant is narrower and stronger than "only `world/rules/` writes":
+> **no module under `world/ai/` applies a state change, ever**, whichever deterministic package does
+> the applying. AGENTS.md carries the identical wording.
 
 ### 3.2 Directory layout
 
@@ -88,7 +101,8 @@ mygame/
 │   │                    geography · factions · races · magic · economy · bestiary
 │   │                    sexual_vocab   ordered-level vocabularies (owned by change 4,
 │   │                                   consumed by change 7 — frozen with the contract)
-│   ├── rules/           deterministic engine — SOLE WRITER
+│   ├── rules/           primary deterministic engine (see §3.1's amended invariant:
+│   │                    world/maps/ and world/quests/ also apply state directly)
 │   │                    dice · combat · action · targeting · clock
 │   │                    traits · sexual_state · buffs · progression
 │   │                    rulebook/   declarative rule tables (YAML)

@@ -28,9 +28,17 @@ The main code areas are:
 
 ## Architectural invariants
 
-- Preserve the single-writer boundary: only the deterministic core in
-  `world/rules/` applies state changes. Generative code submits schema-valid
-  proposals through that core.
+- Preserve the single-writer boundary: it separates generative from
+  deterministic, not `world/rules/` from every other directory. State changes
+  are applied by the deterministic core — `world/rules/` (the primary,
+  general-purpose engine) plus the sibling packages that own one persistent
+  subsystem's own data directly (`world/maps/` for room/instance lifecycle,
+  `world/quests/` for quest lifecycle; each such package is named explicitly
+  here, not implied by proximity). `world/skills/` and `world/lore/` stay
+  read-only/registry-only — any mutation they trigger routes back through
+  `world/rules/`. No module under `world/ai/` applies a state change under any
+  circumstance; it submits schema-valid proposals through the deterministic
+  core instead.
 - Treat module-level lore registries as the source of truth. Use frozen
   dataclasses and keyed registries, and make startup synchronization idempotent.
   Consumers must read registry values instead of duplicating balance constants.
