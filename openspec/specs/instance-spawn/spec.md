@@ -1,4 +1,12 @@
-## ADDED Requirements
+## Purpose
+
+The validated `spawn_instance_room()` entry point for map instances: the `INSTANCE_ROOM` module
+prototype, prototype whitelisting and typeclass validation, rejection of an `InstanceRoom` as
+`origin_room`, and the atomic creation of a room with its TTL/named/origin_room bookkeeping plus a
+bidirectional plain-Exit attach pair.
+
+## Requirements
+
 
 ### Requirement: INSTANCE_ROOM is a module prototype resolving to prototype_key "instance_room"
 `world/prototypes.py` SHALL define `INSTANCE_ROOM`, a module-level dict with `"typeclass":
@@ -36,17 +44,33 @@ but permanently unreachable.
 `world/maps/instance.py::spawn_instance_room(origin_room, prototype, *, exit_key, return_key,
 ttl_seconds=None, named=False, caller=None)` SHALL raise `ValueError` and SHALL NOT call
 `evennia.prototypes.spawner.spawn()` when `prototype.get("prototype_parent")` is not a member of
-`INSTANCE_PROTOTYPE_WHITELIST`.
+`INSTANCE_PROTOTYPE_WHITELIST`, or when the prototype declares an explicit `typeclass` that is not
+exactly `"typeclasses.rooms.InstanceRoom"`. The raiser: a `prototype_parent` whitelist alone does not
+bind the object `spawner.spawn()` actually creates — a prototype may chain from `"instance_room"` while
+also overriding `typeclass` — and a reclaimed-by-exact-typeclass query
+(`InstanceRoom.objects.all()`) would silently skip anything spawned that is not exactly an
+`InstanceRoom`. This was found by rubber-duck review after the original whitelist-only check.
 
 #### Scenario: A whitelisted prototype_parent is accepted
 - **WHEN** `spawn_instance_room()` is called with a prototype whose `prototype_parent` is
-  `"instance_room"`
+  `"instance_room"` and no explicit `typeclass`
 - **THEN** it returns an `InstanceRoom` instance, and `spawner.spawn()` was called
 
 #### Scenario: A non-whitelisted prototype_parent is rejected before spawning
 - **WHEN** `spawn_instance_room()` is called with a prototype whose `prototype_parent` is not in
   `INSTANCE_PROTOTYPE_WHITELIST`
 - **THEN** it raises `ValueError`, and no `InstanceRoom` is created
+
+#### Scenario: An explicit typeclass override is rejected before spawning
+- **WHEN** `spawn_instance_room()` is called with a prototype whose `prototype_parent` is whitelisted
+  but which declares `typeclass` other than `"typeclasses.rooms.InstanceRoom"`
+- **THEN** it raises `ValueError` before `spawner.spawn()` is called, and no `InstanceRoom` is created
+
+#### Scenario: A spawned object that is not an InstanceRoom is rejected and fully rolled back
+- **WHEN** `spawner.spawn()` returns an object that is not an `InstanceRoom` despite a whitelisted
+  prototype (defense in depth against a future prototype-resolution change)
+- **THEN** `spawn_instance_room()` raises `ValueError`, no `Exit` is created, and the stray object is
+  rolled back so it does not linger in the database
 
 ### Requirement: spawn_instance_room sets expire_tick, named, and origin_room, and creates a bidirectional attach exit
 On success, `spawn_instance_room()` SHALL set the new room's `expire_tick` to
@@ -55,6 +79,14 @@ On success, `spawn_instance_room()` SHALL set the new room's `expire_tick` to
 the caller-supplied `origin_room`, and create exactly two ordinary `Exit` objects: one at `origin_room`
 keyed `exit_key` leading to the new room, and one at the new room keyed `return_key` leading back to
 `origin_room`. Neither `Exit` SHALL be a subclass with a custom `at_traverse` override.
+
+The spawn, attribute assignment, and both `Exit.create()` calls SHALL compose one atomic
+all-or-nothing operation: if the second exit (or anything after the first) fails, the first exit and the
+newly spawned room SHALL both be rolled back. Absent this, a partial attach would leave a room
+reachable only one-way, or a room nobody can ever reach again, for the full TTL (rubber-duck review).
+
+`ttl_seconds` SHALL, when provided, be a non-negative `int` (not a `bool`); any other value SHALL raise
+`ValueError` before spawn.
 
 #### Scenario: expire_tick is set from the default TTL when ttl_seconds is omitted
 - **WHEN** `spawn_instance_room(origin_room, prototype, exit_key="in", return_key="out")` is called
@@ -65,6 +97,11 @@ keyed `exit_key` leading to the new room, and one at the new room keyed `return_
 - **WHEN** `spawn_instance_room(..., ttl_seconds=60)` is called with `get_world_clock().tick` equal to
   `T`
 - **THEN** the returned room's `expire_tick` equals `T + 60`
+
+#### Scenario: An invalid ttl_seconds is rejected before spawning
+- **WHEN** `spawn_instance_room(..., ttl_seconds=-1)` or `ttl_seconds="60"` or `ttl_seconds=True` or
+  `ttl_seconds=1.5` is called
+- **THEN** it raises `ValueError` before `spawner.spawn()` is called
 
 #### Scenario: named is set from the caller-supplied value
 - **WHEN** `spawn_instance_room(..., named=True)` is called
@@ -82,3 +119,9 @@ keyed `exit_key` leading to the new room, and one at the new room keyed `return_
   traverses the return exit
 - **THEN** the character ends up back in `origin_room`, using only Evennia's default
   exit-traversal command with no custom movement code
+
+#### Scenario: A failure creating the second exit rolls back the room and first exit
+- **WHEN** the second `Exit.create()` call fails (simulated by a stub raising after the first has
+  succeeded) during an otherwise valid `spawn_instance_room()` call
+- **THEN** the call raises, and neither the newly spawned `InstanceRoom` nor either half of the attach
+  exit pair exists in the database afterward

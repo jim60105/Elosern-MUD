@@ -13,6 +13,7 @@ from evennia.utils.search import search_object
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom
 from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.instance import register_instance_reclamation
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -73,6 +74,8 @@ def sync_grid() -> None:
     grid.add_maps(*XYMAP_DATA_LIST)
     grid.reload()
     grid.spawn()
+
+    register_instance_reclamation()
 
     limbo = search_object("Limbo", exact=True)
     if not limbo:

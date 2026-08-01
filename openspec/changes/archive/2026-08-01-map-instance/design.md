@@ -543,6 +543,22 @@ entirely still cannot lose an NPC to silent destruction, because Evennia's own `
 fail to *despawn* correctly is a registered, owned one (it would be relocated instead of deleted) —
 a strictly safer failure mode than the alternative, not a new hazard.
 
+**Rubber-duck-review correction (2026-08-01), recorded rather than silently applied.** An earlier
+draft of `reclaim_due_instances()` cleared entities and then attempted `room.delete()` inside a
+`django.db.transaction.atomic()` that rolled back if the delete returned `False`. Two problems,
+verified on the installed stack rather than assumed: (1) Evennia's idmapper in-memory object cache
+does not reliably restore deleted/relocated objects on a database-savepoint rollback, so the
+transaction's promise of atomicity did not hold in practice; and (2) the code path itself was
+wrong-shaped — a deferred room should be *unchanged*, not restored from a rollback. **Corrected:
+`reclaim_due_instances()` now consults `InstanceRoom.at_object_delete()` as a pre-flight check
+before any entity is despawned or relocated.** If the safety net refuses, the room is deferred with
+its `contents` and `owned_entities` untouched — deferral is side-effect-free by construction, not by
+best-effort rollback. A second rubber-duck finding (prototype `typeclass` escape, see D-7 below) is
+also incorporated: the whitelist gates the actual spawned type, not merely the claimed parentage,
+because the exact-typeclass reclamation query would silently skip a room spawned under a different
+typeclass. Both corrections keep the `instance-reclamation`/`instance-spawn` delta specs in lockstep
+with the implementation (their scenarios assert the corrected behavior).
+
 ### D-7. The change-21 seam: a one-entry, explicit whitelist tuple — not a registry with validation
 logic, since none is needed yet.
 
@@ -556,7 +572,25 @@ def _validate_prototype_parent(prototype: dict) -> None:
         raise ValueError(
             f"prototype_parent {parent!r} is not in INSTANCE_PROTOTYPE_WHITELIST"
         )
+    typeclass = prototype.get("typeclass")
+    if typeclass is not None and typeclass != "typeclasses.rooms.InstanceRoom":
+        raise ValueError(
+            f"prototype typeclass {typeclass!r} overrides instance_room; "
+            "a whitelisted instance prototype must not override the typeclass"
+        )
 ```
+
+**Rubber-duck-review correction: the whitelist gates the spawned type, not only the claimed
+parentage.** `prototype_parent` membership alone does not bind the object `spawner.spawn()` actually
+creates — a prototype dict may chain from `"instance_room"` while also declaring its own
+`typeclass`, and the reclamation query's exact-typeclass filter (`InstanceRoom.objects.all()`,
+D-9) would silently skip anything spawned under a different typeclass, making a TTL'd room
+permanently unreclaimable. The check above therefore also rejects an explicit `typeclass` that is
+not exactly `"typeclasses.rooms.InstanceRoom"`, and `spawn_instance_room()` additionally verifies
+the spawned object is an `InstanceRoom` (defense in depth) inside the same transaction that creates
+its exits — a non-`InstanceRoom` result rolls the whole attach back. This keeps the whitelist the
+single, enforced gate over what `spawn_instance_room()` can produce, exactly as D-7's "no path to
+spawning an instance room that bypasses it" claim intends.
 
 `world/prototypes.py::INSTANCE_ROOM = {"typeclass": "typeclasses.rooms.InstanceRoom", "desc": "..."}`
 — per Evennia's own module-prototype loading rule (verified directly, Verification section: without an

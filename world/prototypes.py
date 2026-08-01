@@ -57,3 +57,8 @@ ANCHOR_ROOM = {
     "prototype_parent": "xyz_room",
     "typeclass": "typeclasses.rooms.AnchorRoom",
 }
+
+INSTANCE_ROOM = {
+    "typeclass": "typeclasses.rooms.InstanceRoom",
+    "desc": "An ephemeral place on the Instance layer (map-instance).",
+}

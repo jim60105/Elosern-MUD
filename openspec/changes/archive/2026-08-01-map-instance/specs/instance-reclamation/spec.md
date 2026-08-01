@@ -132,6 +132,14 @@ step SHALL `room.delete()` be called. This requirement SHALL hold regardless of 
 an `NPC` or `Monster` — the routing rule (despawn vs. relocate) depends only on `owned_entities`
 membership, never on entity type.
 
+The entity clearing SHALL only ever run for a room the typeclass safety net would accept: the step
+SHALL first consult `InstanceRoom.at_object_delete()` (D-1), and if that returns `False`, SHALL emit
+`"instance_reclaim_deferred"` with no entity despawned or relocated. A deferred room therefore keeps
+its contents and its `owned_entities` registry intact, so the retry is side-effect-free. This replaces
+an earlier draft that cleared entities and then attempted deletion inside a rolling-back transaction —
+a design Evennia's idmapper does not reliably support, and which could leave an owned NPC data-lost on
+the refused-delete path (rubber-duck review).
+
 This is the concrete resolution the rubber-duck review demanded: a due room containing only an NPC
 (no `PlayerCharacter`, no pin) is not merely deferred forever — it is **actually and eventually
 reclaimed**, with its NPC handled by exactly one of the two specified outcomes below.
@@ -162,14 +170,27 @@ reclaimed**, with its NPC handled by exactly one of the two specified outcomes b
   time `room.delete()` is called, so the room's own `at_object_delete()` `PlayerCharacter`-only check
   is never put in conflict with a still-present NPC
 
+#### Scenario: A refused delete defers with contents and ownership intact
+- **WHEN** a due, unpinned, unoccupied `InstanceRoom` would nevertheless be refused by the typeclass
+  safety net (simulated by a stub `InstanceRoom.at_object_delete()` returning `False`), and the room
+  contains a registered and an unregistered `NPC` and a non-empty `owned_entities`
+- **THEN** the call emits a `ScheduledEvent` of kind `"instance_reclaim_deferred"`, the room still
+  exists, and both `NPC`s are still present in its `contents` with `owned_entities` unchanged — the
+  safety net is consulted before any entity is despawned or relocated, so no partial state survives a
+  refused delete
+
 ### Requirement: reclaim_due_instances deletes rooms that are due, unblocked, and not promotable
 For every due `InstanceRoom` with no `PlayerCharacter` present, no active pin, that is not both
 `named` and `interacted`, `reclaim_due_instances()` SHALL clear its non-player entities (per the
 requirement above), call `room.delete()`, and emit a `ScheduledEvent` of kind `"instance_reclaimed"`
-if deletion succeeds. If `room.delete()` returns `False` (the typeclass's own safety net firing —
-expected not to occur in the normal path once entities are cleared, but not assumed impossible),
-`reclaim_due_instances()` SHALL emit a `ScheduledEvent` of kind `"instance_reclaim_deferred"` instead,
-and SHALL NOT raise.
+if deletion succeeds. `reclaim_due_instances()` SHALL NOT raise under any circumstance on this path:
+if the typeclass safety net refuses the room (a `False` return from `InstanceRoom.at_object_delete()`
+or from `room.delete()` itself), `reclaim_due_instances()` SHALL emit a `ScheduledEvent` of kind
+`"instance_reclaim_deferred"` instead. When the refusal is discovered by the pre-flight safety-net
+check (the only path expected to be reachable, and the only one that runs before any entity is
+cleared), the deferred room's contents and ownership registry are untouched; a deferred event emitted
+from the delete-result branch is an unreachable-in-normal-operation defensive outcome and SHALL still
+not raise.
 
 #### Scenario: An unnamed, uninteracted due room with no occupants is reclaimed
 - **WHEN** `reclaim_due_instances(start_tick, end_tick)` is called and a due room with no

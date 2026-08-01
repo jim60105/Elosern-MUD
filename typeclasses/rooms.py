@@ -61,3 +61,36 @@ class TerrainRoom(SceneArchetypeMixin, WildernessRoom):
     """
 
     pass
+
+
+class InstanceRoom(SceneArchetypeMixin, DefaultRoom):
+    """A room on the Instance layer (design doc D3) -- ephemeral, TTL-bounded,
+    spawned through core evennia.prototypes.spawner.spawn(), never through
+    xyzgrid. Carries no (x, y, z) of any kind; reachability is a plain Evennia
+    exit-graph fact, identical to how Limbo itself works (map-instance
+    design.md D-1)."""
+
+    expire_tick: int | None = AttributeProperty(default=None)  # None = promoted
+    named: bool = AttributeProperty(default=False)
+    interacted: bool = AttributeProperty(default=False)
+    pin_reasons: list[str] = AttributeProperty(default=list)
+    owned_entities: list = AttributeProperty(default=list)  # despawned on reclaim
+    origin_room = AttributeProperty(default=None)
+
+    def at_object_receive(self, obj, source_location, move_type="move", **kwargs):
+        super().at_object_receive(obj, source_location, move_type=move_type, **kwargs)
+        from typeclasses.characters import PlayerCharacter
+
+        if isinstance(obj, PlayerCharacter):
+            self.db.interacted = True
+
+    def at_object_delete(self):
+        if not super().at_object_delete():
+            return False
+        if self.db.pin_reasons:
+            return False
+        from typeclasses.characters import PlayerCharacter
+
+        if any(isinstance(occupant, PlayerCharacter) for occupant in self.contents):
+            return False
+        return True
