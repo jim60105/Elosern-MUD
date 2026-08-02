@@ -58,7 +58,22 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
         # 1 entry + 1 east + 1 west + 1 return = 4 legs.
         self.assertEqual(get_world_clock().tick, before + 4 * 9000)
-        self.assertEqual(dict(script.db.itemcoordinates), {})
+        # The player's own bookkeeping is cleaned up on the return exit, but a
+        # persistent population monster stays registered at the entry
+        # coordinate -- the wilderness is no longer empty (wilderness-
+        # monster-population). This preserves the original leak-check intent:
+        # nothing belonging to the round trip is left behind.
+        coordinates = dict(script.db.itemcoordinates)
+        self.assertNotIn(self.char1, coordinates)
+        from typeclasses.monsters import Monster
+
+        entry_monsters = [
+            obj
+            for obj, coords in coordinates.items()
+            if isinstance(obj, Monster) and coords == (60, 100)
+        ]
+        self.assertEqual(len(entry_monsters), 1)
+        self.assertEqual(entry_monsters[0].db.population_key, "wilderness:60:100")
         retained = list(script.db.rooms.values())
         self.assertIn(entry_room, retained or script.db.unused_rooms)
 

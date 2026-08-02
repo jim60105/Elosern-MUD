@@ -88,3 +88,13 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         # coordinate would silently persist if this were not re-assigned.
         room.scene_archetype = region_for_coordinates(*coordinates)
         room.ndb.active_desc = terrain_description(*coordinates)
+        # wilderness-monster-population D-4: ensure the deterministic monster
+        # population for this coordinate whenever a wilderness script is
+        # attached. Deferred import breaks the load-time cycle: this module is
+        # imported by wilderness_population, which reads region_for_coordinates
+        # from here.
+        wilderness = room.wilderness
+        if wilderness is not None:
+            from world.maps.wilderness_population import ensure_population
+
+            ensure_population(wilderness, coordinates)

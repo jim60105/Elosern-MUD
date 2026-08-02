@@ -92,6 +92,7 @@ class WildernessGatewayExitTests(EvenniaTest):
 
     def test_eight_leg_round_trip_advances_clock_by_exactly_72000(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from typeclasses.monsters import Monster
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         before = self._tick()
@@ -103,7 +104,16 @@ class WildernessGatewayExitTests(EvenniaTest):
         self._exit("south").at_traverse(self.char1, self.char1.location)
         self.assertEqual(self._tick(), before + 8 * 9000)
         self.assertIs(self.char1.location, self.north_gate)
-        self.assertEqual(dict(script.db.itemcoordinates), {})
+        # The return-exit cleanup drops the player, but each visited coordinate
+        # keeps its deterministic population monster (wilderness-monster-
+        # population); the leak-check intent -- no player bookkeeping left
+        # behind -- is preserved.
+        coordinates = dict(script.db.itemcoordinates)
+        self.assertNotIn(self.char1, coordinates)
+        self.assertTrue(
+            all(isinstance(obj, Monster) for obj in coordinates),
+            "only population monsters may remain registered",
+        )
 
     def test_other_directions_route_as_ordinary_wilderness_exit(self):
         from typeclasses.rooms import TerrainRoom
@@ -125,13 +135,23 @@ class WildernessGatewayExitTests(EvenniaTest):
 
     def test_vacated_room_is_not_orphaned_and_is_reused_on_reentry(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from typeclasses.monsters import Monster
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         self.gate.at_traverse(self.char1, self.north_gate)
         first_room = self.char1.location
         self._exit("south").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.north_gate)
-        self.assertEqual(dict(script.db.itemcoordinates), {})
+        # The player's bookkeeping is cleaned up on the return exit; only the
+        # deterministic population monster stays registered (wilderness-
+        # monster-population).
+        coordinates = dict(script.db.itemcoordinates)
+        self.assertNotIn(self.char1, coordinates)
+        self.assertTrue(
+            all(isinstance(obj, Monster) for obj in coordinates)
+            and len(coordinates) == 1,
+            "only the entry population monster may remain registered",
+        )
         # The vacated room is either in unused_rooms or retained in db.rooms,
         # never orphaned -- and re-entry reuses the same room object.
         retained = list(script.db.rooms.values())

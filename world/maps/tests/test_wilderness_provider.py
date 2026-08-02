@@ -5,6 +5,7 @@ from tools.spec_traceability import covers_requirement
 import inspect
 import unittest
 
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import TerrainRoom
@@ -107,6 +108,43 @@ class MapProviderTests(EvenniaTest):
         self.assertEqual(room.ndb.active_desc, terrain_description(60, 100))
         self.assertEqual(room.scene_archetype, region_for_coordinates(60, 100))
 
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
+    def test_at_prepare_room_is_population_noop_without_wilderness_script(self):
+        from typeclasses.monsters import Monster
+
+        from world.maps.wilderness_provider import (
+            terrain_description as _terrain_description,
+        )
+
+        room = create_object(TerrainRoom, key="scriptless")
+        self.assertIsNone(room.wilderness)
+        self.provider.at_prepare_room((60, 100), None, room)
+        self.assertEqual(room.scene_archetype, region_for_coordinates(60, 100))
+        self.assertEqual(room.ndb.active_desc, _terrain_description(60, 100))
+        self.assertEqual(Monster.objects.all().count(), 0)
+
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
+    def test_enter_wilderness_populates_the_entry_coordinate(self):
+        from evennia.contrib.grid.wilderness.wilderness import (
+            WildernessScript,
+            create_wilderness,
+            enter_wilderness,
+        )
+        from typeclasses.monsters import Monster
+
+        create_wilderness(name=WILDERNESS_NAME, mapprovider=self.provider)
+        enter_wilderness(self.char1, coordinates=(60, 100), name=WILDERNESS_NAME)
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        monsters = [
+            obj
+            for obj in script.get_objs_at_coordinates((60, 100))
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(monsters), 1)
+        self.assertEqual(monsters[0].db.population_key, "wilderness:60:100")
+        self.assertIs(monsters[0].location, self.char1.location)
+
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_recycled_room_gets_fresh_scene_archetype(self):
         from evennia.contrib.grid.wilderness.wilderness import (
             WildernessScript,

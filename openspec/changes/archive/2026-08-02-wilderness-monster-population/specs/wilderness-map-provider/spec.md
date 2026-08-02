@@ -1,31 +1,4 @@
-## Purpose
-
-The bounded `ElosernWildernessMapProvider` instantiating the deterministic terrain model on the
-wilderness/Virtual layer: a 224×224 grid at 10 km/cell approximating the continent's stated ~500萬 km²
-area, using the project-owned `TerrainRoom` and `WildernessReturnExit` typeclasses.
-
-## Requirements
-
-
-### Requirement: ElosernWildernessMapProvider bounds the map to a 224x224 grid at 10 km per cell
-`world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 10`,
-`WILDERNESS_MAX_X = 223`, `WILDERNESS_MAX_Y = 223`, and `ElosernWildernessMapProvider`, a subclass of
-`evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose `is_valid_coordinates`
-accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and `0 <= y <= WILDERNESS_MAX_Y`.
-
-#### Scenario: Coordinates inside the bound are valid
-- **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (0, 0))` and
-  `(WILDERNESS_MAX_X, WILDERNESS_MAX_Y)` are checked
-- **THEN** both return `True`
-
-#### Scenario: Coordinates outside the bound are invalid
-- **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (-1, 0))` and
-  `(WILDERNESS_MAX_X + 1, 0)` are checked
-- **THEN** both return `False`
-
-#### Scenario: The bound approximates world_info.md's stated continent area
-- **WHEN** `(WILDERNESS_MAX_X + 1) * WILDERNESS_KM_PER_CELL` is computed for both axes and squared
-- **THEN** the result is within 1% of `world_info.md`'s stated ~5,000,000 km² continent area
+## MODIFIED Requirements
 
 ### Requirement: get_location_name and at_prepare_room delegate to the deterministic terrain model
 `ElosernWildernessMapProvider.get_location_name(coordinates)` SHALL return
@@ -66,16 +39,3 @@ script is attached, so a pooled or unit-test `TerrainRoom` is never required to 
   wilderness script (as in the provider's unit tests)
 - **THEN** only the description and scene archetype are set, no exception is raised, and no monster is
   created
-
-### Requirement: ElosernWildernessMapProvider uses TerrainRoom and WildernessReturnExit
-`ElosernWildernessMapProvider.room_typeclass` SHALL be `typeclasses.rooms.TerrainRoom` and
-`ElosernWildernessMapProvider.exit_typeclass` SHALL be `typeclasses.exits.WildernessReturnExit`.
-
-#### Scenario: Rooms created by the provider are TerrainRoom instances
-- **WHEN** a character enters the wilderness through `ElosernWildernessMapProvider`
-- **THEN** `character.location` is an instance of `typeclasses.rooms.TerrainRoom`
-
-#### Scenario: Every directional exit created by the provider is a WildernessReturnExit instance
-- **WHEN** any room created by `ElosernWildernessMapProvider` is inspected
-- **THEN** every one of its eight directional exits is an instance of
-  `typeclasses.exits.WildernessReturnExit`
