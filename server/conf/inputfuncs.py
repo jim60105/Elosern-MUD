@@ -1,52 +1,121 @@
 """
-Input functions
+Project OOB input functions for the Elosern WebClient.
 
-Input functions are always called from the client (they handle server
-input, hence the name).
-
-This module is loaded by being included in the
-`settings.INPUT_FUNC_MODULES` tuple.
-
-All *global functions* included in this module are considered
-input-handler functions and can be called by the client to handle
-input.
-
-An input function must have the following call signature:
-
-    cmdname(session, *args, **kwargs)
-
-Where session will be the active session and *args, **kwargs are extra
-incoming arguments and keyword properties.
-
-A special command is the "default" command, which is will be called
-when no other cmdname matches. It also receives the non-found cmdname
-as argument.
-
-    default(session, cmdname, *args, **kwargs)
-
+This module is loaded through ``settings.INPUT_FUNC_MODULES`` alongside
+Evennia's own input functions. It adds ``ui_sync`` (authenticated WebSocket
+synchronization) and overrides ``text`` so a WebClient command settlement can
+refresh canonical presentation without changing Evennia's command semantics.
 """
 
-# def oob_echo(session, *args, **kwargs):
-#     """
-#     Example echo function. Echoes args, kwargs sent to it.
-#
-#     Args:
-#         session (Session): The Session to receive the echo.
-#         args (list of str): Echo text.
-#         kwargs (dict of str, optional): Keyed echo text
-#
-#     """
-#     session.msg(oob=("echo", args, kwargs))
-#
-#
-# def default(session, cmdname, *args, **kwargs):
-#     """
-#     Handles commands without a matching inputhandler func.
-#
-#     Args:
-#         session (Session): The active Session.
-#         cmdname (str): The (unmatched) command name
-#         args, kwargs (any): Arguments to function.
-#
-#     """
-#     pass
+from evennia.commands.cmdhandler import cmdhandler
+from evennia.server.inputfuncs import _IDLE_COMMAND, _maybe_strip_incoming_mxp
+
+from web.webclient.actions.dispatcher import handle_ui_action
+from web.webclient.actions.registry import build_production_action_registry
+from web.webclient.presentation.ingress import (
+    is_webclient,
+    observe_command_settlement,
+    send_protocol_error,
+    synchronize_session,
+)
+from web.webclient.presentation.protocol import (
+    UI_SYNC,
+    ProtocolValidationError,
+    check_envelope,
+    validate_ui_sync,
+)
+from web.webclient.presentation.registry import build_production_registry
+
+
+def ui_sync(session, *args, **kwargs):
+    """Authenticated WebSocket-only synchronization of canonical presentation.
+
+    Accepts exactly ``{protocol_version: 1}`` from a WebSocket session with an
+    active puppet. The actor is resolved only from ``session.puppet``; a
+    client-supplied actor is rejected by the exact envelope schema. Anonymous,
+    unpuppeted, Telnet, and AJAX sessions receive no character presentation
+    state.
+    """
+    payload = args[0] if args else None
+
+    if not is_webclient(session):
+        # Telnet and AJAX sessions never receive Elosern graphical OOB state.
+        return
+
+    try:
+        check_envelope(payload)
+        validate_ui_sync(payload)
+    except ProtocolValidationError as error:
+        unsupported = "unsupported protocol_version" in str(error)
+        send_protocol_error(
+            session,
+            code="unsupported_version" if unsupported else "malformed_envelope",
+            message="不支援的協定版本" if unsupported else "同步訊息格式錯誤",
+            reload_required=unsupported,
+        )
+        return
+
+    actor = getattr(session, "puppet", None)
+    if actor is None:
+        # No puppet means no character presentation state is emitted.
+        return
+
+    synchronize_session(session, actor)
+
+
+def ui_action(session, *args, **kwargs):
+    """Authenticated WebSocket-only UI action dispatch.
+
+    The actor is resolved only from ``session.puppet``. Anonymous, unpuppeted,
+    Telnet, and AJAX sessions are rejected before adapter invocation, and no
+    character state is returned.
+    """
+    if not is_webclient(session):
+        return
+    actor = getattr(session, "puppet", None)
+    if actor is None:
+        return
+    payload = args[0] if args else None
+    handle_ui_action(
+        session,
+        actor,
+        payload,
+        build_production_action_registry(),
+        build_production_registry(),
+    )
+
+
+def text(session, *args, **kwargs):
+    """Main text input preserving Evennia 6.1 semantics with post-command refresh.
+
+    Idle handling, MXP stripping, nickname replacement, command dispatch, and
+    session counters behave exactly as Evennia's stock ``text`` input function.
+    The difference is that the Deferred returned by the command handler is
+    observed: after a WebClient command settles (callback or errback), a safe
+    full-snapshot refresh is attempted from then-current canonical state. The
+    observer never replaces the original value or Failure, and Telnet/AJAX
+    sessions receive no graphical output.
+    """
+    txt = args[0] if args else None
+    if txt is None:
+        return
+    if txt.strip() in _IDLE_COMMAND:
+        session.update_session_counters(idle=True)
+        return
+
+    txt = _maybe_strip_incoming_mxp(txt)
+
+    if session.account:
+        puppet = session.puppet
+        if puppet:
+            txt = puppet.nicks.nickreplace(txt, categories=("inputline"), include_account=True)
+        else:
+            txt = session.account.nicks.nickreplace(
+                txt, categories=("inputline"), include_account=False
+            )
+    kwargs.pop("options", None)
+    deferred = cmdhandler(session, txt, callertype="session", session=session, **kwargs)
+    session.update_session_counters()
+
+    if is_webclient(session):
+        observe_command_settlement(deferred, session)

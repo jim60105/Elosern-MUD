@@ -1,0 +1,77 @@
+/* ---
+
+  Base style sheet for the Elosern WebClient.
+
+  Replaces the stock Evennia sheet: the Bootstrap `d-none` utility and the
+  minimal text classes that the text transport still emits. The ink-night /
+  vermilion desktop theme lives in elosern.css; this file only anchors the
+  page and the degraded text fallback surface.
+
+--- */
+
+html, body {
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    overflow: hidden;
+}
+
+div {
+    margin: 0px;
+}
+
+.hidden,
+.d-none {
+    display: none;
+}
+
+/* Container surrounding the entire client */
+#clientwrapper {
+    height: 100%;
+}
+
+/* Main scrolling message area (degraded fallback) */
+#main,
+#main-sub {
+    height: 100%;
+}
+
+#messagewindow {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-wrap: break-word;
+}
+
+.content {
+    height: 100%;
+}
+
+/* Utility messages (green) */
+.sys { color: #8ecf6f; }
+
+/* Messages echoed back after input */
+.inp { color: #b0a99a; }
+
+/* Messages returned from the server (most messages) */
+.out {
+    color: #d8d3c8;
+    background-color: transparent;
+    white-space: pre-wrap;
+}
+
+/* Error messages (red/vermilion) */
+.err { color: #e05c3a; }
+
+/* Prompt base (paper white) */
+.prompt { color: #ece7db; }
+
+.underline { text-decoration: underline; }
+
+/* No javascript warning */
+#connecting {
+    position: absolute;
+    width: 100%;
+    padding: .5em .9em
+}

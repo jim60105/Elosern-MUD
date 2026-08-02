@@ -231,6 +231,22 @@ def get_world_clock() -> WorldClock:
     return clock
 
 
+def read_world_clock() -> WorldClock | None:
+    """Return the existing world-clock singleton or ``None`` without creating.
+
+    Presentation reads only through this accessor; it never calls
+    ``get_world_clock``, which would create the Script. A missing singleton is
+    reported as absence so presentation can fail safely.
+    """
+    matches = search_script("world_clock")
+    if not matches:
+        return None
+    script = matches[0]
+    clock = WorldClock(int(script.db.tick or 0))
+    clock._persist = lambda tick: setattr(script.db, "tick", tick)
+    return clock
+
+
 def settle_combat_result(result: Any, entities: Iterable[Any]) -> list[ScheduledEvent]:
     """Settle a reported combat duration through the combat source gate."""
     return get_world_clock().advance(result.total_seconds, AdvanceSource.COMBAT, entities)

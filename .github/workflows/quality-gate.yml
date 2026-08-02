@@ -40,6 +40,9 @@ jobs:
       - name: Sync locked environment
         run: uv sync --locked
 
+      - name: Install Chromium for browser acceptance
+        run: uv run --locked playwright install --with-deps chromium
+
       - name: Prepare Evennia runtime directories
         run: mkdir -p server/db server/logs
 
@@ -48,6 +51,14 @@ jobs:
 
       - name: Validate static requirement traceability
         run: uv run --locked python -m tools.spec_traceability check
+
+      - name: Run Node DOM-independent test suite
+        run: node --test web/static/webclient/js/tests/*.test.js
+
+      - name: Run browser acceptance suite
+        env:
+          OPENSPEC_TEST_EVIDENCE: ${{ env.OPENSPEC_TEST_EVIDENCE }}
+        run: uv run --locked python -m unittest discover -s web/tests/browser -t .
 
       - name: Run full Evennia suite with coverage
         env:

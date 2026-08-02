@@ -37,9 +37,13 @@ def at_server_start():
         sync_wilderness,
     )
     from world.quests.bootstrap import sync_quest_runtime
+    from world.rules.clock import get_world_clock
     from world.rules.guild_economy import sync_guild_economy
     from world.rules.onboarding import sync_guard_npc
 
+    # Deterministic startup owns the world-clock singleton; presentation reads
+    # only through read_world_clock() and must never create it.
+    get_world_clock()
     sync_all()
     sync_grid()
     sync_wilderness()

@@ -1,0 +1,16 @@
+{% extends "webclient/base.html" %}
+
+{% block client %}
+
+<!-- GoldenLayout mounts the version-1 shell into #main-sub. -->
+<div id="main">
+  <div id="main-sub">
+    <!-- Degraded text fallback: if the shell plugins fail to initialize, the
+         stock default_out plugin still appends narrative output here. -->
+    <div id="messagewindow" class="content"></div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{% endblock %}

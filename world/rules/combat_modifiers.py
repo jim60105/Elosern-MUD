@@ -38,11 +38,28 @@ def _merge_adjustments(result: dict[str, Any], incoming: dict[str, Any]) -> dict
     return merged
 
 
-def evaluate_combat_modifiers(entity) -> dict[str, Any]:
-    """Return the merged matching bundle without mutating entity state."""
-    context = _build_context(entity)
-    result: dict[str, Any] = {}
+def matched_combat_modifiers(
+    entity, context: dict[str, Any] | None = None
+) -> tuple[tuple[str, dict[str, Any]], ...]:
+    """Return each matched rule ID with its exact adjustment bundle.
+
+    This read-only query exposes the deterministic per-rule matches so
+    presentation can show each condition without re-evaluating thresholds or
+    reproducing modifier math. ``context`` is the condition context; when
+    omitted it is rebuilt from ``entity``.
+    """
+    if context is None:
+        context = _build_context(entity)
+    matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
         if evaluate_condition(rule.when, context):
-            result = _merge_adjustments(result, rule.then)
+            matches.append((rule.id, dict(rule.then)))
+    return tuple(matches)
+
+
+def evaluate_combat_modifiers(entity) -> dict[str, Any]:
+    """Return the merged matching bundle without mutating entity state."""
+    result: dict[str, Any] = {}
+    for _, adjustments in matched_combat_modifiers(entity):
+        result = _merge_adjustments(result, adjustments)
     return result

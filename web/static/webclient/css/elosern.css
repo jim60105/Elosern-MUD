@@ -1,0 +1,403 @@
+/* ---
+
+  Elosern ink-night / vermilion desktop theme.
+
+  Charcoal and near-black backgrounds with warm paper-gray text; vermilion
+  marks active focus, current position, and critical warnings. Focus never
+  relies on color alone: every focused control gains a shape/border indicator.
+  Reduced-motion preference disables nonessential transitions. The shell
+  targets desktop viewports (1440x900 and 1280x720) with internal scroll areas
+  so every surface stays reachable.
+
+--- */
+
+:root {
+  --elm-ink: #171512;            /* charcoal near-black page */
+  --elm-ink-panel: #1f1c18;      /* raised panels and headers */
+  --elm-ink-raise: #2a2621;      /* hover/active surface */
+  --elm-border: #3a342c;         /* warm gray-brown borders */
+  --elm-paper: #ece7db;          /* warm paper gray text */
+  --elm-paper-dim: #9c958a;      /* secondary text */
+  --elm-vermilion: #e05c3a;      /* seal red accent */
+  --elm-vermilion-dim: #b3442a;
+  --elm-focus-ring: #ff8a5c;     /* lighter vermilion for focus shapes */
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--elm-ink);
+  color: var(--elm-paper);
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+    "DejaVu Sans Mono", Consolas, monospace;
+  font-size: .95em;
+  line-height: 1.45em;
+}
+
+/* ---------------------------------------------------------------- *
+ * Keyboard focus: visible by shape and border, not color alone.
+ * ---------------------------------------------------------------- */
+
+a:focus-visible,
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+.lm_tab:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--elm-focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px var(--elm-ink);
+}
+
+/* ---------------------------------------------------------------- *
+ * Required shell surfaces.
+ * ---------------------------------------------------------------- */
+
+.elosern {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: .75rem .9rem;
+}
+
+/* Header */
+.elosern-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  overflow: hidden;
+  background: var(--elm-ink-panel);
+  border-bottom: 1px solid var(--elm-border);
+  font-size: .9em;
+}
+
+.elosern-header .header-title {
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--elm-paper);
+  border-left: 4px solid var(--elm-vermilion);
+  padding-left: .5rem;
+}
+
+.elosern-header .header-meta {
+  display: flex;
+  gap: 1rem;
+  color: var(--elm-paper-dim);
+}
+
+.elosern-header .header-conn {
+  color: var(--elm-vermilion);
+  border: 1px solid var(--elm-vermilion-dim);
+  padding: 0 .35rem;
+}
+
+/* Narrative: primary reading surface */
+.elosern-narrative {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: break-word;
+  font-family: "Noto Serif TC", "Songti TC", Georgia, serif;
+}
+
+.elosern-narrative .out,
+.elosern-narrative .inp,
+.elosern-narrative .sys,
+.elosern-narrative .err {
+  margin: 0 0 .15rem 0;
+}
+
+/* Placeholders must not fabricate art or map data */
+.elosern-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: .5rem;
+  text-align: center;
+  border: 1px dashed var(--elm-border);
+  color: var(--elm-paper-dim);
+}
+
+.elosern-placeholder .placeholder-heading {
+  color: var(--elm-paper);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- *
+ * Status panel.
+ * ---------------------------------------------------------------- */
+
+.elosern-status .status-actor {
+  margin-bottom: .5rem;
+}
+
+.elosern-status .status-name {
+  font-weight: 700;
+  color: var(--elm-paper);
+}
+
+.elosern-status .status-location {
+  color: var(--elm-paper-dim);
+}
+
+.elosern-status .status-resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: .5rem;
+  margin-bottom: .5rem;
+}
+
+.elosern-status .resource {
+  border: 1px solid var(--elm-border);
+  background: var(--elm-ink-panel);
+  padding: .3rem .5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+}
+
+.elosern-status .resource-label {
+  color: var(--elm-paper-dim);
+  font-weight: 600;
+}
+
+/* Numeric resource labels: real numbers, tabular alignment. */
+.elosern-status .resource-value {
+  color: var(--elm-paper);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.elosern-status .status-conditions {
+  list-style: none;
+  margin: .25rem 0;
+  padding: 0;
+}
+
+.elosern-status .condition {
+  padding: .15rem .4rem;
+  border-left: 3px solid var(--elm-border);
+  margin-bottom: .2rem;
+}
+
+.elosern-status .condition-beneficial {
+  border-left-color: #6f9e5a;
+}
+
+.elosern-status .condition-informational {
+  border-left-color: var(--elm-paper-dim);
+}
+
+.elosern-status .condition-warning {
+  border-left-color: #d8a14a;
+}
+
+.elosern-status .condition-harmful,
+.elosern-status .condition-critical {
+  border-left-color: var(--elm-vermilion);
+  color: var(--elm-paper);
+}
+
+.elosern-status .status-disguise,
+.elosern-status .status-combat {
+  margin-top: .4rem;
+  color: var(--elm-vermilion);
+  border: 1px solid var(--elm-vermilion-dim);
+  padding: .2rem .4rem;
+  width: fit-content;
+}
+
+/* ---------------------------------------------------------------- *
+ * Action dock.
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: .35rem;
+  background: var(--elm-ink-panel);
+  border-top: 1px solid var(--elm-border);
+  overflow: hidden;
+}
+
+.elosern-action-dock .action-guidance {
+  margin: 0;
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+}
+
+/* Disabled controls keep a programmatically associated explanation. */
+.disabled-reason,
+.action-guidance-note,
+[aria-describedby] {
+  color: var(--elm-paper-dim);
+}
+
+/* ---------------------------------------------------------------- *
+ * Command drawer.
+ * ---------------------------------------------------------------- */
+
+.elosern-drawer {
+  padding: .3rem .6rem;
+  overflow: hidden;
+}
+
+.elosern-drawer .prompt {
+  max-height: 1.5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--elm-paper-dim);
+}
+
+.elosern-drawer .inputfieldwrapper {
+  position: relative;
+  height: calc(100% - 1.5rem);
+}
+
+.elosern-drawer .inputsend {
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 1;
+  height: 100%;
+  width: 2rem;
+  color: var(--elm-paper);
+  background-color: var(--elm-ink-raise);
+  border: 1px solid var(--elm-border);
+  cursor: pointer;
+}
+
+.elosern-drawer .inputsend:hover,
+.elosern-drawer .inputsend:focus-visible {
+  background-color: var(--elm-vermilion-dim);
+  color: var(--elm-paper);
+}
+
+.elosern-drawer .inputfield {
+  height: 100%;
+  width: calc(100% - 2.25rem);
+  padding: .25rem .5rem;
+  background-color: var(--elm-ink);
+  color: var(--elm-paper);
+  border: 1px solid var(--elm-border);
+  resize: none;
+  font-family: inherit;
+  font-size: .95em;
+}
+
+.elosern-drawer .inputfield:focus {
+  border-color: var(--elm-focus-ring);
+}
+
+/* ---------------------------------------------------------------- *
+ * Live region for action results: polite, never interrupting.
+ * ---------------------------------------------------------------- */
+
+.elosern-live {
+  min-height: 1.2em;
+  color: var(--elm-paper);
+  border-left: 3px solid var(--elm-vermilion);
+  padding-left: .5rem;
+  font-size: .9em;
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion: disable nonessential transitions and animations.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Safe overflow on the supported desktop viewports. The layout fills the
+ * viewport and scrolls internally; nothing essential is hidden at 1280x720.
+ * ---------------------------------------------------------------- */
+
+@media screen and (max-width: 1400px) {
+  .elosern-header .header-clock {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 1300px), screen and (max-height: 760px) {
+  .elosern {
+    padding: .5rem .6rem;
+  }
+  .elosern-status .status-resources {
+    grid-template-columns: repeat(3, 1fr);
+    gap: .25rem;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Offline overlay (5.6): non-dismissible, preserves the rendered view.
+ * ---------------------------------------------------------------- */
+
+#elosern-offline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: none;
+  background: rgba(10, 10, 12, 0.82);
+  color: var(--elm-paper, #e8e0d2);
+  font: 1.05rem/1.5 var(--elm-ui-face, sans-serif);
+  text-align: center;
+  padding: 2rem;
+}
+
+#elosern-offline-overlay .offline-title {
+  margin-top: 18vh;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--elm-vermilion, #c84a2e);
+}
+
+#elosern-offline-overlay[data-visible="true"] {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- *
+ * Narrative unread marker (5.5).
+ * ---------------------------------------------------------------- */
+
+.elosern-narrative {
+  position: relative;
+}
+
+.narrative-unread {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: flex-start;
+  background: var(--elm-vermilion, #c84a2e);
+  color: var(--elm-ink, #121212);
+  font-weight: 600;
+  padding: .2rem .6rem;
+  border-radius: 0 0 .25rem .25rem;
+  cursor: pointer;
+  width: -moz-fit-content;
+  width: fit-content;
+}
+
+/* Action dock is always reachable and has a visible focus shape. */
+.elosern-action-dock:focus {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+}

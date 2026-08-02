@@ -1,0 +1,31 @@
+# One immutable Traditional Chinese label and severity for every status code.
+#
+# This table must cover exactly the current buff definition keys and combat
+# modifier rule IDs; world/rules/status_display.py fails closed on drift.
+- code: poisoned
+  label: 中毒
+  severity: harmful
+- code: paralysis
+  label: 麻痺
+  severity: critical
+- code: fear
+  label: 恐懼
+  severity: harmful
+- code: conferred_growth_rate
+  label: 成長率加乘
+  severity: beneficial
+- code: poison_agility_penalty
+  label: 中毒敏捷減損
+  severity: harmful
+- code: paralysis_locks_actions
+  label: 麻痺鎖定行動
+  severity: critical
+- code: fear_agility_and_accuracy_penalty
+  label: 恐懼敏捷與準度減損
+  severity: harmful
+- code: high_arousal_agility_accuracy_penalty
+  label: 高度興奮敏捷與準度減損
+  severity: warning
+- code: climax_in_progress_locks_actions
+  label: 高潮進行中鎖定行動
+  severity: warning
