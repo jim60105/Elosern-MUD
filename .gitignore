@@ -43,7 +43,10 @@ env/
 # Tests, Coverage & Translations
 # ==========================================
 .coverage
+coverage.json
+coverage.xml
 .tox
+toolbox/*.lock
 *.mo
 
 # ==========================================

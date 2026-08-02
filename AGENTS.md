@@ -87,16 +87,16 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 
 ```sh
 uv sync --locked
-uv run --locked evennia test --settings settings.py .
-uv run --locked -m unittest discover tests
+uv run --locked evennia test --settings settings.py commands server typeclasses web world
+uv run --locked -m unittest discover -s tests -t .
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
 
-The Evennia command is the full project suite. The `unittest discover tests`
-command is only the top-level contrib-matrix regression check, not a substitute
-for the full suite. Run focused tests while iterating and the full relevant
-suite before handing work off.
+The Evennia command is the full project suite. The `unittest discover -s tests
+-t .` command is only the top-level contrib-matrix regression check, not a
+substitute for the full suite. Run focused tests while iterating and the full
+relevant suite before handing work off.
 
 Use `uv add <package>` and `uv remove <package>` for dependency changes so
 `pyproject.toml` and `uv.lock` remain synchronized. Never edit `uv.lock`

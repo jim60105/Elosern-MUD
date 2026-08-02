@@ -1,84 +1,4 @@
-# Spec Test Traceability Specification
-
-## Purpose
-
-Define deterministic requirement-to-test traceability and reproducible CI
-quality gates for the repository's current OpenSpec contract.
-## Requirements
-### Requirement: Main-spec requirements have deterministic identities
-The verifier SHALL derive one human-readable identifier for every
-`### Requirement:` heading in each direct child capability under
-`openspec/specs/`. It MUST reject identity collisions, malformed requirement
-headings, and requirements outside that current-contract tree MUST NOT affect
-the result.
-
-#### Scenario: Main requirement receives an ID
-- **WHEN** a capability spec contains a valid requirement heading
-- **THEN** the listing command emits an ID composed from the capability and the normalized requirement name
-
-#### Scenario: Proposed and historical specs are excluded
-- **WHEN** active or archived change directories contain requirement headings
-- **THEN** those headings do not appear in the current-contract requirement index
-
-#### Scenario: Colliding normalized names fail
-- **WHEN** two requirement headings in one capability normalize to the same ID
-- **THEN** verification fails and reports both source locations
-
-### Requirement: Existing tests declare requirement coverage locally
-The repository SHALL provide a transparent Python decorator that associates one
-or more literal requirement IDs with a discoverable `test_*` function or method.
-Applying the decorator MUST preserve the callable's identity and behavior, and
-the verifier MUST discover annotations through static source parsing without
-importing game or test modules.
-
-#### Scenario: Unit test declares one requirement
-- **WHEN** a unit-test method is decorated with one valid literal requirement ID
-- **THEN** the verifier records that test location as coverage for the requirement
-
-#### Scenario: Integration test declares multiple requirements
-- **WHEN** an Evennia integration-test method is decorated with multiple valid literal IDs
-- **THEN** the verifier records the test once for every declared requirement
-
-#### Scenario: Invalid annotation is rejected
-- **WHEN** the decorator is placed on a non-test callable or receives a dynamic or unknown ID
-- **THEN** verification fails with the annotation's file and line number
-
-### Requirement: Associated tests provide successful execution evidence
-When the CI evidence path is configured, an annotated test SHALL record its
-qualified identity and declared requirement IDs only after it returns
-successfully. CI completeness verification MUST count only a static association
-with matching successful execution evidence; uncollected, skipped,
-expected-failing, and failing tests MUST NOT satisfy a requirement.
-
-#### Scenario: Passing collected test counts
-- **WHEN** an annotated test is collected and returns successfully under either required test command
-- **THEN** its matching evidence makes each valid declared requirement eligible as covered
-
-#### Scenario: Skipped test does not count
-- **WHEN** the only associated test for a requirement is skipped
-- **THEN** no successful evidence is recorded and CI completeness verification fails for that requirement
-
-#### Scenario: Uncollected annotation does not count
-- **WHEN** an annotation exists on source that neither required test command collects
-- **THEN** it has no matching execution evidence and cannot satisfy the requirement
-
-### Requirement: Every current requirement is associated with a test
-The CI verification command MUST fail when any indexed main-spec requirement has
-no valid and successfully executed unit-test or integration-test association.
-It MUST report all uncovered requirements in deterministic order and MUST NOT
-support a baseline, waiver, or allowlist that converts a gap into success.
-
-#### Scenario: Complete traceability passes
-- **WHEN** every indexed requirement has at least one valid test annotation with matching successful execution evidence and no verification error exists
-- **THEN** verification exits successfully and reports requirement and association totals
-
-#### Scenario: Every gap is reported
-- **WHEN** one or more indexed requirements have no valid test annotation
-- **THEN** verification exits nonzero and lists every uncovered requirement with its spec source location
-
-#### Scenario: Existing test coverage is reused without fabricating tests
-- **WHEN** the initial audit finds an existing test whose assertions cover a requirement
-- **THEN** that test may be annotated without changing its assertions or behavior
+## MODIFIED Requirements
 
 ### Requirement: Continuous integration enforces both quality dimensions
 GitHub Actions MUST run strict OpenSpec validation, complete requirement
@@ -136,6 +56,8 @@ threshold, source-root verification, and externally published XML report.
 - **THEN** CI generates the Codecov XML report from that combined data
 - **AND** it does not upload either intermediate coverage data file as an independent report
 
+## ADDED Requirements
+
 ### Requirement: Aggregate coverage is published to Codecov
 After all local test, traceability, source-root, and coverage-threshold gates
 succeed, GitHub Actions SHALL upload the explicit combined XML report to the
@@ -159,4 +81,3 @@ that repository's Codecov page and scoped to the configured default branch.
 - **WHEN** a reader views `README.md`
 - **THEN** Codecov's generated private-repository badge for `jim60105/MUD` displays the configured default branch's coverage without exposing an upload credential
 - **AND** selecting the badge opens that repository's Codecov page
-

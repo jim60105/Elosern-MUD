@@ -94,9 +94,9 @@ Collect evidence from both required test entry points and verify it with:
 ```sh
 traceability_evidence=$(mktemp)
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  uv run --locked evennia test --settings settings.py .
+  uv run --locked evennia test --settings settings.py commands server typeclasses web world
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  uv run --locked -m unittest discover tests
+  uv run --locked -m unittest discover -s tests -t .
 uv run --locked python -m tools.spec_traceability verify \
   --evidence "$traceability_evidence"
 ```
@@ -114,21 +114,24 @@ the exact aggregate coverage sequence:
 ```sh
 COVERAGE_FILE=.coverage.evennia \
   OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  uv run --locked coverage run -m evennia test --settings settings.py .
+  uv run --locked coverage run -m evennia test --settings settings.py commands server typeclasses web world
 COVERAGE_FILE=.coverage.top-level \
   OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-uv run --locked coverage run -m unittest discover tests
+uv run --locked coverage run -m unittest discover -s tests -t .
 uv run --locked coverage combine .coverage.evennia .coverage.top-level
 uv run --locked coverage json --fail-under=0 -o coverage.json
 uv run --locked python -m tools.verify_coverage_roots coverage.json
 uv run --locked coverage report --fail-under=90
+uv run --locked coverage xml -o coverage.xml
 ```
 
-Coverage uses branch measurement and exactly these first-party production
-roots: `commands`, `server`, `typeclasses`, `web`, and `world`. Only modules
+The Evennia runner owns package-local tests under exactly these first-party
+roots: `commands`, `server`, `typeclasses`, `web`, and `world`; top-level
+repository contracts remain owned by `unittest discover -s tests -t .`. Only modules
 under `*/tests/*` may be omitted from those roots. Dependency code, OpenSpec
 artifacts, and repository tools are outside the configured source roots. Both
-coverage data files must be combined before applying the aggregate 90% gate.
+coverage data files must be combined before applying the aggregate 90% gate or
+generating `coverage.xml` for Codecov.
 
 ## Handling a genuine gap
 

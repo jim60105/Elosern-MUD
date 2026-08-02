@@ -52,12 +52,12 @@ jobs:
       - name: Run full Evennia suite with coverage
         env:
           COVERAGE_FILE: .coverage.evennia
-        run: uv run --locked coverage run -m evennia test --settings settings.py .
+        run: uv run --locked coverage run -m evennia test --settings settings.py commands server typeclasses web world
 
       - name: Run top-level regression suite with coverage
         env:
           COVERAGE_FILE: .coverage.top-level
-        run: uv run --locked coverage run -m unittest discover tests
+        run: uv run --locked coverage run -m unittest discover -s tests -t .
 
       - name: Verify successful requirement execution
         run: >-
@@ -74,3 +74,14 @@ jobs:
 
       - name: Enforce aggregate coverage threshold
         run: uv run --locked coverage report --fail-under=90
+
+      - name: Generate aggregate coverage XML
+        run: uv run --locked coverage xml -o coverage.xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          disable_search: true
+          fail_ci_if_error: true

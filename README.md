@@ -1,5 +1,7 @@
 # Elosern MUD
 
+[![codecov](https://codecov.io/gh/jim60105/MUD/graph/badge.svg?token=ysbLT6R5c7)](https://codecov.io/gh/jim60105/MUD)
+
 This project uses Evennia `6.1.0`, SciPy `1.16.0` for Evennia's XYZ grid contrib, and the container
 image pins Python `3.13`.
 
@@ -50,8 +52,13 @@ Then open `http://localhost:3000` in a browser.
 
 ## Test
 
-Run the contrib matrix regression check in the uv-managed environment:
+Run the package-local Evennia suite and the top-level contrib matrix regression
+check in the uv-managed environment:
 
 ```sh
-uv run --locked -m unittest discover tests
+uv run --locked evennia test --settings settings.py commands server typeclasses web world
+```
+
+```sh
+uv run --locked -m unittest discover -s tests -t .
 ```
