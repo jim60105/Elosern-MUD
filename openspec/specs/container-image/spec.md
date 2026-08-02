@@ -91,8 +91,8 @@ password in the long-lived service configuration.
   base URLs from environment variables that default to Podman's `host.containers.internal`
   hostname for host-local GPU services
 
-### Requirement: .dockerignore excludes non-build-context files
-The project SHALL provide a `.dockerignore` that excludes version control metadata, local virtual
+### Requirement: Container ignore file excludes non-build-context files
+The project SHALL provide a `.containerignore` that excludes version control metadata, local virtual
 environments, caches, and any gitignored development-only paths (such as `tmp/`) from the build
 context.
 

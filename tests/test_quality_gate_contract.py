@@ -25,8 +25,20 @@ class QualityGateContractTests(unittest.TestCase):
 
         job = workflow["jobs"]["quality-gate"]
         self.assertEqual(job["runs-on"], "ubuntu-latest")
-        self.assertEqual(job["env"]["OPENSPEC_TEST_EVIDENCE"], "${{ runner.temp }}/spec-test-evidence.jsonl")
         steps = {step["name"]: step for step in job["steps"]}
+        self.assertEqual(
+            steps["Prepare Evennia runtime directories"]["run"],
+            "mkdir -p server/db server/logs",
+        )
+        self.assertEqual(
+            steps["Configure traceability evidence path"]["run"],
+            'echo "OPENSPEC_TEST_EVIDENCE=$RUNNER_TEMP/spec-test-evidence.jsonl" >> "$GITHUB_ENV"',
+        )
+        step_names = [step["name"] for step in job["steps"]]
+        self.assertLess(
+            step_names.index("Prepare Evennia runtime directories"),
+            step_names.index("Run full Evennia suite with coverage"),
+        )
         self.assertIn("openspec validate --all --strict", steps["Validate OpenSpec"]["run"])
         self.assertIn("tools.spec_traceability check", steps["Validate static requirement traceability"]["run"])
         self.assertIn("tools.spec_traceability verify", steps["Verify successful requirement execution"]["run"])

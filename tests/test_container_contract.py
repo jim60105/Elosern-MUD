@@ -122,11 +122,11 @@ class ContainerContractTests(unittest.TestCase):
         self.assertEqual(bootstrap["volumes"], ["evennia-db:/app/server/db"])
         self.assertIn("evennia createsuperuser", " ".join(bootstrap["command"]))
 
-    @covers_requirement("container-image::dockerignore-excludes-non-build-context-files")
-    def test_dockerignore_excludes_repository_secrets_caches_and_development_paths(self):
+    @covers_requirement("container-image::container-ignore-file-excludes-non-build-context-files")
+    def test_containerignore_excludes_repository_secrets_caches_and_development_paths(self):
         patterns = {
             line.strip()
-            for line in _read(".dockerignore").splitlines()
+            for line in _read(".containerignore").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
         }
         required = {
@@ -196,7 +196,7 @@ class EvenniaSkeletonContractTests(unittest.TestCase):
     @covers_requirement("evennia-project-skeleton::secret-settings-are-never-baked-into-the-image")
     def test_secret_settings_are_excluded_and_never_generated_during_build(self):
         containerfile = _read("Containerfile")
-        ignored = set(_read(".dockerignore").splitlines())
+        ignored = set(_read(".containerignore").splitlines())
 
         self.assertIn("server/conf/secret_settings.py", ignored)
         self.assertNotIn("secret_settings.py", containerfile)

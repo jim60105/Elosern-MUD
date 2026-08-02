@@ -40,6 +40,9 @@ jobs:
       - name: Sync locked environment
         run: uv sync --locked
 
+      - name: Prepare Evennia runtime directories
+        run: mkdir -p server/db server/logs
+
       - name: Validate OpenSpec
         run: openspec validate --all --strict
 

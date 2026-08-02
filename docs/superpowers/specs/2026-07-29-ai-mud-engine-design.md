@@ -706,7 +706,7 @@ a placeholder.
 ```
 Containerfile     multi-stage, non-root, arbitrary-UID capable
 compose.yaml      evennia + volumes; ollama and sd-webui reached over the network
-.dockerignore
+.containerignore
 ```
 
 - **Multi-stage.** Builder installs dependencies with BuildKit cache mounts; runtime carries only
