@@ -10,12 +10,13 @@ permissions:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
-    env:
-      OPENSPEC_TEST_EVIDENCE: ${{ runner.temp }}/spec-test-evidence.jsonl
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Configure traceability evidence path
+        run: echo "OPENSPEC_TEST_EVIDENCE=$RUNNER_TEMP/spec-test-evidence.jsonl" >> "$GITHUB_ENV"
 
       - name: Install Node.js
         uses: actions/setup-node@v7
