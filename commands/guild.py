@@ -3,11 +3,23 @@
 from evennia import Command
 
 from typeclasses.components import GuildStaff
+from world.quests.describe import describe_objective, describe_quest_detail
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.runtime import (
+    QuestDataError,
+    QuestNotFound,
+    QuestState,
+    definition_for,
+    find_record,
+    read_records,
+)
+from world.rules.clock import get_world_clock
 from world.rules.guild import (
     GuildDataError,
     GuildError,
     GuildServiceError,
     RewardClaimError,
+    parse_guild_registration,
     parse_reward_claims,
     register_adventurer,
     turn_in_quest,
@@ -15,17 +27,14 @@ from world.rules.guild import (
 from world.rules.guild_offers import (
     BoardAccessError,
     GuildOfferError,
+    GuildOfferNotFound,
     abandon_guild_quest,
     accept_guild_offer,
+    get_guild_offer,
     list_guild_offers,
 )
 from world.rules.guild_config import get_catalog
 from world.rules.surfaces import read_counter_trait
-from world.quests.runtime import (
-    QuestNotFound,
-    QuestState,
-    read_records,
-)
 
 
 class _GuildCommandBase(Command):
@@ -80,15 +89,13 @@ class CmdGuildList(_GuildCommandBase):
         if not offers:
             self.caller.msg("任務板上目前沒有適合你的任務。")
             return
-        catalog = get_catalog()
         lines = ["任務板："]
         for offer in offers:
-            definition = __import__(
-                "world.quests.definitions", fromlist=["QUEST_DEFINITION_REGISTRY"]
-            ).QUEST_DEFINITION_REGISTRY[offer.definition_key]
+            definition = QUEST_DEFINITION_REGISTRY[offer.definition_key]
             lines.append(
                 f"  {offer.definition_key} — {definition.display_name} "
                 f"(銅 {offer.reward.copper} / 功績 {offer.reward.merit})"
+                f" — {describe_objective(definition.stages[0].objective)}"
             )
         self.caller.msg("\n".join(lines))
 
@@ -136,7 +143,56 @@ class CmdGuildLog(_GuildCommandBase):
                 f"  {record.quest_id} [{record.state.value}] "
                 f"階段 {record.stage_index + 1}"
             )
+        lines.append("用 guild show <quest_id> 查看任務詳情。")
         self.caller.msg("\n".join(lines))
+
+
+class CmdGuildShow(_GuildCommandBase):
+    """Show full detail for one of your quests."""
+
+    key = "guild show"
+    aliases = ("guild 詳情", "guild detail", "任務詳情")
+
+    def func(self) -> None:
+        quest_id = self.args.strip().partition(" ")[0]
+        if not quest_id:
+            self.caller.msg("用法：guild show <quest_id>")
+            return
+        try:
+            records = read_records(self.caller)
+            record = find_record(records, quest_id)
+            if record is None:
+                raise QuestNotFound(quest_id)
+            definition = definition_for(record)
+            offer = self._resolve_offer(definition.key)
+        except QuestNotFound:
+            self.caller.msg("找不到這個任務。")
+            return
+        except (QuestDataError, GuildDataError) as error:
+            self.caller.msg(f"無法顯示任務詳情：{error}")
+            return
+        detail = describe_quest_detail(
+            record,
+            definition,
+            offer,
+            get_world_clock().tick,
+        )
+        self.caller.msg(detail)
+
+    def _resolve_offer(self, definition_key: str):
+        """Return the branch offer for ``definition_key`` or ``None``.
+
+        An unregistered player sees no reward section; a malformed
+        ``guild_registration`` raises ``GuildDataError`` (caught by the
+        caller); a missing offer for the player's branch is never an error.
+        """
+        registration = parse_guild_registration(self.caller)
+        if registration is None:
+            return None
+        try:
+            return get_guild_offer(definition_key, registration["branch_key"])
+        except GuildOfferNotFound:
+            return None
 
 
 class CmdGuildAbandon(_GuildCommandBase):

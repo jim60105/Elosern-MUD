@@ -23,6 +23,8 @@ from world.onboarding.guide import (
 from world.onboarding.guide_dialogue import (
     DIALOGUE_TABLE,
     GUARD_DIALOGUE_KEY,
+    GUILD_STAFF_DIALOGUE_KEY,
+    DialogueDefinition,
     NO_UNDERSTANDING_LINE,
 )
 from world.onboarding.scenes import (
@@ -62,10 +64,11 @@ class SceneBeatTests(unittest.TestCase):
         self.assertEqual(BEAT_REGISTRY[LOOK_BEAT_ID].trigger, TriggerKind.COMMAND_LOOK)
         self.assertEqual(BEAT_REGISTRY[LOOK_BEAT_ID].next_beat_id, GUIDANCE_BEAT_ID)
 
-    def test_guidance_beat_prompts_north_and_guild(self):
+    def test_guidance_beat_prompts_two_step_route_to_guild(self):
         prose = BEAT_REGISTRY[GUIDANCE_BEAT_ID].prose
-        self.assertIn("北", prose)
-        self.assertIn("冒險者公會", prose)
+        self.assertIn("先向北走到南大道", prose)
+        self.assertIn("再向東到冒險者公會外", prose)
+        self.assertNotIn("中央廣場", prose)
         self.assertIsNone(BEAT_REGISTRY[GUIDANCE_BEAT_ID].next_beat_id)
 
     def test_guided_corridor_contains_the_four_documented_rooms(self):
@@ -74,6 +77,25 @@ class SceneBeatTests(unittest.TestCase):
             frozenset({"南門", "南大道", "中央廣場", "冒險者公會外"}),
         )
         self.assertIn(GUILD_EXTERIOR_ROOM_KEY, GUIDED_CORRIDOR)
+
+
+class MapRouteTests(unittest.TestCase):
+    def test_guild_route_matches_the_capital_grid(self):
+        from world.maps.altoria_capital import PROTOTYPES
+
+        def key_at(xy):
+            return PROTOTYPES[xy]["key"]
+
+        self.assertEqual(key_at((2, 0)), "南門")
+        self.assertEqual(key_at((2, 1)), "南大道")
+        self.assertEqual(key_at((3, 1)), "冒險者公會外")
+
+    def test_guidance_never_directs_through_the_plaza(self):
+        prose = BEAT_REGISTRY[GUIDANCE_BEAT_ID].prose
+        self.assertNotIn("中央廣場", prose)
+        from world.maps.altoria_capital import PROTOTYPES
+
+        self.assertEqual(PROTOTYPES[(2, 2)]["key"], "中央廣場")
 
 
 class ArrivalSceneTests(unittest.TestCase):
@@ -149,16 +171,24 @@ class RoomEntryTests(unittest.TestCase):
 
 class DialogueTableTests(unittest.TestCase):
     def test_known_keywords_return_authored_responses(self):
+        definition = DIALOGUE_TABLE[GUARD_DIALOGUE_KEY]
+        self.assertIsNone(definition.greeting)
         for keyword in ("公會", "冒險", "危險", "再見"):
             with self.subTest(keyword=keyword):
                 self.assertEqual(
                     dialogue_response(GUARD_DIALOGUE_KEY, keyword),
                     next(
                         entry.response
-                        for entry in DIALOGUE_TABLE[GUARD_DIALOGUE_KEY]
+                        for entry in definition.responses
                         if entry.keyword == keyword
                     ),
                 )
+
+    def test_guild_keyword_points_east_of_south_street(self):
+        response = dialogue_response(GUARD_DIALOGUE_KEY, "公會")
+        self.assertIn("先向北走到南大道", response)
+        self.assertIn("再向東", response)
+        self.assertNotIn("中央廣場", response)
 
     def test_unknown_keyword_returns_no_understanding(self):
         self.assertEqual(
@@ -167,6 +197,48 @@ class DialogueTableTests(unittest.TestCase):
 
     def test_unknown_dialogue_key_returns_no_understanding(self):
         self.assertEqual(dialogue_response("nope", "公會"), NO_UNDERSTANDING_LINE)
+
+
+class GuildStaffDialogueTests(unittest.TestCase):
+    def test_dialogue_table_is_read_only_at_runtime(self):
+        from types import MappingProxyType
+
+        self.assertIsInstance(DIALOGUE_TABLE, MappingProxyType)
+        with self.assertRaises(TypeError):
+            DIALOGUE_TABLE["bogus"] = DialogueDefinition("x", ())
+        with self.assertRaises((TypeError, AttributeError)):
+            DIALOGUE_TABLE.pop(GUILD_STAFF_DIALOGUE_KEY)
+
+    def test_guild_staff_table_is_registered_and_frozen(self):
+        definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        self.assertIsInstance(definition.greeting, str)
+        self.assertTrue(definition.greeting)
+        self.assertIn("guild register", definition.greeting)
+
+    def test_guild_staff_greeting_teaches_the_guild_commands(self):
+        definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        for command in (
+            "guild register",
+            "guild list",
+            "guild accept",
+            "guild log",
+            "guild show",
+            "guild turnin",
+            "guild abandon",
+            "guild merit",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    command in definition.greeting
+                    or any(command in entry.response for entry in definition.responses)
+                )
+
+    def test_guild_staff_answers_known_keywords(self):
+        definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        for keyword in ("公會", "任務", "註冊", "再見"):
+            with self.subTest(keyword=keyword):
+                response = dialogue_response(GUILD_STAFF_DIALOGUE_KEY, keyword)
+                self.assertNotEqual(response, NO_UNDERSTANDING_LINE)
 
 
 class GuidePromptTests(unittest.TestCase):

@@ -27,6 +27,7 @@ from commands.guild import (
     CmdGuildLog,
     CmdGuildMerit,
     CmdGuildRegister,
+    CmdGuildShow,
     CmdGuildTurnIn,
 )
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
@@ -58,6 +59,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdGuildList)
         self.add(CmdGuildAccept)
         self.add(CmdGuildLog)
+        self.add(CmdGuildShow)
         self.add(CmdGuildAbandon)
         self.add(CmdGuildTurnIn)
         self.add(CmdGuildMerit)

@@ -133,7 +133,8 @@ class ArrivalGuardIntegrationTests(OnboardingJourneyMixin, EvenniaTest):
         self.assertEqual(self.player.onboarding_beat, "look")
         guidance = advance_beat(self.player)
         self.assertIsNotNone(guidance)
-        self.assertIn("北", guidance)
+        self.assertIn("先向北走到南大道", guidance)
+        self.assertIn("冒險者公會外", guidance)
         self.assertTrue(self.player.first_arrival_seen)
 
     @covers_requirement("onboarding-guide::the-arrival-scene-plays-as-the-first-guided-beat")
@@ -332,6 +333,16 @@ class HelpEntryTests(OnboardingJourneyMixin, EvenniaTest):
         self.assertIn("南門", text)
         self.assertIn("守衛", text)
         self.assertIn("冒險者公會", text)
+
+    @covers_requirement("onboarding-guide::a-help-entry-explains-onboarding-afterwards")
+    def test_help_entry_states_the_two_step_route(self):
+        from world.help_entries import HELP_ENTRY_DICTS
+
+        entries = {entry["key"]: entry for entry in HELP_ENTRY_DICTS}
+        text = entries["新手引導"]["text"]
+        self.assertIn("先向北走到南大道", text)
+        self.assertIn("再向東抵達冒險者公會外", text)
+        self.assertNotIn("中央廣場", text)
 
 
 class FullJourneyTests(OnboardingJourneyMixin, EvenniaTest):

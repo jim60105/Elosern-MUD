@@ -1,8 +1,9 @@
-"""Player-facing ``talk`` command for deterministic NPC dialogue (D5)."""
+"""Player-facing ``talk`` command for deterministic NPC dialogue (D5/D4)."""
 
 from evennia import Command
 
 from typeclasses.npcs import NPC
+from world.rules.dialogue import greeting_for, is_dialogue_host
 from world.rules.onboarding import (
     current_guide_prompt,
     is_guide_host,
@@ -67,14 +68,23 @@ class CmdsTalk(Command):
             self.caller.msg(f"{npc.key}說：{response}")
             return
 
-        if not is_guide_host(npc):
-            self.caller.msg(_NO_RESPONSE)
-            return
-        prompt = current_guide_prompt(self.caller)
-        if prompt is None:
+        if is_guide_host(npc):
+            prompt = current_guide_prompt(self.caller)
+            if prompt is not None:
+                self.caller.msg(
+                    f"{npc.key}說：{prompt}\n（用 talk {npc.key} <keyword> 詢問：公會、冒險、危險、再見）"
+                )
+                return
             response = talk_response(npc, self.caller, "再見")
             self.caller.msg(f"{npc.key}說：{response}\n{_USAGE}")
             return
-        self.caller.msg(
-            f"{npc.key}說：{prompt}\n（用 talk {npc.key} <keyword> 詢問：公會、冒險、危險、再見）"
-        )
+
+        if is_dialogue_host(npc):
+            greeting = greeting_for(npc)
+            if greeting is not None:
+                self.caller.msg(f"{npc.key}說：{greeting}\n{_USAGE}")
+                return
+            self.caller.msg(_NO_RESPONSE)
+            return
+
+        self.caller.msg(_NO_RESPONSE)

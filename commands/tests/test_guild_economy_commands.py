@@ -15,7 +15,9 @@ from typeclasses.rooms import Room
 from commands.guild import (
     CmdGuildAccept,
     CmdGuildList,
+    CmdGuildLog,
     CmdGuildRegister,
+    CmdGuildShow,
     CmdGuildTurnIn,
 )
 from commands.combat import CmdEngage, CmdGuildExam
@@ -23,7 +25,7 @@ from commands.economy import CmdBuy, CmdSell, CmdShopStock
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import fulfill_record, read_records
-from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.quests.tests._fixtures import QuestRegistryIsolation, quest, register
 from world.quests.transitions import apply_quest_log_replacement
 from world.rules.guild_config import CATALOG, load_catalog_into_cache
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY, register_guild_offer
@@ -83,6 +85,122 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
             GuildStaff.create(second, service_id="staff2", branch_key="guild_branch_altoria")
         )
         self.call(CmdGuildRegister(), "", "這裡沒有公會服務人員")
+
+
+class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.hall = create_object(Room, key="guild hall")
+        self.char1.location = self.hall
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.staff = create_object(NPC, key="staff", location=self.hall)
+        self.staff.components.add(
+            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        from world.rules.guild_config import register_catalog_offers
+
+        register_catalog_offers(load_catalog_into_cache())
+        from world.quests.runtime import accept_quest
+        from world.rules.guild import register_adventurer
+
+        register_adventurer(self.char1, self.staff)
+        self.record = accept_quest(self.char1, "introductory_hunt")
+
+    @covers_requirement(
+        "quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail",
+        "guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host",
+    )
+    def test_show_accepted_detail_without_staff(self):
+        self.char1.location = create_object(Room, key="empty")
+        output = self.call(CmdGuildShow(), self.record.quest_id, caller=self.char1)
+        self.assertIn("討伐低階魔物", output)
+        self.assertIn("進行中", output)
+        self.assertIn("討伐 1 隻低階魔物", output)
+        self.assertIn("進度：0 / 1", output)
+        self.assertIn("獎勵：銅 50", output)
+
+    @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
+    def test_show_unknown_id_is_rejected_without_state_change(self):
+        self.char1.location = create_object(Room, key="empty")
+        output = self.call(CmdGuildShow(), "bogus:1", caller=self.char1)
+        self.assertIn("找不到這個任務", output)
+        self.assertEqual(read_records(self.char1), [self.record])
+
+    @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
+    def test_show_reward_omitted_when_definition_has_no_offer(self):
+        register(quest("no_offer_hunt"))
+        from world.quests.runtime import accept_quest
+
+        record = accept_quest(self.char1, "no_offer_hunt")
+        self.char1.location = create_object(Room, key="empty")
+        output = self.call(CmdGuildShow(), record.quest_id, caller=self.char1)
+        self.assertIn("測試任務 no_offer_hunt", output)
+        self.assertNotIn("獎勵", output)
+
+    @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
+    def test_show_unregistered_player_sees_no_reward_section(self):
+        self.char1.db.guild_registration = None
+        from typeclasses.characters import PlayerCharacter
+
+        player = create_object(PlayerCharacter, key="unregistered")
+        player.location = self.char1.location
+        from world.quests.runtime import accept_quest
+
+        record = accept_quest(player, "introductory_hunt")
+        output = self.call(CmdGuildShow(), record.quest_id, caller=player)
+        self.assertIn("討伐低階魔物", output)
+        self.assertNotIn("獎勵", output)
+
+    @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
+    def test_show_malformed_registration_errors(self):
+        self.char1.db.guild_registration = {"branch_key": "guild_branch_altoria"}
+        self.char1.location = create_object(Room, key="empty")
+        output = self.call(CmdGuildShow(), self.record.quest_id, caller=self.char1)
+        self.assertIn("無法顯示任務詳情", output)
+
+    @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
+    def test_show_expired_deadline_reports_overdue(self):
+        from unittest.mock import patch
+
+        register(quest("deadline_hunt", deadline_hours=1))
+        from world.quests.runtime import accept_quest
+
+        record = accept_quest(self.char1, "deadline_hunt")
+        self.char1.location = create_object(Room, key="empty")
+        from world.rules.clock import CLOCK_YAML
+
+        with patch("commands.guild.get_world_clock") as clock:
+            clock.return_value.tick = record.deadline_tick
+            output = self.call(CmdGuildShow(), record.quest_id, caller=self.char1)
+        self.assertIn("已逾期", output)
+
+    @covers_requirement(
+        "guild-quest-board::board-listing-and-quest-log-surface-objective-guidance",
+    )
+    def test_board_rows_show_first_objective_one_liner(self):
+        output = self.call(CmdGuildList(), "", caller=self.char1)
+        self.assertIn("討伐 1 隻低階魔物", output)
+        self.assertIn("introductory_hunt", output)
+
+    @covers_requirement(
+        "guild-quest-board::board-listing-and-quest-log-surface-objective-guidance",
+    )
+    def test_log_hints_at_the_detail_command(self):
+        output = self.call(CmdGuildLog(), "", caller=self.char1)
+        self.assertIn("guild show", output)
+
+    @covers_requirement(
+        "guild-quest-board::board-listing-and-quest-log-surface-objective-guidance",
+    )
+    def test_objective_summaries_do_not_change_eligibility(self):
+        from world.rules.guild_offers import list_guild_offers
+
+        eligible = [offer.definition_key for offer in list_guild_offers(self.char1, self.staff)]
+        output = self.call(CmdGuildList(), "", caller=self.char1)
+        for key in eligible:
+            self.assertIn(key, output)
+        self.assertEqual(eligible, ["introductory_hunt"])
 
 
 class CombatCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):

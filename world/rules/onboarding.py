@@ -19,7 +19,6 @@ from world.onboarding.guide import (
     OnboardingSnapshot,
     arrival_scene,
     dialogue_has_keyword,
-    dialogue_response,
     guide_should_prompt,
     next_beat_output,
     room_entry_decision,
@@ -208,20 +207,24 @@ def is_guide_host(npc: Any) -> bool:
 
 
 def talk_response(npc: Any, character: Any, keyword: str) -> str | None:
-    """Return the authored response for ``keyword`` on the guide guard.
+    """Return the authored response for ``keyword`` on ``npc``.
 
-    Requires the ``OnboardingGuide`` component; an NPC without it returns
-    ``None`` so the command can produce the no-response line. Unknown keywords
-    yield the no-understanding line and cause NO state change. A known keyword
-    is recorded on the player's ``guide_progress``.
+    ``npc`` must be a dialogue host (``OnboardingGuide`` or
+    ``ScriptedDialogue``); an NPC without one returns ``None`` so the command
+    can produce the no-response line. Unknown keywords yield the
+    no-understanding line and cause NO state change. A known keyword on an
+    ``OnboardingGuide`` host is recorded on the player's ``guide_progress``;
+    scripted dialogue hosts never write state.
     """
-    if not _is_guard(npc):
-        return None
+    from world.rules.dialogue import dialogue_response as resolve_response
+
+    if not is_guide_host(npc):
+        return resolve_response(npc, keyword)
     component = npc.components.get(OnboardingGuide.get_component_slot())
     dialogue_key = component.dialogue_key or GUARD_DIALOGUE_KEY
+    response = resolve_response(npc, keyword)
     if not dialogue_has_keyword(dialogue_key, keyword):
-        return dialogue_response(dialogue_key, keyword)
-    response = dialogue_response(dialogue_key, keyword)
+        return response
     progress = GuideProgress.from_storage(
         getattr(character, "guide_progress", None) or None
     )

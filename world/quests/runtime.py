@@ -193,12 +193,24 @@ def _coerce_entry(entry: Any) -> dict[str, Any]:
 def validate_record_runtime(record: QuestRecord) -> None:
     """Validate one record against the definition state machine.
 
-    An active record must reference a known definition whose ``stage_index`` is
-    in range and still matches its definition, with progress within the current
-    objective's quantity. A terminal record must be final (no runtime
-    bindings) and, when failed, must carry a reason. Violations raise
+    Every record must reference a known definition whose ``stage_index`` is in
+    range and still matches its definition, with progress within the current
+    objective's quantity. A terminal record must additionally be final (no
+    runtime bindings) and, when failed, must carry a reason. Violations raise
     ``QuestDataError`` instead of silently reinterpreting the record.
     """
+    definition = definition_for(record)
+    if not (0 <= record.stage_index < len(definition.stages)):
+        raise QuestDataError(
+            f"quest {record.quest_id!r} stage index {record.stage_index} "
+            f"is outside definition {record.definition_key!r}"
+        )
+    stage = definition.stages[record.stage_index]
+    if stage.index != record.stage_index:
+        raise QuestDataError(
+            f"quest {record.quest_id!r} stage {record.stage_index} does not "
+            "match its definition"
+        )
     if record.state is not QuestState.IN_PROGRESS:
         if (
             record.stage_room_id is not None
@@ -213,18 +225,6 @@ def validate_record_runtime(record: QuestRecord) -> None:
                 f"failed quest {record.quest_id!r} lacks a failure reason"
             )
         return
-    definition = definition_for(record)
-    if not (0 <= record.stage_index < len(definition.stages)):
-        raise QuestDataError(
-            f"quest {record.quest_id!r} stage index {record.stage_index} "
-            f"is outside definition {record.definition_key!r}"
-        )
-    stage = definition.stages[record.stage_index]
-    if stage.index != record.stage_index:
-        raise QuestDataError(
-            f"quest {record.quest_id!r} stage {record.stage_index} does not "
-            "match its definition"
-        )
     objective = stage.objective
     if not (0 <= record.stage_progress <= objective.quantity):
         raise QuestDataError(

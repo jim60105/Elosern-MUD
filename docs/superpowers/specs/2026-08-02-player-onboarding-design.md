@@ -70,11 +70,13 @@ The beat engine's first beat fires at the South Gate: arrival prose describing t
 the guard's first line prompting `look`. Completion condition: the player inputs `look`.
 
 ### Beat 5 — Guard guidance
-After `look`, the guard prompts movement north to the plaza and the guild. `talk` with the guard
-serves scripted keyword responses (公會 / 冒險 / 危險 / 再見). Guidance ends as completed when the
-player reaches the guild exterior; entering any room outside the guided corridor (南門, 南大道,
-中央廣場, 冒險者公會外) marks the guide skipped. The `look` completion is detected through a
-`PlayerCharacter.at_look` seam.
+After `look`, the guard prompts movement: first north to 南大道, then east to the adventurers'
+guild exterior (冒險者公會外). `talk` with the guard serves scripted keyword responses (公會 / 冒險 /
+危險 / 再見). Guidance ends as completed when the player reaches the guild exterior; entering any
+room outside the guided corridor (南門, 南大道, 中央廣場, 冒險者公會外) marks the guide skipped. The
+`look` completion is detected through a `PlayerCharacter.at_look` seam. The route follows the
+`capital_altoria` grid, which is authoritative: 南門 `(2,0)` → north → 南大道 `(2,1)` → east →
+冒險者公會外 `(3,1)`.
 
 ### Beat 6 — First-day arc (existing systems)
 Guild registration (F rank) → accept 討伐低階魔物 from the board → North Gate → wilderness →

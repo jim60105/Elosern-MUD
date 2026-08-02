@@ -10,7 +10,12 @@ and restores or terminates persisted combat/examination sessions.
 from evennia.utils.create import create_object
 from evennia.utils.logger import log_warn
 
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import (
+    GuildExaminer,
+    GuildStaff,
+    Merchant,
+    ScriptedDialogue,
+)
 from typeclasses.npcs import NPC
 from world.maps.bootstrap import (
     GENERAL_STORE_TAG,
@@ -84,6 +89,7 @@ def sync_service_content() -> None:
         (
             (GuildStaff, {"service_id": GUILD_SERVICE_KEY, "branch_key": "guild_branch_altoria"}),
             (GuildExaminer, {"service_id": GUILD_SERVICE_KEY, "branch_key": "guild_branch_altoria"}),
+            (ScriptedDialogue, {"dialogue_key": "guild_staff"}),
         ),
     )
     _sync_service_host(

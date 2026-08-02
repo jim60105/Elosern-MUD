@@ -282,6 +282,14 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         with self.assertRaises(QuestDataError):
             read_records(self.player)
 
+    def test_terminal_record_with_out_of_range_stage_is_rejected(self):
+        registered = register(quest("terminal_stage"))
+        record = accept_quest(self.player, registered.key)
+        stale = {**to_storage(record), "state": "completed", "stage_index": 5}
+        apply_quest_log_replacement(self.player, [from_storage(stale)])
+        with self.assertRaises(QuestDataError):
+            read_records(self.player)
+
     def test_failed_record_without_reason_is_rejected(self):
         registered = register(quest("reasonless"))
         record = accept_quest(self.player, registered.key)

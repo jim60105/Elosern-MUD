@@ -60,7 +60,7 @@ LOOK_BEAT = Beat(
 GUIDANCE_BEAT = Beat(
     beat_id=GUIDANCE_BEAT_ID,
     prose=(
-        "守衛點頭：「往北走，沿著南大道穿過中央廣場，就能看到冒險者公會。"
+        "守衛點頭：「先向北走到南大道，再向東到冒險者公會外。"
         "到那裡去註冊，領取你的第一份委託。」"
     ),
     trigger=TriggerKind.ENTER_ROOM,

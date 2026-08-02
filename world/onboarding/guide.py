@@ -144,8 +144,10 @@ def room_entry_decision(snapshot: OnboardingSnapshot, room_key: str) -> str | No
 
 def dialogue_response(dialogue_key: str, keyword: str) -> str:
     """Return the authored response for one keyword, or the no-understanding line."""
-    table = DIALOGUE_TABLE.get(dialogue_key, ())
-    for entry in table:
+    definition = DIALOGUE_TABLE.get(dialogue_key)
+    if definition is None:
+        return NO_UNDERSTANDING_LINE
+    for entry in definition.responses:
         if entry.keyword == keyword:
             return entry.response
     return NO_UNDERSTANDING_LINE
@@ -153,7 +155,10 @@ def dialogue_response(dialogue_key: str, keyword: str) -> str:
 
 def dialogue_has_keyword(dialogue_key: str, keyword: str) -> bool:
     """Whether ``keyword`` has an authored response in the named table."""
+    definition = DIALOGUE_TABLE.get(dialogue_key)
+    if definition is None:
+        return False
     return any(
         entry.keyword == keyword
-        for entry in DIALOGUE_TABLE.get(dialogue_key, ())
+        for entry in definition.responses
     )

@@ -51,3 +51,17 @@ class OnboardingGuide(Component):
 
     name = "onboarding_guide"
     dialogue_key = DBField(default=None)
+
+
+class ScriptedDialogue(Component):
+    """Capability marker and dialogue identity of one scripted dialogue host.
+
+    Any NPC carrying this component answers authored ``talk`` lines from the
+    immutable keyed table in ``world/onboarding/guide_dialogue.py``. Unlike
+    ``OnboardingGuide``, scripted dialogue causes no state change; guard
+    keyword tracking on ``guide_progress`` stays exclusive to the onboarding
+    host.
+    """
+
+    name = "scripted_dialogue"
+    dialogue_key = DBField(default=None)
