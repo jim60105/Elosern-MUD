@@ -1,64 +1,61 @@
-*.py[cod]
+# ==========================================
+# Evennia Runtime & Secrets
+# ==========================================
+# Secret settings contains sensitive cryptographic keys and database credentials
+server/conf/secret_settings.py
 
-# C extensions
+# Local SQLite databases (default for local development)
+server/evennia.db3
+*.db
+*.db3
+*.sqlite3
+
+# Server log files and PID / socket / restart files
+server/logs/
+server/*.log
+server/*.pid
+server/*.sock
+*.restart
+
+# Collected static, uploaded media, and world cache (generated, volume-mounted at runtime)
+server/.static/
+server/.media/
+server/.cache/
+
+# ==========================================
+# Python & Virtual Environments
+# ==========================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
 *.so
 
-# Packages
-*.egg
-*.egg-info
-dist
-build
-eggs
-parts
-var
-sdist
-develop-eggs
-.installed.cfg
-lib
-lib64
-__pycache__
-
-# Other
-*.swp
-*.log
-*.log.*
-*.pid
-*.restart
-*.db3
-
-# Installation-specific.
-# For group efforts, comment out some or all of these.
-server/conf/secret_settings.py
-server/logs/*.log.*
-server/.static/*
-server/.media/*
-
-# Unit test / coverage reports
-.coverage
-.tox
-nosetests.xml
-
-# Translations
-*.mo
-
-# Mr Developer
-.mr.developer.cfg
-.project
-.pydevproject
-
-# PyCharm config
-.idea
-
-# VSCode config
-.vscode
-
-tmp/
 .venv/
 venv/
 env/
-**/__pycache__/
-*.db
-*.sqlite3
-server/logs/
+
+# Environment files
 .env
-/server/.cache
+.env.local
+.env.*.local
+
+# ==========================================
+# Tests, Coverage & Translations
+# ==========================================
+.coverage
+.tox
+*.mo
+
+# ==========================================
+# Misc
+# ==========================================
+tmp/
+*.swp
+
+# ==========================================
+# IDEs & System Files
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

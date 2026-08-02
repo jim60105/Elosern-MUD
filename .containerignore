@@ -1,0 +1,50 @@
+# ==========================================
+# Git, CI & Documentation
+# ==========================================
+.git/
+.gitignore
+.github/
+README.md
+docs/
+openspec/
+
+# ==========================================
+# Local Python / Virtual Environments
+# ==========================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ==========================================
+# Evennia Local Runtime & Databases
+# ==========================================
+# Do not bake local test databases, logs, or collected files into the image
+server/evennia.db3
+**/*.db
+**/*.db3
+**/*.sqlite3
+server/logs/
+server/*.log
+server/*.pid
+server/*.sock
+server/.static/
+server/.media/
+server/.cache/
+server/conf/secret_settings.py
+
+# ==========================================
+# Environment & Secrets
+# ==========================================
+.env
+.env.*
+
+# ==========================================
+# Tooling & System Artifacts
+# ==========================================
+.agents/
+.claude/
+tmp/
+tests/
