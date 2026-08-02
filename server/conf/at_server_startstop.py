@@ -38,6 +38,7 @@ def at_server_start():
     )
     from world.quests.bootstrap import sync_quest_runtime
     from world.rules.guild_economy import sync_guild_economy
+    from world.rules.onboarding import sync_guard_npc
 
     sync_all()
     sync_grid()
@@ -45,6 +46,7 @@ def at_server_start():
     sync_service_interiors()
     sync_quest_runtime()
     sync_guild_economy()
+    sync_guard_npc()
 
 
 def at_server_stop():

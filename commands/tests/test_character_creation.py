@@ -6,9 +6,15 @@ from unittest.mock import Mock, patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from commands.character_creation import CmdCharacter, CharacterCreationCmdSet
+from commands.character_creation import (
+    ALLOCATION_AXIS_EXPLANATIONS,
+    CmdCharacter,
+    CharacterCreationCmdSet,
+    creation_start_screen,
+)
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
 
 class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -69,15 +75,47 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.at_cmdset_get()
         self.assertTrue(self.char1.cmdset.has("CharacterCreation"))
 
+    @covers_requirement("character-creation-ux::the-character-creation-command-presents-preset-previews")
     def test_status_and_preset_activation(self):
         output = self.call(CmdCharacter(), "")
         self.assertIn("preset", output)
+        self.assertIn("伊洛瑟恩大陸", output)
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            self.assertIn(key, output)
+            self.assertIn(preset.emphasis, output)
+            self.assertIn(preset.background, output)
         output = self.call(CmdCharacter(), "preset human_wanderer")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
         self.char1.at_cmdset_get()
         self.assertFalse(self.char1.cmdset.has("CharacterCreation"))
         self.assertIsNotNone(self.char1.traits.magic_level)
+
+    def test_creation_start_screen_is_registry_derived_and_reusable(self):
+        screen = creation_start_screen()
+        self.assertIn("你站在伊洛瑟恩大陸的門口", screen)
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            self.assertIn(f"  {key}", screen)
+            self.assertIn(preset.emphasis, screen)
+            self.assertIn(preset.background, screen)
+
+    @covers_requirement("character-creation-ux::custom-creation-mode-explains-its-prompts")
+    def test_custom_prompts_carry_explanations(self):
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        generator = command.func()
+        replies = ["自訂者", "20", "20", "human", "none"] + ["0"] * 6
+        prompts = [next(generator)]
+        for reply in replies:
+            prompts.append(generator.send(reply))
+        joined = "".join(prompts)
+        for race in ("human", "beastfolk", "elf"):
+            self.assertIn(race, joined)
+        for axis, explanation in ALLOCATION_AXIS_EXPLANATIONS.items():
+            self.assertIn(axis, joined)
+            self.assertIn(explanation, joined)
 
     def test_real_rest_reaches_clock_after_activation(self):
         self.call(CmdCharacter(), "preset human_wanderer")
@@ -122,6 +160,21 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         old_key = self.char1.key
         output = self.call(CmdCharacter(), "create", inputs=["cancel", None])
         self.assertIn("已取消", output)
+        self.assertEqual(self.char1.key, old_key)
+        self.assertTrue(self.char1.creation_pending)
+        self.assertEqual(self.char1.traits.all(), [])
+
+    @covers_requirement("character-creation-ux::the-character-creation-restyle-does-not-change-activation-semantics")
+    def test_restyled_custom_prompts_still_reject_age_17(self):
+        old_key = self.char1.key
+        replies = [
+            "新冒險者", "17", "20", "human", "none",
+            "100", "50", "31", "0", "0", "0", "yes",
+        ]
+        output = self.call(
+            CmdCharacter(), "create", inputs=[*reversed(replies), None]
+        )
+        self.assertIn("角色建立失敗", output)
         self.assertEqual(self.char1.key, old_key)
         self.assertTrue(self.char1.creation_pending)
         self.assertEqual(self.char1.traits.all(), [])

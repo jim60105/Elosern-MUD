@@ -25,6 +25,30 @@ several more options for customizing the Guest account system.
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
 
+def _pending_character(account):
+    """Return the account's auto-created shell still awaiting activation, if any."""
+    for character in account.characters:
+        if getattr(character, "creation_pending", False):
+            return character
+    return None
+
+
+def render_pending_character_login(account, session=None):
+    """Show the world introduction then the creation start screen.
+
+    This is the single login coordinator for a pending character: it sends the
+    immutable world introduction (design.md D2/D3) followed by the reusable
+    no-argument ``character`` presentation (design.md D6). The ``onboarding-guide``
+    change extends this same function for activated characters rather than adding
+    a second hook.
+    """
+    from commands.character_creation import creation_start_screen
+    from world.intro import WORLD_INTRODUCTION
+
+    account.msg(WORLD_INTRODUCTION, session=session)
+    account.msg(creation_start_screen(), session=session)
+
+
 class Account(DefaultAccount):
     """
     An Account is the actual OOC player entity. It doesn't exist in the game,
@@ -140,6 +164,26 @@ class Account(DefaultAccount):
         """Preserve Evennia ownership setup, then gate the new shell."""
         super().at_post_create_character(character, **kwargs)
         character.creation_pending = True
+
+    def at_post_login(self, session=None, **kwargs):
+        """Send the world introduction to a still-pending character.
+
+        Calls the parent hook first so Evennia's default login flow (protocol
+        flags, connect channel, auto-puppeting) is preserved. The introduction
+        and creation start screen are rendered only while the auto-created
+        character is still pending creation; activated accounts receive neither.
+        This is the single login coordinator that ``onboarding-guide`` extends.
+        """
+        super().at_post_login(session=session, **kwargs)
+        pending = _pending_character(self)
+        if pending is not None:
+            render_pending_character_login(self, session=session)
+            return
+        from world.rules.onboarding import maybe_play_arrival
+
+        puppet = self.get_puppet(session)
+        if puppet is not None:
+            maybe_play_arrival(puppet)
 
     pass
 

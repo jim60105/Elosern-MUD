@@ -325,6 +325,8 @@ def turn_in_quest(
     for room, _, _ in pin_operations:
         pin_snapshots[id(room)] = snapshot_pin_reasons(room)
 
+    onboarding_completed = False
+
     def writer():
         actor.db.wallet = int(actor.db.wallet or 0) + reward.copper
         actor.db.inventory = list(inventory_plan.after)
@@ -344,6 +346,12 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         actor.db.guild_reward_claims = [*claims, quest_id]
+        nonlocal onboarding_completed
+        if record.definition_key == "introductory_hunt" and not actor.onboarded:
+            from world.rules.onboarding import set_onboarded
+
+            set_onboarded(actor)
+            onboarding_completed = True
 
     def restore():
         from world.rules.surfaces import restore_attribute_best_effort
@@ -367,4 +375,5 @@ def turn_in_quest(
         "copper": reward.copper,
         "merit": reward.merit,
         "items": [str(item.item_key) for item in reward.items],
+        "onboarding_completed": onboarding_completed,
     }

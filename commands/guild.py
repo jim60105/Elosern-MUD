@@ -184,6 +184,10 @@ class CmdGuildTurnIn(_GuildCommandBase):
             f"你回報了任務 {result['quest_id']}，獲得 {result['copper']} 銅、"
             f"功績 {result['merit']} 與道具 {result['items']}。"
         )
+        if result.get("onboarding_completed"):
+            self.caller.msg(
+                "你的第一個日子在這裡圓滿結束。冒險者，歡迎正式踏入伊洛瑟恩大陸。"
+            )
 
 
 class CmdGuildMerit(_GuildCommandBase):

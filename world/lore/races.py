@@ -33,6 +33,7 @@ class RaceProfile:
     static_baseline: StaticBand
     learning_multiplier: float
     can_use_divine_arts: bool
+    description: str
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         static_baseline=_static_band(1, 22),
         learning_multiplier=1.0,
         can_use_divine_arts=False,
+        description="壽命短暫而繁衍迅速的人類，適應力強，是這片大陸最常見的種族。",
     ),
     "beastfolk": RaceProfile(
         key="beastfolk",
@@ -98,6 +100,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         static_baseline=_static_band(4, 34),
         learning_multiplier=1.0,
         can_use_divine_arts=False,
+        description="獸耳與尾巴的獸人族，體魄強健、感官敏銳，以部族文化與野性力量聞名。",
     ),
     "elf": RaceProfile(
         key="elf",
@@ -110,6 +113,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         static_baseline=_static_band(70, 95),
         learning_multiplier=10.0,
         can_use_divine_arts=True,
+        description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法息息相關。",
     ),
 }
 

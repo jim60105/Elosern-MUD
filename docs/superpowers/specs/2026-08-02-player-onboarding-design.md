@@ -71,8 +71,10 @@ the guard's first line prompting `look`. Completion condition: the player inputs
 
 ### Beat 5 — Guard guidance
 After `look`, the guard prompts movement north to the plaza and the guild. `talk` with the guard
-serves scripted keyword responses (公會 / 冒險 / 危險 / 再見). Guidance ends when the player reaches
-the guild exterior.
+serves scripted keyword responses (公會 / 冒險 / 危險 / 再見). Guidance ends as completed when the
+player reaches the guild exterior; entering any room outside the guided corridor (南門, 南大道,
+中央廣場, 冒險者公會外) marks the guide skipped. The `look` completion is detected through a
+`PlayerCharacter.at_look` seam.
 
 ### Beat 6 — First-day arc (existing systems)
 Guild registration (F rank) → accept 討伐低階魔物 from the board → North Gate → wilderness →
@@ -82,8 +84,9 @@ Guild registration (F rank) → accept 討伐低階魔物 from the board → Nor
 Turn-in success sets `onboarded = True` and shows a closing line. No further guidance afterwards.
 
 ### Skip
-At any beat the player may walk away; the guard does not block. Skipping records "guide skipped"
-without setting `onboarded`, so `help` (a 新手引導 entry) and `talk` with the guard remain available.
+At any beat the player may walk away; the guard does not block. Skipping is recorded when the player
+enters a room outside the guided corridor without completing the guide; it does not set `onboarded`,
+so `help` (a 新手引導 entry) and `talk` with the guard remain available.
 
 ---
 
@@ -133,11 +136,15 @@ without setting `onboarded`, so `help` (a 新手引導 entry) and `talk` with th
    its guide progress. It is created idempotently at startup by `sync_guard_npc()`, mirroring the
    existing guild-economy NPC sync.
 2. **`CmdsTalk` works on any NPC** but responds only when the NPC carries a dialogue component;
-   otherwise the player gets "對方沒有理會你". This is layered cleanly away from change 19's LLM
-   dialogue, which uses the existing `NPC.dialogue_memory` seam.
+   otherwise the player gets "對方沒有理會你" — including an un-keyworded `talk <npc>` while the
+   guide is active, which never borrows the guard's guidance line for a component-less NPC. Unknown
+   keywords yield the no-understanding line and cause no state change. This is layered cleanly away
+   from change 19's LLM dialogue, which uses the existing `NPC.dialogue_memory` seam.
 3. **Beat progress lives in character attributes**; reconnection resumes from the current beat.
-4. **Teleport uses the existing movement path** (`world/rules/movement.py`), not a new move
-   mechanism.
+4. **Relocation uses the existing movement path**, never a new move mechanism: after activation
+   commits, the shell is relocated to the South Gate as a best-effort step that must not advance the
+   world clock, must not emit a player-move event, and must never roll back activation. A missing
+   gate, a failed move, or a raised move error degrades to a notice while activation stays committed.
 
 ---
 
@@ -149,8 +156,8 @@ without setting `onboarded`, so `help` (a 新手引導 entry) and `talk` with th
 |---|---|---|---|
 | `onboarded` | bool, default False | rules | first-day journey complete |
 | `onboarding_beat` | int \| None | rules | current beat; None = not started |
-| `guide_progress` | dict | rules | guide dialogue progress |
-| `first_arrival_seen` | bool | rules | whether the arrival scene has played |
+| `guide_progress` | dict | rules | guide state (`state` in active/completed/skipped) plus seen keywords |
+| `first_arrival_seen` | bool | rules | whether the arrival scene has been completed |
 
 All writes go through `world/rules/onboarding.py`; nothing writes these attributes directly.
 
@@ -161,7 +168,11 @@ All writes go through `world/rules/onboarding.py`; nothing writes these attribut
 
 ### 5.3 Skip
 
-- Walking away marks "guide skipped"; `onboarded` is set only on first hunt turn-in.
+- Entering a room outside the guided corridor (南門, 南大道, 中央廣場, 冒險者公會外) marks "guide
+  skipped"; reaching the guild exterior completes guidance; `onboarded` is set only on first hunt
+  turn-in.
+- Guidance ending (completed or skipped) also marks the arrival as seen, so the arrival scene never
+  replays after guidance has ended even when the player never completed the `look` beat.
 - `help` gains a 新手引導 entry; `talk` with the guard still answers basic questions.
 
 ### 5.4 Edge cases

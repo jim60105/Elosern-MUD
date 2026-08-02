@@ -30,6 +30,7 @@ from commands.guild import (
     CmdGuildTurnIn,
 )
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
+from commands.talk import CmdsTalk
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -64,6 +65,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdBuy)
         self.add(CmdSell)
         self.add(CmdInventory)
+        self.add(CmdsTalk)
         self.add(XYZGridCmdSet)
 
 

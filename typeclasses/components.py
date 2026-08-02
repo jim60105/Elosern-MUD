@@ -38,3 +38,16 @@ class Merchant(Component):
     shop_key = DBField(default=None)
     merchant_stock = DBField(default=None)
     last_restock_day = DBField(default=None)
+
+
+class OnboardingGuide(Component):
+    """Capability marker and dialogue identity of the South Gate guide NPC.
+
+    The component encodes intent (onboarding), not the NPC's future role: the
+    same guard may gain unrelated dialogue later. ``dialogue_key`` points at the
+    immutable keyword table in ``world/onboarding/guide_dialogue.py``; per-player
+    guide progress lives on the player character, owned by the rules service.
+    """
+
+    name = "onboarding_guide"
+    dialogue_key = DBField(default=None)

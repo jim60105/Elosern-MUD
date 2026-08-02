@@ -18,7 +18,7 @@ ready for later changes to populate.
 #### Scenario: Player can connect
 - **WHEN** a telnet client connects to port 4000, or a browser opens the webclient on port 4001,
   after the server has started
-- **THEN** the connection succeeds and the default Evennia login/welcome screen is presented
+- **THEN** the connection succeeds and the project's custom connection screen is presented
 
 #### Scenario: Directory layout matches the design
 - **WHEN** the game directory is inspected after initialization

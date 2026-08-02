@@ -23,6 +23,37 @@ def _integer(response: str, field: str) -> int:
         raise CharacterCreationError(f"{field} 必須是整數。") from error
 
 
+ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
+    "hp": "生命值，決定你能承受多少傷害",
+    "mp": "魔力值，驅動法術的消耗",
+    "sp": "體力值，支撐行動與攻擊",
+    "atk_phys": "物理攻擊，影響造成的傷害",
+    "agility": "敏捷，影響命中與迴避",
+    "defense": "防禦，減免受到的傷害",
+}
+
+
+def creation_start_screen() -> str:
+    """Render the no-argument ``character`` presentation (design.md D6).
+
+    A world-view framing line followed by one preview line per preset drawn
+    entirely from immutable registry data: the race one-liner, the allocation
+    emphasis, and the background. Reused by ``CmdCharacter.func`` and by the
+    ``Account.at_post_login`` login coordinator.
+    """
+    lines = ["你站在伊洛瑟恩大陸的門口，世界正等待你的名字。", "可選擇的預設角色："]
+    for key, preset in PLAYER_PRESET_REGISTRY.items():
+        race = RACE_REGISTRY[preset.race]
+        lines.append(
+            f"  {key}（{preset.display_name}）：{race.description} "
+            f"｜配點：{preset.emphasis}｜背景：{preset.background}"
+        )
+    lines.append("請選擇角色建立方式。")
+    lines.append(f"預設角色：character preset <key>（{'、'.join(PLAYER_PRESET_REGISTRY)}）")
+    lines.append("自訂角色：character create")
+    return "\n".join(lines)
+
+
 class CmdCharacter(Command):
     """建立角色。用法：character、character preset <key>、character create"""
 
@@ -35,19 +66,21 @@ class CmdCharacter(Command):
         except CharacterCreationError as error:
             self.caller.msg(f"角色建立失敗：{error}")
             return
+        from world.rules.onboarding import (
+            maybe_play_arrival,
+            relocate_to_starting_location,
+        )
+
+        relocate_to_starting_location(self.caller)
         self.caller.msg(
             f"角色 {result.display_name} 已建立，初始魔法等級為 {result.magic_level}。"
         )
+        maybe_play_arrival(self.caller)
 
     def func(self):
         args = self.args.strip().split()
         if not args:
-            presets = "、".join(PLAYER_PRESET_REGISTRY)
-            self.caller.msg(
-                "請選擇角色建立方式。\n"
-                f"預設角色：character preset <key>（{presets}）\n"
-                "自訂角色：character create"
-            )
+            self.caller.msg(creation_start_screen())
             return
         if args[0].lower() == "preset":
             if len(args) != 2:
@@ -66,7 +99,13 @@ class CmdCharacter(Command):
                 return
             age = _integer((yield "實際年齡（至少 18，可輸入 cancel 取消）："), "實際年齡")
             apparent_age = _integer((yield "外表年齡（至少 18，可輸入 cancel 取消）："), "外表年齡")
-            race = (yield f"種族（{'、'.join(RACE_REGISTRY)}，可輸入 cancel 取消）：").strip()
+            race_explanations = "\n".join(
+                f"  {key}：{RACE_REGISTRY[key].description}" for key in RACE_REGISTRY
+            )
+            race = (yield (
+                f"種族（{'、'.join(RACE_REGISTRY)}，可輸入 cancel 取消）：\n"
+                f"{race_explanations}\n"
+            )).strip()
             if race.lower() == "cancel":
                 self.caller.msg("已取消角色建立。")
                 return
@@ -84,8 +123,9 @@ class CmdCharacter(Command):
             allocations: dict[str, int] = {}
             for axis, (lower, upper) in profile.bounds:
                 span = upper - lower
+                explanation = ALLOCATION_AXIS_EXPLANATIONS.get(axis, "")
                 allocations[axis] = _integer(
-                    (yield f"{axis} 配點（0–{span}）："), axis
+                    (yield f"{axis} 配點（0–{span}）：{explanation}\n"), axis
                 )
             summary = (
                 f"姓名 {name.strip()}，年齡 {age}/{apparent_age}，種族 {race}，"

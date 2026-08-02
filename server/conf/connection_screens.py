@@ -20,24 +20,18 @@ of the screen is done by the unlogged-in "look" command.
 
 """
 
-from django.conf import settings
-
-from evennia import utils
-
 CONNECTION_SCREEN = """
 |b==============================================================|n
- Welcome to |g{}|n, version {}!
+        |g伊洛瑟恩大陸|n —— 一個等待英雄的廣闊世界。
 
- If you have an existing account, connect to it by typing:
-      |wconnect <username> <password>|n
- If you need to create an account, type (without the <>'s):
-      |wcreate <username> <password>|n
+ 如果你已有帳號，請輸入：
+     |wconnect <帳號> <密碼>|n
+ 如果你是新玩家，請輸入：
+     |wcreate <帳號> <密碼>|n
 
- New accounts must create an adult character before entering the world.
- After login, use |wcharacter|n to choose a preset or start custom creation.
+ 新帳號必須建立一個成年角色，才能踏入這個世界。
+ 登入後使用 |wcharacter|n 選擇預設角色或開始自訂角色。
 
- If you have spaces in your username, enclose it in quotes.
- Enter |whelp|n for more info. |wlook|n will re-show this screen.
-|b==============================================================|n""".format(
-    settings.SERVERNAME, utils.get_evennia_version("short")
-)
+ 若帳號名稱包含空格，請用引號括起來。
+ 輸入 |whelp|n 取得更多資訊，|wlook|n 重新顯示此畫面。
+|b==============================================================|n"""

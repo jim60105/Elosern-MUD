@@ -43,10 +43,20 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, XYZRoom):
 
     Adopts ``QuestObservableRoomMixin`` so a ``PlayerCharacter`` entering a grid
     room advances matching REACH/ESCORT stages (quest-runtime D-5). Every
-    ``AnchorRoom`` inherits the hook through this class.
+    ``AnchorRoom`` inherits the hook through this class. After the quest
+    observer, the onboarding observer runs so 南門/公會外/corridor entries reach
+    ``world.rules.onboarding.observe_room_entry`` (onboarding-guide D10) — the
+    same player-entry path, no per-room monkey-patching.
     """
 
-    pass
+    def at_object_receive(self, obj, source_location, move_type="move", **kwargs):
+        super().at_object_receive(obj, source_location, move_type=move_type, **kwargs)
+        from typeclasses.characters import PlayerCharacter
+
+        if isinstance(obj, PlayerCharacter):
+            from world.rules.onboarding import observe_room_entry
+
+            observe_room_entry(obj)
 
 
 class AnchorRoom(GridRoom):

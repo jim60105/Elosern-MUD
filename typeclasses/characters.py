@@ -14,6 +14,10 @@ class PlayerCharacter(LivingEntity):
     guild_rank: str | None = AttributeProperty(default=None)
     quest_log: list = AttributeProperty(default=list)
     wallet: int = AttributeProperty(default=0)
+    onboarded: bool = AttributeProperty(default=False)
+    onboarding_beat: str | None = AttributeProperty(default=None)
+    guide_progress: dict = AttributeProperty(default=dict)
+    first_arrival_seen: bool = AttributeProperty(default=False)
 
     def at_cmdset_get(self, **kwargs) -> None:
         """Derive the creation gate from persistent state for every merge."""
@@ -31,6 +35,22 @@ class PlayerCharacter(LivingEntity):
         if is_in_active_session(self):
             return False
         return super().at_pre_move(destination, move_type=move_type, **kwargs)
+
+    def at_look(self, target, **kwargs) -> str:
+        """Advance the arrival ``look`` beat after a successful look at the gate.
+
+        The onboarding service guards on room + state, so a look elsewhere (or a
+        look that fails) never advances the beat. On a successful advance the
+        guard-guidance prompt is appended to the returned look text.
+        """
+        look_string = super().at_look(target, **kwargs)
+        if not self.creation_pending:
+            from world.rules.onboarding import advance_beat
+
+            guidance = advance_beat(self)
+            if guidance:
+                look_string = f"{look_string}\n\n{guidance}"
+        return look_string
 
 
 class Character(PlayerCharacter):
