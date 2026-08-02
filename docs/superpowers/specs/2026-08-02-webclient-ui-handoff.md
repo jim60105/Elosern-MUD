@@ -117,20 +117,3 @@ details remain hidden until arrival.
 browser harness, Chromium installation, and required quality-gate workflow steps. Browser checks are not
 optional local tests.
 
-## 5. First Plan Boundary
-
-The `webclient-oob-foundation` implementation plan should cover only:
-
-- protocol/epoch/revision envelopes;
-- authenticated input functions;
-- snapshot coordinator and presenter isolation;
-- allowlisted dispatcher infrastructure with test-only proof adapters;
-- compact true-value HP/MP/SP status presenter;
-- GoldenLayout shell, ink-night/vermilion theme, state store, keyboard router, and command drawer;
-- layout-version migration;
-- Node and Playwright harness/CI wiring;
-- OpenSpec requirements, traceability, and verification for this foundation.
-
-Combat, map persistence, service transactions, art subjects, and character-creation forms belong to their
-later delivery units. Foundation placeholders must identify unavailable panels and must not fake those
-features.
