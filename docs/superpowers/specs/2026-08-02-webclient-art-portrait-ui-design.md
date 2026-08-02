@@ -4,8 +4,8 @@
 **Status:** Approved as part of the Browser-First MUD WebClient Suite
 **Parent:** `2026-08-02-webclient-ui-design.md`
 **Delivery units:** `art-assets`, then `webclient-art-panel`
-**Dependencies:** `art-assets` depends on room scene-archetype seams, character/import age gates, and
-bestiary/portrait-policy registries. `webclient-art-panel` depends on `art-assets` and
+**Dependencies:** `art-assets` depends on SceneBuilder, room scene-archetype seams, character/import age
+gates, and bestiary/portrait-policy registries. `webclient-art-panel` depends on `art-assets` and
 `webclient-oob-foundation`.
 
 ---
@@ -19,7 +19,9 @@ speaker or combat target. Missing or failed art is always a presentation degrada
 failure.
 
 The work is split so the deterministic queue/worker/store can be verified without a browser, and the
-panel can later consume only completed asset records and statuses.
+panel can later consume only completed asset records and statuses. `art-assets` lands after SceneBuilder
+so the generated named-NPC portrait lifecycle integrates with its real validated spawn path rather than a
+forward-declared fake hook.
 
 ---
 

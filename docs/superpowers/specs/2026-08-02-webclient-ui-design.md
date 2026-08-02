@@ -632,18 +632,29 @@ The suite is intentionally not one implementation plan.
 
 | Order | OpenSpec change | Depends on | Delivers |
 |---|---|---|---|
-| 1 | `webclient-oob-foundation` | current deterministic milestone | protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
-| 2A | `webclient-combat-menu` | foundation, player combat sessions | combat presenters/actions, targets-list session facade, Telnet target parity, combat browser tests |
-| 2B | `map-knowledge-minimap` | foundation, all current map layers | persistent visited nodes, four layer adapters, local map presenter, instance amendment |
-| 2C | `art-assets` | current room/character/archetype seams | scene and portrait subjects, generic queue, worker contract, placeholders |
-| 3A | `webclient-exploration-menu` | foundation, map knowledge | movement, look, interaction, dialogue, rest/wait menus |
-| 3B | `webclient-service-menus` | foundation, guild/economy/quest APIs | guild, quest, shop, inventory menus |
-| 3C | `webclient-art-panel` | foundation, art assets | scene renderer, portrait overlay, zoom, OOB art updates |
-| 4 | `webclient-character-creation-ui` | foundation, current creation/onboarding APIs | pending-character mode, preset/custom forms, activation transition |
+| Wave 1 | `webclient-oob-foundation` | current deterministic milestone | protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
+| Wave 2A | `webclient-combat-menu` | foundation, player combat sessions | combat presenters/actions, targets-list session facade, Telnet target parity, combat browser tests |
+| Wave 2B | `map-knowledge-minimap` | foundation, all current map layers | persistent visited nodes, four layer adapters, local map presenter, instance amendment |
+| Wave 2C | `webclient-service-menus` | foundation, guild/economy/quest APIs | guild, quest, shop, inventory menus |
+| Wave 2D | `webclient-character-creation-ui` | foundation, current creation/onboarding APIs | pending-character mode, preset/custom forms, activation transition |
+| Wave 3 | `webclient-exploration-menu` | foundation, map knowledge, NPC dialogue | movement, look, interaction, scripted/free-form dialogue, rest/wait menus |
+| Wave 4 | `art-assets` | SceneBuilder, current room/character/archetype seams | scene and portrait subjects, generated named-NPC portrait lifecycle, generic queue, worker contract, placeholders |
+| Wave 5 | `webclient-art-panel` | foundation, art assets | scene renderer, portrait overlay, zoom, OOB art updates |
 
-Changes 2A, 2B, and 2C may proceed in parallel after foundation. Change 3B may also proceed once the
-foundation's contracts are stable. Every change has its own delta specs, tasks, traceability, and strict
-verification.
+Delivery uses dependency waves rather than waiting for every Phase 5 change before UI work:
+
+1. `llm-client` and `webclient-oob-foundation` start in parallel.
+2. After `llm-client`, Narrator, NPC dialogue, and ScenarioDirector proceed in parallel. After the UI
+   foundation, combat menu, map knowledge, service menus, and character-creation UI proceed in parallel.
+3. SceneBuilder follows ScenarioDirector. Exploration menu joins completed NPC dialogue with map knowledge.
+4. Art assets follows SceneBuilder so its generated named-NPC portrait hook lands against a real owner.
+5. The art panel follows both art assets and the UI foundation.
+
+This yields independent critical paths: combat UI is `foundation → combat`; complete exploration joins
+`llm-client → NPC dialogue → exploration` with `foundation → map knowledge → exploration`; generated art
+display is `llm-client → ScenarioDirector → SceneBuilder → art assets → art panel`. Narrator does not block
+the UI because deterministic EventLog templates remain the required fallback. Every change has its own
+delta specs, tasks, traceability, and strict verification.
 
 ---
 

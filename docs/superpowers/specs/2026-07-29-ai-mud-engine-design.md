@@ -850,11 +850,11 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 22 | `art-assets` | 3, 4, 12, 14 | Scene and portrait subjects, serialized queue, worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
+| 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
 | 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
 | 23b | `webclient-combat-menu` | 16, 23a | Skill/action/target menus, multi-target combat-session facade, Telnet target parity, reconnect UI |
 | 23c | `map-knowledge-minimap` | 12, 13, 14, 23a | Persistent visited nodes, grid/wilderness minimaps, coordinate-free instance/interior local graphs |
-| 23d | `webclient-exploration-menu` | 23a, 23c | Movement, look, local interaction, dialogue, rest, and wait menus |
+| 23d | `webclient-exploration-menu` | 19, 23a, 23c | Movement, look, local interaction, scripted and free-form NPC dialogue, rest, and wait menus |
 | 23e | `webclient-service-menus` | 16, 23a | Guild, quest, shop, wallet, and inventory menus |
 | 23f | `webclient-art-panel` | 22, 23a | Scene renderer, contextual portrait overlay, zoom, and OOB art updates |
 | 23g | `webclient-character-creation-ui` | 23a, `login-creation-ux`, `onboarding-guide` | Pending-character mode, preset/custom forms, adult validation, activation transition |
@@ -862,11 +862,17 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 > **Amended 2026-08-02.** The original rows 22 (`art-queue`) and 23 (`webclient-panel`) were too broad
 > after the owner selected a browser-first, keyboard-menu interface with status, map memory, scene and
 > portrait art, combat selection, exploration, services, and character creation. They are replaced by
-> the independently verifiable changes above. Changes 23b, 23c, 23e, and 22 may proceed in parallel
-> after their listed dependencies. The approved source of truth for the suite is
+> the independently verifiable changes above. Phase numbers no longer imply a strict Phase-5-then-Phase-6
+> sequence: change 17 and 23a start in parallel; 18/19/20 fan out after 17 while 23b/23c/23e/23g fan out
+> after 23a; 21 follows 20; 23d joins 19 with 23c; 22 follows 21; and 23f joins 22 with 23a. The approved
+> source of truth for the suite is
 > `docs/superpowers/specs/2026-08-02-webclient-ui-design.md` and its five focused designs.
 
 **Critical path:** `1 → 2 → 3 → 6 → 8 → 9 → 10 → 15 → 20 → 21`
+
+**Post-deterministic critical paths:** AI story generation `17 → 20 → 21`; complete exploration UI
+joins `17 → 19 → 23d` with `23a → 23c → 23d`; generated art display follows
+`17 → 20 → 21 → 22 → 23f`; combat UI remains the independent `23a → 23b` path.
 
 **Milestones**
 

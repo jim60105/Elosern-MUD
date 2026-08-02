@@ -4,7 +4,9 @@
 **Status:** Approved as part of the Browser-First MUD WebClient Suite
 **Parent:** `2026-08-02-webclient-ui-design.md`
 **Delivery units:** `map-knowledge-minimap`, then `webclient-exploration-menu`
-**Depends on:** `webclient-oob-foundation`, existing map layers and movement clock
+**Dependencies:** `map-knowledge-minimap` depends on `webclient-oob-foundation`, existing map layers, and
+the movement clock. `webclient-exploration-menu` depends on map knowledge and `npc-dialogue` so scripted
+and free-form dialogue ship as one complete exploration surface.
 
 ---
 
@@ -17,7 +19,9 @@ wilderness coordinates, instance rooms, and ordinary interiors.
 
 The work is split into two delivery units. `map-knowledge-minimap` owns persisted discovery and read-only
 map payloads. `webclient-exploration-menu` consumes those payloads and adds movement, look, interaction,
-dialogue, and wait/rest action adapters.
+scripted/free-form dialogue, and wait/rest action adapters. Map knowledge can proceed while Phase 5 is in
+flight; the exploration menu waits for NPC dialogue but does not wait for Narrator, ScenarioDirector,
+SceneBuilder, or art.
 
 ---
 
