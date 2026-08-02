@@ -21,6 +21,7 @@ server/*.sock
 server/.static/
 server/.media/
 server/.cache/
+server/.art/
 
 # ==========================================
 # Python & Virtual Environments
@@ -53,6 +54,7 @@ toolbox/*.lock
 # Misc
 # ==========================================
 tmp/
+.superpowers/
 *.swp
 
 # ==========================================

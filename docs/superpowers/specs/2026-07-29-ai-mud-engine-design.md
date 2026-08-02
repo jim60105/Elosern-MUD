@@ -46,6 +46,10 @@ These were settled during design. Do not relitigate them inside a change.
 | D10 | **Scene art is keyed by archetype, not by room.** A tavern in the capital and a tavern in a border town share one image. | GPU cost scales with scene *kinds*, not room count. Style stays consistent for free. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
 | D12 | **Guild advancement requires cumulative merit plus a nonlethal combat examination; shops use finite stock and clock-driven restocking.** Every registrant starts at F, regardless of displayed power. | Preserves the world's stated merit-plus-exam progression, gives Phase 4 a real combat milestone, and makes the reserved caravan/shop clock stages meaningful. |
+| D13 | **The browser WebClient is the first-class graphical client; Telnet remains fully playable as text.** | The project already uses Evennia's WebSocket/GoldenLayout extension points. A second Mudlet/Lua UI would duplicate distribution and compatibility work. |
+| D14 | **Finite ordinary player choices use server-authored, versioned OOB menus.** Free-form values remain text. | Players should not memorize skill, target, Exit, quest, or shop keys; the browser must not parse prose or duplicate rules to discover them. |
+| D15 | **Portrait art is a separate subject type.** Players and explicitly named NPCs have unique portraits; generic monsters share one by archetype. | Preserves D10's scene reuse while bounding portrait GPU/storage cost and giving important characters identity. |
+| D16 | **The local minimap remembers visited nodes and may render coordinate-free Exit graphs.** Instance/interior rooms gain no invented coordinates, world-map membership, or pathfinding. | A truthful local navigation aid can cover every current room type without weakening the four-layer map model. |
 
 ---
 
@@ -156,7 +160,7 @@ from-scratch engine.
 | `ai/npc_dialogue.py` | `evennia.contrib.rpg.llm` — `LLMNPC(DefaultCharacter)` (module `llm_npc.py`) | **Subclass.** Chat memory, prompt priority chain, thinking state are done |
 | `rules/combat.py` | `evennia.contrib.tutorials.evadventure` — **corrected path; it is not under `contrib.rpg`** (`EvAdventureRollEngine` in `rules.py`, `CombatAction` subclasses and `EvAdventureCombatBaseHandler` in `combat_base.py`) | **Reference only.** It is d20 (confirmed: `EvAdventureRollEngine.roll()` rolls `1d20`/`2d20` against a target of 15); we are linear. Borrow its *structure*, not its *formulas* |
 | `rules/dice.py` | `evennia.contrib.rpg.dice` — `roll()` (module `dice.py`) | **Use directly** for the d100 roller — `roll(1, 100, ...)` or the string form `"1d100"` |
-| Front-end panel | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed) | **Configure + plugin.** Edit `goldenlayout_default_config.js`, add an OOB receiver |
+| Front-end suite | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed); project input functions in `server/conf/inputfuncs.py` | **Configure + plugins.** Add a versioned OOB state store, keyboard router, panel renderers, and allowlisted UI action input while retaining normal text commands |
 
 > **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (imports and CLI both verified in an
 > isolated uv environment; requires Python >=3.12) — the version that was actually
@@ -699,6 +703,20 @@ Completed entries are idempotent and never regenerate.
 OOB push on room entry when an image exists; otherwise the panel keeps the previous image or shows
 a placeholder.
 
+> **Amended 2026-08-02 (approved Browser-First MUD WebClient Suite).** Scene behavior above remains
+> unchanged and D10 still forbids per-room scene images. The art queue additionally accepts portrait
+> subjects under a separate namespace: players and explicitly named NPCs have stable unique portrait
+> keys, while generic monsters share a portrait by bestiary archetype. Both adult age gates are checked
+> before portrait enqueue. Scene and portrait jobs share the same serialized external worker boundary.
+> Queue writes are owned by `world/art/service.py` and occur through startup synchronization, successful
+> room entry, or post-commit character/NPC lifecycle hooks; WebClient presenters and workers remain
+> read-only with respect to queue and game state.
+> Generated files live under gitignored `server/.art/`, mounted at `/app/server/.art`. This supersedes
+> the bootstrap compose path `/app/world/art`, which would mask the importable `world/art/` package once
+> change 22 lands.
+> The complete subject, worker, placeholder, and WebClient overlay contract is defined in
+> `docs/superpowers/specs/2026-08-02-webclient-art-portrait-ui-design.md`.
+
 ---
 
 ## 9. Containerization
@@ -719,7 +737,8 @@ compose.yaml      evennia + volumes; ollama and sd-webui reached over the networ
   foreground. It does **not** redirect logging away from disk, so the `server/logs` volume is
   load-bearing rather than optional.
 - **Ports.** 4000 telnet, 4001 webserver, 4002 websocket.
-- **Volumes.** SQLite DB, scene art store, `server/logs` (required — see above).
+- **Volumes.** SQLite DB, generated art at `/app/server/.art`, `server/logs` (required — see above),
+  static files, and media. Never mount generated files over the importable `world/art/` package.
 - **GPU services stay outside.** Ollama and sd-webui are reached via environment variables or
   `extra_hosts`; the image needs no GPU runtime and stays small.
 
@@ -831,8 +850,21 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 22 | `art-queue` | 12, 14 | Archetype registry, queue, worker contract, `@art` commands, scheduler |
-| 23 | `webclient-panel` | 22 | GoldenLayout config, OOB receiver plugin |
+| 22 | `art-assets` | 3, 4, 12, 14 | Scene and portrait subjects, serialized queue, worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
+| 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
+| 23b | `webclient-combat-menu` | 16, 23a | Skill/action/target menus, multi-target combat-session facade, Telnet target parity, reconnect UI |
+| 23c | `map-knowledge-minimap` | 12, 13, 14, 23a | Persistent visited nodes, grid/wilderness minimaps, coordinate-free instance/interior local graphs |
+| 23d | `webclient-exploration-menu` | 23a, 23c | Movement, look, local interaction, dialogue, rest, and wait menus |
+| 23e | `webclient-service-menus` | 16, 23a | Guild, quest, shop, wallet, and inventory menus |
+| 23f | `webclient-art-panel` | 22, 23a | Scene renderer, contextual portrait overlay, zoom, and OOB art updates |
+| 23g | `webclient-character-creation-ui` | 23a, `login-creation-ux`, `onboarding-guide` | Pending-character mode, preset/custom forms, adult validation, activation transition |
+
+> **Amended 2026-08-02.** The original rows 22 (`art-queue`) and 23 (`webclient-panel`) were too broad
+> after the owner selected a browser-first, keyboard-menu interface with status, map memory, scene and
+> portrait art, combat selection, exploration, services, and character creation. They are replaced by
+> the independently verifiable changes above. Changes 23b, 23c, 23e, and 22 may proceed in parallel
+> after their listed dependencies. The approved source of truth for the suite is
+> `docs/superpowers/specs/2026-08-02-webclient-ui-design.md` and its five focused designs.
 
 **Critical path:** `1 → 2 → 3 → 6 → 8 → 9 → 10 → 15 → 20 → 21`
 
