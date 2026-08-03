@@ -28,6 +28,8 @@ if FLEE_SKILL_KEY not in INNATE_SKILL_KEYS:
 
 SKILL_REGISTRY[FLEE_SKILL_KEY] = SkillDef(
     key=FLEE_SKILL_KEY,
+    label="逃跑",
+    description="嘗試脫離當前戰鬥。",
     kind=SkillKind.ACTIVE,
     target_spec=TargetSpec.SELF,
     faction_constraint=FactionConstraint.SELF_ONLY,

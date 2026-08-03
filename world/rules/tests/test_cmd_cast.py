@@ -6,10 +6,16 @@ from unittest.mock import patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from commands.action import CmdCast, REJECTION_MESSAGES
+from commands.action import CmdCast
 from world.rules.action import RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.clock import WorldClock
+from world.rules.player_messages import (
+    rejection_message,
+    session_reason_message,
+    terminal_outcome_message,
+)
+from world.rules.combat_session import SessionReason
 
 
 class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -34,7 +40,7 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             self.call(
                 CmdCast(),
                 "definitely_missing",
-                REJECTION_MESSAGES[RejectReason.UNKNOWN_SKILL],
+                rejection_message(RejectReason.UNKNOWN_SKILL),
             )
         self.assertEqual(clock.tick, 0)
 
@@ -42,7 +48,21 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
         self.call(CmdCast(), "", "用法：cast")
 
     def test_rejection_message_table_covers_every_reason(self):
-        self.assertEqual(set(REJECTION_MESSAGES), set(RejectReason))
+        for reason in RejectReason:
+            message = rejection_message(reason)
+            self.assertTrue(message.strip())
+            self.assertLessEqual(sum(1 for _ in message), 512)
+
+    def test_session_message_table_covers_every_session_reason(self):
+        for reason in SessionReason:
+            message = session_reason_message(str(reason))
+            self.assertTrue(message.strip())
+
+    def test_terminal_outcome_table_covers_every_terminal_outcome(self):
+        for outcome in ("victory", "defeat", "fled", "exam_passed", "exam_failed", "cap"):
+            message = terminal_outcome_message(outcome)
+            self.assertTrue(message.strip())
+            self.assertNotEqual(message, "繼續戰鬥。")
 
     def test_flee_uses_active_battlefield_context(self):
         self.char1.race = "human"

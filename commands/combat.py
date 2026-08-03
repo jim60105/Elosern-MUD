@@ -10,12 +10,17 @@ from world.rules.combat_session import (
     forfeit,
     is_in_active_session,
 )
+from world.rules.combat_view import (
+    CombatViewError,
+    build_combat_view,
+)
 from world.rules.guild_exams import (
     ExamReason,
     GuildExamError,
     start_guild_exam,
 )
 from world.rules.event_log import render_plain_text
+from world.rules.player_messages import session_reason_message
 
 
 class CmdEngage(Command):
@@ -61,8 +66,8 @@ class CmdCombatForfeit(Command):
     def func(self) -> None:
         try:
             result = forfeit(self.caller)
-        except CombatSessionError:
-            self.caller.msg("目前沒有進行中的戰鬥。")
+        except CombatSessionError as error:
+            self.caller.msg(session_reason_message(str(error.args[0])))
             return
         self.caller.msg(
             {
@@ -70,6 +75,54 @@ class CmdCombatForfeit(Command):
                 "exam_failed": "你放棄了考核。",
             }.get(result["outcome"], "戰鬥結束。")
         )
+
+
+class CmdCombatActions(Command):
+    """List active skills and session participant tokens during combat."""
+
+    key = "combat actions"
+    aliases = ("combat 動作", "戰鬥動作")
+    locks = "cmd:all()"
+    help_category = "Combat"
+
+    def func(self) -> None:
+        if not is_in_active_session(self.caller):
+            self.caller.msg("目前沒有進行中的戰鬥。")
+            return
+        try:
+            view = build_combat_view(self.caller)
+        except CombatViewError:
+            self.caller.msg("目前無法顯示戰鬥動作。")
+            return
+        if view.recovery:
+            self.caller.msg("戰鬥紀錄異常，無法列出動作。可使用「投降」結束戰鬥。")
+            return
+        lines = ["可用技能與目標代號："]
+        for skill in view.skills:
+            target_tokens = [
+                p.token
+                for p in view.participants
+                if p.identity in skill.valid_target_ids
+            ]
+            if target_tokens:
+                targets = "可指定：" + "、".join(target_tokens)
+            elif skill.target_spec == "none":
+                targets = "無需目標"
+            elif skill.target_spec == "self":
+                targets = "指定自己"
+            else:
+                targets = "目前無有效目標"
+            status = "可用" if skill.enabled else skill.reason_message or "無法使用"
+            lines.append(f"  {skill.key}（{skill.label}）：{status}｜{targets}")
+        lines.append("目標代號：")
+        lines.append(
+            "  " + "、".join(f"{p.token}＝{p.display_name}" for p in view.participants)
+        )
+        lines.append(
+            "輸入 cast <技能>=<代號>、cast <技能>=<代號1,代號2>，"
+            "或 cast <技能>=all-enemies／all-allies／all。"
+        )
+        self.caller.msg("\n".join(lines))
 
 
 class CmdGuildExam(Command):

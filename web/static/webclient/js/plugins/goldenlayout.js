@@ -222,6 +222,13 @@
           if (typeof condition.remaining_seconds === "number") {
             itemText += "（剩餘 " + condition.remaining_seconds + " 秒）";
           }
+          if (condition.modifiers && Object.keys(condition.modifiers).length > 0) {
+            itemText += "｜" + Object.keys(condition.modifiers)
+              .map(function (key) {
+                return key + " " + condition.modifiers[key];
+              })
+              .join("、");
+          }
           setText(item, itemText);
           list.appendChild(item);
         });

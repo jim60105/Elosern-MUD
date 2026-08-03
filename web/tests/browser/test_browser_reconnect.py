@@ -74,6 +74,18 @@ class ReconnectTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         generation_before = store_state(page)["generation"]
 
+        # Deterministically keep the submitted action's result out of the
+        # client so the request is provably still in flight when the transport
+        # dies: the server can answer a test-only ``proof.noop`` in the same
+        # tick, which would otherwise race the disconnect.
+        page.evaluate(
+            "() => {"
+            "  const client = Elosern.actions && Elosern.actions.client;"
+            "  if (!client) return false;"
+            "  client.onActionResult = function () { return undefined; };"
+            "  return true;"
+            "}"
+        )
         request_id = page.evaluate(
             "() => Elosern.actions.submit('proof.noop', {})"
         )

@@ -45,6 +45,7 @@ def main() -> None:
 
     from typeclasses.accounts import Account
     from typeclasses.characters import PlayerCharacter
+    from typeclasses.monsters import Monster
     from typeclasses.rooms import Room
     from world.rules.character_creation import (
         CharacterCreationRequest,
@@ -96,6 +97,29 @@ def main() -> None:
         allocations=balanced_allocations("human"),
     )
     result = activate_player_character(account, character, request, sampler=sampler)
+
+    # Deterministic combat fixtures (webclient-combat-menu): grant active
+    # skills covering every TargetSpec and spawn two living monsters in the
+    # start room so browser tests can ``engage`` one through the real server.
+    character.db.skills = {
+        "active": ["fire_ball", "wind_blade", "status_disguise", "concentration"],
+        "passive": ["defense_instinct"],
+    }
+    # A persistent poisoned buff gives the status panel a deterministic
+    # applied-modifier condition (agility -10%) for viewport assertions.
+    from world.rules.buffs import _add_buff
+
+    _add_buff(character, "poisoned")
+    for index, (monster_key, hp) in enumerate(
+        (("goblin", 200), ("wolf", 200)), start=1
+    ):
+        monster = create_object(Monster, key=monster_key, nohome=True)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        monster.traits.hp.base = hp
+        monster.traits.hp.current = hp
+        monster.location = room
+        monster.save()
     print(
         f"seeded account={account.key} character={result.display_name} "
         f"race={result.race} magic_level={result.magic_level}"

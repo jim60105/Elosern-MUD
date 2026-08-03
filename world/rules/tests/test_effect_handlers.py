@@ -21,6 +21,7 @@ from world.rules.action import (
     _handle_sexual_event,
     _handle_buff_apply,
     _handle_confer_growth_rate,
+    _handle_self_buff_apply,
     _step5_effect_resolution,
     register_effect_handler,
 )
@@ -111,6 +112,20 @@ class LandedEffectHandlerTests(EvenniaTest):
         ]
         _commit(effects)
         self.assertIn("paralysis", self.entity.buffs.all)
+
+    def test_self_buff_apply_targets_the_caster_without_a_target(self):
+        effects = _handle_self_buff_apply(
+            self.entity,
+            [],
+            "self_buff_apply:focus",
+            {},
+        )
+        effects = [
+            replace(effect, surfaces=frozenset({"buffs"}))
+            for effect in effects
+        ]
+        _commit(effects)
+        self.assertIn("focus", self.entity.buffs.all)
 
     def test_conferred_growth_rate_uses_landed_buff_seam(self):
         effects = _handle_confer_growth_rate(

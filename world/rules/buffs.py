@@ -117,6 +117,38 @@ def entity_active_buffs(entity) -> set[str]:
     return {buff.definition_key for buff in _active_buff_instances(entity)}
 
 
+def active_buff_keys_from_storage(entity) -> set[str]:
+    """Return active definition keys from stored buff cache without a handler.
+
+    Presentation and preview paths must never materialize ``entity.buffs``.
+    This read-only accessor mirrors :func:`entity_active_buffs` against the
+    persisted buff attribute, skipping paused, zero-stack, and expired entries.
+    """
+    from collections.abc import Mapping
+
+    cache = entity.attributes.get("buffs", default={})
+    if cache is None:
+        return set()
+    if not isinstance(cache, Mapping):
+        raise TypeError("buff cache storage is malformed")
+    active: set[str] = set()
+    for buff_cache in cache.values():
+        if not isinstance(buff_cache, Mapping):
+            raise TypeError("buff cache entry is malformed")
+        if buff_cache.get("paused"):
+            continue
+        stacks = buff_cache.get("stacks")
+        if not isinstance(stacks, int) or stacks <= 0:
+            continue
+        remaining = buff_cache.get("remaining_seconds")
+        if isinstance(remaining, int) and remaining <= 0:
+            continue
+        definition_key = buff_cache.get("definition_key")
+        if isinstance(definition_key, str):
+            active.add(definition_key)
+    return active
+
+
 def _active_buff_instances(entity) -> tuple[RulebookBuff, ...]:
     """Return unpaused game-time-unexpired buff instances with positive stacks."""
     return tuple(

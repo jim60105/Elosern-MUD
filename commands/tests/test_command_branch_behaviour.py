@@ -180,7 +180,10 @@ class CombatCommandBranchTests(TestCase):
             command.caller.msg.assert_called_with(message)
 
         command = _command(CmdCombatForfeit)
-        with patch("commands.combat.forfeit", side_effect=CombatSessionError("none")):
+        with patch(
+            "commands.combat.forfeit",
+            side_effect=CombatSessionError(SessionReason.NO_ACTIVE_SESSION),
+        ):
             command.func()
         command.caller.msg.assert_called_with("目前沒有進行中的戰鬥。")
 
@@ -384,7 +387,7 @@ class ActionCommandBranchTests(TestCase):
         for reason, message in (
             (SessionReason.NO_ACTIVE_SESSION, "目前沒有進行中的戰鬥。"),
             (SessionReason.INVALID_RECOVERY, "你已經無法行動，戰鬥結束了。"),
-            (SessionReason.NOT_PRESENT, "這項行動無法完成。"),
+            (SessionReason.NOT_PRESENT, "目標不在這裡。"),
         ):
             command.caller.msg.reset_mock()
             with patch(
@@ -406,7 +409,10 @@ class ActionCommandBranchTests(TestCase):
         with patch(
             "world.rules.combat_session.submit_player_action",
             return_value={"outcome": "victory", "logs": ["log"]},
-        ), patch("commands.action.render_plain_text", return_value="rendered"):
+        ), patch(
+            "world.rules.combat_result.settle_to_messages",
+            return_value=(("rendered",), "戰鬥結束，你取得了勝利。"),
+        ):
             command._cast_in_session(object(), "skill", "")
         self.assertEqual(
             [call.args[0] for call in command.caller.msg.call_args_list],

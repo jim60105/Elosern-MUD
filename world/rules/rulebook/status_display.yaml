@@ -11,6 +11,12 @@
 - code: fear
   label: 恐懼
   severity: harmful
+- code: focus
+  label: 專注
+  severity: beneficial
+- code: focus_accuracy_boost
+  label: 專注準度提升
+  severity: beneficial
 - code: conferred_growth_rate
   label: 成長率加乘
   severity: beneficial

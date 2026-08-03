@@ -68,9 +68,44 @@ class ActionRegistry:
 
 
 def build_production_action_registry() -> ActionRegistry:
-    """Return the production action registry with no gameplay adapters.
+    """Return the production action registry with the first gameplay adapters.
 
-    The dispatcher and validation infrastructure remain available while every
-    production adapter belongs to its later delivery unit.
+    This delivery unit registers exactly ``combat.cast``, ``combat.flee``, and
+    ``combat.forfeit``. Each action binds one exact payload validator and one
+    narrow deterministic adapter; no action routes through the text parser.
     """
-    return ActionRegistry("elosern")
+    from web.webclient.actions.combat_actions import (
+        _cast_adapter,
+        _flee_adapter,
+        _forfeit_adapter,
+        validate_cast_payload,
+        validate_flee_payload,
+        validate_forfeit_payload,
+    )
+
+    registry = ActionRegistry("elosern")
+    registry.register(
+        ActionSpec(
+            action_id="combat.cast",
+            validate_payload=validate_cast_payload,
+            adapter=_cast_adapter,
+            affected_panels=("status", "context_actions"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="combat.flee",
+            validate_payload=validate_flee_payload,
+            adapter=_flee_adapter,
+            affected_panels=("status", "context_actions"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="combat.forfeit",
+            validate_payload=validate_forfeit_payload,
+            adapter=_forfeit_adapter,
+            affected_panels=("status", "context_actions"),
+        )
+    )
+    return registry

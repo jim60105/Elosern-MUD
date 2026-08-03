@@ -1,0 +1,203 @@
+"""Frozen combat-session view model tests (tasks 1.4)."""
+
+from tools.spec_traceability import covers_requirement
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
+from typeclasses.rooms import Room
+from world.rules.combat_session import engage
+from world.rules.combat_view import (
+    CombatViewError,
+    ROOT_ACTIONS,
+    SECONDARY_ACTIONS,
+    build_combat_view,
+)
+
+
+def _player(key="view player"):
+    player = create_object(PlayerCharacter, key=key)
+    player.race = "human"
+    player.apply_race_baseline()
+    return player
+
+
+def _monster(key="view goblin", hp=100):
+    monster = create_object(Monster, key=key)
+    monster.threat_tier = "low"
+    monster.apply_monster_tier("floor")
+    monster.traits.hp.base = hp
+    monster.traits.hp.current = hp
+    return monster
+
+
+class CombatViewTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="view arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.player.db.skills = {"active": ["fire_ball"], "passive": ["defense_instinct"]}
+        self.monster = _monster()
+        self.monster.location = self.room
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_view_preserves_persisted_participant_order_and_tokens(self):
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        self.assertFalse(view.recovery)
+        self.assertEqual(view.session.mode, "hostile")
+        self.assertEqual(view.session.round, 0)
+        self.assertEqual(view.session.state, "ready")
+        self.assertIsNone(view.session.reason)
+        self.assertEqual(
+            [(p.token, p.team, p.identity) for p in view.participants],
+            [("a1", "party", self.player.pk), ("e1", "foes", self.monster.pk)],
+        )
+        self.assertEqual(view.root_actions, ROOT_ACTIONS)
+        self.assertEqual(view.secondary_actions, SECONDARY_ACTIONS)
+        for participant in view.participants:
+            self.assertIsNone(participant.portrait_ref)
+            self.assertGreater(participant.identity, 0)
+            self.assertEqual(participant.state, "active")
+            self.assertEqual(participant.hp_maximum, 100)
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_skills_follow_handler_order_and_exclude_passives(self):
+        self.player.db.skills = {
+            "active": ["wind_blade", "fire_ball"],
+            "passive": ["defense_instinct"],
+        }
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        keys = [skill.key for skill in view.skills]
+        self.assertEqual(
+            keys,
+            [
+                "wind_blade",
+                "fire_ball",
+                "flee",
+                "basic_attack",
+            ],
+        )
+        self.assertNotIn("defense_instinct", keys)
+        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        self.assertEqual(wind.target_spec, "area")
+        self.assertEqual(wind.shorthands, ("all-enemies", "all"))
+        self.assertTrue(wind.enabled)
+        self.assertEqual(wind.valid_target_ids, (self.monster.pk,))
+        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
+        self.assertEqual(fire.cost, {"mp": 20})
+        self.assertEqual(fire.element, "fire")
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_disabled_skill_keeps_stable_reason(self):
+        self.player.traits.mp.base = 0
+        self.player.traits.mp.current = 0
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
+        self.assertFalse(fire.enabled)
+        self.assertEqual(fire.reason_code, "insufficient_resource")
+        self.assertTrue(fire.reason_message.strip())
+        self.assertTrue(fire.label.strip())
+        self.assertTrue(fire.description.strip())
+
+    @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
+    def test_view_is_read_only(self):
+        engage(self.player, self.monster)
+        before = {
+            "player_hp": self.player.traits.hp.current,
+            "monster_hp": self.monster.traits.hp.current,
+            "rounds": self.player.db.active_combat["rounds_elapsed"],
+            "mp": self.player.traits.mp.current,
+        }
+        view = build_combat_view(self.player)
+        self.assertTrue(view.participants)
+        after = {
+            "player_hp": self.player.traits.hp.current,
+            "monster_hp": self.monster.traits.hp.current,
+            "rounds": self.player.db.active_combat["rounds_elapsed"],
+            "mp": self.player.traits.mp.current,
+        }
+        self.assertEqual(before, after)
+
+    def test_no_session_raises_view_error(self):
+        with self.assertRaises(CombatViewError):
+            build_combat_view(self.player)
+
+    def test_unreconstructable_participant_yields_recovery_view(self):
+        engage(self.player, self.monster)
+        self.monster.delete()
+        view = build_combat_view(self.player)
+        self.assertTrue(view.recovery)
+        self.assertEqual(view.session.state, "recovery")
+        self.assertIsNotNone(view.session.reason)
+        self.assertEqual(view.root_actions, ())
+        self.assertEqual(view.secondary_actions, ("forfeit",))
+        self.assertEqual(view.participants, ())
+        self.assertEqual(view.skills, ())
+
+    def test_participant_states_fled_knocked_out_and_defeated(self):
+        from world.rules.combat_session import from_storage, read_session, to_storage, _persist
+
+        engage(self.player, self.monster)
+        record = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "fled_ids": [self.monster.pk],
+            }
+        )
+        _persist(self.player, record)
+        view = build_combat_view(self.player)
+        monster_view = next(
+            p for p in view.participants if p.identity == self.monster.pk
+        )
+        self.assertEqual(monster_view.state, "fled")
+
+        record = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "fled_ids": [],
+                "knocked_out_ids": [self.monster.pk],
+            }
+        )
+        _persist(self.player, record)
+        view = build_combat_view(self.player)
+        monster_view = next(
+            p for p in view.participants if p.identity == self.monster.pk
+        )
+        self.assertEqual(monster_view.state, "knocked_out")
+
+        record = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "fled_ids": [],
+                "knocked_out_ids": [],
+            }
+        )
+        _persist(self.player, record)
+        self.monster.traits.hp.base = 0
+        self.monster.traits.hp.current = 0
+        view = build_combat_view(self.player)
+        monster_view = next(
+            p for p in view.participants if p.identity == self.monster.pk
+        )
+        self.assertEqual(monster_view.state, "defeated")
+
+    def test_hp_maximum_falls_back_when_trait_max_missing(self):
+        engage(self.player, self.monster)
+        from unittest.mock import patch
+
+        with patch.object(type(self.monster.traits.hp), "max", None, create=True):
+            view = build_combat_view(self.player)
+        monster_view = next(
+            p for p in view.participants if p.identity == self.monster.pk
+        )
+        self.assertGreaterEqual(monster_view.hp_maximum, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

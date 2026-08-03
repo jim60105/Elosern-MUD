@@ -232,7 +232,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", opponent)
+            result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
         self.assertEqual(opponent.traits.hp.current, 1)
@@ -246,7 +246,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", opponent)
+            result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
         self.assertEqual(self.player.guild_rank, "E")
@@ -301,7 +301,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         opponent.traits.hp.current = 2000
         session = read_session(self.player)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", opponent)
+            result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_failed")
         self.assertEqual(self.player.guild_rank, "F")
         self.assertGreaterEqual(self.player.traits.hp.current, 1)

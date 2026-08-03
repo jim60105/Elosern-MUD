@@ -73,11 +73,18 @@ class FactionConstraint(StrEnum):
     SELF_ONLY = "self_only"
 
 
+# Presentation metadata bounds shared by every immutable skill definition.
+LABEL_MAX = 128
+DESCRIPTION_MAX = 512
+
+
 @dataclass(frozen=True)
 class SkillDef:
     """Immutable definition of a skill known to deterministic consumers."""
 
     key: str
+    label: str
+    description: str
     kind: SkillKind
     target_spec: TargetSpec
     cost: dict[str, int]
@@ -86,9 +93,35 @@ class SkillDef:
     effects: list[str]
     faction_constraint: FactionConstraint = FactionConstraint.ANY
 
+    def __post_init__(self) -> None:
+        """Enforce the registry invariants for every constructor path.
+
+        Direct ``SkillDef(...)`` construction (for example the production
+        ``flee`` definition) must observe the same bounded presentation
+        metadata and the same immutable collection contract as the seed
+        builder, so no runtime code can mutate a registered definition.
+        """
+        _validate_metadata(self.label, self.description)
+        object.__setattr__(self, "cost", _FrozenDict(self.cost))
+        object.__setattr__(self, "effects", _FrozenList(self.effects))
+
+
+def _validate_metadata(label: str, description: str) -> None:
+    """Reject empty or oversized player-facing presentation metadata."""
+    if not isinstance(label, str) or not label.strip():
+        raise ValueError("skill label must be a non-empty string")
+    if not isinstance(description, str) or not description.strip():
+        raise ValueError("skill description must be a non-empty string")
+    if sum(1 for _ in label) > LABEL_MAX:
+        raise ValueError(f"skill label exceeds {LABEL_MAX} code points")
+    if sum(1 for _ in description) > DESCRIPTION_MAX:
+        raise ValueError(f"skill description exceeds {DESCRIPTION_MAX} code points")
+
 
 def _skill(
     key: str,
+    label: str,
+    description: str,
     kind: SkillKind,
     target_spec: TargetSpec,
     *,
@@ -99,8 +132,11 @@ def _skill(
     faction_constraint: FactionConstraint = FactionConstraint.ANY,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
+    _validate_metadata(label, description)
     return SkillDef(
         key=key,
+        label=label,
+        description=description,
         kind=kind,
         target_spec=target_spec,
         cost=_FrozenDict({} if cost is None else cost),
@@ -114,10 +150,12 @@ def _skill(
 _BODY_TRAITS = ("atk_phys", "agility", "defense")
 
 
-def _body_multiplier(key: str, multiplier: float) -> SkillDef:
+def _body_multiplier(key: str, label: str, multiplier: float) -> SkillDef:
     """Build one active physical-stat multiplier tier."""
     return _skill(
         key,
+        label,
+        "以體內能量強化自身的物理能力，提升攻擊、敏捷與防禦。",
         SkillKind.ACTIVE,
         TargetSpec.SELF,
         usable_out_of_combat=True,
@@ -133,17 +171,21 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
     for skill in (
         _skill(
             "basic_attack",
+            "基本攻擊",
+            "以普通攻擊對單一敵人造成物理傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             element="fire",
             faction_constraint=FactionConstraint.ENEMY,
             effects=["damage:fire:physical"],
         ),
-        _body_multiplier("body_enhancement", 100),
-        _body_multiplier("body_enhancement_extreme", 1000),
-        _body_multiplier("body_enhancement_basic", 1.2),
+        _body_multiplier("body_enhancement", "身體強化", 100),
+        _body_multiplier("body_enhancement_extreme", "身體超強化", 1000),
+        _body_multiplier("body_enhancement_basic", "身體強化·初階", 1.2),
         _skill(
             "fire_mastery",
+            "火焰精通",
+            "被動提昇火焰系魔法的掌握程度與威力。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             element="fire",
@@ -151,6 +193,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "dark_mastery",
+            "闇屬性精通",
+            "被動提昇闇屬性魔法的掌握程度與威力。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             element="dark",
@@ -158,6 +202,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "wind_mastery",
+            "風屬性精通",
+            "被動提昇風屬性魔法的掌握程度與威力。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             element="wind",
@@ -165,6 +211,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "light_mastery",
+            "光屬性精通",
+            "被動提昇光屬性魔法的掌握程度與威力。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             element="light",
@@ -172,6 +220,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "fire_ball",
+            "火球術",
+            "凝聚火焰魔力，對單一敵人造成魔法傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"mp": 20},
@@ -181,6 +231,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "wind_blade",
+            "風刃術",
+            "颳起銳利風刃，對範圍內所有敵人造成魔法傷害。",
             SkillKind.ACTIVE,
             TargetSpec.AREA,
             cost={"mp": 24},
@@ -190,6 +242,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "flight",
+            "飛行術",
+            "操控風元素飛行，可前往遠處的場合。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             cost={"mp": 10},
@@ -199,6 +253,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "dual_wield_style",
+            "雙持劍術",
+            "同時揮舞兩把武器進行戰鬥的架式。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             cost={"sp": 8},
@@ -206,6 +262,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "light_sword_style",
+            "光劍架式",
+            "以光之劍的架式對單一敵人造成物理傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"sp": 6},
@@ -214,6 +272,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "shadow_slash",
+            "影斬",
+            "潛入闇影後對單一敵人斬出一記物理攻擊。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"sp": 18},
@@ -223,6 +283,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "flash_step",
+            "瞬步",
+            "以高速步伐瞬間移動，可前往較近的場合。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             cost={"sp": 12},
@@ -231,13 +293,26 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "status_disguise",
+            "狀態偽裝",
+            "偽裝自身的外貌與部分能力數值。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             usable_out_of_combat=True,
             effects=["set_disguise"],
         ),
         _skill(
+            "concentration",
+            "集中",
+            "凝聚精神，暫時提升自身的專注與準確度。",
+            SkillKind.ACTIVE,
+            TargetSpec.NONE,
+            cost={"mp": 5},
+            effects=["self_buff_apply:focus"],
+        ),
+        _skill(
             "dominion_art",
+            "統御術",
+            "授予目標一部分自身技能的效果。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
@@ -245,66 +320,88 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "defense_instinct",
+            "防禦直覺",
+            "被動強化自身的防禦能力。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:defense_small"],
         ),
         _skill(
             "blade_art_mastery",
+            "劍術精通",
+            "被動提昇劍術相關技能的效果。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:blade_arts"],
         ),
         _skill(
             "extreme_endurance",
+            "極限耐力",
+            "被動強化自身的耐力上限。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:endurance_extreme"],
         ),
         _skill(
             "magic_circle_comprehension",
+            "魔法陣理解",
+            "被動提昇對魔法陣的理解與運用。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:magic_circle_comprehension"],
         ),
         _skill(
             "precise_mana_control",
+            "精準魔力控制",
+            "被動強化對魔力的精準控制。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:mana_precision"],
         ),
         _skill(
             "retainer_martial_training",
+            "隨從武藝訓練",
+            "被動提昇隨從角色的武藝水準。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:retainer_training"],
         ),
         _skill(
             "guardian_instinct",
+            "守護直覺",
+            "被動強化守護同伴的直覺。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:guardian_instinct"],
         ),
         _skill(
             "elf_longevity",
+            "精靈長壽",
+            "被動延長生命週期，是精靈種族的特質。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_trait:elf_longevity"],
         ),
         _skill(
             "reincarnation_boon_elosia",
+            "轉生祝福·艾露西亞",
+            "轉生帶來的祝福，被動加速魔力成長。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["growth_rate:magic:100"],
         ),
         _skill(
             "reincarnation_boon_yuka",
+            "轉生祝福·由花",
+            "轉生帶來的祝福，被動強化戰鬥預感。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["combat_prediction:武感"],
         ),
         _skill(
             "reincarnation_boon_yuna",
+            "轉生祝福·由奈",
+            "轉生帶來的祝福，被動精通性魔法的掌握。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["element_mastery_rank:性魔法:主宰"],

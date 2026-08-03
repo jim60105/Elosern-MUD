@@ -48,6 +48,12 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertIn("fear", entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
+    def test_buff_focus(self):
+        entity = self._entity()
+        _add_buff(entity, "focus")
+        self.assertIn("focus", entity_active_buffs(entity))
+        self.assertFalse(blocks_action(entity))
+
     @covers_requirement("buff-handler-integration::growth-rate-multiplier-is-a-pure-query-folding-every-active-conferred-growth-rate")
     @covers_requirement("buff-handler-integration::a-rate-of-change-modifier-can-be-conferred-from-one-entity-to-another-as-a-buff")
     def test_buff_conferred_growth_rate(self):

@@ -205,15 +205,21 @@ def _step3_targeting(
     request: ActionRequest,
     skill: SkillDef,
 ) -> list[Any]:
-    candidates = (
-        expand_target_shorthand(
+    if isinstance(request.targets, str):
+        # Shorthand is approved only for AREA-target skills; SINGLE shorthands
+        # are rejected even when expansion would yield exactly one entity.
+        if skill.target_spec is not TargetSpec.AREA:
+            raise RejectedAction(
+                RejectReason.TARGET_SPEC_MISMATCH,
+                "target shorthand requires an area skill",
+            )
+        candidates = expand_target_shorthand(
             request.actor,
             request.context,
             request.targets,
         )
-        if isinstance(request.targets, str)
-        else list(request.targets)
-    )
+    else:
+        candidates = list(request.targets)
     if skill.target_spec is TargetSpec.SELF and not candidates:
         candidates = [request.actor]
     return resolve_targets(request, skill, candidates)
@@ -312,6 +318,37 @@ def _handle_buff_apply(
     ]
 
 
+def _handle_self_buff_apply(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+) -> list[PendingEffect]:
+    """Apply one definition-keyed buff to the caster without a target.
+
+    ``TargetSpec.NONE`` skills resolve to an empty target list, so this handler
+    binds the actor directly instead of iterating targets. This keeps a NONE
+    skill meaningful (a concentration-style self effect) while still never
+    accepting a caller-supplied target.
+    """
+    del targets, context
+    try:
+        key = effect_id.split(":", 1)[1]
+    except IndexError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            effect_id,
+        ) from error
+    return [
+        PendingEffect(
+            actor,
+            f"self_buff_applied|{_entity_key(actor)}|{key}",
+            frozenset({"buffs"}),
+            lambda: _add_buff(actor, key),
+        )
+    ]
+
+
 def _handle_confer_growth_rate(
     actor: Any,
     targets: list[Any],
@@ -383,6 +420,11 @@ register_effect_handler(
 register_effect_handler(
     "buff_apply",
     _handle_buff_apply,
+    frozenset({"buffs"}),
+)
+register_effect_handler(
+    "self_buff_apply",
+    _handle_self_buff_apply,
     frozenset({"buffs"}),
 )
 register_effect_handler(
@@ -510,6 +552,7 @@ _ENTRY_TEMPLATES = {
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
+    "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "sexual_transition": "{target} 的狀態發生了變化。",
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
@@ -541,6 +584,8 @@ def _entries_from_effect(
             "scale": float(values[1]),
         }
     elif kind == "buff_applied":
+        data = {"buff_key": values[0]}
+    elif kind == "self_buff_applied":
         data = {"buff_key": values[0]}
     elif kind == "sexual_transition":
         data = {"event": values[0]}

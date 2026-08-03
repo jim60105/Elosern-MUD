@@ -753,3 +753,154 @@ test("beginTransport rejects non-increasing generations", () => {
   assert.throws(() => store.beginTransport(1));
   assert.throws(() => store.beginTransport(0));
 });
+
+// ---------------------------------------------------------------------------
+// context_actions combat panel schema (task 4.1).
+// ---------------------------------------------------------------------------
+
+function validCombatSkill(overrides) {
+  return deepMerge(
+    {
+      key: "fire_ball",
+      label: "火球術",
+      description: "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+      cost: { mp: 20 },
+      target_spec: "single",
+      element: "fire",
+      enabled: true,
+      disabled_reason: null,
+      targets: [2],
+      shorthands: [],
+    },
+    overrides
+  );
+}
+
+function validCombatParticipant(overrides) {
+  return deepMerge(
+    {
+      identity: 2,
+      token: "e1",
+      display_name: "哥布林",
+      team: "foes",
+      state: "active",
+      hp_current: 100,
+      hp_maximum: 100,
+      portrait_ref: null,
+    },
+    overrides
+  );
+}
+
+function validCombatPanel(overrides) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "combat",
+      session: {
+        session_id: "hostile:1:0",
+        mode: "hostile",
+        round: 0,
+        state: "ready",
+        reason: null,
+      },
+      participants: [validCombatParticipant()],
+      root_actions: ["attack", "skills", "items", "defend", "flee"],
+      secondary_actions: ["forfeit"],
+      skills: [validCombatSkill()],
+    },
+    overrides
+  );
+}
+
+function validRecoveryPanel(overrides) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "combat",
+      session: {
+        session_id: "hostile:1:0",
+        mode: "hostile",
+        round: 2,
+        state: "recovery",
+        reason: { code: "missing_participant", message: "戰鬥成員已無法確認。" },
+      },
+      participants: [],
+      root_actions: [],
+      secondary_actions: ["forfeit"],
+      skills: [],
+    },
+    overrides
+  );
+}
+
+test("validates the available context_actions combat panel", () => {
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validCombatPanel()));
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validRecoveryPanel()));
+});
+
+test("rejects malformed context_actions panels atomically", () => {
+  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 1, available: false }));
+  assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ extra: 1 })));
+  assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ kind: "exploration" })));
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ root_actions: ["attack", "skills", "items", "defend", "flee", "bogus"] })
+    )
+  );
+  // A disabled skill must carry a disabled_reason.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill({ enabled: false, disabled_reason: null })] })
+    )
+  );
+  // Only AREA skills may carry shorthands.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill({ shorthands: ["all-enemies"] })] })
+    )
+  );
+  // portrait_ref must be null in schema version 1.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        participants: [validCombatParticipant({ portrait_ref: "https://x.test/a.png" })],
+      })
+    )
+  );
+  // Skill targets must reference a presented participant.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({ skills: [validCombatSkill({ targets: [99] })] })
+  );
+  // A recovery session must not expose cast/flee root actions.
+  assert.throws(() => Protocol.validateContextActionsPanel(validRecoveryPanel({ root_actions: ["attack"] })));
+  // A ready session must have a null reason.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        session: {
+          session_id: "hostile:1:0",
+          mode: "hostile",
+          round: 0,
+          state: "ready",
+          reason: { code: "x", message: "說明" },
+        },
+      })
+    )
+  );
+});
+
+test("a combat snapshot with a malformed context_actions panel is rejected atomically", () => {
+  const bad = snapshot({
+    mode: "combat",
+    panels: {
+      status: validStatusPanel({ combat: { mode: "hostile", round: 0 } }),
+      context_actions: validCombatPanel({ kind: "bogus" }),
+    },
+  });
+  const store = Protocol.createStore();
+  assert.equal(store.receive(1, "ui_snapshot", [bad], {}).accepted, false);
+  assert.equal(store.getState().phase, "idle");
+});

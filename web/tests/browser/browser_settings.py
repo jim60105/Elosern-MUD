@@ -30,6 +30,14 @@ def _env_path(name: str, default: str) -> str:
 
 SERVERNAME = "Elosern Browser Test"
 
+# The production settings register the project-authored trait types that the
+# combat/sexual handlers require; without them any materialization of a
+# project trait (for example ``SexualState``'s ``ordered_level``) fails.
+TRAIT_CLASS_PATHS = [
+    "world.rules.sexual_state.OrderedLevelTrait",
+    "world.rules.traits.DeterministicGaugeTrait",
+]
+
 # Django requires a SECRET_KEY to be set; a fixed value is fine for an
 # isolated loopback test server. The developer's secret_settings are never
 # loaded because this module does not import ``server.conf.settings``.

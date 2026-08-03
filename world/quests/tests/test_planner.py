@@ -41,6 +41,8 @@ from ._fixtures import (
 
 CLAW_SKILL = SkillDef(
     key="claw",
+    label="利爪",
+    description="以利爪撕扯單一敵人。",
     kind=SkillKind.ACTIVE,
     target_spec=TargetSpec.SINGLE,
     cost={},

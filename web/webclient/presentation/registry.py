@@ -149,13 +149,15 @@ class PresentationRegistry:
 
 
 def build_production_registry() -> PresentationRegistry:
-    """Build the production registry containing exactly the ``status`` panel.
+    """Build the production registry containing the ``status`` and
+    ``context_actions`` panels.
 
-    The status presenter lives in ``web.webclient.presentation.status``, which
-    owns the read-only canonical status query. It is imported here (rather than
-    at module import) so this module stays importable while that presenter is
-    being developed.
+    The status presenter lives in ``web.webclient.presentation.status`` and the
+    combat panel in ``web.webclient.presentation.combat_panel``; both are
+    imported here (rather than at module import) so this module stays
+    importable while a presenter is being developed.
     """
+    from web.webclient.presentation.combat_panel import context_actions_presenter
     from web.webclient.presentation.status import status_presenter
 
     registry = PresentationRegistry("elosern")
@@ -165,6 +167,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=1,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=status_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="context_actions",
+            schema_version=1,
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=context_actions_presenter,
         )
     )
     return registry

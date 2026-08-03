@@ -14,6 +14,7 @@ from world.rules.action import (
     ActionResolver,
     CommitFailed,
     PendingEffect,
+    RejectReason,
     _commit,
 )
 from world.rules.buffs import grant_conferred_growth_rate
@@ -247,7 +248,7 @@ class ProgressionTests(EvenniaTest):
             )
         self.assertEqual(actor.db.magic_xp, 2 * COMBAT_KILL_XP_TABLE["low"])
 
-    def test_duplicate_area_targets_award_one_kill_only(self):
+    def test_duplicate_area_targets_reject_before_resolution(self):
         actor = self._character("duplicate-fighter")
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         monster = self._monster("duplicate-goblin")
@@ -262,12 +263,11 @@ class ProgressionTests(EvenniaTest):
             [monster, monster],
             BattlefieldActionContext(battlefield),
         )
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            run_round(
-                battlefield,
-                lambda entity, _: request if entity is actor else None,
-            )
-        self.assertEqual(actor.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
+        self.assertIsNone(actor.db.magic_xp)
+        self.assertEqual(monster.traits.hp.current, 1)
 
     def test_non_monster_target_never_awards_kill_xp(self):
         actor = self._character("player-fighter")

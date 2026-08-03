@@ -7,6 +7,9 @@
 - id: fear_agility_and_accuracy_penalty
   when: {buff_active: fear}
   then: {agility: "-15%", accuracy: -10}
+- id: focus_accuracy_boost
+  when: {buff_active: focus}
+  then: {accuracy: 10}
 - id: high_arousal_agility_accuracy_penalty
   when: {field: arousal, gte: 高度}
   then: {agility: "-20%", accuracy: -15}

@@ -12,6 +12,10 @@
   duration: 60
   stacking: refresh
   modifiers: {}
+- key: focus
+  duration: 60
+  stacking: refresh
+  modifiers: {}
 - key: conferred_growth_rate
   duration: null
   stacking: unique_per_source

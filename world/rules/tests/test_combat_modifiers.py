@@ -44,6 +44,11 @@ class CombatModifierTests(EvenniaTest):
             evaluate_combat_modifiers(entity), {"agility": "-15%", "accuracy": -10}
         )
 
+    def test_rule_focus_accuracy_boost(self):
+        entity = self._entity()
+        _add_buff(entity, "focus")
+        self.assertEqual(evaluate_combat_modifiers(entity), {"accuracy": 10})
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no", "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module")
     def test_rule_high_arousal_agility_accuracy_penalty(self):
         entity = self._entity()

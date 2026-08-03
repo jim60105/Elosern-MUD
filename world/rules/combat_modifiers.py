@@ -4,10 +4,97 @@ from pathlib import Path
 import re
 from typing import Any
 
-from world.rules.buffs import entity_active_buffs
+from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
+from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
 from world.rules.rulebook.schema import evaluate_condition, load_rules
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
+
+
+class _StoredLevel:
+    """Read-only ordinal mirror for stored sexual-level comparisons."""
+
+    def __init__(self, value: int, levels: tuple[str, ...]):
+        self.value = value
+        self.levels = tuple(levels)
+
+    def _ordinal_of(self, other: Any) -> int:
+        if isinstance(other, _StoredLevel):
+            return other.value
+        if isinstance(other, str):
+            return self.levels.index(other)
+        return int(other)
+
+    def __eq__(self, other: object) -> bool:
+        return self.value == self._ordinal_of(other)
+
+    def __ge__(self, other: object) -> bool:
+        return self.value >= self._ordinal_of(other)
+
+    def __gt__(self, other: object) -> bool:
+        return self.value > self._ordinal_of(other)
+
+    def __le__(self, other: object) -> bool:
+        return self.value <= self._ordinal_of(other)
+
+    def __lt__(self, other: object) -> bool:
+        return self.value < self._ordinal_of(other)
+
+
+def _stored_sexual_level(entity: Any, field: str) -> Any:
+    """Read one stored sexual level without materializing the handler."""
+    from collections.abc import Mapping
+
+    traits = entity.attributes.get("sexual_traits", default=None, category="traits")
+    if isinstance(traits, Mapping) and field in traits:
+        raw = traits[field]
+        if isinstance(raw, Mapping):
+            value = raw.get("value")
+            levels = raw.get("levels") or ()
+            if isinstance(value, str):
+                if levels:
+                    try:
+                        return _StoredLevel(levels.index(value), tuple(levels))
+                    except ValueError:
+                        return value
+                return value
+            if isinstance(value, int) and isinstance(levels, (list, tuple)) and 0 <= value < len(levels):
+                return _StoredLevel(value, tuple(levels))
+            return value
+    from collections.abc import Mapping
+
+    baseline = entity.attributes.get("sexual", default=None)
+    if isinstance(baseline, Mapping) and isinstance(baseline.get(field), str):
+        return baseline[field]
+    return None
+
+
+def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
+    """Build the combat-modifier condition context from stored state only.
+
+    Reads the persisted buff cache and stored sexual traits or baseline without
+    materializing ``entity.buffs`` or ``entity.sexual``. Returns a context
+    accepted by :func:`matched_combat_modifiers` so preview and revalidation
+    never create a lazy handler or default attribute.
+    """
+    context: dict[str, Any] = {"active_buffs": active_buff_keys_from_storage(entity)}
+    for field, levels in (("arousal", AROUSAL_LEVELS), ("climax_phase", CLIMAX_PHASE_LEVELS)):
+        value = _stored_sexual_level(entity, field)
+        if isinstance(value, str) and value in levels:
+            context[field] = _StoredLevel(levels.index(value), levels)
+        elif isinstance(value, _StoredLevel):
+            context[field] = value
+    return context
+
+
+def evaluate_combat_modifiers_no_create(entity: Any) -> dict[str, Any]:
+    """Return the merged matching bundle from stored state without handlers."""
+    result: dict[str, Any] = {}
+    for _, adjustments in matched_combat_modifiers(
+        entity, context=build_no_create_condition_context(entity)
+    ):
+        result = _merge_adjustments(result, adjustments)
+    return result
 
 
 def _build_context(entity) -> dict[str, Any]:

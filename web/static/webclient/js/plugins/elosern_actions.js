@@ -257,11 +257,15 @@
       getStoreState: getStoreState,
       prefix: options.prefix || "web",
       onNotice: function (kind, message) {
-        if (liveRegion) {
-          while (liveRegion.firstChild) {
-            liveRegion.removeChild(liveRegion.firstChild);
+        // Resolve the live region by ID at notice time: the combat dock swaps
+        // the action-dock subtree in and out, so a captured reference can go
+        // stale. The fallback keeps the foundation live region working.
+        var region = document.getElementById("elosern-action-live") || liveRegion;
+        if (region) {
+          while (region.firstChild) {
+            region.removeChild(region.firstChild);
           }
-          liveRegion.appendChild(document.createTextNode(message == null ? "" : String(message)));
+          region.appendChild(document.createTextNode(message == null ? "" : String(message)));
         }
         if (kind === "uncertain") {
           var overlay = document.getElementById("elosern-offline-overlay");

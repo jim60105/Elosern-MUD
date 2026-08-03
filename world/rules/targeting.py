@@ -6,6 +6,10 @@ from typing import Any, Protocol, runtime_checkable
 from world.skills.registry import FactionConstraint, SkillDef, TargetSpec
 
 
+# The approved deterministic AREA shorthands accepted in combat.
+AREA_SHORTHANDS = ("all-enemies", "all-allies", "all")
+
+
 class Relation(StrEnum):
     """An action context's relation between two entities."""
 
@@ -118,21 +122,71 @@ def _validate_candidate(request: Any, target: Any, skill: SkillDef) -> None:
         validator(request, target, skill)
 
 
+def candidate_rejection(
+    request: Any,
+    target: Any,
+    skill: SkillDef,
+) -> tuple[Any, str] | None:
+    """Return the first ordered validation failure for one target, or ``None``.
+
+    Runs the identical presence, alive, range, and faction validators in the
+    same order as final target resolution so read-only preview and revalidation
+    never drift from execution.
+    """
+    from world.rules.action import RejectedAction
+
+    for validator in _VALIDATORS:
+        try:
+            validator(request, target, skill)
+        except RejectedAction as rejection:
+            return rejection.reason, rejection.detail
+    return None
+
+
+def _target_identity(target: Any) -> tuple[str, int]:
+    """Return a stable identity for one candidate object."""
+    pk = getattr(target, "pk", None)
+    if isinstance(pk, int):
+        return ("pk", pk)
+    return ("id", id(target))
+
+
 def resolve_targets(
     request: Any,
     skill: SkillDef,
     candidates: list[Any],
 ) -> list[Any]:
-    """Validate target cardinality and candidates in the required order."""
+    """Validate target cardinality and candidates in the required order.
+
+    Target-shape validation runs before candidate validation. NONE accepts no
+    candidates; SELF accepts normalized empty input or exactly the actor;
+    SINGLE requires exactly one explicit candidate; AREA requires a nonempty
+    unique list (empty or duplicate explicit input is malformed).
+    """
     if skill.target_spec is TargetSpec.NONE:
+        if candidates:
+            _rejection("target_spec_mismatch", "none-target skill accepts no targets")
         return []
     if skill.target_spec is TargetSpec.SELF:
+        if not candidates:
+            candidates = [request.actor]
         if len(candidates) != 1 or candidates[0] is not request.actor:
             _rejection("target_spec_mismatch", "self-target skill requires the actor")
-    elif skill.target_spec is TargetSpec.SINGLE and len(candidates) != 1:
-        _rejection("target_spec_mismatch", "single-target skill requires one target")
-    elif skill.target_spec is TargetSpec.AREA and not candidates:
-        _rejection("no_valid_targets_in_area", "area skill has no candidates")
+    elif skill.target_spec is TargetSpec.SINGLE:
+        if len(candidates) != 1:
+            _rejection("target_spec_mismatch", "single-target skill requires one target")
+    elif skill.target_spec is TargetSpec.AREA:
+        if not candidates:
+            _rejection("no_valid_targets_in_area", "area skill has no candidates")
+        seen: set[tuple[str, int]] = set()
+        for target in candidates:
+            identity = _target_identity(target)
+            if identity in seen:
+                _rejection(
+                    "target_spec_mismatch",
+                    "area skill cannot repeat a target identity",
+                )
+            seen.add(identity)
 
     if skill.target_spec is not TargetSpec.AREA:
         for target in candidates:

@@ -401,3 +401,72 @@ input:focus-visible,
   outline: 2px solid var(--elm-focus-ring, #ff8a5c);
   outline-offset: 2px;
 }
+
+/* ---------------------------------------------------------------- *
+ * Combat action dock (webclient-combat-menu).
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock[data-mode="combat"] {
+  padding: .4rem .6rem;
+  overflow: auto;
+  justify-content: flex-start;
+}
+
+.elosern-action-dock .combat-heading {
+  color: var(--elm-paper);
+  font-weight: 600;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .combat-recovery {
+  color: var(--elm-vermilion, #ff5c4d);
+  border: 1px solid var(--elm-vermilion-dim, #5c2a26);
+  padding: .3rem .5rem;
+}
+
+.elosern-action-dock .combat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .combat-control {
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel, #1c1c1c);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .2rem .6rem;
+  cursor: pointer;
+}
+
+.elosern-action-dock .combat-control:focus,
+.elosern-action-dock .combat-control:focus-visible {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+}
+
+.elosern-action-dock .combat-detail {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+  min-height: 1.2rem;
+}
+
+.elosern-action-dock .combat-live {
+  color: var(--elm-vermilion, #ff5c4d);
+  min-height: 1.2rem;
+}
+
+/* Non-color focus indicator for combat controls (ink-night + vermilion). */
+@media (prefers-reduced-motion: reduce) {
+  .elosern-action-dock .combat-control {
+    transition: none;
+  }
+}
+
+/* Safe overflow at the minimum supported viewport. */
+@media (max-width: 1280px), (max-height: 720px) {
+  .elosern-action-dock[data-mode="combat"] {
+    max-height: 12rem;
+    overflow-y: auto;
+  }
+}

@@ -28,7 +28,7 @@ The dispatcher SHALL accept actions only from authenticated WebSocket sessions w
 - **THEN** no adapter runs and no character state is returned
 
 ### Requirement: Action registries are allowlisted and duplicate-safe
-The action registry SHALL bind each stable action ID to one exact payload validator and one adapter, SHALL reject duplicate registration, and SHALL reject unknown action IDs. This foundation SHALL register no production game action; tests SHALL use an isolated test-only proof adapter that cannot be reached in production configuration.
+The action registry SHALL bind each stable action ID to one exact payload validator and one adapter, SHALL reject duplicate registration, and SHALL reject unknown action IDs. The production registry SHALL contain exactly `combat.cast`, `combat.flee`, and `combat.forfeit` as its first gameplay adapters until another owning change adds an explicitly specified action. Tests MAY use an isolated proof adapter that cannot be reached in production configuration. No action SHALL route an action ID or payload string through the text command parser.
 
 #### Scenario: Unknown action cannot become a command
 - **WHEN** a client submits an unregistered action ID or a string resembling an Evennia command
@@ -42,9 +42,13 @@ The action registry SHALL bind each stable action ID to one exact payload valida
 - **WHEN** two adapters attempt to register the same action ID
 - **THEN** registry construction fails rather than selecting one by registration order
 
-#### Scenario: Foundation production registry is mutation-empty
-- **WHEN** the foundation action registry is loaded outside tests
-- **THEN** it exposes no production gameplay adapter while the dispatcher and validation infrastructure remain available
+#### Scenario: Production registry exposes only specified combat mutations
+- **WHEN** the production registry is loaded after the combat-menu change
+- **THEN** its action IDs are exactly `combat.cast`, `combat.flee`, and `combat.forfeit`, each with its own exact validator and deterministic adapter
+
+#### Scenario: Test proof action remains isolated
+- **WHEN** a dispatcher test installs a synthetic proof adapter
+- **THEN** that adapter exists only in the test-owned registry and does not appear in the production registry
 
 ### Requirement: Adapters preserve deterministic ownership boundaries
 Every adapter SHALL re-resolve every client-referenced identity, re-authorize current domain state, and call a public API owned by the deterministic core or its explicitly named subsystem owner. An adapter SHALL NOT assign `.db`, `AttributeProperty`, traits, buffs, sexual state, map knowledge, quest state, wallet, inventory, or location directly. Presenters SHALL NOT invoke adapters.

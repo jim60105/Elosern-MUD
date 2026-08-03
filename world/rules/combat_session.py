@@ -19,6 +19,7 @@ from evennia.objects.models import ObjectDB
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
+from world.rules.action_preview import revalidate_submission
 from world.rules.combat import (
     COMBAT_YAML,
     Battlefield,
@@ -228,6 +229,96 @@ def read_session(actor: Any) -> CombatSessionRecord | None:
         return from_storage(dict(raw))
     except CombatSessionError:
         raise
+
+
+_TOKEN_RE = None
+
+
+def _token_pattern() -> str:
+    return r"^(a|e)(\d+)$"
+
+
+def resolve_target_token(
+    actor: Any,
+    token: str,
+) -> Any:
+    """Resolve one session-local ``aN``/``eN`` token to a live participant.
+
+    Tokens stay bound to the same dbref for the session lifetime because the
+    persisted ``player_ids`` then ``enemy_ids`` tuples are immutable. The token
+    is a presentation alias; it is never persisted separately.
+    """
+    import re
+
+    record = read_session(actor)
+    if record is None:
+        raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
+    match = re.fullmatch(_token_pattern(), token.strip())
+    if match is None:
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    prefix, raw_index = match.groups()
+    index = int(raw_index)
+    if prefix == "a":
+        if not 1 <= index <= len(record.player_ids):
+            raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+        dbref = record.player_ids[index - 1]
+    else:
+        if not 1 <= index <= len(record.enemy_ids):
+            raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+        dbref = record.enemy_ids[index - 1]
+    from evennia.objects.models import ObjectDB
+
+    entity = ObjectDB.objects.filter(id=dbref).first()
+    if entity is None:
+        raise CombatSessionError(
+            SessionReason.MISSING_PARTICIPANT, f"token dbref {dbref} missing"
+        )
+    return entity
+
+
+def parse_session_targets(
+    actor: Any,
+    target_value: str,
+    *,
+    search: Any | None = None,
+) -> list[Any] | str:
+    """Parse an active-session target value into facade input.
+
+    Accepts one ``aN``/``eN`` token, a comma-separated list of tokens only, or
+    one complete approved AREA shorthand. A one-target display-name search is
+    retained for backward Telnet parity. Rejects duplicate tokens, token/name
+    mixtures, and shorthand/token mixtures before preview.
+    """
+    from world.rules.targeting import AREA_SHORTHANDS
+
+    stripped = target_value.strip()
+    if not stripped:
+        return []
+    if stripped in AREA_SHORTHANDS:
+        if "," in stripped:
+            raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+        return stripped
+    parts = [part.strip() for part in stripped.split(",")]
+    if any(part in AREA_SHORTHANDS for part in parts):
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    is_token = lambda part: bool(__import__("re").fullmatch(_token_pattern(), part))
+    if all(is_token(part) for part in parts):
+        seen: set[str] = set()
+        resolved: list[Any] = []
+        for part in parts:
+            if part in seen:
+                raise CombatSessionError(SessionReason.DUPLICATE_PARTICIPANT)
+            seen.add(part)
+            resolved.append(resolve_target_token(actor, part))
+        return resolved
+    if any(is_token(part) for part in parts) or len(parts) > 1:
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    if search is None:
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    target = search(stripped)
+    if target is None:
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    return [target]
 
 
 def is_in_active_session(actor: Any) -> bool:
@@ -458,12 +549,21 @@ def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
     return tuple(sorted(knocked))
 
 
-def submit_player_action(actor: Any, skill_key: str, target: Any) -> dict[str, Any]:
+def submit_player_action(
+    actor: Any,
+    skill_key: str,
+    targets_or_shorthand: list[Any] | str,
+) -> dict[str, Any]:
     """Run one ordinary round (or overwhelm compression) for one player action.
 
-    ``target`` may be ``None`` for self-target skills; otherwise it must be a
-    live roster member. A preflight rejection returns before initiative and
-    consumes no round or world time.
+    ``targets_or_shorthand`` is either a concrete list of live participant
+    objects or one approved AREA shorthand (``all-enemies``, ``all-allies``,
+    ``all``). Player-facing NONE and SELF input must be an empty list; SELF is
+    bound to the actor inside the rules layer. The facade revalidates the
+    submitted target value through the shared side-effect-free preview, runs
+    ``ActionResolver.preflight()``, and only then starts one round (or the
+    resolver-backed overwhelm compression). A rejection returns before
+    initiative and consumes no round or world time.
     """
     record = read_session(actor)
     if record is None:
@@ -471,14 +571,30 @@ def submit_player_action(actor: Any, skill_key: str, target: Any) -> dict[str, A
     battlefield = reconstruct_battlefield(actor, record)
     if _stored_trait_value(actor.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.INVALID_RECOVERY)
-    if target is not None and str(target.key) not in battlefield.roster:
+    if not isinstance(targets_or_shorthand, (list, str)):
+        raise TypeError("submit_player_action requires an explicit target list or shorthand")
+    if not isinstance(targets_or_shorthand, str) and not all(
+        str(target.key) in battlefield.roster
+        for target in targets_or_shorthand
+    ):
         raise CombatSessionError(SessionReason.NOT_PRESENT)
+
+    context = _context_for(battlefield, record)
+    preview = revalidate_submission(
+        actor, skill_key, context, targets_or_shorthand
+    )
+    if not preview.enabled:
+        return {
+            "outcome": "rejected",
+            "reason": preview.reason,
+            "detail": preview.detail,
+        }
 
     request = ActionRequest(
         actor=actor,
         skill_key=skill_key,
-        targets=[] if target is None else [target],
-        context=_context_for(battlefield, record),
+        targets=targets_or_shorthand,
+        context=context,
     )
     preflight = ActionResolver.preflight(request)
     if preflight.outcome == "rejected":

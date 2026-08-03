@@ -182,6 +182,43 @@
   // Plugin lifecycle.
   // -------------------------------------------------------------------------
 
+  // -------------------------------------------------------------------------
+  // Combat detail pane: disabled entries stay focusable with an explanation.
+  // -------------------------------------------------------------------------
+
+  function setSafeText(element, text) {
+    if (!element) {
+      return;
+    }
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+    element.appendChild(document.createTextNode(text == null ? "" : String(text)));
+  }
+
+  // On focus or a disabled confirm, show the focused entry's explanation in
+  // the combat detail pane (created by the combat dock) without any packet.
+  function renderCombatDetail(payload) {
+    var detail = document.getElementById("combat-detail");
+    if (!detail) {
+      return;
+    }
+    var item = payload && payload.item;
+    if (!item) {
+      return;
+    }
+    var text = "";
+    if (item.enabled === false) {
+      text =
+        (item.disabledReason && item.disabledReason.message) ||
+        item.description ||
+        "";
+    } else {
+      text = item.description || "";
+    }
+    setSafeText(detail, text);
+  }
+
   function wireKeyboardRouter() {
     if (window.Elosern && window.Elosern.KeyboardRouter) {
       var router = window.Elosern.KeyboardRouter.createRouter({
@@ -189,16 +226,114 @@
           if (name === "open-drawer") {
             openDrawer();
           } else if (name === "submit") {
-            // The action dock emits submit events for its menu items; the
-            // concrete action-dock adapter wires specific action IDs.
-            var actions = getActions();
-            if (actions && payload && payload.item && payload.item.actionId) {
-              actions.submit(payload.item.actionId, payload.item.payload || {});
-            }
+            handleSubmission(payload);
+          } else if (name === "space") {
+            handleSpace(payload);
+          } else if (name === "focus" || name === "disabled") {
+            renderCombatDetail(payload);
           }
         },
       });
       window.Elosern.keyboard = router;
+    }
+  }
+
+  // Combat menu submission wiring (task 4.5): the combat-menu model owns the
+  // exact payloads; the action client sends them once the store is unlocked.
+  function getCombat() {
+    return (window.Elosern && window.Elosern._combat) || null;
+  }
+
+  function handleSubmission(payload) {
+    var actions = getActions();
+    var combat = getCombat();
+    var item = payload && payload.item;
+    if (!item) {
+      return;
+    }
+    // Internal navigation events first; only real action IDs are sent.
+    if (item.actionId === "open-skill" && item.payload && combat) {
+      openCombatSkill(combat, item.payload.skillKey);
+      return;
+    }
+    if (item.actionId === "toggle-target") {
+      // AREA candidates are toggled with Space, not Enter.
+      return;
+    }
+    if (item.actionId === "choose-shorthand" && item.payload && combat) {
+      if (combat.focusSkillKey) {
+        window.Elosern.CombatMenu.chooseShorthand(
+          combat,
+          combat.focusSkillKey,
+          item.payload.shorthand
+        );
+      }
+      return;
+    }
+    if (item.key === "attack" && combat) {
+      openCombatSkill(combat, window.Elosern.CombatMenu.BASIC_ATTACK_KEY);
+      return;
+    }
+    if (item.key === "skills" && combat) {
+      var router = getKeyboard();
+      if (router) {
+        router.pushMenu(combat.menus.skills);
+      }
+      return;
+    }
+    if (item.key === "forfeit" && combat) {
+      var router = getKeyboard();
+      if (router) {
+        router.pushMenu(combat.menus.forfeit);
+      }
+      return;
+    }
+    if (item.key === "flee" && combat) {
+      // The root flee item carries combat.flee; fall through to submit.
+    }
+    if (item.confirm && combat && combat.focusSkillKey) {
+      // AREA confirmation payload is computed from the live selection state.
+      var skill = combat.skillByKey[combat.focusSkillKey];
+      if (skill && skill.targetSpec === "area") {
+        var payload = window.Elosern.CombatMenu.areaPayload(skill);
+        if (payload && actions) {
+          actions.submit("combat.cast", payload);
+        }
+        return;
+      }
+    }
+    if (item.actionId) {
+      if (actions) {
+        actions.submit(item.actionId, item.payload || {});
+      }
+    }
+  }
+
+  function openCombatSkill(combat, skillKey) {
+    var router = getKeyboard();
+    if (!router) {
+      return;
+    }
+    combat.focusSkillKey = skillKey;
+    var menu = window.Elosern.CombatMenu.openSkill(combat, skillKey);
+    if (menu) {
+      router.pushMenu(menu);
+    }
+  }
+
+  function handleSpace(payload) {
+    var combat = getCombat();
+    var keyboard = getKeyboard();
+    var item = payload && payload.item;
+    if (!combat || !keyboard || !item) {
+      return;
+    }
+    if (item.actionId === "toggle-target" && item.payload) {
+      var skillKey = combat.focusSkillKey;
+      if (!skillKey) {
+        return;
+      }
+      window.Elosern.CombatMenu.toggleArea(combat, skillKey, item.payload.identity);
     }
   }
 
@@ -209,6 +344,7 @@
     var actions = window.Elosern.Actions.createBrowserActions({
       evennia: window.Evennia,
       controller: window.Elosern.StateController,
+      keyboard: getKeyboard(),
       liveRegion: el("elosern-action-live") || null,
     });
     window.Elosern.actions = actions;

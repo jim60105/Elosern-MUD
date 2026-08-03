@@ -101,6 +101,8 @@ class TargetDefeatedEventTests(EvenniaTest):
         skill_key = "test_double_fire"
         SKILL_REGISTRY[skill_key] = SkillDef(
             key=skill_key,
+            label="雙重火焰",
+            description="測試用：對單一敵人造成兩次火焰傷害。",
             kind=SkillKind.ACTIVE,
             target_spec=TargetSpec.SINGLE,
             cost={},

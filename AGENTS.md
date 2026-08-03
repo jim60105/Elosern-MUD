@@ -98,6 +98,33 @@ The Evennia command is the full project suite. The `unittest discover -s tests
 substitute for the full suite. Run focused tests while iterating and the full
 relevant suite before handing work off.
 
+### Test runtime budget (measured, do not waste wall-clock)
+
+The full Evennia suite (`evennia test ... commands server typeclasses web
+world`) takes roughly **5–10 minutes**; running all of `world` plus `commands`
+alone is ~4–5 minutes. The managed browser suite is the slowest thing in the
+repo and dominates total runtime:
+
+- Each Playwright test boots a real Evennia server. Foundation browser tests
+  share one server per process (~30–40s each); **combat browser tests boot one
+  server per test** because a live combat session (or an abnormal transport
+  close during combat) leaves the shared Evennia server in a state that corrupts
+  later fresh logins. A combat test therefore takes ~35–70s each.
+- `web/tests/browser/test_browser_combat.py` (12 tests) ≈ 6–8 minutes;
+  `test_browser_combat_rejection.py` (4 tests) ≈ 4 minutes; the full browser
+  suite (`unittest discover -s web/tests/browser -t .`) is 20+ minutes.
+- Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are ~1s.
+- `tools/spec_traceability check` is seconds; the `verify --evidence` gate needs
+  the full evidence run only at final handoff.
+
+During iteration, run **only the package tests your change touches** (e.g.
+`uv run --locked evennia test --settings settings.py world.rules.tests.test_combat_session`)
+or the specific Node/browser file. Run the full Evennia suite and the browser
+suite only (a) after a large cross-cutting change, or (b) once, as part of the
+final pre-handoff check. When a browser test needs to be re-run, prefer a single
+test class or file over the whole suite, and reuse a still-running managed
+server rather than booting another.
+
 Use `uv add <package>` and `uv remove <package>` for dependency changes so
 `pyproject.toml` and `uv.lock` remain synchronized. Never edit `uv.lock`
 manually, invoke project Python tools outside `uv run --locked`, or use `pip`

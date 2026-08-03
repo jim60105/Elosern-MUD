@@ -56,6 +56,29 @@
   ];
   var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical"];
 
+  // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
+  var MAX_SESSION_ID_CODE_POINTS = 128;
+  var MAX_PARTICIPANTS = 16;
+  var MAX_SKILLS = 32;
+  var MAX_DISPLAY_NAME = 64;
+  var MAX_LABEL = 128;
+  var MAX_DESCRIPTION = 512;
+  var MAX_SKILL_TARGETS = 16;
+  var MAX_SHORTHANDS = 3;
+  var MAX_TOKEN = 16;
+  var MAX_ACTION_KEYS = 16;
+  var MAX_COST_KEYS = 8;
+  var MAX_REASON_MESSAGE = 512;
+  var SESSION_MODES = ["hostile", "guild_exam"];
+  var SESSION_STATES = ["ready", "recovery"];
+  var TEAMS = ["party", "foes"];
+  var PARTICIPANT_STATES = ["active", "fled", "knocked_out", "defeated"];
+  var TARGET_SPECS = ["none", "self", "single", "area"];
+  var ALLOWED_SHORTHANDS = ["all-enemies", "all-allies", "all"];
+  var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
+  var SECONDARY_ACTIONS = ["forfeit"];
+  var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
+
   var MESSAGE_NAMES = {
     ui_snapshot: true,
     ui_update: true,
@@ -65,13 +88,14 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
-  var PANEL_ALLOWLIST = { status: 1 };
+  var PANEL_ALLOWLIST = { status: 1, context_actions: 1 };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
   var PANEL_NAME_RE = /^[a-z0-9_]{1,64}$/;
   var IDENTIFIER_RE = /^[a-z0-9._]{1,64}$/;
   var REQUEST_ID_RE = /^[A-Za-z0-9:_-]{1,64}$/;
   var CORRELATION_RE = /^[0-9a-f]{32}$/;
+  var TOKEN_RE = /^[ae]\d+$/;
 
   // ---------------------------------------------------------------------------
   // Small value helpers.
@@ -487,6 +511,276 @@
     return payload;
   }
 
+  function validateToken(value) {
+    if (typeof value !== "string" || !TOKEN_RE.test(value) || value.length > MAX_TOKEN) {
+      throw new Error("participant token must be aN or eN");
+    }
+    return value;
+  }
+
+  function validateSession(value) {
+    requireExactFields(
+      value,
+      "combat session",
+      ["session_id", "mode", "round", "state", "reason"],
+      []
+    );
+    var sessionId = requireString(value.session_id, "session_id", MAX_SESSION_ID_CODE_POINTS);
+    if (!sessionId.trim()) {
+      throw new Error("session_id must be non-empty");
+    }
+    if (SESSION_MODES.indexOf(value.mode) === -1) {
+      throw new Error("session mode must be hostile or guild_exam");
+    }
+    requireInt(value.round, "round", 0, MAX_SAFE_INTEGER);
+    if (SESSION_STATES.indexOf(value.state) === -1) {
+      throw new Error("session state must be ready or recovery");
+    }
+    var reason = value.reason;
+    if (reason === null) {
+      if (value.state !== "ready") {
+        throw new Error("a recovery session requires a reason");
+      }
+    } else {
+      var hasCorrelation = false;
+      requireExactFields(reason, "session reason", ["code", "message"], []);
+      validateIdentifier(reason.code, "session reason code");
+      requireString(reason.message, "session reason message", MAX_REASON_MESSAGE);
+      if (value.state !== "recovery") {
+        throw new Error("a ready session must have a null reason");
+      }
+    }
+    return value;
+  }
+
+  function validateParticipant(value) {
+    requireExactFields(
+      value,
+      "participant",
+      ["identity", "token", "display_name", "team", "state", "hp_current", "hp_maximum", "portrait_ref"],
+      []
+    );
+    requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
+    validateToken(value.token);
+    var displayName = requireString(value.display_name, "display_name", MAX_DISPLAY_NAME);
+    if (!displayName.trim()) {
+      throw new Error("participant display_name must be non-empty");
+    }
+    if (TEAMS.indexOf(value.team) === -1) {
+      throw new Error("participant team must be party or foes");
+    }
+    if (PARTICIPANT_STATES.indexOf(value.state) === -1) {
+      throw new Error("participant state is not a stable value");
+    }
+    requireInt(value.hp_current, "hp_current", 0, MAX_SAFE_INTEGER);
+    requireInt(value.hp_maximum, "hp_maximum", 1, MAX_SAFE_INTEGER);
+    if (value.hp_current > value.hp_maximum) {
+      throw new Error("participant hp_current must not exceed its maximum");
+    }
+    if (value.portrait_ref !== null) {
+      throw new Error("portrait_ref must be null in this schema version");
+    }
+    return value;
+  }
+
+  function validateDisabledReason(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(value, "disabled_reason", ["code", "message"], []);
+    validateIdentifier(value.code, "disabled_reason code");
+    requireString(value.message, "disabled_reason message", MAX_REASON_MESSAGE);
+    return value;
+  }
+
+  function validateSkill(value) {
+    requireExactFields(
+      value,
+      "skill",
+      ["key", "label", "description", "cost", "target_spec", "element", "enabled", "disabled_reason", "targets", "shorthands"],
+      []
+    );
+    validateIdentifier(value.key, "skill key");
+    var label = requireString(value.label, "skill label", MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("skill label must be non-empty");
+    }
+    var description = requireString(value.description, "skill description", MAX_DESCRIPTION);
+    if (!description.trim()) {
+      throw new Error("skill description must be non-empty");
+    }
+    var cost = value.cost;
+    if (!isPlainObject(cost) || Object.keys(cost).length > MAX_COST_KEYS) {
+      throw new Error("skill cost must be a bounded object");
+    }
+    Object.keys(cost).forEach(function (resource) {
+      validateIdentifier(resource, "cost resource key");
+      requireInt(cost[resource], "cost amount", 0, MAX_SAFE_INTEGER);
+    });
+    if (TARGET_SPECS.indexOf(value.target_spec) === -1) {
+      throw new Error("skill target_spec is not a stable value");
+    }
+    if (value.element !== null) {
+      validateIdentifier(value.element, "skill element");
+    }
+    requireBool(value.enabled, "enabled");
+    var disabledReason = validateDisabledReason(value.disabled_reason);
+    if (!value.enabled && disabledReason === null) {
+      throw new Error("a disabled skill requires a disabled_reason");
+    }
+    if (value.enabled && disabledReason !== null) {
+      throw new Error("an enabled skill must not carry a disabled_reason");
+    }
+    var targets = value.targets;
+    if (!Array.isArray(targets) || targets.length > MAX_SKILL_TARGETS) {
+      throw new Error("skill targets exceed their bound");
+    }
+    var seenTargets = {};
+    targets.forEach(function (target) {
+      if (typeof target !== "number" || !Number.isInteger(target) || target <= 0) {
+        throw new Error("skill targets must be positive integers");
+      }
+      if (seenTargets[target]) {
+        throw new Error("skill targets must be unique");
+      }
+      seenTargets[target] = true;
+    });
+    var shorthands = value.shorthands;
+    if (!Array.isArray(shorthands) || shorthands.length > MAX_SHORTHANDS) {
+      throw new Error("skill shorthands exceed their bound");
+    }
+    var seenShorthands = {};
+    shorthands.forEach(function (shorthand) {
+      if (ALLOWED_SHORTHANDS.indexOf(shorthand) === -1) {
+        throw new Error("skill carries an unapproved shorthand");
+      }
+      if (seenShorthands[shorthand]) {
+        throw new Error("skill shorthands must be unique");
+      }
+      seenShorthands[shorthand] = true;
+    });
+    if (value.target_spec !== "area" && shorthands.length > 0) {
+      throw new Error("only area skills may carry shorthands");
+    }
+    return value;
+  }
+
+  function validateActionKeys(value, name) {
+    if (!Array.isArray(value) || value.length > MAX_ACTION_KEYS) {
+      throw new Error(name + " exceed their bound");
+    }
+    var seen = {};
+    value.forEach(function (key) {
+      validateIdentifier(key, name + " key");
+      if (seen[key]) {
+        throw new Error(name + " must be unique");
+      }
+      seen[key] = true;
+    });
+    return value;
+  }
+
+  // Exact available context_actions combat panel v1 schema.
+  function validateContextActionsPanel(payload) {
+    if (payload.available === false) {
+      requireExactFields(payload, "context_actions panel", ["schema_version", "available", "reason"], []);
+      requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+      if (payload.schema_version !== 1) {
+        throw new Error("unsupported context_actions panel schema_version");
+      }
+      var reason = payload.reason;
+      var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
+      requireExactFields(
+        reason,
+        "context_actions panel reason",
+        ["code", "message"],
+        hasCorrelation ? ["correlation_id"] : []
+      );
+      validateIdentifier(reason.code, "reason.code");
+      validateMessage(reason.message, "reason.message");
+      if (hasCorrelation) {
+        validateCorrelationId(reason.correlation_id);
+      }
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "context_actions panel",
+      ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "skills"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported context_actions panel schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "combat") {
+      throw new Error("combat panel must be available with kind combat");
+    }
+
+    var session = validateSession(payload.session);
+
+    var participants = payload.participants;
+    if (!Array.isArray(participants) || participants.length > MAX_PARTICIPANTS) {
+      throw new Error("participants exceed their bound");
+    }
+    participants.forEach(validateParticipant);
+
+    var rootActions = validateActionKeys(payload.root_actions, "root_actions");
+    var secondaryActions = validateActionKeys(payload.secondary_actions, "secondary_actions");
+
+    if (session.state === "ready") {
+      if (
+        rootActions.length !== ROOT_ACTIONS.length ||
+        rootActions.some(function (key, index) { return key !== ROOT_ACTIONS[index]; })
+      ) {
+        throw new Error("ready session must expose the exact root actions");
+      }
+      if (
+        secondaryActions.length !== SECONDARY_ACTIONS.length ||
+        secondaryActions.some(function (key, index) { return key !== SECONDARY_ACTIONS[index]; })
+      ) {
+        throw new Error("ready session must expose confirmed Forfeit");
+      }
+    } else {
+      if (rootActions.length > 0) {
+        throw new Error("recovery session exposes no cast or flee action");
+      }
+      if (
+        secondaryActions.length !== RECOVERY_SECONDARY_ACTIONS.length ||
+        secondaryActions.some(function (key, index) { return key !== RECOVERY_SECONDARY_ACTIONS[index]; })
+      ) {
+        throw new Error("recovery session must retain confirmed Forfeit");
+      }
+    }
+
+    var skills = payload.skills;
+    if (!Array.isArray(skills) || skills.length > MAX_SKILLS) {
+      throw new Error("skills exceed their bound");
+    }
+    skills.forEach(validateSkill);
+
+    var identitySet = {};
+    participants.forEach(function (participant) {
+      identitySet[participant.identity] = true;
+    });
+    skills.forEach(function (skill) {
+      skill.targets.forEach(function (target) {
+        if (!identitySet[target]) {
+          throw new Error("skill targets must reference a presented participant");
+        }
+      });
+    });
+    var skillKeys = {};
+    skills.forEach(function (skill) {
+      if (skillKeys[skill.key]) {
+        throw new Error("skill keys must be unique");
+      }
+      skillKeys[skill.key] = true;
+    });
+    return payload;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validatePanel(name, schemaVersion, payload) {
@@ -509,6 +803,9 @@
     }
     if (name === "status") {
       return validateStatusPanel(payload);
+    }
+    if (name === "context_actions") {
+      return validateContextActionsPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -676,6 +973,7 @@
     validateActionResult: validateActionResult,
     validateProtocolError: validateProtocolError,
     validateStatusPanel: validateStatusPanel,
+    validateContextActionsPanel: validateContextActionsPanel,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.
