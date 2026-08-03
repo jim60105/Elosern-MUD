@@ -53,6 +53,28 @@ def _register_narrator_layer():
         logger.log_warn(f"narrator registration skipped at server start: {exc}")
 
 
+def _register_npc_dialogue_layer():
+    """Register the npc_dialogue layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover npc_dialogue registration
+    (a conflicting fallback/validator, or a conflicting output schema) must
+    never abort server startup; the reply gate still fails loudly on a
+    non-npc_dialogue registration, so correctness is preserved.
+    """
+    from evennia import logger
+    from world.ai.guardrail import GuardrailRegistrationError
+    from world.ai.npc_dialogue import register_npc_dialogue
+    from world.ai.schemas.registry import DuplicateSchemaError
+
+    try:
+        register_npc_dialogue()
+    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
+        logger.log_warn(f"npc_dialogue registration skipped at server start: {exc}")
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -80,6 +102,7 @@ def at_server_start():
     sync_guild_economy()
     sync_guard_npc()
     _register_narrator_layer()
+    _register_npc_dialogue_layer()
 
 
 def at_server_stop():
