@@ -17,23 +17,28 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 
 
 class MovementCostMixin:
-    """Charges WorldClock for a successful, player-driven exit traversal.
+    """Charges WorldClock and records map knowledge for a successful player traversal.
 
     Hooks ``at_post_traverse`` — which Evennia's stock ``DefaultExit.at_traverse``
     calls only from its successful-``move_to()`` branch — rather than inspecting
     ``at_traverse``'s own return value, which is ``None`` in both branches
     (map-movement-clock design.md D-2). A locked exit never reaches this hook
     (the access check runs first), and a vetoed ``at_pre_move`` aborts before it
-    (design.md D-6); neither needs a guard here.
+    (design.md D-6); neither needs a guard here. After charging, the destination
+    node is recorded through ``world.rules.map_knowledge.record_arrival``
+    (map-knowledge-minimap design D3) — a no-op for anything that is not a
+    ``PlayerCharacter`` and never raises from the traversal hook.
     """
 
     movement_cost_key: str = "move"
 
     def at_post_traverse(self, traversing_object, source_location, **kwargs):
         super().at_post_traverse(traversing_object, source_location, **kwargs)
+        from world.rules.map_knowledge import record_arrival
         from world.rules.movement import charge_movement
 
         charge_movement(traversing_object, self.movement_cost_key)
+        record_arrival(traversing_object)
 
 
 class Exit(MovementCostMixin, ObjectParent, DefaultExit):
@@ -79,7 +84,9 @@ class WildernessGateExit(Exit):
     at_traverse is fully overridden -- mirrors WildernessExit's own pattern of
     ignoring target_location entirely. db.anchor_key is set by sync_wilderness()
     at creation time -- it is NOT optional, and a gate exit created without it
-    will KeyError on first use (map-wilderness design.md D-7).
+    will KeyError on first use (map-wilderness design.md D-7). A successful
+    entry charges wilderness_move and records the destination ``wild:`` node
+    (map-knowledge-minimap design D3).
     """
 
     def at_traverse(self, traversing_object, target_location, **kwargs):
@@ -107,9 +114,11 @@ class WildernessGateExit(Exit):
             exclude=[traversing_object],
         )
         traversing_object.at_post_move(None)
+        from world.rules.map_knowledge import record_arrival
         from world.rules.movement import charge_movement
 
         charge_movement(traversing_object, "wilderness_move")
+        record_arrival(traversing_object)
         return True
 
 
@@ -119,7 +128,9 @@ class WildernessReturnExit(WildernessExit):
     back into the grid room, and routes everything else like a stock
     WildernessExit. The clock cost is charged on EVERY successful traversal --
     special-cased return branch and ordinary fallback alike -- so no wilderness
-    step is free (map-wilderness design.md D-6's correction note).
+    step is free (map-wilderness design.md D-6's correction note). Every
+    successful step also records its destination node through
+    ``record_arrival`` (map-knowledge-minimap design D3).
     """
 
     def at_traverse(self, traversing_object, target_location):
@@ -136,16 +147,20 @@ class WildernessReturnExit(WildernessExit):
                     return False
                 if not traversing_object.move_to(grid_room, quiet=False):
                     return False
+                from world.rules.map_knowledge import record_arrival
                 from world.rules.movement import charge_movement
 
                 charge_movement(traversing_object, "wilderness_move")
+                record_arrival(traversing_object)
                 return True
         # ORDINARY wilderness movement -- every coordinate/direction that is not
         # a registered gateway. Not free: a successful step still pays
         # wilderness_move; only the routing decision is gated.
         result = super().at_traverse(traversing_object, target_location)
         if result:
+            from world.rules.map_knowledge import record_arrival
             from world.rules.movement import charge_movement
 
             charge_movement(traversing_object, "wilderness_move")
+            record_arrival(traversing_object)
         return result

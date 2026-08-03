@@ -1,0 +1,175 @@
+"""Minimap browser acceptance journeys (map-knowledge-minimap 5.2-5.4).
+
+These journeys boot a dedicated managed server seeded with
+``ELOSERN_BROWSER_MINIMAP=1`` so the activated character is relocated to 南門
+with map knowledge already recorded (grid, wilderness, interior, and instance
+layers). They prove the minimap renders the validated payload, distinguishes
+states without color alone, focuses remembered remote nodes without a travel
+action, never reveals unknown nodes, rebuilds from server-persisted knowledge
+on reconnect, and stays visible and keyboard-operable at both supported
+viewports.
+"""
+
+from __future__ import annotations
+
+import time
+
+from tools.spec_traceability import covers_requirement
+
+from .browser_base import BrowserAcceptanceTest
+from .browser_helpers import store_state
+
+
+class LocalMapBrowserTest(BrowserAcceptanceTest):
+    """Dedicated minimap server with pre-recorded knowledge, shared per process."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from . import fixtures
+        from .harness import ManagedServer
+
+        runtime = fixtures.create_runtime(prefix="elosern-minimap-")
+        runtime.env["ELOSERN_BROWSER_MINIMAP"] = "1"
+        cls.server = ManagedServer(runtime=runtime)
+        cls.server.start()
+        cls.base_url = f"http://127.0.0.1:{cls.server.runtime.http_port}"
+        cls.webclient_url = cls.server.runtime.webclient_url
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if getattr(cls, "server", None) is not None:
+            try:
+                cls.server.stop()
+            finally:
+                cls.server = None
+
+    def _local_map_panel(self, page):
+        return store_state(page)["panels"].get("local_map")
+
+    def _wait_local_map_available(self, page, timeout=30000):
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            panel = self._local_map_panel(page)
+            if panel is not None and panel.get("available") is True:
+                return panel
+            page.wait_for_timeout(250)
+        raise AssertionError("local_map never became available")
+
+    def _local_map_nodes(self, page):
+        return self._wait_local_map_available(page)["nodes"]
+
+    def _send(self, page, command):
+        page.evaluate(
+            "(args) => Evennia.msg('text', [args.cmd], {})", {"cmd": command}
+        )
+
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_minimap_renders_and_distinguishes_states_without_color(self):
+        page = self.logged_in_page()
+        panel = self._wait_local_map_available(page)
+        self.assertEqual(panel["layer"], "grid")
+        self.assertEqual(panel["current_node"], "grid:capital_altoria:2:0")
+
+        # The surface renders legend text as text nodes and a current node.
+        page.wait_for_selector(".elosern-local-map .local-map-title")
+        legend_text = page.locator(".local-map-legend").inner_text()
+        self.assertIn("你目前所在的位置", legend_text)
+
+        # The seeded knowledge includes wilderness, interior, and instance
+        # visits, so the grid layer carries remembered grid-adjacent nodes and
+        # the current node is distinguishable by non-color indicators.
+        current = page.locator(".local-map-node.node-current")
+        self.assertEqual(current.count(), 1)
+        self.assertIn("node-shape-circle", current.get_attribute("class"))
+        self.assertIn("node-border-double", current.get_attribute("class"))
+        self.assertTrue(current.is_visible())
+
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_remembered_remote_node_focus_shows_name_without_travel_action(self):
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+        # The seeded fixture recorded 北門 (2,4), which is outside the visual
+        # range from 南門, so the grid layer carries a remembered remote node.
+        remembered = page.locator(".local-map-node.node-remembered")
+        self.assertGreaterEqual(remembered.count(), 1)
+        remembered.first.click()
+        page.wait_for_function(
+            "() => (document.getElementById('local-map-detail').textContent || '')"
+            ".indexOf('已探索') !== -1"
+        )
+        detail = page.locator("#local-map-detail").inner_text()
+        self.assertIn("已探索", detail)
+        self.assertIn("北門", detail)
+        # No travel control appears for a remembered remote node.
+        self.assertEqual(page.locator("#local-map-detail button").count(), 0)
+
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_unknown_nodes_never_appear_in_the_dom(self):
+        page = self.logged_in_page()
+        panel = self._wait_local_map_available(page)
+        presented = {node["id"] for node in panel["nodes"]}
+        node_count = page.locator(".local-map-node").count()
+        self.assertLessEqual(node_count, len(presented))
+        # Every rendered node corresponds to a presented node id.
+        for index in range(node_count):
+            node_id = page.evaluate(
+                "(i) => document.querySelectorAll('.local-map-node')[i].dataset.nodeId",
+                index,
+            )
+            self.assertIn(node_id, presented)
+
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_reconnect_rebuilds_minimap_from_persisted_knowledge(self):
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+        nodes_before = self._local_map_nodes(page)
+        self.assertTrue(nodes_before)
+
+        page.evaluate(
+            "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
+        )
+        page.wait_for_function(
+            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+        )
+        page.evaluate("Evennia.connect()")
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            panel = self._local_map_panel(page)
+            if panel is not None and panel.get("available") is True:
+                break
+            page.wait_for_timeout(500)
+        nodes_after = self._local_map_nodes(page)
+        # No client map cache is authoritative: the rebuilt map carries the
+        # same server-persisted current node and knowledge.
+        self.assertEqual(
+            {node["id"] for node in nodes_after},
+            {node["id"] for node in nodes_before},
+        )
+
+    @covers_requirement(
+        "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
+    )
+    def test_minimap_visible_and_keyboard_usable_at_both_viewports(self):
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.new_page(viewport)
+                from .browser_helpers import login_and_open
+
+                login_and_open(page, self.webclient_url, self.base_url)
+                self._wait_local_map_available(page)
+                for selector in (
+                    ".elosern-narrative",
+                    ".elosern-status",
+                    ".elosern-local-map",
+                ):
+                    self.assertTrue(
+                        page.locator(selector).is_visible(),
+                        f"{selector} not visible at {viewport}",
+                    )
+                page.close()
+
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main()

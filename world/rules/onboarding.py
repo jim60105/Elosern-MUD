@@ -86,7 +86,10 @@ def relocate_to_starting_location(character: Any) -> None:
     movement path with move hooks disabled: it never rolls activation back,
     never advances the world clock, never emits a player-move EventLog, and
     never triggers the room-entry observer or an automatic look (it is not a
-    player action). If 南門 is missing, the move fails, or the move raises, the
+    player action). On a successful relocation it records the South Gate's
+    ``grid:capital_altoria:2:0`` node through ``record_arrival`` without
+    charging movement time (map-knowledge-minimap design D3/player-character-
+    creation). If 南門 is missing, the move fails, or the move raises, the
     shell stays put and the player receives a degradation notice instead of the
     arrival welcome — activation itself is never rolled back.
     """
@@ -106,6 +109,9 @@ def relocate_to_starting_location(character: Any) -> None:
         log_warn(f"relocate_to_starting_location: relocation failed: {error}")
         character.msg(_DEGRADATION_NOTICE)
         return
+    from world.rules.map_knowledge import record_arrival
+
+    record_arrival(character)
     character.msg(
         f"歡迎，{character.key}。你踏上了伊洛瑟恩大陸的土地。"
     )

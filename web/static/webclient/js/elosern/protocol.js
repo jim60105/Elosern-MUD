@@ -79,6 +79,27 @@
   var SECONDARY_ACTIONS = ["forfeit"];
   var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
 
+  // local_map panel bounds (mirror of web.webclient.presentation.local_map,
+  // design D10a).
+  var LOCAL_MAP_MAX_NODES = 64;
+  var LOCAL_MAP_MAX_EDGES = 128;
+  var LOCAL_MAP_MAX_LEGEND = 16;
+  var LOCAL_MAP_MAX_STRING = 256;
+  var LOCAL_MAP_MAX_TITLE = 128;
+  var LOCAL_MAP_MAX_NODE_ID = 128;
+  var LOCAL_MAP_MAX_EXIT_REF = 64;
+  var LOCAL_MAP_COORD_MIN = -1024;
+  var LOCAL_MAP_COORD_MAX = 1024;
+  var LOCAL_MAP_VISIBILITIES = [
+    "current",
+    "visible_unvisited",
+    "visible_visited",
+    "remembered",
+  ];
+  var LOCAL_MAP_LAYERS = ["grid", "wilderness", "instance", "interior"];
+  var LOCAL_MAP_ACTION_KINDS = ["move"];
+  var NODE_ID_RE = /^(grid|wild|room):[^:]+(?::[^:]+)*$/;
+
   var MESSAGE_NAMES = {
     ui_snapshot: true,
     ui_update: true,
@@ -88,7 +109,7 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
-  var PANEL_ALLOWLIST = { status: 1, context_actions: 1 };
+  var PANEL_ALLOWLIST = { status: 1, context_actions: 1, local_map: 1 };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
   var PANEL_NAME_RE = /^[a-z0-9_]{1,64}$/;
@@ -781,6 +802,245 @@
     return payload;
   }
 
+  // Exact available local_map panel v1 schema (design D10a).
+  function requireNodeId(value, field) {
+    requireString(value, field, LOCAL_MAP_MAX_NODE_ID);
+    if (!NODE_ID_RE.test(value)) {
+      throw new Error(field + " is not a canonical node ID");
+    }
+    return value;
+  }
+
+  function requireExitRef(value, field) {
+    if (
+      typeof value !== "string" ||
+      value.length < 1 ||
+      value.length > LOCAL_MAP_MAX_EXIT_REF
+    ) {
+      throw new Error(
+        field + " must be 1.." + LOCAL_MAP_MAX_EXIT_REF + " ASCII characters"
+      );
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[^\x00-\x7F]/.test(value)) {
+      throw new Error(field + " must be ASCII");
+    }
+    return value;
+  }
+
+  function requireCoord(value, field) {
+    requireInt(value, field, LOCAL_MAP_COORD_MIN, LOCAL_MAP_COORD_MAX);
+    return value;
+  }
+
+  function validateLocalMapAction(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(value, "action", ["kind", "exit_ref", "destination"], []);
+    if (LOCAL_MAP_ACTION_KINDS.indexOf(value.kind) === -1) {
+      throw new Error("action kind is not a stable value");
+    }
+    requireExitRef(value.exit_ref, "action.exit_ref");
+    requireNodeId(value.destination, "action.destination");
+    return {
+      kind: value.kind,
+      exit_ref: value.exit_ref,
+      destination: value.destination,
+    };
+  }
+
+  function validateLocalMapNode(value) {
+    requireExactFields(
+      value,
+      "node",
+      ["id", "label", "x", "y", "visibility", "current", "anchor", "landmark", "action"],
+      []
+    );
+    var nodeId = requireNodeId(value.id, "node.id");
+    var label = requireString(value.label, "node.label", LOCAL_MAP_MAX_STRING);
+    if (!label.trim()) {
+      throw new Error("node.label must be non-empty");
+    }
+    var x = requireCoord(value.x, "node.x");
+    var y = requireCoord(value.y, "node.y");
+    if (LOCAL_MAP_VISIBILITIES.indexOf(value.visibility) === -1) {
+      throw new Error("node.visibility is not a stable value");
+    }
+    var current = requireBool(value.current, "current");
+    var anchor = requireBool(value.anchor, "anchor");
+    var landmark = requireBool(value.landmark, "landmark");
+    var action = validateLocalMapAction(value.action);
+    if (value.visibility === "current" && !current) {
+      throw new Error("the current node must carry current=true");
+    }
+    if (current && value.visibility !== "current") {
+      throw new Error("a non-current node must not carry current=true");
+    }
+    return {
+      id: nodeId,
+      label: label,
+      x: x,
+      y: y,
+      visibility: value.visibility,
+      current: current,
+      anchor: anchor,
+      landmark: landmark,
+      action: action,
+    };
+  }
+
+  function validateLocalMapEdge(value) {
+    requireExactFields(
+      value,
+      "edge",
+      ["source", "destination", "label", "known", "traversable"],
+      []
+    );
+    var source = requireNodeId(value.source, "edge.source");
+    var destination = requireNodeId(value.destination, "edge.destination");
+    var label = requireString(value.label, "edge.label", LOCAL_MAP_MAX_STRING);
+    var known = requireBool(value.known, "known");
+    var traversable = requireBool(value.traversable, "traversable");
+    if (source === destination) {
+      throw new Error("an edge must connect two distinct nodes");
+    }
+    return {
+      source: source,
+      destination: destination,
+      label: label,
+      known: known,
+      traversable: traversable,
+    };
+  }
+
+  function validateLocalMapPanel(payload) {
+    if (payload.available === false) {
+      requireExactFields(payload, "local_map panel", ["schema_version", "available", "reason"], []);
+      requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+      if (payload.schema_version !== 1) {
+        throw new Error("unsupported local_map panel schema_version");
+      }
+      var reason = payload.reason;
+      var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
+      requireExactFields(
+        reason,
+        "local_map panel reason",
+        ["code", "message"],
+        hasCorrelation ? ["correlation_id"] : []
+      );
+      validateIdentifier(reason.code, "reason.code");
+      validateMessage(reason.message, "reason.message");
+      if (hasCorrelation) {
+        validateCorrelationId(reason.correlation_id);
+      }
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "local_map panel",
+      ["schema_version", "available", "layer", "current_node", "title", "nodes", "edges", "legend"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported local_map panel schema_version");
+    }
+    if (LOCAL_MAP_LAYERS.indexOf(payload.layer) === -1) {
+      throw new Error("layer is not a stable value");
+    }
+    var currentNode = requireNodeId(payload.current_node, "current_node");
+    var prefix = currentNode.split(":")[0];
+    if (payload.layer === "grid" && prefix !== "grid") {
+      throw new Error("a grid-layer payload must have a grid current node");
+    }
+    if (payload.layer === "wilderness" && prefix !== "wild") {
+      throw new Error("a wilderness-layer payload must have a wild current node");
+    }
+    if (
+      (payload.layer === "instance" || payload.layer === "interior") &&
+      prefix !== "room"
+    ) {
+      throw new Error("an instance/interior payload must have a room current node");
+    }
+    var title = requireString(payload.title, "title", LOCAL_MAP_MAX_TITLE);
+    if (!title.trim()) {
+      throw new Error("title must be non-empty");
+    }
+
+    var nodes = payload.nodes;
+    if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > LOCAL_MAP_MAX_NODES) {
+      throw new Error("nodes must be a list of 1.." + LOCAL_MAP_MAX_NODES + " entries");
+    }
+    var nodeViews = nodes.map(validateLocalMapNode);
+    var currentCount = nodeViews.filter(function (node) {
+      return node.current;
+    }).length;
+    if (currentCount !== 1) {
+      throw new Error("the payload must mark exactly one current node");
+    }
+    if (!nodeViews.some(function (node) {
+      return node.id === currentNode;
+    })) {
+      throw new Error("current_node must be present in nodes");
+    }
+    var nodeIds = nodeViews.map(function (node) {
+      return node.id;
+    });
+    var unique = {};
+    nodeIds.forEach(function (id) {
+      if (unique[id]) {
+        throw new Error("node ids must be unique");
+      }
+      unique[id] = true;
+    });
+
+    var edges = payload.edges;
+    if (!Array.isArray(edges) || edges.length > LOCAL_MAP_MAX_EDGES) {
+      throw new Error("edges must be a list of at most " + LOCAL_MAP_MAX_EDGES + " entries");
+    }
+    var edgeViews = edges.map(validateLocalMapEdge);
+    edgeViews.forEach(function (edge) {
+      if (!unique[edge.source]) {
+        throw new Error("edge.source must reference a presented node");
+      }
+      if (!unique[edge.destination]) {
+        throw new Error("edge.destination must reference a presented node");
+      }
+    });
+
+    var legend = payload.legend;
+    if (!Array.isArray(legend) || legend.length > LOCAL_MAP_MAX_LEGEND) {
+      throw new Error("legend must be a list of at most " + LOCAL_MAP_MAX_LEGEND + " entries");
+    }
+    var legendViews = legend.map(function (entry) {
+      var text = requireString(entry, "legend", LOCAL_MAP_MAX_STRING);
+      if (!text.trim()) {
+        throw new Error("legend entries must be non-empty");
+      }
+      return text;
+    });
+
+    var result = {
+      schema_version: 1,
+      available: true,
+      layer: payload.layer,
+      current_node: currentNode,
+      title: title,
+      nodes: nodeViews,
+      edges: edgeViews,
+      legend: legendViews,
+    };
+    // Envelope guarantee (design D10a): the per-field bounds are ceilings, not
+    // a guarantee that any combination of them fits, so the validator enforces
+    // the serialized byte size directly and fails closed over the envelope.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("local_map payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validatePanel(name, schemaVersion, payload) {
@@ -806,6 +1066,9 @@
     }
     if (name === "context_actions") {
       return validateContextActionsPanel(payload);
+    }
+    if (name === "local_map") {
+      return validateLocalMapPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -956,6 +1219,18 @@
     MAX_CONDITION_COUNT: MAX_CONDITION_COUNT,
     MAX_CONDITION_LABEL: MAX_CONDITION_LABEL,
     MAX_MODIFIER_KEYS: MAX_MODIFIER_KEYS,
+    LOCAL_MAP_MAX_NODES: LOCAL_MAP_MAX_NODES,
+    LOCAL_MAP_MAX_EDGES: LOCAL_MAP_MAX_EDGES,
+    LOCAL_MAP_MAX_LEGEND: LOCAL_MAP_MAX_LEGEND,
+    LOCAL_MAP_MAX_STRING: LOCAL_MAP_MAX_STRING,
+    LOCAL_MAP_MAX_TITLE: LOCAL_MAP_MAX_TITLE,
+    LOCAL_MAP_MAX_NODE_ID: LOCAL_MAP_MAX_NODE_ID,
+    LOCAL_MAP_MAX_EXIT_REF: LOCAL_MAP_MAX_EXIT_REF,
+    LOCAL_MAP_COORD_MIN: LOCAL_MAP_COORD_MIN,
+    LOCAL_MAP_COORD_MAX: LOCAL_MAP_COORD_MAX,
+    LOCAL_MAP_VISIBILITIES: LOCAL_MAP_VISIBILITIES.slice(),
+    LOCAL_MAP_LAYERS: LOCAL_MAP_LAYERS.slice(),
+    LOCAL_MAP_ACTION_KINDS: LOCAL_MAP_ACTION_KINDS.slice(),
     MODES: MODES.slice(),
     OUTCOMES: OUTCOMES.slice(),
     COMBAT_MODES: COMBAT_MODES.slice(),
@@ -974,6 +1249,7 @@
     validateProtocolError: validateProtocolError,
     validateStatusPanel: validateStatusPanel,
     validateContextActionsPanel: validateContextActionsPanel,
+    validateLocalMapPanel: validateLocalMapPanel,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

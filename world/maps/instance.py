@@ -189,21 +189,48 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
             # active pin or a PlayerCharacter). Defer with no entity clearing.
             events.append(ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key}))
             continue
+        prune_deferred = False
         with transaction.atomic():
-            _clear_non_player_entities(room)
-            if room.delete():
-                events.append(ScheduledEvent("instance_reclaimed", end_tick, {"room": room.key}))
+            # Prune the reclaimed room's room:<dbref> from every affected
+            # player BEFORE any entity or room mutation (map-knowledge-minimap
+            # design D4). On a genuine knowledge-persistence failure the whole
+            # transaction is rolled back and the room stays eligible for a
+            # later pass; the deferred event is appended only after leaving the
+            # atomic block, so emitted events always agree with the committed
+            # database state.
+            from world.rules.map_knowledge import (
+                KnowledgePruneError,
+                prune_reclaimed_room,
+            )
+
+            try:
+                prune_reclaimed_room(room.id)
+            except KnowledgePruneError:
+                transaction.set_rollback(True)
+                prune_deferred = True
             else:
-                # Unreachable in the deterministic settlement pass: the
-                # pre-flight check above and this call see the same pins and
-                # contents, and nothing between them can change either. Kept as
-                # a defensive no-raise branch in case a future override changes
-                # that; the entity clears it would leave behind are the
-                # accept-once-and-audit cost of that hypothetical, not a normal
-                # path.
-                events.append(
-                    ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key})
-                )
+                _clear_non_player_entities(room)
+                if room.delete():
+                    events.append(
+                        ScheduledEvent("instance_reclaimed", end_tick, {"room": room.key})
+                    )
+                else:
+                    # Unreachable in the deterministic settlement pass: the
+                    # pre-flight check above and this call see the same pins and
+                    # contents, and nothing between them can change either. Kept as
+                    # a defensive no-raise branch in case a future override changes
+                    # that; the entity clears it would leave behind are the
+                    # accept-once-and-audit cost of that hypothetical, not a normal
+                    # path.
+                    events.append(
+                        ScheduledEvent(
+                            "instance_reclaim_deferred", end_tick, {"room": room.key}
+                        )
+                    )
+        if prune_deferred:
+            events.append(
+                ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key})
+            )
     return events
 
 

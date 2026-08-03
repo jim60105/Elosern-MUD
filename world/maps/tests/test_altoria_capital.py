@@ -76,6 +76,28 @@ class AltoriaCapitalMapTests(unittest.TestCase):
                     self.assertEqual(prototype["prototype_parent"], "grid_room")
                     self.assertEqual(prototype["key"], GRID_KEYS[coordinate])
 
+    @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
+    def test_options_declare_bounded_visual_range(self):
+        options = XYMAP_DATA.get("options", {})
+        self.assertIn("map_visual_range", options)
+        self.assertIn("map_mode", options)
+        visual_range = options["map_visual_range"]
+        self.assertIsInstance(visual_range, int)
+        self.assertIsNot(visual_range, True)
+        self.assertGreaterEqual(visual_range, 1)
+        self.assertLessEqual(visual_range, 8)
+        self.assertIn(options["map_mode"], ("nodes", "scan"))
+        # Adding options SHALL NOT change topology.
+        self.assertEqual(len(self.map.node_index_map), 13)
+        self.assertEqual(len(self._links()), 12)
+
+    def _links(self):
+        edges = set()
+        for node in self.map.node_index_map.values():
+            for neighbor in node.links.values():
+                edges.add(frozenset(((node.X, node.Y), (neighbor.X, neighbor.Y))))
+        return edges
+
     def test_no_building_interiors_in_descriptions(self):
         for coordinate, prototype in PROTOTYPES.items():
             with self.subTest(coordinate=coordinate):

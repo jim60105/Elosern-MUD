@@ -158,6 +158,7 @@ def build_production_registry() -> PresentationRegistry:
     importable while a presenter is being developed.
     """
     from web.webclient.presentation.combat_panel import context_actions_presenter
+    from web.webclient.presentation.local_map import local_map_presenter
     from web.webclient.presentation.status import status_presenter
 
     registry = PresentationRegistry("elosern")
@@ -175,6 +176,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=1,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=context_actions_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="local_map",
+            schema_version=1,
+            unavailable_reason=("map_unavailable", "區域地圖目前無法顯示"),
+            presenter=local_map_presenter,
         )
     )
     return registry

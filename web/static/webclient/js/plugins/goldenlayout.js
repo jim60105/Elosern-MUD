@@ -3,7 +3,7 @@
  *
  * Replaces the stock free-form pane editor with the approved version-1
  * desktop shell. Registers exactly the required components -- header,
- * narrative, art placeholder, status, local-map placeholder, action dock, and
+ * narrative, art placeholder, status, local-map minimap, action dock, and
  * command drawer -- and exposes only the minimal layout operations the shell
  * needs. Required components and the action dock are never closable.
  *
@@ -350,6 +350,165 @@
     container.getElement().append(root);
   }
 
+  function registerLocalMap(container) {
+    var root = makeElement("div", "elosern elosern-local-map");
+    root.setAttribute("role", "region");
+    root.setAttribute("aria-label", "區域地圖");
+    container.getElement().append(root);
+
+    var unsubscribe = subscribeState(function (state) {
+      renderLocalMap(root, state);
+    });
+    unsubscribers.push(unsubscribe);
+  }
+
+  function renderLocalMap(root, state) {
+    var controller = getStateController();
+    var panel = state.panels && state.panels["local_map"];
+
+    if (!panel) {
+      setText(root, "尚未同步地圖");
+      return;
+    }
+    if (panel.available === false) {
+      var reason = panel.reason;
+      setText(root, reason ? reason.message : "區域地圖暫時無法顯示");
+      if (controller) {
+        controller.resetResyncEpisode("local_map");
+      }
+      return;
+    }
+
+    try {
+      var localMap = window.Elosern && window.Elosern.LocalMap;
+      if (!localMap) {
+        setText(root, "此介面暫時無法顯示");
+        return;
+      }
+      var model = localMap.reducePanel(panel);
+      while (root.firstChild) {
+        root.removeChild(root.firstChild);
+      }
+
+      var title = makeElement("div", "local-map-title");
+      setText(title, model.title || "區域地圖");
+      root.appendChild(title);
+
+      var canvas = makeElement("div", "local-map-canvas");
+      canvas.setAttribute("tabindex", "0");
+      canvas.setAttribute("role", "figure");
+      canvas.setAttribute("aria-label", model.title || "區域地圖");
+      var nodesById = {};
+      model.nodes.forEach(function (node) {
+        nodesById[node.id] = node;
+      });
+
+      // Render edges first so node markers draw on top.
+      model.edges.forEach(function (edge) {
+        var source = nodesById[edge.source];
+        var destination = nodesById[edge.destination];
+        if (!source || !destination) {
+          return;
+        }
+        var edgeEl = makeElement("div", "local-map-edge");
+        edgeEl.style.left = (Math.min(source.x, destination.x) + 64) + "px";
+        edgeEl.style.top = (Math.min(source.y, destination.y) + 32) + "px";
+        edgeEl.style.width =
+          (Math.abs(source.x - destination.x) + 1) + "px";
+        edgeEl.style.height =
+          (Math.abs(source.y - destination.y) + 1) + "px";
+        if (edge.known) {
+          edgeEl.classList.add("edge-known");
+        }
+        if (edge.traversable) {
+          edgeEl.classList.add("edge-traversable");
+        }
+        if (edge.label) {
+          var edgeLabel = makeElement("span", "local-map-edge-label");
+          setText(edgeLabel, edge.label);
+          edgeEl.appendChild(edgeLabel);
+        }
+        canvas.appendChild(edgeEl);
+      });
+
+      model.nodes.forEach(function (node) {
+        var nodeEl = makeElement("button", "local-map-node");
+        nodeEl.type = "button";
+        nodeEl.dataset.nodeId = node.id;
+        nodeEl.classList.add("node-" + node.visibility);
+        nodeEl.classList.add("node-shape-" + node.shape);
+        nodeEl.classList.add("node-border-" + node.border);
+        if (node.current) {
+          nodeEl.classList.add("node-current");
+        }
+        if (node.anchor) {
+          nodeEl.classList.add("node-anchor");
+        }
+        if (node.landmark) {
+          nodeEl.classList.add("node-landmark");
+        }
+        nodeEl.style.left = (node.x + 64) + "px";
+        nodeEl.style.top = (node.y + 32) + "px";
+        var labelEl = makeElement("span", "local-map-node-label");
+        setText(labelEl, node.labelPrefix + node.label);
+        nodeEl.appendChild(labelEl);
+        nodeEl.setAttribute("aria-label", node.label);
+        // A remembered remote node focuses its name/landmark and carries no
+        // travel action (the move adapter is the exploration-menu unit).
+        if (node.visibility === "remembered") {
+          nodeEl.classList.add("node-focusable");
+          nodeEl.addEventListener("click", function () {
+            focusLocalMapNode(root, model, node);
+          });
+        } else if (node.action !== null) {
+          // Adjacent traversable nodes remain inert in this change: clicking
+          // does nothing until the exploration-menu unit registers movement.
+          nodeEl.classList.add("node-action-ready");
+        }
+        canvas.appendChild(nodeEl);
+      });
+      root.appendChild(canvas);
+
+      if (model.legend.length > 0) {
+        var legend = makeElement("ul", "local-map-legend");
+        model.legend.forEach(function (entry) {
+          var item = makeElement("li", "local-map-legend-entry");
+          setText(item, entry);
+          legend.appendChild(item);
+        });
+        root.appendChild(legend);
+      }
+
+      var detail = makeElement("div", "local-map-detail");
+      detail.setAttribute("role", "status");
+      detail.setAttribute("aria-live", "polite");
+      detail.id = "local-map-detail";
+      setText(detail, "");
+      root.appendChild(detail);
+
+      if (controller) {
+        controller.resetResyncEpisode("local_map");
+      }
+    } catch (error) {
+      setText(root, "此介面暫時無法顯示");
+      if (controller) {
+        controller.requestResync("local_map");
+      }
+    }
+  }
+
+  function focusLocalMapNode(root, model, node) {
+    var detail = root.querySelector(".local-map-detail");
+    if (!detail) {
+      return;
+    }
+    var focusNote = "已探索的遠方位置：" + node.label;
+    if (node.landmark) {
+      focusNote += "（地標）";
+    }
+    setText(detail, focusNote);
+  }
+
   function registerComponents(layout) {
     layout.registerComponent("header", registerHeader);
     layout.registerComponent("narrative", registerNarrative);
@@ -357,9 +516,7 @@
       registerUnavailable(container, "場景圖像", "場景圖像的生成與顯示尚未開放。");
     });
     layout.registerComponent("status", registerStatus);
-    layout.registerComponent("local-map", function (container) {
-      registerUnavailable(container, "區域地圖", "區域地圖的顯示尚未開放。");
-    });
+    layout.registerComponent("local-map", registerLocalMap);
     layout.registerComponent("action-dock", registerActionDock);
     layout.registerComponent("command-drawer", registerCommandDrawer);
   }

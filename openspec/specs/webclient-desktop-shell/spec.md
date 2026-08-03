@@ -6,15 +6,15 @@ The desktop GoldenLayout surfaces, client state reduction, keyboard focus model,
 
 
 ### Requirement: The WebClient loads a local desktop GoldenLayout shell
-The project WebClient SHALL load Evennia's existing transport together with locally served, pinned, license-documented jQuery and GoldenLayout assets. It SHALL make no remote request for a runtime UI dependency. Layout version 1 SHALL provide required header, narrative, art placeholder, status, local-map placeholder, action-dock, and command-drawer components.
+The project WebClient SHALL load Evennia's existing transport together with locally served, pinned, license-documented jQuery and GoldenLayout assets. It SHALL make no remote request for a runtime UI dependency. Layout version 1 SHALL provide required header, narrative, art placeholder, status, local-map, action-dock, and command-drawer components. The `local-map` component SHALL render the `webclient-local-map` panel owned by the `map-knowledge-minimap` delivery unit; the art component remains a placeholder until the art delivery unit lands.
 
 #### Scenario: Offline page load has its UI dependencies
 - **WHEN** the WebClient is opened with all non-local network requests blocked
 - **THEN** the transport code, GoldenLayout shell, project modules, and theme load from the project origin without a CDN failure
 
-#### Scenario: Foundation placeholders do not fabricate features
-- **WHEN** the version-1 shell renders before later map and art changes exist
-- **THEN** the art and local-map surfaces identify those panels as unavailable and show no invented image or map data
+#### Scenario: The minimap renders instead of a placeholder while art stays unavailable
+- **WHEN** the version-1 shell renders after the map-knowledge-minimap change
+- **THEN** the local-map surface renders the validated `local_map` payload, and the art surface still identifies itself as unavailable with no invented image
 
 ### Requirement: Required desktop surfaces remain visible and usable
 The narrative log SHALL occupy the primary reading area, with supporting header, status, placeholders, and action dock visible at 1440x900 and 1280x720. Required components and the action dock SHALL NOT be permanently closable. The foundation SHALL target desktop only and SHALL NOT claim mobile acceptance.

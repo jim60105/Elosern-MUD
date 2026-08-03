@@ -92,6 +92,13 @@ PROTOTYPES = {
 XYMAP_DATA = {
     "zcoord": "capital_altoria",
     "map": MAPSTR,
+    "options": {
+        # map-knowledge-minimap: the closed visual-range options the xyzgrid
+        # contrib's own get_visual_range accepts, consumed by the grid layer
+        # adapter. Adding these SHALL NOT change topology or connectivity.
+        "map_visual_range": 2,
+        "map_mode": "nodes",
+    },
     "prototypes": {
         **PROTOTYPES,
         # map-movement-clock: every intra-city link spawns as CostedXYZExit so

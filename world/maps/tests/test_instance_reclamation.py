@@ -287,3 +287,195 @@ class ReclaimDeferredReevalTests(EvenniaTest):
             ScheduledEvent("instance_reclaimed", 100, {"room": room.key}),
             second,
         )
+
+
+class ReclaimKnowledgePruneTests(EvenniaTest):
+    """Map-knowledge pruning inside the reclaim transaction (map-knowledge-minimap D4)."""
+
+    def _due_room(self, key):
+        room = create_object(InstanceRoom, key=key)
+        room.db.expire_tick = 50
+        room.db.named = False
+        room.db.interacted = False
+        return room
+
+    def _knowledge(self, character):
+        from world.rules.map_knowledge import KnowledgeError, parse_knowledge
+
+        try:
+            return {visit.node_id for visit in parse_knowledge(character)}
+        except KnowledgeError:
+            return set()
+
+    @covers_requirement("instance-reclamation::reclaim-due-instances-deletes-rooms-that-are-due-unblocked-and-not-promotable")
+    def test_reclaim_removes_room_node_from_affected_player_in_same_transaction(self):
+        room = self._due_room("prune_transaction")
+        self.char1.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {
+                    f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
+                    f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
+                },
+            },
+        )
+        events = reclaim_due_instances(0, 100)
+        self.assertFalse(InstanceRoom.objects.filter(id=room.id).exists())
+        self.assertIn(
+            ScheduledEvent("instance_reclaimed", 100, {"room": room.key}),
+            events,
+        )
+        self.assertNotIn(f"room:{room.id}", self._knowledge(self.char1))
+        self.assertIn(f"room:{self.room1.id}", self._knowledge(self.char1))
+
+    def test_unrelated_players_are_untouched_by_reclaim_prune(self):
+        room = self._due_room("prune_unrelated")
+        self.char1.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {
+                    f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30}
+                },
+            },
+        )
+        reclaim_due_instances(0, 100)
+        self.assertNotIn(f"room:{room.id}", self._knowledge(self.char1))
+        self.assertIn(f"room:{self.room1.id}", self._knowledge(self.char1))
+
+    def test_character_without_knowledge_attribute_stays_without_one(self):
+        room = self._due_room("prune_no_attr")
+        self.assertFalse(self.char1.attributes.has("map_knowledge"))
+        reclaim_due_instances(0, 100)
+        self.assertFalse(self.char1.attributes.has("map_knowledge"))
+
+    @covers_requirement("instance-reclamation::reclaim-due-instances-deletes-rooms-that-are-due-unblocked-and-not-promotable")
+    def test_promoted_room_retains_visited_identity(self):
+        room = self._due_room("prune_promoted")
+        room.db.named = True
+        room.db.interacted = True
+        self.char1.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {
+                    f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20}
+                },
+            },
+        )
+        events = reclaim_due_instances(0, 100)
+        self.assertTrue(InstanceRoom.objects.filter(id=room.id).exists())
+        self.assertIsNone(room.db.expire_tick)
+        self.assertIn(
+            ScheduledEvent("instance_promoted", 100, {"room": room.key}),
+            events,
+        )
+        self.assertIn(f"room:{room.id}", self._knowledge(self.char1))
+
+    def test_prune_runs_before_entity_or_room_mutation(self):
+        from typeclasses.npcs import NPC
+
+        room = self._due_room("prune_order")
+        npc = create_object(NPC, key="left_behind")
+        npc.move_to(room, quiet=True)
+        self.char1.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20}},
+            },
+        )
+        from world.rules import map_knowledge as map_knowledge_module
+
+        order = []
+
+        def recording_prune(room_id):
+            order.append("prune")
+
+        def recording_clear(room_obj):
+            order.append("clear")
+            # Mirror the real clearing so the room can still be deleted.
+            from typeclasses.entities import LivingEntity
+
+            for entity in list(room_obj.contents):
+                if isinstance(entity, LivingEntity):
+                    entity.delete()
+
+        def recording_delete(self_obj):
+            if self_obj is room:
+                order.append("delete")
+            return True
+
+        with patch.object(
+            map_knowledge_module, "prune_reclaimed_room", side_effect=recording_prune
+        ), patch(
+            "world.maps.instance._clear_non_player_entities", side_effect=recording_clear
+        ), patch(
+            "evennia.objects.objects.DefaultObject.delete", recording_delete
+        ):
+            events = reclaim_due_instances(0, 100)
+        self.assertEqual(order, ["prune", "clear", "delete"])
+        self.assertIn(
+            ScheduledEvent("instance_reclaimed", 100, {"room": room.key}),
+            events,
+        )
+
+    @covers_requirement("instance-reclamation::reclaim-due-instances-deletes-rooms-that-are-due-unblocked-and-not-promotable")
+    def test_prune_failure_rolls_back_delete_and_defers_room(self):
+        room = self._due_room("prune_failure")
+        from world.rules.map_knowledge import KnowledgePruneError
+
+        def boom(room_id):
+            raise KnowledgePruneError("injected persistence failure")
+
+        with patch(
+            "world.rules.map_knowledge.prune_reclaimed_room", side_effect=boom
+        ):
+            events = reclaim_due_instances(0, 100)
+        # The transaction rolled back before any entity/room mutation.
+        self.assertTrue(InstanceRoom.objects.filter(id=room.id).exists())
+        self.assertIn(
+            ScheduledEvent("instance_reclaim_deferred", 100, {"room": room.key}),
+            events,
+        )
+        self.assertNotIn(
+            ScheduledEvent("instance_reclaimed", 100, {"room": room.key}),
+            events,
+        )
+
+    @covers_requirement("instance-reclamation::reclaim-due-instances-deletes-rooms-that-are-due-unblocked-and-not-promotable")
+    def test_real_write_failure_restores_player_knowledge_in_memory(self):
+        # A genuine write failure (not a mocked prune) inside the reclaim
+        # transaction must leave the player's in-memory knowledge consistent
+        # with the pre-reclaim value after the rollback. Evennia's Attribute
+        # ``value`` setter assigns ``db_value`` in-memory before ``save()``
+        # runs, so the prune module's own snapshot restore repairs the cache
+        # even when the restore save also fails -- the idmapper never diverges
+        # from the rolled-back database (design D4).
+        room = self._due_room("prune_real_failure")
+        before = {
+            "schema_version": 1,
+            "visited": {
+                f"room:{room.id}": {"first_seen_tick": 10, "last_seen_tick": 20},
+                f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
+            },
+        }
+        self.char1.attributes.add("map_knowledge", before)
+        from evennia.typeclasses.attributes import Attribute
+
+        def disk_full(*args, **kwargs):
+            raise RuntimeError("disk full")
+
+        with patch.object(Attribute, "save", disk_full):
+            events = reclaim_due_instances(0, 100)
+        self.assertTrue(InstanceRoom.objects.filter(id=room.id).exists())
+        self.assertIn(
+            ScheduledEvent("instance_reclaim_deferred", 100, {"room": room.key}),
+            events,
+        )
+        self.assertNotIn(
+            ScheduledEvent("instance_reclaimed", 100, {"room": room.key}),
+            events,
+        )
+        self.assertEqual(self.char1.attributes.get("map_knowledge"), before)

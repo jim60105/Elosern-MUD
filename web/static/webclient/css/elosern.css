@@ -470,3 +470,120 @@ input:focus-visible,
     overflow-y: auto;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Local minimap (map-knowledge-minimap). States are distinguishable by shape,
+ * border, and text label in addition to color.
+ * ------------------------------------------------------------------------- */
+
+.elosern-local-map {
+  padding: .5rem;
+  min-height: 4rem;
+  overflow: auto;
+  color: var(--elm-paper);
+  font-size: .85em;
+}
+
+.local-map-title {
+  font-weight: bold;
+  margin-bottom: .25rem;
+}
+
+.local-map-canvas {
+  position: relative;
+  min-height: 3rem;
+  margin: .25rem 0;
+}
+
+.local-map-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border: 1px solid var(--elm-border, #3a3a3a);
+  color: var(--elm-paper);
+  padding: .1rem .3rem;
+  min-width: 1rem;
+  text-align: center;
+  cursor: default;
+}
+
+/* Non-color state indicators: shape + border style + label prefix. */
+.node-shape-circle { border-radius: 50%; }
+.node-shape-square { border-radius: 2px; }
+.node-shape-diamond { transform: translate(-50%, -50%) rotate(45deg); }
+.node-shape-diamond .local-map-node-label {
+  transform: rotate(-45deg);
+  display: inline-block;
+}
+
+.node-border-double { border-style: double; }
+.node-border-medium { border-width: 2px; }
+.node-border-dashed { border-style: dashed; }
+
+.node-current {
+  color: var(--elm-vermilion, #ff5c4d);
+  border-color: var(--elm-vermilion, #ff5c4d);
+  font-weight: bold;
+}
+.node-visible_visited {
+  color: var(--elm-paper-dim);
+  border-color: var(--elm-paper-dim);
+}
+.node-visible_unvisited {
+  color: var(--elm-paper-dim);
+  border-color: var(--elm-border, #3a3a3a);
+}
+.node-remembered {
+  color: var(--elm-paper-dim);
+  border-color: var(--elm-focus-ring, #ff8a5c);
+}
+.node-anchor {
+  outline: 1px solid var(--elm-focus-ring, #ff8a5c);
+}
+.node-focusable:focus,
+.node-focusable:focus-visible {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+}
+
+.local-map-edge {
+  position: absolute;
+  background: var(--elm-border, #3a3a3a);
+  pointer-events: none;
+}
+.local-map-edge.edge-known {
+  background: var(--elm-paper-dim);
+}
+.local-map-edge.edge-traversable {
+  background: var(--elm-focus-ring, #ff8a5c);
+}
+.local-map-edge-label {
+  position: absolute;
+  font-size: .7em;
+  color: var(--elm-paper-dim);
+}
+
+.local-map-legend {
+  list-style: none;
+  margin: .25rem 0 0;
+  padding: 0;
+}
+.local-map-legend-entry {
+  color: var(--elm-paper-dim);
+  font-size: .8em;
+}
+
+.local-map-detail {
+  color: var(--elm-paper-dim);
+  font-size: .85em;
+  min-height: 1rem;
+  margin-top: .25rem;
+}
+
+/* Safe overflow at the minimum supported viewport. */
+@media (max-width: 1280px), (max-height: 720px) {
+  .elosern-local-map {
+    max-height: 10rem;
+    overflow-y: auto;
+  }
+}

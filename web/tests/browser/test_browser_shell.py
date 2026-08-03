@@ -47,11 +47,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_unavailable_placeholders_and_numeric_status(self):
         page = self.logged_in_page()
         placeholders = page.locator(".elosern-placeholder").all_inner_texts()
-        self.assertEqual(len(placeholders), 2, "art and local-map placeholders")
+        self.assertEqual(len(placeholders), 1, "art placeholder only")
         combined = "\n".join(placeholders)
         self.assertIn("尚未開放", combined)
         self.assertIn("場景圖像", combined)
-        self.assertIn("區域地圖", combined)
+        # The minimap surface renders (or gracefully reports unavailable) and
+        # is no longer a placeholder.
+        local_map_surface = page.locator(".elosern-local-map")
+        self.assertEqual(local_map_surface.count(), 1, "local-map surface present")
+        self.assertTrue(local_map_surface.is_visible())
 
         resources = page.locator(".resource-value").all_inner_texts()
         self.assertEqual(len(resources), 3, "hp, mp, sp resource rows")

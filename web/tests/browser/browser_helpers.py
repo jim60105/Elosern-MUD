@@ -153,6 +153,72 @@ def valid_status_panel(name: str, identity: str) -> dict:
     }
 
 
+def valid_local_map_panel(**overrides) -> dict:
+    """A schema-valid available local_map panel for injected snapshots.
+
+    Mirrors the exact D10a shape the server presenter emits; the grid fixture
+    uses two nodes (current plus a visible neighbor) and one edge.
+    """
+    panel = {
+        "schema_version": 1,
+        "available": True,
+        "layer": "grid",
+        "current_node": "grid:capital_altoria:2:0",
+        "title": "南門街道圖",
+        "nodes": [
+            {
+                "id": "grid:capital_altoria:2:0",
+                "label": "南門",
+                "x": 2,
+                "y": 0,
+                "visibility": "current",
+                "current": True,
+                "anchor": False,
+                "landmark": False,
+                "action": None,
+            },
+            {
+                "id": "grid:capital_altoria:2:1",
+                "label": "南大道",
+                "x": 2,
+                "y": 1,
+                "visibility": "visible_visited",
+                "current": False,
+                "anchor": False,
+                "landmark": False,
+                "action": {
+                    "kind": "move",
+                    "exit_ref": "42",
+                    "destination": "grid:capital_altoria:2:1",
+                },
+            },
+            {
+                "id": "grid:capital_altoria:0:3",
+                "label": "市場街",
+                "x": 0,
+                "y": 3,
+                "visibility": "remembered",
+                "current": False,
+                "anchor": False,
+                "landmark": False,
+                "action": None,
+            },
+        ],
+        "edges": [
+            {
+                "source": "grid:capital_altoria:2:0",
+                "destination": "grid:capital_altoria:2:1",
+                "label": "n",
+                "known": True,
+                "traversable": True,
+            }
+        ],
+        "legend": ["你目前所在的位置", "尚未探索的相鄰位置"],
+    }
+    panel.update(overrides)
+    return panel
+
+
 def snapshot_envelope(epoch: str, revision: int, panels: dict, **overrides) -> dict:
     """A schema-valid full snapshot envelope (mirrors server schema)."""
     envelope = {
