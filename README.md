@@ -52,13 +52,21 @@ Then open `http://localhost:3000` in a browser.
 
 ## Test
 
-Run the package-local Evennia suite and the top-level contrib matrix regression
-check in the uv-managed environment:
+Use the explicit retained test profile for package-local non-browser tests:
 
 ```sh
-uv run --locked evennia test --settings settings.py commands server typeclasses web world
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+  --keepdb commands server typeclasses world web.webclient
 ```
 
+Run managed browser acceptance and repository-wide contracts separately:
+
 ```sh
+uv run --locked python -m unittest discover -s web/tests/browser -t .
 uv run --locked -m unittest discover -s tests -t .
 ```
+
+For fast feedback, replace the package labels with one dotted module, class, or
+method and optionally add `--failfast`. Focused tests do not replace final
+verification. See `docs/development/evennia-test-performance.md` for profiling,
+database rebuild, parallel-evaluation, evidence, and coverage commands.

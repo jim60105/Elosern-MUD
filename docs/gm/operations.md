@@ -29,12 +29,20 @@ podman compose up
 
 ```sh
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
-uv run --locked evennia test --settings settings.py world.imports world.quests world.rules commands
-uv run --locked evennia test --settings settings.py .
-uv run --locked -m unittest discover tests
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+  --keepdb world.imports world.quests world.rules commands
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+  --keepdb commands server typeclasses world web.webclient
+uv run --locked python -m unittest discover -s web/tests/browser -t .
+uv run --locked -m unittest discover -s tests -t .
 uv run --locked python -m compileall -q world typeclasses commands server
 git diff --check
 ```
+
+`server/db/evennia-test.sqlite3` is reserved for the retained test profile. If
+migrations change or retained-state failures appear, omit `--keepdb` and add
+`--noinput`, or remove only that file before rerunning. Do not remove
+`server/db/evennia.db3`.
 
 OpenSpec 變更中的內容工作還需遵循該變更的 `tasks.md`。在交付前，執行 `openspec validate <change> --strict`，並確認勾選的工作項目都有對應的已驗證實作。
 

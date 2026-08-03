@@ -89,20 +89,24 @@ Lines record only after an annotated test returns successfully and only when
 `OPENSPEC_TEST_EVIDENCE` is configured. Failing, skipped, expected-failing, and
 uncollected tests therefore do not satisfy a requirement.
 
-Collect evidence from both required test entry points and verify it with:
+Collect evidence from all three disjoint Python entry points and verify it with:
 
 ```sh
 traceability_evidence=$(mktemp)
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  uv run --locked evennia test --settings settings.py commands server typeclasses web world
+  uv run --locked python -m unittest discover -s web/tests/browser -t .
+OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
+  MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+    --settings test_settings.py --keepdb \
+    commands server typeclasses world web.webclient
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
   uv run --locked -m unittest discover -s tests -t .
 uv run --locked python -m tools.spec_traceability verify \
   --evidence "$traceability_evidence"
 ```
 
-Both test commands are mandatory. The top-level regression suite is not a
-substitute for the full Evennia suite.
+All three test commands are mandatory. The managed browser, non-browser
+Evennia, and top-level suites are not substitutes for one another.
 
 ## Final local quality gate
 
@@ -112,26 +116,42 @@ requirement gaps and the coverage dependency and configuration are enabled, run
 the exact aggregate coverage sequence:
 
 ```sh
-COVERAGE_FILE=.coverage.evennia \
+COVERAGE_FILE=.coverage.browser \
   OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  uv run --locked coverage run -m evennia test --settings settings.py commands server typeclasses web world
+  uv run --locked coverage run -m unittest discover \
+    -s web/tests/browser -t .
+COVERAGE_FILE=.coverage.evennia \
+  MUD_TEST_SETTINGS=1 \
+  OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
+  uv run --locked coverage run -m evennia test \
+    --settings test_settings.py --noinput \
+    commands server typeclasses world web.webclient
 COVERAGE_FILE=.coverage.top-level \
   OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-uv run --locked coverage run -m unittest discover -s tests -t .
-uv run --locked coverage combine .coverage.evennia .coverage.top-level
+  uv run --locked coverage run -m unittest discover -s tests -t .
+uv run --locked coverage combine \
+  .coverage.evennia .coverage.browser .coverage.top-level
 uv run --locked coverage json --fail-under=0 -o coverage.json
 uv run --locked python -m tools.verify_coverage_roots coverage.json
 uv run --locked coverage report --fail-under=90
 uv run --locked coverage xml -o coverage.xml
 ```
 
-The Evennia runner owns package-local tests under exactly these first-party
-roots: `commands`, `server`, `typeclasses`, `web`, and `world`; top-level
-repository contracts remain owned by `unittest discover -s tests -t .`. Only modules
-under `*/tests/*` may be omitted from those roots. Dependency code, OpenSpec
-artifacts, and repository tools are outside the configured source roots. Both
+The Evennia runner owns package-local tests under `commands`, `server`,
+`typeclasses`, `world`, and `web.webclient`. Explicit browser discovery solely
+owns `web/tests/browser/`; top-level repository contracts remain owned by
+`unittest discover -s tests -t .`. Coverage still measures exactly the five
+first-party roots `commands`, `server`, `typeclasses`, `web`, and `world`; only
+modules under `*/tests/*` may be omitted. Dependency code, OpenSpec artifacts,
+and repository tools are outside the configured source roots. All three
 coverage data files must be combined before applying the aggregate 90% gate or
-generating `coverage.xml` for Codecov.
+generating `coverage.xml` for Codecov. The browser wrapper records its parent
+test harness; managed server child-process coverage is not claimed.
+
+The dedicated retained database is `server/db/evennia-test.sqlite3`. Omit
+`--keepdb` and add `--noinput` to rebuild it after migration changes. If
+retained state is corrupt, remove only that file and rerun the clean profile;
+never delete the developer database at `server/db/evennia.db3`.
 
 ## Handling a genuine gap
 

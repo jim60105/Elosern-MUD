@@ -87,16 +87,21 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 
 ```sh
 uv sync --locked
-uv run --locked evennia test --settings settings.py commands server typeclasses web world
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands server typeclasses world web.webclient
+uv run --locked python -m unittest discover -s web/tests/browser -t .
 uv run --locked -m unittest discover -s tests -t .
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
 
-The Evennia command is the full project suite. The `unittest discover -s tests
--t .` command is only the top-level contrib-matrix regression check, not a
-substitute for the full suite. Run focused tests while iterating and the full
-relevant suite before handing work off.
+The three Python commands have disjoint ownership: the Evennia command runs
+non-browser package tests, browser discovery owns managed Playwright tests, and
+`unittest discover -s tests -t .` owns repository-wide contracts. Run focused
+dotted labels while iterating, but run every affected ownership domain before
+handoff. The retained database is `server/db/evennia-test.sqlite3`; omit
+`--keepdb` and add `--noinput`, or remove only that file, after migration changes or unexplained
+retained-state failures. See `docs/development/evennia-test-performance.md` for
+profiling and parallel-evaluation commands.
 
 ### Test runtime budget (measured, do not waste wall-clock)
 
@@ -182,8 +187,9 @@ requirement or its tests.
   and add the missing test in the behavior change that owns the requirement.
   Do not enable or weaken the required CI workflow to bypass the gap.
 - The final coverage gate measures branches in exactly `commands`, `server`,
-  `typeclasses`, `web`, and `world`, omits only `*/tests/*`, combines the full
-  Evennia and top-level regression data files, and requires at least 90%.
+  `typeclasses`, `web`, and `world`, omits only `*/tests/*`, combines the
+  non-browser Evennia, managed browser, and top-level regression data files,
+  and requires at least 90%.
 
 ## Container behavior
 

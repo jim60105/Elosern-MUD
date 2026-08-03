@@ -3,6 +3,7 @@ and the rulebook TTL data (map-instance tasks 3.3-3.4, 4.4-4.9, 6.2)."""
 
 from tools.spec_traceability import covers_requirement
 
+import unittest
 from unittest.mock import patch
 
 from evennia.prototypes import prototypes as prototypes_module
@@ -275,7 +276,7 @@ class InstanceSpawnTests(EvenniaTest):
         self.assertIsInstance(room, InstanceRoom)
 
 
-class InstanceYamlTests(EvenniaTest):
+class InstanceYamlTests(unittest.TestCase):
     @covers_requirement("instance-reclamation::default-ttl-seconds-is-declared-rulebook-data")
     def test_default_ttl_seconds_matches_independent_arithmetic(self):
         self.assertEqual(INSTANCE_YAML["default_ttl_seconds"], 345600)

@@ -38,17 +38,19 @@ class QualityGateContractTests(unittest.TestCase):
         step_names = [step["name"] for step in job["steps"]]
         self.assertLess(
             step_names.index("Prepare Evennia runtime directories"),
-            step_names.index("Run full Evennia suite with coverage"),
+            step_names.index("Run full non-browser Evennia suite with coverage"),
         )
         self.assertIn("openspec validate --all --strict", steps["Validate OpenSpec"]["run"])
         self.assertIn("tools.spec_traceability check", steps["Validate static requirement traceability"]["run"])
         self.assertIn("tools.spec_traceability verify", steps["Verify successful requirement execution"]["run"])
-        evennia_command = steps["Run full Evennia suite with coverage"]["run"]
+        evennia_step = steps["Run full non-browser Evennia suite with coverage"]
+        evennia_command = evennia_step["run"]
         self.assertEqual(
             evennia_command,
-            "uv run --locked coverage run -m evennia test --settings settings.py commands server typeclasses web world",
+            "uv run --locked coverage run -m evennia test --settings test_settings.py --noinput commands server typeclasses world web.webclient",
         )
-        self.assertNotIn("evennia test --settings settings.py .", evennia_command)
+        self.assertEqual(evennia_step["env"]["MUD_TEST_SETTINGS"], "1")
+        self.assertNotIn("evennia test --settings test_settings.py .", evennia_command)
         self.assertEqual(
             steps["Run top-level regression suite with coverage"]["run"],
             "uv run --locked coverage run -m unittest discover -s tests -t .",
@@ -82,8 +84,12 @@ class QualityGateContractTests(unittest.TestCase):
         )
         steps = {step["name"]: step for step in workflow["jobs"]["quality-gate"]["steps"]}
         self.assertEqual(
-            steps["Run full Evennia suite with coverage"]["env"]["COVERAGE_FILE"],
+            steps["Run full non-browser Evennia suite with coverage"]["env"]["COVERAGE_FILE"],
             ".coverage.evennia",
+        )
+        self.assertEqual(
+            steps["Run browser acceptance suite"]["env"]["COVERAGE_FILE"],
+            ".coverage.browser",
         )
         self.assertEqual(
             steps["Run top-level regression suite with coverage"]["env"]["COVERAGE_FILE"],
@@ -91,7 +97,7 @@ class QualityGateContractTests(unittest.TestCase):
         )
         self.assertEqual(
             steps["Combine coverage data"]["run"],
-            "uv run --locked coverage combine .coverage.evennia .coverage.top-level",
+            "uv run --locked coverage combine .coverage.evennia .coverage.browser .coverage.top-level",
         )
         self.assertIn("tools.verify_coverage_roots", steps["Verify coverage source roots"]["run"])
         self.assertEqual(

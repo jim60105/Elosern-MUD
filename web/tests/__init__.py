@@ -1,6 +1,5 @@
-"""Browser acceptance test package marker.
+"""Browser acceptance tests owned by the explicit serial browser entry point.
 
-Makes ``web.tests.browser`` discoverable as a package by both the Evennia test
-runner (``evennia test --settings settings.py web``) and the explicit browser
-entry point (``python -m unittest discover -s web/tests/browser -t .``).
+The non-browser Evennia profile targets ``web.webclient`` instead of broad
+``web`` discovery so managed server tests are not executed twice.
 """

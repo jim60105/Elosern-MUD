@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+import unittest
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
@@ -59,7 +60,7 @@ class ExamRegistryIsolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class ExamRecordTests(ExamRegistryIsolation, EvenniaTest):
+class ExamRecordTests(unittest.TestCase):
     def test_record_round_trips_through_json(self):
         record = from_storage(
             {

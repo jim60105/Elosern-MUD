@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -182,7 +183,7 @@ class ServiceHostResolutionTests(EvenniaTest):
             resolve_local_service_host(self.player, GuildStaff)
 
 
-class RegistrationBoundaryScanTests(EvenniaTest):
+class RegistrationBoundaryScanTests(unittest.TestCase):
     @covers_requirement("disguised-stats-boundary::disguised-stats-keys-are-readable-by-exactly-three-consumers-including-implemented-guild-registration")
     def test_get_display_value_docstring_names_exactly_three_consumers(self):
         doc = inspect.getdoc(get_display_value).lower()

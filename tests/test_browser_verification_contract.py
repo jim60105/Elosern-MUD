@@ -35,7 +35,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
 
         self.assertLess(
             step_names.index("Install Chromium for browser acceptance"),
-            step_names.index("Run full Evennia suite with coverage"),
+            step_names.index("Run browser acceptance suite"),
             "Chromium must be installed before any Python runner that can "
             "discover browser tests",
         )
@@ -61,7 +61,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
         )
         self.assertEqual(
             steps["Run browser acceptance suite"]["run"],
-            "uv run --locked python -m unittest discover -s web/tests/browser -t .",
+            "uv run --locked coverage run -m unittest discover -s web/tests/browser -t .",
         )
 
     @covers_requirement(
@@ -77,6 +77,8 @@ class BrowserVerificationContractTests(unittest.TestCase):
             browser_step["env"].get("OPENSPEC_TEST_EVIDENCE"),
             "${{ env.OPENSPEC_TEST_EVIDENCE }}",
         )
+        self.assertEqual(browser_step["env"].get("COVERAGE_FILE"), ".coverage.browser")
+        self.assertNotIn("--parallel", browser_step["run"])
 
     @covers_requirement(
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"
@@ -88,7 +90,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
         for required in (
             "Validate OpenSpec",
             "Validate static requirement traceability",
-            "Run full Evennia suite with coverage",
+            "Run full non-browser Evennia suite with coverage",
             "Run top-level regression suite with coverage",
             "Verify successful requirement execution",
             "Verify coverage source roots",

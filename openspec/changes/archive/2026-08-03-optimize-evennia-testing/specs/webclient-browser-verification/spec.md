@@ -1,16 +1,4 @@
-## Purpose
-
-Required Node and Playwright entry points, isolated deterministic server fixtures, supported viewport acceptance, and CI integration.
-
-## Requirements
-
-
-### Requirement: DOM-independent client behavior has an executable Node test gate
-Protocol validation/reduction and keyboard routing SHALL be implemented as DOM-independent JavaScript modules and SHALL have deterministic tests runnable with Node 24's built-in test runner. The suite SHALL cover exact schemas, atomic new-epoch adoption, active-epoch revision ordering, old-epoch rejection, panel replacement, focus movement, Escape stack behavior, command-drawer transition, disabled entries, and repeated-Enter suppression without adding an npm runtime dependency.
-
-#### Scenario: Node suite verifies state and keyboard contracts
-- **WHEN** `node --test web/static/webclient/js/tests/*.test.js` runs
-- **THEN** all protocol reducer and keyboard-router behavior tests pass without a browser, remote request, package installation, or generated game data
+## MODIFIED Requirements
 
 ### Requirement: Browser acceptance uses an isolated managed Evennia runtime
 The browser-test harness SHALL create a temporary SQLite database and temporary runtime/log paths, allocate dynamic loopback Telnet, HTTP, and WebSocket ports per harness instance, seed deterministic account and character fixtures, start Evennia non-interactively with browser-test-only settings, poll its allocated localhost WebClient with a bounded readiness timeout, and always stop only its owned server process after success, failure, or timeout. It SHALL NOT assume port 4001 or read or write the developer database. Each invocation SHALL use fresh ports and temporary roots without shared process state. The explicit managed browser command SHALL be the sole quality-gate owner of `web/tests/browser/`; the non-browser Evennia command SHALL retain `web.webclient` tests but SHALL NOT collect browser tests again.
@@ -30,28 +18,6 @@ The browser-test harness SHALL create a temporary SQLite database and temporary 
 #### Scenario: Quality gate does not duplicate browser discovery
 - **WHEN** the quality workflow runs both managed browser and non-browser Evennia entry points
 - **THEN** every browser test executes through the managed browser entry point exactly once
-
-### Requirement: Browser tests are localhost-only and deterministic
-Playwright acceptance SHALL use Chromium installed through the locked uv environment, SHALL block or fail every non-local network request, and SHALL use deterministic placeholders without invoking an LLM, image generator, or other external service.
-
-#### Scenario: Browser journey makes no remote request
-- **WHEN** the foundation acceptance suite loads and exercises the real WebClient
-- **THEN** every successful HTTP and WebSocket request targets localhost and no test result depends on remote availability
-
-### Requirement: Browser acceptance covers foundation recovery and layout behavior
-Playwright SHALL verify required shell visibility at 1440x900 and 1280x720, keyboard-only drawer open/send/close and focus restoration, transport interruption and control locking, lower-revision adoption in a new epoch, rejection of delayed prior-epoch messages, known layout migration, unknown layout reset, presenter degradation, and protocol mismatch with preserved text input.
-
-#### Scenario: Supported viewports pass the shell journey
-- **WHEN** the acceptance journey runs at each supported desktop viewport
-- **THEN** every required surface is visible and the keyboard-only command journey completes with action-dock focus restored
-
-#### Scenario: Reconnect behavior is exercised end to end
-- **WHEN** the harness interrupts the active WebSocket and reconnects it
-- **THEN** stale controls remain locked, the browser adopts the new epoch's lower-revision snapshot, and an injected delayed old-epoch message changes no state
-
-#### Scenario: Incompatible protocol preserves text input
-- **WHEN** the harness injects a snapshot with an unsupported protocol version
-- **THEN** graphical actions disable while an ordinary text command can still be sent and rendered
 
 ### Requirement: Node and Playwright checks are mandatory quality-gate steps
 Playwright SHALL be added to the synchronized uv development dependency group. The required quality workflow SHALL install Chromium with `uv run --locked playwright install --with-deps chromium` before the browser runner, run `node --test web/static/webclient/js/tests/*.test.js`, and run the explicit `web/tests/browser/` discovery once, serially, under coverage. Browser tests carrying requirement annotations SHALL write to the same `OPENSPEC_TEST_EVIDENCE` path before execution evidence is verified. Browser coverage SHALL be combined with non-browser Evennia and top-level coverage before exact-root and aggregate threshold verification. Managed browser acceptance MUST NOT be included in a generic parallel Evennia profile. Existing strict OpenSpec, Python suite, traceability, coverage-root, aggregate 90% branch-coverage, and Codecov gates SHALL remain enabled.

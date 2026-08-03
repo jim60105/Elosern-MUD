@@ -26,6 +26,7 @@ server/evennia.db3
 **/*.db
 **/*.db3
 **/*.sqlite3
+**/*.sqlite3-journal
 server/logs/
 server/*.log
 server/*.pid

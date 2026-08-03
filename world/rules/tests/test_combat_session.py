@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -100,7 +101,7 @@ class InnateSkillTests(EvenniaTest):
         self.assertEqual(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
 
 
-class CombatSessionRecordTests(EvenniaTest):
+class CombatSessionRecordTests(unittest.TestCase):
     def test_record_round_trips_through_json(self):
         record = from_storage(
             {
@@ -146,6 +147,8 @@ class CombatSessionRecordTests(EvenniaTest):
                 with self.assertRaises(CombatSessionError):
                     from_storage(data)
 
+
+class CombatSessionIdTests(EvenniaTest):
     def test_deterministic_session_ids(self):
         player = _player()
         with patch("world.rules.clock.get_world_clock", return_value=WorldClock(42)):
