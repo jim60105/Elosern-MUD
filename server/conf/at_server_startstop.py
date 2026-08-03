@@ -25,6 +25,34 @@ def at_server_init():
     pass
 
 
+def _register_narrator_layer():
+    """Register the narrator layer's guardrail hooks with the template renderer.
+
+    Called from ``at_server_start`` because it must run after ``evennia._init()``
+    has populated ``evennia.logger``: ``world.ai.guardrail`` captures the logger
+    at import time, so registering during settings load would permanently bind a
+    ``None`` logger and break every degrade path. This site may import
+    ``world.rules`` on the narrator's behalf; ``world/ai/`` never does.
+
+    Registration is boot-tolerant: an already-present narrator registration
+    (this module's own idempotent re-registration, or a foreign one left by an
+    earlier in-process test) must never abort server startup. The narrate gate
+    still fails loudly on a non-narrator registration, so correctness is
+    preserved even when this swallow path is taken.
+    """
+    from evennia import logger
+    from world.ai.guardrail import GuardrailRegistrationError
+    from world.ai.narrator import register_narrator
+    from world.rules.event_log import render_plain_text
+
+    try:
+        register_narrator(
+            lambda event_logs: "\n".join(render_plain_text(log) for log in event_logs)
+        )
+    except GuardrailRegistrationError as exc:
+        logger.log_warn(f"narrator registration skipped at server start: {exc}")
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -51,6 +79,7 @@ def at_server_start():
     sync_quest_runtime()
     sync_guild_economy()
     sync_guard_npc()
+    _register_narrator_layer()
 
 
 def at_server_stop():
