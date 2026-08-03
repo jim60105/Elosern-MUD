@@ -52,6 +52,13 @@ EXTRA_LAUNCHER_COMMANDS["xyzgrid"] = "evennia.contrib.grid.xyzgrid.launchcmd.xyz
 # contrib's module is appended without duplicating the project module.
 PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototypes"]
 
+# Generative-layer LLM endpoint profiles (llm-client). Local-first by default:
+# base_url derives from OLLAMA_BASE_URL (the compose runtime) or falls back to a
+# bare-metal localhost endpoint.
+from world.ai.profiles import default_profiles
+
+LLM_PROFILES = default_profiles()
+
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.
