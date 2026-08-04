@@ -433,7 +433,7 @@ class ContextActionsPresenterTests(EvenniaTest):
     def test_production_registry_contains_every_registered_panel(self):
         self.assertEqual(
             self.registry.panel_names,
-            frozenset({"status", "context_actions", "local_map"}),
+            frozenset({"status", "context_actions", "local_map", "services"}),
         )
 
 

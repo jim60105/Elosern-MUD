@@ -68,11 +68,14 @@ class ActionRegistry:
 
 
 def build_production_action_registry() -> ActionRegistry:
-    """Return the production action registry with the first gameplay adapters.
+    """Return the production action registry with the combat and service adapters.
 
-    This delivery unit registers exactly ``combat.cast``, ``combat.flee``, and
-    ``combat.forfeit``. Each action binds one exact payload validator and one
-    narrow deterministic adapter; no action routes through the text parser.
+    The registry contains exactly the three combat adapters (``combat.cast``,
+    ``combat.flee``, ``combat.forfeit``) plus the seven service adapters
+    (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
+    ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``).
+    Each action binds one exact payload validator and one narrow deterministic
+    adapter; no action routes through the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _cast_adapter,
@@ -81,6 +84,22 @@ def build_production_action_registry() -> ActionRegistry:
         validate_cast_payload,
         validate_flee_payload,
         validate_forfeit_payload,
+    )
+    from web.webclient.actions.service_actions import (
+        _buy_adapter,
+        _exam_start_adapter,
+        _guild_register_adapter,
+        _quest_abandon_adapter,
+        _quest_accept_adapter,
+        _quest_turnin_adapter,
+        _sell_adapter,
+        validate_buy_payload,
+        validate_exam_start_payload,
+        validate_guild_register_payload,
+        validate_quest_abandon_payload,
+        validate_quest_accept_payload,
+        validate_quest_turnin_payload,
+        validate_sell_payload,
     )
 
     registry = ActionRegistry("elosern")
@@ -106,6 +125,62 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_forfeit_payload,
             adapter=_forfeit_adapter,
             affected_panels=("status", "context_actions"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.register",
+            validate_payload=validate_guild_register_payload,
+            adapter=_guild_register_adapter,
+            affected_panels=("status", "services"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.quest_accept",
+            validate_payload=validate_quest_accept_payload,
+            adapter=_quest_accept_adapter,
+            affected_panels=("services",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.quest_abandon",
+            validate_payload=validate_quest_abandon_payload,
+            adapter=_quest_abandon_adapter,
+            affected_panels=("services",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.quest_turnin",
+            validate_payload=validate_quest_turnin_payload,
+            adapter=_quest_turnin_adapter,
+            affected_panels=("status", "services"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.exam_start",
+            validate_payload=validate_exam_start_payload,
+            adapter=_exam_start_adapter,
+            affected_panels=("status", "services", "context_actions"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="shop.buy",
+            validate_payload=validate_buy_payload,
+            adapter=_buy_adapter,
+            affected_panels=("status", "services"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="shop.sell",
+            validate_payload=validate_sell_payload,
+            adapter=_sell_adapter,
+            affected_panels=("status", "services"),
         )
     )
     return registry

@@ -159,6 +159,7 @@ def build_production_registry() -> PresentationRegistry:
     """
     from web.webclient.presentation.combat_panel import context_actions_presenter
     from web.webclient.presentation.local_map import local_map_presenter
+    from web.webclient.presentation.services import services_presenter
     from web.webclient.presentation.status import status_presenter
 
     registry = PresentationRegistry("elosern")
@@ -184,6 +185,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=1,
             unavailable_reason=("map_unavailable", "區域地圖目前無法顯示"),
             presenter=local_map_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="services",
+            schema_version=1,
+            unavailable_reason=("services_unavailable", "服務選單目前無法顯示"),
+            presenter=services_presenter,
         )
     )
     return registry

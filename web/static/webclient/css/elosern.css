@@ -471,6 +471,84 @@ input:focus-visible,
   }
 }
 
+/* ---------------------------------------------------------------- *
+ * Services action dock (webclient-service-menus). Focus is indicated
+ * by an outline plus a leading glyph, never by color alone.
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock .services-heading {
+  color: var(--elm-paper);
+  font-weight: 600;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .services-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .services-control {
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel, #1c1c1c);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .2rem .6rem;
+  cursor: pointer;
+}
+
+.elosern-action-dock .services-control.focused {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+  border-style: double;
+}
+
+.elosern-action-dock .services-control.focused::before {
+  content: "▸ ";
+}
+
+.elosern-action-dock .services-control.disabled {
+  color: var(--elm-paper-dim);
+  border-style: dashed;
+}
+
+.elosern-action-dock .services-detail {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+  min-height: 1.2rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.elosern-action-dock .services-quantity {
+  margin: .3rem 0;
+  padding: .3rem .5rem;
+  border: 1px solid var(--elm-border, #3a3a3a);
+}
+
+.elosern-action-dock .services-quantity-value {
+  font-size: 1.2em;
+  letter-spacing: .2em;
+}
+
+.elosern-action-dock .services-confirm {
+  margin: .3rem 0;
+  padding: .3rem .5rem;
+  border: 2px double var(--elm-vermilion, #ff5c4d);
+}
+
+.elosern-action-dock .services-live {
+  color: var(--elm-vermilion, #ff5c4d);
+  min-height: 1.2rem;
+}
+
+@media (max-width: 1280px), (max-height: 720px) {
+  .elosern-action-dock[data-mode="exploration"] .services-menu {
+    max-height: 9rem;
+    overflow-y: auto;
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Local minimap (map-knowledge-minimap). States are distinguishable by shape,
  * border, and text label in addition to color.

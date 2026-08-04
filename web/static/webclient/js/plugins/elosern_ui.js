@@ -36,6 +36,13 @@
     ) || null;
   }
 
+  function getServices() {
+    return (
+      window.Elosern &&
+      window.Elosern.serviceDock
+    ) || null;
+  }
+
   function getActions() {
     return (
       window.Elosern &&
@@ -232,6 +239,12 @@
           } else if (name === "focus" || name === "disabled") {
             renderCombatDetail(payload);
           }
+          // Forward navigation events to the services dock so it can keep its
+          // DOM rows and detail pane in sync without owning a second router.
+          var services = getServices();
+          if (services && services.isActive && services.isActive()) {
+            services.onRouterEvent(name, payload);
+          }
         },
       });
       window.Elosern.keyboard = router;
@@ -250,6 +263,21 @@
     var item = payload && payload.item;
     if (!item) {
       return;
+    }
+    // Service dock navigation events (submenus, quest detail, abandon
+    // confirmation, quantity forms) are owned by the services dock.
+    var services = getServices();
+    if (services && services.isActive && services.isActive()) {
+      if (
+        item.openSubmenu ||
+        item.openDetail ||
+        item.confirmActionId ||
+        item.quantity ||
+        (item.key && item.key.indexOf("cancel-") === 0)
+      ) {
+        services.handleItem(item);
+        return;
+      }
     }
     // Internal navigation events first; only real action IDs are sent.
     if (item.actionId === "open-skill" && item.payload && combat) {

@@ -84,12 +84,8 @@ def _current_tick() -> int:
     return int(get_world_clock().tick)
 
 
-def shop_is_open(shop_key: str) -> bool:
-    """Return whether the shop's interval currently contains the world time."""
-    config = get_catalog().shop_configs.get(shop_key)
-    if config is None:
-        raise TradeError(TradeReason.MALFORMED_STOCK, "unknown shop")
-    tick = _current_tick()
+def _shop_open_at(config: Any, tick: int) -> bool:
+    """Return whether ``config``'s interval contains the world tick (pure)."""
     seconds_into_day = tick % _DAY_SECONDS
     seconds_per_hour = int(CLOCK_YAML["seconds_per_hour"])
     current_hour = seconds_into_day // seconds_per_hour
@@ -100,6 +96,23 @@ def shop_is_open(shop_key: str) -> bool:
     if open_minute < close_minute:
         return open_minute <= now < close_minute
     return now >= open_minute or now < close_minute
+
+
+def shop_is_open_at(shop_key: str, tick: int) -> bool:
+    """Return whether the shop's interval contains the given world tick.
+
+    Pure and clock-free so read-only presentation can derive opening state
+    without ever creating the world-clock singleton.
+    """
+    config = get_catalog().shop_configs.get(shop_key)
+    if config is None:
+        raise TradeError(TradeReason.MALFORMED_STOCK, "unknown shop")
+    return _shop_open_at(config, tick)
+
+
+def shop_is_open(shop_key: str) -> bool:
+    """Return whether the shop's interval currently contains the world time."""
+    return shop_is_open_at(shop_key, _current_tick())
 
 
 def _offer_rule(shop_key: str, item_key: str):

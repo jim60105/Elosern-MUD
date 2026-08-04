@@ -100,7 +100,8 @@ def _deadline_line(deadline_tick: int | None, current_tick: int) -> str | None:
     return f"期限：剩餘 {hours} 小時"
 
 
-def _reward_line(offer: Any) -> str:
+def describe_reward(offer: Any) -> str:
+    """Render one offer's reward into a single Traditional Chinese line."""
     reward = offer.reward
     item_text = "、".join(
         f"{ITEM_REGISTRY[quantity.item_key].display_name_zh} × {quantity.quantity}"
@@ -110,6 +111,19 @@ def _reward_line(offer: Any) -> str:
     if item_text:
         line += f"、{item_text}"
     return line
+
+
+def _reward_line(offer: Any) -> str:
+    return describe_reward(offer)
+
+
+def describe_deadline(deadline_tick: int | None, current_tick: int) -> str | None:
+    """Render the remaining-deadline line, or ``None`` when no deadline exists.
+
+    This is the public rendering seam the services panel uses so its quest
+    rows reuse the exact prose the ``guild show`` command produces.
+    """
+    return _deadline_line(deadline_tick, current_tick)
 
 
 def describe_quest_detail(

@@ -110,11 +110,24 @@ class RegistryTests(unittest.TestCase):
     @covers_requirement(
         "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
     )
-    def test_production_registry_exposes_only_combat_adapters(self):
+    def test_production_registry_exposes_only_combat_and_service_adapters(self):
         registry = build_production_action_registry()
         self.assertEqual(
             registry.action_ids,
-            frozenset({"combat.cast", "combat.flee", "combat.forfeit"}),
+            frozenset(
+                {
+                    "combat.cast",
+                    "combat.flee",
+                    "combat.forfeit",
+                    "guild.register",
+                    "guild.quest_accept",
+                    "guild.quest_abandon",
+                    "guild.quest_turnin",
+                    "guild.exam_start",
+                    "shop.buy",
+                    "shop.sell",
+                }
+            ),
         )
         # Validation and dispatch infrastructure remains usable.
         self.assertTrue(hasattr(registry, "spec"))

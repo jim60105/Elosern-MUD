@@ -1175,3 +1175,462 @@ test("local_map byte budget fails closed on the theoretical worst case", () => {
     )
   );
 });
+
+// ---------------------------------------------------------------------------
+// services panel schema (design D4).
+// ---------------------------------------------------------------------------
+
+function validServicesAction(overrides) {
+  return Object.assign(
+    {
+      action_id: "guild.register",
+      label: "註冊為冒險者",
+      enabled: true,
+      disabled_reason: null,
+      quantity: null,
+    },
+    overrides || {}
+  );
+}
+
+function validServicesBoardRow(overrides) {
+  return Object.assign(
+    {
+      definition_key: "introductory_hunt",
+      display_name: "討伐低階魔物",
+      objective_summary: "討伐 1 隻低階魔物",
+      reward_summary: "獎勵：銅 50、功績 25、治療藥水 × 2",
+      rank: "F",
+      accept: validServicesAction({ action_id: "guild.quest_accept", label: "接取" }),
+    },
+    overrides || {}
+  );
+}
+
+function validServicesQuestRow(overrides) {
+  return Object.assign(
+    {
+      quest_id: "introductory_hunt:1",
+      definition_key: "introductory_hunt",
+      display_name: "討伐低階魔物",
+      state: "in_progress",
+      stage_index: 0,
+      stage_progress: 0,
+      objective_summary: "討伐 1 隻低階魔物",
+      deadline_line: null,
+      detail: "討伐低階魔物\n狀態：進行中\n階段：1\n目標：討伐 1 隻低階魔物\n進度：0 / 1\n獎勵：銅 50、功績 25、治療藥水 × 2",
+      abandon: validServicesAction({ action_id: "guild.quest_abandon", label: "放棄" }),
+      turnin: validServicesAction({
+        action_id: "guild.quest_turnin",
+        label: "回報",
+        enabled: false,
+        disabled_reason: { code: "quest_transition", message: "這個任務目前無法進行此操作。" },
+      }),
+    },
+    overrides || {}
+  );
+}
+
+function validServicesStockRow(overrides) {
+  return Object.assign(
+    {
+      item_key: "meal",
+      display_name: "普通餐食",
+      buy_copper: 10,
+      sell_copper: 5,
+      stock: 20,
+      max_stock: 20,
+      buy: validServicesAction({ action_id: "shop.buy", label: "購買", quantity: { min: 1, max: 20 } }),
+    },
+    overrides || {}
+  );
+}
+
+function validServicesSellableRow(overrides) {
+  return Object.assign(
+    {
+      item_key: "meal",
+      display_name: "普通餐食",
+      sell_copper: 5,
+      held: 2,
+      sell: validServicesAction({ action_id: "shop.sell", label: "販賣", quantity: { min: 1, max: 2 } }),
+    },
+    overrides || {}
+  );
+}
+
+function validServicesPanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "services",
+      host: null,
+      player: {
+        wallet: 1000,
+        guild_registered: false,
+        guild_rank: null,
+        guild_merit: 0,
+        next_rank: null,
+        next_threshold: null,
+      },
+      guild: {
+        registration: {
+          registered: false,
+          register: validServicesAction(),
+        },
+        board: [],
+        quests: [],
+        rank: null,
+      },
+      shop: null,
+      inventory: {
+        rows: [{ item_key: "meal", display_name: "普通餐食", held: 1, equipped: false }],
+        wallet: 1000,
+      },
+      pagination: {
+        board_total: 0,
+        quest_total: 0,
+        stock_total: 0,
+        sellable_total: 0,
+        inventory_total: 1,
+      },
+    },
+    overrides || {}
+  );
+}
+
+test("validates the services panel available/unavailable discriminator", () => {
+  assert.deepEqual(
+    Protocol.validateServicesPanel(validServicesPanel()),
+    validServicesPanel()
+  );
+  const unavailable = {
+    schema_version: 1,
+    available: false,
+    reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
+  };
+  assert.deepEqual(Protocol.validateServicesPanel(unavailable), unavailable);
+  assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), kind: "combat" }));
+  assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), available: "yes" }));
+});
+
+test("services panel rejects unknown-surface and malformed fields", () => {
+  assert.throws(() =>
+    Protocol.validateServicesPanel({ ...validServicesPanel(), secret: 1 })
+  );
+  assert.throws(() =>
+    Protocol.validateServicesPanel({ ...validServicesPanel(), host: { identity: "公會長", display_name: "x" } })
+  );
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...validServicesPanel(),
+      player: { ...validServicesPanel().player, guild_registered: true, guild_rank: null },
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...validServicesPanel(),
+      guild: {
+        ...validServicesPanel().guild,
+        board: [
+          validServicesBoardRow({ accept: validServicesAction({ action_id: "guild.register" }) }),
+        ],
+      },
+      pagination: { ...validServicesPanel().pagination, board_total: 1 },
+    })
+  );
+});
+
+test("services panel enforces quantity bounds and unknown-node-style rejection", () => {
+  const panel = validServicesPanel({
+    shop: {
+      open: true,
+      stock: [validServicesStockRow({ buy: validServicesAction({ action_id: "shop.buy" }) })],
+      sellable: [],
+    },
+    pagination: { ...validServicesPanel().pagination, stock_total: 1 },
+  });
+  assert.throws(() => Protocol.validateServicesPanel(panel), /quantity bounds/);
+  const panel2 = validServicesPanel({
+    shop: {
+      open: true,
+      stock: [
+        validServicesStockRow({
+          buy: validServicesAction({
+            action_id: "shop.buy",
+            quantity: { min: 1, max: Protocol.SERVICES_MAX_QUANTITY + 1 },
+          }),
+        }),
+      ],
+      sellable: [],
+    },
+    pagination: { ...validServicesPanel().pagination, stock_total: 1 },
+  });
+  assert.throws(() => Protocol.validateServicesPanel(panel2), /quantity/);
+  const booleanQuantity = validServicesPanel({
+    shop: {
+      open: true,
+      stock: [
+        validServicesStockRow({
+          buy: validServicesAction({ action_id: "shop.buy", quantity: { min: 1, max: true } }),
+        }),
+      ],
+      sellable: [],
+    },
+    pagination: { ...validServicesPanel().pagination, stock_total: 1 },
+  });
+  assert.throws(() => Protocol.validateServicesPanel(booleanQuantity), /quantity/);
+});
+
+test("services panel enforces row ceilings for every surface", () => {
+  const board = [];
+  for (let i = 0; i < Protocol.SERVICES_MAX_BOARD_ROWS + 1; i++) {
+    board.push(validServicesBoardRow());
+  }
+  assert.throws(() =>
+    Protocol.validateServicesPanel(
+      validServicesPanel({
+        guild: { ...validServicesPanel().guild, board },
+        pagination: { ...validServicesPanel().pagination, board_total: board.length },
+      })
+    )
+  );
+  const inventory = [];
+  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS + 1; i++) {
+    inventory.push({ item_key: "meal", display_name: "普通餐食", held: 1, equipped: false });
+  }
+  assert.throws(() =>
+    Protocol.validateServicesPanel(
+      validServicesPanel({
+        inventory: { rows: inventory, wallet: 0 },
+        pagination: { ...validServicesPanel().pagination, inventory_total: inventory.length },
+      })
+    )
+  );
+});
+
+test("services panel pagination must match shipped rows and null surfaces", () => {
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...validServicesPanel(),
+      guild: null,
+      pagination: { ...validServicesPanel().pagination, board_total: 1 },
+    })
+  );
+  const withRows = validServicesPanel({
+    guild: {
+      registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
+      board: [validServicesBoardRow()],
+      quests: [validServicesQuestRow()],
+      rank: null,
+    },
+    player: {
+      wallet: 1000,
+      guild_registered: true,
+      guild_rank: "F",
+      guild_merit: 60,
+      next_rank: "E",
+      next_threshold: 50,
+    },
+    pagination: { ...validServicesPanel().pagination, board_total: 1, quest_total: 1 },
+  });
+  assert.deepEqual(Protocol.validateServicesPanel(withRows), withRows);
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...withRows,
+      pagination: { ...withRows.pagination, board_total: 0 },
+    })
+  );
+});
+
+test("a structurally maximal realistic services payload fits the envelope", () => {
+  const board = [];
+  const quests = [];
+  const stock = [];
+  const sellable = [];
+  const inventory = [];
+  for (let i = 0; i < Protocol.SERVICES_MAX_BOARD_ROWS; i++) {
+    board.push(validServicesBoardRow());
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_QUEST_ROWS; i++) {
+    quests.push(validServicesQuestRow());
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_STOCK_ROWS; i++) {
+    stock.push(validServicesStockRow());
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_SELLABLE_ROWS; i++) {
+    sellable.push(validServicesSellableRow());
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
+    inventory.push({ item_key: "meal", display_name: "普通餐食", held: 2, equipped: false });
+  }
+  const panel = validServicesPanel({
+    guild: {
+      registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
+      board: board,
+      quests: quests,
+      rank: {
+        rank: "F",
+        merit: 60,
+        next_rank: "E",
+        next_threshold: 50,
+        eligible: true,
+        exam_start: validServicesAction({ action_id: "guild.exam_start", label: "升階考核（E）" }),
+      },
+    },
+    shop: { open: true, stock: stock, sellable: sellable },
+    inventory: { rows: inventory, wallet: 1000000 },
+    pagination: {
+      board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
+      quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
+      stock_total: Protocol.SERVICES_MAX_STOCK_ROWS,
+      sellable_total: Protocol.SERVICES_MAX_SELLABLE_ROWS,
+      inventory_total: Protocol.SERVICES_MAX_INVENTORY_ROWS,
+    },
+  });
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(panel));
+  assert.ok(Protocol.jsonByteSize(panel) <= Protocol.MAX_CANONICAL_JSON_BYTES);
+});
+
+test("services payload maximizing every string field fails the byte gate", () => {
+  // Every string field at its bound on every surface simultaneously. Each
+  // field is individually in bounds, so only the serialized-size gate can
+  // reject it (design D4).
+  const max64 = "獎".repeat(Protocol.SERVICES_MAX_KEY);
+  const max128 = "獎".repeat(Protocol.SERVICES_MAX_DISPLAY_NAME);
+  const maxDetail = "獎".repeat(Protocol.SERVICES_MAX_DETAIL);
+  const board = [];
+  const quests = [];
+  const stock = [];
+  const sellable = [];
+  const inventory = [];
+  for (let i = 0; i < Protocol.SERVICES_MAX_BOARD_ROWS; i++) {
+    board.push({
+      definition_key: max64,
+      display_name: max128,
+      objective_summary: max128,
+      reward_summary: max128,
+      rank: max64.slice(0, Protocol.SERVICES_MAX_RANK_KEY),
+      accept: validServicesAction({ action_id: "guild.quest_accept" }),
+    });
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_QUEST_ROWS; i++) {
+    quests.push({
+      quest_id: max64,
+      definition_key: max64,
+      display_name: max128,
+      state: "in_progress",
+      stage_index: 0,
+      stage_progress: 0,
+      objective_summary: max128,
+      deadline_line: max64.slice(0, Protocol.SERVICES_MAX_DEADLINE_LINE),
+      detail: maxDetail,
+      abandon: validServicesAction({ action_id: "guild.quest_abandon" }),
+      turnin: validServicesAction({
+        action_id: "guild.quest_turnin",
+        enabled: false,
+        disabled_reason: { code: "quest_transition", message: max64 },
+      }),
+    });
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_STOCK_ROWS; i++) {
+    stock.push({
+      item_key: max64,
+      display_name: max128,
+      buy_copper: 10,
+      sell_copper: 5,
+      stock: 20,
+      max_stock: 20,
+      buy: validServicesAction({
+        action_id: "shop.buy",
+        enabled: false,
+        disabled_reason: { code: "insufficient_stock", message: max64 },
+      }),
+    });
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_SELLABLE_ROWS; i++) {
+    sellable.push({
+      item_key: max64,
+      display_name: max128,
+      sell_copper: 5,
+      held: 20,
+      sell: validServicesAction({
+        action_id: "shop.sell",
+        enabled: false,
+        disabled_reason: { code: "stock_overflow", message: max64 },
+      }),
+    });
+  }
+  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
+    inventory.push({ item_key: max64, display_name: max128, held: 20, equipped: false });
+  }
+  const panel = validServicesPanel({
+    host: {
+      identity: "1".repeat(Protocol.SERVICES_MAX_KEY),
+      display_name: max128.repeat(2).slice(0, Protocol.SERVICES_MAX_HOST_DISPLAY_NAME),
+    },
+    player: {
+      wallet: 0,
+      guild_registered: true,
+      guild_rank: "F",
+      guild_merit: 0,
+      next_rank: "E",
+      next_threshold: 1,
+    },
+    guild: {
+      registration: {
+        registered: true,
+        register: validServicesAction({
+          enabled: false,
+          disabled_reason: { code: "already_registered", message: max64 },
+        }),
+      },
+      board: board,
+      quests: quests,
+      rank: {
+        rank: "F",
+        merit: 0,
+        next_rank: "E",
+        next_threshold: 1,
+        eligible: false,
+        exam_start: validServicesAction({
+          action_id: "guild.exam_start",
+          enabled: false,
+          disabled_reason: { code: "below_threshold", message: max64 },
+        }),
+      },
+    },
+    shop: { open: false, stock: stock, sellable: sellable },
+    inventory: { rows: inventory, wallet: 0 },
+    pagination: {
+      board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
+      quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
+      stock_total: Protocol.SERVICES_MAX_STOCK_ROWS,
+      sellable_total: Protocol.SERVICES_MAX_SELLABLE_ROWS,
+      inventory_total: Protocol.SERVICES_MAX_INVENTORY_ROWS,
+    },
+  });
+  assert.throws(() => Protocol.validateServicesPanel(panel), /envelope/);
+});
+
+test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 1,
+    mode: "exploration",
+    panels: {
+      services: { ...validServicesPanel(), kind: "bogus" },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  const store = Protocol.createStore();
+  store.beginTransport(1);
+  const accepted = store.receive(1, "ui_snapshot", [envelope], {});
+  assert.equal(accepted.accepted, false);
+  assert.equal(accepted.reason, "invalid");
+  assert.equal(store.getState().phase, "awaiting_initial_snapshot");
+});
