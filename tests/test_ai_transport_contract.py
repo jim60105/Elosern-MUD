@@ -85,6 +85,7 @@ def _imports_state_writer(tree: ast.Module) -> list[str]:
 
 
 class AiTransportBoundaryTests(unittest.TestCase):
+    @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     def test_only_client_py_imports_a_live_transport(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -121,6 +122,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
                             f"{module_path} must not import {module}",
                         )
 
+    @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     def test_no_ai_module_imports_a_state_writer(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -129,6 +131,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
                 self.assertEqual(banned, [])
 
     @covers_requirement("fake-llm-client::generative-layer-tests-never-contact-a-live-endpoint")
+    @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     def test_tests_never_construct_openai_compat_client(self):
         for module_path in _module_paths(AI_TESTS_ROOT):
             if module_path.name == "test_client.py":
@@ -138,6 +141,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
                 self.assertNotIn("OpenAICompatClient(", source)
 
     @covers_requirement("fake-llm-client::generative-layer-tests-never-contact-a-live-endpoint")
+    @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     def test_generative_module_source_has_no_socket_imports(self):
         for module_path in [
             *_production_module_paths(AI_ROOT),
@@ -150,6 +154,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
 
 
 class DeterministicPathBanTests(unittest.TestCase):
+    @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     def test_deterministic_paths_stay_free_of_llm_imports(self):
         for package in DETERMINISTIC_PACKAGES:
             package_root = REPO_ROOT / package
