@@ -8,9 +8,7 @@ composition root that posts generated quests to the guild board, the instance-la
 and the minimal commands that trigger generation and scene entry. The materializer is deterministic
 (it spawns and binds, so it lives in `world/quests/`), atomic, and idempotent; permanent layers are
 located only and never accumulate spawned entities.
-
 ## Requirements
-
 ### Requirement: SceneBuilder is the deterministic requirements-to-spawn materialization layer
 `world/quests/scene_builder.py` SHALL be a deterministic module that imports no `world.ai` module and
 no live transport, SHALL consume a stage's spawn requirements only as plain validated data
@@ -235,3 +233,28 @@ under `world/ai/` SHALL import the SceneBuilder.
 - **WHEN** the AI transport-boundary and deterministic-path contract tests run after this change
 - **THEN** they pass unchanged, and no `world/ai/` production module imports `world.quests.scene_builder`
   or any other state writer
+
+### Requirement: The occupant spawn path exposes a post-commit portrait-eligibility seam with unchanged atomicity
+`world/quests/scene_builder.py` SHALL, after spawning and registering occupants inside the same outer
+atomic materialization, schedule a portrait ensure through `transaction.on_commit` for any occupant
+that carries an explicit `{"mode": "named", "stable_key": ...}` portrait policy, so the schedule fires
+only after the materialization commits and an art failure can never roll back a materialized scene. An
+occupant with no policy (every role-based scene NPC and monster spawned today) SHALL schedule nothing.
+The existing atomicity, idempotency, and lore-derived-stat behavior of `materialize_stage` SHALL be
+unchanged.
+
+#### Scenario: A generic role-based occupant schedules no portrait
+- **WHEN** a scene with role-based NPCs and monsters is materialized
+- **THEN** none of the occupants carries a portrait policy and no post-commit portrait job is scheduled
+
+#### Scenario: A named-policy occupant schedules after commit only
+- **WHEN** an occupant carrying an explicit named portrait policy is materialized and the transaction
+  commits
+- **THEN** exactly one post-commit portrait ensure is scheduled for that occupant's subject, and no
+  artwork failure can roll back the materialization
+
+#### Scenario: A rolled-back materialization emits no portrait job
+- **WHEN** an occupant spawn fails after an earlier occupant was spawned and the outer transaction
+  rolls back
+- **THEN** no post-commit portrait job is emitted and the existing full rollback behavior is unchanged
+

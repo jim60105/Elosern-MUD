@@ -58,6 +58,7 @@ COPY --chown=root:0 web/ /app/web/
 COPY --chown=root:0 commands/ /app/commands/
 COPY --chown=root:0 typeclasses/ /app/typeclasses/
 COPY --chown=root:0 world/ /app/world/
+COPY --chown=root:0 tools/ /app/tools/
 
 RUN find /app -type d -exec chmod 0755 {} + && \
     find /app -type f -exec chmod 0644 {} + && \
@@ -66,7 +67,7 @@ RUN find /app -type d -exec chmod 0755 {} + && \
     install -d -m 775 -o root -g 0 /app/server/logs && \
     install -d -m 775 -o root -g 0 /app/server/.static && \
     install -d -m 775 -o root -g 0 /app/server/.media && \
-    install -d -m 775 -o root -g 0 /app/world/art && \
+    install -d -m 775 -o root -g 0 /app/server/.art && \
     chmod 1775 /app/server
 
 ########################################
@@ -90,7 +91,7 @@ ENV PATH="/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/world/art"]
+VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/server/.art"]
 EXPOSE 4000 4001 4002
 USER $UID
 STOPSIGNAL SIGINT

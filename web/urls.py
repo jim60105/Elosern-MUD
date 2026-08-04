@@ -18,6 +18,8 @@ from django.urls import include, path
 # default evennia patterns
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
+from web.art_media import art_media
+
 # add patterns
 urlpatterns = [
     # website
@@ -26,6 +28,8 @@ urlpatterns = [
     path("webclient/", include("web.webclient.urls")),
     # web admin
     path("admin/", include("web.admin.urls")),
+    # art assets: same-origin media route for validated stored identities.
+    path("art/<path:identity>", art_media, name="art-media"),
     # add any extra urls here:
     # path("mypath/", include("path.to.my.urls.file")),
 ]

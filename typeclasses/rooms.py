@@ -57,6 +57,9 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, XYZRoom):
             from world.rules.onboarding import observe_room_entry
 
             observe_room_entry(obj)
+            from world.art.service import ensure_scene_asset
+
+            ensure_scene_asset(self.scene_archetype)
 
 
 class AnchorRoom(GridRoom):
@@ -105,6 +108,9 @@ class InstanceRoom(SceneArchetypeMixin, QuestObservableRoomMixin, DefaultRoom):
 
         if isinstance(obj, PlayerCharacter):
             self.db.interacted = True
+            from world.art.service import ensure_scene_asset
+
+            ensure_scene_asset(self.scene_archetype)
 
     def at_object_delete(self):
         if not super().at_object_delete():

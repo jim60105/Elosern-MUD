@@ -25,7 +25,7 @@ services:
       - /tmp:rw,nosuid,nodev,mode=1777
     volumes:
       - evennia-db:/app/server/db
-      - evennia-art:/app/world/art
+      - evennia-art:/app/server/.art
       - evennia-logs:/app/server/logs
       - evennia-static:/app/server/.static
       - evennia-media:/app/server/.media

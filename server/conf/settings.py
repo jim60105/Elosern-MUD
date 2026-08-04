@@ -27,6 +27,7 @@ put secret game- or server-specific settings in secret_settings.py.
 # Use the defaults from Evennia unless explicitly overridden
 from evennia.settings_default import *
 import os
+import sys
 
 ######################################################################
 # Evennia base server config
@@ -58,6 +59,44 @@ PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototype
 from world.ai.profiles import default_profiles
 
 LLM_PROFILES = default_profiles()
+
+######################################################################
+# Deterministic art-assets backend (art-assets)
+######################################################################
+
+# Root directory for generated scene/portrait asset outputs. Gitignored and
+# mounted at /app/server/.art in the container so it can never shadow the
+# importable world/art/ package.
+ART_STORE_ROOT = os.path.join(GAME_DIR, "server", ".art")
+
+# External worker command executed for every claimed art batch. JSON lines in
+# on stdin, JSON lines out on stdout; overridable by settings and pointed at a
+# fixture command in tests. The worker implementation itself (local SD, a
+# prompt-writing agent, or a fixture) is external to the engine and outside
+# this change's code; the module is the design's swap point.
+ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
+
+# Bounded wall-clock budget for one worker invocation (seconds).
+ART_WORKER_TIMEOUT_SECONDS = 60
+
+# Periodic queue drain control. When ART_SCHEDULER_ENABLED is False the
+# ArtDrainScript never drains; records stay missing/pending and placeholders
+# remain.
+ART_SCHEDULER_ENABLED = True
+ART_SCHEDULER_INTERVAL_SECONDS = 30
+ART_SCHEDULER_LIMIT = 4
+
+# The periodic art drain Script. It survives reloads and is recreated
+# automatically; at_script_creation reads the interval from the settings above.
+# When ART_SCHEDULER_ENABLED is False the Script never drains (records remain
+# pending and placeholders remain).
+GLOBAL_SCRIPTS = {
+    "art_drain": {
+        "typeclass": "world.art.scheduler.ArtDrainScript",
+        "repeats": -1,
+        "desc": "Periodic deterministic art-queue drain.",
+    },
+}
 
 
 ######################################################################

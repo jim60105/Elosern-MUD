@@ -128,6 +128,13 @@ def at_server_start():
     _register_npc_dialogue_layer()
     _register_scenario_director_layer()
 
+    # Deterministic art-assets startup sync: ensure a record for every scene
+    # and generic-monster subject, then recover explicit named portrait
+    # policies (idempotent; a failure is bounded and never aborts startup).
+    from world.art.service import art_sync_all
+
+    art_sync_all()
+
 
 def at_server_stop():
     """

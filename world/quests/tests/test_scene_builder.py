@@ -11,6 +11,7 @@ invariants (offline tests only, no live client, no startup re-sync).
 from unittest.mock import patch
 import unittest
 
+from django.db import transaction
 from django.test import override_settings
 
 from evennia.prototypes import prototypes as prototypes_module
@@ -456,6 +457,80 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         with self.assertRaises(SceneBuilderSpawnError):
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
+
+    @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
+    def test_generic_occupant_spawn_schedules_no_portrait(self):
+        record, _ = self._accept(_instance_bound_payload())
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        self.assertEqual(callbacks, [])
+        from world.art.store import ArtAssetRecord
+
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+
+    @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
+    @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
+    def test_named_policy_occupant_schedules_after_commit_only(self):
+        record, _ = self._accept(_instance_bound_payload())
+
+        def forged_spawn_npc(room, requirement, role, tier_key, disposition, position):
+            npc = create_object(NPC, key=f"named-{position}", location=room)
+            npc.race = "human"
+            npc.apply_race_baseline()
+            npc.db.age = 22
+            npc.db.apparent_age = 22
+            npc.db.portrait_policy = {"mode": "named", "stable_key": f"named-{position}"}
+            return npc
+
+        with (
+            patch(
+                "world.quests.scene_builder._spawn_npc",
+                side_effect=forged_spawn_npc,
+            ),
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+        ):
+            materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        self.assertEqual(len(callbacks), 1)
+        from world.art.store import ArtAssetRecord
+
+        records = ArtAssetRecord.objects.filter(
+            db_key="art:portrait:character:named-0"
+        )
+        self.assertEqual(records.count(), 1)
+
+    @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
+    @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
+    def test_rolled_back_materialization_emits_no_portrait_job(self):
+        record, _ = self._accept(_instance_bound_payload())
+
+        def forged_spawn_npc(room, requirement, role, tier_key, disposition, position):
+            npc = create_object(NPC, key=f"named-{position}", location=room)
+            npc.race = "human"
+            npc.apply_race_baseline()
+            npc.db.age = 22
+            npc.db.apparent_age = 22
+            npc.db.portrait_policy = {"mode": "named", "stable_key": f"named-{position}"}
+            return npc
+
+        with (
+            patch(
+                "world.quests.scene_builder._spawn_npc",
+                side_effect=forged_spawn_npc,
+            ),
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+        ):
+            with patch(
+                "world.quests.scene_builder._bind_stage",
+                side_effect=RuntimeError("spawn failed"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    materialize_stage(
+                        self.player, record.quest_id, origin_room=self.anchor
+                    )
+        self.assertEqual(callbacks, [])
+        from world.art.store import ArtAssetRecord
+
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
 
 class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixin, EvenniaTest):

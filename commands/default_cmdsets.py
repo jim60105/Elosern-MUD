@@ -18,6 +18,7 @@ from evennia import default_cmds
 from evennia.contrib.grid.xyzgrid.commands import XYZGridCmdSet
 
 from commands.action import CmdCast
+from commands.art import CmdArtRequeue, CmdArtRetry, CmdArtRun, CmdArtStatus
 from commands.combat import (
     CmdCombatActions,
     CmdCombatForfeit,
@@ -56,6 +57,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         """
         super().at_cmdset_creation()
         self.add(CmdCast)
+        self.add(CmdArtStatus)
+        self.add(CmdArtRun)
+        self.add(CmdArtRetry)
+        self.add(CmdArtRequeue)
         self.add(CmdRest)
         self.add(CmdSleep)
         self.add(CmdWaitUntil)

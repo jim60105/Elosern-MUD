@@ -66,7 +66,7 @@ class ContainerContractTests(unittest.TestCase):
             "/app/server/logs",
             "/app/server/.static",
             "/app/server/.media",
-            "/app/world/art",
+            "/app/server/.art",
         }
 
         self.assertRegex(
@@ -104,7 +104,7 @@ class ContainerContractTests(unittest.TestCase):
             set(evennia["volumes"]),
             {
                 "evennia-db:/app/server/db",
-                "evennia-art:/app/world/art",
+                "evennia-art:/app/server/.art",
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",

@@ -25,13 +25,14 @@ STATE_WRITER_MODULES = (
     "world.rules",
     "world.maps",
     "world.quests",
+    "world.art",
     "typeclasses",
     "evennia.prototypes.spawner",
     "evennia.utils.create",
 )
 FORBIDDEN_FRAGMENTS = ("ollama", "llm_client", "world.ai")
 
-DETERMINISTIC_PACKAGES = ("world/rules", "world/maps", "world/quests", "commands")
+DETERMINISTIC_PACKAGES = ("world/rules", "world/maps", "world/quests", "world/art", "commands")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AI_ROOT = REPO_ROOT / "world" / "ai"

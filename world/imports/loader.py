@@ -56,6 +56,12 @@ def _instantiate_validated_character(
     }
     entity.db.equipment = record["equipment"]
     entity.db.inventory = record["inventory"]
+    # Persist the adult identity the art gate reads, and establish the explicit
+    # named portrait policy (design D2): the character's unique-portrait subject
+    # derives only from this policy, never from its display name or role.
+    entity.db.age = record["age"]
+    entity.db.apparent_age = record["apparent_age"]
+    entity.db.portrait_policy = {"mode": "named", "stable_key": record["key"]}
     return entity
 
 
@@ -66,7 +72,16 @@ def load_batch(
     if not report.all_valid:
         raise ImportRejected(report)
     with transaction.atomic():
-        return [
+        entities = [
             _instantiate_validated_character(record, typeclass)
             for record in report.character_records
         ]
+        # Post-commit portrait ensure, registered inside the all-or-nothing
+        # batch so a rolled-back import emits nothing. The callback is the
+        # service's exception-safe wrapper: an art failure never surfaces as an
+        # import error (design D7).
+        from world.art.service import schedule_portrait_ensure
+
+        for entity in entities:
+            schedule_portrait_ensure(entity)
+        return entities

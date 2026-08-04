@@ -23,6 +23,23 @@ panel can later consume only completed asset records and statuses. `art-assets` 
 so the generated named-NPC portrait lifecycle integrates with its real validated spawn path rather than a
 forward-declared fake hook.
 
+> **Amended 2026-08-05 (change `art-assets`).** Two scope clarifications for the `art-assets` delivery
+> unit:
+> 1. **Named-NPC portrait lifecycle scope.** `art-assets` delivers the validated portrait-policy seam on
+>    the deterministic SceneBuilder spawn path (a spawned occupant carrying an explicit named portrait
+>    policy schedules its unique-portrait ensure after the spawn transaction commits; today's role-based
+>    scene NPCs carry no policy and resolve to no portrait), plus the unique-portrait lifecycles for
+>    player-created and validated-import named characters — both reachable from real gameplay inputs.
+>    Making generated quests *themselves* spawn named NPCs with unique portraits is deferred: it requires
+>    an optional per-NPC portrait-policy field on `QuestBlueprint`/`StageSpawnRequirement`, which needs a
+>    scenario-director dependency that `art-assets` does not have. The spawn-path seam this change
+>    delivers is real and validated, exercised today by the generic no-policy path.
+> 2. **Worker drain is claim-based and non-blocking.** Queue records gain an `in_progress` claim status
+>    with a lease timestamp; the queue lock is held only for fast DB transactions (claim/settle), never
+>    while the external worker subprocess runs (which executes on a background Twisted thread). A
+>    successful worker result must exactly equal the engine's pre-computed expected output identity for
+>    its job. This keeps the single-job GPU boundary while guaranteeing art never blocks play.
+
 ---
 
 ## 2. Goals and Non-Goals

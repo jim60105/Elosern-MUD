@@ -229,7 +229,32 @@ def _spawn_occupants(
             )
     for occupant in occupants:
         register_owned_entity(room, occupant)
+    _schedule_occupant_portraits(occupants)
     return tuple(occupants)
+
+
+def _schedule_occupant_portraits(occupants: tuple[Any, ...] | list[Any]) -> None:
+    """Schedule the portrait ensure for occupants carrying an explicit named policy.
+
+    Runs inside the outer atomic materialization, so ``transaction.on_commit``
+    fires only after the spawn transaction commits and an art failure can never
+    roll back a materialized scene (design D9). Today's role-based occupants
+    carry no policy and schedule nothing.
+    """
+    named = [
+        occupant
+        for occupant in occupants
+        if getattr(occupant, "db", None) is not None
+        and occupant.db.portrait_policy is not None
+        and hasattr(occupant.db.portrait_policy, "get")
+        and occupant.db.portrait_policy.get("mode") == "named"
+    ]
+    if not named:
+        return
+    from world.art.service import schedule_occupant_portrait
+
+    for occupant in named:
+        schedule_occupant_portrait(occupant)
 
 
 def _bind_stage(

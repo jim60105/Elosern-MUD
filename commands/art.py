@@ -1,0 +1,190 @@
+"""Staff-only ``@art`` command family for the deterministic art backend.
+
+Restricted to staff: ``@art status`` (list/filter records), ``@art run``
+(drain now, non-blocking), ``@art retry`` (re-enqueue failed records), and
+``@art requeue <full-subject-key>`` (forced regeneration). Status output never
+includes persona text, prompt content, absolute filesystem paths, or the store
+root (design D8).
+"""
+
+from django.conf import settings
+from evennia import Command
+
+from world.art.adult import PortraitRejected
+from world.art.queue import failed_keys, record_key, requeue
+from world.art.store import ArtAssetRecord
+from world.art.subjects import (
+    ArtSubjectError,
+    ArtSubjectKind,
+    monster_subject_for,
+    parse_subject,
+    scene_subject_for,
+)
+
+
+class _ArtCommand(Command):
+    """Base for the staff art command family."""
+
+    locks = "cmd:perm(Developer)"
+    help_category = "Admin"
+
+    def is_accessible(self) -> bool:
+        if self.caller is None:
+            return False
+        return bool(self.caller.check_permstring("Developer"))
+
+
+def _kind_filter(subject_kind: str | None) -> str | None:
+    if subject_kind is None or subject_kind == "all":
+        return None
+    if subject_kind == "scene":
+        return ArtSubjectKind.SCENE.value
+    if subject_kind in ("portrait", "character", "monster"):
+        return "portrait"
+    return None
+
+
+class CmdArtStatus(_ArtCommand):
+    """列出美術資產記錄。用法：art status [scene|portrait|monster]"""
+
+    key = "art status"
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        args = self.args.strip().split()
+        kind = _kind_filter(args[0] if args else None)
+        if kind is None and args:
+            self.caller.msg("用法：art status [scene|portrait|monster]")
+            return
+        records = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if kind is None or record.db.kind.startswith(kind)
+        ]
+        records.sort(key=lambda record: record.db_key)
+        if not records:
+            self.caller.msg("沒有符合的美術資產記錄。")
+            return
+        lines = []
+        for record in records:
+            lines.append(
+                f"  {record.db_key.removeprefix('art:')} "
+                f"[{record.db.status}] 次數:{record.db.attempt_count} "
+                f"比例:{record.db.aspect_ratio or '-'} "
+                f"錯誤:{record.db.last_error_code or '-'}"
+            )
+        self.caller.msg("\n".join(lines))
+
+
+class CmdArtRun(_ArtCommand):
+    """立即排空美術佇列。用法：art run [--limit N]"""
+
+    key = "art run"
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        limit = settings.ART_SCHEDULER_LIMIT
+        args = self.args.strip().split()
+        if args:
+            if args[0] == "--limit" and len(args) == 2:
+                try:
+                    limit = int(args[1])
+                except ValueError:
+                    self.caller.msg("--limit 需要整數。")
+                    return
+                if limit < 1:
+                    self.caller.msg("--limit 必須至少為 1。")
+                    return
+            else:
+                self.caller.msg("用法：art run [--limit N]")
+                return
+        from world.art.worker import drain
+
+        try:
+            dispatched = drain(limit)
+        except OSError as error:
+            self.caller.msg(f"無法啟動美術 worker：{error}")
+            return
+        self.caller.msg(f"已派送 {dispatched} 個美術工作。")
+        self.caller.msg("美術工作在背景執行，不會阻擋遊戲。")
+
+
+class CmdArtRetry(_ArtCommand):
+    """重新排入所有失敗的美術記錄。用法：art retry"""
+
+    key = "art retry"
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        keys = failed_keys()
+        from world.art.queue import ensure
+
+        from world.art.service import retry_character_portrait
+        from world.art.subjects import ArtSubjectKind, description_for
+
+        reenqueued = 0
+        for full_key in keys:
+            try:
+                subject = parse_subject(full_key)
+            except ArtSubjectError:
+                continue
+            if subject.kind is ArtSubjectKind.CHARACTER:
+                try:
+                    retry_character_portrait(subject.key)
+                except (ArtSubjectError, PortraitRejected):
+                    continue
+                reenqueued += 1
+                continue
+            record = ArtAssetRecord.objects.filter(
+                db_key=record_key(subject)
+            ).first()
+            description = record.db.source_description if record else ""
+            ensure(subject, description)
+            reenqueued += 1
+        self.caller.msg(f"已重新排入 {reenqueued} 個失敗記錄。")
+
+
+class CmdArtRequeue(_ArtCommand):
+    """強制重新生成單一主體。用法：art requeue <full-subject-key>"""
+
+    key = "art requeue"
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        parts = self.args.strip().split()
+        if len(parts) != 1:
+            self.caller.msg("用法：art requeue <full-subject-key>")
+            return
+        try:
+            subject = parse_subject(parts[0])
+        except ArtSubjectError as error:
+            self.caller.msg(f"無效的 subject key：{error}")
+            return
+        if subject.kind is ArtSubjectKind.CHARACTER:
+            from world.art.service import requeue_character_portrait
+
+            try:
+                requeue_character_portrait(subject.key)
+            except (ArtSubjectError, PortraitRejected) as error:
+                self.caller.msg(f"無法重新排入：{error}")
+                return
+            self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
+            return
+        try:
+            if subject.kind is ArtSubjectKind.SCENE:
+                scene_subject_for(subject.key)
+            else:
+                monster_subject_for(subject.key)
+        except ArtSubjectError as error:
+            self.caller.msg(f"無效的 subject key：{error}")
+            return
+        requeue(subject)
+        self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
