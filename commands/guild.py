@@ -36,6 +36,63 @@ from world.rules.guild_offers import (
 from world.rules.guild_config import get_catalog
 from world.rules.surfaces import read_counter_trait
 
+from server.ai_director_service import (
+    NoSuitableTemplateError,
+    request_generated_quest,
+)
+
+_REQUESTED_TYPES = ("討伐", "採集", "護衛", "探索", "緊急")
+
+
+class _GuildRequestPendingError(RuntimeError):
+    """A live generative request has not resolved yet; ask again shortly."""
+
+
+def _parse_requested_type(raw: str) -> str | None:
+    """Return the requested quest type, defaulting to 討伐 on an empty arg."""
+    if not raw:
+        return "討伐"
+    if raw in _REQUESTED_TYPES:
+        return raw
+    return None
+
+
+def _resolve_deferred(deferred, caller):
+    """Resolve an already-fired Deferred synchronously, or track a live request.
+
+    The composition root resolves synchronously on the offline/degrade path
+    (the only path the deterministic game depends on). A still-pending live
+    request is tracked on the caller (so a retry cannot double-submit), gains a
+    completion callback that reports the posted offer or the named rejection
+    when it fires, and raises ``_GuildRequestPendingError`` so the command can
+    tell the player the request is in flight.
+    """
+    from twisted.python.failure import Failure
+
+    if deferred.called:
+        if isinstance(deferred.result, Failure):
+            deferred.result.raiseException()
+        return deferred.result
+
+    caller.ndb.guild_request_pending = deferred
+
+    def _finish(result):
+        caller.ndb.guild_request_pending = None
+        if isinstance(result, Failure):
+            if result.check(NoSuitableTemplateError):
+                caller.msg("公會目前沒有適合你的委託。")
+            else:
+                caller.msg("委託未能完成，請稍後再試。")
+        else:
+            caller.msg(
+                f"你張貼了一份委託：{result.definition.display_name} "
+                f"（{result.definition.key}）。用 guild list 查看。"
+            )
+        return result
+
+    deferred.addBoth(_finish)
+    raise _GuildRequestPendingError("the request is still being planned")
+
 
 class _GuildCommandBase(Command):
     """Base for commands that resolve one local GuildStaff host."""
@@ -271,4 +328,61 @@ class CmdGuildMerit(_GuildCommandBase):
         self.caller.msg(
             f"你的階級是 {rank}，累計功績 {merit} / {threshold[next_rank.key]} "
             f"(升階 {next_rank.key})。"
+        )
+
+
+class CmdGuildRequest(_GuildCommandBase):
+    """Request a generated quest from the ScenarioDirector and post it to the board."""
+
+    key = "guild request"
+    aliases = ("guild 委託", "委託任務")
+
+    def func(self) -> None:
+        staff = self.resolve_staff()
+        if staff is None:
+            return
+        try:
+            registration = parse_guild_registration(self.caller)
+        except GuildDataError as error:
+            self.caller.msg(f"無法委託：{error}")
+            return
+        if registration is None:
+            self.caller.msg("你尚未註冊為冒險者。")
+            return
+        rank = self.caller.guild_rank
+        if rank is None:
+            self.caller.msg("你尚未註冊為冒險者。")
+            return
+        requested_type = _parse_requested_type(self.args.strip())
+        if requested_type is None:
+            self.caller.msg("用法：guild request [討伐|採集|護衛|探索|緊急]")
+            return
+        guild_staff = staff.components.get(GuildStaff.get_component_slot())
+        branch_key = guild_staff.branch_key
+        context = {
+            "requested_type": requested_type,
+            "allowed_rank": rank,
+            "issuer_branch": branch_key,
+            "anchor": getattr(self.caller.location, "anchor_key", None),
+        }
+        if getattr(self.caller.ndb, "guild_request_pending", None) is not None:
+            self.caller.msg("委託正在規劃中，請稍後再試。")
+            return
+
+        try:
+            compiled = _resolve_deferred(
+                request_generated_quest(context=context), self.caller
+            )
+        except NoSuitableTemplateError:
+            self.caller.msg("公會目前沒有適合你的委託。")
+            return
+        except _GuildRequestPendingError:
+            self.caller.msg("委託正在規劃中，請稍後再試。")
+            return
+        except Exception as error:
+            self.caller.msg(f"無法委託：{error}")
+            return
+        self.caller.msg(
+            f"你張貼了一份委託：{compiled.definition.display_name} "
+            f"（{compiled.definition.key}）。用 guild list 查看。"
         )

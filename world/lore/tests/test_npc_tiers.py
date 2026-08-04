@@ -5,6 +5,7 @@ from dataclasses import FrozenInstanceError
 import unittest
 
 from world.lore.npc_tiers import NPC_TIER_REGISTRY, NPCTier
+from world.lore.races import RACE_REGISTRY, STATIC_TIER_REGISTRY
 
 from tools.spec_traceability import covers_requirement
 
@@ -17,6 +18,18 @@ class NPCTierRegistryTests(unittest.TestCase):
             self.assertEqual(key, tier.key)
             self.assertIsInstance(tier, NPCTier)
             self.assertTrue(tier.display_name_zh)
+
+    @covers_requirement("scenario-director::scene-archetype-and-npc-tier-registries-are-immutable-lore-data")
+    @covers_requirement("scene-builder::npc-role-tiers-resolve-deterministic-physical-stats-through-the-lore-registries")
+    def test_every_tier_resolves_a_lore_backed_stat_mapping(self):
+        self.assertTrue(RACE_REGISTRY)
+        self.assertTrue(STATIC_TIER_REGISTRY)
+        for key, tier in NPC_TIER_REGISTRY.items():
+            with self.subTest(tier=key):
+                race = RACE_REGISTRY[tier.race_key]
+                static_tier = STATIC_TIER_REGISTRY[tier.static_tier_key]
+                self.assertEqual(static_tier.race_key, tier.race_key)
+                self.assertEqual(static_tier.race_key, race.key)
 
     @covers_requirement("scenario-director::scene-archetype-and-npc-tier-registries-are-immutable-lore-data")
     def test_entries_are_frozen_with_no_consumer_mutation(self):

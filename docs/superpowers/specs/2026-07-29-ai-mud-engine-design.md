@@ -91,6 +91,15 @@ apply it.
 > **no module under `world/ai/` applies a state change, ever**, whichever deterministic package does
 > the applying. AGENTS.md carries the identical wording.
 
+> **Amended 2026-08-04 (change `scene-builder`).** §3.1's layer diagram lists `SceneBuilder` in the
+> generative `world/ai/` box, but change 21's `SceneBuilder` is the deterministic
+> requirements→prototype→spawn materializer (it spawns rooms and occupants and binds quest state), so
+> it cannot live under `world/ai/`, which never applies a state change. `SceneBuilder` is therefore the
+> deterministic compiler in `world/quests/` (`world/quests/scene_builder.py`); the generative role is
+> carried by the `ScenarioDirector`'s `QuestBlueprint`, which already contains the scene requirements.
+> The forward-declared `scene_builder` LLM profile stays registered and unused as a seam for a future
+> generative scene-flavor layer.
+
 ### 3.2 Directory layout
 
 ```
@@ -648,9 +657,14 @@ The narrative payoff falls out of D2 for free.
 | Layer | Degradation |
 |---|---|
 | ScenarioDirector | draw from a hand-written quest template pool |
-| SceneBuilder | generic room template for that archetype |
+| SceneBuilder | no LLM degradation — it is deterministic (`world/quests/`); a scene that cannot materialize raises a named, side-effect-free rejection |
 | Narrator | template-render the EventLog |
 | NPCDialogue | fall back to greeting or silence |
+
+> **Amended 2026-08-04 (change `scene-builder`).** The §7.5 row above originally read "SceneBuilder |
+> generic room template for that archetype". That row no longer applies: the SceneBuilder is the
+> deterministic materializer in `world/quests/` (see §3.1 amendment) and has no LLM degradation path —
+> the guardrail degrades the *proposal* (ScenarioDirector), not the materializer.
 
 **The game must remain playable with the LLM entirely offline.** This is an acceptance criterion,
 not an aspiration.

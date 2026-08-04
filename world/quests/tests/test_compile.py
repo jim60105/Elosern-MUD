@@ -35,8 +35,10 @@ from world.ai.profiles import default_profiles
 from world.quests.compile import (
     CompiledQuest,
     QuestCompileError,
+    SCENE_REQUIREMENT_REGISTRY,
     compile_quest_blueprint,
     register_generated_quest,
+    scene_requirements_for,
 )
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -206,6 +208,14 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
             "kind": "defeat",
             "quantity": 1,
             "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
             {"role": "victim", "tier": "civilian", "disposition": "frightened"}
@@ -421,6 +431,221 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
 
 
+class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_occupant_stage_at_anchor_is_rejected_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "victim", "tier": "civilian", "disposition": None}
+        ]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_occupant_stage_at_grid_is_rejected_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "grid",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": None,
+            "xyz": [2, 2, "capital_altoria"],
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "victim", "tier": "civilian", "disposition": None}
+        ]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_escort_stage_at_instance_is_rejected_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["quest_type"] = "護衛"
+        payload["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_escort_stage_at_anchor_is_allowed_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["quest_type"] = "護衛"
+        payload["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
+        payload["stages"][0]["npc_req"] = []
+        compiled = compile_quest_blueprint(payload)
+        self.assertEqual(
+            compiled.definition.stages[0].objective.kind, ObjectiveKind.ESCORT
+        )
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_bound_defeat_quantity_exceeding_npc_reqs_is_rejected(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 2,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_unknown_anchor_near_is_rejected_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["location_req"]["anchor_near"] = "capital_grandia"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_unvalidated_scene_bound_violation_is_rejected_deterministically(self):
+        from world.ai.scenario_director import _VALIDATORS
+
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        guardrail_errors = []
+        for validator in _VALIDATORS.values():
+            guardrail_errors.extend(validator(payload))
+        self.assertTrue(guardrail_errors, "guardrail must reject the same payload")
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(payload)
+
+
+class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
+
+    def tearDown(self):
+        SCENE_REQUIREMENT_REGISTRY.clear()
+        SCENE_REQUIREMENT_REGISTRY.update(self._requirements_items)
+        super().tearDown()
+
+    def _bound_compiled(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        return compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_scene_requirements_are_registered_with_the_publication(self):
+        compiled = self._bound_compiled()
+        register_generated_quest(compiled)
+        requirements = scene_requirements_for(compiled.definition.key)
+        self.assertEqual(len(requirements), 1)
+        self.assertEqual(requirements[0].index, 0)
+        self.assertEqual(requirements[0].npc_reqs, (("bandit", "bandit", None),))
+        self.assertEqual(compiled.stage_requirements, requirements)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_double_registration_keeps_one_requirement_entry(self):
+        compiled = self._bound_compiled()
+        register_generated_quest(compiled)
+        before = scene_requirements_for(compiled.definition.key)
+        register_generated_quest(compiled)
+        after = scene_requirements_for(compiled.definition.key)
+        self.assertEqual(len(before), 1)
+        self.assertEqual(after, before)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_two_blueprints_differing_only_in_scenes_compile_to_different_keys(self):
+        first = self._bound_compiled()
+        second_payload = _defeat_payload()
+        second_payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        second_payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "另一段不同的場景描述。",
+        }
+        second_payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        second = compile_quest_blueprint(second_payload)
+        self.assertNotEqual(first.definition.key, second.definition.key)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_conflicting_offer_rollback_leaves_no_requirement_entry(self):
+        compiled = self._bound_compiled()
+        existing_offer = GuildQuestOffer(
+            definition_key=compiled.definition.key,
+            issuer_branch_key="guild_branch_altoria",
+            reward=QuestReward(copper=60, items=(), merit=25),
+        )
+        GUILD_OFFER_REGISTRY[(compiled.definition.key, "guild_branch_altoria")] = (
+            existing_offer
+        )
+        before_definition = dict(QUEST_DEFINITION_REGISTRY)
+        before_offer = dict(GUILD_OFFER_REGISTRY)
+        with self.assertRaises(QuestCompileError):
+            register_generated_quest(compiled)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
+        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
+        self.assertNotIn(compiled.definition.key, SCENE_REQUIREMENT_REGISTRY)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_hand_written_definition_reads_back_empty_requirements(self):
+        from world.quests.catalog import INTRODUCTORY_HUNT
+
+        register_quest_definition(INTRODUCTORY_HUNT)
+        self.assertEqual(scene_requirements_for(INTRODUCTORY_HUNT.key), ())
+        self.assertNotIn(INTRODUCTORY_HUNT.key, SCENE_REQUIREMENT_REGISTRY)
+
+
 class SharedPayloadContractTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("scenario-director::the-canonical-payload-contract-is-versioned-and-shared-by-both-boundaries")
     def test_guardrail_valid_payload_compiles_without_contract_rejection(self):
@@ -511,10 +736,22 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTest):
 
         compiled = compile_quest_blueprint(blueprint.to_payload())
         register_generated_quest(compiled)
+        self.assertTrue(scene_requirements_for(compiled.definition.key))
 
         record = accept_quest(self.player, compiled.definition.key)
         self.assertIs(record.state, QuestState.IN_PROGRESS)
+        from world.quests.binding import bind_stage_runtime
+
+        from typeclasses.rooms import InstanceRoom
+
+        room = create_object(InstanceRoom, key="offline-director-instance")
         monster = self._monster("offline-director-goblin")
+        bind_stage_runtime(
+            self.player,
+            record.quest_id,
+            room=room,
+            objective_targets=(monster,),
+        )
         result = self._resolve_lethal(monster)
         self.assertEqual(result.outcome, "success")
 

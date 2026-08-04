@@ -760,6 +760,66 @@ def _validate_defeat_selector(parsed: Any) -> list[str]:
     return errors
 
 
+def _validate_scene_bound_rules(parsed: Any) -> list[str]:
+    """Enforce the shared scene-bound rules the compiler also enforces (D5).
+
+    Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
+    entities always live in a reclaimable instance room; an ESCORT stage must be
+    a permanent destination (never instance, never instance-materialized); a
+    bound-target DEFEAT quantity must not exceed its ``npc_req`` count; and
+    ``anchor_near`` must name a placed anchor.
+    """
+    errors: list[str] = []
+    for index, stage in enumerate(_stages(parsed)):
+        if not isinstance(stage, dict):
+            continue
+        location = stage.get("location_req")
+        objective = stage.get("objective")
+        npc_req = stage.get("npc_req")
+        layer = location.get("layer") if isinstance(location, dict) else None
+        has_npc = isinstance(npc_req, list) and bool(npc_req)
+        is_escort = isinstance(objective, dict) and objective.get("kind") == "escort"
+        if has_npc and layer != "instance":
+            errors.append(
+                f"stage {index} declares NPC requirements outside an "
+                "instance-layer destination; occupant-bearing scenes must be "
+                "instances"
+            )
+        if is_escort and layer == "instance":
+            errors.append(
+                f"stage {index} declares an ESCORT objective at an instance "
+                "destination; ESCORT scenes must be permanent rooms (located "
+                "only, never instance-materialized)"
+            )
+        if (
+            isinstance(objective, dict)
+            and objective.get("kind") == "defeat"
+            and objective.get("monster_tier") is None
+            and has_npc
+        ):
+            quantity = objective.get("quantity", 1)
+            if (
+                not isinstance(quantity, bool)
+                and isinstance(quantity, int)
+                and quantity > len(npc_req)
+            ):
+                errors.append(
+                    f"stage {index} bound DEFEAT quantity {quantity} exceeds "
+                    f"the number of npc_req entries {len(npc_req)}"
+                )
+        if isinstance(location, dict):
+            anchor_near = location.get("anchor_near")
+            if anchor_near is not None and (
+                not isinstance(anchor_near, str)
+                or anchor_near not in ANCHOR_PLACEMENT_REGISTRY
+            ):
+                errors.append(
+                    f"stage {index} anchor_near {anchor_near!r} is not a placed "
+                    "anchor in ANCHOR_PLACEMENT_REGISTRY"
+                )
+    return errors
+
+
 def _validate_objective_selectors(parsed: Any) -> list[str]:
     errors: list[str] = []
     for index, stage in enumerate(_stages(parsed)):
@@ -814,6 +874,7 @@ _VALIDATORS: dict[str, Any] = {
     "monster_tier_known": _validate_monster_tier_known,
     "anchor_known": _validate_anchor_known,
     "defeat_selector": _validate_defeat_selector,
+    "scene_bound_rules": _validate_scene_bound_rules,
     "objective_selectors": _validate_objective_selectors,
     "issuer_known": _validate_issuer_known,
     "stage_indices_contiguous": _validate_stage_indices_contiguous,

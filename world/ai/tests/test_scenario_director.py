@@ -451,6 +451,111 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
 
+class SceneBoundValidatorTests(unittest.TestCase):
+    def setUp(self):
+        _reset_all()
+        register_scenario_director()
+
+    def tearDown(self):
+        _reset_all()
+
+    def _instance_bound_payload(self, **overrides):
+        payload = _payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        payload.update(overrides)
+        return payload
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_occupant_stage_at_anchor_is_rejected_and_retried(self):
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["location_req"]["layer"] = "anchor"
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_bound_defeat_quantity_exceeding_is_rejected_and_retried(self):
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["objective"]["quantity"] = 2
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_unknown_anchor_near_is_rejected_and_retried(self):
+        bad = _payload()
+        bad["stages"][0]["location_req"]["anchor_near"] = "capital_grandia"
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_escort_stage_at_instance_is_rejected_and_retried(self):
+        bad = self._instance_bound_payload()
+        bad["quest_type"] = "護衛"
+        bad["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
+        bad["stages"][0]["npc_req"] = []
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_valid_instance_bound_payload_passes_guardrail_and_compiles(self):
+        payload = self._instance_bound_payload()
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [])
+        from world.quests.compile import (
+            SCENE_REQUIREMENT_REGISTRY,
+            compile_quest_blueprint,
+            register_generated_quest,
+        )
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY, validate_definition
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        compiled = compile_quest_blueprint(payload)
+        validate_definition(compiled.definition)
+        register_generated_quest(compiled)
+        self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
+        QUEST_DEFINITION_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.clear()
+        SCENE_REQUIREMENT_REGISTRY.clear()
+
+
 class ScenarioDirectorRegistrationTests(unittest.TestCase):
     def setUp(self):
         _reset_all()
@@ -682,6 +787,79 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
                 )
         QUEST_DEFINITION_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.clear()
+
+    @covers_requirement("scene-builder::the-hand-written-template-pool-gains-an-instance-layer-scene-so-offline-play-exercises-the-materializer")
+    def test_instance_layer_template_validates_compiles_and_registers_with_requirements(self):
+        from jsonschema import Draft7Validator
+
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+        from world.quests.compile import (
+            SCENE_REQUIREMENT_REGISTRY,
+            compile_quest_blueprint,
+            register_generated_quest,
+            scene_requirements_for,
+        )
+        from world.quests.definitions import (
+            QUEST_DEFINITION_REGISTRY,
+            DestinationKind,
+            validate_definition,
+        )
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        instance = next(
+            entry
+            for entry in QUEST_TEMPLATE_POOL
+            if any(
+                stage.location is not None
+                and stage.location.layer == "instance"
+                and stage.npc_reqs
+                for stage in entry.stages
+            )
+        )
+        payload = instance.to_payload()
+        validator = Draft7Validator(scenario_director.SCENARIO_DIRECTOR_OUTPUT_SCHEMA)
+        self.assertEqual([error.message for error in validator.iter_errors(payload)], [])
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [])
+        compiled = compile_quest_blueprint(payload)
+        validate_definition(compiled.definition)
+        register_generated_quest(compiled)
+        self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
+        self.assertIn(
+            (compiled.definition.key, compiled.issuer_branch_key),
+            GUILD_OFFER_REGISTRY,
+        )
+        requirements = scene_requirements_for(compiled.definition.key)
+        self.assertTrue(requirements)
+        self.assertTrue(
+            requirements[0].location is not None
+            and requirements[0].location.kind is DestinationKind.BOUND_INSTANCE
+        )
+        self.assertTrue(requirements[0].npc_reqs)
+        QUEST_DEFINITION_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.clear()
+        SCENE_REQUIREMENT_REGISTRY.clear()
+
+    @covers_requirement("scene-builder::the-hand-written-template-pool-gains-an-instance-layer-scene-so-offline-play-exercises-the-materializer")
+    def test_offline_request_can_produce_a_materializable_instance_quest(self):
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        with override_settings(LLM_PROFILES=_raw(scenario_director={"enabled": False})):
+            d = generate_quest_blueprint(FakeLLMClient(), context=_context())
+            result = await_result(d)
+        self.assertEqual(
+            result,
+            next(
+                entry
+                for entry in QUEST_TEMPLATE_POOL
+                if any(
+                    stage.location is not None
+                    and stage.location.layer == "instance"
+                    and stage.npc_reqs
+                    for stage in entry.stages
+                )
+            ),
+        )
 
 
 class ScenarioDirectorStartupRegistrationTests(unittest.TestCase):

@@ -32,9 +32,11 @@ from commands.guild import (
     CmdGuildLog,
     CmdGuildMerit,
     CmdGuildRegister,
+    CmdGuildRequest,
     CmdGuildShow,
     CmdGuildTurnIn,
 )
+from commands.scene import CmdEnterScene
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
 
@@ -69,6 +71,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdGuildAbandon)
         self.add(CmdGuildTurnIn)
         self.add(CmdGuildMerit)
+        self.add(CmdGuildRequest)
+        self.add(CmdEnterScene)
         self.add(CmdShopStock)
         self.add(CmdBuy)
         self.add(CmdSell)

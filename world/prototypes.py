@@ -62,3 +62,15 @@ INSTANCE_ROOM = {
     "typeclass": "typeclasses.rooms.InstanceRoom",
     "desc": "An ephemeral place on the Instance layer (map-instance).",
 }
+
+SCENE_NPC = {
+    "typeclass": "typeclasses.npcs.NPC",
+    "prototype_key": "scene_npc",
+    "desc": "A scene occupant (scene-builder).",
+}
+
+SCENE_MONSTER = {
+    "typeclass": "typeclasses.monsters.Monster",
+    "prototype_key": "scene_monster",
+    "desc": "A scene monster (scene-builder).",
+}

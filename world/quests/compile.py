@@ -86,6 +86,14 @@ class StageSpawnRequirement:
     npc_reqs: tuple[tuple[str, str, str | None], ...]
 
 
+# Process-local spawn-requirement registry, keyed by definition key (D4). It
+# lives here -- the compile boundary -- because it is the only place the
+# transient ``CompiledQuest.stage_requirements`` is registered atomically with
+# the definition and offer. Like ``QUEST_DEFINITION_REGISTRY`` and
+# ``GUILD_OFFER_REGISTRY``, it does not survive a server restart.
+SCENE_REQUIREMENT_REGISTRY: dict[str, tuple[StageSpawnRequirement, ...]] = {}
+
+
 @dataclass(frozen=True)
 class CompiledQuest:
     """The closed immutable runtime translation of one validated proposal."""
@@ -244,6 +252,11 @@ def _validate_scene_fields(
         anchor_near = location_payload.get("anchor_near")
         if anchor_near is not None and not isinstance(anchor_near, str):
             _reject(f"stage {stage_index} anchor_near must be a string or None")
+        if anchor_near is not None and anchor_near not in ANCHOR_PLACEMENT_REGISTRY:
+            _reject(
+                f"stage {stage_index} anchor_near {anchor_near!r} "
+                "is not a placed anchor in ANCHOR_PLACEMENT_REGISTRY"
+            )
         scene_sentence = location_payload.get("scene_sentence")
         _validate_strings(
             stage_index,
@@ -337,23 +350,114 @@ def _compile_objective(
     _reject(f"stage {stage_index} unknown objective kind {kind_value!r}")  # pragma: no cover
 
 
-def _definition_key(definition_fields: dict[str, Any]) -> str:
+def _definition_key(
+    definition_fields: dict[str, Any],
+    stage_requirements: tuple[StageSpawnRequirement, ...],
+) -> str:
     """Return the stable content-digest key for a compiled definition.
 
-    ``sha256`` over the canonical serialization of the definition's own fields,
-    hex-prefixed. Equal content always yields an equal key; different content
-    never collides. Reward and issuer are offer-level and excluded, so two
-    blueprints with identical stages but different rewards share a definition
-    key and surface as offer conflicts through ``register_generated_quest``.
+    ``sha256`` over the canonical serialization of the definition's own fields
+    **plus the canonical serialization of the compiled per-stage spawn
+    requirements**, hex-prefixed. Equal content always yields an equal key;
+    different content never collides. Folding the scene requirements into the
+    digest means two blueprints with identical runtime stages but different
+    scenes (archetype, ``anchor_near``, ``scene_sentence``, or ``npc_reqs``)
+    get different keys, so one can never silently overwrite the other's
+    spawn-requirement entry. Reward and issuer are offer-level and excluded, so
+    two blueprints with identical stages but different rewards share a
+    definition key and surface as offer conflicts through
+    ``register_generated_quest``.
     """
     canonical = json.dumps(
-        definition_fields,
+        {
+            "definition": definition_fields,
+            "stage_requirements": [
+                _stage_requirement_canonical(requirement)
+                for requirement in stage_requirements
+            ],
+        },
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":"),
     )
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f"ai_{digest[:16]}"
+
+
+def _stage_requirement_canonical(requirement: StageSpawnRequirement) -> dict[str, Any]:
+    """Serialize one ``StageSpawnRequirement`` into a canonical JSON-safe dict.
+
+    This is the single canonical shape used both for the definition content
+    digest and for equality against a previously registered requirement entry,
+    so two compilations of identical scenes compare equal by construction.
+    """
+    location = requirement.location
+    return {
+        "index": requirement.index,
+        "objective_kind": requirement.objective_kind.value,
+        "location": (
+            None
+            if location is None
+            else {
+                "kind": location.kind.value,
+                "anchor_key": location.anchor_key,
+                "xyz": None if location.xyz is None else list(location.xyz),
+            }
+        ),
+        "archetype": requirement.archetype,
+        "anchor_near": requirement.anchor_near,
+        "scene_sentence": requirement.scene_sentence,
+        "npc_reqs": [
+            {"role": role, "tier": tier, "disposition": disposition}
+            for role, tier, disposition in requirement.npc_reqs
+        ],
+    }
+
+
+def _validate_scene_bound_rules(
+    stage_index: int,
+    location: RoomLocator | None,
+    objective: QuestObjective,
+    npc_reqs: tuple[tuple[str, str, str | None], ...],
+) -> None:
+    """Enforce the shared scene-bound rules the guardrail also checks (D5).
+
+    Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
+    entities always live in a reclaimable instance room, never a permanent map
+    room. An ESCORT stage must be a permanent destination (never instance): the
+    SceneBuilder locates permanent rooms only, so an ESCORT scene never spawns
+    its protected entities into the destination room (which would auto-complete
+    the escort on entry) and never pollutes a permanent map. A bound-target
+    DEFEAT must declare a quantity no greater than its ``npc_req`` count so the
+    objective is always satisfiable by defeating the bound targets.
+    """
+    has_occupants = bool(npc_reqs)
+    if has_occupants and not (
+        location is not None and location.kind is DestinationKind.BOUND_INSTANCE
+    ):
+        _reject(
+            f"stage {stage_index} declares NPC requirements outside an "
+            "instance-layer destination; occupant-bearing scenes must be instances"
+        )
+    if (
+        objective.kind is ObjectiveKind.ESCORT
+        and location is not None
+        and location.kind is DestinationKind.BOUND_INSTANCE
+    ):
+        _reject(
+            f"stage {stage_index} declares an ESCORT objective at an instance "
+            "destination; ESCORT scenes must be permanent rooms (located only, "
+            "never instance-materialized)"
+        )
+    if (
+        objective.kind is ObjectiveKind.DEFEAT
+        and objective.requires_bound_targets
+        and objective.quantity > len(npc_reqs)
+    ):
+        _reject(
+            f"stage {stage_index} bound DEFEAT quantity {objective.quantity} exceeds "
+            f"the number of npc_req entries {len(npc_reqs)}"
+        )
 
 
 def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
@@ -444,6 +548,7 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
             location,
             bool(npc_reqs),
         )
+        _validate_scene_bound_rules(position, location, objective, npc_reqs)
         quest_stages.append(QuestStage(index=index, objective=objective))
         stage_requirements.append(
             StageSpawnRequirement(
@@ -485,7 +590,7 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
         ],
         "deadline_hours": deadline,
     }
-    key = _definition_key(definition_fields)
+    key = _definition_key(definition_fields, tuple(stage_requirements))
     definition = QuestDefinition(
         key=key,
         display_name=name,
@@ -507,17 +612,31 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
     )
 
 
-def register_generated_quest(compiled: CompiledQuest) -> None:
-    """Register one compiled definition and its offer all-or-nothing.
+def scene_requirements_for(definition_key: str) -> tuple[StageSpawnRequirement, ...]:
+    """Return one definition's registered spawn requirements, or an empty tuple.
 
-    Preflights both registries' equal/conflict states before writing either, so
-    a conflicting definition or offer raises ``QuestCompileError`` before any
-    mutation. Otherwise the definition is written first and the offer second; if
-    the offer write fails despite preflight (defensive), the just-added
-    definition entry is rolled back, so a generated definition is never left
-    registered without its offer.
+    A hand-written catalog definition (never compiled through this boundary) has
+    no entry and reads back ``()``, so the SceneBuilder can distinguish a
+    generated scene from a hand-written stage with no scene.
+    """
+    return SCENE_REQUIREMENT_REGISTRY.get(definition_key, ())
+
+
+def register_generated_quest(compiled: CompiledQuest) -> None:
+    """Register one compiled definition, its offer, and its spawn requirements
+    all-or-nothing.
+
+    Preflights all three registries' equal/conflict states before writing any,
+    so a conflicting definition, offer, or spawn-requirement entry raises
+    ``QuestCompileError`` before any mutation. Otherwise the definition is
+    written first, then the offer and the requirement entry; if a later write
+    fails despite preflight (defensive), every entry this call added -- the
+    definition, the offer, and the requirements -- is rolled back together, so
+    a generated definition is never left registered without its offer or its
+    scene requirements.
     """
     definition = compiled.definition
+    requirements = compiled.stage_requirements
     offer = GuildQuestOffer(
         definition_key=definition.key,
         issuer_branch_key=compiled.issuer_branch_key,
@@ -528,6 +647,7 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
     offer_current = GUILD_OFFER_REGISTRY.get(
         (definition.key, compiled.issuer_branch_key)
     )
+    requirement_current = SCENE_REQUIREMENT_REGISTRY.get(definition.key)
     if definition_current is not None and definition_current != definition:
         _reject(f"conflicting definition already registered under {definition.key!r}")
     if offer_current is not None and offer_current != offer:
@@ -535,12 +655,24 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
             f"conflicting offer already registered for {definition.key!r} "
             f"at branch {compiled.issuer_branch_key!r}"
         )
+    if requirement_current is not None and requirement_current != requirements:
+        _reject(
+            f"conflicting spawn requirements already registered under "
+            f"{definition.key!r}"
+        )
 
     definition_added = definition_current is None
+    offer_added = offer_current is None
+    requirement_added = requirement_current is None
     register_quest_definition(definition)
     try:
         register_guild_offer(offer)
+        SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
     except Exception:
         if definition_added:
             QUEST_DEFINITION_REGISTRY.pop(definition.key, None)
+        if offer_added:
+            GUILD_OFFER_REGISTRY.pop((definition.key, compiled.issuer_branch_key), None)
+        if requirement_added:
+            SCENE_REQUIREMENT_REGISTRY.pop(definition.key, None)
         raise
