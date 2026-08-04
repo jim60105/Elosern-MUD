@@ -39,6 +39,19 @@ forward-declared fake hook.
 >    while the external worker subprocess runs (which executes on a background Twisted thread). A
 >    successful worker result must exactly equal the engine's pre-computed expected output identity for
 >    its job. This keeps the single-job GPU boundary while guaranteeing art never blocks play.
+>
+> **Amended 2026-08-05 (change `webclient-art-panel`).** Exploration-menu descriptors and the
+> dialogue-speaker focus publisher are deferred to the `webclient-exploration-menu` delivery unit (23d),
+> which is not a `webclient-art-panel` dependency and had not landed. `webclient-art-panel` (23f)
+> delivers the complete read-only portrait catalog for currently focusable present entities — combat
+> participants in combat mode, dialogue hosts and explicit named-policy characters present in the room
+> in exploration mode — plus the combat descriptors that reference it (the `context_actions` participant
+> `portrait_ref`), the scene renderer, and the targeted OOB art updates. The exploration mode therefore
+> renders the catalog seam immediately, but a portrait card appears only once a 23d exploration descriptor
+> publishes a client-local focus against that same catalog; until then, no focus means no portrait card.
+> 23f acceptance covers catalog selection, no-focus, and combat focus; the end-to-end "exploration
+> speaker" journey is completed by 23d against the same opaque present-entity catalog-key contract,
+> with focus remaining entirely client-local.
 
 ---
 
