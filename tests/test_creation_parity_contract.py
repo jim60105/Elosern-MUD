@@ -1,0 +1,78 @@
+"""Repository-wide parity contract for the creation panel (webclient-character-creation-ui).
+
+The D2 ``creation`` bounds are shared between the Python validator in
+``web/webclient/presentation/creation.py`` and the JavaScript validator in
+``web/static/webclient/js/elosern/protocol.js``. This contract enforces
+numerically identical values so a browser never disables a panel the server
+considers valid (or vice versa), mirroring the services/local_map parity
+contracts.
+"""
+
+from pathlib import Path
+import re
+import unittest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+_PY_CREATION = REPO_ROOT / "web/webclient/presentation/creation.py"
+_JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
+
+_CREATION_CONSTANTS = (
+    ("MAX_PRESETS", "CREATION_MAX_PRESETS"),
+    ("MAX_RACES", "CREATION_MAX_RACES"),
+    ("MAX_SUBRACES", "CREATION_MAX_SUBRACES"),
+    ("MAX_PROFILES", "CREATION_MAX_PROFILES"),
+    ("MIN_NAME_LENGTH", "CREATION_MIN_NAME_LENGTH"),
+    ("MAX_NAME_LENGTH", "CREATION_MAX_NAME_LENGTH"),
+    ("AGE_MINIMUM", "CREATION_AGE_MINIMUM"),
+    ("AGE_MAXIMUM", "CREATION_AGE_MAXIMUM"),
+    ("APPARENT_AGE_MINIMUM", "CREATION_APPARENT_AGE_MINIMUM"),
+    ("APPARENT_AGE_MAXIMUM", "CREATION_APPARENT_AGE_MAXIMUM"),
+    ("MAX_PRESET_KEY_CODE_POINTS", "CREATION_MAX_PRESET_KEY"),
+    ("MAX_DISPLAY_NAME_CODE_POINTS", "CREATION_MAX_DISPLAY_NAME"),
+    ("MAX_RACE_KEY_CODE_POINTS", "CREATION_MAX_RACE_KEY"),
+    ("MAX_DESCRIPTION_CODE_POINTS", "CREATION_MAX_DESCRIPTION"),
+    ("MAX_EMPHASIS_CODE_POINTS", "CREATION_MAX_EMPHASIS"),
+    ("MAX_BACKGROUND_CODE_POINTS", "CREATION_MAX_BACKGROUND"),
+    ("MAX_SUBRACE_KEY_CODE_POINTS", "CREATION_MAX_SUBRACE_KEY"),
+    ("MAX_SPECIALTY_CODE_POINTS", "CREATION_MAX_SPECIALTY"),
+    ("MAX_LABEL_CODE_POINTS", "CREATION_MAX_LABEL"),
+    ("MAX_EXPLANATION_CODE_POINTS", "CREATION_MAX_EXPLANATION"),
+)
+
+
+class CreationValidatorParityContract(unittest.TestCase):
+    def test_python_and_js_validators_share_identical_d2_bounds(self):
+        py_source = _PY_CREATION.read_text(encoding="utf-8")
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        mismatches = []
+        for py_name, js_name in _CREATION_CONSTANTS:
+            py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
+            js_match = re.search(rf"var {js_name}\s*=\s*([0-9]+)", js_source)
+            if py_match is None or js_match is None:
+                mismatches.append(f"{py_name}/{js_name}: missing constant")
+                continue
+            if py_match.group(1) != js_match.group(1):
+                mismatches.append(
+                    f"{py_name}={py_match.group(1)} vs {js_name}={js_match.group(1)}"
+                )
+        self.assertEqual(mismatches, [], "Python/JS creation bounds diverged")
+
+    def test_python_and_js_share_axes_and_stages(self):
+        py_source = _PY_CREATION.read_text(encoding="utf-8")
+        py_wizard = (REPO_ROOT / "world/rules/creation_wizard.py").read_text(encoding="utf-8")
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        for fragment in ('"hp", "mp", "sp", "atk_phys", "agility", "defense"',):
+            self.assertIn(fragment, py_source, f"Python creation missing {fragment!r}")
+            self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
+        for fragment in ('"preset_selected"', '"custom_filled"'):
+            self.assertIn(fragment, py_wizard, f"Python wizard missing {fragment!r}")
+            self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
+
+    def test_panel_allowlist_contains_creation_v1(self):
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        self.assertIn("creation: 1", js_source)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -132,6 +132,33 @@
   var SERVICES_BUY = "shop.buy";
   var SERVICES_SELL = "shop.sell";
 
+  // creation panel bounds (mirror of web.webclient.presentation.creation,
+  // design D2). These constants are shared with the server through a
+  // dual-direction parity test.
+  var CREATION_MAX_PRESETS = 8;
+  var CREATION_MAX_RACES = 8;
+  var CREATION_MAX_SUBRACES = 16;
+  var CREATION_MAX_PROFILES = 16;
+  var CREATION_MIN_NAME_LENGTH = 1;
+  var CREATION_MAX_NAME_LENGTH = 80;
+  var CREATION_AGE_MINIMUM = 18;
+  var CREATION_AGE_MAXIMUM = 10000;
+  var CREATION_APPARENT_AGE_MINIMUM = 18;
+  var CREATION_APPARENT_AGE_MAXIMUM = 10000;
+  var CREATION_MAX_PRESET_KEY = 64;
+  var CREATION_MAX_DISPLAY_NAME = 128;
+  var CREATION_MAX_RACE_KEY = 64;
+  var CREATION_MAX_DESCRIPTION = 512;
+  var CREATION_MAX_EMPHASIS = 256;
+  var CREATION_MAX_BACKGROUND = 256;
+  var CREATION_MAX_SUBRACE_KEY = 64;
+  var CREATION_MAX_SPECIALTY = 256;
+  var CREATION_MAX_LABEL = 128;
+  var CREATION_MAX_EXPLANATION = 256;
+  var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense"];
+  var CREATION_PRESET_STAGE = "preset_selected";
+  var CREATION_CUSTOM_STAGE = "custom_filled";
+
   var MESSAGE_NAMES = {
     ui_snapshot: true,
     ui_update: true,
@@ -141,7 +168,7 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
-  var PANEL_ALLOWLIST = { status: 1, context_actions: 1, local_map: 1, services: 1 };
+  var PANEL_ALLOWLIST = { status: 1, context_actions: 1, local_map: 1, services: 1, creation: 1 };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
   var PANEL_NAME_RE = /^[a-z0-9_]{1,64}$/;
@@ -1592,6 +1619,322 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // creation panel v1 validator (mirror of web.webclient.presentation.creation).
+  // ---------------------------------------------------------------------------
+
+  function validateCreationPresetCard(value) {
+    requireExactFields(
+      value,
+      "preset card",
+      ["key", "display_name", "race", "race_description", "subrace", "emphasis", "background"],
+      []
+    );
+    var key = validateIdentifier(value.key, "preset key");
+    if (codePoints(key) > CREATION_MAX_PRESET_KEY) {
+      throw new Error("preset key exceeds its bound");
+    }
+    requireString(value.display_name, "display_name", CREATION_MAX_DISPLAY_NAME);
+    var race = validateIdentifier(value.race, "preset race");
+    if (codePoints(race) > CREATION_MAX_RACE_KEY) {
+      throw new Error("preset race exceeds its bound");
+    }
+    requireString(value.race_description, "race_description", CREATION_MAX_DESCRIPTION);
+    if (value.subrace !== null) {
+      var subrace = validateIdentifier(value.subrace, "preset subrace");
+      if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("preset subrace exceeds its bound");
+      }
+    }
+    requireString(value.emphasis, "emphasis", CREATION_MAX_EMPHASIS);
+    requireString(value.background, "background", CREATION_MAX_BACKGROUND);
+    return value;
+  }
+
+  function validateCreationName(value) {
+    requireExactFields(value, "name bounds", ["min_length", "max_length"], []);
+    var minimum = requireInt(value.min_length, "min_length", 1, MAX_SAFE_INTEGER);
+    var maximum = requireInt(value.max_length, "max_length", 1, MAX_SAFE_INTEGER);
+    if (
+      minimum !== CREATION_MIN_NAME_LENGTH ||
+      maximum !== CREATION_MAX_NAME_LENGTH
+    ) {
+      throw new Error("name bounds do not match the advertised contract");
+    }
+    return value;
+  }
+
+  function validateCreationAdult(value) {
+    requireExactFields(
+      value,
+      "adult bounds",
+      ["age_minimum", "age_maximum", "apparent_age_minimum", "apparent_age_maximum"],
+      []
+    );
+    var ageMinimum = requireInt(value.age_minimum, "age_minimum", 1, MAX_SAFE_INTEGER);
+    var ageMaximum = requireInt(value.age_maximum, "age_maximum", 1, MAX_SAFE_INTEGER);
+    var apparentMinimum = requireInt(
+      value.apparent_age_minimum,
+      "apparent_age_minimum",
+      1,
+      MAX_SAFE_INTEGER
+    );
+    var apparentMaximum = requireInt(
+      value.apparent_age_maximum,
+      "apparent_age_maximum",
+      1,
+      MAX_SAFE_INTEGER
+    );
+    if (
+      ageMinimum !== CREATION_AGE_MINIMUM ||
+      ageMaximum !== CREATION_AGE_MAXIMUM ||
+      apparentMinimum !== CREATION_APPARENT_AGE_MINIMUM ||
+      apparentMaximum !== CREATION_APPARENT_AGE_MAXIMUM
+    ) {
+      throw new Error("adult bounds do not match the advertised contract");
+    }
+    return value;
+  }
+
+  function validateCreationRaceOption(value) {
+    requireExactFields(value, "race option", ["key", "description", "subraces"], []);
+    var key = validateIdentifier(value.key, "race key");
+    if (codePoints(key) > CREATION_MAX_RACE_KEY) {
+      throw new Error("race key exceeds its bound");
+    }
+    requireString(value.description, "description", CREATION_MAX_DESCRIPTION);
+    if (value.subraces !== null) {
+      if (!Array.isArray(value.subraces) || value.subraces.length > CREATION_MAX_SUBRACES) {
+        throw new Error("race subraces must be a list or null within its bound");
+      }
+      value.subraces.forEach(function (entry) {
+        var subrace = validateIdentifier(entry, "race subrace");
+        if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+          throw new Error("race subrace exceeds its bound");
+        }
+      });
+    }
+    return value;
+  }
+
+  function validateCreationSubraces(value) {
+    if (!isPlainObject(value) || Object.keys(value).length > CREATION_MAX_SUBRACES) {
+      throw new Error("subraces must be an object within its bound");
+    }
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length; i++) {
+      var subraceKey = validateIdentifier(keys[i], "subrace key");
+      if (codePoints(subraceKey) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("subrace key exceeds its bound");
+      }
+      var entry = value[keys[i]];
+      requireExactFields(
+        entry,
+        "subrace entry",
+        ["display_name_zh", "common_name_zh", "specialty"],
+        []
+      );
+      requireString(entry.display_name_zh, "display_name_zh", CREATION_MAX_SPECIALTY);
+      requireString(entry.common_name_zh, "common_name_zh", CREATION_MAX_SPECIALTY);
+      requireString(entry.specialty, "specialty", CREATION_MAX_SPECIALTY);
+    }
+    return value;
+  }
+
+  function validateCreationAxis(value) {
+    requireExactFields(
+      value,
+      "allocation axis",
+      ["axis", "label", "explanation", "minimum", "maximum"],
+      []
+    );
+    var axis = validateIdentifier(value.axis, "axis");
+    if (CREATION_AXES.indexOf(axis) === -1) {
+      throw new Error("axis " + axis + " is not an allocatable starting axis");
+    }
+    requireString(value.label, "label", CREATION_MAX_LABEL);
+    requireString(value.explanation, "explanation", CREATION_MAX_EXPLANATION);
+    var minimum = requireInt(value.minimum, "minimum", 0, MAX_SAFE_INTEGER);
+    var maximum = requireInt(value.maximum, "maximum", 0, MAX_SAFE_INTEGER);
+    if (minimum > maximum) {
+      throw new Error("axis minimum must not exceed maximum");
+    }
+    return value;
+  }
+
+  function validateCreationProfile(value) {
+    requireExactFields(value, "profile", ["race", "subrace", "budget", "axes"], []);
+    var race = validateIdentifier(value.race, "profile race");
+    if (codePoints(race) > CREATION_MAX_RACE_KEY) {
+      throw new Error("profile race exceeds its bound");
+    }
+    if (value.subrace !== null) {
+      var subrace = validateIdentifier(value.subrace, "profile subrace");
+      if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("profile subrace exceeds its bound");
+      }
+    }
+    requireInt(value.budget, "budget", 0, MAX_SAFE_INTEGER);
+    if (!Array.isArray(value.axes) || value.axes.length !== 6) {
+      throw new Error("profile axes must contain exactly six axes");
+    }
+    var axisKeys = {};
+    value.axes.forEach(function (axis) {
+      validateCreationAxis(axis);
+      axisKeys[axis.axis] = true;
+    });
+    var expected = {};
+    CREATION_AXES.forEach(function (axis) {
+      expected[axis] = true;
+    });
+    var keyCount = Object.keys(axisKeys).length;
+    var expectedCount = Object.keys(expected).length;
+    if (keyCount !== expectedCount) {
+      throw new Error("profile axes must match the six starting axes");
+    }
+    return value;
+  }
+
+  function validateCreationCustom(value) {
+    requireExactFields(
+      value,
+      "custom",
+      ["name", "adult", "races", "subraces", "profiles"],
+      []
+    );
+    validateCreationName(value.name);
+    validateCreationAdult(value.adult);
+    if (!Array.isArray(value.races) || value.races.length === 0 || value.races.length > CREATION_MAX_RACES) {
+      throw new Error("races must be a non-empty list within its bound");
+    }
+    value.races.forEach(validateCreationRaceOption);
+    validateCreationSubraces(value.subraces);
+    if (!Array.isArray(value.profiles) || value.profiles.length === 0 || value.profiles.length > CREATION_MAX_PROFILES) {
+      throw new Error("profiles must be a non-empty list within its bound");
+    }
+    value.profiles.forEach(validateCreationProfile);
+    return value;
+  }
+
+  function validateCreationDraft(value) {
+    if (value === null) {
+      return value;
+    }
+    if (!isPlainObject(value)) {
+      throw new Error("draft must be a JSON object or null");
+    }
+    if (value.mode === "preset") {
+      requireExactFields(value, "preset draft", ["mode", "stage", "preset_key"], []);
+      if (value.stage !== CREATION_PRESET_STAGE) {
+        throw new Error("unsupported preset draft stage");
+      }
+      var presetKey = validateIdentifier(value.preset_key, "draft preset_key");
+      if (codePoints(presetKey) > CREATION_MAX_PRESET_KEY) {
+        throw new Error("draft preset_key exceeds its bound");
+      }
+      return {
+        mode: "preset",
+        stage: CREATION_PRESET_STAGE,
+        preset_key: presetKey,
+      };
+    }
+    if (value.mode === "custom") {
+      requireExactFields(
+        value,
+        "custom draft",
+        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations"],
+        []
+      );
+      if (value.stage !== CREATION_CUSTOM_STAGE) {
+        throw new Error("unsupported custom draft stage");
+      }
+      requireString(value.display_name, "display_name", CREATION_MAX_DISPLAY_NAME);
+      requireInt(value.age, "age", CREATION_AGE_MINIMUM, CREATION_AGE_MAXIMUM);
+      requireInt(
+        value.apparent_age,
+        "apparent_age",
+        CREATION_APPARENT_AGE_MINIMUM,
+        CREATION_APPARENT_AGE_MAXIMUM
+      );
+      var race = validateIdentifier(value.race, "draft race");
+      if (codePoints(race) > CREATION_MAX_RACE_KEY) {
+        throw new Error("draft race exceeds its bound");
+      }
+      if (value.subrace !== null) {
+        var subrace = validateIdentifier(value.subrace, "draft subrace");
+        if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+          throw new Error("draft subrace exceeds its bound");
+        }
+      }
+      var allocations = value.allocations;
+      if (!isPlainObject(allocations)) {
+        throw new Error("draft allocations must be an object");
+      }
+      var allocationKeys = Object.keys(allocations).slice().sort();
+      var expectedKeys = CREATION_AXES.slice().sort();
+      if (allocationKeys.join(",") !== expectedKeys.join(",")) {
+        throw new Error("draft allocations must contain exactly the six axes");
+      }
+      CREATION_AXES.forEach(function (axis) {
+        requireInt(allocations[axis], axis, 0, 10000);
+      });
+      return {
+        mode: "custom",
+        stage: CREATION_CUSTOM_STAGE,
+        display_name: value.display_name,
+        age: value.age,
+        apparent_age: value.apparent_age,
+        race: race,
+        subrace: value.subrace,
+        allocations: allocations,
+      };
+    }
+    throw new Error("draft has an unknown mode");
+  }
+
+  function validateCreationPanel(payload) {
+    if (payload.available === false) {
+      // The common unavailable discriminator; validateStatusPanel handles it.
+      validateStatusPanel(payload);
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "creation panel",
+      ["schema_version", "available", "kind", "draft", "presets", "custom"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported creation schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "creation") {
+      throw new Error("creation panel must be available with kind creation");
+    }
+    if (!Array.isArray(payload.presets) || payload.presets.length === 0 || payload.presets.length > CREATION_MAX_PRESETS) {
+      throw new Error("presets must be a non-empty list within its bound");
+    }
+    payload.presets.forEach(validateCreationPresetCard);
+    validateCreationCustom(payload.custom);
+    var draft = validateCreationDraft(payload.draft);
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "creation",
+      draft: draft,
+      presets: payload.presets,
+      custom: payload.custom,
+    };
+    // Envelope guarantee (design D2): per-field bounds are ceilings, not a
+    // guarantee that any combination of them fits, so the validator enforces
+    // the serialized byte size directly and fails closed over the envelope.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("creation payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validatePanel(name, schemaVersion, payload) {
@@ -1623,6 +1966,9 @@
     }
     if (name === "services") {
       return validateServicesPanel(payload);
+    }
+    if (name === "creation") {
+      return validateCreationPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -1803,6 +2149,27 @@
     SERVICES_MIN_QUANTITY: SERVICES_MIN_QUANTITY,
     SERVICES_QUEST_STATES: SERVICES_QUEST_STATES.slice(),
     SERVICES_ACTIONS: SERVICES_ACTIONS.slice(),
+    CREATION_MAX_PRESETS: CREATION_MAX_PRESETS,
+    CREATION_MAX_RACES: CREATION_MAX_RACES,
+    CREATION_MAX_SUBRACES: CREATION_MAX_SUBRACES,
+    CREATION_MAX_PROFILES: CREATION_MAX_PROFILES,
+    CREATION_MIN_NAME_LENGTH: CREATION_MIN_NAME_LENGTH,
+    CREATION_MAX_NAME_LENGTH: CREATION_MAX_NAME_LENGTH,
+    CREATION_AGE_MINIMUM: CREATION_AGE_MINIMUM,
+    CREATION_AGE_MAXIMUM: CREATION_AGE_MAXIMUM,
+    CREATION_APPARENT_AGE_MINIMUM: CREATION_APPARENT_AGE_MINIMUM,
+    CREATION_APPARENT_AGE_MAXIMUM: CREATION_APPARENT_AGE_MAXIMUM,
+    CREATION_MAX_PRESET_KEY: CREATION_MAX_PRESET_KEY,
+    CREATION_MAX_DISPLAY_NAME: CREATION_MAX_DISPLAY_NAME,
+    CREATION_MAX_RACE_KEY: CREATION_MAX_RACE_KEY,
+    CREATION_MAX_DESCRIPTION: CREATION_MAX_DESCRIPTION,
+    CREATION_MAX_EMPHASIS: CREATION_MAX_EMPHASIS,
+    CREATION_MAX_BACKGROUND: CREATION_MAX_BACKGROUND,
+    CREATION_MAX_SUBRACE_KEY: CREATION_MAX_SUBRACE_KEY,
+    CREATION_MAX_SPECIALTY: CREATION_MAX_SPECIALTY,
+    CREATION_MAX_LABEL: CREATION_MAX_LABEL,
+    CREATION_MAX_EXPLANATION: CREATION_MAX_EXPLANATION,
+    CREATION_AXES: CREATION_AXES.slice(),
     MODES: MODES.slice(),
     OUTCOMES: OUTCOMES.slice(),
     COMBAT_MODES: COMBAT_MODES.slice(),
@@ -1823,6 +2190,7 @@
     validateContextActionsPanel: validateContextActionsPanel,
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
+    validateCreationPanel: validateCreationPanel,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

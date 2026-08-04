@@ -665,3 +665,156 @@ input:focus-visible,
     overflow-y: auto;
   }
 }
+
+/* ---------------------------------------------------------------- *
+ * Character-creation action dock (webclient-character-creation-ui).
+ * Focus is indicated by an outline plus a leading glyph, never by
+ * color alone.
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock[data-mode="creation"] {
+  padding: .4rem .6rem;
+  overflow: auto;
+  justify-content: flex-start;
+}
+
+.elosern-action-dock .creation-heading {
+  color: var(--elm-paper);
+  font-weight: 600;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .creation-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .creation-control {
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel, #1c1c1c);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .2rem .6rem;
+  cursor: pointer;
+}
+
+.elosern-action-dock .creation-control.focused,
+.elosern-action-dock .creation-control:focus,
+.elosern-action-dock .creation-control:focus-visible {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+  border-style: double;
+}
+
+.elosern-action-dock .creation-control.focused::before {
+  content: "▸ ";
+}
+
+.elosern-action-dock .creation-control.disabled {
+  color: var(--elm-paper-dim);
+  border-style: dashed;
+}
+
+.elosern-action-dock .creation-detail {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+  min-height: 1.2rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.elosern-action-dock .creation-live {
+  color: var(--elm-vermilion, #ff5c4d);
+  min-height: 1.2rem;
+}
+
+.elosern-action-dock .creation-confirm {
+  margin: .3rem 0;
+  padding: .3rem .5rem;
+  border: 2px double var(--elm-vermilion, #ff5c4d);
+  width: 100%;
+}
+
+.elosern-action-dock .creation-confirm-title {
+  color: var(--elm-paper);
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .creation-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.elosern-action-dock .creation-field {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+}
+
+.elosern-action-dock .creation-field-label {
+  color: var(--elm-paper);
+  min-width: 4.5rem;
+}
+
+.elosern-action-dock .creation-field input[type="text"],
+.elosern-action-dock .creation-field input[type="number"] {
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel, #1c1c1c);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .15rem .4rem;
+  min-width: 6rem;
+}
+
+.elosern-action-dock .creation-field input:focus,
+.elosern-action-dock .creation-field input:focus-visible {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+}
+
+.elosern-action-dock .creation-field-message {
+  color: var(--elm-vermilion, #ff5c4d);
+  font-size: .85em;
+}
+
+.elosern-action-dock .creation-race,
+.elosern-action-dock .creation-subrace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.elosern-action-dock .creation-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+  color: var(--elm-paper);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .15rem .4rem;
+}
+
+.elosern-action-dock .creation-radio:focus-within {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+}
+
+.elosern-action-dock .creation-budget {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+}
+
+.elosern-action-dock .creation-form-actions {
+  display: flex;
+  gap: .35rem;
+  margin-top: .3rem;
+}
+
+/* Safe overflow at the minimum supported viewport. */
+@media (max-width: 1280px), (max-height: 720px) {
+  .elosern-action-dock[data-mode="creation"] {
+    max-height: 12rem;
+    overflow-y: auto;
+  }
+}

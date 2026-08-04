@@ -158,6 +158,7 @@ def build_production_registry() -> PresentationRegistry:
     importable while a presenter is being developed.
     """
     from web.webclient.presentation.combat_panel import context_actions_presenter
+    from web.webclient.presentation.creation import creation_presenter
     from web.webclient.presentation.local_map import local_map_presenter
     from web.webclient.presentation.services import services_presenter
     from web.webclient.presentation.status import status_presenter
@@ -193,6 +194,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=1,
             unavailable_reason=("services_unavailable", "服務選單目前無法顯示"),
             presenter=services_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="creation",
+            schema_version=1,
+            unavailable_reason=("creation_unavailable", "角色建立畫面目前無法顯示"),
+            presenter=creation_presenter,
         )
     )
     return registry

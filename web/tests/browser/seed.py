@@ -27,6 +27,18 @@ BROWSER_ACCOUNT_PASSWORD = os.environ.get(
 BROWSER_CHARACTER_NAME = os.environ.get("ELOSERN_BROWSER_CHARACTER", "BrowserTest")
 BROWSER_ROOM_NAME = os.environ.get("ELOSERN_BROWSER_ROOM", "測試起點")
 
+# The pending-creation login account (webclient-character-creation-ui). A
+# separate NON-superuser account keeps the pending shell's ownership intact:
+# Evennia's one-time initial setup swaps the superuser account's typeclass with
+# clean_attributes=True, which wipes _playable_characters on the superuser
+# account and, because the server caches that account in process memory, an
+# external repair cannot refresh it.
+CREATION_ACCOUNT_USERNAME = os.environ.get("ELOSERN_BROWSER_CREATION_ACCOUNT", "browsercreator")
+CREATION_ACCOUNT_EMAIL = "creation@example.test"
+CREATION_ACCOUNT_PASSWORD = os.environ.get(
+    "ELOSERN_BROWSER_CREATION_PASSWORD", "CreationBrowserTest!2026"
+)
+
 
 def _minimap_fixture(character) -> None:
     """Deterministically place an activated character with map knowledge.
@@ -292,6 +304,70 @@ def main() -> None:
         typeclass=Account,
         is_superuser=True,
     )
+
+    if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
+        # A pending-creation account (webclient-character-creation-ui): the
+        # auto-created adult shell is creation-pending with an empty trait set
+        # and no activation, exactly as a freshly registered account sees it.
+        # Optionally a validated custom draft is saved so browser journeys can
+        # resume at the custom_filled stage. The South Gate and world clock are
+        # created by the managed server's own at_server_start bootstrap.
+        # Evennia's initial setup assumes ObjectDB #1 is the superuser
+        # character and #2 is Limbo: it locks #1 with ``puppet:false()`` and
+        # wipes the superuser account's attributes. So #1 is a dedicated dummy
+        # superuser character and the pending shell is #3, owned by a
+        # non-superuser account the initial setup never touches.
+        superuser_character = create_object(
+            PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True
+        )
+        account.at_post_create_character(superuser_character)
+        superuser_character.db_account = account
+        room = create_object(Room, key=BROWSER_ROOM_NAME, nohome=True)
+        superuser_character.location = room
+        superuser_character.home = room
+        superuser_character.save()
+        account.db._last_puppet = superuser_character
+
+        pending = create_object(PlayerCharacter, key="creation-shell", nohome=True)
+        creator = create_account(
+            CREATION_ACCOUNT_USERNAME,
+            CREATION_ACCOUNT_EMAIL,
+            CREATION_ACCOUNT_PASSWORD,
+            typeclass=Account,
+        )
+        creator.at_post_create_character(pending)
+        pending.db_account = creator
+        pending.location = room
+        pending.home = room
+        pending.save()
+        creator.db._last_puppet = pending
+        if os.environ.get("ELOSERN_BROWSER_CREATION_PRESET_DRAFT") == "1":
+            from world.rules.creation_wizard import save_preset_draft
+
+            save_preset_draft(creator, pending, "human_wanderer")
+            pending.save()
+        elif os.environ.get("ELOSERN_BROWSER_CREATION_DRAFT") == "1":
+            from world.rules.creation_wizard import save_custom_draft
+
+            save_custom_draft(
+                creator,
+                pending,
+                CharacterCreationRequest(
+                    mode="custom",
+                    display_name="草稿角色",
+                    age=21,
+                    apparent_age=21,
+                    race="beastfolk",
+                    subrace="foxkin",
+                    allocations=balanced_allocations("beastfolk", "foxkin"),
+                ),
+            )
+            pending.save()
+        print(
+            f"seeded pending creation account={creator.key} "
+            f"character={pending.key} pending=True"
+        )
+        return
 
     character = create_object(PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True)
     account.at_post_create_character(character)

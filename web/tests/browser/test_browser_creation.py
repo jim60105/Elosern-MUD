@@ -1,0 +1,736 @@
+"""Keyboard-only character-creation browser acceptance (webclient-character-creation-ui).
+
+These journeys drive the real Evennia server's creation surface through the
+GoldenLayout creation dock: preset selection → confirmation → activation →
+exploration snapshot with the creation dock torn down, custom form via
+keyboard-only finite controls and free-text fields, server rejection of both
+underage fields despite bypassed client validation, the destructive reset
+confirmation, stale and duplicate submission behavior, reconnect at a saved
+draft stage that never auto-resubmits activation, and viewport verification at
+1440x900 and 1280x720.
+
+Each creation journey boots its own dedicated isolated server so the mutated
+character state (activation, draft) never leaks into another journey. All
+fixtures are deterministic; no remote, LLM, or image service is involved.
+"""
+
+from __future__ import annotations
+
+import time
+
+from tools.spec_traceability import covers_requirement
+
+from .browser_base import BrowserAcceptanceTest
+from .browser_helpers import (
+    install_outbound_recorder,
+    outbound_messages,
+    sent_action_count,
+    store_state,
+)
+from .harness import ManagedServer
+from . import fixtures
+from .seed import CREATION_ACCOUNT_PASSWORD, CREATION_ACCOUNT_USERNAME
+
+
+def _press(page, key, wait_ms=60):
+    page.keyboard.press(key)
+    page.wait_for_timeout(wait_ms)
+
+
+class CreationBrowserTest(BrowserAcceptanceTest):
+    """Boots one dedicated isolated server per test with a creation fixture."""
+
+    CREATION_DRAFT = False
+    CREATION_PRESET_DRAFT = False
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        # Each test boots its own isolated server; never the shared one.
+        pass
+
+    def setUp(self) -> None:
+        runtime = fixtures.create_runtime()
+        runtime.env["ELOSERN_BROWSER_CREATION"] = "1"
+        if self.CREATION_DRAFT:
+            runtime.env["ELOSERN_BROWSER_CREATION_DRAFT"] = "1"
+        if self.CREATION_PRESET_DRAFT:
+            runtime.env["ELOSERN_BROWSER_CREATION_PRESET_DRAFT"] = "1"
+        self.server = ManagedServer(runtime=runtime)
+        self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
+        super().setUp()
+
+    def tearDown(self) -> None:
+        server = getattr(self, "server", None)
+        super().tearDown()
+        if server is not None:
+            try:
+                server.stop()
+            finally:
+                self.server = None
+
+    # -- navigation helpers ---------------------------------------------------
+
+    def _login_creation(self, viewport=None):
+        """Open a guarded page, log in as the pending account, wait for creation."""
+        page = self.new_page(viewport if viewport else (1440, 900))
+        login_url = f"{self.base_url}/auth/login/"
+        attempts = 4
+        for attempt in range(attempts):
+            page.goto(login_url)
+            try:
+                page.wait_for_selector("#id_username", timeout=20000)
+                break
+            except Exception:
+                if attempt == attempts - 1:
+                    raise
+                page.wait_for_timeout(1500)
+        page.fill("#id_username", CREATION_ACCOUNT_USERNAME)
+        page.fill("#id_password", CREATION_ACCOUNT_PASSWORD)
+        page.click('input[type="submit"]')
+        page.wait_for_load_state("networkidle")
+        page.goto(self.webclient_url)
+        self._wait_creation_available(page)
+        return page
+
+    def _creation_panel(self, page):
+        panels = store_state(page)["panels"]
+        return panels.get("creation")
+
+    def _dock_mode(self, page):
+        return page.evaluate(
+            "document.getElementById('action-dock').getAttribute('data-mode')"
+        )
+
+    def _wait_creation_available(self, page, timeout=60000):
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            state = store_state(page)
+            panel = state["panels"].get("creation")
+            if (
+                state["mode"] == "creation"
+                and panel
+                and panel.get("available") is True
+            ):
+                return panel
+            page.wait_for_timeout(250)
+        raise AssertionError(
+            "creation panel never became available; sent=%r; state=%r"
+            % (page.evaluate("window.__elosernSent || []"), store_state(page))
+        )
+
+    def _wait_exploration(self, page, timeout=60000):
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            state = store_state(page)
+            if state["mode"] == "exploration":
+                return state
+            page.wait_for_timeout(250)
+        raise AssertionError(
+            "exploration mode never arrived; sent=%r; state=%r"
+            % (page.evaluate("window.__elosernSent || []"), store_state(page))
+        )
+
+    def _wait_result(self, page, predicate, timeout=30000):
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            result = store_state(page)["lastActionResult"]
+            if result is not None and predicate(result):
+                return result
+            page.wait_for_timeout(250)
+        raise AssertionError("action result predicate never became true")
+
+    def _focus_dock(self, page):
+        page.evaluate("document.getElementById('action-dock').focus()")
+
+    def _sent_payloads(self, page, action_id):
+        payloads = []
+        for cmd, args, _kw in outbound_messages(page):
+            if cmd == "ui_action" and args and args[0].get("action_id") == action_id:
+                payloads.append(args[0].get("payload"))
+        return payloads
+
+
+class PresetCreationJourneys(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    def test_preset_selection_confirm_activate_reaches_exploration(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(len(panel["presets"]), 3)
+        self.assertEqual(self._dock_mode(page), "creation")
+
+        # Focus the action dock and open the preset list (keyboard only).
+        self._focus_dock(page)
+        _press(page, "Enter")  # 預設角色
+        _press(page, "Enter")  # human_wanderer card (first preset)
+        self.assertEqual(sent_action_count(page, "creation.preset"), 1)
+        payloads = self._sent_payloads(page, "creation.preset")
+        self.assertEqual(payloads, [{"preset_key": "human_wanderer"}])
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+
+        _press(page, "Enter")  # 確認啟用
+        self._wait_exploration(page)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 1)
+        self.assertNotEqual(self._dock_mode(page), "creation")
+        creation = self._creation_panel(page)
+        self.assertFalse(creation["available"])
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_escape_from_preset_confirm_returns_to_list_without_mutation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "Enter")  # 預設角色
+        _press(page, "Enter")  # human_wanderer card -> confirmation screen
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        _press(page, "Escape")  # pop exactly one level back to the preset list
+        self.assertEqual(page.locator(".creation-confirm").count(), 0)
+        self.assertGreaterEqual(page.locator(".creation-preset").count(), 1)
+        # No activation or reset was sent; only the earlier preset-selection save.
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+
+
+class CustomCreationJourneys(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_custom_form_keyboard_journey_to_activation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")
+
+        # Name and adult age fields: focus the name field, then Tab/Shift+Tab
+        # through the text/numeric fields exactly as a keyboard-only player does.
+        page.evaluate("document.getElementById('creation-field-displayName').focus()")
+        page.keyboard.type("新冒險者")
+        _press(page, "Tab")  # name -> actual age
+        self.assertEqual(
+            page.evaluate("document.activeElement.id"),
+            "creation-field-age",
+            "Tab must move focus from the name field to the age field",
+        )
+        page.keyboard.type("24")
+        _press(page, "Tab")  # actual age -> apparent age
+        self.assertEqual(
+            page.evaluate("document.activeElement.id"),
+            "creation-field-apparentAge",
+            "Tab must move focus to the apparent age field",
+        )
+        page.keyboard.type("24")
+        _press(page, "Shift+Tab")  # apparent age -> actual age
+        self.assertEqual(
+            page.evaluate("document.activeElement.id"),
+            "creation-field-age",
+            "Shift+Tab must move focus back to the age field",
+        )
+        _press(page, "Tab")  # back to apparent age, values preserved
+        self.assertEqual(
+            page.evaluate("document.activeElement.id"),
+            "creation-field-apparentAge",
+        )
+
+        # Select the beastfolk race radio with keyboard arrows (human -> beastfolk).
+        page.evaluate("document.getElementById('creation-race-0').focus()")
+        _press(page, "ArrowRight")
+        self.assertTrue(
+            page.evaluate("document.getElementById('creation-race-1').checked"),
+            "beastfolk race radio must be selected",
+        )
+        # Select the foxkin subrace radio with keyboard arrows from the default
+        # "none" option (beastfolk has seven subraces; foxkin is the last).
+        page.evaluate("document.querySelector('input[name=creation-subrace]').focus()")
+        for _ in range(7):
+            _press(page, "ArrowDown")
+        page.wait_for_timeout(150)
+        foxkin_checked = page.evaluate(
+            "() => Array.from(document.querySelectorAll('input[name=creation-subrace]'))"
+            ".some((el) => el.value === 'foxkin' && el.checked)"
+        )
+        self.assertTrue(foxkin_checked, "foxkin subrace radio must be selected")
+
+        # Fill the six allocation inputs deterministically for beastfolk/foxkin.
+        page.evaluate("document.getElementById('creation-field-hp').focus()")
+        page.keyboard.type("25")
+        page.evaluate("document.getElementById('creation-field-mp').focus()")
+        page.keyboard.type("10")
+        page.evaluate("document.getElementById('creation-field-sp').focus()")
+        page.keyboard.type("25")
+        page.evaluate("document.getElementById('creation-field-atk_phys').focus()")
+        page.keyboard.type("15")
+        page.evaluate("document.getElementById('creation-field-agility').focus()")
+        page.keyboard.type("15")
+        page.evaluate("document.getElementById('creation-field-defense').focus()")
+        page.keyboard.type("15")
+
+        # Submit the custom form (keyboard-only Enter on the submit button).
+        page.evaluate("document.getElementById('creation-submit').focus()")
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "creation.custom"), 1)
+        payloads = self._sent_payloads(page, "creation.custom")
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["race"], "beastfolk")
+        self.assertEqual(payloads[0]["subrace"], "foxkin")
+        self.assertEqual(payloads[0]["allocations"]["hp"], 25)
+
+        # The confirmation screen appears; Enter confirms activation.
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        _press(page, "Enter")
+        self._wait_exploration(page)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 1)
+        self.assertNotEqual(self._dock_mode(page), "creation")
+
+    @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
+    def test_underage_actual_age_rejected_despite_disabled_client_validation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")
+        # Bypass client-side constraints entirely: remove the HTML minimums and
+        # submit a raw ui_action (the dock's advisory check never sees it).
+        page.evaluate(
+            "() => { const f = document.getElementById('creation-field-age'); "
+            "f.min = ''; f.max = ''; }"
+        )
+        page.evaluate(
+            """() => {
+              const s = Elosern.StateController.getState();
+              Evennia.msg('ui_action', [{
+                protocol_version: 1,
+                presentation_epoch: s.activeEpoch,
+                request_id: 'underage-age-1',
+                base_revision: s.revision,
+                action_id: 'creation.custom',
+                payload: {
+                  display_name: '年輕冒險者',
+                  age: 17,
+                  apparent_age: 24,
+                  race: 'human',
+                  subrace: null,
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                },
+              }], {});
+            }"""
+        )
+        deadline = time.monotonic() + 15
+        result = None
+        while time.monotonic() < deadline:
+            result = store_state(page)["lastActionResult"]
+            if (
+                result
+                and result["outcome"] == "rejected"
+                and result["code"] in ("underage_age", "malformed_payload")
+            ):
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "underage_age")
+        panel = self._creation_panel(page)
+        self.assertTrue(panel["available"])
+        self.assertIsNone(panel["draft"])
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        # The dock remains the sole owner in creation mode.
+        self.assertEqual(self._dock_mode(page), "creation")
+
+    @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
+    def test_underage_apparent_age_rejected_independently(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")
+        page.evaluate(
+            "() => { const f = document.getElementById('creation-field-apparentAge'); "
+            "f.min = ''; f.max = ''; }"
+        )
+        page.evaluate(
+            """() => {
+              const s = Elosern.StateController.getState();
+              Evennia.msg('ui_action', [{
+                protocol_version: 1,
+                presentation_epoch: s.activeEpoch,
+                request_id: 'underage-apparent-1',
+                base_revision: s.revision,
+                action_id: 'creation.custom',
+                payload: {
+                  display_name: '年輕冒險者',
+                  age: 24,
+                  apparent_age: 17,
+                  race: 'human',
+                  subrace: null,
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                },
+              }], {});
+            }"""
+        )
+        deadline = time.monotonic() + 15
+        result = None
+        while time.monotonic() < deadline:
+            result = store_state(page)["lastActionResult"]
+            if (
+                result
+                and result["outcome"] == "rejected"
+                and result["code"] in ("underage_apparent_age", "malformed_payload")
+            ):
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "underage_apparent_age")
+        self.assertIsNone(self._creation_panel(page)["draft"])
+
+
+class ResetAndDraftJourneys(CreationBrowserTest):
+    CREATION_DRAFT = True
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_reset_requires_confirmation_and_clears_the_draft(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(panel["draft"]["mode"], "custom")
+        self.assertEqual(panel["draft"]["display_name"], "草稿角色")
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")
+        # The saved draft restored the form.
+        page.wait_for_function(
+            "() => document.getElementById('creation-field-displayName') && "
+            "document.getElementById('creation-field-displayName').value === '草稿角色'"
+        )
+        # Open the destructive reset confirmation; no mutation may be sent yet.
+        page.evaluate("document.getElementById('creation-reset').focus()")
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        _press(page, "Enter")  # 確認清除
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            panel = self._creation_panel(page)
+            if panel and panel.get("draft") is None:
+                break
+            page.wait_for_timeout(250)
+        self.assertIsNone(panel["draft"])
+        self.assertEqual(sent_action_count(page, "creation.reset"), 1)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertEqual(self._dock_mode(page), "creation")
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_escape_from_reset_confirm_returns_to_form_without_mutation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(panel["draft"]["mode"], "custom")
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")
+        page.wait_for_function(
+            "() => document.getElementById('creation-field-displayName') && "
+            "document.getElementById('creation-field-displayName').value === '草稿角色'"
+        )
+        # Open the destructive reset confirmation, then Escape instead of
+        # confirming: exactly one menu level pops and the draft is preserved.
+        page.evaluate("document.getElementById('creation-reset').focus()")
+        _press(page, "Enter")
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+        _press(page, "Escape")
+        page.wait_for_function(
+            "() => document.getElementById('creation-submit') !== null && "
+            "document.querySelector('.creation-confirm') === null"
+        )
+        # No reset or activation was sent; the saved draft is still intact.
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertEqual(self._creation_panel(page)["draft"]["mode"], "custom")
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_escape_preserves_the_saved_draft(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(panel["draft"]["mode"], "custom")
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+        page.wait_for_function(
+            "() => document.getElementById('creation-field-displayName') && "
+            "document.getElementById('creation-field-displayName').value === '草稿角色'"
+        )
+        _press(page, "Escape")  # pop back to root; values stay on the server
+        page.wait_for_function(
+            "() => document.querySelectorAll('.creation-control').length >= 2"
+        )
+        # The saved server draft was never cleared and no mutation was sent.
+        self.assertEqual(sent_action_count(page, "creation.custom"), 0)
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+        self.assertEqual(self._creation_panel(page)["draft"]["mode"], "custom")
+
+
+class CreationDispatchJourneys(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::creation-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
+    def test_stale_revision_returns_stale_without_mutation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        stale_revision = store_state(page)["revision"] - 1
+
+        page.evaluate(
+            """({stale_revision}) => {
+              const s = Elosern.StateController.getState();
+              Evennia.msg('ui_action', [{
+                protocol_version: 1,
+                presentation_epoch: s.activeEpoch,
+                request_id: 'stale-custom-1',
+                base_revision: stale_revision,
+                action_id: 'creation.custom',
+                payload: {
+                  display_name: '不應儲存',
+                  age: 20,
+                  apparent_age: 20,
+                  race: 'human',
+                  subrace: null,
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                },
+              }], {});
+            }""",
+            {"stale_revision": stale_revision},
+        )
+        result = self._wait_result(page, lambda r: r["requestId"] == "stale-custom-1")
+        self.assertEqual(result["outcome"], "stale")
+        self.assertEqual(result["code"], "stale")
+        self.assertIsNone(self._creation_panel(page)["draft"])
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
+    def test_duplicate_request_executes_custom_once(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        revision = store_state(page)["revision"]
+
+        def send_custom(request_id):
+            page.evaluate(
+                """({revision, request_id}) => {
+                  const s = Elosern.StateController.getState();
+                  Evennia.msg('ui_action', [{
+                    protocol_version: 1,
+                    presentation_epoch: s.activeEpoch,
+                    request_id,
+                    base_revision: revision,
+                    action_id: 'creation.custom',
+                    payload: {
+                      display_name: '重複角色',
+                      age: 20,
+                      apparent_age: 20,
+                      race: 'human',
+                      subrace: null,
+                      allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                    },
+                  }], {});
+                }""",
+                {"revision": revision, "request_id": request_id},
+            )
+
+        send_custom("dup-custom-1")
+        first = self._wait_result(
+            page, lambda r: r["requestId"] == "dup-custom-1" and r["outcome"] == "success"
+        )
+        self.assertEqual(first["outcome"], "success")
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self._creation_panel(page).get("draft"):
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(self._creation_panel(page)["draft"]["display_name"], "重複角色")
+        self.assertEqual(sent_action_count(page, "creation.custom"), 1)
+
+        send_custom("dup-custom-1")
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "creation.custom") >= 2:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(sent_action_count(page, "creation.custom"), 2)
+        page.wait_for_timeout(600)
+        self.assertEqual(self._creation_panel(page)["draft"]["display_name"], "重複角色")
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_stale_custom_preserves_typed_values_and_asks_for_review(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+        page.evaluate("document.getElementById('creation-field-displayName').focus()")
+        page.keyboard.type("尚未送出")
+
+        # A stale custom save cannot resubmit automatically: the server returns
+        # stale and emits a fresh snapshot, so the dock keeps the typed value.
+        stale_revision = store_state(page)["revision"] - 1
+        page.evaluate(
+            """({stale_revision}) => {
+              const s = Elosern.StateController.getState();
+              Evennia.msg('ui_action', [{
+                protocol_version: 1,
+                presentation_epoch: s.activeEpoch,
+                request_id: 'stale-typed-1',
+                base_revision: stale_revision,
+                action_id: 'creation.custom',
+                payload: {
+                  display_name: '不應儲存',
+                  age: 20,
+                  apparent_age: 20,
+                  race: 'human',
+                  subrace: null,
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                },
+              }], {});
+            }""",
+            {"stale_revision": stale_revision},
+        )
+        result = self._wait_result(page, lambda r: r["requestId"] == "stale-typed-1")
+        self.assertEqual(result["outcome"], "stale")
+        # The typed unsent value was preserved and no action was auto-submitted.
+        self.assertEqual(
+            page.evaluate("document.getElementById('creation-field-displayName').value"),
+            "尚未送出",
+        )
+        self.assertEqual(sent_action_count(page, "creation.custom"), 1)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertIsNone(self._creation_panel(page)["draft"])
+
+
+class ReconnectCreationJourney(CreationBrowserTest):
+    CREATION_DRAFT = True
+
+    @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    def test_reconnect_restores_saved_stage_and_never_auto_resubmits(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(panel["draft"]["display_name"], "草稿角色")
+        generation_before = store_state(page)["generation"]
+
+        page.evaluate(
+            "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
+        )
+        page.wait_for_function(
+            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+        )
+        deadline = time.monotonic() + 30
+        reconnects = 0
+        while time.monotonic() < deadline:
+            state = store_state(page)
+            if state["generation"] > generation_before:
+                break
+            if reconnects == 0 and time.monotonic() > deadline - 20:
+                page.evaluate("Evennia.connect()")
+                reconnects += 1
+            page.wait_for_timeout(500)
+        page.wait_for_function(
+            "() => { const s = Elosern.StateController.getState(); "
+            "return s.connected && s.phase === 'active'; }",
+            timeout=30000,
+        )
+        self._wait_creation_available(page)
+        panel = self._creation_panel(page)
+        self.assertTrue(panel["available"])
+        # The draft stage was restored and no activation was auto-submitted.
+        self.assertEqual(panel["draft"]["display_name"], "草稿角色")
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+
+
+class ReconnectPresetCreationJourney(CreationBrowserTest):
+    CREATION_PRESET_DRAFT = True
+
+    @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    def test_reconnect_restores_preset_stage_and_never_auto_activates(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        panel = self._wait_creation_available(page)
+        self.assertEqual(panel["draft"]["mode"], "preset")
+        self.assertEqual(panel["draft"]["stage"], "preset_selected")
+        generation_before = store_state(page)["generation"]
+
+        page.evaluate(
+            "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
+        )
+        page.wait_for_function(
+            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+        )
+        deadline = time.monotonic() + 30
+        reconnects = 0
+        while time.monotonic() < deadline:
+            state = store_state(page)
+            if state["generation"] > generation_before:
+                break
+            if reconnects == 0 and time.monotonic() > deadline - 20:
+                page.evaluate("Evennia.connect()")
+                reconnects += 1
+            page.wait_for_timeout(500)
+        page.wait_for_function(
+            "() => { const s = Elosern.StateController.getState(); "
+            "return s.connected && s.phase === 'active'; }",
+            timeout=30000,
+        )
+        self._wait_creation_available(page)
+        panel = self._creation_panel(page)
+        self.assertTrue(panel["available"])
+        # The preset_selected stage survived the reconnect and no activation was
+        # auto-submitted; the dock resumes at the preset confirmation screen.
+        self.assertEqual(panel["draft"]["mode"], "preset")
+        self.assertEqual(panel["draft"]["stage"], "preset_selected")
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+
+
+class ViewportCreationJourney(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    def test_1280x720_keeps_creation_essentials_visible_and_literal(self):
+        page = self._login_creation((1280, 720))
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self.assertEqual(self._dock_mode(page), "creation")
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+        page.wait_for_function(
+            "() => document.getElementById('creation-submit') !== null"
+        )
+        controls = page.locator(".creation-control")
+        self.assertGreaterEqual(controls.count(), 1)
+        for index in range(controls.count()):
+            self.assertTrue(controls.nth(index).is_visible())
+        # Narrative and status-unavailable surfaces remain visible.
+        self.assertTrue(page.locator(".elosern-narrative").is_visible())
+        placeholder_texts = page.locator(".elosern-placeholder").all_inner_texts()
+        self.assertTrue(
+            all("尚未開放" in text for text in placeholder_texts),
+            "status-unavailable placeholder remains",
+        )
+        # Literal-text safety: no control label is rendered as trusted HTML.
+        for cmd, args, _kw in outbound_messages(page):
+            if cmd == "ui_action":
+                self.assertNotIn("</", str(args))
+        # The creation dock is the sole action-dock owner in creation mode.
+        self.assertEqual(self._dock_mode(page), "creation")
+        creation = self._creation_panel(page)
+        for forbidden in ("persona", "skills", "equipment", "inventory", "magic_level"):
+            self.assertNotIn(forbidden, creation)
+
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main()

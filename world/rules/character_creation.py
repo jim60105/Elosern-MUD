@@ -246,6 +246,15 @@ def activate_player_character(
                 character.attributes.add(key, value)
                 if write_observer:
                     write_observer(key)
+            # Every activation path (Telnet command, WebClient ``activate_draft``)
+            # clears the staging creation draft in the SAME atomic transaction, so
+            # a completed character never retains a draft (webclient-character-
+            # creation-ui D3). This is the single documented finalization write
+            # to ``creation_draft`` outside the wizard's save path.
+            if character.attributes.has("creation_draft"):
+                if write_observer:
+                    write_observer("creation_draft")
+                character.attributes.remove("creation_draft")
     except Exception:
         character.key = old_key
         restore_traits(character, trait_snapshot)

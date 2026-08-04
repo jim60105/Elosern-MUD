@@ -43,6 +43,13 @@
     ) || null;
   }
 
+  function getCreation() {
+    return (
+      window.Elosern &&
+      window.Elosern.creationDock
+    ) || null;
+  }
+
   function getActions() {
     return (
       window.Elosern &&
@@ -245,6 +252,12 @@
           if (services && services.isActive && services.isActive()) {
             services.onRouterEvent(name, payload);
           }
+          // The creation dock keeps its preset list and detail pane in sync
+          // the same way; only the active mode's dock owns the action dock.
+          var creation = getCreation();
+          if (creation && creation.isActive && creation.isActive()) {
+            creation.onRouterEvent(name, payload);
+          }
         },
       });
       window.Elosern.keyboard = router;
@@ -276,6 +289,22 @@
         (item.key && item.key.indexOf("cancel-") === 0)
       ) {
         services.handleItem(item);
+        return;
+      }
+    }
+    // Creation dock navigation events (preset cards, custom form, activation
+    // confirmation) are owned by the creation dock.
+    var creation = getCreation();
+    if (creation && creation.isActive && creation.isActive()) {
+      if (
+        item.openSubmenu ||
+        item.presetKey ||
+        item.actionId === "creation.activate" ||
+        item.actionId === "creation.preset" ||
+        item.actionId === "creation.custom" ||
+        (item.key && item.key.indexOf("cancel-") === 0)
+      ) {
+        creation.handleItem(item);
         return;
       }
     }

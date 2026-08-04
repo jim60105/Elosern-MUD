@@ -110,7 +110,7 @@ class RegistryTests(unittest.TestCase):
     @covers_requirement(
         "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
     )
-    def test_production_registry_exposes_only_combat_and_service_adapters(self):
+    def test_production_registry_exposes_only_combat_service_and_creation_adapters(self):
         registry = build_production_action_registry()
         self.assertEqual(
             registry.action_ids,
@@ -126,6 +126,10 @@ class RegistryTests(unittest.TestCase):
                     "guild.exam_start",
                     "shop.buy",
                     "shop.sell",
+                    "creation.preset",
+                    "creation.custom",
+                    "creation.activate",
+                    "creation.reset",
                 }
             ),
         )

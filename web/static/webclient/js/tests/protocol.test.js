@@ -1634,3 +1634,219 @@ test("services is in the production panel allowlist and a bad panel rejects atom
   assert.equal(accepted.reason, "invalid");
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
+
+// ---------------------------------------------------------------------------
+// creation panel v1 (mirror of web.webclient.presentation.creation).
+// ---------------------------------------------------------------------------
+
+function validCreationPanel(overrides) {
+  const axes = Protocol.CREATION_AXES.map((axis) => ({
+    axis,
+    label: axis === "hp" ? "生命值" : "配點",
+    explanation: "測試說明",
+    minimum: 0,
+    maximum: 100,
+  }));
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "creation",
+      draft: null,
+      presets: [
+        {
+          key: "human_wanderer",
+          display_name: "艾琳",
+          race: "human",
+          race_description: "人類",
+          subrace: null,
+          emphasis: "均衡",
+          background: "旅人",
+        },
+        {
+          key: "elf_guardian",
+          display_name: "瑟芮雅",
+          race: "elf",
+          race_description: "精靈",
+          subrace: "fionnen",
+          emphasis: "守護",
+          background: "護衛",
+        },
+      ],
+      custom: {
+        name: { min_length: 1, max_length: 80 },
+        adult: {
+          age_minimum: 18,
+          age_maximum: 10000,
+          apparent_age_minimum: 18,
+          apparent_age_maximum: 10000,
+        },
+        races: [
+          { key: "human", description: "人類", subraces: null },
+          { key: "elf", description: "精靈", subraces: ["fionnen", "ciaran"] },
+        ],
+        subraces: {
+          fionnen: { display_name_zh: "斐歐恩族", common_name_zh: "森林精靈", specialty: "射術" },
+        },
+        profiles: [
+          { race: "human", subrace: null, budget: 181, axes },
+          { race: "elf", subrace: "fionnen", budget: 37, axes },
+        ],
+      },
+    },
+    overrides
+  );
+}
+
+test("accepts a valid creation panel and the common unavailable form", () => {
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(validCreationPanel()));
+  assert.doesNotThrow(() =>
+    Protocol.validateCreationPanel({
+      schema_version: 1,
+      available: false,
+      reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
+    })
+  );
+});
+
+test("creation panel rejects malformed and unknown-node fields", () => {
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ extra: 1 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ kind: "services" })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
+  const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
+  assert.throws(() => Protocol.validateCreationPanel(badDraft));
+  const personaCard = validCreationPanel();
+  personaCard.presets[0].persona = "forbidden";
+  assert.throws(() => Protocol.validateCreationPanel(personaCard));
+  const unknownProfile = validCreationPanel();
+  unknownProfile.custom.profiles[0].axes[0].axis = "luck";
+  assert.throws(() => Protocol.validateCreationPanel(unknownProfile));
+  const wrongAxes = validCreationPanel();
+  wrongAxes.custom.profiles[0].axes = wrongAxes.custom.profiles[0].axes.slice(0, 5);
+  assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
+});
+
+test("creation panel enforces per-field bounds", () => {
+  assert.throws(() =>
+    Protocol.validateCreationPanel(validCreationPanel({ presets: [] }))
+  );
+  const oversizePresets = validCreationPanel();
+  while (oversizePresets.presets.length < Protocol.CREATION_MAX_PRESETS + 1) {
+    oversizePresets.presets.push(oversizePresets.presets[0]);
+  }
+  assert.throws(() => Protocol.validateCreationPanel(oversizePresets));
+  const longPresetKey = validCreationPanel();
+  longPresetKey.presets[0].key = "x".repeat(Protocol.CREATION_MAX_PRESET_KEY + 1);
+  assert.throws(() => Protocol.validateCreationPanel(longPresetKey));
+  const underageDraft = validCreationPanel({
+    draft: {
+      mode: "custom",
+      stage: "custom_filled",
+      display_name: "新角色",
+      age: 17,
+      apparent_age: 20,
+      race: "human",
+      subrace: null,
+      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0 },
+    },
+  });
+  assert.throws(() => Protocol.validateCreationPanel(underageDraft));
+  const badAllocations = validCreationPanel({
+    draft: {
+      mode: "custom",
+      stage: "custom_filled",
+      display_name: "新角色",
+      age: 20,
+      apparent_age: 20,
+      race: "human",
+      subrace: null,
+      allocations: { hp: 0 },
+    },
+  });
+  assert.throws(() => Protocol.validateCreationPanel(badAllocations));
+});
+
+test("a structurally maximal realistic creation payload fits the envelope", () => {
+  const payload = validCreationPanel();
+  assert.ok(Protocol.jsonByteSize(payload) < Protocol.MAX_CANONICAL_JSON_BYTES / 4);
+});
+
+test("creation payload maximizing every string field fails the byte gate", () => {
+  const huge = "x".repeat(Protocol.CREATION_MAX_EXPLANATION);
+  const axes = Protocol.CREATION_AXES.map((axis, index) => ({
+    axis,
+    label: "x".repeat(Protocol.CREATION_MAX_LABEL - 1) + String(index),
+    explanation: huge,
+    minimum: 0,
+    maximum: 10000,
+  }));
+  const card = {
+    key: "p".repeat(Protocol.CREATION_MAX_PRESET_KEY),
+    display_name: "x".repeat(Protocol.CREATION_MAX_DISPLAY_NAME),
+    race: "r".repeat(Protocol.CREATION_MAX_RACE_KEY),
+    race_description: "x".repeat(Protocol.CREATION_MAX_DESCRIPTION),
+    subrace: "s".repeat(Protocol.CREATION_MAX_SUBRACE_KEY),
+    emphasis: "x".repeat(Protocol.CREATION_MAX_EMPHASIS),
+    background: "x".repeat(Protocol.CREATION_MAX_BACKGROUND),
+  };
+  const race = {
+    key: "r".repeat(Protocol.CREATION_MAX_RACE_KEY),
+    description: "x".repeat(Protocol.CREATION_MAX_DESCRIPTION),
+    subraces: Array(Protocol.CREATION_MAX_SUBRACES).fill("s".repeat(Protocol.CREATION_MAX_SUBRACE_KEY)),
+  };
+  const subraceEntry = {
+    display_name_zh: "x".repeat(Protocol.CREATION_MAX_SPECIALTY),
+    common_name_zh: "x".repeat(Protocol.CREATION_MAX_SPECIALTY),
+    specialty: "x".repeat(Protocol.CREATION_MAX_SPECIALTY),
+  };
+  const subraces = {};
+  for (let i = 0; i < Protocol.CREATION_MAX_SUBRACES; i++) {
+    subraces["s" + i] = Object.assign({}, subraceEntry);
+  }
+  const profile = {
+    race: "r".repeat(Protocol.CREATION_MAX_RACE_KEY),
+    subrace: "s".repeat(Protocol.CREATION_MAX_SUBRACE_KEY),
+    budget: 999999,
+    axes,
+  };
+  const payload = {
+    schema_version: 1,
+    available: true,
+    kind: "creation",
+    draft: null,
+    presets: Array(Protocol.CREATION_MAX_PRESETS).fill(Object.assign({}, card)),
+    custom: {
+      name: { min_length: 1, max_length: 80 },
+      adult: {
+        age_minimum: 18,
+        age_maximum: 10000,
+        apparent_age_minimum: 18,
+        apparent_age_maximum: 10000,
+      },
+      races: Array(Protocol.CREATION_MAX_RACES).fill(Object.assign({}, race)),
+      subraces,
+      profiles: Array(Protocol.CREATION_MAX_PROFILES).fill(Object.assign({}, profile)),
+    },
+  };
+  assert.ok(Protocol.jsonByteSize(payload) > Protocol.MAX_CANONICAL_JSON_BYTES);
+  assert.throws(() => Protocol.validateCreationPanel(payload), /envelope/);
+});
+
+test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 1,
+    mode: "creation",
+    panels: { creation: { ...validCreationPanel(), kind: "bogus" } },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  const store = Protocol.createStore();
+  store.beginTransport(1);
+  const accepted = store.receive(1, "ui_snapshot", [envelope], {});
+  assert.equal(accepted.accepted, false);
+  assert.equal(accepted.reason, "invalid");
+  assert.equal(store.getState().phase, "awaiting_initial_snapshot");
+});

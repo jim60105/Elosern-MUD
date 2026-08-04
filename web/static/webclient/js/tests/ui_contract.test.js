@@ -51,3 +51,32 @@ test("narrative preserves scrollback position with an unread count", () => {
   assert.match(source, /narrativeUnread/);
   assert.match(source, /wasAtBottom/);
 });
+
+test("creation dock and menu insert text via text APIs and never trust HTML", () => {
+  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
+  const menu = read("web/static/webclient/js/elosern/creation_menu.js");
+  assert.ok(/createTextNode/.test(dock), "dock inserts text through text APIs");
+  for (const source of [dock, menu]) {
+    assert.strictEqual(/innerHTML/.test(source), false, "no innerHTML interpolation");
+  }
+  // The DOM-independent menu model never touches the document at load time.
+  assert.strictEqual(/document\./.test(menu), false, "menu stays DOM-independent");
+});
+
+test("creation dock and menu never write canonical or draft state to localStorage", () => {
+  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
+  const menu = read("web/static/webclient/js/elosern/creation_menu.js");
+  for (const source of [dock, menu]) {
+    assert.strictEqual(
+      /localStorage/.test(source),
+      false,
+      "creation state must never be stored client-side"
+    );
+  }
+});
+
+test("creation dock adult fields advertise the 18 minimum", () => {
+  const source = read("web/static/webclient/js/plugins/creation_dock.js");
+  assert.match(source, /實際年齡（至少 18）/);
+  assert.match(source, /外表年齡（至少 18）/);
+});

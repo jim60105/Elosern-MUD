@@ -18,6 +18,14 @@ class PlayerCharacter(LivingEntity):
     onboarding_beat: str | None = AttributeProperty(default=None)
     guide_progress: dict = AttributeProperty(default=dict)
     first_arrival_seen: bool = AttributeProperty(default=False)
+    # Server-owned creation-wizard staging draft (webclient-character-creation-
+    # ui D3). The single-writer rule is enforced by code review: every write
+    # routes through world.rules.creation_wizard, which is the sole writer.
+    # It is staging state, not canonical identity; it is cleared atomically
+    # with activation and never sets age/race/traits/creation_pending.
+    # autocreate=False so reading the property never materializes an empty
+    # staging attribute on every pending shell.
+    creation_draft: dict | None = AttributeProperty(default=None, autocreate=False)
 
     def at_cmdset_get(self, **kwargs) -> None:
         """Derive the creation gate from persistent state for every merge."""

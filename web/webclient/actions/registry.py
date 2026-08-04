@@ -68,14 +68,16 @@ class ActionRegistry:
 
 
 def build_production_action_registry() -> ActionRegistry:
-    """Return the production action registry with the combat and service adapters.
+    """Return the production action registry with the combat, service, and creation adapters.
 
     The registry contains exactly the three combat adapters (``combat.cast``,
-    ``combat.flee``, ``combat.forfeit``) plus the seven service adapters
+    ``combat.flee``, ``combat.forfeit``), the seven service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
-    ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``).
-    Each action binds one exact payload validator and one narrow deterministic
-    adapter; no action routes through the text parser.
+    ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
+    and the four creation adapters (``creation.preset``, ``creation.custom``,
+    ``creation.activate``, ``creation.reset``). Each action binds one exact
+    payload validator and one narrow deterministic adapter; no action routes
+    through the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _cast_adapter,
@@ -84,6 +86,16 @@ def build_production_action_registry() -> ActionRegistry:
         validate_cast_payload,
         validate_flee_payload,
         validate_forfeit_payload,
+    )
+    from web.webclient.actions.creation_actions import (
+        _creation_activate_adapter,
+        _creation_custom_adapter,
+        _creation_preset_adapter,
+        _creation_reset_adapter,
+        validate_creation_activate_payload,
+        validate_creation_custom_payload,
+        validate_creation_preset_payload,
+        validate_creation_reset_payload,
     )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
@@ -181,6 +193,40 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_sell_payload,
             adapter=_sell_adapter,
             affected_panels=("status", "services"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.preset",
+            validate_payload=validate_creation_preset_payload,
+            adapter=_creation_preset_adapter,
+            affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.custom",
+            validate_payload=validate_creation_custom_payload,
+            adapter=_creation_custom_adapter,
+            affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.activate",
+            validate_payload=validate_creation_activate_payload,
+            adapter=_creation_activate_adapter,
+            # No affected panels: activation publishes a full snapshot so the
+            # exploration hand-off is atomic (design D5).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.reset",
+            validate_payload=validate_creation_reset_payload,
+            adapter=_creation_reset_adapter,
+            affected_panels=("creation",),
         )
     )
     return registry
