@@ -35,6 +35,17 @@ class DeterministicGaugeTrait(GaugeTrait):
         """Read stored state without applying elapsed real time."""
         return self._enforce_boundaries(current)
 
+    def _enforce_boundaries(self, value):
+        """Clamp like the base trait, then coerce to integral storage.
+
+        The Evennia base clamp returns the configured float ``max`` boundary
+        verbatim when a gauge is full, so any write at full renders the stored
+        current as a float. The character model stores integer gauges (the
+        status read model rejects floats), so every boundary value is rounded
+        to the nearest integer here.
+        """
+        return round(super()._enforce_boundaries(value))
+
     def _check_and_start_timer(self, value):
         """Keep the public setter deterministic."""
         return value

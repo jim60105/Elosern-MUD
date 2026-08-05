@@ -313,6 +313,22 @@
       if (text.trim() === "") {
         return;
       }
+      // Free-form dialogue intercepts the drawer: the exploration dock holds
+      // the server-authored NPC reference and submits `explore.talk_freeform`
+      // with the typed speech instead of sending ordinary text.
+      var exploration = window.Elosern && window.Elosern.explorationDock;
+      if (
+        exploration &&
+        typeof exploration.consumeFreeformText === "function" &&
+        exploration.consumeFreeformText(text)
+      ) {
+        field.value = "";
+        var ui = window.Elosern && window.Elosern.ui;
+        if (ui && typeof ui.closeDrawer === "function") {
+          ui.closeDrawer(true);
+        }
+        return;
+      }
       if (window.plugin_handler && typeof window.plugin_handler.onSend === "function") {
         window.plugin_handler.onSend(text);
       } else if (window.Evennia) {
@@ -454,16 +470,19 @@
         nodeEl.appendChild(labelEl);
         nodeEl.setAttribute("aria-label", node.label);
         // A remembered remote node focuses its name/landmark and carries no
-        // travel action (the move adapter is the exploration-menu unit).
+        // travel action.
         if (node.visibility === "remembered") {
           nodeEl.classList.add("node-focusable");
           nodeEl.addEventListener("click", function () {
             focusLocalMapNode(root, model, node);
           });
         } else if (node.action !== null) {
-          // Adjacent traversable nodes remain inert in this change: clicking
-          // does nothing until the exploration-menu unit registers movement.
+          // Adjacent traversable nodes submit `explore.move` with the move
+          // descriptor's `exit_ref` and the panel's `current_node`.
           nodeEl.classList.add("node-action-ready");
+          nodeEl.addEventListener("click", function () {
+            submitLocalMapMove(panel, node);
+          });
         }
         canvas.appendChild(nodeEl);
       });
@@ -776,6 +795,25 @@
       });
       unsubscribers.push(unsubscribeFocus);
     }
+    }
+
+  // Adjacent traversable map nodes submit `explore.move` through their move
+  // descriptor (webclient-local-map). The submitted `exit_ref` and
+  // `current_node` come only from the validated payload; a remembered remote
+  // node (action null) stays inert, and nothing is ever invented client-side.
+  function submitLocalMapMove(panel, node) {
+    var actions = window.Elosern && window.Elosern.actions;
+    if (!actions || !node.action || node.action.kind !== "move") {
+      return;
+    }
+    var currentNode = panel && panel.current_node;
+    if (!currentNode) {
+      return;
+    }
+    actions.submit("explore.move", {
+      exit_ref: node.action.exit_ref,
+      current_node: currentNode,
+    });
   }
 
   function registerComponents(layout) {

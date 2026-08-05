@@ -107,10 +107,20 @@ class RegistryTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             registry.spec("combat.cast")
 
+    def test_validate_and_adapter_resolves_the_registered_spec(self):
+        registry = ActionRegistry("test")
+        spec = _proof_spec()
+        registry.register(spec)
+        resolved, adapter = registry.validate_and_adapter("proof.noop")
+        self.assertIs(resolved, spec)
+        self.assertEqual(
+            adapter("actor", {}), spec.adapter("actor", {})
+        )
+
     @covers_requirement(
         "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
     )
-    def test_production_registry_exposes_only_combat_service_and_creation_adapters(self):
+    def test_production_registry_exposes_only_specified_adapters(self):
         registry = build_production_action_registry()
         self.assertEqual(
             registry.action_ids,
@@ -130,6 +140,12 @@ class RegistryTests(unittest.TestCase):
                     "creation.custom",
                     "creation.activate",
                     "creation.reset",
+                    "explore.move",
+                    "explore.look",
+                    "explore.talk_scripted",
+                    "explore.talk_freeform",
+                    "explore.engage",
+                    "explore.wait",
                 }
             ),
         )

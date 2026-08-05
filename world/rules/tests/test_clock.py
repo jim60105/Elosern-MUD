@@ -14,8 +14,10 @@ from world.rules.clock import (
     WorldClock,
     WorldDateTime,
     _STAGE_ORDER,
+    _has_settlement_work,
     _settle_buffs_and_decay,
     _settle_gauge_regen,
+    _try_accrue_magic_study,
     settle_combat_result,
     register_event_source,
     seconds_until_daypart,
@@ -71,6 +73,34 @@ class ClockTests(unittest.TestCase):
         entity = Entity()
         _settle_gauge_regen([entity], 28800)
         self.assertEqual(entity.traits.hp.current, 100)
+
+    def test_fractional_regen_is_floored_to_integer_storage(self):
+        entity = Entity()
+        entity.traits.hp = Gauge(10, 100, 0.5)
+        _settle_gauge_regen([entity], 45)
+        self.assertIsInstance(entity.traits.hp.current, int)
+        self.assertEqual(entity.traits.hp.current, 32)
+        self.assertEqual(entity.traits.hp.regen_remainder, 0.5)
+
+    def test_segmented_regen_matches_one_equal_length_advance(self):
+        segment = Entity()
+        segment.traits.hp = Gauge(10, 125, 1.25)
+        single = Entity()
+        single.traits.hp = Gauge(10, 125, 1.25)
+        _settle_gauge_regen([segment], 30)
+        _settle_gauge_regen([segment], 30)
+        _settle_gauge_regen([single], 60)
+        self.assertEqual(segment.traits.hp.current, single.traits.hp.current)
+        self.assertEqual(segment.traits.hp.current, 85)
+        self.assertEqual(segment.traits.hp.regen_remainder, 0.0)
+        self.assertEqual(single.traits.hp.regen_remainder, 0.0)
+
+    def test_regen_remainder_resets_when_a_gauge_clamps_at_full(self):
+        entity = Entity()
+        entity.traits.hp = Gauge(99, 125, 1.25)
+        _settle_gauge_regen([entity], 30)
+        self.assertEqual(entity.traits.hp.current, 125)
+        self.assertEqual(entity.traits.hp.regen_remainder, 0.0)
 
     @covers_requirement("settlement-stage-order::long-jumps-settle-in-quanta-not-per-second-steps-with-an-early-exit-once-nothing")
     def test_no_work_exits_before_a_quantum(self):
@@ -178,6 +208,42 @@ class ClockTests(unittest.TestCase):
         self.assertLess(_STAGE_ORDER.index("sexual_decay"), _STAGE_ORDER.index("magic_study"))
         self.assertLess(_STAGE_ORDER.index("magic_study"), _STAGE_ORDER.index("daily_resets"))
 
+    def test_negative_tick_and_negative_advance_fail_closed(self):
+        with self.assertRaises(ValueError):
+            WorldDateTime.from_tick(-1)
+        with self.assertRaises(ValueError):
+            WorldClock().advance(-1, AdvanceSource.SKIP, [])
+
+    def test_buffed_actor_is_detected_as_settlement_work(self):
+        buff = SimpleNamespace(
+            paused=False, stacks=1, remaining_seconds=300, tick_interval=None
+        )
+        entity = Entity()
+        entity.buffs = SimpleNamespace(all={"poisoned": buff})
+        self.assertTrue(_has_settlement_work(entity))
+        idle = Entity()
+        self.assertFalse(_has_settlement_work(idle))
+
+    def test_magic_study_import_failure_degrades_gracefully(self):
+        with patch.dict(sys.modules, {"world.rules.progression": None}):
+            _try_accrue_magic_study((), 60, AdvanceSource.SKIP)
+
+    def test_invalid_settlement_interval_fails_module_validation(self):
+        import importlib
+
+        import world.rules.clock as clock_module
+        import world.rules.sexual_state as sexual_state
+
+        original = dict(sexual_state.DECAY_CONFIG)
+        sexual_state.DECAY_CONFIG["fake_bad"] = {"interval_seconds": 0}
+        try:
+            with self.assertRaises(ValueError):
+                importlib.reload(clock_module)
+        finally:
+            sexual_state.DECAY_CONFIG.clear()
+            sexual_state.DECAY_CONFIG.update(original)
+            importlib.reload(clock_module)
+
 
 class WorldClockPersistenceTests(EvenniaTest):
     @covers_requirement("settlement-stage-order::scheduledevent-is-a-plain-json-compatible-record-with-no-live-entity-references", "world-clock::tick-is-persisted-via-a-non-repeating-script-used-purely-as-an-attribute-container")
@@ -187,3 +253,21 @@ class WorldClockPersistenceTests(EvenniaTest):
         clock = get_world_clock()
         clock.advance(7, AdvanceSource.COMBAT, [])
         self.assertEqual(get_world_clock().tick, 7)
+
+    def test_gauge_persistence_stays_integral_with_regen_remainder(self):
+        from typeclasses.characters import PlayerCharacter
+        from evennia.utils.create import create_object
+        from world.rules.clock import _settle_gauge_regen
+
+        entity = create_object(PlayerCharacter, key="regen gauge keeper")
+        entity.race = "human"
+        entity.apply_race_baseline()
+        entity.traits.hp.current = 10
+        entity.traits.hp.base = 125
+        entity.traits.hp.rate = 1.25
+
+        _settle_gauge_regen([entity], 30)
+        stored_after = entity.attributes.get("traits", category="traits")["hp"]
+        self.assertIsInstance(stored_after["current"], int)
+        self.assertEqual(stored_after["current"], 47)
+        self.assertEqual(stored_after["regen_remainder"], 0.5)

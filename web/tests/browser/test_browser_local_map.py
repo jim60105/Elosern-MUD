@@ -68,7 +68,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         panel = self._wait_local_map_available(page)
         self.assertEqual(panel["layer"], "grid")
-        self.assertEqual(panel["current_node"], "grid:capital_altoria:2:0")
+        # The shared server character may already stand at an adjacent grid
+        # node (an earlier journey submits ``explore.move``), so the current
+        # node is asserted position-agnostic: any capital grid node renders.
+        self.assertTrue(panel["current_node"].startswith("grid:capital_altoria:"))
 
         # The surface renders legend text as text nodes and a current node.
         page.wait_for_selector(".elosern-local-map .local-map-title")
@@ -149,6 +152,32 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
     )
+    @covers_requirement("webclient-local-map::adjacent-traversable-map-nodes-submit-explore-move-through-their-move-descriptor")
+    def test_adjacent_traversable_node_submits_explore_move(self):
+        page = self.logged_in_page()
+        from .browser_helpers import install_outbound_recorder, sent_action_count
+
+        install_outbound_recorder(page)
+        self._wait_local_map_available(page)
+        action_ready = page.locator(".local-map-node.node-action-ready")
+        self.assertGreaterEqual(action_ready.count(), 1)
+        action_ready.first.click()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "explore.move") >= 1:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        sent = page.evaluate("window.__elosernSent || []")
+        payload = next(
+            args[0]["payload"]
+            for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "explore.move"
+        )
+        panel = self._local_map_panel(page)
+        self.assertEqual(payload["current_node"], panel["current_node"])
+        self.assertTrue(payload["exit_ref"])
+
     def test_minimap_visible_and_keyboard_usable_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):

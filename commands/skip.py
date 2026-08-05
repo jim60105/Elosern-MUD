@@ -1,63 +1,40 @@
-"""Player-facing deterministic rest, sleep, and wait commands."""
+"""Player-facing deterministic rest, sleep, and wait commands.
 
-import math
-import re
+The duration parsing, full-regen computation, safety gate, and summary
+rendering all delegate to the shared ``world.rules.time_skip`` helper (design
+D7) so the WebClient ``explore.wait`` adapter and the typed commands can never
+diverge. The clock advance uses the module-level ``get_world_clock`` name so
+the deterministic command tests can keep patching it.
+"""
 
 from evennia import Command
 
 from world.rules.clock import (
     AdvanceSource,
-    CLOCK_YAML,
     DaypartError,
-    ScheduledEvent,
     get_world_clock,
     seconds_until_daypart,
 )
-from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
-from world.rules.traits import GAUGE_KEYS
+from world.rules.skip_safety import evaluate_skip_safety
+from world.rules.time_skip import (
+    DurationParseError,
+    parse_duration,
+    rejection_message,
+    render_skip_summary,
+    seconds_to_full_regen,
+)
 
-
-class DurationParseError(ValueError):
-    """Raised for an explicit rest duration with unsupported syntax."""
-
-
-_DURATION_RE = re.compile(r"^(?P<amount>\d+)\s*(?P<unit>[smhd])$")
-_UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
-_REJECTIONS = {
-    SkipRejectReason.IN_COMBAT: "你仍在戰鬥中，無法跳過時間。",
-    SkipRejectReason.HOSTILE_PRESENT: "附近有活著的怪物，這裡不安全。",
-}
-
-
-def _parse_duration(text: str) -> int:
-    match = _DURATION_RE.fullmatch(text.strip())
-    if match is None:
-        raise DurationParseError("duration must use <number><s|m|h|d>")
-    return int(match["amount"]) * _UNIT_SECONDS[match["unit"]]
-
-
-def _seconds_to_full_regen(entity) -> int:
-    seconds = 0
-    for key in GAUGE_KEYS:
-        gauge = getattr(entity.traits, key)
-        rate = float(getattr(gauge, "rate", 0))
-        if rate > 0 and gauge.value < gauge.max:
-            seconds = max(seconds, math.ceil((gauge.max - gauge.value) / rate))
-    return min(seconds, CLOCK_YAML["max_sleep_seconds"])
-
-
-def _render_skip_summary(seconds: int, events: list[ScheduledEvent]) -> str:
-    message = f"時間經過了 {seconds} 秒。"
-    if any(event.kind == "daily_reset" for event in events):
-        message += " 新的一天開始了。"
-    return message
+# Thin names retained for the deterministic command tests.
+_parse_duration = parse_duration
+_seconds_to_full_regen = seconds_to_full_regen
+_render_skip_summary = render_skip_summary
 
 
 def _safe_to_skip(caller) -> bool:
     reason = evaluate_skip_safety(caller)
     if reason is None:
         return True
-    caller.msg(_REJECTIONS[reason])
+    caller.msg(rejection_message(reason))
     return False
 
 

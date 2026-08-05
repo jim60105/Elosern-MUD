@@ -1,6 +1,7 @@
 """Presenter registry contract tests (foundation section 1.2)."""
 
 import unittest
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -16,10 +17,10 @@ def _context(actor=None):
     return PresentationContext(actor=actor, protocol_version=1)
 
 
-def _spec(name="status", presenter=None):
+def _spec(name="status", presenter=None, schema_version=1):
     return PresenterSpec(
         name=name,
-        schema_version=1,
+        schema_version=schema_version,
         unavailable_reason=("missing_data", "無法讀取角色資料"),
         presenter=presenter or (lambda context: {"available": True, "value": 1}),
     )
@@ -84,6 +85,32 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(payload["reason"]["correlation_id"], "d" * 32)
         self.assertNotIn("traceback", json_repr(payload))
         self.assertNotIn("exception", json_repr(payload))
+
+    def test_registration_rejects_invalid_schema_version(self):
+        registry = PresentationRegistry("test")
+        with self.assertRaises(ProtocolValidationError):
+            registry.register(_spec(schema_version=0))
+
+    def test_presenter_non_available_payload_is_rejected(self):
+        registry = PresentationRegistry("test")
+        registry.register(_spec(presenter=lambda context: {"available": False}))
+        with self.assertRaises(ProtocolValidationError):
+            registry.render("status", _context())
+        registry = PresentationRegistry("test")
+        registry.register(_spec(presenter=lambda context: [1, 2]))
+        with self.assertRaises(ProtocolValidationError):
+            registry.render("status", _context())
+
+    def test_logger_failure_still_isolates_presenter_errors(self):
+        registry = PresentationRegistry("test")
+        registry.register(_spec(presenter=lambda context: 1 / 0))
+        with patch(
+            "evennia.utils.logger.log_trace",
+            side_effect=RuntimeError("log down"),
+        ):
+            payload = registry.render("status", _context())
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "internal_presenter_error")
 
 
 def json_repr(payload):

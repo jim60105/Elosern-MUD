@@ -17,6 +17,9 @@ from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
 from world.rules.status_display import display_for
 
 _GAUGE_KEYS = ("hp", "mp", "sp")
+_STATIC_KEYS = ("atk_phys", "agility", "defense")
+_COUNTER_KEYS = ("magic_level", "guild_merit")
+_EQUIPMENT_SLOTS = ("weapon_main", "weapon_off", "armor")
 _BUFF_CACHE_KEY = "buffs"
 _SEXUAL_TRAITS_KEY = "sexual_traits"
 _SEXUAL_TRAITS_CATEGORY = "traits"
@@ -85,6 +88,44 @@ class StatusReadModel:
     combat_mode: str | None
     combat_round: int | None
     creation_pending: bool
+
+
+@dataclass(frozen=True)
+class CharacterTraitView:
+    """One read-only character trait row: gauges report current/maximum."""
+
+    key: str
+    current: int
+    maximum: int | None
+
+
+@dataclass(frozen=True)
+class CharacterEquipmentView:
+    """One read-only equipped item row (slot plus canonical item key)."""
+
+    slot: str
+    item_key: str
+
+
+@dataclass(frozen=True)
+class CharacterReadModel:
+    """The complete read-only inputs of the version-1 ``character`` panel.
+
+    Shares the same canonical trait storage the compact ``status`` panel reads,
+    so the two panels cannot drift apart: gauges go through the same strict
+    ``_require_gauge`` parser and statics/counters through the same trait dict.
+    Every value is true state; ``disguise_displayed`` is reported separately
+    and is never substituted for a true trait.
+    """
+
+    traits: tuple[CharacterTraitView, ...]
+    passive_keys: tuple[str, ...]
+    equipment: tuple[CharacterEquipmentView, ...]
+    disguise_active: bool
+    disguise_displayed: tuple[tuple[str, int], ...]
+    guild_rank: str | None
+    guild_merit: int
+    wallet: int
 
 
 def _read_attribute(entity: Any, key: str, default=None, category: str | None = None) -> Any:
@@ -274,4 +315,119 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
         combat_mode=None if combat is None else combat[0],
         combat_round=None if combat is None else combat[1],
         creation_pending=bool(getattr(entity, "creation_pending", False)),
+    )
+
+
+def _require_static_trait(traits_data: dict[str, Any], key: str) -> int:
+    raw = traits_data.get(key)
+    if not isinstance(raw, Mapping):
+        raise StatusQueryError(f"trait {key!r} is missing")
+    base = raw.get("current", raw.get("base"))
+    if isinstance(base, bool) or not isinstance(base, int):
+        raise StatusQueryError(f"trait {key!r} base is not an integer")
+    return base
+
+
+def _read_guild_merit(traits_data: dict[str, Any]) -> int:
+    merit = _require_static_trait(traits_data, "guild_merit")
+    if merit < 0:
+        raise StatusQueryError("guild_merit is negative")
+    return merit
+
+
+def _read_passive_keys(entity: Any) -> tuple[str, ...]:
+    raw = entity.db.skills
+    if not isinstance(raw, Mapping):
+        return ()
+    passive = raw.get("passive")
+    if not _is_list_like(passive):
+        return ()
+    return tuple(str(key) for key in passive if isinstance(key, str) and key)
+
+
+def _is_list_like(value: Any) -> bool:
+    """Whether ``value`` behaves like a bounded sequence of elements.
+
+    Evennia deserializes stored lists as ``_SaverList`` (a
+    ``MutableSequence``, not a ``list`` subclass), so the check must accept any
+    non-string sequence.
+    """
+    from collections.abc import Sequence
+
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def _read_equipment(entity: Any) -> tuple[CharacterEquipmentView, ...]:
+    raw = entity.db.equipment
+    if not isinstance(raw, Mapping):
+        return ()
+    rows: list[CharacterEquipmentView] = []
+    for slot in _EQUIPMENT_SLOTS:
+        value = raw.get(slot)
+        if isinstance(value, str) and value:
+            rows.append(CharacterEquipmentView(slot, value))
+    accessories = raw.get("accessories")
+    if _is_list_like(accessories):
+        for value in accessories:
+            if isinstance(value, str) and value:
+                rows.append(CharacterEquipmentView("accessory", value))
+    return tuple(rows)
+
+
+def _read_disguise(entity: Any) -> tuple[bool, tuple[tuple[str, int], ...]]:
+    raw = _read_attribute(entity, "disguised_stats", default=None)
+    if raw is None:
+        return False, ()
+    if not isinstance(raw, Mapping):
+        raise StatusQueryError("disguised_stats is malformed")
+    displayed: list[tuple[str, int]] = []
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key:
+            raise StatusQueryError("disguised_stats key is malformed")
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise StatusQueryError(f"disguised_stats {key!r} is not an integer")
+        displayed.append((key, value))
+    displayed.sort(key=lambda entry: entry[0])
+    return True, tuple(displayed)
+
+
+def _read_wallet(entity: Any) -> int:
+    raw = entity.db.wallet
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise StatusQueryError("wallet is malformed")
+    return raw
+
+
+def build_character_read_model(entity: Any) -> CharacterReadModel:
+    """Build the frozen character read model or raise :class:`StatusQueryError`.
+
+    Reads the same canonical trait dict the status model reads, so the expanded
+    character surface and the compact status surface agree on every shared
+    value. Equipment, disguise, guild, and wallet are read strictly and fail
+    closed when malformed; no handler is materialized and nothing is written.
+    """
+    traits_data = _read_attribute(
+        entity, "traits", default=None, category="traits"
+    )
+    if not isinstance(traits_data, Mapping):
+        raise StatusQueryError("trait storage is unavailable")
+    traits_data = dict(traits_data)
+
+    traits: list[CharacterTraitView] = []
+    for key in _GAUGE_KEYS:
+        gauge = _require_gauge(traits_data, key)
+        traits.append(CharacterTraitView(key, gauge.current, gauge.maximum))
+    for key in _STATIC_KEYS + _COUNTER_KEYS:
+        traits.append(CharacterTraitView(key, _require_static_trait(traits_data, key), None))
+
+    disguise_active, disguise_displayed = _read_disguise(entity)
+    return CharacterReadModel(
+        traits=tuple(traits),
+        passive_keys=_read_passive_keys(entity),
+        equipment=_read_equipment(entity),
+        disguise_active=disguise_active,
+        disguise_displayed=disguise_displayed,
+        guild_rank=getattr(entity, "guild_rank", None),
+        guild_merit=_read_guild_merit(traits_data),
+        wallet=_read_wallet(entity),
     )

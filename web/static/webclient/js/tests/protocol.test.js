@@ -1975,3 +1975,439 @@ test("creation is in the production panel allowlist and a bad panel rejects atom
   assert.equal(accepted.reason, "invalid");
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
+
+// ---------------------------------------------------------------------------
+// exploration panel v1 (design D10)
+// ---------------------------------------------------------------------------
+
+function validExplorationKeyword(overrides) {
+  return Object.assign({ keyword_id: "公會", label: "公會" }, overrides || {});
+}
+
+function validExplorationAffordance(overrides) {
+  return Object.assign(
+    {
+      kind: "action",
+      action_id: "explore.talk_scripted",
+      label: "交談",
+      enabled: true,
+      disabled_reason: null,
+    },
+    overrides || {}
+  );
+}
+
+function validExplorationMoveRow(overrides) {
+  return Object.assign(
+    {
+      exit_ref: "42",
+      label: "東",
+      destination: "room:7",
+      enabled: true,
+      disabled_reason: null,
+    },
+    overrides || {}
+  );
+}
+
+function validExplorationLookEntity(overrides) {
+  return Object.assign(
+    { identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null },
+    overrides || {}
+  );
+}
+
+function validExplorationLookObject(overrides) {
+  return Object.assign({ identity: 6, display_name: "木箱" }, overrides || {});
+}
+
+function validExplorationTarget(overrides) {
+  return Object.assign(
+    {
+      identity: 5,
+      display_name: "南門守衛",
+      portrait_ref: null,
+      affordances: [validExplorationAffordance()],
+      keywords: [validExplorationKeyword()],
+    },
+    overrides || {}
+  );
+}
+
+function validExplorationPanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "exploration",
+      move: [validExplorationMoveRow()],
+      look: {
+        room: { identity: 3, display_name: "南門", room: true },
+        entities: [validExplorationLookEntity()],
+        objects: [validExplorationLookObject()],
+      },
+      interact: [validExplorationTarget()],
+      character: { available: true },
+      quests: { available: true },
+      inventory: { available: true },
+    },
+    overrides || {}
+  );
+}
+
+test("validates the exploration panel available/unavailable discriminator", () => {
+  assert.deepEqual(
+    Protocol.validateExplorationPanel(unavailableStatusPanel()),
+    unavailableStatusPanel()
+  );
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
+  assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));
+  assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ kind: "services" })));
+  assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 2 })));
+});
+
+test("enforces exploration D10 bounds", () => {
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        move: Array(Protocol.EXPLORATION_MAX_MOVE_EXITS + 1).fill(validExplorationMoveRow()),
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        move: [validExplorationMoveRow({ exit_ref: "x".repeat(Protocol.EXPLORATION_MAX_EXIT_REF + 1) })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        move: [validExplorationMoveRow({ exit_ref: "中文" })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        move: [validExplorationMoveRow({ destination: "not:a:node" })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        look: {
+          ...validExplorationPanel().look,
+          entities: Array(Protocol.EXPLORATION_MAX_LOOK_ENTITIES + 1).fill(validExplorationLookEntity()),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        look: {
+          ...validExplorationPanel().look,
+          objects: Array(Protocol.EXPLORATION_MAX_LOOK_OBJECTS + 1).fill(validExplorationLookObject()),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: Array(Protocol.EXPLORATION_MAX_INTERACT_TARGETS + 1).fill(validExplorationTarget()),
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: Array(Protocol.EXPLORATION_MAX_AFFORDANCES + 1).fill(
+              {
+                kind: "action",
+                action_id: "explore.engage",
+                label: "戰鬥",
+                enabled: true,
+                disabled_reason: null,
+              }
+            ),
+          }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS + 1).fill(
+              validExplorationKeyword()
+            ),
+          }),
+        ],
+      })
+    )
+  );
+});
+
+test("affordance shapes are exact in the exploration panel", () => {
+  // navigate never carries an action_id; action never carries a surface.
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: [
+              {
+                kind: "navigate",
+                action_id: "explore.talk_scripted",
+                surface: "guild",
+                label: "公會服務",
+                enabled: true,
+                disabled_reason: null,
+              },
+            ],
+          }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: [
+              {
+                kind: "action",
+                surface: "guild",
+                label: "公會服務",
+                enabled: true,
+                disabled_reason: null,
+              },
+            ],
+          }),
+        ],
+      })
+    )
+  );
+  // Keywords require a talk_scripted affordance on the target.
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: [
+              validExplorationAffordance({ action_id: "explore.engage" }),
+            ],
+          }),
+        ],
+      })
+    )
+  );
+  // explore.take is outside the closed action set.
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: [
+              {
+                kind: "action",
+                action_id: "explore.take",
+                label: "拾取",
+                enabled: true,
+                disabled_reason: null,
+              },
+            ],
+          }),
+        ],
+      })
+    )
+  );
+});
+
+test("exploration portrait_ref must be null and entries exact", () => {
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({ interact: [validExplorationTarget({ portrait_ref: "cat:goblin" })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        look: {
+          ...validExplorationPanel().look,
+          entities: [validExplorationLookEntity({ portrait_ref: "cat:goblin" })],
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(validExplorationPanel({ quests: { available: "yes" } }))
+  );
+});
+
+test("worst-case exploration payload fits the envelope and all-ceilings fails closed", () => {
+  const interact = [];
+  for (let i = 0; i < Protocol.EXPLORATION_MAX_INTERACT_TARGETS; i++) {
+    const affordances = [validExplorationAffordance()];
+    for (let j = 1; j < Protocol.EXPLORATION_MAX_AFFORDANCES; j++) {
+      affordances.push({
+        kind: "action",
+        action_id: "explore.engage",
+        label: "戰鬥",
+        enabled: true,
+        disabled_reason: null,
+      });
+    }
+    interact.push(
+      validExplorationTarget({
+        identity: i + 1,
+        affordances,
+        keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS).fill(
+          validExplorationKeyword()
+        ),
+      })
+    );
+  }
+  const worst = validExplorationPanel({
+    move: Array(Protocol.EXPLORATION_MAX_MOVE_EXITS).fill(validExplorationMoveRow()),
+    look: {
+      room: { identity: 3, display_name: "南門", room: true },
+      entities: Array(Protocol.EXPLORATION_MAX_LOOK_ENTITIES).fill(validExplorationLookEntity()),
+      objects: Array(Protocol.EXPLORATION_MAX_LOOK_OBJECTS).fill(validExplorationLookObject()),
+    },
+    interact,
+  });
+  const normalized = Protocol.validateExplorationPanel(worst);
+  assert.ok(Protocol.jsonByteSize(normalized) <= Protocol.MAX_CANONICAL_JSON_BYTES);
+
+  const overInteract = [];
+  for (let i = 0; i < Protocol.EXPLORATION_MAX_INTERACT_TARGETS; i++) {
+    overInteract.push(
+      validExplorationTarget({
+        identity: i + 1,
+        affordances: Array(Protocol.EXPLORATION_MAX_AFFORDANCES).fill(
+          validExplorationAffordance({ label: "交談".repeat(60) })
+        ),
+        keywords: Array(Protocol.EXPLORATION_MAX_SCRIPTED_KEYWORDS).fill(
+          validExplorationKeyword({
+            keyword_id: "k".repeat(Protocol.EXPLORATION_MAX_KEYWORD_ID),
+            label: "話".repeat(Protocol.EXPLORATION_MAX_KEYWORD_LABEL),
+          })
+        ),
+      })
+    );
+  }
+  const over = validExplorationPanel({ interact: overInteract });
+  assert.throws(() => Protocol.validateExplorationPanel(over), /envelope/);
+});
+
+test("exploration and character are in the production panel allowlist", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 1,
+    mode: "exploration",
+    panels: { exploration: { ...validExplorationPanel(), kind: "bogus" } },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  const store = Protocol.createStore();
+  store.beginTransport(1);
+  const accepted = store.receive(1, "ui_snapshot", [envelope], {});
+  assert.equal(accepted.accepted, false);
+  assert.equal(accepted.reason, "invalid");
+});
+
+// ---------------------------------------------------------------------------
+// character panel v1 (design D10)
+// ---------------------------------------------------------------------------
+
+function validCharacterPanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "character",
+      traits: [
+        { key: "hp", label: "生命", current: 10, max: 10 },
+        { key: "atk_phys", label: "攻擊", current: 5, max: null },
+      ],
+      passives: [{ key: "defense_instinct", label: "防禦直覺" }],
+      equipment: [
+        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" },
+      ],
+      disguise: { active: false, description: "", displayed: [] },
+      guild: { rank: null, merit: 0 },
+      wallet: 100,
+    },
+    overrides || {}
+  );
+}
+
+test("validates the character panel available/unavailable discriminator", () => {
+  assert.deepEqual(
+    Protocol.validateCharacterPanel(unavailableStatusPanel()),
+    unavailableStatusPanel()
+  );
+  assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
+});
+
+test("enforces character D10 bounds and disguise honesty", () => {
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: Array(Protocol.CHARACTER_MAX_TRAIT_ROWS + 1).fill({
+          key: "hp",
+          label: "生命",
+          current: 10,
+          max: 10,
+        }),
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [
+          { key: "hp", label: "生命", current: 10, max: 10 },
+          { key: "hp", label: "生命", current: 10, max: 10 },
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [{ key: "hp", label: "生命", current: 11, max: 10 }],
+      })
+    )
+  );
+  // An inactive disguise must not carry displayed rows.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        disguise: {
+          active: false,
+          description: "",
+          displayed: [{ key: "atk_phys", label: "攻擊", value: 12 }],
+        },
+      })
+    )
+  );
+  // A wallet is a non-negative safe integer.
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ wallet: -1 })));
+});

@@ -162,9 +162,9 @@ After an admitted service action settles, the server SHALL emit every returned m
 - **WHEN** `guild.exam_start` succeeds for the exact next rank
 - **THEN** the update carries mode `combat` and a `context_actions` combat payload, `services` becomes unavailable, and no additional service mutation is admitted in that mode
 
-#### Scenario: Mode change tears down the service dock atomically
+#### Scenario: Mode change tears down the exploration dock and its service submenus atomically
 - **WHEN** the browser adopts a valid update or snapshot whose mode is `combat`
-- **THEN** the service dock synchronously unloads, unregisters its keyboard handlers, discards any local quantity, selection, and confirmation state, and only the combat dock owns action-dock focus
+- **THEN** the exploration action dock — including the service submenus re-homed under its Interact/Quests/Inventory roots — synchronously unloads, unregisters its keyboard handlers, discards any local quantity, selection, confirmation, and speech state, and only the combat dock owns action-dock focus
 
 #### Scenario: Rejected purchase emits no fabricated prose
 - **WHEN** the economy API rejects for insufficient funds
@@ -182,10 +182,10 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: registration success and idempotent re-registration, board list to detail to accept, active-quest abandon behind an explicit confirmation screen, completed-quest turn-in, merit/exam eligibility and the transition into the combat menu with the service dock torn down, shop open/closed status at fixed world times, buy and sell quantity validation with exact copper and stock outcomes, stale and duplicate submission behavior, repeated-inventory display, and reconnect retention. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, and SHALL assert that no use/equip control and no remote or ambiguous host control is rendered.
+The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: registration success and idempotent re-registration, board list to detail to accept, active-quest abandon behind an explicit confirmation screen, completed-quest turn-in, merit/exam eligibility and the transition into the combat menu with the service dock torn down, shop open/closed status at fixed world times, buy and sell quantity validation with exact copper and stock outcomes, stale and duplicate submission behavior, repeated-inventory display, and reconnect retention. The service submenus SHALL be reached from the exploration dock's Interact/Quests/Inventory roots rather than a standalone Services root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, and SHALL assert that no use/equip control and no remote or ambiguous host control is rendered.
 
 #### Scenario: Guild board journey completes in Chromium
-- **WHEN** a seeded registered member uses arrows and Enter to open Services, open Guild, open Board, and accept an eligible offer
+- **WHEN** a seeded registered member uses arrows and Enter to open the exploration dock, open Quests, open Guild, open Board, and accept an eligible offer
 - **THEN** the flow submits exactly `guild.quest_accept` once with the expected definition key and the refreshed quest log appears without typed input
 
 #### Scenario: Abandon requires confirmation

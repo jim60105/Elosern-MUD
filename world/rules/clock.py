@@ -3,7 +3,7 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from math import gcd
+from math import floor, gcd
 from pathlib import Path
 from typing import Any
 
@@ -117,7 +117,20 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
                 continue
             rate = float(getattr(gauge, "rate", 0))
             maximum = float(gauge.max)
-            gauge.current = min(maximum, _gauge_value(gauge) + rate * elapsed_seconds)
+            # Gauge storage is integral (the status read model rejects floats),
+            # so each gauge keeps a sub-unit regen remainder. Accruing in
+            # float keeps segmented advances (two moves) equal to one advance
+            # of the same total duration: floor(lost) + floor(lost) == floor(2*lost)
+            # only when the per-advance fraction is carried, never dropped.
+            carried = float(getattr(gauge, "regen_remainder", 0.0))
+            continuous = _gauge_value(gauge) + carried + rate * elapsed_seconds
+            if continuous >= maximum:
+                gauge.current = round(maximum)
+                gauge.regen_remainder = 0.0
+            else:
+                whole = floor(continuous)
+                gauge.current = whole
+                gauge.regen_remainder = continuous - whole
 
 
 def _has_settlement_work(entity: Any) -> bool:

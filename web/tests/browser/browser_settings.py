@@ -103,6 +103,16 @@ ART_WORKER_TIMEOUT_SECONDS = _env_int("ELOSERN_BROWSER_ART_TIMEOUT", 60)
 ART_SCHEDULER_ENABLED = False
 ART_SCHEDULER_INTERVAL_SECONDS = 30
 ART_SCHEDULER_LIMIT = 4
+# The browser harness is fully offline: every LLM profile stays enabled for the
+# layers that are never called, but ``npc_dialogue`` is disabled so the free-form
+# dialogue seam degrades to the authored greeting/silence deterministically with
+# no transport attempt. This mirrors the "deterministic game must remain fully
+# playable offline" invariant without touching the developer environment.
+from world.ai.profiles import default_profiles  # noqa: E402
+
+_LLM_PROFILES = default_profiles()
+_LLM_PROFILES["npc_dialogue"]["enabled"] = False
+LLM_PROFILES = _LLM_PROFILES
 
 
 # ---------------------------------------------------------------------------

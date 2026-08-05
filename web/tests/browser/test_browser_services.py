@@ -102,13 +102,29 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         )
 
     def _open_surface(self, page, surface_key):
-        """From the services root, open the named surface submenu."""
+        """From the exploration root, open the re-homed services surface.
+
+        The standalone Services root no longer exists: guild/shop are reached
+        through Interact -> the local host -> its navigate-kind service entry,
+        and inventory through the exploration root's Inventory entry.
+        """
         page.evaluate("document.getElementById('action-dock').focus()")
-        order = ["guild", "shop", "inventory"]
-        index = order.index(surface_key)
-        for _ in range(index):
+        if surface_key == "inventory":
+            # Move, Look, Interact, Character, Quests, Inventory
+            for _ in range(5):
+                _press(page, "ArrowDown")
+            _press(page, "Enter")
+            return self._services_panel(page)
+        # guild/shop: Interact -> first target -> navigate service entry.
+        _press(page, "ArrowDown")  # Look
+        _press(page, "ArrowDown")  # Interact
+        _press(page, "Enter")  # open Interact
+        _press(page, "Enter")  # select the first present target
+        if surface_key == "guild":
+            # The guild staff carries scripted talk first; the navigate entry
+            # follows it.
             _press(page, "ArrowDown")
-        _press(page, "Enter")
+        _press(page, "Enter")  # open the service submenu
         return self._services_panel(page)
 
     def _open_guild_menu(self, page):

@@ -68,16 +68,19 @@ class ActionRegistry:
 
 
 def build_production_action_registry() -> ActionRegistry:
-    """Return the production action registry with the combat, service, and creation adapters.
+    """Return the production action registry with the combat, service, creation,
+    and exploration adapters.
 
     The registry contains exactly the three combat adapters (``combat.cast``,
     ``combat.flee``, ``combat.forfeit``), the seven service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
-    and the four creation adapters (``creation.preset``, ``creation.custom``,
-    ``creation.activate``, ``creation.reset``). Each action binds one exact
-    payload validator and one narrow deterministic adapter; no action routes
-    through the text parser.
+    the four creation adapters (``creation.preset``, ``creation.custom``,
+    ``creation.activate``, ``creation.reset``), and the six exploration
+    adapters (``explore.move``, ``explore.look``, ``explore.talk_scripted``,
+    ``explore.talk_freeform``, ``explore.engage``, ``explore.wait``). Each
+    action binds one exact payload validator and one narrow deterministic
+    adapter; no action routes through the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _cast_adapter,
@@ -96,6 +99,20 @@ def build_production_action_registry() -> ActionRegistry:
         validate_creation_custom_payload,
         validate_creation_preset_payload,
         validate_creation_reset_payload,
+    )
+    from web.webclient.actions.exploration_actions import (
+        _engage_adapter,
+        _look_adapter,
+        _move_adapter,
+        _talk_freeform_adapter,
+        _talk_scripted_adapter,
+        _wait_adapter,
+        validate_engage_payload,
+        validate_look_payload,
+        validate_move_payload,
+        validate_talk_freeform_payload,
+        validate_talk_scripted_payload,
+        validate_wait_payload,
     )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
@@ -227,6 +244,62 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_creation_reset_payload,
             adapter=_creation_reset_adapter,
             affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.move",
+            validate_payload=validate_move_payload,
+            adapter=_move_adapter,
+            # No affected panels: movement changes location, clock, map, header,
+            # and shop/quest state together (design D3).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.look",
+            validate_payload=validate_look_payload,
+            adapter=_look_adapter,
+            # Look changes no panel; the ordinary full-snapshot refresh keeps
+            # the dock honest with the onboarding beat (design D4).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.talk_scripted",
+            validate_payload=validate_talk_scripted_payload,
+            adapter=_talk_scripted_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.talk_freeform",
+            validate_payload=validate_talk_freeform_payload,
+            adapter=_talk_freeform_adapter,
+            # Full snapshot so an applied intent (including a mode change)
+            # refreshes atomically (design D5).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.engage",
+            validate_payload=validate_engage_payload,
+            adapter=_engage_adapter,
+            affected_panels=("status", "context_actions"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.wait",
+            validate_payload=validate_wait_payload,
+            adapter=_wait_adapter,
+            # No affected panels: a clock skip changes header, status, shop
+            # hours, and quest deadlines together (design D7).
+            affected_panels=(),
         )
     )
     return registry

@@ -43,6 +43,20 @@
     ) || null;
   }
 
+  function getExploration() {
+    return (
+      window.Elosern &&
+      window.Elosern.explorationDock
+    ) || null;
+  }
+
+  function getCharacter() {
+    return (
+      window.Elosern &&
+      window.Elosern.characterDock
+    ) || null;
+  }
+
   function getCreation() {
     return (
       window.Elosern &&
@@ -86,6 +100,19 @@
     var text = field.value;
     if (text.trim() === "") {
       return false;
+    }
+    // Free-form dialogue intercepts the drawer: the exploration dock holds the
+    // server-authored NPC reference and submits `explore.talk_freeform` with
+    // the typed speech instead of sending ordinary text.
+    var exploration = getExploration();
+    if (
+      exploration &&
+      typeof exploration.consumeFreeformText === "function" &&
+      exploration.consumeFreeformText(text)
+    ) {
+      field.value = "";
+      closeDrawer(true);
+      return true;
     }
     // Ordinary text through Evennia's text transport; never ui_action.
     if (window.plugin_handler && typeof window.plugin_handler.onSend === "function") {
@@ -252,11 +279,21 @@
               combatDock.publishFocusForItem(payload && payload.item);
             }
           }
-          // Forward navigation events to the services dock so it can keep its
-          // DOM rows and detail pane in sync without owning a second router.
+          // Forward navigation events to the exploration dock so it can keep
+          // its DOM rows and detail pane in sync without owning a second
+          // router; the active sub-docks (services/character) update the same
+          // way.
+          var exploration = getExploration();
+          if (exploration && exploration.isActive && exploration.isActive()) {
+            exploration.onRouterEvent(name, payload);
+          }
           var services = getServices();
           if (services && services.isActive && services.isActive()) {
             services.onRouterEvent(name, payload);
+          }
+          var character = getCharacter();
+          if (character && character.isActive && character.isActive()) {
+            character.onRouterEvent(name, payload);
           }
           // The creation dock keeps its preset list and detail pane in sync
           // the same way; only the active mode's dock owns the action dock.
@@ -297,7 +334,8 @@
       return;
     }
     // Service dock navigation events (submenus, quest detail, abandon
-    // confirmation, quantity forms) are owned by the services dock.
+    // confirmation, quantity forms) are owned by the services dock; when it is
+    // mounted (a re-homed service submenu) it must be consulted first.
     var services = getServices();
     if (services && services.isActive && services.isActive()) {
       if (
@@ -308,6 +346,24 @@
         (item.key && item.key.indexOf("cancel-") === 0)
       ) {
         services.handleItem(item);
+        return;
+      }
+    }
+    // Exploration dock navigation events (submenus, targets, keyword buttons,
+    // character root, re-homed service submenus, free-form dialogue) are owned
+    // by the exploration dock.
+    var exploration = getExploration();
+    if (exploration && exploration.isActive && exploration.isActive()) {
+      if (
+        item.openSubmenu ||
+        item.openTarget ||
+        item.openKeywords ||
+        item.openCharacter ||
+        item.openServiceSubmenu ||
+        item.openRestForm ||
+        item.freeform
+      ) {
+        exploration.handleItem(item);
         return;
       }
     }

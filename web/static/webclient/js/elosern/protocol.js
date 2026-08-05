@@ -168,7 +168,16 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
-  var PANEL_ALLOWLIST = { art: 1, status: 1, context_actions: 2, local_map: 1, services: 1, creation: 1 };
+  var PANEL_ALLOWLIST = {
+    art: 1,
+    status: 1,
+    context_actions: 2,
+    local_map: 1,
+    services: 1,
+    creation: 1,
+    exploration: 1,
+    character: 1,
+  };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
   var PANEL_NAME_RE = /^[a-z0-9_]{1,64}$/;
@@ -1941,6 +1950,537 @@
     return result;
   }
 
+  // ---------------------------------------------------------------------------
+  // exploration panel v1 validators (mirror of
+  // web.webclient.presentation.exploration, design D10). Shared bounds are
+  // guarded by a dual-direction parity test.
+  // ---------------------------------------------------------------------------
+
+  var EXPLORATION_MAX_MOVE_EXITS = 12;
+  var EXPLORATION_MAX_LOOK_ENTITIES = 32;
+  var EXPLORATION_MAX_LOOK_OBJECTS = 32;
+  var EXPLORATION_MAX_INTERACT_TARGETS = 32;
+  var EXPLORATION_MAX_AFFORDANCES = 8;
+  var EXPLORATION_MAX_SCRIPTED_KEYWORDS = 16;
+  var EXPLORATION_MAX_EXIT_REF = 64;
+  var EXPLORATION_MAX_NODE_ID = 128;
+  var EXPLORATION_MAX_DISPLAY_NAME = 128;
+  var EXPLORATION_MAX_KIND = 32;
+  var EXPLORATION_MAX_LABEL = 128;
+  var EXPLORATION_MAX_KEYWORD_ID = 64;
+  var EXPLORATION_MAX_KEYWORD_LABEL = 128;
+  var EXPLORATION_MAX_REASON_MESSAGE = 128;
+  var EXPLORATION_ACTION_KINDS = ["action", "navigate"];
+  var EXPLORATION_ACTION_IDS = [
+    "explore.talk_scripted",
+    "explore.talk_freeform",
+    "explore.engage",
+  ];
+  var EXPLORATION_SURFACES = ["guild", "shop"];
+  var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
+
+  function requireNodeId(value, field) {
+    requireString(value, field, EXPLORATION_MAX_NODE_ID);
+    if (!NODE_ID_RE.test(value)) {
+      throw new Error(field + " is not a canonical node ID");
+    }
+    return value;
+  }
+
+  function requireExitRef(value, field) {
+    if (
+      typeof value !== "string" ||
+      value.length < 1 ||
+      value.length > EXPLORATION_MAX_EXIT_REF
+    ) {
+      throw new Error(
+        field + " must be 1.." + EXPLORATION_MAX_EXIT_REF + " ASCII characters"
+      );
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[^\x00-\x7F]/.test(value)) {
+      throw new Error(field + " must be ASCII");
+    }
+    return value;
+  }
+
+  function requireIdentity(value, field) {
+    return requireInt(value, field, 1, MAX_SAFE_INTEGER);
+  }
+
+  function validateExplorationDisabledReason(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(value, "disabled_reason", ["code", "message"], []);
+    validateIdentifier(value.code, "disabled_reason code");
+    var reasonMessage = requireString(
+      value.message,
+      "disabled_reason message",
+      EXPLORATION_MAX_REASON_MESSAGE
+    );
+    if (!reasonMessage.trim()) {
+      throw new Error("disabled_reason message must be non-empty");
+    }
+    return value;
+  }
+
+  function validateExplorationKeyword(value) {
+    requireExactFields(value, "scripted keyword", ["keyword_id", "label"], []);
+    var keywordId = requireString(value.keyword_id, "keyword_id", EXPLORATION_MAX_KEYWORD_ID);
+    if (!keywordId.trim()) {
+      throw new Error("keyword_id must be non-empty");
+    }
+    var keywordLabel = requireString(value.label, "keyword label", EXPLORATION_MAX_KEYWORD_LABEL);
+    if (!keywordLabel.trim()) {
+      throw new Error("keyword label must be non-empty");
+    }
+    return value;
+  }
+
+  function validateExplorationAffordance(value) {
+    if (!isPlainObject(value)) {
+      throw new Error("affordance must be a JSON object");
+    }
+    var kind = value.kind;
+    if (EXPLORATION_ACTION_KINDS.indexOf(kind) === -1) {
+      throw new Error("affordance kind is not a stable value");
+    }
+    requireExactFields(
+      value,
+      "affordance",
+      ["kind", "label", "enabled", "disabled_reason"],
+      ["action_id", "surface"]
+    );
+    var label = requireString(value.label, "label", EXPLORATION_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("affordance label must be non-empty");
+    }
+    var enabled = requireBool(value.enabled, "enabled");
+    var disabledReason = validateExplorationDisabledReason(value.disabled_reason);
+    if (disabledReason === null) {
+      if (!enabled) {
+        throw new Error("a disabled affordance requires a disabled_reason");
+      }
+    } else if (enabled) {
+      throw new Error("an enabled affordance must not carry a disabled_reason");
+    }
+
+    if (kind === "action") {
+      requireExactFields(
+        value,
+        "action affordance",
+        ["kind", "action_id", "label", "enabled", "disabled_reason"],
+        []
+      );
+      var actionId = validateIdentifier(value.action_id, "action_id");
+      if (EXPLORATION_ACTION_IDS.indexOf(actionId) === -1) {
+        throw new Error("action_id is not a registered exploration action");
+      }
+      return {
+        kind: kind,
+        action_id: actionId,
+        label: label,
+        enabled: enabled,
+        disabled_reason: disabledReason,
+      };
+    }
+    requireExactFields(
+      value,
+      "navigation affordance",
+      ["kind", "surface", "label", "enabled", "disabled_reason"],
+      []
+    );
+    if (EXPLORATION_SURFACES.indexOf(value.surface) === -1) {
+      throw new Error("surface is not a stable value");
+    }
+    return {
+      kind: kind,
+      surface: value.surface,
+      label: label,
+      enabled: enabled,
+      disabled_reason: disabledReason,
+    };
+  }
+
+  function validateExplorationLookEntity(value) {
+    requireExactFields(
+      value,
+      "look entity",
+      ["identity", "display_name", "kind", "portrait_ref"],
+      []
+    );
+    requireIdentity(value.identity, "entity.identity");
+    var displayName = requireString(value.display_name, "display_name", EXPLORATION_MAX_DISPLAY_NAME);
+    if (!displayName.trim()) {
+      throw new Error("entity display_name must be non-empty");
+    }
+    if (EXPLORATION_ENTITY_KINDS.indexOf(value.kind) === -1) {
+      throw new Error("entity kind is not a stable value");
+    }
+    if (value.portrait_ref !== null) {
+      throw new Error("portrait_ref must be null in this schema version");
+    }
+    return value;
+  }
+
+  function validateExplorationLookObject(value) {
+    requireExactFields(value, "look object", ["identity", "display_name"], []);
+    requireIdentity(value.identity, "object.identity");
+    var objectName = requireString(value.display_name, "display_name", EXPLORATION_MAX_DISPLAY_NAME);
+    if (!objectName.trim()) {
+      throw new Error("object display_name must be non-empty");
+    }
+    return value;
+  }
+
+  function validateExplorationLookRoom(value) {
+    requireExactFields(value, "look room", ["identity", "display_name", "room"], []);
+    requireIdentity(value.identity, "room.identity");
+    var roomName = requireString(value.display_name, "display_name", EXPLORATION_MAX_DISPLAY_NAME);
+    if (!roomName.trim()) {
+      throw new Error("room display_name must be non-empty");
+    }
+    if (value.room !== true) {
+      throw new Error("room marker must be true");
+    }
+    return value;
+  }
+
+  function validateExplorationLook(value) {
+    requireExactFields(value, "look", ["room", "entities", "objects"], []);
+    validateExplorationLookRoom(value.room);
+    if (!Array.isArray(value.entities) || value.entities.length > EXPLORATION_MAX_LOOK_ENTITIES) {
+      throw new Error("look entities must be a list of at most " + EXPLORATION_MAX_LOOK_ENTITIES + " entries");
+    }
+    value.entities.forEach(validateExplorationLookEntity);
+    if (!Array.isArray(value.objects) || value.objects.length > EXPLORATION_MAX_LOOK_OBJECTS) {
+      throw new Error("look objects must be a list of at most " + EXPLORATION_MAX_LOOK_OBJECTS + " entries");
+    }
+    value.objects.forEach(validateExplorationLookObject);
+    return value;
+  }
+
+  function validateExplorationInteractTarget(value) {
+    requireExactFields(
+      value,
+      "interact target",
+      ["identity", "display_name", "portrait_ref", "affordances"],
+      ["keywords"]
+    );
+    requireIdentity(value.identity, "target.identity");
+    var targetName = requireString(value.display_name, "display_name", EXPLORATION_MAX_DISPLAY_NAME);
+    if (!targetName.trim()) {
+      throw new Error("target display_name must be non-empty");
+    }
+    if (value.portrait_ref !== null) {
+      throw new Error("portrait_ref must be null in this schema version");
+    }
+    if (
+      !Array.isArray(value.affordances) ||
+      value.affordances.length > EXPLORATION_MAX_AFFORDANCES
+    ) {
+      throw new Error("affordances must be a list of at most " + EXPLORATION_MAX_AFFORDANCES + " entries");
+    }
+    value.affordances.forEach(validateExplorationAffordance);
+    if (Object.prototype.hasOwnProperty.call(value, "keywords")) {
+      if (
+        !Array.isArray(value.keywords) ||
+        value.keywords.length > EXPLORATION_MAX_SCRIPTED_KEYWORDS
+      ) {
+        throw new Error(
+          "keywords must be a list of at most " + EXPLORATION_MAX_SCRIPTED_KEYWORDS + " entries"
+        );
+      }
+      value.keywords.forEach(validateExplorationKeyword);
+      var hasScripted = value.affordances.some(function (affordance) {
+        return (
+          affordance.kind === "action" &&
+          affordance.action_id === "explore.talk_scripted"
+        );
+      });
+      if (value.keywords.length > 0 && !hasScripted) {
+        throw new Error("keywords require a talk_scripted affordance on the target");
+      }
+    }
+    return value;
+  }
+
+  function validateExplorationAvailability(value, name) {
+    requireExactFields(value, name, ["available"], []);
+    requireBool(value.available, "available");
+    return value;
+  }
+
+  function validateExplorationMoveRow(value) {
+    requireExactFields(
+      value,
+      "move row",
+      ["exit_ref", "label", "destination", "enabled", "disabled_reason"],
+      []
+    );
+    requireExitRef(value.exit_ref, "exit_ref");
+    var label = requireString(value.label, "label", EXPLORATION_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("exit label must be non-empty");
+    }
+    requireNodeId(value.destination, "destination");
+    var enabled = requireBool(value.enabled, "enabled");
+    var disabledReason = validateExplorationDisabledReason(value.disabled_reason);
+    if (disabledReason === null) {
+      if (!enabled) {
+        throw new Error("a disabled exit requires a disabled_reason");
+      }
+    } else if (enabled) {
+      throw new Error("an enabled exit must not carry a disabled_reason");
+    }
+    return value;
+  }
+
+  // Exact available exploration panel v1 schema (design D10).
+  function validateExplorationPanel(payload) {
+    if (payload.available === false) {
+      // The common unavailable discriminator; validateStatusPanel handles it.
+      validateStatusPanel(payload);
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "exploration panel",
+      [
+        "schema_version",
+        "available",
+        "kind",
+        "move",
+        "look",
+        "interact",
+        "character",
+        "quests",
+        "inventory",
+      ],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported exploration schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "exploration") {
+      throw new Error("exploration panel must be available with kind exploration");
+    }
+
+    if (!Array.isArray(payload.move) || payload.move.length > EXPLORATION_MAX_MOVE_EXITS) {
+      throw new Error("move must be a list of at most " + EXPLORATION_MAX_MOVE_EXITS + " rows");
+    }
+    payload.move.forEach(validateExplorationMoveRow);
+    validateExplorationLook(payload.look);
+    if (
+      !Array.isArray(payload.interact) ||
+      payload.interact.length > EXPLORATION_MAX_INTERACT_TARGETS
+    ) {
+      throw new Error("interact must be a list of at most " + EXPLORATION_MAX_INTERACT_TARGETS + " targets");
+    }
+    var seen = {};
+    payload.interact.forEach(function (target) {
+      validateExplorationInteractTarget(target);
+      if (seen[target.identity]) {
+        throw new Error("interact target identities must be unique");
+      }
+      seen[target.identity] = true;
+    });
+    validateExplorationAvailability(payload.character, "character");
+    validateExplorationAvailability(payload.quests, "quests");
+    validateExplorationAvailability(payload.inventory, "inventory");
+
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "exploration",
+      move: payload.move,
+      look: payload.look,
+      interact: payload.interact,
+      character: payload.character,
+      quests: payload.quests,
+      inventory: payload.inventory,
+    };
+    // Envelope guarantee (design D10): per-field bounds are ceilings, not a
+    // guarantee that any combination of them fits, so the validator enforces
+    // the serialized byte size directly and fails closed over the envelope.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("exploration payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // character panel v1 validators (mirror of
+  // web.webclient.presentation.character, design D10). Shared bounds are
+  // guarded by a dual-direction parity test.
+  // ---------------------------------------------------------------------------
+
+  var CHARACTER_MAX_TRAIT_ROWS = 32;
+  var CHARACTER_MAX_PASSIVE_ROWS = 32;
+  var CHARACTER_MAX_EQUIPMENT_ROWS = 32;
+  var CHARACTER_MAX_DISPLAYED_ROWS = 32;
+  var CHARACTER_MAX_KEY = 64;
+  var CHARACTER_MAX_LABEL = 128;
+  var CHARACTER_MAX_DESCRIPTION = 256;
+  var CHARACTER_MAX_SLOT = 32;
+
+  function validateCharacterKey(value, field) {
+    var key = validateIdentifier(value, field);
+    if (codePoints(key) > CHARACTER_MAX_KEY) {
+      throw new Error(field + " exceeds its bound");
+    }
+    return key;
+  }
+
+  function validateCharacterTraitRow(value) {
+    requireExactFields(value, "trait row", ["key", "label", "current", "max"], []);
+    validateCharacterKey(value.key, "trait key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("trait label must be non-empty");
+    }
+    requireInt(value.current, "current", 0, MAX_SAFE_INTEGER);
+    if (value.max !== null) {
+      requireInt(value.max, "max", 1, MAX_SAFE_INTEGER);
+      if (value.current > value.max) {
+        throw new Error("trait current must not exceed maximum");
+      }
+    }
+    return value;
+  }
+
+  function validateCharacterPassiveRow(value) {
+    requireExactFields(value, "passive row", ["key", "label"], []);
+    validateCharacterKey(value.key, "passive key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("passive label must be non-empty");
+    }
+    return value;
+  }
+
+  function validateCharacterEquipmentRow(value) {
+    requireExactFields(value, "equipment row", ["slot", "item_key", "display_name"], []);
+    var slot = requireString(value.slot, "slot", CHARACTER_MAX_SLOT);
+    if (!slot.trim()) {
+      throw new Error("slot must be non-empty");
+    }
+    validateCharacterKey(value.item_key, "item_key");
+    var displayName = requireString(value.display_name, "display_name", CHARACTER_MAX_LABEL);
+    if (!displayName.trim()) {
+      throw new Error("equipment display_name must be non-empty");
+    }
+    return value;
+  }
+
+  function validateCharacterDisplayedRow(value) {
+    requireExactFields(value, "displayed row", ["key", "label", "value"], []);
+    validateCharacterKey(value.key, "displayed key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("displayed label must be non-empty");
+    }
+    requireInt(value.value, "value", 0, MAX_SAFE_INTEGER);
+    return value;
+  }
+
+  function validateCharacterDisguise(value) {
+    requireExactFields(value, "disguise", ["active", "description", "displayed"], []);
+    var active = requireBool(value.active, "active");
+    var description = requireString(value.description, "description", CHARACTER_MAX_DESCRIPTION);
+    if (!Array.isArray(value.displayed) || value.displayed.length > CHARACTER_MAX_DISPLAYED_ROWS) {
+      throw new Error("displayed must be a list of at most " + CHARACTER_MAX_DISPLAYED_ROWS + " rows");
+    }
+    value.displayed.forEach(validateCharacterDisplayedRow);
+    if (!active && value.displayed.length > 0) {
+      throw new Error("an undisguised actor must have an empty displayed list");
+    }
+    if (active && !description.trim()) {
+      throw new Error("disguise description must be non-empty when active");
+    }
+    return value;
+  }
+
+  function validateCharacterGuild(value) {
+    requireExactFields(value, "guild", ["rank", "merit"], []);
+    if (value.rank !== null) {
+      var rank = requireString(value.rank, "rank", CHARACTER_MAX_KEY);
+      if (!rank.trim()) {
+        throw new Error("rank must be non-empty when set");
+      }
+    }
+    requireInt(value.merit, "merit", 0, MAX_SAFE_INTEGER);
+    return value;
+  }
+
+  // Exact available character panel v1 schema (design D10).
+  function validateCharacterPanel(payload) {
+    if (payload.available === false) {
+      // The common unavailable discriminator; validateStatusPanel handles it.
+      validateStatusPanel(payload);
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "character panel",
+      ["schema_version", "available", "kind", "traits", "passives", "equipment", "disguise", "guild", "wallet"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported character schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "character") {
+      throw new Error("character panel must be available with kind character");
+    }
+    if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
+      throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
+    }
+    var traitKeys = {};
+    payload.traits.forEach(function (row) {
+      validateCharacterTraitRow(row);
+      if (traitKeys[row.key]) {
+        throw new Error("trait keys must be unique");
+      }
+      traitKeys[row.key] = true;
+    });
+    if (!Array.isArray(payload.passives) || payload.passives.length > CHARACTER_MAX_PASSIVE_ROWS) {
+      throw new Error("passives must be a list of at most " + CHARACTER_MAX_PASSIVE_ROWS + " rows");
+    }
+    payload.passives.forEach(validateCharacterPassiveRow);
+    if (!Array.isArray(payload.equipment) || payload.equipment.length > CHARACTER_MAX_EQUIPMENT_ROWS) {
+      throw new Error("equipment must be a list of at most " + CHARACTER_MAX_EQUIPMENT_ROWS + " rows");
+    }
+    payload.equipment.forEach(validateCharacterEquipmentRow);
+    validateCharacterDisguise(payload.disguise);
+    validateCharacterGuild(payload.guild);
+    requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
+
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "character",
+      traits: payload.traits,
+      passives: payload.passives,
+      equipment: payload.equipment,
+      disguise: payload.disguise,
+      guild: payload.guild,
+      wallet: payload.wallet,
+    };
+    // Envelope guarantee (design D10): an over-limit payload fails closed.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("character payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
+  // Panel discriminator dispatch: the unavailable form is common to every
+  // registered panel; the available form is validated against its schema.
+
   // Exact available art panel v1 schema (mirror of
   // web.webclient.presentation.art, webclient-art-panel D1).
   var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
@@ -2171,6 +2711,12 @@
     if (name === "art") {
       return validateArtPanel(payload);
     }
+    if (name === "exploration") {
+      return validateExplorationPanel(payload);
+    }
+    if (name === "character") {
+      return validateCharacterPanel(payload);
+    }
     if (name === "status") {
       return validateStatusPanel(payload);
     }
@@ -2365,6 +2911,32 @@
     SERVICES_MIN_QUANTITY: SERVICES_MIN_QUANTITY,
     SERVICES_QUEST_STATES: SERVICES_QUEST_STATES.slice(),
     SERVICES_ACTIONS: SERVICES_ACTIONS.slice(),
+    EXPLORATION_MAX_MOVE_EXITS: EXPLORATION_MAX_MOVE_EXITS,
+    EXPLORATION_MAX_LOOK_ENTITIES: EXPLORATION_MAX_LOOK_ENTITIES,
+    EXPLORATION_MAX_LOOK_OBJECTS: EXPLORATION_MAX_LOOK_OBJECTS,
+    EXPLORATION_MAX_INTERACT_TARGETS: EXPLORATION_MAX_INTERACT_TARGETS,
+    EXPLORATION_MAX_AFFORDANCES: EXPLORATION_MAX_AFFORDANCES,
+    EXPLORATION_MAX_SCRIPTED_KEYWORDS: EXPLORATION_MAX_SCRIPTED_KEYWORDS,
+    EXPLORATION_MAX_EXIT_REF: EXPLORATION_MAX_EXIT_REF,
+    EXPLORATION_MAX_NODE_ID: EXPLORATION_MAX_NODE_ID,
+    EXPLORATION_MAX_DISPLAY_NAME: EXPLORATION_MAX_DISPLAY_NAME,
+    EXPLORATION_MAX_KIND: EXPLORATION_MAX_KIND,
+    EXPLORATION_MAX_LABEL: EXPLORATION_MAX_LABEL,
+    EXPLORATION_MAX_KEYWORD_ID: EXPLORATION_MAX_KEYWORD_ID,
+    EXPLORATION_MAX_KEYWORD_LABEL: EXPLORATION_MAX_KEYWORD_LABEL,
+    EXPLORATION_MAX_REASON_MESSAGE: EXPLORATION_MAX_REASON_MESSAGE,
+    EXPLORATION_ACTION_KINDS: EXPLORATION_ACTION_KINDS.slice(),
+    EXPLORATION_ACTION_IDS: EXPLORATION_ACTION_IDS.slice(),
+    EXPLORATION_SURFACES: EXPLORATION_SURFACES.slice(),
+    EXPLORATION_ENTITY_KINDS: EXPLORATION_ENTITY_KINDS.slice(),
+    CHARACTER_MAX_TRAIT_ROWS: CHARACTER_MAX_TRAIT_ROWS,
+    CHARACTER_MAX_PASSIVE_ROWS: CHARACTER_MAX_PASSIVE_ROWS,
+    CHARACTER_MAX_EQUIPMENT_ROWS: CHARACTER_MAX_EQUIPMENT_ROWS,
+    CHARACTER_MAX_DISPLAYED_ROWS: CHARACTER_MAX_DISPLAYED_ROWS,
+    CHARACTER_MAX_KEY: CHARACTER_MAX_KEY,
+    CHARACTER_MAX_LABEL: CHARACTER_MAX_LABEL,
+    CHARACTER_MAX_DESCRIPTION: CHARACTER_MAX_DESCRIPTION,
+    CHARACTER_MAX_SLOT: CHARACTER_MAX_SLOT,
     CREATION_MAX_PRESETS: CREATION_MAX_PRESETS,
     CREATION_MAX_RACES: CREATION_MAX_RACES,
     CREATION_MAX_SUBRACES: CREATION_MAX_SUBRACES,
@@ -2404,6 +2976,8 @@
     validateProtocolError: validateProtocolError,
     validateStatusPanel: validateStatusPanel,
     validateArtPanel: validateArtPanel,
+    validateExplorationPanel: validateExplorationPanel,
+    validateCharacterPanel: validateCharacterPanel,
     validateContextActionsPanel: validateContextActionsPanel,
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,

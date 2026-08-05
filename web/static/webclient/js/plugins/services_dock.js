@@ -1,19 +1,20 @@
 /*
- * Elosern services action-dock renderer.
+ * Elosern services action-dock renderer (re-homed under the exploration dock).
  *
- * In exploration mode the Services root (Guild / Shop / Inventory), the
- * per-surface submenus, the bounded quantity form, the quest-detail pane, and
- * the destructive-abandon confirmation screen are rendered into the action
- * dock and driven through the DOM-independent service-menu model and the
- * KeyboardRouter. Every server string (labels, disabled reasons, quest detail)
- * is inserted through text APIs, never trusted HTML; focus is distinguishable
- * without color; quantity input accepts bounded integers via keyboard only.
+ * The services submenus (guild, shop, quest log, inventory) are reached only
+ * from the exploration dock's Interact/Quests/Inventory roots -- there is no
+ * standalone Services root. This dock is mounted by the exploration dock via
+ * `enterService(root, panel, menuKey)` and unmounted via `leaveService()`; it
+ * never owns the action-dock surface on its own. The `services` panel payload
+ * and its seven `guild.*`/`shop.*` adapters are unchanged.
  *
- * Mode ownership is exclusive: when the client atomically adopts a `combat`
- * mode, this dock synchronously unloads, unregisters its keyboard handler,
- * discards local quantity/selection/confirmation state, and never resets the
- * keyboard router (the combat dock owns action-dock focus). When exploration
- * mode returns it remounts from the canonical snapshot.
+ * When active it renders the bounded quantity form and the destructive-abandon
+ * confirmation screen, driven through the DOM-independent service-menu model
+ * and the KeyboardRouter. Every server string (labels, disabled reasons, quest
+ * detail) is inserted through text APIs, never trusted HTML; focus is
+ * distinguishable without color; quantity input accepts bounded integers via
+ * keyboard only. A `combat`-mode adoption unloads this dock atomically and
+ * never resets the keyboard router (the combat dock owns action-dock focus).
  */
 (function () {
   "use strict";
@@ -66,6 +67,7 @@
     _unsubscribe: null,
     _lastSignature: null,
     _focusKey: null,
+    _root: null,
 
     isActive: function () {
       return this._mounted;
@@ -87,68 +89,61 @@
       }
     },
 
-    _mount: function (root, panel) {
+    enterService: function (root, panel, menuKey) {
       var self = this;
+      this._root = root;
       this._model = window.Elosern.ServiceMenu.buildMenus(panel);
       this._mounted = true;
-      root.setAttribute("data-mode", "exploration");
+      this._currentMenuKey = this._model.menus[menuKey] ? menuKey : "guild";
       this._renderDock(root, panel);
 
       var keyboard = getKeyboard();
       if (keyboard) {
-        var rootMenu = this._model.menus.root;
-        keyboard.reset(rootMenu);
+        keyboard.pushMenu(this._model.menus[this._currentMenuKey]);
         this._ownsKeyboard = true;
       }
-
-      // Render the focused item's explanation into the detail pane.
       this._renderFocusHint();
+      if (!this._unsubscribe) {
+        var controller = getController();
+        if (controller && controller.subscribe) {
+          this._unsubscribe = controller.subscribe(function (state) {
+            var servicesPanel = state.panels && state.panels["services"];
+            if (!dock._mounted || !servicesPanel || servicesPanel.available !== true) {
+              return;
+            }
+            var signature = dock._panelSignature(servicesPanel);
+            if (signature !== dock._lastSignature) {
+              dock._model = window.Elosern.ServiceMenu.buildMenus(servicesPanel);
+              dock._renderDock(root, servicesPanel);
+              dock._lastSignature = signature;
+            }
+          });
+        }
+      }
+      this._lastSignature = this._panelSignature(panel);
     },
 
-    _unmount: function (root) {
+    leaveService: function () {
+      var root = this._root;
       this._unbindQuantityKeys();
       this._discardLocalState();
+      if (this._unsubscribe) {
+        this._unsubscribe();
+        this._unsubscribe = null;
+      }
       this._model = null;
       this._mounted = false;
       this._ownsKeyboard = false;
       this._lastSignature = null;
-      // In combat mode the combat dock owns the action-dock DOM; the services
-      // dock must never wipe combat controls. Otherwise restore the foundation
-      // guidance (including the stable live region).
+      this._root = null;
+      // The exploration dock owns the action-dock DOM; never wipe its content.
       if (root && root.getAttribute("data-mode") !== "combat") {
-        this._renderGuidance(root);
-      }
-    },
-
-    _renderGuidance: function (root) {
-      // Restore the full foundation action dock (guidance plus the stable
-      // live-region element) so combat/reconnect notices keep working after
-      // the services dock unloads.
-      var guidance = el("action-dock-guidance");
-      if (guidance) {
-        var note = el("action-dock-description");
-        if (note) {
-          setText(note, "圖形化動作選單尚未開放。請使用底部指令輸入列輸入指令。");
+        var menuEl = root.querySelector(".services-menu");
+        if (menuEl) {
+          while (menuEl.firstChild) {
+            menuEl.removeChild(menuEl.firstChild);
+          }
         }
-      } else if (root) {
-        while (root.firstChild) {
-          root.removeChild(root.firstChild);
-        }
-        var p = makeElement("p", "action-guidance");
-        p.id = "action-dock-guidance";
-        var span = makeElement("span", "action-guidance-note");
-        span.id = "action-dock-description";
-        setText(span, "圖形化動作選單尚未開放。請使用底部指令輸入列輸入指令。");
-        p.appendChild(span);
-        root.appendChild(p);
-      }
-      if (root && !el("elosern-action-live")) {
-        var live = makeElement("div", "elosern-live");
-        live.id = "elosern-action-live";
-        live.setAttribute("role", "status");
-        live.setAttribute("aria-live", "polite");
-        live.setAttribute("aria-atomic", "true");
-        root.appendChild(live);
       }
     },
 
@@ -157,7 +152,7 @@
         root.removeChild(root.firstChild);
       }
       var heading = makeElement("div", "services-heading");
-      setText(heading, "公會與商店服務");
+      setText(heading, "服務");
       root.appendChild(heading);
 
       var menu = makeElement("div", "services-menu");
@@ -172,8 +167,6 @@
       live.setAttribute("aria-live", "polite");
       root.appendChild(live);
 
-      // Render the current keyboard menu's items into the DOM so the player
-      // can see and operate them at the supported viewports.
       this._renderMenuItems(menu, panel);
       this._renderQuantityForm(root, panel);
       this._renderConfirmScreen(root, panel);
@@ -334,7 +327,6 @@
           self._reenterMenu();
           return;
         }
-        // Any other key is left to the global router (navigation).
       };
       document.addEventListener("keydown", this._keydownBound, true);
     },
@@ -369,7 +361,6 @@
       }
     },
 
-    // Router event bridge called by elosern_ui.js.
     onRouterEvent: function (name, payload) {
       if (!this._mounted) {
         return;
@@ -388,17 +379,15 @@
         var frame = keyboard ? keyboard.currentItem() : null;
         this._currentMenuKey = this._menuKeyFor(frame, this._model);
         var dockRoot = el("action-dock");
-        var menuEl = dockRoot && dockRoot.querySelector(".services-menu");
-        if (menuEl) {
-          this._renderMenuItems(menuEl, this._model && this._model.panel);
+        var dockMenu = dockRoot && dockRoot.querySelector(".services-menu");
+        if (dockMenu) {
+          this._renderMenuItems(dockMenu, this._model && this._model.panel);
         }
         this._renderFocusHint();
       }
     },
 
     _menuKeyFor: function (currentItem, model) {
-      // The current router menu's items let us infer which logical submenu we
-      // are inside; fall back to root when no match is found.
       if (!model) {
         return "root";
       }
@@ -417,17 +406,6 @@
       return "root";
     },
 
-    _findQuestRow: function (questId) {
-      var guild = this._model && this._model.panel && this._model.panel.guild;
-      var rows = (guild && guild.quests) || [];
-      for (var i = 0; i < rows.length; i++) {
-        if (rows[i].quest_id === questId) {
-          return rows[i];
-        }
-      }
-      return null;
-    },
-
     handleItem: function (item) {
       var keyboard = getKeyboard();
       if (!keyboard || !this._model) {
@@ -435,7 +413,6 @@
       }
       if (item.openSubmenu) {
         if (item.openSubmenu.indexOf("quest-") === 0) {
-          // Quest rows open a dynamically built detail menu (詳情/放棄/回報).
           var questRow = this._findQuestRow(item.questId);
           if (questRow) {
             var detailMenu = window.Elosern.ServiceMenu.questMenuFor(
@@ -482,8 +459,20 @@
       }
       if (item.key && item.key.indexOf("cancel-") === 0) {
         keyboard.popMenu();
+        this._pendingConfirm = null;
         this._refreshDock();
       }
+    },
+
+    _findQuestRow: function (questId) {
+      var guild = this._model && this._model.panel && this._model.panel.guild;
+      var rows = (guild && guild.quests) || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].quest_id === questId) {
+          return rows[i];
+        }
+      }
+      return null;
     },
 
     _refreshDock: function () {
@@ -536,59 +525,18 @@
     },
   };
 
-  function panelAvailable(state) {
-    var panel = state.panels && state.panels["services"];
-    return state.mode === "exploration" && panel && panel.available === true;
-  }
-
+  // The services dock no longer owns the action-dock surface by itself; it is
+  // mounted by the exploration dock through `enterService`. Combat/creation
+  // adoption unmounts it without ever resetting the keyboard router.
   var plugin = {
     init: function () {
       var controller = getController();
       if (!controller || !controller.subscribe) {
         return;
       }
-      var lastEpoch = null;
       controller.subscribe(function (state) {
-        var root = el("action-dock");
-        if (!root) {
-          return;
-        }
-        // A new transport epoch (reconnect) discards any unsubmitted local
-        // quantity/selection/confirmation state.
-        var epochChanged =
-          state.activeEpoch && state.activeEpoch !== lastEpoch;
-        if (epochChanged) {
-          lastEpoch = state.activeEpoch;
-        }
-        if (epochChanged && dock._mounted) {
-          dock._discardLocalState();
-        }
-        if (panelAvailable(state)) {
-          var panel = state.panels["services"];
-          var signature = dock._panelSignature(panel);
-          if (!dock._mounted) {
-            dock._mount(root, panel);
-          } else if (epochChanged || signature !== dock._lastSignature) {
-            // A newer snapshot refreshes the dock without tearing down an
-            // in-progress interaction; only a fresh epoch resets the keyboard.
-            dock._model = window.Elosern.ServiceMenu.buildMenus(panel);
-            dock._renderDock(root, panel);
-            var keyboard = getKeyboard();
-            if (keyboard && epochChanged) {
-              keyboard.reset(dock._model.menus.root);
-              dock._ownsKeyboard = true;
-              dock._currentMenuKey = "root";
-              dock._focusKey = null;
-            } else if (keyboard && dock._currentMenuKey === "root") {
-              keyboard.replaceMenu(dock._model.menus.root);
-            }
-          }
-          dock._lastSignature = signature;
-        } else if (dock._mounted) {
-          // Combat/creation or an unavailable services panel: the owning dock
-          // manages the action-dock; the services dock only cleans up itself
-          // and never resets the keyboard router here.
-          dock._unmount(root);
+        if (state.mode === "combat" && dock._mounted) {
+          dock.leaveService();
         }
       });
     },

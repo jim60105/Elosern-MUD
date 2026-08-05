@@ -494,3 +494,24 @@ class SkipCommandBranchTests(TestCase):
             command.func()
         command.caller.msg.assert_called_with("附近有活著的怪物，這裡不安全。")
         clock.assert_not_called()
+
+    def test_sleep_rejects_unsafe_skip_before_any_advance(self):
+        command = _command(CmdSleep)
+        with patch("commands.skip._safe_to_skip", return_value=False), patch(
+            "commands.skip.get_world_clock"
+        ) as clock:
+            command.func()
+        clock.assert_not_called()
+
+    def test_wait_until_daypart_advances_and_reports_summary(self):
+        command = _command(CmdWaitUntil, "until dawn")
+        event = SimpleNamespace(kind="daily_reset")
+        with patch("commands.skip._safe_to_skip", return_value=True), patch(
+            "commands.skip.seconds_until_daypart", return_value=120
+        ), patch("commands.skip.get_world_clock") as clock:
+            clock.return_value.advance.return_value = [event]
+            command.func()
+        clock.return_value.advance.assert_called_once_with(
+            120, AdvanceSource.SKIP, [command.caller]
+        )
+        command.caller.msg.assert_called_with("時間經過了 120 秒。 新的一天開始了。")

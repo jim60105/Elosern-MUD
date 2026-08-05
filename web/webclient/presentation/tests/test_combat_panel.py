@@ -457,7 +457,16 @@ class ContextActionsPresenterTests(EvenniaTest):
         self.assertEqual(
             self.registry.panel_names,
             frozenset(
-                {"art", "status", "context_actions", "local_map", "services", "creation"}
+                {
+                    "art",
+                    "status",
+                    "context_actions",
+                    "local_map",
+                    "services",
+                    "creation",
+                    "exploration",
+                    "character",
+                }
             ),
         )
 

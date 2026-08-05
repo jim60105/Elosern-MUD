@@ -12,6 +12,7 @@ from world.rules.buffs import _add_buff
 from world.rules.combat_session import engage
 from world.rules.status_query import (
     StatusQueryError,
+    build_character_read_model,
     build_status_read_model,
 )
 
@@ -124,6 +125,150 @@ class StatusReadModelTests(EvenniaTest):
             self.actor.attributes.get("sexual_traits", category="traits"),
             "reading status must not materialize the sexual handler",
         )
+
+    def test_malformed_buff_cache_and_entries_fail_closed(self):
+        self.actor.attributes.add("buffs", "junk")
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+        self.actor.attributes.add("buffs", None)
+        model = build_status_read_model(self.actor)
+        self.assertEqual(model.conditions, ())
+        self.actor.attributes.add("buffs", {"bad": "junk"})
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+    def test_paused_zero_stack_and_expired_buff_entries_are_skipped(self):
+        self.actor.attributes.add(
+            "buffs",
+            {
+                "paused_one": {"definition_key": "poisoned", "stacks": 1, "paused": True},
+                "zero_stacks": {"definition_key": "poisoned", "stacks": 0},
+                "expired": {"definition_key": "poisoned", "stacks": 1, "remaining_seconds": 0},
+            },
+        )
+        model = build_status_read_model(self.actor)
+        self.assertEqual(model.conditions, ())
+
+    def test_unknown_buff_definition_fails_closed(self):
+        self.actor.attributes.add(
+            "buffs", {"mystery": {"definition_key": "nope", "stacks": 1}}
+        )
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+    def test_malformed_combat_record_fails_closed(self):
+        for raw in ("junk", {"mode": "bandit", "rounds_elapsed": 1}):
+            self.actor.attributes.add("active_combat", raw)
+            with self.assertRaises(StatusQueryError):
+                build_status_read_model(self.actor)
+        self.actor.attributes.add(
+            "active_combat", {"mode": "hostile", "rounds_elapsed": -1}
+        )
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+
+class CharacterReadModelTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.actor = _actor(self)
+
+    def _traits(self):
+        return dict(self.actor.attributes.get("traits", category="traits"))
+
+    def _model(self):
+        return build_character_read_model(self.actor)
+
+    def test_reads_gauges_statics_and_counters(self):
+        model = self._model()
+        self.assertEqual(
+            [trait.key for trait in model.traits],
+            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_level", "guild_merit"],
+        )
+        hp = next(trait for trait in model.traits if trait.key == "hp")
+        self.assertEqual(hp.current, 100)
+        self.assertEqual(hp.maximum, 100)
+        atk = next(trait for trait in model.traits if trait.key == "atk_phys")
+        self.assertIsNone(atk.maximum)
+        self.assertEqual(model.wallet, 0)
+
+    def test_malformed_gauge_base_modifier_and_multiplier_fail_closed(self):
+        for field in ("base", "mod", "mult"):
+            traits = self._traits()
+            traits["hp"] = {**traits["hp"], field: True}
+            self.actor.attributes.add("traits", traits, category="traits")
+            with self.assertRaises(StatusQueryError):
+                self._model()
+
+    def test_gauge_current_validation_fails_closed(self):
+        for value in (True, -1, 10**9):
+            traits = self._traits()
+            traits["hp"]["current"] = value
+            self.actor.attributes.add("traits", traits, category="traits")
+            with self.assertRaises(StatusQueryError):
+                self._model()
+
+    def test_malformed_static_and_counter_traits_fail_closed(self):
+        traits = self._traits()
+        del traits["atk_phys"]
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            self._model()
+        traits["atk_phys"] = {"base": True}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            self._model()
+        traits["guild_merit"] = {"base": -5}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+    def test_non_sequence_passive_and_junk_accessories_are_skipped(self):
+        self.actor.db.skills = {"active": [], "passive": "none"}
+        model = self._model()
+        self.assertEqual(model.passive_keys, ())
+        self.actor.db.equipment = {
+            "weapon_main": "plain_sword",
+            "weapon_off": None,
+            "armor": None,
+            "accessories": ["ring", 5, None],
+        }
+        model = self._model()
+        self.assertEqual(
+            [row.slot for row in model.equipment], ["weapon_main", "accessory"]
+        )
+
+    def test_malformed_disguise_fails_closed(self):
+        self.actor.db.disguised_stats = "yes"
+        with self.assertRaises(StatusQueryError):
+            self._model()
+        self.actor.db.disguised_stats = {"": 5}
+        with self.assertRaises(StatusQueryError):
+            self._model()
+        self.actor.db.disguised_stats = {"atk_phys": True}
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+    def test_malformed_wallet_fails_closed(self):
+        for value in (True, -1):
+            self.actor.db.wallet = value
+            with self.assertRaises(StatusQueryError):
+                self._model()
+
+
+class LevelRefComparisonTests(unittest.TestCase):
+    def test_ordinal_comparisons_accept_levelref_str_and_int(self):
+        from world.rules.status_query import _LevelRef
+
+        levels = ("a", "b", "c")
+        ref = _LevelRef(1, levels)
+        self.assertEqual(ref, _LevelRef(1, levels))
+        self.assertEqual(ref, "b")
+        self.assertEqual(ref == 1, True)
+        self.assertTrue(ref >= 0)
+        self.assertTrue(ref <= "c")
+        self.assertTrue(ref < 2)
+        self.assertTrue(ref > 0)
 
 
 if __name__ == "__main__":

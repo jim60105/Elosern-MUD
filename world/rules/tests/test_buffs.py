@@ -35,6 +35,16 @@ class BuffIntegrationTests(EvenniaTest):
         tick_buffs(entity)
         self.assertEqual(entity.traits.hp.value, before - 5)
 
+    def test_buff_tick_on_full_gauge_stores_integer(self):
+        entity = self._entity()
+        _add_buff(entity, "poisoned")
+        stored = entity.attributes.get("traits", category="traits")["hp"]
+        self.assertNotIn("current", stored)
+        tick_buffs(entity)
+        stored = entity.attributes.get("traits", category="traits")["hp"]
+        self.assertEqual(stored["current"], stored["base"] - 5)
+        self.assertIsInstance(stored["current"], int)
+
     @covers_requirement("buff-handler-integration::a-declared-unbuilt-seam-exists-for-buff-forbidden-actions")
     def test_buff_paralysis(self):
         entity = self._entity()

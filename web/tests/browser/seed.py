@@ -106,9 +106,8 @@ def _minimap_fixture(character) -> None:
 
     # Wilderness layer: place the character into the wilderness directly
     # (enter_wilderness moves without charging the clock -- the gate exit's
-    # wilderness_move charge is a gameplay cost that would also run gauge
-    # regen, mutating traits into floats; this fixture only needs the visited
-    # node recorded), then return to 南門.
+    # wilderness_move charge is a gameplay cost this fixture does not need;
+    # only the visited node must be recorded), then return to 南門.
     if north_gate is not None:
         from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
         from typeclasses.rooms import TerrainRoom
@@ -358,6 +357,58 @@ def _services_fixture(character) -> None:
     print(f"seeded services fixture: {mode}")
 
 
+def _exploration_fixture(character) -> None:
+    """Deterministically prepare an exploration-menu fixture (webclient-exploration-menu).
+
+    Opted-in with ``ELOSERN_BROWSER_EXPLORATION=1``. Places the character at the
+    South Gate with the scripted-dialogue guard, a present ``LLMNPC`` whose
+    ``npc_dialogue`` profile is disabled offline, a living hostile monster, and
+    an onboarding state that lets a ``look`` advance the arrival beat. No
+    remote, LLM, or image service is involved.
+    """
+    from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
+    from evennia.utils.create import create_object
+    from evennia.utils.search import search_object_by_tag
+    from typeclasses.components import ScriptedDialogue
+    from typeclasses.monsters import Monster
+    from typeclasses.npcs import LLMNPC
+    from world.maps.bootstrap import (
+        SOUTH_GATE_XYZ,
+        sync_grid,
+        sync_service_interiors,
+    )
+    from world.onboarding.scenes import LOOK_BEAT_ID
+    from world.rules.map_knowledge import record_arrival
+    from world.rules.onboarding import sync_guard_npc
+
+    if os.environ.get("ELOSERN_BROWSER_EXPLORATION") != "1":
+        return
+
+    sync_grid()
+    sync_service_interiors()
+    sync_guard_npc()
+    south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+    if south_gate is None:
+        return
+    character.location = south_gate
+    character.onboarded = False
+    character.onboarding_beat = LOOK_BEAT_ID
+    character.guide_progress = {"state": "active", "seen_keywords": []}
+    character.first_arrival_seen = False
+    character.save()
+    record_arrival(character)
+
+    bard = create_object(LLMNPC, key="吟遊詩人", location=south_gate)
+    bard.components.add(
+        ScriptedDialogue.create(bard, dialogue_key="guild_staff")
+    )
+
+    goblin = create_object(Monster, key="哥布林", location=south_gate)
+    goblin.threat_tier = "low"
+    goblin.apply_monster_tier("floor")
+    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin")
+
+
 def main() -> None:
     os.environ.setdefault(
         "DJANGO_SETTINGS_MODULE", "web.tests.browser.browser_settings"
@@ -498,6 +549,7 @@ def main() -> None:
     _services_fixture(character)
 
     _art_fixture(character, room)
+    _exploration_fixture(character)
 
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
