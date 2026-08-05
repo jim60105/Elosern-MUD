@@ -135,6 +135,11 @@ def at_server_start():
 
     art_sync_all()
 
+    # WebClient art completion push: re-entrant-safe via a stable dispatch UID.
+    from web.webclient.presentation.art_push import connect_art_push
+
+    connect_art_push()
+
 
 def at_server_stop():
     """

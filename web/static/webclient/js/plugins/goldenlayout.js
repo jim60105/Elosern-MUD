@@ -509,12 +509,279 @@
     setText(detail, focusNote);
   }
 
+  // -------------------------------------------------------------------------
+  // Art component (webclient-art-panel): scene + contextual portrait overlay.
+  // -------------------------------------------------------------------------
+
+  function registerArt(container) {
+    var root = makeElement("div", "elosern elosern-art");
+    root.setAttribute("role", "region");
+    root.setAttribute("aria-label", "場景圖像");
+    container.getElement().append(root);
+
+    var artFocusSubscribed = false;
+    var model = null;
+    var restoreSceneFocus = false;
+    // Client-local record of media URLs whose image failed to load. A failed
+    // URL degrades to its truthful placeholder and is never re-requested until
+    // the payload carries a new URL or the page is reloaded.
+    var failedUrls = {};
+
+    function markFailedUrl(url) {
+      if (url) {
+        failedUrls[url] = true;
+      }
+    }
+
+    function isFailedUrl(url) {
+      return !!url && failedUrls[url] === true;
+    }
+
+    function render() {
+      subscribeArtFocus();
+      clearFullView();
+      if (!window.Elosern || !window.Elosern.ArtPanel) {
+        setText(root, "此介面暫時無法顯示");
+        return;
+      }
+      var state = getStateController() ? getStateController().getState() : null;
+      var panel = state && state.panels && state.panels["art"];
+      if (!panel) {
+        setText(root, "尚未同步場景圖像");
+        return;
+      }
+      if (panel.available === false) {
+        var reason = panel.reason;
+        setText(root, reason ? reason.message : "場景圖像目前無法顯示");
+        return;
+      }
+      var previous = model;
+      model = window.Elosern.ArtPanel.reducePanel(panel, state.mode, previous);
+      while (root.firstChild) {
+        root.removeChild(root.firstChild);
+      }
+      var scene = renderScene(root, model);
+      renderPortrait(root, model, scene);
+      if (restoreSceneFocus) {
+        restoreSceneFocus = false;
+        var image = root.querySelector(".art-scene-image");
+        if (image) {
+          image.focus();
+        }
+      }
+      var controller = getStateController();
+      if (controller && typeof controller.resetResyncEpisode === "function") {
+        controller.resetResyncEpisode("art");
+      }
+    }
+
+    function renderScene(root, model) {
+      var scene = model.scene;
+      var scenePane = makeElement("div", "art-scene");
+      scenePane.classList.add("art-scene-" + scene.state);
+      if (scene.state === "asset" || scene.state === "pending") {
+        if (isFailedUrl(scene.url)) {
+          // The image previously failed to load; never re-fetch this URL.
+          var failed = makeElement("div", "art-scene-empty");
+          setText(
+            failed,
+            scene.placeholderLabel || "圖片載入失敗，請重新整理畫面"
+          );
+          scenePane.appendChild(failed);
+        } else {
+          var img = makeElement("img", "art-scene-image");
+          img.src = scene.url;
+          img.alt = scene.alt;
+          img.setAttribute("tabindex", "0");
+          img.setAttribute("role", "button");
+          img.setAttribute("aria-label", scene.label + "（按下 Enter 開啟全畫面）");
+          img.addEventListener("error", function () {
+            markFailedUrl(scene.url);
+            render();
+          });
+          img.addEventListener("click", function () {
+            model.sceneFullView = true;
+            render();
+          });
+          img.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              model.sceneFullView = true;
+              render();
+            }
+          });
+          scenePane.appendChild(img);
+        }
+        if (scene.state === "pending") {
+          scenePane.classList.add("art-dimmed");
+          var pendingNote = makeElement("div", "art-pending");
+          setText(pendingNote, "目前場景圖片生成中");
+          scenePane.appendChild(pendingNote);
+        }
+      } else {
+        var placeholder = makeElement("div", "art-scene-empty");
+        setText(
+          placeholder,
+          scene.placeholderLabel || scene.label || "場景圖像暫時無法顯示"
+        );
+        scenePane.appendChild(placeholder);
+      }
+      var caption = makeElement("figcaption", "art-caption");
+      var labelLine = makeElement("span", "art-caption-label");
+      setText(labelLine, scene.label);
+      var altLine = makeElement("span", "art-caption-alt");
+      setText(altLine, scene.alt);
+      caption.appendChild(labelLine);
+      caption.appendChild(altLine);
+      scenePane.appendChild(caption);
+      root.appendChild(scenePane);
+      if (model.sceneFullView) {
+        renderFullView(root, model, scene, scenePane);
+      }
+      return scenePane;
+    }
+
+    function renderPortrait(root, model, scenePane) {
+      var focus = model.focusKey;
+      if (focus === null) {
+        return;
+      }
+      var entry = model.catalog[focus];
+      if (!entry) {
+        return;
+      }
+      var card = makeElement("div", "art-portrait");
+      card.classList.add("art-portrait-3x4");
+      if (entry.url && !isFailedUrl(entry.url)) {
+        var img = makeElement("img", "art-portrait-image");
+        img.src = entry.url;
+        img.alt = entry.alt;
+        img.setAttribute("tabindex", "0");
+        img.setAttribute("role", "button");
+        img.setAttribute("aria-label", entry.name + "（開啟全畫面）");
+        img.addEventListener("error", function () {
+          markFailedUrl(entry.url);
+          render();
+        });
+        img.addEventListener("click", function () {
+          model.portraitFullView = true;
+          render();
+        });
+        img.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            model.portraitFullView = true;
+            render();
+          }
+        });
+        card.appendChild(img);
+      } else {
+        var placeholder = makeElement("div", "art-portrait-placeholder");
+        setText(
+          placeholder,
+          entry.placeholderLabel || "肖像暫時無法顯示"
+        );
+        card.appendChild(placeholder);
+      }
+      var context = makeElement("div", "art-portrait-context");
+      var name = makeElement("span", "art-portrait-name");
+      setText(name, entry.name);
+      var role = makeElement("span", "art-portrait-role");
+      setText(role, entry.role || "");
+      context.appendChild(name);
+      context.appendChild(role);
+      card.appendChild(context);
+      root.appendChild(card);
+      if (model.portraitFullView) {
+        renderFullView(root, model, entry, card);
+      }
+    }
+
+    function renderFullView(root, model, target, source) {
+      var overlay = makeElement("div", "art-fullview");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("tabindex", "0");
+      if (target.url && !isFailedUrl(target.url)) {
+        var img = makeElement("img", "art-fullview-image");
+        img.src = target.url;
+        img.alt = target.alt;
+        img.addEventListener("error", function () {
+          markFailedUrl(target.url);
+          render();
+        });
+        overlay.appendChild(img);
+      } else {
+        var note = makeElement("div", "art-fullview-note");
+        setText(note, target.placeholderLabel || "圖像暫時無法顯示");
+        overlay.appendChild(note);
+      }
+      var close = makeElement("button", "art-fullview-close");
+      close.type = "button";
+      setText(close, "關閉（Esc）");
+      close.addEventListener("click", function () {
+        model.sceneFullView = false;
+        model.portraitFullView = false;
+        render();
+      });
+      overlay.appendChild(close);
+      overlay.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          model.sceneFullView = false;
+          model.portraitFullView = false;
+          restoreSceneFocus = true;
+          render();
+        }
+      });
+      document.body.appendChild(overlay);
+      overlay.focus();
+      root._artFullView = overlay;
+    }
+
+    function clearFullView() {
+      if (root._artFullView && root._artFullView.parentNode) {
+        root._artFullView.parentNode.removeChild(root._artFullView);
+        root._artFullView = null;
+      }
+    }
+
+    var unsubscribe = subscribeState(function () {
+      clearFullView();
+      render();
+    });
+    unsubscribers.push(unsubscribe);
+
+    // The art focus bus is created by elosern_ui after this plugin registers,
+    // so the subscription is deferred until the bus actually exists; later
+    // focus publications then re-select the portrait without any packet.
+    function subscribeArtFocus() {
+      if (artFocusSubscribed) {
+        return;
+      }
+      var bus = (
+        window.Elosern &&
+        window.Elosern.artFocusBus
+      ) || null;
+      if (!bus) {
+        return;
+      }
+      artFocusSubscribed = true;
+      var unsubscribeFocus = bus.subscribe(function (focusKey) {
+        if (model) {
+          model.focusKey = focusKey;
+          clearFullView();
+          render();
+        }
+      });
+      unsubscribers.push(unsubscribeFocus);
+    }
+  }
+
   function registerComponents(layout) {
     layout.registerComponent("header", registerHeader);
     layout.registerComponent("narrative", registerNarrative);
-    layout.registerComponent("art", function (container) {
-      registerUnavailable(container, "場景圖像", "場景圖像的生成與顯示尚未開放。");
-    });
+    layout.registerComponent("art", registerArt);
     layout.registerComponent("status", registerStatus);
     layout.registerComponent("local-map", registerLocalMap);
     layout.registerComponent("action-dock", registerActionDock);

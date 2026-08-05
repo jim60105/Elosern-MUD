@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``context_actions`` combat panel and presenter.
+"""Exact schema-version-2 ``context_actions`` combat panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
@@ -39,7 +39,7 @@ from world.rules.combat_view import (
     build_combat_view,
 )
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 1
+CONTEXT_ACTIONS_SCHEMA_VERSION = 2
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_SKILL_KEY = 64
@@ -53,6 +53,7 @@ MAX_TEAM = 16
 MAX_STATE = 16
 MAX_ACTION_KEYS = 16
 MAX_REASON_CODE = 64
+MAX_PARTICIPANT_REF = 32
 
 # Participant display-state values the panel emits.
 PARTICIPANT_STATES = frozenset({"active", "fled", "knocked_out", "defeated"})
@@ -143,8 +144,14 @@ def _validate_participant(value: Any) -> dict[str, Any]:
     hp_maximum = _require_int(value, "hp_maximum", minimum=1, maximum=MAX_SAFE_INTEGER)
     if hp_current > hp_maximum:
         raise ProtocolValidationError("participant hp_current must not exceed maximum")
-    if value["portrait_ref"] is not None:
-        raise ProtocolValidationError("portrait_ref must be null in this schema version")
+    portrait_ref = value["portrait_ref"]
+    if portrait_ref is not None:
+        if not isinstance(portrait_ref, str) or not portrait_ref.isdecimal():
+            raise ProtocolValidationError(
+                "portrait_ref must be an opaque decimal catalog key or null"
+            )
+        if len(portrait_ref) > MAX_PARTICIPANT_REF:
+            raise ProtocolValidationError("portrait_ref exceeds its bound")
     return {
         "identity": identity,
         "token": token,
@@ -153,7 +160,7 @@ def _validate_participant(value: Any) -> dict[str, Any]:
         "state": state,
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
-        "portrait_ref": None,
+        "portrait_ref": portrait_ref,
     }
 
 
@@ -376,7 +383,7 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
             "state": participant.state,
             "hp_current": participant.hp_current,
             "hp_maximum": participant.hp_maximum,
-            "portrait_ref": None,
+            "portrait_ref": participant.portrait_ref,
         }
         for participant in view.participants
     ]

@@ -168,7 +168,7 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
-  var PANEL_ALLOWLIST = { status: 1, context_actions: 1, local_map: 1, services: 1, creation: 1 };
+  var PANEL_ALLOWLIST = { art: 1, status: 1, context_actions: 2, local_map: 1, services: 1, creation: 1 };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
   var PANEL_NAME_RE = /^[a-z0-9_]{1,64}$/;
@@ -657,8 +657,14 @@
     if (value.hp_current > value.hp_maximum) {
       throw new Error("participant hp_current must not exceed its maximum");
     }
-    if (value.portrait_ref !== null) {
-      throw new Error("portrait_ref must be null in this schema version");
+    var portraitRef = value.portrait_ref;
+    if (portraitRef !== null) {
+      if (typeof portraitRef !== "string" || !/^[0-9]+$/.test(portraitRef)) {
+        throw new Error("portrait_ref must be an opaque decimal catalog key or null");
+      }
+      if (portraitRef.length > 32) {
+        throw new Error("portrait_ref exceeds its bound");
+      }
     }
     return value;
   }
@@ -760,12 +766,12 @@
     return value;
   }
 
-  // Exact available context_actions combat panel v1 schema.
+  // Exact available context_actions combat panel v2 schema.
   function validateContextActionsPanel(payload) {
     if (payload.available === false) {
       requireExactFields(payload, "context_actions panel", ["schema_version", "available", "reason"], []);
       requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-      if (payload.schema_version !== 1) {
+      if (payload.schema_version !== 2) {
         throw new Error("unsupported context_actions panel schema_version");
       }
       var reason = payload.reason;
@@ -791,7 +797,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported context_actions panel schema_version");
     }
     if (payload.available !== true || payload.kind !== "combat") {
@@ -1935,8 +1941,217 @@
     return result;
   }
 
+  // Exact available art panel v1 schema (mirror of
+  // web.webclient.presentation.art, webclient-art-panel D1).
+  var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
+  var ART_ROLES = ["隊友", "敵方", "對話對象", "人物"];
+
+  function validateArtPlaceholder(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(value, "art placeholder", ["kind", "label"], []);
+    if (ART_PLACEHOLDER_KINDS.indexOf(value.kind) === -1) {
+      throw new Error("placeholder kind is not a stable value");
+    }
+    var label = requireString(value.label, "placeholder label", 128);
+    if (!label.trim()) {
+      throw new Error("placeholder label must be non-empty");
+    }
+    return { kind: value.kind, label: label };
+  }
+
+  function validateArtScene(value) {
+    requireExactFields(
+      value,
+      "art scene",
+      ["archetype", "label", "subject_key", "status", "url", "aspect_ratio", "alt", "placeholder"],
+      []
+    );
+    if (value.archetype !== null) {
+      var archetype = requireString(value.archetype, "archetype", 64);
+      if (!archetype.trim()) {
+        throw new Error("scene archetype must be non-empty");
+      }
+    }
+    var label = requireString(value.label, "scene label", 128);
+    if (!label.trim()) {
+      throw new Error("scene label must be non-empty");
+    }
+    if (value.subject_key !== null) {
+      requireString(value.subject_key, "scene subject_key", 128);
+    }
+    var status = value.status;
+    if (status !== null) {
+      requireString(status, "scene status", 16);
+      if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
+        throw new Error("scene status is not a stable value");
+      }
+    }
+    var url = value.url;
+    if (url !== null) {
+      requireString(url, "scene url", 128);
+      if (url.indexOf("/art/") !== 0) {
+        throw new Error("scene url must be a same-origin media URL");
+      }
+    }
+    if (value.aspect_ratio !== null && value.aspect_ratio !== "16:9") {
+      throw new Error("scene aspect_ratio must be 16:9");
+    }
+    var alt = requireString(value.alt, "scene alt", 512);
+    if (!alt.trim()) {
+      throw new Error("scene alt must be non-empty");
+    }
+    var placeholder = validateArtPlaceholder(value.placeholder);
+    if (placeholder === null && status !== "done") {
+      throw new Error("scene placeholder must be present unless done");
+    }
+    if (placeholder !== null && status === "done") {
+      throw new Error("a done scene must not carry a placeholder");
+    }
+    return {
+      archetype: value.archetype,
+      label: label,
+      subject_key: value.subject_key,
+      status: status,
+      url: url,
+      aspect_ratio: value.aspect_ratio,
+      alt: alt,
+      placeholder: placeholder,
+    };
+  }
+
+  function validateArtContext(value) {
+    requireExactFields(value, "art context", ["name", "role"], []);
+    var name = requireString(value.name, "context name", 64);
+    if (!name.trim()) {
+      throw new Error("context name must be non-empty");
+    }
+    var role = requireString(value.role, "context role", 16);
+    if (ART_ROLES.indexOf(role) === -1) {
+      throw new Error("context role is not a stable value");
+    }
+    return { name: name, role: role };
+  }
+
+  function validateArtCatalogEntry(value) {
+    requireExactFields(
+      value,
+      "art catalog entry",
+      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "context"],
+      []
+    );
+    if (value.subject_key !== null) {
+      requireString(value.subject_key, "catalog subject_key", 128);
+    }
+    var status = value.status;
+    if (status !== null) {
+      requireString(status, "catalog status", 16);
+      if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
+        throw new Error("catalog status is not a stable value");
+      }
+    }
+    var url = value.url;
+    if (url !== null) {
+      requireString(url, "catalog url", 128);
+      if (url.indexOf("/art/") !== 0) {
+        throw new Error("catalog url must be a same-origin media URL");
+      }
+    }
+    if (value.aspect_ratio !== null && value.aspect_ratio !== "3:4") {
+      throw new Error("catalog aspect_ratio must be 3:4");
+    }
+    var alt = requireString(value.alt, "catalog alt", 512);
+    if (!alt.trim()) {
+      throw new Error("catalog alt must be non-empty");
+    }
+    validateArtPlaceholder(value.placeholder);
+    validateArtContext(value.context);
+    return value;
+  }
+
+  function validateArtPanel(payload) {
+    if (payload.available === false) {
+      // The common unavailable discriminator; validateStatusPanel handles it.
+      validateStatusPanel(payload);
+      return payload;
+    }
+
+    requireExactFields(
+      payload,
+      "art panel",
+      ["schema_version", "available", "kind", "scene", "portrait_catalog"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported art schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "scene") {
+      throw new Error("art panel must be available with kind scene");
+    }
+
+    var scene = validateArtScene(payload.scene);
+    var catalog = payload.portrait_catalog;
+    if (!isPlainObject(catalog) || Object.keys(catalog).length > 32) {
+      throw new Error("portrait_catalog must be a bounded object");
+    }
+    var entries = {};
+    var keys = Object.keys(catalog);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (!/^[0-9]+$/.test(key)) {
+        throw new Error("catalog keys must be opaque decimal strings");
+      }
+      entries[key] = validateArtCatalogEntry(catalog[key]);
+    }
+
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "scene",
+      scene: scene,
+      portrait_catalog: entries,
+    };
+    // Envelope guarantee (design D7): per-field bounds are ceilings, not a
+    // guarantee that any combination of them fits, so the validator enforces
+    // the serialized byte size directly and fails closed over the envelope.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("art payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
+  function validateUnavailablePanel(payload, schemaVersion) {
+    // The common unavailable discriminator: exactly schema_version, available
+    // false, and a bounded reason. schema_version matches the panel's
+    // registered version (so a v2 panel like context_actions is accepted).
+    requireExactFields(payload, "panel", ["schema_version", "available", "reason"], []);
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== schemaVersion) {
+      throw new Error("unsupported panel schema_version");
+    }
+    if (payload.available !== false) {
+      throw new Error("available must be false for the unavailable form");
+    }
+    var reason = payload.reason;
+    var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
+    requireExactFields(
+      reason,
+      "panel reason",
+      ["code", "message"],
+      hasCorrelation ? ["correlation_id"] : []
+    );
+    validateIdentifier(reason.code, "reason.code");
+    validateMessage(reason.message, "reason.message");
+    if (hasCorrelation) {
+      validateCorrelationId(reason.correlation_id);
+    }
+    return payload;
+  }
+
   function validatePanel(name, schemaVersion, payload) {
     if (!isPlainObject(payload)) {
       throw new Error("panel " + name + " must be a JSON object");
@@ -1948,12 +2163,13 @@
       );
     }
     if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
+      return validateUnavailablePanel(payload, schemaVersion);
     }
     if (payload.available !== true) {
       throw new Error("panel " + name + " is missing the availability discriminator");
+    }
+    if (name === "art") {
+      return validateArtPanel(payload);
     }
     if (name === "status") {
       return validateStatusPanel(payload);
@@ -2187,6 +2403,7 @@
     validateActionResult: validateActionResult,
     validateProtocolError: validateProtocolError,
     validateStatusPanel: validateStatusPanel,
+    validateArtPanel: validateArtPanel,
     validateContextActionsPanel: validateContextActionsPanel,
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,

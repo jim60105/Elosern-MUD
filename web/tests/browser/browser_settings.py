@@ -89,6 +89,21 @@ CACHE_DIR = _env_path("ELOSERN_BROWSER_CACHE_DIR", CACHE_DIR)
 MEDIA_ROOT = _env_path("ELOSERN_BROWSER_MEDIA_ROOT", MEDIA_ROOT)
 STATIC_ROOT = _env_path("ELOSERN_BROWSER_STATIC_ROOT", STATIC_ROOT)
 
+# Art store for browser acceptance: a private temporary root, and a worker
+# command that can be pointed at a fixture (or fixed to fail for offline
+# journeys) through the environment.
+ART_STORE_ROOT = _env_path("ELOSERN_BROWSER_ART_ROOT", os.path.join(CACHE_DIR, "art"))
+_ART_WORKER_CMD = os.environ.get("ELOSERN_BROWSER_ART_WORKER_CMD", "")
+ART_WORKER_CMD = (
+    _ART_WORKER_CMD.split(",")
+    if _ART_WORKER_CMD
+    else ["python", "-m", "tools.art_worker"]
+)
+ART_WORKER_TIMEOUT_SECONDS = _env_int("ELOSERN_BROWSER_ART_TIMEOUT", 60)
+ART_SCHEDULER_ENABLED = False
+ART_SCHEDULER_INTERVAL_SECONDS = 30
+ART_SCHEDULER_LIMIT = 4
+
 
 # ---------------------------------------------------------------------------
 # Evennia 6.1 webclient session detection.

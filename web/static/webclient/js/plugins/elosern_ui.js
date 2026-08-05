@@ -245,6 +245,12 @@
             handleSpace(payload);
           } else if (name === "focus" || name === "disabled") {
             renderCombatDetail(payload);
+            // Arrow-key navigation over combat target descriptors updates the
+            // client-local portrait focus; no packet is ever sent.
+            var combatDock = window.Elosern && window.Elosern.combatDock;
+            if (combatDock && combatDock.publishFocusForItem) {
+              combatDock.publishFocusForItem(payload && payload.item);
+            }
           }
           // Forward navigation events to the services dock so it can keep its
           // DOM rows and detail pane in sync without owning a second router.
@@ -261,6 +267,19 @@
         },
       });
       window.Elosern.keyboard = router;
+    }
+  }
+
+  // The one client-local art focus bus shared by the combat dock (publisher)
+  // and the art renderer (subscriber). Created once so both sides always talk
+  // to the same channel; it never sends a packet.
+  function ensureArtFocusBus() {
+    if (
+      !window.Elosern.artFocusBus &&
+      window.Elosern &&
+      window.Elosern.ArtFocus
+    ) {
+      window.Elosern.artFocusBus = window.Elosern.ArtFocus.createBus();
     }
   }
 
@@ -448,6 +467,7 @@
 
   var plugin = {
     init: function () {
+      ensureArtFocusBus();
       wireKeyboardRouter();
       wireActions();
       wireConnections();

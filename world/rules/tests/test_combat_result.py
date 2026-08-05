@@ -57,7 +57,7 @@ class CombatResultRenderingTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "round")
         self.assertEqual(
-            result["affected_panels"], ("status", "context_actions")
+            result["affected_panels"], ("status", "context_actions", "art")
         )
         self.assertNotIn("logs", result)
 

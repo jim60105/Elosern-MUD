@@ -59,7 +59,9 @@ class CombatViewTests(EvenniaTest):
         self.assertEqual(view.root_actions, ROOT_ACTIONS)
         self.assertEqual(view.secondary_actions, SECONDARY_ACTIONS)
         for participant in view.participants:
-            self.assertIsNone(participant.portrait_ref)
+            self.assertEqual(
+                participant.portrait_ref, str(participant.identity)
+            )
             self.assertGreater(participant.identity, 0)
             self.assertEqual(participant.state, "active")
             self.assertEqual(participant.hp_maximum, 100)

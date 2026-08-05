@@ -592,7 +592,7 @@ test("a multi-panel message with one malformed panel is rejected atomically", ()
 
   // Valid status plus an unregistered panel name: the whole update is rejected.
   const mixed = snapshot({
-    panels: { status: validStatusPanel(), art: unavailableStatusPanel() },
+    panels: { status: validStatusPanel(), mystery: unavailableStatusPanel() },
   });
   const result = store.receive(1, "ui_snapshot", [mixed], {});
   assert.equal(result.accepted, false);
@@ -795,7 +795,7 @@ function validCombatParticipant(overrides) {
 function validCombatPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "combat",
       session: {
@@ -817,7 +817,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "combat",
       session: {
@@ -842,7 +842,7 @@ test("validates the available context_actions combat panel", () => {
 });
 
 test("rejects malformed context_actions panels atomically", () => {
-  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 1, available: false }));
+  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 2, available: false }));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ kind: "exploration" })));
   assert.throws(() =>
@@ -862,11 +862,25 @@ test("rejects malformed context_actions panels atomically", () => {
       validCombatPanel({ skills: [validCombatSkill({ shorthands: ["all-enemies"] })] })
     )
   );
-  // portrait_ref must be null in schema version 1.
+  // portrait_ref must be an opaque decimal catalog key or null in version 2.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({
         participants: [validCombatParticipant({ portrait_ref: "https://x.test/a.png" })],
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        participants: [validCombatParticipant({ portrait_ref: "42" })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        participants: [validCombatParticipant({ portrait_ref: "4.2" })],
       })
     )
   );
@@ -1633,6 +1647,117 @@ test("services is in the production panel allowlist and a bad panel rejects atom
   assert.equal(accepted.accepted, false);
   assert.equal(accepted.reason, "invalid");
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
+});
+
+// ---------------------------------------------------------------------------
+// art panel v1 (mirror of web.webclient.presentation.art, webclient-art-panel).
+// ---------------------------------------------------------------------------
+
+function validArtScene(overrides) {
+  return deepMerge(
+    {
+      archetype: "tavern_interior",
+      label: "酒館內部",
+      subject_key: "scene:tavern_interior",
+      status: "done",
+      url: "/art/scene/tavern_interior.png",
+      aspect_ratio: "16:9",
+      alt: "酒館內部場景",
+      placeholder: null,
+    },
+    overrides
+  );
+}
+
+function validArtCatalogEntry(overrides) {
+  return deepMerge(
+    {
+      subject_key: "portrait:monster:low",
+      status: "done",
+      url: "/art/portrait/monster/low.png",
+      aspect_ratio: "3:4",
+      alt: "低階魔物",
+      placeholder: null,
+      context: { name: "哥布林", role: "敵方" },
+    },
+    overrides
+  );
+}
+
+function validArtPanel(overrides) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "scene",
+      scene: validArtScene(),
+      portrait_catalog: { "42": validArtCatalogEntry() },
+    },
+    overrides
+  );
+}
+
+test("art is in the production panel allowlist and validates the available payload", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
+  assert.doesNotThrow(() => Protocol.validateArtPanel(validArtPanel()));
+  assert.doesNotThrow(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        scene: validArtScene({
+          archetype: "forest_path",
+          status: "pending",
+          url: null,
+          placeholder: { kind: "missing", label: "未生成" },
+        }),
+        portrait_catalog: {
+          "7": validArtCatalogEntry({
+            subject_key: null,
+            status: null,
+            url: null,
+            aspect_ratio: null,
+            placeholder: { kind: "unavailable", label: "無法提供" },
+            context: { name: "旅店主人", role: "對話對象" },
+          }),
+        },
+      })
+    )
+  );
+});
+
+test("rejects malformed art panels atomically", () => {
+  assert.throws(() => Protocol.validateArtPanel({ schema_version: 1, available: false }));
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ kind: "combat" })));
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 2 })));
+  // A pending scene without a placeholder is untruthful.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        scene: validArtScene({ status: "pending", url: null, placeholder: null }),
+      })
+    )
+  );
+  // A done scene must not carry a placeholder.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({ scene: validArtScene({ placeholder: { kind: "missing", label: "未生成" } }) })
+    )
+  );
+  // A same-origin URL restriction is enforced.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({ scene: validArtScene({ url: "https://evil.test/x.png" }) })
+    )
+  );
+  // Catalog keys must be opaque decimal strings.
+  assert.throws(() =>
+    Protocol.validateArtPanel(validArtPanel({ portrait_catalog: { abc: validArtCatalogEntry() } }))
+  );
+  // A malformed context role is rejected.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({ portrait_catalog: { "42": validArtCatalogEntry({ context: { name: "x", role: "boss" } }) } })
+    )
+  );
 });
 
 // ---------------------------------------------------------------------------

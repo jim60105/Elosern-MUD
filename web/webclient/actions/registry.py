@@ -120,7 +120,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="combat.cast",
             validate_payload=validate_cast_payload,
             adapter=_cast_adapter,
-            affected_panels=("status", "context_actions"),
+            affected_panels=("status", "context_actions", "art"),
         )
     )
     registry.register(
@@ -128,7 +128,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="combat.flee",
             validate_payload=validate_flee_payload,
             adapter=_flee_adapter,
-            affected_panels=("status", "context_actions"),
+            affected_panels=("status", "context_actions", "art"),
         )
     )
     registry.register(
@@ -136,7 +136,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="combat.forfeit",
             validate_payload=validate_forfeit_payload,
             adapter=_forfeit_adapter,
-            affected_panels=("status", "context_actions"),
+            affected_panels=("status", "context_actions", "art"),
         )
     )
     registry.register(

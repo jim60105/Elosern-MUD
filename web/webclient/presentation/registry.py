@@ -157,6 +157,7 @@ def build_production_registry() -> PresentationRegistry:
     imported here (rather than at module import) so this module stays
     importable while a presenter is being developed.
     """
+    from web.webclient.presentation.art import art_presenter
     from web.webclient.presentation.combat_panel import context_actions_presenter
     from web.webclient.presentation.creation import creation_presenter
     from web.webclient.presentation.local_map import local_map_presenter
@@ -164,6 +165,14 @@ def build_production_registry() -> PresentationRegistry:
     from web.webclient.presentation.status import status_presenter
 
     registry = PresentationRegistry("elosern")
+    registry.register(
+        PresenterSpec(
+            name="art",
+            schema_version=1,
+            unavailable_reason=("art_unavailable", "場景圖像目前無法顯示"),
+            presenter=art_presenter,
+        )
+    )
     registry.register(
         PresenterSpec(
             name="status",
@@ -175,7 +184,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="context_actions",
-            schema_version=1,
+            schema_version=2,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=context_actions_presenter,
         )

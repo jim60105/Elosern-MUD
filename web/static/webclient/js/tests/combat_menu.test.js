@@ -53,7 +53,7 @@ function validParticipant(overrides) {
 function readyPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "combat",
       session: {
@@ -301,10 +301,14 @@ test("Escape pops one level without ending combat", () => {
   assert.ok(emitted.some(([name]) => name === "menu-closed"));
 });
 
-test("no focus packet is emitted for portrait-less participants", () => {
-  // The model itself never constructs a focus packet or portrait key.
-  const combat = CombatMenu.buildMenus(readyPanel(), {});
-  assert.equal(combat.participants[0].portrait_ref, null);
+test("no focus packet is emitted for portrait participants", () => {
+  // The model itself never constructs a focus packet or portrait key; it only
+  // carries the server-authored portrait_ref through unchanged.
+  const combat = CombatMenu.buildMenus(
+    readyPanel({ participants: [validParticipant({ portrait_ref: "42" })] }),
+    {}
+  );
+  assert.equal(combat.participants[0].portrait_ref, "42");
   assert.equal(JSON.stringify(combat).indexOf("portrait_ref") !== -1, true);
   assert.equal(JSON.stringify(combat).indexOf("focus-packet") === -1, true);
 });

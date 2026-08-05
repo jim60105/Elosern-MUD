@@ -177,13 +177,19 @@ def subject_for(record: ArtAssetRecord) -> ArtSubject:
     return parse_subject(f"{record.db.kind}:{record.db.subject_key}")
 
 
-def _run_and_settle_batch(records: list[ArtAssetRecord]) -> None:
+def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
     """Run the worker for one claimed batch and settle every result.
 
     Runs on a background Twisted thread with the queue lock released. The
     batch protocol is one-to-one: missing, duplicated, or unparseable results
     mark the unfinished claimed jobs ``failed`` with a bounded protocol error,
     so no job can be stuck ``in_progress`` or silently double-completed.
+
+    Returns the subjects whose ``settle()`` actually applied a terminal
+    ``done``/``failed`` status. A stale settle that returned ``None`` (the
+    record was requeued or reclaimed by a newer worker) is excluded, so the
+    completion notification is emitted only for a result that is truly the
+    current record.
     """
     subjects = [subject_for(record) for record in records]
     descriptions = [str(record.db.source_description or "") for record in records]
@@ -192,27 +198,31 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> None:
         raw_results = _run_worker(jobs)
     except (WorkerProtocolError, subprocess.TimeoutExpired, OSError) as error:
         _fail_batch(subjects, _bounded_error(error))
-        return
+        return []
 
     if len(raw_results) != len(jobs):
         # One-to-one batch protocol: a missing or duplicated result marks every
         # unfinished claimed job failed so none stays stuck in_progress.
         _fail_batch(subjects, "worker_batch_protocol_error")
-        return
+        return []
 
+    settled: list[ArtSubject] = []
     try:
         for subject, job, result in zip(subjects, jobs, raw_results):
             status, identity, error = _valid_result(job, result)
-            settle(
+            if settle(
                 subject,
                 status=status,
                 output_identity=identity,
                 error=error,
-            )
+            ) is not None:
+                settled.append(subject)
     except Exception:
         # Defensive: an unexpected settle error must never leave a claimed job
         # stuck in_progress; fail every unfinished subject as a bounded failure.
         _fail_batch(subjects, "worker_settle_error")
+        return []
+    return settled
 
 
 def _fail_batch(subjects: list[ArtSubject], error: str) -> None:
@@ -231,6 +241,22 @@ def _bounded_error(error: Exception) -> str:
     if isinstance(error, OSError):
         return "worker_start_failed"
     return "worker_protocol_error"
+
+
+def _notify_completed_batch(subjects: list[ArtSubject]) -> None:
+    """Emit ``asset_completed`` for the subjects that really settled.
+
+    Runs on the reactor thread (the ``deferToThread`` success callback) or on
+    the calling thread in deterministic ``drain_synchronous`` tests. Never runs
+    on the worker subprocess thread, so no subscriber touches the DB from a
+    worker thread. The payload carries only the completed full subject key.
+    """
+    if not subjects:
+        return
+    from world.art.signals import asset_completed
+
+    for subject in subjects:
+        asset_completed.send(sender=subject.__class__, subject_key=subject.full())
 
 
 def drain(limit: int) -> int:
@@ -257,14 +283,21 @@ def drain(limit: int) -> int:
         _release_worker_slot()
         return 0
     deferred = threads.deferToThread(_run_and_release_slot, records)
+    # The success callback runs on the reactor thread, so the completion
+    # notification is never emitted from the worker subprocess thread.
+    deferred.addCallback(_notify_completed_batch)
     deferred.addErrback(_log_drain_failure)
     return len(records)
 
 
-def _run_and_release_slot(records: list[ArtAssetRecord]) -> None:
-    """Run a claimed batch on the worker thread and always release the slot."""
+def _run_and_release_slot(records: list[ArtAssetRecord]) -> list[ArtSubject]:
+    """Run a claimed batch on the worker thread and always release the slot.
+
+    Returns the subjects whose terminal status was actually applied so the
+    reactor-thread callback can emit the completion notification.
+    """
     try:
-        _run_and_settle_batch(records)
+        return _run_and_settle_batch(records)
     finally:
         _release_worker_slot()
 
@@ -280,7 +313,8 @@ def drain_synchronous(limit: int) -> int:
         records = claim(limit)
         if not records:
             return 0
-        _run_and_settle_batch(records)
+        settled = _run_and_settle_batch(records)
+        _notify_completed_batch(settled)
         return len(records)
     finally:
         _release_worker_slot()

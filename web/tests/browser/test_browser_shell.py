@@ -46,11 +46,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_unavailable_placeholders_and_numeric_status(self):
         page = self.logged_in_page()
+        # The art component is now the real renderer: no foundation placeholder
+        # remains, and a scene without a generated asset renders the truthful
+        # art placeholder inside the art surface.
         placeholders = page.locator(".elosern-placeholder").all_inner_texts()
-        self.assertEqual(len(placeholders), 1, "art placeholder only")
-        combined = "\n".join(placeholders)
-        self.assertIn("尚未開放", combined)
-        self.assertIn("場景圖像", combined)
+        self.assertEqual(len(placeholders), 0, "no foundation placeholder remains")
+        art_surface = page.locator(".elosern-art")
+        self.assertEqual(art_surface.count(), 1, "art surface present")
+        self.assertTrue(art_surface.is_visible())
         # The minimap surface renders (or gracefully reports unavailable) and
         # is no longer a placeholder.
         local_map_surface = page.locator(".elosern-local-map")

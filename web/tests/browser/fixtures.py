@@ -113,6 +113,7 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         "ELOSERN_BROWSER_MEDIA_ROOT": str(media_dir),
         "ELOSERN_BROWSER_STATIC_ROOT": str(static_dir),
         "ELOSERN_BROWSER_CACHE_DIR": str(cache_dir),
+        "ELOSERN_BROWSER_ART_ROOT": str(cache_dir / "art"),
         "ELOSERN_BROWSER_TELNET_PORT": str(ports[TELNET_PORT]),
         "ELOSERN_BROWSER_HTTP_PORT": str(ports[HTTP_PORT]),
         "ELOSERN_BROWSER_INTERNAL_PORT": str(ports[INTERNAL_PORT]),

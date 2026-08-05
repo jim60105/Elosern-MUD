@@ -44,8 +44,10 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
     return lines, terminal_outcome_message(outcome)
 
 
-# The panels an admitted combat action may update after settlement.
-AFFECTED_PANELS = ("status", "context_actions")
+# The panels an admitted combat action may update after settlement. The art
+# panel is included so a combat result that changes the participant roster or
+# session state replaces the portrait catalog in the same ui_update.
+AFFECTED_PANELS = ("status", "context_actions", "art")
 
 
 def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:

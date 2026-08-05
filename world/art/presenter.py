@@ -19,8 +19,10 @@ from world.art.subjects import (
     ArtSubjectError,
     ArtSubjectKind,
     character_subject_for,
+    monster_subject_for,
 )
 from world.art.worker import expected_output_identity
+from world.lore.monsters import MONSTER_TIER_REGISTRY
 
 # Placeholder kinds, exactly what the browser must show when no asset exists.
 PLACEHOLDER_MISSING = "missing"
@@ -74,6 +76,7 @@ def resolve_subject(subject: ArtSubject) -> dict:
             "url": None,
             "aspect_ratio": record.db.aspect_ratio if record else None,
             "alt": PLACEHOLDER_LABELS[kind],
+            "subject_key": subject.full(),
         }
     identity = _validated_output_identity(subject, record.db.output_identity)
     if identity is None:
@@ -88,6 +91,7 @@ def resolve_subject(subject: ArtSubject) -> dict:
         "url": media_url_for(identity),
         "aspect_ratio": record.db.aspect_ratio,
         "alt": subject.full(),
+        "subject_key": subject.full(),
     }
 
 
@@ -111,6 +115,29 @@ def resolve_character(entity) -> dict:
     return resolve_subject(subject)
 
 
+def resolve_entity(entity) -> dict:
+    """Resolve one present entity's portrait by kind (design D3).
+
+    A generic monster (``threat_tier`` resolving in ``MONSTER_TIER_REGISTRY``)
+    resolves ``portrait:monster:<threat_tier>`` through
+    ``monster_subject_for`` + ``resolve_subject`` with no adult gate. A
+    character resolves through :func:`resolve_character` (explicit named
+    policy plus both adult age gates). Anything else yields the unavailable
+    placeholder. A rejected subject never returns a prompt, a subject key, or
+    a URL.
+    """
+    threat_tier = getattr(entity, "threat_tier", None)
+    if threat_tier in MONSTER_TIER_REGISTRY:
+        try:
+            subject = monster_subject_for(threat_tier)
+        except ArtSubjectError:
+            return _placeholder_unavailable("無法提供")
+        payload = resolve_subject(subject)
+        payload["subject_key"] = subject.full()
+        return payload
+    return resolve_character(entity)
+
+
 def resolve_scene(archetype: str) -> dict:
     """Resolve a validated scene archetype to its presentation payload."""
     from world.art.subjects import scene_subject_for
@@ -130,4 +157,5 @@ def _placeholder_unavailable(label: str) -> dict:
         "url": None,
         "aspect_ratio": None,
         "alt": label,
+        "subject_key": None,
     }

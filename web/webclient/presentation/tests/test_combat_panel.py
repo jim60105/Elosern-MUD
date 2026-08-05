@@ -57,7 +57,7 @@ def _valid_participant(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "combat",
         "session": {
@@ -78,7 +78,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "combat",
         "session": {
@@ -148,6 +148,22 @@ class ContextActionsSchemaTests(unittest.TestCase):
         panel["participants"][0]["portrait_ref"] = "https://example.test/a.png"
         with self.assertRaises(Exception):
             validate_context_actions(panel)
+
+    def test_accepts_decimal_portrait_ref_and_null(self):
+        panel = _valid_panel()
+        panel["participants"][0]["portrait_ref"] = "42"
+        normalized = validate_context_actions(panel)
+        self.assertEqual(normalized["participants"][0]["portrait_ref"], "42")
+        panel = _valid_panel()
+        panel["participants"][0]["portrait_ref"] = None
+        validate_context_actions(panel)
+
+    def test_rejects_malformed_portrait_ref(self):
+        for value in ("abc", "4.2", "42a", "a" * 33, True, 42):
+            panel = _valid_panel()
+            panel["participants"][0]["portrait_ref"] = value
+            with self.assertRaises(Exception):
+                validate_context_actions(panel)
 
     def test_rejects_skill_shorthand_on_single(self):
         panel = _valid_panel()
@@ -379,7 +395,14 @@ class ContextActionsPresenterTests(EvenniaTest):
         self.assertIn("basic_attack", keys)
         self.assertIn("flee", keys)
         self.assertNotIn("defense_instinct", keys)
-        self.assertEqual(payload["participants"][0]["portrait_ref"], None)
+        self.assertEqual(
+            [p["portrait_ref"] for p in payload["participants"]],
+            [str(self.player.pk), str(self.monster.pk)],
+        )
+        self.assertEqual(
+            [p["portrait_ref"] for p in payload["participants"]],
+            [str(p["identity"]) for p in payload["participants"]],
+        )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
     def test_exploration_uses_unavailable_form_without_fabrication(self):
@@ -434,7 +457,7 @@ class ContextActionsPresenterTests(EvenniaTest):
         self.assertEqual(
             self.registry.panel_names,
             frozenset(
-                {"status", "context_actions", "local_map", "services", "creation"}
+                {"art", "status", "context_actions", "local_map", "services", "creation"}
             ),
         )
 

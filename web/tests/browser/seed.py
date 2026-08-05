@@ -17,6 +17,7 @@ only when it is executed as ``python -m web.tests.browser.seed``.
 """
 
 import os
+from pathlib import Path
 
 # Deterministic fixture identity. Password is fixed so Playwright can log in.
 BROWSER_ACCOUNT_USERNAME = os.environ.get("ELOSERN_BROWSER_ACCOUNT", "browserplayer")
@@ -26,6 +27,16 @@ BROWSER_ACCOUNT_PASSWORD = os.environ.get(
 )
 BROWSER_CHARACTER_NAME = os.environ.get("ELOSERN_BROWSER_CHARACTER", "BrowserTest")
 BROWSER_ROOM_NAME = os.environ.get("ELOSERN_BROWSER_ROOM", "測試起點")
+
+# A minimal valid 4x4 RGB PNG so a ``done`` art record's media URL actually
+# decodes in the browser. Image-load-failure journeys abort this URL on the
+# wire; the bytes must stay valid for the rendering journeys to pass.
+FIXTURE_VALID_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000004000000040802000000"
+    "269309290000001049444154789c6338d0e000470cc4710078521801"
+    "1ec406c00000000049454e44ae426082"
+)
+
 
 # The pending-creation login account (webclient-character-creation-ui). A
 # separate NON-superuser account keeps the pending shell's ownership intact:
@@ -127,6 +138,98 @@ def _minimap_fixture(character) -> None:
     record_arrival(character)
     character.location = south_gate
     character.save()
+
+
+def _art_fixture(character, room) -> None:
+    """Deterministically prepare art records for browser acceptance.
+
+    Opted-in with ``ELOSERN_BROWSER_ART=<mode>``. Each mode places the
+    character in a room that carries the validated ``scene_archetype`` seam and
+    settles art records (done/pending/failed) whose output files are written
+    under the runtime art store, so browser journeys can assert the real scene
+    renderer and portrait catalog without any image service. ``missing`` leaves
+    records untouched (missing placeholders). No remote, LLM, or image service
+    is involved.
+    """
+    import os
+
+    from evennia.utils.create import create_object
+    from typeclasses.monsters import Monster
+    from typeclasses.rooms import GridRoom
+    from world.art.queue import ensure, settle
+    from world.art.store import ArtAssetStatus
+    from world.art.subjects import ArtSubject, ArtSubjectKind
+
+    mode = os.environ.get("ELOSERN_BROWSER_ART", "")
+    if not mode:
+        return
+
+    from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+
+    archetype = "tavern_interior"
+    if archetype not in SCENE_ARCHETYPE_REGISTRY:
+        raise AssertionError("art fixture archetype must be a registered scene")
+
+    art_room = create_object(
+        GridRoom, key="art 酒館場景", nohome=True, location=None
+    )
+    art_room.scene_archetype = archetype
+    character.location = art_room
+    character.db.portrait_policy = {
+        "mode": "named",
+        "stable_key": f"browser-{character.pk}",
+    }
+    # A present named-policy NPC and a living monster so combat catalog tests
+    # have both a dialogue host and a generic monster in the room.
+    host = create_object(
+        __import__("typeclasses.npcs", fromlist=["NPC"]).NPC,
+        key="酒館老闆",
+        location=art_room,
+    )
+    from typeclasses.components import ScriptedDialogue
+    from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
+
+    host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+    monster = create_object(Monster, key="酒館灰狼", location=art_room, nohome=True)
+    monster.threat_tier = "low"
+    monster.apply_monster_tier("floor")
+    character.save()
+
+    art_root = os.environ.get("ELOSERN_BROWSER_ART_ROOT")
+    if not art_root:
+        return
+    root = Path(art_root)
+    (root / "scene").mkdir(parents=True, exist_ok=True)
+
+    scene = ArtSubject(ArtSubjectKind.SCENE, archetype)
+    ensure(scene, "desc")
+    if mode == "done":
+        identity = "scene/tavern_interior.png"
+        (root / identity).write_bytes(FIXTURE_VALID_PNG)
+        from world.art.queue import claim
+
+        claim(10)
+        settle(scene, status=ArtAssetStatus.DONE, output_identity=identity, error=None)
+    elif mode == "failed":
+        from world.art.queue import claim
+
+        claim(10)
+        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="fixture")
+    elif mode == "pending":
+        from world.art.queue import claim
+
+        claim(10)
+        pending = ArtSubject(ArtSubjectKind.SCENE, archetype)
+        ensure(pending, "desc")
+        record = __import__(
+            "world.art.queue", fromlist=["record_key"]
+        ).record_key(pending)
+        record_obj = __import__(
+            "world.art.store", fromlist=["ArtAssetRecord"]
+        ).ArtAssetRecord.objects.filter(db_key=record).first()
+        record_obj.db.status = ArtAssetStatus.PENDING
+        record_obj.save()
+    print(f"seeded art fixture: {mode}")
 
 
 def _services_fixture(character) -> None:
@@ -393,6 +496,8 @@ def main() -> None:
         _minimap_fixture(character)
 
     _services_fixture(character)
+
+    _art_fixture(character, room)
 
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the

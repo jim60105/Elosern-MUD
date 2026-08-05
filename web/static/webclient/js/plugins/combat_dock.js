@@ -56,6 +56,85 @@
     ) || null;
   }
 
+  function getArtFocus() {
+    return (
+      window.Elosern &&
+      window.Elosern.artFocusBus
+    ) || null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Client-local portrait focus publication (webclient-art-panel D6). The dock
+  // publishes the highlighted participant's opaque catalog key (its
+  // server-authored `portrait_ref`) through the in-memory bus; no packet is
+  // ever sent and the browser never constructs a subject key or URL. Leaving
+  // combat clears the focus so no portrait card lingers.
+  // -------------------------------------------------------------------------
+
+  function publishCombatFocus(panel) {
+    var artFocus = getArtFocus();
+    if (!artFocus) {
+      return;
+    }
+    if (!panel || panel.available !== true) {
+      artFocus.publish(null);
+      return;
+    }
+    // The first participant in deterministic presenter order that carries a
+    // server-authored catalog key is the highlighted target. No focus packet
+    // is ever sent and the browser never constructs a subject key or URL.
+    var participants = panel.participants || [];
+    var focus = null;
+    for (var index = 0; index < participants.length; index++) {
+      if (participants[index].portrait_ref) {
+        focus = participants[index].portrait_ref;
+        break;
+      }
+    }
+    artFocus.publish(focus);
+  }
+
+  // A menu descriptor that references a combat participant (a target or AREA
+  // candidate item) is resolved to that participant's server-authored catalog
+  // key. Other descriptors (root actions, skills, confirmations) carry no
+  // catalog reference and keep the current portrait.
+  var KEEP_FOCUS = "@@keep@@";
+
+  function portraitRefForItem(item) {
+    if (!item || !item.key) {
+      return KEEP_FOCUS;
+    }
+    var identity = null;
+    if (item.key.indexOf("target-") === 0) {
+      identity = item.key.slice("target-".length);
+    } else if (item.key.indexOf("area-") === 0) {
+      identity = item.key.slice("area-".length);
+    } else {
+      return KEEP_FOCUS;
+    }
+    var controller = getController();
+    var state = controller ? controller.getState() : null;
+    var panel = state && state.panels && state.panels["context_actions"];
+    var participants = (panel && panel.participants) || [];
+    for (var index = 0; index < participants.length; index++) {
+      if (String(participants[index].identity) === identity) {
+        return participants[index].portrait_ref || null;
+      }
+    }
+    return KEEP_FOCUS;
+  }
+
+  function publishFocusForItem(item) {
+    var artFocus = getArtFocus();
+    if (!artFocus) {
+      return;
+    }
+    var focus = portraitRefForItem(item);
+    if (focus !== KEEP_FOCUS) {
+      artFocus.publish(focus);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Rendering the combat dock from the validated panel.
   // -------------------------------------------------------------------------
@@ -219,6 +298,7 @@
           renderCombatDock(root, panel);
           pushCombatMenus(panel);
           root.setAttribute("data-mode", "combat");
+          publishCombatFocus(panel);
         } else if (root.getAttribute("data-mode") === "combat") {
           // Leave combat mode: return to the foundation guidance, which the
           // goldenlayout renderer owns from initial layout.
@@ -228,6 +308,7 @@
             keyboard.reset(null);
           }
           pushCombatMenus._lastSignature = null;
+          publishCombatFocus(null);
         }
         previousMode = mode;
       });
@@ -236,6 +317,10 @@
 
   window.Elosern = window.Elosern || {};
   window.Elosern.combatDock = plugin;
+  // The keyboard router forwards focus events here so arrow-key navigation
+  // through combat target descriptors switches the client-local portrait
+  // without sending any packet.
+  plugin.publishFocusForItem = publishFocusForItem;
   if (window.plugin_handler) {
     window.plugin_handler.add("elosern_combat_dock", plugin);
   }

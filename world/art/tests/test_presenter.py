@@ -2,17 +2,20 @@
 
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
 from world.art.presenter import (
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
     media_url_for,
     resolve_character,
+    resolve_entity,
     resolve_scene,
     resolve_subject,
 )
@@ -147,6 +150,121 @@ class ArtPresenterTests(EvenniaTest):
         url = media_url_for("scene/forest_path.png")
         self.assertTrue(url.startswith("/art/"))
         self.assertNotIn(".art", url)
+
+
+class ResolveEntityTests(EvenniaTest):
+    """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        (self.root / "scene").mkdir()
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.player = create_object(PlayerCharacter, key="entity-player")
+        self.player.age = 22
+        self.player.apparent_age = 22
+        self.player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.player.pk),
+        }
+        self.monster = create_object(Monster, key="entity-wolf")
+        self.monster.threat_tier = "low"
+        self.monster.apply_monster_tier("floor")
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        super().tearDown()
+
+    def _count_file(self):
+        count_file = Path(self.tempdir.name) / "count.txt"
+        return count_file
+
+    def _assert_no_worker_job(self, subject_key):
+        """Assert the fixture worker never received a job for a subject."""
+        import os
+
+        count_file = self._count_file()
+        env = dict(os.environ)
+        env["ART_FIXTURE_STORE_ROOT"] = str(self.root)
+        env["ART_FIXTURE_COUNT_FILE"] = str(count_file)
+        worker_cmd = [
+            "python",
+            str(
+                Path(__file__).parent.parent
+                / "tests"
+                / "fixtures"
+                / "fixture_worker.py"
+            ),
+        ]
+        with override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_WORKER_CMD=worker_cmd,
+        ):
+            with patch.dict(os.environ, env):
+                from world.art.worker import drain_synchronous
+
+                drain_synchronous(10)
+        if count_file.exists():
+            lines = count_file.read_text(encoding="utf-8").splitlines()
+            self.assertNotIn(subject_key, lines)
+
+    def test_named_character_resolves_through_the_adult_gate(self):
+        payload = resolve_entity(self.player)
+        self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIn("subject_key", payload)
+
+    def test_generic_monster_resolves_its_archetype_subject(self):
+        payload = resolve_entity(self.monster)
+        self.assertEqual(payload["subject_key"], "portrait:monster:low")
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+
+    def test_age_seventeen_never_reaches_a_worker(self):
+        self.player.age = 17
+        payload = resolve_entity(self.player)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+        self._assert_no_worker_job(f"portrait:character:{self.player.pk}")
+
+    def test_apparent_age_seventeen_never_reaches_a_worker(self):
+        self.player.apparent_age = 17
+        payload = resolve_entity(self.player)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self._assert_no_worker_job(f"portrait:character:{self.player.pk}")
+
+    def test_missing_age_values_reject_without_a_prompt(self):
+        self.player.attributes.remove("age")
+        payload = resolve_entity(self.player)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+
+    def test_malformed_age_values_reject_without_a_prompt(self):
+        self.player.age = "adult"
+        payload = resolve_entity(self.player)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+
+    def test_unknown_threat_tier_falls_back_to_placeholder(self):
+        self.monster.threat_tier = "mythical"
+        payload = resolve_entity(self.monster)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+
+    def test_entity_without_policy_resolves_to_unavailable(self):
+        plain = create_object(PlayerCharacter, key="plain-entity")
+        plain.age = 30
+        plain.apparent_age = 30
+        payload = resolve_entity(plain)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
 
 
 if __name__ == "__main__":

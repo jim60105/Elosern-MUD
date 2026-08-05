@@ -58,7 +58,9 @@ class ParticipantView:
         state: ``"active"``, ``"fled"``, ``"knocked_out"``, or ``"defeated"``.
         hp_current: The current true HP value.
         hp_maximum: The maximum true HP value.
-        portrait_ref: Always ``None`` until the art panel change lands.
+        portrait_ref: The opaque art-catalog key for this participant while
+            the participant is present in the ``webclient-art-panel`` portrait
+            catalog, else ``None``.
     """
 
     identity: int
@@ -166,6 +168,22 @@ def _bound(value: str, maximum: int, field: str) -> str:
     return value
 
 
+def combat_participants(actor: Any) -> tuple[int, ...]:
+    """Return the ordered participant identities of the actor's active session.
+
+    Reads the persisted ``player_ids`` then ``enemy_ids`` tuples and returns
+    them in exactly that order, with no portrait or other presentation data.
+    Both :func:`build_combat_view` and ``world.rules.art_view.build_art_view``
+    consume this one roster query so the ``context_actions`` and ``art`` panels
+    can never drift on participant membership or order. Raises
+    :class:`CombatViewError` when there is no valid active session.
+    """
+    record = read_session(actor)
+    if record is None:
+        raise CombatViewError("no active combat session")
+    return tuple((*record.player_ids, *record.enemy_ids))
+
+
 def build_combat_view(actor: Any) -> CombatView:
     """Build the frozen combat view for ``actor`` or raise ``CombatViewError``.
 
@@ -177,6 +195,7 @@ def build_combat_view(actor: Any) -> CombatView:
     record = read_session(actor)
     if record is None:
         raise CombatViewError("no active combat session")
+    roster = combat_participants(actor)
     session_id = _bound(record.session_id, MAX_SESSION_ID_CODE_POINTS, "session_id")
     session = SessionView(
         session_id=session_id,
@@ -204,7 +223,7 @@ def build_combat_view(actor: Any) -> CombatView:
             secondary_actions=RECOVERY_SECONDARY_ACTIONS,
         )
 
-    participants = _build_participants(actor, record, battlefield)
+    participants = _build_participants(actor, record, battlefield, roster)
     skills = _build_skills(actor, record, battlefield, participants)
     return CombatView(
         session=session,
@@ -219,11 +238,14 @@ def _build_participants(
     actor: Any,
     record: Any,
     battlefield: Any,
+    roster: tuple[int, ...],
 ) -> tuple[ParticipantView, ...]:
     def resolve(dbref: int):
         from evennia.objects.models import ObjectDB
 
         return ObjectDB.objects.filter(id=dbref).first()
+
+    from world.rules.art_view import portrait_catalog_key
 
     participants: list[ParticipantView] = []
     for team, ids, prefix in (
@@ -231,6 +253,8 @@ def _build_participants(
         ("foes", record.enemy_ids, "e"),
     ):
         for index, dbref in enumerate(ids, start=1):
+            if int(dbref) not in roster:
+                raise CombatViewError(f"participant {dbref} is absent from the roster")
             entity = resolve(dbref)
             if entity is None:
                 raise CombatViewError(f"participant {dbref} is unreconstructable")
@@ -246,7 +270,7 @@ def _build_participants(
                     state=_participant_state(entity, int(dbref), record),
                     hp_current=current,
                     hp_maximum=maximum,
-                    portrait_ref=None,
+                    portrait_ref=portrait_catalog_key(int(dbref)),
                 )
             )
     if not participants or len(participants) > MAX_PARTICIPANTS:
@@ -345,5 +369,6 @@ __all__ = [
     "SessionView",
     "SkillDescriptorView",
     "build_combat_view",
+    "combat_participants",
     "rejection_message_from_session",
 ]
