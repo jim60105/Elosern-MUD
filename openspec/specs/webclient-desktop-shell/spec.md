@@ -31,6 +31,10 @@ The narrative log SHALL occupy the primary reading area, with supporting header,
 - **WHEN** the shell renders at 1280x720
 - **THEN** every required component remains reachable and the player can read narrative, inspect status, and open the command drawer
 
+#### Scenario: Mounting the shell retires the degraded text fallback
+- **WHEN** the GoldenLayout shell mounts into its container
+- **THEN** the stock text-only fallback is hidden so it cannot stack with the mounted shell in normal document flow and push required surfaces below the visible viewport
+
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom. Narrative output SHALL remain usable if every structured renderer is unavailable.
 
@@ -119,3 +123,7 @@ On WebSocket loss after a successful connection, the shell SHALL preserve the la
 #### Scenario: Reconnect waits for canonical state
 - **WHEN** the socket reconnects but no valid full snapshot has arrived
 - **THEN** the offline/synchronizing lock remains until the new-epoch snapshot is accepted
+
+#### Scenario: The overlay stays off before any successful connection
+- **WHEN** a first-time visitor opens the WebClient and no connection has ever reached the active phase
+- **THEN** the offline overlay remains hidden so the stock connect/create prompt underneath stays visible and usable

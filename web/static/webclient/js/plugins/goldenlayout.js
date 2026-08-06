@@ -909,6 +909,15 @@
     if (!mainsub) {
       return;
     }
+    // GoldenLayout appends its root into #main-sub rather than replacing its
+    // children, so the degraded text fallback (#messagewindow) must be hidden
+    // here or it stacks above the mounted shell in normal flow and pushes the
+    // real UI one full viewport below the fold, where `body{overflow:hidden}`
+    // clips it entirely.
+    var fallback = document.getElementById("messagewindow");
+    if (fallback) {
+      fallback.classList.add("d-none");
+    }
     myLayout = new window.GoldenLayout(buildLayout(), mainsub);
     registerComponents(myLayout);
     myLayout.init();

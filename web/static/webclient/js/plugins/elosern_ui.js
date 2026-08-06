@@ -203,12 +203,19 @@
     overlay.setAttribute("data-visible", visible ? "true" : "false");
   }
 
+  // Set once the shell has rendered a real view at least once. Before that
+  // point (a first visit, not yet logged in) there is nothing to preserve,
+  // and `phase` never reaches "active" until after login and puppet, so
+  // gating on it keeps the non-dismissible full-viewport overlay from
+  // trapping every first-time visitor behind it before they can log in.
+  var hasBeenActive = false;
+
   // The overlay is removed only after a valid new-epoch snapshot is adopted.
   function updateOverlayFromState() {
     var controller = window.Elosern && window.Elosern.StateController;
     var state = controller ? controller.getState() : null;
     if (!state) {
-      showOverlay(true);
+      showOverlay(hasBeenActive);
       return;
     }
     var ready =
@@ -216,7 +223,10 @@
       state.phase === "active" &&
       state.activeEpoch &&
       !state.mutationsLocked;
-    showOverlay(!ready);
+    if (ready) {
+      hasBeenActive = true;
+    }
+    showOverlay(hasBeenActive && !ready);
   }
 
   // -------------------------------------------------------------------------
@@ -528,7 +538,9 @@
       wireActions();
       wireConnections();
       document.addEventListener("keydown", routeKeyboard);
-      showOverlay(true);
+      // Not shown here: before the first successful activation the overlay
+      // stays off (see hasBeenActive) so the stock login/creation flow under
+      // it stays usable for a first-time visitor.
     },
     onSend: function (line) {
       // Ensure no drawer path ever builds a ui_action; text stays text.
