@@ -152,6 +152,14 @@ On WebSocket loss after a successful connection, the shell SHALL preserve the la
 - **WHEN** the socket reconnects but no valid full snapshot has arrived
 - **THEN** the offline/synchronizing lock remains until the new-epoch snapshot is accepted
 
+#### Scenario: A dropped first sync is re-requested on a bounded budget
+- **WHEN** the first reconnection `ui_sync` lands before the portal re-attaches the account puppet and the snapshot is dropped
+- **THEN** the client re-requests `ui_sync` on a bounded, disarming schedule, ceasing on adoption, on disconnect, or once the attempt budget is spent
+
+#### Scenario: Extremely stale reconnections recover once
+- **WHEN** the authenticated snapshot never arrives after the bounded re-request budget, so the portal has lost the browser's authenticated session
+- **THEN** the client reloads the page at most once per tab session (guarded by a persistent marker) and otherwise leaves the synchronizing lock in place
+
 #### Scenario: The overlay stays off before any successful connection
 - **WHEN** a first-time visitor opens the WebClient and no connection has ever reached the active phase
 - **THEN** the offline overlay remains hidden so the stock connect/create prompt underneath stays visible and usable
