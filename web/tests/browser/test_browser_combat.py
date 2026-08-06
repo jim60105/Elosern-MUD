@@ -114,9 +114,17 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         self.assertEqual(self._dock_mode(page), "combat")
         page.evaluate("document.getElementById('action-dock').focus()")
+        # The action dock remains the documented focus target and forwards
+        # focus to the mounted listbox row container (composite widget).
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
-            "action-dock",
+            page.evaluate(
+                """() => {
+                  const active = document.activeElement;
+                  const dock = document.getElementById('action-dock');
+                  return active === dock || (active && dock.contains(active));
+                }"""
+            ),
+            True,
         )
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")

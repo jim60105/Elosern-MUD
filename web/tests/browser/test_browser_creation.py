@@ -188,7 +188,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Escape")  # pop exactly one level back to the preset list
         self.assertEqual(page.locator(".creation-confirm").count(), 0)
-        self.assertGreaterEqual(page.locator(".creation-preset").count(), 1)
+        self.assertGreaterEqual(page.locator("#creation-body .dock-row").count(), 1)
         # No activation or reset was sent; only the earlier preset-selection save.
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
@@ -469,7 +469,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         )
         _press(page, "Escape")  # pop back to root; values stay on the server
         page.wait_for_function(
-            "() => document.querySelectorAll('.creation-control').length >= 2"
+            "() => document.querySelectorAll('.dock-row').length >= 2"
         )
         # The saved server draft was never cleared and no mutation was sent.
         self.assertEqual(sent_action_count(page, "creation.custom"), 0)

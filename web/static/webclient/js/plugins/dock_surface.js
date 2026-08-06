@@ -1,0 +1,169 @@
+/*
+ * Elosern shared dock surface renderer and delegated pointer bridge.
+ *
+ * Every action-dock surface (exploration, services, creation, character,
+ * combat) renders its rows through `DockSurface.renderRows`, so the row
+ * markup, the focused marker, the disabled marker with its （無法使用）
+ * suffix, the accessible disabled association, and the row identity
+ * attribute are defined in exactly one place. Rows form one composite
+ * widget: the row container carries `role="listbox"`, is the surface's
+ * single tab stop, and names the focused row through
+ * `aria-activedescendant`; rows carry `role="option"`, `tabindex="-1"` (so
+ * no row is individually reachable by sequential keyboard navigation), and
+ * `aria-selected`.
+ *
+ * `installPointerBridge` registers exactly one delegated `click` listener
+ * and one delegated `mousedown` listener on the stable `#action-dock`
+ * element, installed once at shell init. A click resolves the row through
+ * `closest("[data-item-key]")`, is admitted only when it is a primary
+ * single activation (`event.detail === 1`) whose resolved row is still
+ * connected to the document, and then walks the identical path as Enter:
+ * `focusItemByKey(key)` followed by a pointer-sourced `confirm`. The
+ * `isConnected` check stops a second rapid activation on a navigation row
+ * -- which pushes a frame instead of submitting and is therefore not
+ * covered by the in-flight mutation lock -- from double-pushing after the
+ * first activation's re-render detached the old rows. The bridge performs
+ * no submission itself and knows nothing about any specific dock.
+ */
+(function () {
+  "use strict";
+
+  var DISABLED_SUFFIX = "（無法使用）";
+
+  function makeElement(tag, className) {
+    var element = document.createElement(tag);
+    if (className) {
+      element.className = className;
+    }
+    return element;
+  }
+
+  function setText(element, text) {
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+    element.appendChild(document.createTextNode(text == null ? "" : String(text)));
+  }
+
+  function getKeyboard() {
+    return (
+      window.Elosern &&
+      window.Elosern.keyboard
+    ) || null;
+  }
+
+  // Render `items` as rows inside `container`. The container becomes the
+  // listbox composite widget; `idPrefix` produces stable row ids
+  // `<idPrefix>-<index>` that `aria-activedescendant` references.
+  // `options.nonSubmitting` renders display-only rows (e.g. the character
+  // panel): focusable, without the disabled marker, and carrying no action.
+  function renderRows(container, items, options) {
+    options = options || {};
+    var focusKey = options.focusKey == null ? null : options.focusKey;
+    var idPrefix = options.idPrefix || "row";
+    var nonSubmitting = !!options.nonSubmitting;
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+    container.setAttribute("role", "listbox");
+    container.setAttribute("tabindex", "0");
+
+    var focusedId = null;
+    var rows = [];
+    for (var i = 0; i < items.length; i += 1) {
+      var item = items[i];
+      var key = item && item.key !== undefined ? item.key : item && item.label;
+      var row = makeElement("button", "dock-row");
+      row.type = "button";
+      row.setAttribute("data-item-key", key);
+      row.id = idPrefix + "-" + i;
+      row.setAttribute("role", "option");
+      row.setAttribute("tabindex", "-1");
+      row.setAttribute("aria-selected", "false");
+      if (nonSubmitting) {
+        setText(row, item.label);
+      } else {
+        var disabled = !item.enabled;
+        if (disabled) {
+          row.classList.add("disabled");
+          row.setAttribute("aria-disabled", "true");
+          setText(row, item.label + DISABLED_SUFFIX);
+        } else {
+          setText(row, item.label);
+        }
+      }
+      if (key === focusKey) {
+        row.classList.add("focused");
+        row.setAttribute("aria-selected", "true");
+        focusedId = row.id;
+      }
+      container.appendChild(row);
+      rows.push(row);
+    }
+    if (focusedId !== null) {
+      container.setAttribute("aria-activedescendant", focusedId);
+    } else if (rows.length > 0) {
+      // A router frame always has a focused item, but a fallback keeps the
+      // composite widget well-formed for display-only surfaces.
+      rows[0].classList.add("focused");
+      rows[0].setAttribute("aria-selected", "true");
+      container.setAttribute("aria-activedescendant", rows[0].id);
+    } else {
+      container.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  // The single delegated pointer bridge on #action-dock.
+  function installPointerBridge() {
+    var dock = document.getElementById("action-dock");
+    if (!dock) {
+      return;
+    }
+    dock.addEventListener("mousedown", function (event) {
+      var row = event.target && event.target.closest
+        ? event.target.closest("[data-item-key]")
+        : null;
+      if (!row || !row.isConnected) {
+        return;
+      }
+      // Keep DOM focus on the composite widget so the visible focus ring
+      // stays where the router says it is.
+      event.preventDefault();
+      var container = row.parentNode;
+      if (container && typeof container.focus === "function") {
+        container.focus();
+      }
+    });
+
+    dock.addEventListener("click", function (event) {
+      // A keyboard-synthesized click on a focused control fires with
+      // detail === 0; the repeat events of a multi-click have detail > 1.
+      if (event.detail !== 1) {
+        return;
+      }
+      var row = event.target && event.target.closest
+        ? event.target.closest("[data-item-key]")
+        : null;
+      // The stale-row guard: a dock that re-rendered in response to the
+      // first activation detached its old rows, so a second activation
+      // whose row is no longer connected is rejected regardless of timing.
+      if (!row || !row.isConnected) {
+        return;
+      }
+      var key = row.getAttribute("data-item-key");
+      var keyboard = getKeyboard();
+      if (!keyboard) {
+        return;
+      }
+      keyboard.focusItemByKey(key);
+      keyboard.confirm({ source: "pointer" });
+    });
+  }
+
+  window.Elosern = window.Elosern || {};
+  window.Elosern.DockSurface = {
+    renderRows: renderRows,
+    installPointerBridge: installPointerBridge,
+    DISABLED_SUFFIX: DISABLED_SUFFIX,
+  };
+})();

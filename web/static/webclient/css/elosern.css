@@ -101,7 +101,11 @@ input:focus-visible,
   overflow-y: auto;
   overflow-x: hidden;
   overflow-wrap: break-word;
-  font-family: "Noto Serif TC", "Songti TC", Georgia, serif;
+  /* Monospace-first so the portal's box/ASCII map art stays column-aligned;
+     CJK glyphs fall through to a CJK face and remain double-width in
+     practice, the standard arrangement for a CJK MUD client. */
+  font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK TC", Consolas,
+    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
 }
 
 .elosern-narrative .out,
@@ -239,6 +243,44 @@ input:focus-visible,
 .action-guidance-note,
 [aria-describedby] {
   color: var(--elm-paper-dim);
+}
+
+/* ---------------------------------------------------------------- *
+ * Shared dock rows (webclient-pointer-activation). Every dock surface
+ * renders through DockSurface.renderRows; these rules style the one
+ * row model. Focus is indicated by an outline plus a leading glyph,
+ * never by color alone.
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock .dock-row {
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel, #1c1c1c);
+  border: 1px solid var(--elm-border, #3a3a3a);
+  padding: .2rem .6rem;
+  cursor: pointer;
+}
+
+.elosern-action-dock .dock-row.focused {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
+  border-style: double;
+}
+
+.elosern-action-dock .dock-row.focused::before {
+  content: "▸ ";
+}
+
+.elosern-action-dock .dock-row.disabled {
+  color: var(--elm-paper-dim);
+  border-style: dashed;
+}
+
+/* The listbox container is the single tab stop; its focus ring is the
+   composite widget's focus indication (rows themselves stay out of the
+   sequential navigation order). */
+.elosern-action-dock [role="listbox"]:focus {
+  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------- *
@@ -431,20 +473,6 @@ input:focus-visible,
   margin-bottom: .3rem;
 }
 
-.elosern-action-dock .combat-control {
-  color: var(--elm-paper);
-  background: var(--elm-ink-panel, #1c1c1c);
-  border: 1px solid var(--elm-border, #3a3a3a);
-  padding: .2rem .6rem;
-  cursor: pointer;
-}
-
-.elosern-action-dock .combat-control:focus,
-.elosern-action-dock .combat-control:focus-visible {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
-  outline-offset: 2px;
-}
-
 .elosern-action-dock .combat-detail {
   color: var(--elm-paper-dim);
   font-size: .9em;
@@ -456,9 +484,9 @@ input:focus-visible,
   min-height: 1.2rem;
 }
 
-/* Non-color focus indicator for combat controls (ink-night + vermilion). */
+/* Non-color focus indicator for combat rows (ink-night + vermilion). */
 @media (prefers-reduced-motion: reduce) {
-  .elosern-action-dock .combat-control {
+  .elosern-action-dock .dock-row {
     transition: none;
   }
 }
@@ -482,34 +510,13 @@ input:focus-visible,
   margin-bottom: .3rem;
 }
 
-.elosern-action-dock .services-menu {
+.elosern-action-dock .exploration-menu,
+.elosern-action-dock .services-menu,
+.elosern-action-dock .character-menu {
   display: flex;
   flex-wrap: wrap;
   gap: .35rem;
   margin-bottom: .3rem;
-}
-
-.elosern-action-dock .services-control {
-  color: var(--elm-paper);
-  background: var(--elm-ink-panel, #1c1c1c);
-  border: 1px solid var(--elm-border, #3a3a3a);
-  padding: .2rem .6rem;
-  cursor: pointer;
-}
-
-.elosern-action-dock .services-control.focused {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
-  outline-offset: 2px;
-  border-style: double;
-}
-
-.elosern-action-dock .services-control.focused::before {
-  content: "▸ ";
-}
-
-.elosern-action-dock .services-control.disabled {
-  color: var(--elm-paper-dim);
-  border-style: dashed;
 }
 
 .elosern-action-dock .services-detail {
@@ -557,6 +564,8 @@ input:focus-visible,
 .elosern-local-map {
   padding: .5rem;
   min-height: 4rem;
+  /* The lattice canvas reserves its own space; the pane scrolls in both
+     axes instead of letting content overlap or clip. */
   overflow: auto;
   color: var(--elm-paper);
   font-size: .85em;
@@ -567,10 +576,17 @@ input:focus-visible,
   margin-bottom: .25rem;
 }
 
+/* Lattice cell dimensions (shared with goldenlayout.js MAP_CELL_W/H). */
+:root {
+  --elm-map-cell-w: 76px;
+  --elm-map-cell-h: 28px;
+}
+
 .local-map-canvas {
   position: relative;
-  min-height: 3rem;
   margin: .25rem 0;
+  /* The inline width/height from the lattice model reserve real space. */
+  overflow: visible;
 }
 
 .local-map-node {
@@ -579,10 +595,20 @@ input:focus-visible,
   background: transparent;
   border: 1px solid var(--elm-border, #3a3a3a);
   color: var(--elm-paper);
-  padding: .1rem .3rem;
+  padding: 0 .3rem;
   min-width: 1rem;
   text-align: center;
   cursor: default;
+  max-width: calc(var(--elm-map-cell-w) - .6rem);
+}
+
+/* Single-line labels with an overflow indicator; the full label stays
+   available as the accessible name and title. */
+.local-map-node-label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Non-color state indicators: shape + border style + label prefix. */
@@ -624,21 +650,47 @@ input:focus-visible,
   outline-offset: 2px;
 }
 
-.local-map-edge {
+/* Edge layer: one SVG with a line per edge; never intercepts node clicks. */
+.local-map-edge-layer {
   position: absolute;
-  background: var(--elm-border, #3a3a3a);
-  pointer-events: none;
+  inset: 0;
+  overflow: visible;
+}
+
+.local-map-edge {
+  stroke: var(--elm-border, #3a3a3a);
+  stroke-width: 2;
 }
 .local-map-edge.edge-known {
-  background: var(--elm-paper-dim);
+  stroke: var(--elm-paper-dim);
 }
 .local-map-edge.edge-traversable {
-  background: var(--elm-focus-ring, #ff8a5c);
+  stroke: var(--elm-focus-ring, #ff8a5c);
 }
-.local-map-edge-label {
-  position: absolute;
-  font-size: .7em;
-  color: var(--elm-paper-dim);
+
+/* Remembered remote nodes: a bounded focusable list below the canvas. */
+.local-map-remembered {
+  list-style: none;
+  margin: .25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.local-map-remembered-entry {
+  display: inline-flex;
+}
+
+.local-map-remembered-node {
+  position: static;
+  transform: none;
+  max-width: none;
+  cursor: pointer;
+}
+
+.local-map-remembered-node.node-shape-diamond {
+  transform: none;
 }
 
 .local-map-legend {
@@ -656,14 +708,6 @@ input:focus-visible,
   font-size: .85em;
   min-height: 1rem;
   margin-top: .25rem;
-}
-
-/* Safe overflow at the minimum supported viewport. */
-@media (max-width: 1280px), (max-height: 720px) {
-  .elosern-local-map {
-    max-height: 10rem;
-    overflow-y: auto;
-  }
 }
 
 /* ---------------------------------------------------------------- *
@@ -691,29 +735,14 @@ input:focus-visible,
   margin-bottom: .3rem;
 }
 
+/* Custom-form action buttons share the row visual language but are outside
+   the row model (modal form fields own their own keys). */
 .elosern-action-dock .creation-control {
   color: var(--elm-paper);
   background: var(--elm-ink-panel, #1c1c1c);
   border: 1px solid var(--elm-border, #3a3a3a);
   padding: .2rem .6rem;
   cursor: pointer;
-}
-
-.elosern-action-dock .creation-control.focused,
-.elosern-action-dock .creation-control:focus,
-.elosern-action-dock .creation-control:focus-visible {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
-  outline-offset: 2px;
-  border-style: double;
-}
-
-.elosern-action-dock .creation-control.focused::before {
-  content: "▸ ";
-}
-
-.elosern-action-dock .creation-control.disabled {
-  color: var(--elm-paper-dim);
-  border-style: dashed;
 }
 
 .elosern-action-dock .creation-detail {

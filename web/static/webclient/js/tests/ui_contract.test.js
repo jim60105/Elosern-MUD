@@ -18,32 +18,98 @@ function read(rel) {
 }
 
 test("drawer plugin never constructs ui_action", () => {
-  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
+  // The drawer component (goldenlayout.js) owns the single send path.
+  const drawer = read("web/static/webclient/js/plugins/goldenlayout.js");
   // The drawer is explicitly an ordinary-text path.
-  assert.match(source, /plugin_handler\.onSend/);
-  assert.match(source, /Evennia\.msg\("text"/);
-  // No ui_action envelope is ever built or sent by the drawer plugin.
+  assert.match(drawer, /plugin_handler\.onSend/);
+  assert.match(drawer, /Evennia\.msg\("text"/);
+  // No ui_action envelope is ever built or sent by the drawer path.
   assert.strictEqual(
-    /\bui_action\b/.test(source),
-    true,
-    "drawer plugin mentions ui_action only in its explanatory comment"
-  );
-  assert.strictEqual(
-    /Evennia\.msg\(\s*["']ui_action["']/.test(source),
+    /Evennia\.msg\(\s*["']ui_action["']/.test(drawer),
     false,
     "drawer must not send ui_action"
   );
   assert.strictEqual(
-    /msg\(\s*["']ui_action["']/.test(source),
+    /msg\(\s*["']ui_action["']/.test(drawer),
     false,
     "drawer must never construct a ui_action message"
   );
+});
+
+test("elosern_ui no longer binds a bare document keydown listener", () => {
+  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
+  // Key routing runs through the plugin `onKeydown` contract, not a direct
+  // document listener; the only document-level listeners that remain are the
+  // stock plugins' capture-phase modal-capture exceptions (services quantity,
+  // exploration rest, creation form), which live in the docks, not here.
+  assert.strictEqual(
+    /document\.addEventListener\(\s*["']keydown["']/.test(source),
+    false,
+    "elosern_ui must route keydown through the plugin contract"
+  );
+  // The plugin exposes the hook and claims exactly what the router consumed.
+  assert.match(source, /onKeydown:\s*routeKeyboard/);
+  // The drawer owns the send path; no duplicate send implementation remains.
+  assert.strictEqual(
+    /sendDrawerText/.test(source),
+    false,
+    "the duplicated send path must be gone"
+  );
+  // The delegated pointer bridge is installed once at init.
+  assert.match(source, /installPointerBridge\(\)/);
 });
 
 test("goldenlayout inserts text through text APIs, not HTML", () => {
   const source = read("web/static/webclient/js/plugins/goldenlayout.js");
   assert.ok(/createTextNode/.test(source));
   assert.ok(/innerHTML/.test(source) === false, "no innerHTML interpolation");
+});
+
+test("the narrative markup pipeline never parses HTML strings", () => {
+  const plugins = [
+    "web/static/webclient/js/plugins/goldenlayout.js",
+    "web/static/webclient/js/plugins/elosern_ui.js",
+  ];
+  const markup = "web/static/webclient/js/elosern/narrative_markup.js";
+  const forbidden = [
+    "DOMParser",
+    "insertAdjacentHTML",
+    "outerHTML",
+    "createContextualFragment",
+    "document.write",
+    "eval",
+  ];
+  for (const rel of plugins) {
+    const source = read(rel);
+    for (const api of forbidden) {
+      assert.strictEqual(
+        source.includes(api),
+        false,
+        `${rel} must never use ${api}`
+      );
+    }
+  }
+  const tokenizer = read(markup);
+  for (const api of forbidden) {
+    assert.strictEqual(
+      tokenizer.includes(api),
+      false,
+      `${markup} must never use ${api}`
+    );
+  }
+  // The tokenizer is DOM-independent: no document reference at all.
+  assert.strictEqual(
+    /document\./.test(tokenizer),
+    false,
+    "narrative_markup.js stays DOM-independent"
+  );
+  // No innerHTML on the narrative path either (goldenlayout already asserted;
+  // the tokenizer must be clean too).
+  assert.strictEqual(
+    tokenizer.includes("innerHTML"),
+    false,
+    "narrative_markup.js must never use innerHTML"
+  );
 });
 
 test("narrative preserves scrollback position with an unread count", () => {

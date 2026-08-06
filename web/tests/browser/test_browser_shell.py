@@ -77,29 +77,62 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         narrative_before = page.locator(".elosern-narrative").inner_text()
 
+        # Open the drawer with `/` and send an ordinary command. The field
+        # clears, the drawer stays open, and focus remains in the field so
+        # consecutive commands need no pointer interaction.
         page.evaluate("document.getElementById('action-dock').focus()")
         page.keyboard.press("/")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
-        self.assertTrue(page.evaluate("Elosern.ui.isDrawerOpen()"))
+        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_function(
-            "() => !Elosern.ui.isDrawerOpen() && "
-            "document.activeElement === document.getElementById('action-dock')"
-        )
-        page.wait_for_function(
             "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
             arg=narrative_before.__len__(),
+        )
+        # Focus retained in the field, drawer still open, field cleared.
+        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(
+            page.evaluate(
+                "document.activeElement === document.getElementById('inputfield')"
+            )
+        )
+        self.assertEqual(
+            page.evaluate("document.getElementById('inputfield').value"), ""
         )
         narrative_after = page.locator(".elosern-narrative").inner_text()
         self.assertNotEqual(
             narrative_after, narrative_before, "drawer send produced no narrative"
         )
 
-        # Cancel path: reopen and Escape must not send anything.
+        # A second command can be sent with no pointer interaction.
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
+            arg=narrative_after.__len__(),
+        )
+        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(
+            page.evaluate(
+                "document.activeElement === document.getElementById('inputfield')"
+            )
+        )
+
+        # Cancel path: reopen, type, and Escape must not send anything; the
+        # drawer closes and action-dock focus is restored (the action dock
+        # forwards focus to the mounted listbox row container).
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => !Elosern.drawer.isOpen() && (() => {"
+            "  const dock = document.getElementById('action-dock');"
+            "  return document.activeElement === dock || "
+            "    (document.activeElement && dock.contains(document.activeElement));"
+            "})()"
+        )
         page.evaluate("document.getElementById('action-dock').focus()")
         page.keyboard.press("/")
         page.wait_for_function(
@@ -109,13 +142,136 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         narrative_before_cancel = page.locator(".elosern-narrative").inner_text()
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => !Elosern.ui.isDrawerOpen() && "
-            "document.activeElement === document.getElementById('action-dock')"
+            "() => !Elosern.drawer.isOpen() && (() => {"
+            "  const dock = document.getElementById('action-dock');"
+            "  return document.activeElement === dock || "
+            "    (document.activeElement && dock.contains(document.activeElement));"
+            "})()"
         )
         self.assertEqual(
             page.locator(".elosern-narrative").inner_text(),
             narrative_before_cancel,
             "Escape must not send drawer text",
+        )
+
+    @covers_requirement(
+        "webclient-narrative-markup::the-narrative-renders-the-transport-stream-through-a-strict-allowlist-markup-pipeline"
+    )
+    @covers_requirement(
+        "webclient-narrative-markup::the-narrative-palette-is-generated-with-a-contrast-floor-and-honors-reduced-motion"
+    )
+    def test_narrative_renders_styled_prose_not_markup_source(self):
+        page = self.logged_in_page()
+        narrative_before = page.locator(".elosern-narrative").inner_text()
+
+        # A real room look through the server; the narrative must grow with
+        # the room's prose. The *visible text* must never show element or
+        # entity source characters (the DOM may legitimately contain rendered
+        # span elements -- that is the pipeline working).
+        page.evaluate("Evennia.msg('text', ['look'], {})")
+        page.wait_for_function(
+            "(before) => document.querySelector('.elosern-narrative')"
+            ".innerText.length > before",
+            arg=narrative_before.__len__(),
+        )
+        page.wait_for_timeout(300)
+        narrative_text = page.locator(".elosern-narrative").inner_text()
+        self.assertNotIn("&lt;", narrative_text)
+        self.assertNotIn("&amp;", narrative_text)
+        self.assertNotIn("<span", narrative_text)
+        self.assertNotIn("</span>", narrative_text)
+
+        # A converted colored line renders with a palette class, never as
+        # markup source.
+        page.evaluate(
+            "() => Elosern.goldenlayout.onText("
+            "['|r南大道|n|g 綠|n'], {})"
+        )
+        page.wait_for_function(
+            "() => document.querySelectorAll("
+            "'.elosern-narrative span[class*=\"color-\"]').length >= 2"
+        )
+        colored = page.locator(".elosern-narrative span[class*='color-']")
+        self.assertGreaterEqual(colored.count(), 2)
+        for index in range(colored.count()):
+            cls = colored.nth(index).get_attribute("class")
+            self.assertRegex(cls, r"(?:^|\s)color-\d{3}(?:\s|$)")
+        # The styled text is visible, not its source.
+        text = page.locator(".elosern-narrative").inner_text()
+        self.assertIn("南大道", text)
+        self.assertNotIn("<span", text)
+
+    @covers_requirement(
+        "webclient-narrative-markup::the-narrative-palette-is-generated-with-a-contrast-floor-and-honors-reduced-motion"
+    )
+    def test_narrative_wide_row_soft_wraps_inside_the_pane(self):
+        page = self.logged_in_page()
+        # Baseline: the GoldenLayout shell itself may carry a small fixed
+        # layout overflow; the wide row must not add to it.
+        baseline_scroll = page.evaluate(
+            "() => document.documentElement.scrollWidth - "
+            "document.documentElement.clientWidth"
+        )
+        # A row wider than the narrative pane's content width soft-wraps
+        # inside the pane: no clipping, no additional page-level scroll.
+        wide = "X" * 400 + " 尾部"
+        page.evaluate(
+            "(text) => Elosern.goldenlayout.onText([text], {})", wide
+        )
+        page.wait_for_function(
+            "(text) => {"
+            "  const outs = document.querySelectorAll('.elosern-narrative .out');"
+            "  const last = outs[outs.length - 1];"
+            "  return last && last.innerText.indexOf('尾部') !== -1;"
+            "}",
+            arg=wide,
+        )
+        # The full text is present (nothing clipped from the DOM).
+        text = page.locator(".elosern-narrative .out").last.inner_text()
+        self.assertIn("尾部", text)
+        # The wide row did not widen the page.
+        horizontal_scroll = page.evaluate(
+            "() => document.documentElement.scrollWidth - "
+            "document.documentElement.clientWidth"
+        )
+        self.assertEqual(
+            horizontal_scroll,
+            baseline_scroll,
+            "a wide narrative row must soft-wrap without widening the page",
+        )
+
+    @covers_requirement(
+        "webclient-pointer-activation::keyboard-input-is-dispatched-through-the-webclient-plugin-contract"
+    )
+    def test_keydown_noise_is_gone_during_keyboard_navigation(self):
+        page = self.logged_in_page()
+        console_messages = []
+        page.on("console", lambda msg: console_messages.append(msg.text))
+
+        # Navigate the action dock with the keyboard: arrows, Enter, Escape,
+        # and drawer typing must never report an unhandled keydown.
+        page.evaluate("document.getElementById('action-dock').focus()")
+        for _ in range(3):
+            page.keyboard.press("ArrowDown")
+        page.keyboard.press("ArrowUp")
+        page.keyboard.press("Escape")
+        page.keyboard.press("/")
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(300)
+
+        noise = [
+            message
+            for message in console_messages
+            if "NO plugin handled this Keydown" in message
+        ]
+        self.assertEqual(
+            noise,
+            [],
+            "the plugin must claim exactly the events its router consumed",
         )
 
     @covers_requirement(

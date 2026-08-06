@@ -229,34 +229,22 @@
     },
 
     _renderRootMenu: function (body, panel) {
-      var self = this;
-      this._currentItems().forEach(function (item, index) {
-        var button = makeElement("button", "creation-control");
-        button.type = "button";
-        button.setAttribute("data-creation-key", item.key);
-        button.classList.add("focused");
-        setText(button, item.label);
-        body.appendChild(button);
+      if (!window.Elosern || !window.Elosern.DockSurface) {
+        return;
+      }
+      window.Elosern.DockSurface.renderRows(body, this._currentItems(), {
+        focusKey: this._focusKey,
+        idPrefix: "creation-row",
       });
     },
 
     _renderPresetList: function (body, panel) {
-      var self = this;
-      var items = this._currentItems();
-      items.forEach(function (item, index) {
-        var button = makeElement("button", "creation-control creation-preset");
-        button.type = "button";
-        button.setAttribute("data-preset-key", item.presetKey || "");
-        if (self._focusKey === item.key) {
-          button.classList.add("focused");
-          button.setAttribute("aria-current", "true");
-        }
-        if (!item.enabled) {
-          button.classList.add("disabled");
-          button.setAttribute("aria-disabled", "true");
-        }
-        setText(button, item.label);
-        body.appendChild(button);
+      if (!window.Elosern || !window.Elosern.DockSurface) {
+        return;
+      }
+      window.Elosern.DockSurface.renderRows(body, this._currentItems(), {
+        focusKey: this._focusKey,
+        idPrefix: "creation-row",
       });
     },
 
@@ -272,17 +260,20 @@
       setText(title, text);
       screen.appendChild(title);
       body.appendChild(screen);
-      this._renderConfirmButtons(body);
+      this._renderConfirmButtons(screen);
     },
 
-    _renderConfirmButtons: function (body) {
-      var self = this;
-      (this._currentConfirmItems()).forEach(function (item) {
-        var button = makeElement("button", "creation-control");
-        button.type = "button";
-        button.setAttribute("data-creation-key", item.key);
-        setText(button, item.label);
-        body.appendChild(button);
+    _renderConfirmButtons: function (screen) {
+      if (!window.Elosern || !window.Elosern.DockSurface) {
+        return;
+      }
+      // Rows render into their own container inside the confirmation screen
+      // so the shared renderer's clear-and-replace never wipes the screen.
+      var rows = makeElement("div", "creation-confirm-rows");
+      screen.appendChild(rows);
+      window.Elosern.DockSurface.renderRows(rows, this._currentConfirmItems(), {
+        focusKey: this._focusKey,
+        idPrefix: "creation-row",
       });
     },
 
@@ -294,6 +285,12 @@
           panel.draft
         );
       }
+      // The custom form is a modal form outside the row model: it captures its
+      // own keys while open, so the shared container must not carry listbox
+      // semantics while the form owns the surface.
+      body.removeAttribute("role");
+      body.removeAttribute("tabindex");
+      body.removeAttribute("aria-activedescendant");
       var state = this._customState;
       var custom = panel.custom;
       var form = makeElement("div", "creation-form");
@@ -387,18 +384,15 @@
       var submit = makeElement("button", "creation-control creation-submit");
       submit.type = "button";
       submit.id = "creation-submit";
-      submit.setAttribute("data-creation-key", "submit-custom");
       setText(submit, "確認建立");
       actions.appendChild(submit);
       var reset = makeElement("button", "creation-control creation-reset");
       reset.type = "button";
       reset.id = "creation-reset";
-      reset.setAttribute("data-creation-key", "reset-custom");
       setText(reset, "清除草稿");
       actions.appendChild(reset);
       var cancel = makeElement("button", "creation-control creation-cancel");
       cancel.type = "button";
-      cancel.setAttribute("data-creation-key", "cancel-custom");
       setText(cancel, "返回");
       actions.appendChild(cancel);
       form.appendChild(actions);

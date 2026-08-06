@@ -130,7 +130,6 @@
       root.appendChild(heading);
 
       var menu = makeElement("div", "character-menu");
-      menu.setAttribute("role", "group");
       menu.setAttribute("aria-label", "角色狀態");
       root.appendChild(menu);
 
@@ -146,18 +145,16 @@
       live.setAttribute("aria-live", "polite");
       root.appendChild(live);
 
-      var self = this;
-      model.items.forEach(function (item) {
-        var row = makeElement("div", "character-row");
-        if (item.section) {
-          row.classList.add("character-section");
-        }
-        if (self._focusKey === item.key) {
-          row.classList.add("focused");
-        }
-        setText(row, item.label);
-        menu.appendChild(row);
-      });
+      // Display-only rows: focusable through the shared surface (a click moves
+      // router focus and updates the detail pane) but marked non-submitting,
+      // so no row carries an action and nothing is ever submitted.
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.renderRows(menu, model.items, {
+          focusKey: this._focusKey,
+          idPrefix: "character-row",
+          nonSubmitting: true,
+        });
+      }
     },
 
     _renderFocusHint: function () {

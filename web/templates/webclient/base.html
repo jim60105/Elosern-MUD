@@ -21,6 +21,7 @@ for a runtime UI dependency.
 
     <!-- Project theme first so GoldenLayout and component styles can override it. -->
     <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/css/webclient.css" %}>
+    <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/css/ansi_palette.css" %}>
     <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/css/elosern.css" %}>
 
     <!-- Local pinned jQuery. -->
@@ -83,10 +84,12 @@ for a runtime UI dependency.
         <script src={% static "webclient/js/elosern/exploration_menu.js" %} type="text/javascript"></script>
         <script src={% static "webclient/js/elosern/character_menu.js" %} type="text/javascript"></script>
         <script src={% static "webclient/js/elosern/local_map.js" %} type="text/javascript"></script>
+        <script src={% static "webclient/js/elosern/narrative_markup.js" %} type="text/javascript"></script>
         <script src={% static "webclient/js/elosern/art_panel.js" %} type="text/javascript"></script>
         <script src={% static "webclient/js/elosern/art_focus.js" %} type="text/javascript"></script>
         <script src={% static "webclient/js/plugins/elosern_state.js" %} language="javascript" type="text/javascript"></script>
         <script src={% static "webclient/js/plugins/elosern_actions.js" %} language="javascript" type="text/javascript"></script>
+        <script src={% static "webclient/js/plugins/dock_surface.js" %} language="javascript" type="text/javascript"></script>
         <script src={% static "webclient/js/plugins/goldenlayout.js" %} language="javascript" type="text/javascript"></script>
         <script src={% static "webclient/js/plugins/history.js" %} language="javascript" type="text/javascript"></script>
         <script src={% static "webclient/js/plugins/default_out.js" %} language="javascript" type="text/javascript"></script>

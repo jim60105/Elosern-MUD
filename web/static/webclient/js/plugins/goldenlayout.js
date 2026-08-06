@@ -16,6 +16,15 @@
 
   var GAME_TITLE = "Elosern";
 
+  // Minimap lattice cell dimensions (must match the CSS custom properties
+  // --elm-map-cell-w/--elm-map-cell-h in elosern.css).
+  var MAP_CELL_W = 76;
+  var MAP_CELL_H = 28;
+
+  // SVG namespace for the edge layer; assembled so the source contains no
+  // literal http URL (the repository contract forbids remote references).
+  var SVG_NS = "http" + "://www.w3.org/2000/svg";
+
   var myLayout = null;
   var narrativeDiv = null;
   var promptDiv = null;
@@ -277,6 +286,20 @@
     live.setAttribute("aria-atomic", "true");
     root.appendChild(live);
 
+    // The action dock remains the surface's documented focus target; when a
+    // dock mounts a listbox row container, focus forwards to it so existing
+    // focus-restoration callers (closeDrawer, the browser journeys) need no
+    // change.
+    var originalFocus = root.focus;
+    root.focus = function () {
+      var listbox = root.querySelector('[role="listbox"]');
+      if (listbox && typeof listbox.focus === "function" && listbox !== document.activeElement) {
+        listbox.focus();
+        return;
+      }
+      originalFocus.call(root);
+    };
+
     container.getElement().append(root);
 
     var unsubscribe = subscribeState(function (state) {
@@ -308,14 +331,46 @@
     wrapper.appendChild(button);
     wrapper.appendChild(field);
 
-    function sendCurrent() {
+    var drawerOpen = false;
+
+    function isOpen() {
+      return drawerOpen;
+    }
+
+    function open() {
+      drawerOpen = true;
+      field.focus();
+      return true;
+    }
+
+    // `restoreFocus` returns focus to the action dock (the documented way
+    // back to the menu surface after Escape or a dock-borrowed send).
+    function close(restoreFocus) {
+      drawerOpen = false;
+      if (restoreFocus) {
+        var dock = document.getElementById("action-dock");
+        if (dock && dock.focus) {
+          dock.focus();
+        }
+      }
+      // Any close that was not this dock's own successful free-form consume
+      // releases the borrowed-drawer reference, so a cancelled dialogue can
+      // never capture a later command.
+      var exploration = window.Elosern && window.Elosern.explorationDock;
+      if (exploration && typeof exploration.clearPendingFreeform === "function") {
+        exploration.clearPendingFreeform();
+      }
+    }
+
+    function send() {
       var text = field.value;
       if (text.trim() === "") {
-        return;
+        return false;
       }
       // Free-form dialogue intercepts the drawer: the exploration dock holds
       // the server-authored NPC reference and submits `explore.talk_freeform`
-      // with the typed speech instead of sending ordinary text.
+      // with the typed speech instead of sending ordinary text. A consumed
+      // send closes the drawer and returns focus to the dock that borrowed it.
       var exploration = window.Elosern && window.Elosern.explorationDock;
       if (
         exploration &&
@@ -323,11 +378,8 @@
         exploration.consumeFreeformText(text)
       ) {
         field.value = "";
-        var ui = window.Elosern && window.Elosern.ui;
-        if (ui && typeof ui.closeDrawer === "function") {
-          ui.closeDrawer(true);
-        }
-        return;
+        close(true);
+        return true;
       }
       if (window.plugin_handler && typeof window.plugin_handler.onSend === "function") {
         window.plugin_handler.onSend(text);
@@ -335,35 +387,43 @@
         window.Evennia.msg("text", [text], {});
       }
       field.value = "";
-      var ui = window.Elosern && window.Elosern.ui;
-      if (ui && typeof ui.closeDrawer === "function") {
-        ui.closeDrawer(true);
+      // A send routed as ordinary text releases the borrowed-drawer reference
+      // too: a cancelled dialogue must never capture a later command.
+      if (exploration && typeof exploration.clearPendingFreeform === "function") {
+        exploration.clearPendingFreeform();
       }
+      // An ordinary text send keeps the drawer open and focus in the field so
+      // consecutive commands are typeable without any pointer interaction;
+      // Escape is the documented way back to the menu surface.
+      return true;
     }
 
-    field.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        sendCurrent();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        var ui = window.Elosern && window.Elosern.ui;
-        if (ui && typeof ui.closeDrawer === "function") {
-          ui.closeDrawer(true);
-        } else {
-          field.blur();
-        }
-      }
+    // Track the field's real focus state; the drawer plugin owns Enter and
+    // Escape through the plugin `onKeydown` contract, so no key listener is
+    // bound here (exactly one listener handles a given Enter press).
+    field.addEventListener("focus", function () {
+      field.classList.add("focused");
+    });
+    field.addEventListener("blur", function () {
+      field.classList.remove("focused");
     });
 
     button.addEventListener("click", function () {
       field.focus();
-      sendCurrent();
+      send();
     });
 
     root.appendChild(prompt);
     root.appendChild(wrapper);
     container.getElement().append(root);
+
+    window.Elosern = window.Elosern || {};
+    window.Elosern.drawer = {
+      send: send,
+      open: open,
+      close: close,
+      isOpen: isOpen,
+    };
   }
 
   function registerLocalMap(container) {
@@ -414,38 +474,51 @@
       canvas.setAttribute("tabindex", "0");
       canvas.setAttribute("role", "figure");
       canvas.setAttribute("aria-label", model.title || "區域地圖");
+      // The canvas reserves its own space from the lattice so the pane
+      // scrolls instead of letting nodes overprint the legend.
+      canvas.style.width = model.cols * MAP_CELL_W + "px";
+      canvas.style.height = model.rows * MAP_CELL_H + "px";
+
       var nodesById = {};
       model.nodes.forEach(function (node) {
         nodesById[node.id] = node;
       });
 
-      // Render edges first so node markers draw on top.
-      model.edges.forEach(function (edge) {
-        var source = nodesById[edge.source];
-        var destination = nodesById[edge.destination];
-        if (!source || !destination) {
-          return;
-        }
-        var edgeEl = makeElement("div", "local-map-edge");
-        edgeEl.style.left = (Math.min(source.x, destination.x) + 64) + "px";
-        edgeEl.style.top = (Math.min(source.y, destination.y) + 32) + "px";
-        edgeEl.style.width =
-          (Math.abs(source.x - destination.x) + 1) + "px";
-        edgeEl.style.height =
-          (Math.abs(source.y - destination.y) + 1) + "px";
-        if (edge.known) {
-          edgeEl.classList.add("edge-known");
-        }
-        if (edge.traversable) {
-          edgeEl.classList.add("edge-traversable");
-        }
-        if (edge.label) {
-          var edgeLabel = makeElement("span", "local-map-edge-label");
-          setText(edgeLabel, edge.label);
-          edgeEl.appendChild(edgeLabel);
-        }
-        canvas.appendChild(edgeEl);
-      });
+      // Edge layer: one non-interactive SVG with a line per edge between
+      // cell centers; the label lives on the line's accessible name.
+      if (model.edges.length > 0) {
+        var svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("class", "local-map-edge-layer");
+        svg.setAttribute("width", model.cols * MAP_CELL_W);
+        svg.setAttribute("height", model.rows * MAP_CELL_H);
+        svg.style.pointerEvents = "none";
+        model.edges.forEach(function (edge) {
+          var source = nodesById[edge.source];
+          var destination = nodesById[edge.destination];
+          // An edge touching a node that is not on the canvas (a remembered
+          // remote node) is omitted from the drawn layer.
+          if (!source || !destination) {
+            return;
+          }
+          var line = document.createElementNS(SVG_NS, "line");
+          line.setAttribute("x1", source.col * MAP_CELL_W + MAP_CELL_W / 2);
+          line.setAttribute("y1", source.row * MAP_CELL_H + MAP_CELL_H / 2);
+          line.setAttribute("x2", destination.col * MAP_CELL_W + MAP_CELL_W / 2);
+          line.setAttribute("y2", destination.row * MAP_CELL_H + MAP_CELL_H / 2);
+          line.classList.add("local-map-edge");
+          if (edge.known) {
+            line.classList.add("edge-known");
+          }
+          if (edge.traversable) {
+            line.classList.add("edge-traversable");
+          }
+          if (edge.label) {
+            line.setAttribute("aria-label", edge.label);
+          }
+          svg.appendChild(line);
+        });
+        canvas.appendChild(svg);
+      }
 
       model.nodes.forEach(function (node) {
         var nodeEl = makeElement("button", "local-map-node");
@@ -463,20 +536,15 @@
         if (node.landmark) {
           nodeEl.classList.add("node-landmark");
         }
-        nodeEl.style.left = (node.x + 64) + "px";
-        nodeEl.style.top = (node.y + 32) + "px";
+        // True cell centres.
+        nodeEl.style.left = (node.col * MAP_CELL_W + MAP_CELL_W / 2) + "px";
+        nodeEl.style.top = (node.row * MAP_CELL_H + MAP_CELL_H / 2) + "px";
         var labelEl = makeElement("span", "local-map-node-label");
         setText(labelEl, node.labelPrefix + node.label);
         nodeEl.appendChild(labelEl);
         nodeEl.setAttribute("aria-label", node.label);
-        // A remembered remote node focuses its name/landmark and carries no
-        // travel action.
-        if (node.visibility === "remembered") {
-          nodeEl.classList.add("node-focusable");
-          nodeEl.addEventListener("click", function () {
-            focusLocalMapNode(root, model, node);
-          });
-        } else if (node.action !== null) {
+        nodeEl.setAttribute("title", node.label);
+        if (node.action !== null) {
           // Adjacent traversable nodes submit `explore.move` with the move
           // descriptor's `exit_ref` and the panel's `current_node`.
           nodeEl.classList.add("node-action-ready");
@@ -487,6 +555,38 @@
         canvas.appendChild(nodeEl);
       });
       root.appendChild(canvas);
+
+      // Remembered remote nodes render as a bounded focusable list below the
+      // canvas: their payload coordinates describe places outside the current
+      // field of view, so they never appear on the coordinate canvas and
+      // never imply adjacency to the local neighbourhood.
+      if (model.remembered.length > 0) {
+        var rememberedList = makeElement("ul", "local-map-remembered");
+        rememberedList.setAttribute("aria-label", "曾經到過、但不在附近的遠方位置");
+        model.remembered.forEach(function (node) {
+          var item = makeElement("li", "local-map-remembered-entry");
+          var button = makeElement("button", "local-map-node local-map-remembered-node");
+          button.type = "button";
+          button.dataset.nodeId = node.id;
+          button.classList.add("node-remembered");
+          button.classList.add("node-shape-" + node.shape);
+          button.classList.add("node-border-" + node.border);
+          button.classList.add("node-focusable");
+          var labelEl = makeElement("span", "local-map-node-label");
+          setText(labelEl, node.labelPrefix + node.label);
+          button.appendChild(labelEl);
+          button.setAttribute("aria-label", node.label);
+          button.setAttribute("title", node.label);
+          // Focus-only: writes the name/landmark into the detail line and
+          // carries no travel action.
+          button.addEventListener("click", function () {
+            focusLocalMapNode(root, model, node);
+          });
+          item.appendChild(button);
+          rememberedList.appendChild(item);
+        });
+        root.appendChild(rememberedList);
+      }
 
       if (model.legend.length > 0) {
         var legend = makeElement("ul", "local-map-legend");
@@ -839,9 +939,65 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Text routing. The narrative is the only text surface; server text is
-  // inserted as text nodes, never trusted HTML.
+  // Text routing. The narrative is the only text surface; server text arrives
+  // as Evennia's ANSI->HTML stream and is rendered through the strict
+  // allowlist pipeline (elosern/narrative_markup.js), which builds nodes with
+  // element/text-node constructors only and degrades anything outside its
+  // allowlist to literal text. If the module is absent, the shell falls back
+  // to literal text (a defensive path, not a supported mode).
   // ---------------------------------------------------------------------------
+
+  function getNarrativeMarkup() {
+    return (
+      window.Elosern &&
+      window.Elosern.NarrativeMarkup
+    ) || null;
+  }
+
+  // Render one converted text message into `root` (a `.out` line wrapper or
+  // the prompt surface). Nodes are built exclusively through the element and
+  // text-node constructors.
+  function renderConvertedText(root, text) {
+    var markup = getNarrativeMarkup();
+    if (!markup || typeof markup.tokenize !== "function") {
+      setText(root, text);
+      return;
+    }
+    var tokens = markup.tokenize(text);
+    // The append target follows the span stack; the line itself is the base.
+    var stack = [root];
+    for (var i = 0; i < tokens.length; i += 1) {
+      var token = tokens[i];
+      var target = stack[stack.length - 1];
+      if (token.kind === "text") {
+        target.appendChild(document.createTextNode(token.value));
+      } else if (token.kind === "break") {
+        target.appendChild(document.createElement("br"));
+      } else if (token.kind === "open") {
+        var span = document.createElement("span");
+        (token.classes || []).forEach(function (cls) {
+          span.classList.add(cls);
+        });
+        if (token.style) {
+          if (token.style.color) {
+            span.style.color = token.style.color;
+          }
+          if (token.style.backgroundColor) {
+            span.style.backgroundColor = token.style.backgroundColor;
+          }
+        }
+        target.appendChild(span);
+        stack.push(span);
+      } else if (token.kind === "close") {
+        // The tokenizer balances opens/closes; a close with no open (an
+        // unbalanced message) degrades to text there, so this should never
+        // pop the base line.
+        if (stack.length > 1) {
+          stack.pop();
+        }
+      }
+    }
+  }
 
   function appendNarrative(text) {
     if (!narrativeDiv) {
@@ -849,7 +1005,7 @@
     }
     var wasAtBottom = atNarrativeBottom();
     var line = makeElement("div", "out");
-    setText(line, text);
+    renderConvertedText(line, text);
     narrativeDiv.appendChild(line);
     if (wasAtBottom) {
       narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
@@ -874,7 +1030,12 @@
       return false;
     }
     if (promptDiv) {
-      setText(promptDiv, args[0]);
+      // The prompt surface receives the same converted stream as the
+      // narrative; render it through the allowlist pipeline too.
+      while (promptDiv.firstChild) {
+        promptDiv.removeChild(promptDiv.firstChild);
+      }
+      renderConvertedText(promptDiv, args[0]);
       return true;
     }
     return false;

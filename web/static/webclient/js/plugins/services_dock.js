@@ -189,25 +189,12 @@
     },
 
     _renderMenuItems: function (menu, panel) {
-      var self = this;
-      while (menu.firstChild) {
-        menu.removeChild(menu.firstChild);
+      if (!window.Elosern || !window.Elosern.DockSurface) {
+        return;
       }
-      this._currentItems().forEach(function (item, index) {
-        var button = makeElement("button", "services-control");
-        button.type = "button";
-        button.setAttribute("data-service-key", item.key);
-        if (self._focusKey === item.key) {
-          button.classList.add("focused");
-          button.setAttribute("aria-current", "true");
-        }
-        if (!item.enabled) {
-          button.classList.add("disabled");
-          button.setAttribute("aria-disabled", "true");
-        }
-        var label = item.label + (item.enabled ? "" : "（無法使用）");
-        setText(button, label);
-        menu.appendChild(button);
+      window.Elosern.DockSurface.renderRows(menu, this._currentItems(), {
+        focusKey: this._focusKey,
+        idPrefix: "services-row",
       });
     },
 

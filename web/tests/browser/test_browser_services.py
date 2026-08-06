@@ -163,7 +163,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         page = self.logged_in_page((1280, 720))
         panel = self._wait_services_available(page)
         self._open_guild_menu(page)
-        controls = page.locator(".services-control")
+        controls = page.locator(".dock-row")
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
@@ -382,9 +382,9 @@ class ShopJourneys(ServicesBrowserTest):
         inventory_menu = page.evaluate(
             """() => {
               const controls = Array.from(
-                document.querySelectorAll('.services-control')
+                document.querySelectorAll('.dock-row')
               );
-              return controls.map((el) => el.getAttribute('data-service-key'));
+              return controls.map((el) => el.getAttribute('data-item-key'));
             }"""
         )
         self.assertTrue(
@@ -396,8 +396,8 @@ class ShopJourneys(ServicesBrowserTest):
         # control is a bounded submenu/action row, never a dbref or a host
         # identity, and no submitted payload carries a host/branch/actor field.
         control_keys = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.services-control'))
-              .map((el) => el.getAttribute('data-service-key'))"""
+            """() => Array.from(document.querySelectorAll('.dock-row'))
+              .map((el) => el.getAttribute('data-item-key'))"""
         )
         host_like = [k for k in control_keys if k and "#" in k or (k and k.isdigit())]
         self.assertEqual(
@@ -530,8 +530,8 @@ class ShopClosedJourneys(ServicesBrowserTest):
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page), 0)
         stock = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.services-control'))
-              .map((el) => ({ key: el.getAttribute('data-service-key'),
+            """() => Array.from(document.querySelectorAll('.dock-row'))
+              .map((el) => ({ key: el.getAttribute('data-item-key'),
                               disabled: el.getAttribute('aria-disabled') === 'true' }))"""
         )
         disabled = [entry for entry in stock if entry["key"].startswith("stock-")]

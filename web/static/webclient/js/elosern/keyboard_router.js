@@ -90,6 +90,40 @@
       return item && item.key !== undefined ? item.key : item && item.label;
     }
 
+    // Move the frame's focus onto the item carrying `key`, emitting `focus`.
+    // Returns false without side effects when the key is not in the current
+    // frame.
+    function focusItemByKey(key) {
+      var frame = current();
+      if (!frame) {
+        return false;
+      }
+      var menu = frame.menu;
+      if (menu.grid && menu.gridCols > 0) {
+        for (var row = 0; row < menu.items.length; row += 1) {
+          var col = row % menu.gridCols;
+          var index = row;
+          var candidate = menu.items[index];
+          if (candidate && itemKey(candidate) === key) {
+            frame.focusRow = Math.floor(index / menu.gridCols);
+            frame.focusCol = index % menu.gridCols;
+            notifyFocus(frame);
+            return true;
+          }
+        }
+        return false;
+      }
+      for (var listIndex = 0; listIndex < menu.items.length; listIndex += 1) {
+        var item = menu.items[listIndex];
+        if (item && itemKey(item) === key) {
+          frame.focusRow = listIndex;
+          notifyFocus(frame);
+          return true;
+        }
+      }
+      return false;
+    }
+
     // Move focus within the current menu geometry.
     function move(direction) {
       var frame = current();
@@ -145,7 +179,13 @@
       return true;
     }
 
-    function confirm() {
+    // Confirm the focused item. `options.source` distinguishes pointer
+    // activation from the keyboard: a pointer confirm shares the disabled,
+    // locked, and submit gates but neither consults nor sets the held-Enter
+    // repeat guard, which exists to suppress key repeat and would otherwise
+    // reject a legitimate second click on the same row.
+    function confirm(options) {
+      var source = (options && options.source) || "keyboard";
       var frame = current();
       if (!frame) {
         return false;
@@ -163,11 +203,13 @@
         emit("locked", {});
         return false;
       }
-      if (repeatGuard && repeatGuard.key === ENTER && repeatGuard.itemKey === itemKey(item)) {
-        emit("repeat-suppressed", { itemKey: itemKey(item) });
-        return false;
+      if (source !== "pointer") {
+        if (repeatGuard && repeatGuard.key === ENTER && repeatGuard.itemKey === itemKey(item)) {
+          emit("repeat-suppressed", { itemKey: itemKey(item) });
+          return false;
+        }
+        repeatGuard = { key: ENTER, itemKey: itemKey(item) };
       }
-      repeatGuard = { key: ENTER, itemKey: itemKey(item) };
       emit("submit", { item: item, itemKey: itemKey(item) });
       return true;
     }
@@ -268,6 +310,10 @@
         var frame = current();
         return frame ? itemAt(frame, frame.focusRow, frame.focusCol) : null;
       },
+      // The current frame's menu (read-only); null when no frame is mounted.
+      currentMenu: function () {
+        return currentMenu();
+      },
 
       // Submission gating.
       setMutationInFlight: function (value) {
@@ -293,6 +339,8 @@
         return press(key, !!repeat);
       },
       focus: focusRowCol,
+      focusItemByKey: focusItemByKey,
+      confirm: confirm,
     };
   }
 

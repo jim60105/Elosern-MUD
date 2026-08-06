@@ -8,6 +8,19 @@
  * travel action). Unknown nodes never appear because the server already
  * validated the panel; this module only adds a small bounded layout pass.
  *
+ * Layout is a bounded integer lattice computed over the current field of
+ * view only: `current`, `visible_unvisited`, and `visible_visited` nodes
+ * occupy `col = x - minX`, `row = y - minY` cells, and the model exports
+ * the lattice's column and row counts. `remembered` remote nodes are kept
+ * out of the coordinate canvas entirely (their payload coordinates describe
+ * places outside the current view and must not distort the local spacing);
+ * they surface as a bounded, order-preserved list.
+ *
+ * When the in-view span would exceed `MAX_LATTICE` columns or rows -- only
+ * possible for a schema-valid but geometrically sparse payload -- the model
+ * falls back to rank compression over the distinct sorted coordinate
+ * values, which cannot exceed the payload's 64-node bound.
+ *
  * No `document` or `window` access at load time; Node tests exercise the
  * model directly. All server strings are passed through unchanged as display
  * text; the model never parses narrative.
@@ -23,10 +36,9 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  // Renderer-local geometry caps (must stay within the panel's -1024..1024).
-  var MAX_LAYOUT_X = 64;
-  var MAX_LAYOUT_Y = 32;
+  var MAX_LATTICE = 64;
   var MAX_FOCUS_TARGETS = 16;
+  var MAX_NODES = 64;
 
   // Visibility -> non-color visual indicators.
   var STATE_INDICATORS = {
@@ -36,21 +48,13 @@
     remembered: { shape: "diamond", border: "dashed", labelPrefix: "◆ " },
   };
 
-  function clampCoord(value, minimum, maximum) {
-    var n = Number(value);
-    if (!isFinite(n)) {
-      n = 0;
-    }
-    return Math.max(minimum, Math.min(maximum, Math.round(n)));
-  }
-
   function nodeModel(node) {
     var indicator = STATE_INDICATORS[node.visibility] || STATE_INDICATORS.remembered;
     return {
       id: node.id,
       label: node.label,
-      x: clampCoord(node.x, -MAX_LAYOUT_X, MAX_LAYOUT_X),
-      y: clampCoord(node.y, -MAX_LAYOUT_Y, MAX_LAYOUT_Y),
+      x: node.x,
+      y: node.y,
       visibility: node.visibility,
       current: !!node.current,
       anchor: !!node.anchor,
@@ -78,10 +82,7 @@
 
   function focusTargets(model) {
     var targets = [];
-    model.nodes.forEach(function (node) {
-      if (node.visibility !== "remembered") {
-        return;
-      }
+    model.remembered.forEach(function (node) {
       if (targets.length >= MAX_FOCUS_TARGETS) {
         return;
       }
@@ -96,9 +97,26 @@
     return targets;
   }
 
-  // Deterministic bounded layout pass: normalize the renderer-local node
-  // positions into a finite pane while preserving relative order by (y, x).
-  function normalizeLayout(nodes) {
+  // Rank compression: distinct sorted coordinate values become consecutive
+  // indices. Deterministic and bounded by the number of distinct values.
+  function compressAxis(values) {
+    var sorted = values.slice().sort(function (a, b) {
+      return a - b;
+    });
+    var rank = {};
+    var index = 0;
+    for (var i = 0; i < sorted.length; i += 1) {
+      if (rank[sorted[i]] === undefined) {
+        rank[sorted[i]] = index;
+        index += 1;
+      }
+    }
+    return rank;
+  }
+
+  // Deterministic bounded layout pass: place only in-view nodes on the
+  // lattice. Returns { nodes, cols, rows }.
+  function layoutNodes(nodes) {
     var minX = Infinity;
     var maxX = -Infinity;
     var minY = Infinity;
@@ -117,31 +135,68 @@
         maxY = node.y;
       }
     });
-    if (!isFinite(minX) || !isFinite(minY)) {
-      return nodes;
+    if (nodes.length === 0) {
+      return { nodes: [], cols: 0, rows: 0 };
     }
-    var spanX = Math.max(1, maxX - minX);
-    var spanY = Math.max(1, maxY - minY);
-    return nodes.map(function (node) {
-      return Object.assign({}, node, {
-        x: Math.round(((node.x - minX) / spanX) * (MAX_LAYOUT_X * 2) - MAX_LAYOUT_X),
-        y: Math.round(((node.y - minY) / spanY) * (MAX_LAYOUT_Y * 2) - MAX_LAYOUT_Y),
-      });
-    });
+    var cols = maxX - minX + 1;
+    var rows = maxY - minY + 1;
+    if (cols <= MAX_LATTICE && rows <= MAX_LATTICE) {
+      return {
+        nodes: nodes.map(function (node) {
+          return Object.assign({}, node, {
+            col: node.x - minX,
+            row: node.y - minY,
+          });
+        }),
+        cols: cols,
+        rows: rows,
+      };
+    }
+    // Sparse fallback: rank-compress both axes; cannot exceed the payload's
+    // node bound (at most 64 distinct values each).
+    var colRank = compressAxis(nodes.map(function (node) {
+      return node.x;
+    }));
+    var rowRank = compressAxis(nodes.map(function (node) {
+      return node.y;
+    }));
+    return {
+      nodes: nodes.map(function (node) {
+        return Object.assign({}, node, {
+          col: colRank[node.x],
+          row: rowRank[node.y],
+        });
+      }),
+      cols: Math.max(1, Object.keys(colRank).length),
+      rows: Math.max(1, Object.keys(rowRank).length),
+    };
   }
 
   function reducePanel(panel) {
-    var nodes = (panel && panel.nodes || []).map(nodeModel);
-    nodes = normalizeLayout(nodes);
+    var all = (panel && panel.nodes || []).map(nodeModel);
+    var inView = [];
+    var remembered = [];
+    for (var i = 0; i < all.length && inView.length + remembered.length < MAX_NODES; i += 1) {
+      var node = all[i];
+      if (node.visibility === "remembered") {
+        remembered.push(node);
+      } else {
+        inView.push(node);
+      }
+    }
+    var layout = layoutNodes(inView);
     var edges = (panel && panel.edges || []).map(edgeModel);
     var legend = (panel && panel.legend || []).slice();
     var model = {
       layer: panel && panel.layer || null,
       currentNode: panel && panel.current_node || null,
       title: panel && panel.title || "",
-      nodes: nodes,
+      nodes: layout.nodes,
+      cols: layout.cols,
+      rows: layout.rows,
       edges: edges,
       legend: legend,
+      remembered: remembered,
       focusTargets: [],
     };
     model.focusTargets = focusTargets(model);
@@ -149,11 +204,12 @@
   }
 
   return {
-    MAX_LAYOUT_X: MAX_LAYOUT_X,
-    MAX_LAYOUT_Y: MAX_LAYOUT_Y,
+    MAX_LATTICE: MAX_LATTICE,
     MAX_FOCUS_TARGETS: MAX_FOCUS_TARGETS,
+    MAX_NODES: MAX_NODES,
     STATE_INDICATORS: Object.assign({}, STATE_INDICATORS),
     reducePanel: reducePanel,
     focusTargets: focusTargets,
+    layoutNodes: layoutNodes,
   };
 });

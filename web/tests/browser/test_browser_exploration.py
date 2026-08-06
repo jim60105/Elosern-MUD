@@ -224,6 +224,59 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             arg="歡迎來到冒險者公會",
         )
 
+    @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+    )
+    def test_cancelled_freeform_dialogue_cannot_capture_a_later_command(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        # Open free-form dialogue but cancel with Escape without sending.
+        self._open_root(page, 2)  # Interact
+        _press(page, "ArrowDown")  # the bard (LLMNPC)
+        _press(page, "Enter")
+        _press(page, "ArrowDown")  # 自由交談
+        _press(page, "Enter")
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
+        page.keyboard.type("話到嘴邊又吞了回去")
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => !Elosern.drawer.isOpen() && (() => {"
+            "  const dock = document.getElementById('action-dock');"
+            "  return document.activeElement === dock || "
+            "    (document.activeElement && dock.contains(document.activeElement));"
+            "})()"
+        )
+
+        # Send an ordinary command through the drawer: it must travel as text,
+        # never as explore.talk_freeform speech to the previously selected NPC.
+        page.keyboard.press("/")
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
+        narrative_before = page.locator(".elosern-narrative").inner_text()
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(before) => document.querySelector('.elosern-narrative')"
+            ".innerText.length > before",
+            arg=narrative_before.__len__(),
+        )
+        self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
+        # The command was sent through the text path.
+        text_sends = [
+            args[0]
+            for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmd == "text"
+        ]
+        self.assertTrue(
+            any("look" in str(item) for item in text_sends),
+            "the ordinary command must travel through the text transport",
+        )
+
     @covers_requirement("webclient-exploration-menu::explore-engage-delegates-to-the-existing-engage-contract")
     def test_engage_transitions_to_combat(self):
         page = self.logged_in_page()

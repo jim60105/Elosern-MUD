@@ -251,25 +251,12 @@
     },
 
     _renderMenuItems: function (menu, panel) {
-      var self = this;
-      while (menu.firstChild) {
-        menu.removeChild(menu.firstChild);
+      if (!window.Elosern || !window.Elosern.DockSurface) {
+        return;
       }
-      this._currentItems().forEach(function (item, index) {
-        var button = makeElement("button", "exploration-control");
-        button.type = "button";
-        button.setAttribute("data-exploration-key", item.key);
-        if (self._focusKey === item.key) {
-          button.classList.add("focused");
-          button.setAttribute("aria-current", "true");
-        }
-        if (!item.enabled) {
-          button.classList.add("disabled");
-          button.setAttribute("aria-disabled", "true");
-        }
-        var label = item.label + (item.enabled ? "" : "（無法使用）");
-        setText(button, label);
-        menu.appendChild(button);
+      window.Elosern.DockSurface.renderRows(menu, this._currentItems(), {
+        focusKey: this._focusKey,
+        idPrefix: "exploration-row",
       });
     },
 
@@ -549,10 +536,18 @@
     },
 
     _openFreeformDrawer: function () {
-      var ui = window.Elosern && window.Elosern.ui;
-      if (ui && typeof ui.openDrawer === "function") {
-        ui.openDrawer();
+      var drawer = window.Elosern && window.Elosern.drawer;
+      if (drawer && typeof drawer.open === "function") {
+        drawer.open();
       }
+    },
+
+    // Release the borrowed-drawer reference. Called by the drawer whenever it
+    // closes for any reason other than this dock's own successful consume,
+    // and whenever a send is routed as ordinary text, so a cancelled dialogue
+    // can never capture a later command.
+    clearPendingFreeform: function () {
+      this._pendingFreeform = null;
     },
 
     // Called by elosern_ui when the drawer sends text; returns true when the

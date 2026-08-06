@@ -2,19 +2,17 @@
  * Elosern browser UI wiring.
  *
  * Connects the DOM-independent KeyboardRouter and action client to the real
- * Evennia emitter and the GoldenLayout shell: global key handling for `/` and
- * arrows, the command drawer on the ordinary text transport, the
+ * Evennia emitter and the GoldenLayout shell: plugin-contract key handling
+ * for `/` and arrows, the command drawer on the ordinary text transport, the
  * non-dismissible offline overlay, and connection-open synchronization.
  *
- * The drawer sends ordinary text through `plugin_handler.onSend` (the same
- * `text` inputfunc path as the normal input field). It never constructs a
- * `ui_action` envelope.
+ * The drawer component (goldenlayout.js) owns the single send path and sends
+ * ordinary text through `plugin_handler.onSend` (the same `text` inputfunc
+ * path as the normal input field). Nothing here ever constructs a `ui_action`
+ * envelope.
  */
 (function () {
   "use strict";
-
-  var drawerOpen = false;
-  var pendingDrawerText = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -71,87 +69,49 @@
     ) || null;
   }
 
-  function openDrawer() {
-    var field = el("inputfield");
-    if (!field) {
-      return false;
-    }
-    drawerOpen = true;
-    field.focus();
-    return true;
-  }
-
-  function closeDrawer(restoreFocus) {
-    drawerOpen = false;
-    pendingDrawerText = null;
-    if (restoreFocus) {
-      var dock = el("action-dock");
-      if (dock && dock.focus) {
-        dock.focus();
-      }
-    }
-  }
-
-  function sendDrawerText() {
-    var field = el("inputfield");
-    if (!field) {
-      return false;
-    }
-    var text = field.value;
-    if (text.trim() === "") {
-      return false;
-    }
-    // Free-form dialogue intercepts the drawer: the exploration dock holds the
-    // server-authored NPC reference and submits `explore.talk_freeform` with
-    // the typed speech instead of sending ordinary text.
-    var exploration = getExploration();
-    if (
-      exploration &&
-      typeof exploration.consumeFreeformText === "function" &&
-      exploration.consumeFreeformText(text)
-    ) {
-      field.value = "";
-      closeDrawer(true);
-      return true;
-    }
-    // Ordinary text through Evennia's text transport; never ui_action.
-    if (window.plugin_handler && typeof window.plugin_handler.onSend === "function") {
-      window.plugin_handler.onSend(text);
-    } else if (window.Evennia) {
-      window.Evennia.msg("text", [text], {});
-    }
-    field.value = "";
-    closeDrawer(true);
-    return true;
+  function getDrawer() {
+    return (
+      window.Elosern &&
+      window.Elosern.drawer
+    ) || null;
   }
 
   function routeKeyboard(event) {
     var keyboard = getKeyboard();
+    var drawer = getDrawer();
     // `/` opens the drawer outside editable fields.
     if (event.key === "/" && !isEditable(event.target)) {
       event.preventDefault();
       if (keyboard) {
         keyboard.handle("/");
-      } else {
-        openDrawer();
+      } else if (drawer) {
+        drawer.open();
       }
       return true;
     }
-    if (!drawerOpen && isEditable(event.target)) {
-      // Normal typing in the input field is untouched.
-      return false;
-    }
-    if (drawerOpen) {
+    if (drawer && drawer.isOpen()) {
+      // The open drawer owns its field. Enter sends and Escape cancels; every
+      // other key typed into the drawer is claimed (without preventDefault,
+      // so normal editing proceeds) so the plugin handler reports no
+      // unhandled keydown while the player types. The stock command-history
+      // recall keys are not claimed and keep their turn.
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        sendDrawerText();
+        drawer.send();
         return true;
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        closeDrawer(true);
+        drawer.close(true);
         return true;
       }
+      if (event.shiftKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+        return false;
+      }
+      return true;
+    }
+    if (isEditable(event.target)) {
+      // Normal typing in the input field is untouched.
       return false;
     }
     if (keyboard) {
@@ -165,8 +125,7 @@
       ) {
         event.preventDefault();
       }
-      keyboard.handle(key, repeat);
-      return true;
+      return keyboard.handle(key, repeat);
     }
     return false;
   }
@@ -275,7 +234,10 @@
       var router = window.Elosern.KeyboardRouter.createRouter({
         onEvent: function (name, payload) {
           if (name === "open-drawer") {
-            openDrawer();
+            var drawer = getDrawer();
+            if (drawer) {
+              drawer.open();
+            }
           } else if (name === "submit") {
             handleSubmission(payload);
           } else if (name === "space") {
@@ -310,6 +272,13 @@
           var creation = getCreation();
           if (creation && creation.isActive && creation.isActive()) {
             creation.onRouterEvent(name, payload);
+          }
+          // The combat dock renders the router's current frame; every frame
+          // change re-renders its rows (root, skills, targets, shorthand,
+          // forfeit).
+          var combatDock = window.Elosern && window.Elosern.combatDock;
+          if (combatDock && typeof combatDock.onRouterEvent === "function") {
+            combatDock.onRouterEvent(name, payload);
           }
         },
       });
@@ -537,23 +506,36 @@
       wireKeyboardRouter();
       wireActions();
       wireConnections();
-      document.addEventListener("keydown", routeKeyboard);
+      // One delegated pointer listener on the stable action-dock element,
+      // installed at shell init, survives every dock re-render.
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.installPointerBridge();
+      }
       // Not shown here: before the first successful activation the overlay
       // stays off (see hasBeenActive) so the stock login/creation flow under
       // it stays usable for a first-time visitor.
     },
     onSend: function (line) {
       // Ensure no drawer path ever builds a ui_action; text stays text.
-      if (drawerOpen) {
-        pendingDrawerText = line;
-      }
       return null; // allow the stock text command to proceed unchanged
     },
+    // Key handling runs through the plugin contract so the plugin handler
+    // claims exactly the events the router (or the open drawer) consumed.
+    onKeydown: routeKeyboard,
     // Exposed for acceptance tests and focus restoration.
-    openDrawer: openDrawer,
-    closeDrawer: closeDrawer,
+    openDrawer: function () {
+      var drawer = getDrawer();
+      return drawer ? drawer.open() : false;
+    },
+    closeDrawer: function (restoreFocus) {
+      var drawer = getDrawer();
+      if (drawer) {
+        drawer.close(!!restoreFocus);
+      }
+    },
     isDrawerOpen: function () {
-      return drawerOpen;
+      var drawer = getDrawer();
+      return drawer ? drawer.isOpen() : false;
     },
     updateOverlayFromState: updateOverlayFromState,
   };

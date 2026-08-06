@@ -139,3 +139,114 @@ test("action locking awaits declared presentation revision", () => {
   router.handle("Enter");
   assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
 });
+
+test("focusItemByKey moves focus and emits focus for a hit", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({
+    items: [
+      { key: "move", label: "移動", enabled: true },
+      { key: "look", label: "查看", enabled: true },
+      { key: "interact", label: "互動", enabled: true },
+    ],
+  });
+  events.length = 0;
+  const moved = router.focusItemByKey("interact");
+  assert.strictEqual(moved, true);
+  assert.strictEqual(events[0].name, "focus");
+  assert.strictEqual(events[0].payload.itemKey, "interact");
+  assert.strictEqual(router.currentItem().key, "interact");
+});
+
+test("focusItemByKey returns false without side effects on a miss", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({
+    items: [
+      { key: "move", label: "移動", enabled: true },
+      { key: "look", label: "查看", enabled: true },
+    ],
+  });
+  events.length = 0;
+  const moved = router.focusItemByKey("nonexistent");
+  assert.strictEqual(moved, false);
+  assert.strictEqual(events.length, 0);
+  assert.strictEqual(router.currentItem().key, "move");
+});
+
+test("focusItemByKey resolves grid items by row and column", () => {
+  const { router, events } = makeRouter();
+  const items = [];
+  for (let i = 0; i < 6; i += 1) {
+    items.push({ key: "g" + i, label: "g" + i, enabled: true });
+  }
+  router.pushMenu({ grid: true, gridCols: 3, items });
+  events.length = 0;
+  router.focusItemByKey("g4");
+  assert.strictEqual(events[0].payload.row, 1);
+  assert.strictEqual(events[0].payload.col, 1);
+  assert.strictEqual(router.currentItem().key, "g4");
+});
+
+test("pointer confirm on an enabled item emits exactly one submit", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
+  events.length = 0;
+  router.confirm({ source: "pointer" });
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
+});
+
+test("pointer confirm on a disabled item emits disabled and no submit", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({
+    items: [{ key: "defend", label: "defend", enabled: false, description: "no" }],
+  });
+  events.length = 0;
+  router.confirm({ source: "pointer" });
+  assert.strictEqual(events[0].name, "disabled");
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 0);
+});
+
+test("pointer confirm while locked emits locked", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
+  router.setMutationInFlight(true);
+  events.length = 0;
+  router.confirm({ source: "pointer" });
+  assert.strictEqual(events[0].name, "locked");
+  router.setMutationInFlight(false);
+  router.setAwaitingRevision(3);
+  events.length = 0;
+  router.confirm({ source: "pointer" });
+  assert.strictEqual(events[0].name, "locked");
+});
+
+test("two consecutive pointer confirms both submit (no repeat guard)", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
+  events.length = 0;
+  router.confirm({ source: "pointer" });
+  router.confirm({ source: "pointer" });
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 2);
+});
+
+test("held Enter suppression is unchanged for keyboard confirms", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
+  events.length = 0;
+  router.handle("Enter");
+  router.handle("Enter", true);
+  router.handle("Enter", true);
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
+  assert.strictEqual(events.filter((e) => e.name === "repeat-suppressed").length, 2);
+});
+
+test("confirm defaults to the keyboard source", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
+  events.length = 0;
+  router.confirm();
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
+  // The default keyboard confirm sets the repeat guard.
+  router.confirm();
+  assert.strictEqual(events.filter((e) => e.name === "submit").length, 1);
+  assert.strictEqual(events.filter((e) => e.name === "repeat-suppressed").length, 1);
+});

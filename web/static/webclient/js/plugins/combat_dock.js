@@ -139,6 +139,27 @@
   // Rendering the combat dock from the validated panel.
   // -------------------------------------------------------------------------
 
+  // Render the router's current frame as dock rows. Every frame the player
+  // can reach -- the root actions, Skills, a target list, a shorthand choice,
+  // the Forfeit confirmation -- is pushed onto the router stack, so the rows
+  // on screen are always exactly the items the router will navigate, explain,
+  // and submit.
+  function renderCombatRows(controls) {
+    var keyboard = getKeyboard();
+    if (!keyboard || !window.Elosern || !window.Elosern.DockSurface) {
+      return;
+    }
+    var frame = keyboard.currentMenu();
+    if (!frame) {
+      return;
+    }
+    var focused = keyboard.currentItem();
+    window.Elosern.DockSurface.renderRows(controls, frame.items, {
+      focusKey: focused && focused.key !== undefined ? focused.key : null,
+      idPrefix: "combat-row",
+    });
+  }
+
   function renderCombatDock(root, panel) {
     // Re-rendering replaces the subtree; drop the previous subscription so a
     // long combat never accumulates duplicate listeners.
@@ -170,16 +191,9 @@
     }
 
     var controls = makeElement("div", "combat-controls");
-    controls.setAttribute("role", "group");
     controls.setAttribute("aria-label", "戰鬥動作");
-    panel.root_actions.forEach(function (actionKey) {
-      var button = makeElement("button", "combat-control combat-control-" + actionKey);
-      button.type = "button";
-      button.setAttribute("data-action", actionKey);
-      setText(button, actionLabel(actionKey));
-      controls.appendChild(button);
-    });
     root.appendChild(controls);
+    renderCombatRows(controls);
 
     var detail = makeElement("div", "combat-detail");
     detail.id = "combat-detail";
@@ -295,9 +309,13 @@
           // Render combat controls and rebuild the keyboard root from the
           // accepted panel. The foundation action dock (including the stable
           // #elosern-action-live element) remains untouched elsewhere.
+          // `data-mode` is marked first so the router reset below (which
+          // emits `focus` synchronously) is accepted by onRouterEvent and
+          // re-renders the rows from the new combat root frame in the same
+          // call stack -- never a stale pre-combat frame.
+          root.setAttribute("data-mode", "combat");
           renderCombatDock(root, panel);
           pushCombatMenus(panel);
-          root.setAttribute("data-mode", "combat");
           publishCombatFocus(panel);
         } else if (root.getAttribute("data-mode") === "combat") {
           // Leave combat mode: return to the foundation guidance, which the
@@ -312,6 +330,23 @@
         }
         previousMode = mode;
       });
+    },
+    // Router event bridge (wired from elosern_ui alongside the other docks):
+    // every frame change re-renders the rows from the router's current frame,
+    // so submenus (skills, targets, shorthand, forfeit) become visible instead
+    // of leaving the player navigating blind with only the detail pane.
+    onRouterEvent: function (name) {
+      if (name !== "focus" && name !== "menu-closed" && name !== "escape-root") {
+        return;
+      }
+      var root = el("action-dock");
+      if (!root || root.getAttribute("data-mode") !== "combat") {
+        return;
+      }
+      var controls = root.querySelector(".combat-controls");
+      if (controls) {
+        renderCombatRows(controls);
+      }
     },
   };
 

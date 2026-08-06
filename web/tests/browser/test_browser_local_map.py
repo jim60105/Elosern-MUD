@@ -149,6 +149,76 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             {node["id"] for node in nodes_before},
         )
 
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_minimap_content_stays_inside_its_pane(self):
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.new_page(viewport)
+                from .browser_helpers import login_and_open
+
+                login_and_open(page, self.webclient_url, self.base_url)
+                self._wait_local_map_available(page)
+                page.wait_for_selector(".local-map-canvas")
+
+                # Every node marker's bounding box is inside the map canvas.
+                # (Remembered remote nodes render in the bounded list below
+                # the canvas and are excluded here.)
+                canvas_box = page.locator(".local-map-canvas").bounding_box()
+                canvas_nodes = page.locator(
+                    ".local-map-canvas .local-map-node"
+                )
+                node_count = canvas_nodes.count()
+                self.assertGreaterEqual(node_count, 1)
+                for index in range(node_count):
+                    inside = page.evaluate(
+                        """(i) => {
+                          const canvas = document.querySelector('.local-map-canvas');
+                          const node = document.querySelectorAll(
+                            '.local-map-canvas .local-map-node')[i];
+                          const cr = canvas.getBoundingClientRect();
+                          const nr = node.getBoundingClientRect();
+                          return nr.left >= cr.left - 1 && nr.right <= cr.right + 1 &&
+                                 nr.top >= cr.top - 1 && nr.bottom <= cr.bottom + 1;
+                        }""",
+                        index,
+                    )
+                    self.assertTrue(
+                        inside,
+                        f"node {index} must stay inside the map canvas at {viewport}",
+                    )
+                self.assertIsNotNone(canvas_box)
+
+                # No two node markers overlap (distinct lattice cells).
+                boxes = []
+                for index in range(node_count):
+                    box = page.evaluate(
+                        """(i) => {
+                          const r = document.querySelectorAll(
+                            '.local-map-canvas .local-map-node')[i]
+                            .getBoundingClientRect();
+                          return {left: r.left, top: r.top, right: r.right, bottom: r.bottom};
+                        }""",
+                        index,
+                    )
+                    boxes.append(box)
+                for i in range(len(boxes)):
+                    for j in range(i + 1, len(boxes)):
+                        overlap = not (
+                            boxes[i]["right"] <= boxes[j]["left"] + 1
+                            or boxes[j]["right"] <= boxes[i]["left"] + 1
+                            or boxes[i]["bottom"] <= boxes[j]["top"] + 1
+                            or boxes[j]["bottom"] <= boxes[i]["top"] + 1
+                        )
+                        self.assertFalse(
+                            overlap, f"nodes {i} and {j} overlap at {viewport}"
+                        )
+
+                # The legend and detail line remain visible below the canvas.
+                self.assertTrue(page.locator(".local-map-legend").is_visible())
+                detail = page.locator("#local-map-detail")
+                self.assertTrue(detail.is_visible())
+                page.close()
+
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
     )
