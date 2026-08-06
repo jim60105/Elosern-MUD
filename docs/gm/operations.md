@@ -15,6 +15,15 @@ podman compose up
 
 本機 Python 指令一律經由鎖定的 `uv` 環境執行。不要直接以系統 Python、`pip` 或手動編輯 `uv.lock` 執行專案作業。
 
+不使用容器時，第一次執行前先建立 Account #1：
+
+```sh
+uv run --locked evennia migrate --noinput
+uv run --locked evennia createsuperuser
+```
+
+再執行 `./scripts/serve.sh` 啟動服務。
+
 ## 內容變更檢查清單
 
 - 角色卡先通過匯入驗證，並檢查拒絕與警告。

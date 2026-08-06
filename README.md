@@ -40,6 +40,23 @@ Use `uv add <package>` and `uv remove <package>` to change dependencies so that 
 and `uv.lock` stay synchronized. The `--locked` commands intentionally fail when those files
 disagree.
 
+Before the first run against a fresh checkout, apply migrations and create Account #1
+interactively (this also creates `server/db/evennia.db3`):
+
+```sh
+uv run --locked evennia migrate --noinput
+uv run --locked evennia createsuperuser
+```
+
+Then start the server in the foreground with:
+
+```sh
+./scripts/serve.sh
+```
+
+Connect through telnet at `localhost:4000` or the web client at `http://localhost:4001`. Press
+Ctrl+C to stop.
+
 ## Preview documentation
 
 Start the Docsify documentation site from the project root:
