@@ -108,7 +108,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",
-                "${PROMPTS_DIR:-./prompts}:/app/prompts:ro",
+                "${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z",
             },
         )
         self.assertEqual(
@@ -127,7 +127,7 @@ class ContainerContractTests(unittest.TestCase):
     def test_prompt_files_are_baked_and_mounted_read_only(self):
         compose = yaml.safe_load(_read("compose.yaml"))
         volumes = compose["services"]["evennia"]["volumes"]
-        self.assertIn("${PROMPTS_DIR:-./prompts}:/app/prompts:ro", volumes)
+        self.assertIn("${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z", volumes)
         self.assertNotIn("/app/prompts:rw", " ".join(volumes))
 
         containerfile = _read("Containerfile")

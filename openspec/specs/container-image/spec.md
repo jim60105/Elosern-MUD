@@ -60,8 +60,11 @@ The project SHALL provide a `compose.yaml` that runs the Evennia service with th
 volumes design doc §9 specifies. It SHALL persist the SQLite database, logs, generated static
 files, uploaded media, and scene art. It SHALL bake the repo's `prompts/` directory into the image
 at `/app/prompts` and mount the host prompt folder read-only into the container at `/app/prompts`
-via `${PROMPTS_DIR:-./prompts}:/app/prompts:ro`, so an admin can edit prompt files on the host and
-apply them by restarting or reloading the server without rebuilding the image. It SHALL also
+via `${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z`, so an admin can edit prompt files on the host and
+apply them by restarting or reloading the server without rebuilding the image. The `,z` option
+relabels the bind mount with the SELinux container context so the read-only mount stays readable
+under enforcing SELinux (for example on Fedora or RHEL hosts) without weakening its read-only
+semantics. It SHALL also
 provide a profile-gated, interactive one-shot bootstrap service for initializing a fresh database
 without storing the initial administrator's password in the long-lived service configuration.
 
@@ -90,7 +93,7 @@ without storing the initial administrator's password in the long-lived service c
 
 #### Scenario: Prompt files are mounted read-only from the host
 - **WHEN** `compose.yaml` is inspected and the container is started
-- **THEN** the `evennia` service mounts `${PROMPTS_DIR:-./prompts}:/app/prompts:ro`, the server
+- **THEN** the `evennia` service mounts `${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z`, the server
   reads prompts from that mount, and the image also contains the same default files at
   `/app/prompts` for standalone runs
 

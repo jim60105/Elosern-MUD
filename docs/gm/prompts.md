@@ -6,7 +6,7 @@
 
 - 儲存庫：`prompts/`（本機裸機執行）
 - 容器映像：`/app/prompts`（映像內建同一個資料夾，僅映像執行也可用）
-- 容器執行期：`compose.yaml` 以唯讀 bind mount 掛載 `${PROMPTS_DIR:-./prompts}:/app/prompts:ro`，主機上的編輯在重新啟動或 reload 後生效
+- 容器執行期：`compose.yaml` 以唯讀 bind mount 掛載 `${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z`（`z` 為 SELinux relabel，於強制模式主機上仍可讀取），主機上的編輯在重新啟動或 reload 後生效
 
 ```
 prompts/
