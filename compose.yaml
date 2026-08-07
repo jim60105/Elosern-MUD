@@ -14,6 +14,7 @@ services:
       - "4000:4000"
       - "4001:4001"
       - "4002:4002"
+    env_file: .env
     environment:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.containers.internal:11434}
       SD_WEBUI_BASE_URL: ${SD_WEBUI_BASE_URL:-http://host.containers.internal:7860}
@@ -29,7 +30,7 @@ services:
       - evennia-logs:/app/server/logs
       - evennia-static:/app/server/.static
       - evennia-media:/app/server/.media
-      - ${PROMPTS_DIR:-./prompts}:/app/prompts:ro
+      - ${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z
 
   # First run only: podman compose --profile bootstrap run --rm bootstrap
   bootstrap:
