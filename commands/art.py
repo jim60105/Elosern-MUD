@@ -74,6 +74,7 @@ class CmdArtStatus(_ArtCommand):
                 f"[{record.db.status}] 次數:{record.db.attempt_count} "
                 f"比例:{record.db.aspect_ratio or '-'} "
                 f"錯誤:{record.db.last_error_code or '-'}"
+                f"{' 提示詞變更' if record.db.hash_changed else ''}"
             )
         self.caller.msg("\n".join(lines))
 
@@ -106,8 +107,8 @@ class CmdArtRun(_ArtCommand):
 
         try:
             dispatched = drain(limit)
-        except OSError as error:
-            self.caller.msg(f"無法啟動美術 worker：{error}")
+        except Exception as error:  # noqa: BLE001 - bounded; named client errors settle records
+            self.caller.msg(f"美術排空失敗：{error}")
             return
         self.caller.msg(f"已派送 {dispatched} 個美術工作。")
         self.caller.msg("美術工作在背景執行，不會阻擋遊戲。")

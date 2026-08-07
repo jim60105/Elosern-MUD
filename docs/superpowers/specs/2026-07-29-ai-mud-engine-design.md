@@ -45,6 +45,15 @@ These were settled during design. Do not relitigate them inside a change.
 | D9 | **`world/lore/` is Python; `world/rules/rulebook/` is YAML.** | Lore is a versioned single source of truth that deserves code review. Balance numbers are data that should be tunable without touching Python. |
 | D10 | **Scene art is keyed by archetype, not by room.** A tavern in the capital and a tavern in a border town share one image. | GPU cost scales with scene *kinds*, not room count. Style stays consistent for free. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
+
+> **Amended (change `internal-art-worker`).** D11's "shells out to a configurable worker command" no longer
+> holds: the engine now owns an **internal, in-process sd-webui client** (`world/art/sd_worker.py`). The
+> engine maintains the same queue but calls `/sdapi/v1/txt2img` itself with a bounded wall-clock timeout,
+> response/resource caps, and a bounded named-error taxonomy; the swappable seam becomes the prompt
+> library (`prompts/art.yaml` keys `art.scene_prompt` / `art.portrait_prompt` / `art.negative_prompt`)
+> plus the `ART_SD_*` settings, and the external `ART_WORKER_CMD` contract (`tools/art_worker.py`) is
+> removed. The single-slot serialization, lease reclaim, scheduler, and offline degrade path are
+> unchanged.
 | D12 | **Guild advancement requires cumulative merit plus a nonlethal combat examination; shops use finite stock and clock-driven restocking.** Every registrant starts at F, regardless of displayed power. | Preserves the world's stated merit-plus-exam progression, gives Phase 4 a real combat milestone, and makes the reserved caravan/shop clock stages meaningful. |
 | D13 | **The browser WebClient is the first-class graphical client; Telnet remains fully playable as text.** | The project already uses Evennia's WebSocket/GoldenLayout extension points. A second Mudlet/Lua UI would duplicate distribution and compatibility work. |
 | D14 | **Finite ordinary player choices use server-authored, versioned OOB menus.** Free-form values remain text. | Players should not memorize skill, target, Exit, quest, or shop keys; the browser must not parse prose or duplicate rules to discover them. |
@@ -685,23 +694,32 @@ room → references archetype → registry lookup
    ↓ missing
 art/queue          engine's only job: track which archetypes lack images
    ↓
-external worker    reads queue → writes full prompt → runs SD → stores → writes back
+internal client    reads queue → renders prompts from prompts/art.yaml → POSTs
+                   txt2img to sd-webui → validates PNG → writes atomically
    ↓
 any room referencing that archetype hits the cache
 ```
 
-**Worker contract** — the swap point:
+**Worker contract** — the internal txt2img client (amended; see the D11 amendment):
 
 ```python
-import sys
-
-ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
-# stdin  ← [{archetype, scene_sentence, out_path}, …]
-# stdout → [{archetype, status, path, error}, …]
+# The engine calls sd-webui itself on a background Twisted thread:
+ART_SD_BASE_URL = os.environ.get("SD_WEBUI_BASE_URL", "http://127.0.0.1:7860")
+ART_SD_CLIENT = "world.art.sd_worker.SDWebUIClient"  # swappable seam
+# POST {ART_SD_BASE_URL}/sdapi/v1/txt2img
+# body ← {prompt, negative_prompt, steps, cfg_scale, width, height,
+#         sampler_name?, scheduler?, override_settings{samples_format, sd_model_checkpoint?},
+#         override_settings_restore_afterwards}
+# response → {"images": ["<base64 PNG>", ...]} → validated PNG bytes
+# failures → bounded named codes (sd_connection_error, sd_timeout, sd_http_error,
+#            sd_malformed_response, sd_no_image, sd_decode_error, sd_not_png,
+#            sd_response_too_large, sd_image_dimensions_too_large, plus
+#            sd_prompt_error / sd_client_config_error / sd_internal_error)
 ```
 
-Replacing the worker with an agent-driven prompt builder, or with a direct sd-webui client, changes
-`ART_WORKER_CMD` and nothing else.
+The image-generation prompts are authored in `prompts/art.yaml` (`art.scene_prompt`,
+`art.portrait_prompt`, `art.negative_prompt`) and rendered through the prompt library like every other
+layer; swapping the generator means changing `ART_SD_CLIENT` or the prompt text, nothing else.
 
 | Command | Behaviour |
 |---|---|
@@ -864,7 +882,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
+| 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, internal sd-webui worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
 | 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
 | 23b | `webclient-combat-menu` | 16, 23a | Skill/action/target menus, multi-target combat-session facade, Telnet target parity, reconnect UI |
 | 23c | `map-knowledge-minimap` | 12, 13, 14, 23a | Persistent visited nodes, grid/wilderness minimaps, coordinate-free instance/interior local graphs |

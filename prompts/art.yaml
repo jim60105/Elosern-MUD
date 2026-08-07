@@ -4,3 +4,35 @@ prompts:
   art.character_description: |-
     A {race} adult named {name} ({age}) in the {style}.
   art.monster_description: "{description} ({display_name}；例如：{examples})"
+  # Positive prompt template for scene subjects. {description} is the
+  # deterministic scene sentence from the scene-archetype registry; the
+  # surrounding text is authored per the image-prompt-builder-nl skill.
+  art.scene_prompt: |-
+    A wide establishing shot of a fantasy scene — {description} — rendered as a detailed
+    digital painting in the style of classic illustrated storybooks, with confident
+    painterly brushwork, soft edges, and layered atmospheric depth. Warm golden light from
+    the dominant light source shapes the foreground and cools toward shadowed corners;
+    muted earth tones with wood, stone, and candlelit amber accents. Readable composition
+    with clear foreground, midground, and background planes in a 16:9 cinematic frame at
+    eye level, anchored by one small narrative detail such as a drifting wisp of smoke or a
+    tarnished object catching the light. Any signage or lettering bears no readable text,
+    no watermark.
+  # Positive prompt template for character and monster portraits. {description}
+  # is the deterministic character/monster description; the surrounding text is
+  # authored per the image-prompt-builder-nl skill.
+  art.portrait_prompt: |-
+    A medium half-body portrait of an adult fantasy figure — {description} — facing the
+    viewer at a three-quarter angle, rendered as a detailed digital illustration with
+    confident brushwork, soft shading, and clean linework. Soft warm key light from the
+    upper left with a gentle rim light on the far side; a rich harmonious palette with
+    deep shadow tones. Vertical 3:4 composition with the figure occupying the central
+    two-thirds against a simple out-of-focus background at eye level, anchored by one
+    small narrative detail such as a stray lock of hair or a worn accessory. No readable
+    text, no letters, no watermark.
+  # Shared negative prompt for every art generation request. Plain text with no
+  # placeholders.
+  art.negative_prompt: |-
+    lowres, jpeg artifacts, blurry, deformed, disfigured, bad anatomy, extra limbs,
+    missing limbs, cropped, out of frame, watermark, signature, text, letters, logo,
+    duplicate, mutilated, mutated hands, fused fingers, poorly drawn face, bad
+    proportions, oversaturated, cluttered background

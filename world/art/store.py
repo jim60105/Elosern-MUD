@@ -46,6 +46,8 @@ class ArtAssetRecord(DefaultScript):
     subject_key: str = AttributeProperty(default="")
     source_description: str = AttributeProperty(default="")
     source_hash: str = AttributeProperty(default="")
+    prompt_digest: str = AttributeProperty(default="")
+    generation_token: str = AttributeProperty(default="")
     status: str = AttributeProperty(default=ArtAssetStatus.MISSING)
     output_identity: str | None = AttributeProperty(default=None)
     prior_output_identity: str | None = AttributeProperty(default=None)

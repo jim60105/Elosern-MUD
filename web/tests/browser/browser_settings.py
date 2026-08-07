@@ -89,17 +89,30 @@ CACHE_DIR = _env_path("ELOSERN_BROWSER_CACHE_DIR", CACHE_DIR)
 MEDIA_ROOT = _env_path("ELOSERN_BROWSER_MEDIA_ROOT", MEDIA_ROOT)
 STATIC_ROOT = _env_path("ELOSERN_BROWSER_STATIC_ROOT", STATIC_ROOT)
 
-# Art store for browser acceptance: a private temporary root, and a worker
-# command that can be pointed at a fixture (or fixed to fail for offline
-# journeys) through the environment.
+# Art store for browser acceptance: a private temporary root, and the internal
+# image-generation client pointed at the deterministic fake (dotted path,
+# overridable through the environment) so the harness generates images without
+# a socket.
 ART_STORE_ROOT = _env_path("ELOSERN_BROWSER_ART_ROOT", os.path.join(CACHE_DIR, "art"))
-_ART_WORKER_CMD = os.environ.get("ELOSERN_BROWSER_ART_WORKER_CMD", "")
-ART_WORKER_CMD = (
-    _ART_WORKER_CMD.split(",")
-    if _ART_WORKER_CMD
-    else ["python", "-m", "tools.art_worker"]
+ART_SD_CLIENT = _env_path(
+    "ELOSERN_BROWSER_SD_CLIENT",
+    "world.art.fake_sd_client.FakeSDWebUIClient",
 )
-ART_WORKER_TIMEOUT_SECONDS = _env_int("ELOSERN_BROWSER_ART_TIMEOUT", 60)
+ART_SD_BASE_URL = "http://127.0.0.1:7860"
+ART_SD_TIMEOUT_SECONDS = _env_int("ELOSERN_BROWSER_SD_TIMEOUT", 600)
+ART_SD_STEPS = 30
+ART_SD_CFG_SCALE = 7.0
+ART_SD_SAMPLER = ""
+ART_SD_SCHEDULER = ""
+ART_SD_CHECKPOINT = ""
+ART_SD_SCENE_WIDTH = 1344
+ART_SD_SCENE_HEIGHT = 768
+ART_SD_PORTRAIT_WIDTH = 768
+ART_SD_PORTRAIT_HEIGHT = 1024
+ART_SD_MAX_RESPONSE_BYTES = 52428800
+ART_SD_MAX_IMAGE_DIMENSIONS = 4096
+ART_SD_MAX_IMAGE_PIXELS = 16777216
+ART_SD_PREPIN_SAMPLES_FORMAT = False
 ART_SCHEDULER_ENABLED = False
 ART_SCHEDULER_INTERVAL_SECONDS = 30
 ART_SCHEDULER_LIMIT = 4

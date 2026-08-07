@@ -69,15 +69,54 @@ LLM_PROFILES = default_profiles()
 # importable world/art/ package.
 ART_STORE_ROOT = os.path.join(GAME_DIR, "server", ".art")
 
-# External worker command executed for every claimed art batch. JSON lines in
-# on stdin, JSON lines out on stdout; overridable by settings and pointed at a
-# fixture command in tests. The worker implementation itself (local SD, a
-# prompt-writing agent, or a fixture) is external to the engine and outside
-# this change's code; the module is the design's swap point.
-ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
+# ---------------------------------------------------------------------------
+# Internal sd-webui client (design D11 amendment: the engine now owns the
+# image-generation call instead of shelling out to an external worker).
+# ---------------------------------------------------------------------------
 
-# Bounded wall-clock budget for one worker invocation (seconds).
-ART_WORKER_TIMEOUT_SECONDS = 60
+# Base URL of the sd-webui / Forge API. Derives from the compose runtime's
+# SD_WEBUI_BASE_URL environment variable and falls back to a bare-metal
+# localhost endpoint.
+ART_SD_BASE_URL = os.environ.get("SD_WEBUI_BASE_URL", "http://127.0.0.1:7860")
+
+# Bounded wall-clock budget for one txt2img exchange (seconds). sd-webui
+# generation is slow; the lease-reclaim bound sizes itself by the worst-case
+# batch (ART_SCHEDULER_LIMIT x this timeout + margin).
+ART_SD_TIMEOUT_SECONDS = 600
+
+# Generation parameters. Empty sampler/scheduler/checkpoint mean "the server's
+# default"; when set, the values pass through as sampler_name/scheduler/
+# override_settings.sd_model_checkpoint and must match the server's
+# enumeration exactly.
+ART_SD_STEPS = 30
+ART_SD_CFG_SCALE = 7.0
+ART_SD_SAMPLER = ""
+ART_SD_SCHEDULER = ""
+ART_SD_CHECKPOINT = ""
+
+# Per-aspect-ratio output sizes (multiples of 8, SDXL-friendly): scenes use
+# 16:9 and portraits use 3:4.
+ART_SD_SCENE_WIDTH = 1344
+ART_SD_SCENE_HEIGHT = 768
+ART_SD_PORTRAIT_WIDTH = 768
+ART_SD_PORTRAIT_HEIGHT = 1024
+
+# Dotted path of the client class (the swappable seam). Tests and the browser
+# harness point this at world.art.fake_sd_client.FakeSDWebUIClient so no test
+# ever opens a socket to an image service.
+ART_SD_CLIENT = "world.art.sd_worker.SDWebUIClient"
+
+# Resource caps: response body/base64 payload size (bytes), PNG width/height,
+# and total pixels. Violations settle records failed with the bounded
+# sd_response_too_large / sd_image_dimensions_too_large codes.
+ART_SD_MAX_RESPONSE_BYTES = 52428800
+ART_SD_MAX_IMAGE_DIMENSIONS = 4096
+ART_SD_MAX_IMAGE_PIXELS = 16777216
+
+# Opt-in one-time samples_format=png pre-pin via POST /sdapi/v1/options. The
+# pre-pin permanently mutates the shared server's persistent default, so it
+# defaults to False and is meant only for a dedicated sd-webui instance.
+ART_SD_PREPIN_SAMPLES_FORMAT = False
 
 ######################################################################
 # Prompt library (prompt-library)

@@ -10,6 +10,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.presenter import (
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
@@ -178,44 +179,42 @@ class ResolveEntityTests(EvenniaTest):
         self.tempdir.cleanup()
         super().tearDown()
 
-    def _count_file(self):
-        count_file = Path(self.tempdir.name) / "count.txt"
-        return count_file
+    def _drain_with_fake(self, fake):
+        """Run a synchronous drain with ``fake`` injected through the seam."""
+        with patch("world.art.worker.resolve_sd_client", return_value=fake):
+            from world.art.worker import drain_synchronous
 
-    def _assert_no_worker_job(self, subject_key):
-        """Assert the fixture worker never received a job for a subject."""
-        import os
+            return drain_synchronous(10)
 
-        count_file = self._count_file()
-        env = dict(os.environ)
-        env["ART_FIXTURE_STORE_ROOT"] = str(self.root)
-        env["ART_FIXTURE_COUNT_FILE"] = str(count_file)
-        worker_cmd = [
-            "python",
-            str(
-                Path(__file__).parent.parent
-                / "tests"
-                / "fixtures"
-                / "fixture_worker.py"
-            ),
-        ]
-        with override_settings(
-            ART_STORE_ROOT=str(self.root),
-            ART_WORKER_CMD=worker_cmd,
-        ):
-            with patch.dict(os.environ, env):
-                from world.art.worker import drain_synchronous
+    def _generation_keys(self):
+        """Full subject keys the fake client was asked to generate for."""
+        from world.art.worker import drain_synchronous
 
-                drain_synchronous(10)
-        if count_file.exists():
-            lines = count_file.read_text(encoding="utf-8").splitlines()
-            self.assertNotIn(subject_key, lines)
+        fake = FakeSDWebUIClient()
+        with patch("world.art.worker.resolve_sd_client", return_value=fake):
+            drain_synchronous(10)
+        return {subject.full() for subject, _ in fake.calls}
+
+    def _assert_no_generation_requested(self, subject_key):
+        """Assert the fake client never received a generation for a subject."""
+        self.assertNotIn(subject_key, self._generation_keys())
 
     def test_named_character_resolves_through_the_adult_gate(self):
         payload = resolve_entity(self.player)
         self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         self.assertIn("subject_key", payload)
+
+    def test_valid_adult_character_reaches_the_generation_client(self):
+        from world.art.subjects import character_subject_for
+
+        subject = character_subject_for(self.player)
+        self.assertIsNotNone(subject)
+        ensure(subject, "desc")
+        fake = FakeSDWebUIClient()
+        self._drain_with_fake(fake)
+        generated = {generated_subject.full() for generated_subject, _ in fake.calls}
+        self.assertIn(subject.full(), generated)
 
     def test_generic_monster_resolves_its_archetype_subject(self):
         payload = resolve_entity(self.monster)
@@ -228,14 +227,14 @@ class ResolveEntityTests(EvenniaTest):
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])
         self.assertIsNone(payload["url"])
-        self._assert_no_worker_job(f"portrait:character:{self.player.pk}")
+        self._assert_no_generation_requested(f"portrait:character:{self.player.pk}")
 
     def test_apparent_age_seventeen_never_reaches_a_worker(self):
         self.player.apparent_age = 17
         payload = resolve_entity(self.player)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])
-        self._assert_no_worker_job(f"portrait:character:{self.player.pk}")
+        self._assert_no_generation_requested(f"portrait:character:{self.player.pk}")
 
     def test_missing_age_values_reject_without_a_prompt(self):
         self.player.attributes.remove("age")

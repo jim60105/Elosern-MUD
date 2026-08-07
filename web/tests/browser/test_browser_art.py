@@ -150,41 +150,25 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
 
 class ArtFailedSceneTest(ArtSceneBrowserTest):
     def setUp(self) -> None:
-        # Point the worker at the deterministic fixture worker, told to fail
-        # the tavern scene subject, so ``@art run`` produces a real failed
-        # record at runtime (a seed-failed record would be re-enqueued by the
-        # startup sync).
-        from pathlib import Path
-
-        fixtures_worker = (
-            Path(__file__).resolve().parents[3]
-            / "world"
-            / "art"
-            / "tests"
-            / "fixtures"
-            / "fixture_worker.py"
-        )
+        # Point the image-generation client at the deterministic failing
+        # double, so ``@art run`` produces a real failed record at runtime (a
+        # seed-failed record would be re-enqueued by the startup sync).
         os.environ["ELOSERN_BROWSER_ART"] = "pending"
-        os.environ["ELOSERN_BROWSER_ART_WORKER_CMD"] = (
-            f"python,{fixtures_worker}"
+        os.environ["ELOSERN_BROWSER_SD_CLIENT"] = (
+            "web.tests.browser.fake_sd_client.FailingSDWebUIClient"
         )
-        os.environ["ART_FIXTURE_STORE_ROOT"] = os.environ.get(
-            "ELOSERN_BROWSER_ART_ROOT", ""
-        )
-        os.environ["ART_FIXTURE_FAIL"] = "scene:tavern_interior"
         super().setUp()
         for key in (
             "ELOSERN_BROWSER_ART",
-            "ELOSERN_BROWSER_ART_WORKER_CMD",
-            "ART_FIXTURE_STORE_ROOT",
-            "ART_FIXTURE_FAIL",
+            "ELOSERN_BROWSER_SD_CLIENT",
         ):
             os.environ.pop(key, None)
 
     @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
     def test_failed_scene_uses_the_placeholder(self):
         page = self.logged_in_page()
-        # Drain the queue with the failing worker, then refresh presentation.
+        # Drain the queue with the failing image-generation client, then refresh
+        # presentation.
         page.evaluate("Evennia.msg('text', ['@art run --limit 1'], {})")
         page.wait_for_timeout(1500)
         page.evaluate("Evennia.msg('text', ['look'], {})")

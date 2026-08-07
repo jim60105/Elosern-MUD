@@ -14,7 +14,7 @@ prompts/
 ├── npc_dialogue.yaml       NPC 對話系統提示詞範本
 ├── scenario_director.yaml  任務企劃（ScenarioDirector）系統提示詞
 ├── npc.yaml                NPC 思考回饋範本
-├── art.yaml                美術描述範本與風格片段
+├── art.yaml                美術描述範本、風格片段與生成提示詞（scene／portrait／negative）
 └── character_creation.yaml 創角提示詞（前瞻註冊，尚未有消費者）
 ```
 
@@ -42,6 +42,9 @@ prompts:
 | `art.style` | `art.yaml` | 無 |
 | `art.character_description` | `art.yaml` | `{race}`、`{name}`、`{age}`、`{style}` |
 | `art.monster_description` | `art.yaml` | `{description}`、`{display_name}`、`{examples}` |
+| `art.scene_prompt` | `art.yaml` | `{description}` |
+| `art.portrait_prompt` | `art.yaml` | `{description}` |
+| `art.negative_prompt` | `art.yaml` | 無 |
 | `character_creation.system` | `character_creation.yaml` | 無 |
 
 只有允許清單內的 `{token}` 會被替換，替換是逐一且精確的：
@@ -72,13 +75,48 @@ prompts:
 - 任務企劃 → 任務模板池
 - 思考回饋 → 不顯示
 - 美術描述 → 以登錄表資料為底的確定性描述
+- 美術生成 → 記錄以具名錯誤碼（如 `sd_prompt_error`）結算為 `failed`，佔位圖不變
 
 前向註冊的 `character_creation.system` 失敗只會記錄警告，永遠不會阻擋啟動。修復檔案後重新驗證並重新啟動即可復原。
+
+## 美術生成提示詞（`art.scene_prompt` / `art.portrait_prompt` / `art.negative_prompt`）
+
+引擎內的 sd-webui 客戶端（`world/art/sd_worker.py`）是美術圖像生成的唯一消費者，提示詞文字只存在於 `prompts/art.yaml`：
+
+- `art.scene_prompt` — 場景主體的正向提示詞範本，含一個 `{description}` 占位符；代入值是該場景在登錄表中的確定性一句話描述。
+- `art.portrait_prompt` — 角色／怪物肖像的正向提示詞範本，同樣含 `{description}` 占位符；代入值是確定性角色／怪物描述。
+- `art.negative_prompt` — 每個請求共用的負向提示詞，純文字、無占位符。
+
+範本文字以自然語言英文撰寫（風格、構圖、光線、鏡頭等），與其他層一樣在載入時驗證；未知的 `{token}` 是載入時錯誤。改動三個鍵中任何一個，都會改變記錄的「已渲染提示詞摘要」（rendered-prompt digest）：`done` 記錄會被標記 `hash_changed` 供管理員審核，已完成的圖片不會被悄悄取代，也不會在一般遊玩中重新生成。
+
+### 生成設定（`ART_SD_*`）
+
+| 設定 | 預設值 | 說明 |
+| --- | --- | --- |
+| `ART_SD_BASE_URL` | `SD_WEBUI_BASE_URL` 環境變數，否則 `http://127.0.0.1:7860` | sd-webui / Forge 的 API 根位址（compose 已傳入 `SD_WEBUI_BASE_URL`） |
+| `ART_SD_TIMEOUT_SECONDS` | `600` | 單次 txt2img 交換的總牆鐘截止時間；租約回收以最壞批次（`ART_SCHEDULER_LIMIT` × 此值 + 餘量）計算 |
+| `ART_SD_STEPS` / `ART_SD_CFG_SCALE` | `30` / `7.0` | 取樣步數與 CFG |
+| `ART_SD_SAMPLER` / `ART_SD_SCHEDULER` | 空字串 | 空＝伺服器預設；設定後會以 `sampler_name` / `scheduler` 傳出，必須與伺服器列舉的名稱完全一致 |
+| `ART_SD_CHECKPOINT` | 空字串 | 選用：確切的模型標題（含 hash 後綴）；空＝伺服器現用模型 |
+| `ART_SD_SCENE_WIDTH/HEIGHT` | `1344` / `768` | 場景（16:9）輸出尺寸，8 的倍數、SDXL 友善 |
+| `ART_SD_PORTRAIT_WIDTH/HEIGHT` | `768` / `1024` | 肖像（3:4）輸出尺寸 |
+| `ART_SD_CLIENT` | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket |
+| `ART_SD_MAX_RESPONSE_BYTES` | `52428800`（50 MiB） | 回應本文／base64 上限 |
+| `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
+| `ART_SD_PREPIN_SAMPLES_FORMAT` | `False` | 選用：啟動時把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 實例；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
+
+### 提示詞編輯流程（美術生成）
+
+1. 編輯 `prompts/art.yaml` 的三個 `art.*` 生成鍵。
+2. `uv run --locked python -m world.prompts.validate` 驗證。
+3. 重新啟動（或 reload）伺服器。
+4. 對已完成的 `done` 記錄，`@art status` 會顯示「提示詞變更」標記（`hash_changed`），圖片不會被取代。
+5. 確認要套用後，用 `@art requeue <subject-key>` 重新生成；重新生成失敗時，先前的有效圖片會被保留，不會被破壞。
 
 ## 容器注意事項
 
 - 掛載是唯讀的：伺服器不會寫入提示詞；管理員在主機上編輯。
-- 同一個資料夾在容器內是世界可讀的，外部美術 worker（設計 D11 的可抽換指令）也可以讀取隨附的提示詞片段；worker 契約不變。
+- 同一個資料夾在容器內是世界可讀的；引擎內的 sd-webui 客戶端（設計 D11 修正）讀取 `art.*` 生成提示詞，與其他層共用同一個資料夾與載入驗證。
 - 掛載會覆蓋映像內建的預設檔案，兩邊內容相同，沒有分歧風險。
 
 ## 本機預覽文件

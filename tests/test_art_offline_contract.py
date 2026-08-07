@@ -1,10 +1,14 @@
 """Repository-wide offline acceptance contract for the art backend.
 
-With the worker command fixed to fail and every LLM profile unavailable, the
+With the sd-webui client fixed to fail and every LLM profile unavailable, the
 deterministic game must remain fully playable while every art state degrades
 to the approved placeholders (design D3/Goals, focused design §5). This is a
-repository check over source invariants plus the deterministic-path contract;
-the behavior-level offline loop lives in the package suites.
+repository check over source invariants: the engine must never open a socket
+in tests (the harness injects the fake client through ``ART_SD_CLIENT``), the
+external worker command must be fully removed, and every art state must keep
+its deterministic degrade path. The behavior-level offline loop lives in the
+package suites (``world.art.tests.test_worker`` scripts every named ``SDError``
+through the fake client and asserts the presenter keeps its placeholders).
 """
 
 from pathlib import Path
@@ -52,6 +56,22 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("art_sync_all", source)
+
+    def test_external_worker_command_and_tool_are_fully_removed(self):
+        settings_source = (REPO_ROOT / "server" / "conf" / "settings.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("ART_WORKER_CMD", settings_source)
+        self.assertNotIn("ART_WORKER_TIMEOUT_SECONDS", settings_source)
+        self.assertFalse((REPO_ROOT / "tools" / "art_worker.py").exists())
+
+    def test_every_harness_injects_the_fake_client_never_a_socket(self):
+        browser_settings = (
+            REPO_ROOT / "web" / "tests" / "browser" / "browser_settings.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("ART_SD_CLIENT", browser_settings)
+        self.assertIn("world.art.fake_sd_client.FakeSDWebUIClient", browser_settings)
+        self.assertNotIn("ART_WORKER_CMD", browser_settings)
 
 
 if __name__ == "__main__":

@@ -1,42 +1,55 @@
-"""The external worker boundary and store-path confinement (design D5).
+"""The internal sd-webui worker boundary and store-path confinement.
 
-The engine's only job is to hand validated jobs to an external command and
-validate the results. A job is ``{"kind", "key", "description", "out_path",
-"aspect_ratio"}``; the engine pre-computes the exact expected relative output
-identity per subject and writes it as ``out_path``. A result is accepted only
-when its key matches an input job, its status is ``success``/``failed``, and
-its ``output_identity`` exactly equals the expected identity with an existing
-regular file under ``ART_STORE_ROOT`` (symlink-resolved).
+The engine owns an in-process sd-webui client (design D11 amendment): for every
+claimed record it resolves the configured client (``ART_SD_CLIENT`` dotted
+path), calls ``generate(subject, description)`` with a bounded timeout, and
+writes the returned PNG bytes atomically to the pre-computed expected relative
+identity under ``ART_STORE_ROOT`` (symlink-resolved). A job settles ``done``
+only when the client returned valid PNG bytes and the engine wrote them to
+exactly the expected identity.
+
+Every claimed subject reaches a terminal settle. Named client errors
+(``SDError`` codes), prompt-library failures (``sd_prompt_error``),
+client-resolution failures (``sd_client_config_error``), and unexpected
+internal errors (``sd_internal_error``) all settle the subject ``failed``, so a
+bad admin prompt or a settings typo can never leave a batch half
+``in_progress``.
 
 Drains are claim-based and non-blocking: the claim and settle are fast DB
-transactions under the queue lock, and the worker subprocess runs on a
-background Twisted thread with the lock released and a bounded timeout.
+transactions under the queue lock, and the client call runs on a background
+Twisted thread with the lock released and a bounded timeout.
 """
 
-import json
 import os
-import subprocess
-import threading
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from django.conf import settings
 from twisted.internet import threads
 
-from world.art.queue import claim, queue_lock, reclaim_expired_leases, settle
+from world.art.queue import (
+    claim,
+    queue_lock,
+    reclaim_expired_leases,
+    settle,
+    settle_generated,
+)
+from world.art.sd_worker import SDError, resolve_sd_client
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
-
-
-class WorkerProtocolError(ValueError):
-    """Raised when a worker result violates the one-to-one batch protocol."""
-
+from world.prompts.loader import PromptLibraryError
 
 _LEASE_MARGIN_SECONDS = 5
 
-# Exactly one external worker subprocess may be in flight at a time (one
-# worker concurrency slot, design D4). The flag is guarded by the shared queue
-# lock so a second drain can never double-claim or start a second worker.
+
+class WorkerStoreError(ValueError):
+    """Raised when a validated output identity would escape the store root."""
+
+
+# Exactly one sd-webui generation may be in flight at a time (one worker
+# concurrency slot, design D4). The flag is guarded by the shared queue lock so
+# a second drain can never double-claim or start a second generation.
 _worker_in_flight = False
 
 
@@ -68,22 +81,6 @@ def _store_root() -> Path:
     return Path(settings.ART_STORE_ROOT)
 
 
-def _worker_env() -> dict[str, str]:
-    """Subprocess environment: expose the store root and the game directory.
-
-    The default worker (``tools.art_worker``) must be importable as a module
-    even though the subprocess runs with ``cwd=ART_STORE_ROOT``, so the game
-    directory is added to ``PYTHONPATH``. Custom workers may ignore it.
-    """
-    env = dict(os.environ)
-    env["ART_DEFAULT_STORE_ROOT"] = str(_store_root())
-    env["ART_GAME_DIR"] = str(Path(settings.GAME_DIR))
-    game_dir = str(Path(settings.GAME_DIR))
-    existing = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = game_dir if not existing else f"{game_dir}:{existing}"
-    return env
-
-
 def _resolved_under_root(path: Path) -> Path | None:
     """Return the symlink-resolved path if it stays inside the store root."""
     try:
@@ -96,80 +93,36 @@ def _resolved_under_root(path: Path) -> Path | None:
     return resolved
 
 
-def _build_job(subject: ArtSubject, description: str) -> dict[str, Any]:
-    return {
-        "kind": subject.kind.value,
-        "key": subject.full(),
-        "description": description,
-        "out_path": expected_output_identity(subject),
-        "aspect_ratio": "16:9" if subject.kind is ArtSubjectKind.SCENE else "3:4",
-    }
+def _write_temp(identity: str, png_bytes: bytes) -> str:
+    """Write the PNG to a unique temporary file inside the store directory.
 
-
-def _run_worker(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Run the configured worker command on the current thread.
-
-    JSON-lines jobs in, JSON-lines results out, bounded by
-    ``ART_WORKER_TIMEOUT_SECONDS``. This is the only place a worker subprocess
-    is ever spawned; the caller decides on which thread it runs.
+    The final atomic replace onto ``identity`` happens later in
+    ``settle_generated`` (under the queue lock, only while the claim is still
+    current), so a stale or failed generation never touches the record's prior
+    valid output. The identity must resolve inside the store root (the
+    symlink-resolved under-root check) or the write is rejected before any file
+    is created.
     """
-    payload = "\n".join(json.dumps(job, ensure_ascii=False) for job in jobs) + "\n"
-    completed = subprocess.run(
-        settings.ART_WORKER_CMD,
-        input=payload,
-        capture_output=True,
-        text=True,
-        timeout=settings.ART_WORKER_TIMEOUT_SECONDS,
-        cwd=str(_store_root()),
-        env=_worker_env(),
+    target = _store_root() / identity
+    if _resolved_under_root(target) is None:
+        raise WorkerStoreError(
+            f"output identity {identity!r} resolves outside the store root"
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
     )
-    results: list[dict[str, Any]] = []
-    for line in completed.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(png_bytes)
+            handle.flush()
+    except BaseException:
         try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise WorkerProtocolError(
-                f"worker emitted non-JSON output: {error}"
-            ) from error
-        if not isinstance(parsed, dict):
-            raise WorkerProtocolError(
-                "worker emitted a non-object result line"
-            )
-        results.append(parsed)
-    return results
-
-
-def _valid_result(
-    job: dict[str, Any], result: dict[str, Any]
-) -> tuple[str, str | None, str | None]:
-    """Validate one result against its input job.
-
-    Returns ``(settle_status, output_identity, error)``. A result is accepted
-    only when its key matches the input job, its status is ``success``/``failed``,
-    and -- for a success -- its ``output_identity`` exactly equals the expected
-    identity resolving to an existing regular file under the root. Anything
-    else is rejected with a bounded protocol error.
-    """
-    if result.get("key") != job["key"]:
-        return ArtAssetStatus.FAILED, None, "worker_result_key_mismatch"
-    status = result.get("status")
-    if status == "success":
-        identity = result.get("output_identity")
-        if not isinstance(identity, str) or identity != job["out_path"]:
-            return ArtAssetStatus.FAILED, None, "worker_output_identity_mismatch"
-        target = _store_root() / identity
-        resolved = _resolved_under_root(target)
-        if resolved is None:
-            return ArtAssetStatus.FAILED, None, "worker_output_out_of_root"
-        if not resolved.is_file():
-            return ArtAssetStatus.FAILED, None, "worker_output_missing"
-        return ArtAssetStatus.DONE, identity, None
-    if status == "failed":
-        return ArtAssetStatus.FAILED, None, result.get("error") or "worker_failed"
-    return ArtAssetStatus.FAILED, None, "worker_result_invalid_status"
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    return tmp_path
 
 
 def subject_for(record: ArtAssetRecord) -> ArtSubject:
@@ -177,51 +130,85 @@ def subject_for(record: ArtAssetRecord) -> ArtSubject:
     return parse_subject(f"{record.db.kind}:{record.db.subject_key}")
 
 
+def _settle_one(
+    client: Any,
+    record: ArtAssetRecord,
+) -> tuple[str, str | None, str | None, bool] | None:
+    """Generate and publish one claimed record; return the settle outcome.
+
+    Every failure mode maps to a bounded settle: named ``SDError`` codes,
+    prompt-library failures (``sd_prompt_error``), and any unexpected internal
+    error (``sd_internal_error``); the record's prior valid output is retained
+    on every failure path. A success publishes the PNG atomically through
+    ``settle_generated``, which already settles the record ``done`` under the
+    queue lock (the returned flag marks that). Returns ``None`` when the claim
+    was requeued or reclaimed mid-flight and must not be settled by this
+    worker.
+    """
+    subject = subject_for(record)
+    description = str(record.db.source_description or "")
+    try:
+        png_bytes = client.generate(subject, description)
+        identity = expected_output_identity(subject)
+        tmp_path = _write_temp(identity, png_bytes)
+    except SDError as error:
+        return ArtAssetStatus.FAILED, None, error.code, False
+    except PromptLibraryError:
+        return ArtAssetStatus.FAILED, None, "sd_prompt_error", False
+    except WorkerStoreError:
+        return ArtAssetStatus.FAILED, None, "worker_output_out_of_root", False
+    except Exception:
+        return ArtAssetStatus.FAILED, None, "sd_internal_error", False
+    committed = settle_generated(
+        subject,
+        generation_token=str(record.db.generation_token or ""),
+        output_identity=identity,
+        tmp_path=tmp_path,
+    )
+    if committed is None:
+        return None
+    return ArtAssetStatus.DONE, identity, None, True
+
+
 def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
-    """Run the worker for one claimed batch and settle every result.
+    """Generate and settle one claimed batch on the background thread.
 
-    Runs on a background Twisted thread with the queue lock released. The
-    batch protocol is one-to-one: missing, duplicated, or unparseable results
-    mark the unfinished claimed jobs ``failed`` with a bounded protocol error,
-    so no job can be stuck ``in_progress`` or silently double-completed.
+    The client is resolved once per batch: a bad ``ART_SD_CLIENT`` dotted path
+    settles every claimed subject ``failed`` with ``sd_client_config_error``.
+    Each subject is then generated and published independently, so one bad
+    subject never fails its batch-mates and no claimed job is left
+    ``in_progress``.
 
-    Returns the subjects whose ``settle()`` actually applied a terminal
-    ``done``/``failed`` status. A stale settle that returned ``None`` (the
-    record was requeued or reclaimed by a newer worker) is excluded, so the
-    completion notification is emitted only for a result that is truly the
-    current record.
+    Returns the subjects whose status was actually applied (``done`` via
+    ``settle_generated``, or a terminal ``failed`` via ``settle``). A stale
+    result whose claim was requeued or reclaimed is excluded, so the completion
+    notification is emitted only for a result that is truly the current record.
     """
     subjects = [subject_for(record) for record in records]
-    descriptions = [str(record.db.source_description or "") for record in records]
-    jobs = [_build_job(subject, description) for subject, description in zip(subjects, descriptions)]
     try:
-        raw_results = _run_worker(jobs)
-    except (WorkerProtocolError, subprocess.TimeoutExpired, OSError) as error:
-        _fail_batch(subjects, _bounded_error(error))
+        client = resolve_sd_client()
+    except Exception:
+        _fail_batch(subjects, "sd_client_config_error")
         return []
-
-    if len(raw_results) != len(jobs):
-        # One-to-one batch protocol: a missing or duplicated result marks every
-        # unfinished claimed job failed so none stays stuck in_progress.
-        _fail_batch(subjects, "worker_batch_protocol_error")
-        return []
-
     settled: list[ArtSubject] = []
-    try:
-        for subject, job, result in zip(subjects, jobs, raw_results):
-            status, identity, error = _valid_result(job, result)
-            if settle(
+    for subject, record in zip(subjects, records):
+        outcome = _settle_one(client, record)
+        if outcome is None:
+            continue
+        status, identity, error, already_settled = outcome
+        if already_settled:
+            settled.append(subject)
+            continue
+        if (
+            settle(
                 subject,
                 status=status,
                 output_identity=identity,
                 error=error,
-            ) is not None:
-                settled.append(subject)
-    except Exception:
-        # Defensive: an unexpected settle error must never leave a claimed job
-        # stuck in_progress; fail every unfinished subject as a bounded failure.
-        _fail_batch(subjects, "worker_settle_error")
-        return []
+            )
+            is not None
+        ):
+            settled.append(subject)
     return settled
 
 
@@ -235,12 +222,17 @@ def _fail_batch(subjects: list[ArtSubject], error: str) -> None:
         )
 
 
-def _bounded_error(error: Exception) -> str:
-    if isinstance(error, subprocess.TimeoutExpired):
-        return "worker_timeout"
-    if isinstance(error, OSError):
-        return "worker_start_failed"
-    return "worker_protocol_error"
+def _lease_timeout() -> float:
+    """Lease-reclaim bound sized by the worst-case claimed batch.
+
+    A batch of up to ``ART_SCHEDULER_LIMIT`` claimed records can run for
+    ``N x ART_SD_TIMEOUT_SECONDS`` on the single slot, so the lease bound is
+    ``N x timeout + margin`` -- never a flat per-item timeout -- so a
+    legitimately slow batch is not reclaimed while its worker thread is still
+    running. The hard per-request deadline plus the per-subject terminal-settle
+    guarantee mean a batch always finishes within a bounded wall-clock budget.
+    """
+    return (int(settings.ART_SCHEDULER_LIMIT) * float(settings.ART_SD_TIMEOUT_SECONDS)) + _LEASE_MARGIN_SECONDS
 
 
 def _notify_completed_batch(subjects: list[ArtSubject]) -> None:
@@ -248,7 +240,7 @@ def _notify_completed_batch(subjects: list[ArtSubject]) -> None:
 
     Runs on the reactor thread (the ``deferToThread`` success callback) or on
     the calling thread in deterministic ``drain_synchronous`` tests. Never runs
-    on the worker subprocess thread, so no subscriber touches the DB from a
+    on the worker generation thread, so no subscriber touches the DB from a
     worker thread. The payload carries only the completed full subject key.
     """
     if not subjects:
@@ -263,18 +255,16 @@ def drain(limit: int) -> int:
     """Claim up to ``limit`` pending jobs and dispatch them non-blocking.
 
     Reclaims expired leases, claims the batch synchronously (fast, under the
-    queue lock), then runs the worker subprocess and settles the results on a
-    background Twisted thread with the lock released. At most one worker runs
-    at a time; a drain attempted while another worker is in flight claims
-    nothing and returns 0. Returns the number of jobs dispatched; the caller
-    (a command or the scheduler Script) never blocks on the worker wait.
+    queue lock), then generates and settles the results on a background Twisted
+    thread with the lock released. At most one generation runs at a time; a
+    drain attempted while another is in flight claims nothing and returns 0.
+    Returns the number of jobs dispatched; the caller (a command or the
+    scheduler Script) never blocks on the generation wait.
     """
     if not _try_acquire_worker_slot():
         return 0
     try:
-        reclaim_expired_leases(
-            settings.ART_WORKER_TIMEOUT_SECONDS + _LEASE_MARGIN_SECONDS
-        )
+        reclaim_expired_leases(_lease_timeout())
         records = claim(limit)
     except Exception:
         _release_worker_slot()
@@ -284,7 +274,7 @@ def drain(limit: int) -> int:
         return 0
     deferred = threads.deferToThread(_run_and_release_slot, records)
     # The success callback runs on the reactor thread, so the completion
-    # notification is never emitted from the worker subprocess thread.
+    # notification is never emitted from the worker generation thread.
     deferred.addCallback(_notify_completed_batch)
     deferred.addErrback(_log_drain_failure)
     return len(records)
@@ -307,9 +297,7 @@ def drain_synchronous(limit: int) -> int:
     if not _try_acquire_worker_slot():
         return 0
     try:
-        reclaim_expired_leases(
-            settings.ART_WORKER_TIMEOUT_SECONDS + _LEASE_MARGIN_SECONDS
-        )
+        reclaim_expired_leases(_lease_timeout())
         records = claim(limit)
         if not records:
             return 0

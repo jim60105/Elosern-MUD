@@ -121,6 +121,57 @@ class ArtQueueTests(EvenniaTest):
         self.assertEqual(record.db.output_identity, "scene/city_street.png")
         self.assertTrue(record.db.hash_changed)
 
+    @covers_requirement("art-queue-worker::a-changed-source-description-hash-is-reported-never-silently-applied")
+    def test_changed_prompt_digest_is_staff_noted_without_replacing_the_image(self):
+        subject = _scene("city_street")
+        ensure(subject, "same description")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/city_street.png",
+            error=None,
+        )
+        # Simulate an admin edit of art.scene_prompt: the stored digest no
+        # longer matches the current rendering while the source hash is
+        # untouched.
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        record.db.prompt_digest = "stale-digest"
+        record.save()
+        ensure(subject, "same description")
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(record.db.output_identity, "scene/city_street.png")
+        self.assertTrue(record.db.hash_changed)
+        self.assertEqual(record.db.source_hash, source_hash("same description"))
+
+    def test_ensure_stores_the_rendered_prompt_digest(self):
+        subject = _scene("forest_path")
+        record = ensure(subject, "desc")
+        self.assertTrue(record.db.prompt_digest)
+        self.assertNotEqual(record.db.prompt_digest, source_hash("desc"))
+        again = ensure(subject, "desc")
+        self.assertEqual(again.db.prompt_digest, record.db.prompt_digest)
+        self.assertEqual(again.db.status, ArtAssetStatus.PENDING)
+
+    def test_requeue_recomputes_the_rendered_prompt_digest(self):
+        subject = _scene("dungeon_interior")
+        ensure(subject, "desc")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/dungeon_interior.png",
+            error=None,
+        )
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        record.db.prompt_digest = "stale-digest"
+        record.save()
+        requeue(subject)
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertNotEqual(record.db.prompt_digest, "stale-digest")
+        self.assertTrue(record.db.prompt_digest)
+
     @covers_requirement("art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference")
     def test_claim_makes_in_progress_with_a_lease_and_increments_attempts(self):
         subject = _scene("mountain_path")

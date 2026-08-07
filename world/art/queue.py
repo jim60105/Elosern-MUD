@@ -9,13 +9,19 @@ background Twisted thread -- so concurrent drains, ``@art`` commands, and
 """
 
 import hashlib
+import os
 import threading
 import time
+import uuid
+from pathlib import Path
 
+from django.conf import settings
 from evennia.utils.create import create_script
 
+from world.art.sd_worker import prompt_digest
 from world.art.store import ArtAssetRecord, ArtAssetStatus, status_rank
 from world.art.subjects import ArtSubject
+from world.prompts.loader import PromptLibraryError
 
 # The single shared serialization lock for every scene and portrait operation.
 queue_lock = threading.Lock()
@@ -29,6 +35,21 @@ def record_key(subject: ArtSubject) -> str:
 def source_hash(description: str) -> str:
     """Deterministic sha256 of the canonical subject description."""
     return hashlib.sha256(description.encode("utf-8")).hexdigest()
+
+
+def _prompt_digest_or_empty(subject: ArtSubject, description: str) -> str:
+    """The rendered-prompt digest, or an empty sentinel when the library is broken.
+
+    The digest is sha256 of the rendered positive+negative prompt pair. A
+    broken prompt library (an admin mid-edit, an unreadable file) must never
+    block an enqueue, so the failure degrades to an empty digest; a later
+    successful render then differs from the stored value and surfaces through
+    the ``hash_changed`` review flag exactly like a prompt edit.
+    """
+    try:
+        return prompt_digest(subject, description)
+    except PromptLibraryError:
+        return ""
 
 
 def _all_records() -> list[ArtAssetRecord]:
@@ -76,19 +97,24 @@ def ensure(subject: ArtSubject, description: str) -> ArtAssetRecord:
 
     An existing ``pending``/``in_progress``/``done`` record is left alone; a
     ``missing`` or ``failed`` record becomes ``pending`` (the retry path). A
-    changed source hash for a ``done`` record is surfaced for staff review and
-    never silently replaces the completed image (design D4).
+    changed source hash or a changed rendered-prompt digest for a ``done``
+    record is surfaced for staff review and never silently replaces the
+    completed image (design D4, D-3b).
     """
     digest = source_hash(description)
     with queue_lock:
         record = _find_or_create(subject)
         prior = record.db.status
         if prior in ArtAssetStatus.ACTIVE or prior == ArtAssetStatus.DONE:
-            if prior == ArtAssetStatus.DONE and record.db.source_hash != digest:
-                record.db.hash_changed = True
+            if prior == ArtAssetStatus.DONE:
+                if record.db.source_hash != digest:
+                    record.db.hash_changed = True
+                if record.db.prompt_digest != _prompt_digest_or_empty(subject, description):
+                    record.db.hash_changed = True
             return record
         record.db.source_hash = digest
         record.db.source_description = description
+        record.db.prompt_digest = _prompt_digest_or_empty(subject, description)
         record.db.aspect_ratio = _aspect_ratio_for(subject)
         record.db.status = ArtAssetStatus.PENDING
         if record.db.enqueued_at is None:
@@ -102,12 +128,20 @@ def requeue(subject: ArtSubject) -> ArtAssetRecord:
     """Force a staff regeneration: reset to ``pending`` under the lock.
 
     The prior valid output (if any) is preserved for rollback and retained
-    across a later failed regeneration (design D4).
+    across a later failed regeneration (design D4). The rendered-prompt digest
+    is recomputed so it tracks the prompt text the pending job will actually
+    render, and the generation token is cleared so an in-flight worker from the
+    previous claim can never publish its output. This keeps the review flag
+    free of spurious changes after a successful regeneration.
     """
     with queue_lock:
         record = _find_or_create(subject)
         if record.db.status == ArtAssetStatus.DONE and record.db.output_identity:
             record.db.prior_output_identity = record.db.output_identity
+        record.db.prompt_digest = _prompt_digest_or_empty(
+            subject, str(record.db.source_description or "")
+        )
+        record.db.generation_token = ""
         record.db.status = ArtAssetStatus.PENDING
         if record.db.enqueued_at is None:
             record.db.enqueued_at = time.time()
@@ -117,8 +151,9 @@ def requeue(subject: ArtSubject) -> ArtAssetRecord:
 def claim(limit: int) -> list[ArtAssetRecord]:
     """Claim up to ``limit`` ``pending`` records under the lock.
 
-    Each claimed record becomes ``in_progress`` with a ``claimed_at`` lease and
-    an incremented attempt count. The lock is released before any worker work.
+    Each claimed record becomes ``in_progress`` with a ``claimed_at`` lease,
+    a fresh generation token, and an incremented attempt count. The lock is
+    released before any worker work.
     """
     with queue_lock:
         pending = [
@@ -134,6 +169,7 @@ def claim(limit: int) -> list[ArtAssetRecord]:
             record.db.claimed_at = now
             record.db.attempt_count = int(record.db.attempt_count or 0) + 1
             record.db.last_error_code = None
+            record.db.generation_token = uuid.uuid4().hex
         return claimed
 
 
@@ -186,6 +222,68 @@ def settle(subject: ArtSubject, *, status: str, output_identity: str | None,
             record.db.last_error_code = error or "settle_error"
             record.db.claimed_at = None
         return record
+
+
+def settle_generated(
+    subject: ArtSubject,
+    *,
+    generation_token: str,
+    output_identity: str,
+    tmp_path: str,
+) -> ArtAssetRecord | None:
+    """Atomically publish a generated PNG for the current claim under the lock.
+
+    The claim's ``generation_token`` must still match the record and the record
+    must still be ``in_progress``: a worker whose job was requeued (reset to
+    ``pending``) or reclaimed can never publish, so a stale generation can
+    never replace the record's prior valid output. When the claim is current,
+    the already-written temporary file is atomically replaced onto the expected
+    identity and the record settles ``done`` in the same critical section. On
+    any failure the temporary file is removed, the existing output is never
+    touched, and the error propagates for the worker to bound.
+    """
+    with queue_lock:
+        records = _records_for(subject)
+        if not records:
+            _remove_tmp(tmp_path)
+            return None
+        record = records[0]
+        if (
+            record.db.status != ArtAssetStatus.IN_PROGRESS
+            or record.db.generation_token != generation_token
+        ):
+            _remove_tmp(tmp_path)
+            return None
+        target = Path(settings.ART_STORE_ROOT) / output_identity
+        try:
+            resolved = target.resolve()
+        except OSError:
+            resolved = None
+        root = Path(settings.ART_STORE_ROOT).resolve()
+        if resolved is None or resolved == root or root not in resolved.parents:
+            _remove_tmp(tmp_path)
+            raise ValueError(f"output identity {output_identity!r} escapes the store root")
+        try:
+            os.replace(tmp_path, target)
+        except BaseException:
+            _remove_tmp(tmp_path)
+            raise
+        record.db.status = ArtAssetStatus.DONE
+        record.db.output_identity = output_identity
+        record.db.prior_output_identity = None
+        record.db.completed_at = time.time()
+        record.db.last_error_code = None
+        record.db.claimed_at = None
+        record.db.generation_token = ""
+        return record
+
+
+def _remove_tmp(tmp_path: str) -> None:
+    """Best-effort removal of a stale or failed temporary output file."""
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
 
 
 def failed_keys() -> list[str]:

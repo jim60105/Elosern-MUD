@@ -49,6 +49,9 @@ def _build() -> dict[str, PromptSpec]:
             "art.yaml",
             ("description", "display_name", "examples"),
         ),
+        PromptSpec("art.scene_prompt", "art.yaml", ("description",)),
+        PromptSpec("art.portrait_prompt", "art.yaml", ("description",)),
+        PromptSpec("art.negative_prompt", "art.yaml"),
         # Forward-declared seam: registered and validated, but no runtime
         # consumer calls it yet (the character-creation feature is deterministic
         # until its generative task here).

@@ -311,6 +311,63 @@ class RenderContractTests(PromptFixture):
         self.assertEqual(first, "A 貓人族 adult named 艾琳 (24) in the approved visual style.")
 
 
+class ArtGenerationPromptTests(PromptFixture):
+    """The three art generation prompt keys that feed the sd-webui client."""
+
+    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
+    def test_art_generation_keys_load_and_render_deterministically(self):
+        library = self.load()
+        for key in ("art.scene_prompt", "art.portrait_prompt", "art.negative_prompt"):
+            self.assertIn(key, library.texts)
+        scene = render_prompt("art.scene_prompt", description="desc")
+        portrait = render_prompt("art.portrait_prompt", description="desc")
+        negative = render_prompt("art.negative_prompt")
+        self.assertIn("desc", scene)
+        self.assertIn("desc", portrait)
+        self.assertNotIn("{description}", scene)
+        self.assertNotIn("{description}", portrait)
+        self.assertNotIn("{", negative)
+        self.assertEqual(scene, render_prompt("art.scene_prompt", description="desc"))
+        self.assertEqual(portrait, render_prompt("art.portrait_prompt", description="desc"))
+
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
+    def test_art_generation_keys_reject_unknown_placeholders(self):
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\n"
+            "prompts:\n"
+            "  art.style: approved visual style\n"
+            "  art.scene_prompt: 場景 {nmme}。\n",
+        )
+        library = self.load()
+        error = library.errors["art.scene_prompt"]
+        self.assertIn("unknown placeholder", error.problem)
+        self.assertIn("nmme", error.problem)
+        self.assertNotIn("art.scene_prompt", library.texts)
+
+    def test_editing_an_art_template_changes_the_rendered_prompt_text(self):
+        library = self.load()
+        before = render_prompt("art.scene_prompt", description="desc")
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\n"
+            "prompts:\n"
+            "  art.style: approved visual style\n"
+            "  art.character_description: |-\n"
+            "    A {race} adult named {name} ({age}) in the {style}.\n"
+            "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n"
+            "  art.negative_prompt: lowres, text\n"
+            "  art.portrait_prompt: |-\n"
+            "    A portrait — {description} — painted.\n"
+            "  art.scene_prompt: |-\n"
+            "    A wide scene — {description} — painted.\n",
+        )
+        self.load()
+        after = render_prompt("art.scene_prompt", description="desc")
+        self.assertNotEqual(before, after)
+        self.assertEqual(library.unavailable, frozenset())
+
+
 class LoadLifecycleTests(unittest.TestCase):
     def tearDown(self) -> None:
         reset_prompt_library()
