@@ -53,7 +53,7 @@ def _guild_exterior():
 class OnboardingGridMixin:
     def setUp(self):
         super().setUp()
-        create_object(__import__("typeclasses.rooms", fromlist=["Room"]).Room, key="Limbo", location=None)
+        create_object(__import__("typeclasses.rooms", fromlist=["Room"]).Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()
         self.player = create_object(PlayerCharacter, key="onboard-player")

@@ -24,7 +24,7 @@ SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
 class ServiceInteriorTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         self.grid = sync_grid()
         self.grid = None
 

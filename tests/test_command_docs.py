@@ -29,10 +29,16 @@ evennia._init()
 
 from evennia import default_cmds
 from evennia.commands.cmdhandler import CMD_NOMATCH
-from evennia.contrib.grid.xyzgrid.commands import XYZGridCmdSet
 
 from commands.character_creation import CharacterCreationCmdSet
-from commands.default_cmdsets import CharacterCmdSet
+from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
+from commands.localized import (
+    LOCALIZED_ACCOUNT_KEYS,
+    LOCALIZED_CHARACTER_KEYS,
+    LOCALIZED_ORIGINAL_KEYS,
+    LOCALIZED_XYZGRID_KEYS,
+    ProjectXYZGridCmdSet,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +52,7 @@ EVENNIA_DOCS_POINTER = "https://evennia.com/docs/latest/Components/Commands.html
 
 CHARACTER_TABLE_HEADING = "Evennia 預設角色指令（CharacterCmdSet）"
 ACCOUNT_TABLE_HEADING = "Evennia 預設帳號指令（AccountCmdSet）"
+LOCALIZED_TABLE_HEADING = "本地化預設指令（Localized zh-tw Defaults）"
 
 # Curated syntax/context manifest. The commands parse ``self.args`` by hand,
 # so argument syntax cannot be derived mechanically and is the single
@@ -114,10 +121,35 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     },
     "character": {
         "syntax": "character、character preset <key>、character create",
-        "context": "角色建立（建立模式取代一般指令，仍可用 help 與 quit）",
+        "context": "角色建立（建立模式取代一般指令，仍可用 說明 與 登出）",
     },
-    "goto": {"syntax": "goto <location>、path <location>、path clear", "context": "一般（探索與移動）"},
-    "map": {"syntax": "map [<Zcoord>]、map list", "context": "一般（探索，需建造者權限）"},
+    "前往": {
+        "syntax": "前往 <地點>、path <地點>、path clear",
+        "context": "一般（探索與移動）",
+    },
+    "地圖": {"syntax": "地圖 [Z 座標]、地圖 list", "context": "一般（探索，需建造者權限）"},
+    "看": {"syntax": "看、look", "context": "一般（隨時可用）"},
+    "說明": {"syntax": "說明 [<主題>]", "context": "一般（隨時可用）"},
+    "說": {"syntax": "說 <訊息>", "context": "一般"},
+    "動作": {"syntax": "動作 <動作描述>", "context": "一般"},
+    "拿": {"syntax": "拿 <物品>", "context": "一般"},
+    "丟": {"syntax": "丟 <物品>", "context": "一般"},
+    "給": {"syntax": "給 <物品> = <對象>", "context": "一般"},
+    "回家": {"syntax": "回家", "context": "一般（需 home 權限或建造者權限）"},
+    "耳語": {"syntax": "耳語 <角色> = <訊息>", "context": "一般"},
+    "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
+    "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
+    "登出": {"syntax": "登出", "context": "一般（隨時可用）"},
+    "在線": {"syntax": "在線", "context": "一般"},
+    "離開角色": {"syntax": "離開角色", "context": "一般"},
+    "進入世界": {"syntax": "進入世界 [<角色>]", "context": "一般（需有可附身角色）"},
+    "傳訊": {"syntax": "傳訊 <帳號> <訊息>", "context": "一般（通訊）"},
+    "密碼": {"syntax": "密碼 <舊密碼> = <新密碼>", "context": "一般"},
+    "選項": {"syntax": "選項 [名稱 = 數值]", "context": "一般"},
+    "連線": {"syntax": "連線", "context": "一般"},
+    "色彩": {"syntax": "色彩 ansi、xterm256、truecolor", "context": "一般"},
+    "樣式": {"syntax": "樣式 [<選項> = <數值>]", "context": "一般"},
+    "降權": {"syntax": "降權", "context": "一般"},
     "@teleport": {
         "syntax": "@teleport <目標位置>、@teleport (X,Y[,Z])、@teleport <物件> = <目標位置>",
         "context": "一般（探索與建造，需建造者權限）",
@@ -157,16 +189,20 @@ def _command_aliases(command) -> set[str]:
 def mounted_command_classes() -> dict[str, object]:
     """Return key -> command instance for every command the docs must cover.
 
-    The project ``CharacterCmdSet`` merged set, filtered by class identity
-    against the Evennia defaults, yields the project-authored surface (project
-    overrides such as ``inventory`` collide with default keys, so key
-    subtraction alone is insufficient); the nested ``XYZGridCmdSet`` is
-    expanded explicitly so its ``@open``/``@teleport`` overrides are never lost
-    to key collisions with the defaults, and ``CharacterCreationCmdSet``
+    The project ``CharacterCmdSet`` and ``AccountCmdSet`` merged sets, filtered
+    by class identity against the Evennia defaults, yield the project-authored
+    surface (project overrides such as ``inventory`` collide with default keys,
+    so key subtraction alone is insufficient); the nested project XYZGrid set
+    is expanded explicitly so its ``@open``/``@teleport`` overrides are never
+    lost to key collisions with the defaults, and ``CharacterCreationCmdSet``
     contributes ``character``. The non-typable ``CMD_NOMATCH`` gate is
     deliberately excluded.
     """
-    merged = {command.key: command for command in CharacterCmdSet().commands}
+    merged = {
+        command.key: command
+        for cmdset in (CharacterCmdSet(), AccountCmdSet())
+        for command in cmdset.commands
+    }
     default_classes = {
         type(command)
         for cmdset in (
@@ -178,7 +214,7 @@ def mounted_command_classes() -> dict[str, object]:
     classes = {
         key: command for key, command in merged.items() if type(command) not in default_classes
     }
-    classes.update({command.key: command for command in XYZGridCmdSet().commands})
+    classes.update({command.key: command for command in ProjectXYZGridCmdSet().commands})
     classes.update(
         {
             command.key: command
@@ -319,12 +355,12 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("character create", entry["語法"])
         self.assertIn("cancel", entry["說明"])
         self.assertIn("取代", entry["情境"])
-        self.assertIn("help", entry["情境"])
-        self.assertIn("quit", entry["情境"])
+        self.assertIn("說明", entry["情境"])
+        self.assertIn("登出", entry["情境"])
 
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_contrib_commands_are_documented(self):
-        for key in ("goto", "map", "@teleport", "@open"):
+        for key in ("前往", "地圖", "@teleport", "@open"):
             entry = self.entries[key]
             self.assertEqual(entry["指令"], key)
             self.assertTrue(entry["語法"])
@@ -333,13 +369,16 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::complete-command-reference", "game-command-docs::drift-contract-test")
     def test_default_index_tables_match_evennia_cmdsets(self):
         tables = parse_default_tables(self.reference)
+        character_keys = {command.key for command in default_cmds.CharacterCmdSet().commands}
+        account_keys = {command.key for command in default_cmds.AccountCmdSet().commands}
         expected = {
-            CHARACTER_TABLE_HEADING: {
-                command.key for command in default_cmds.CharacterCmdSet().commands
-            },
-            ACCOUNT_TABLE_HEADING: {
-                command.key for command in default_cmds.AccountCmdSet().commands
-            },
+            CHARACTER_TABLE_HEADING: character_keys - LOCALIZED_ORIGINAL_KEYS,
+            ACCOUNT_TABLE_HEADING: account_keys - LOCALIZED_ORIGINAL_KEYS,
+            LOCALIZED_TABLE_HEADING: set(
+                LOCALIZED_CHARACTER_KEYS
+                + LOCALIZED_ACCOUNT_KEYS
+                + LOCALIZED_XYZGRID_KEYS
+            ),
         }
         for heading, keys in expected.items():
             rows = tables.get(heading)
@@ -347,7 +386,7 @@ class CommandDocsContractTests(unittest.TestCase):
             self.assertEqual(
                 rows.keys(),
                 keys,
-                f"index table {heading!r} drifted from the Evennia default cmdset",
+                f"index table {heading!r} drifted from the mounted cmdset",
             )
             for key, description in rows.items():
                 self.assertTrue(

@@ -467,7 +467,8 @@ def main() -> None:
         # resume at the custom_filled stage. The South Gate and world clock are
         # created by the managed server's own at_server_start bootstrap.
         # Evennia's initial setup assumes ObjectDB #1 is the superuser
-        # character and #2 is Limbo: it locks #1 with ``puppet:false()`` and
+        # character and #2 is 虛境 (the renamed starting room): it locks #1 with
+        # ``puppet:false()`` and
         # wipes the superuser account's attributes. So #1 is a dedicated dummy
         # superuser character and the pending shell is #3, owned by a
         # non-superuser account the initial setup never touches.

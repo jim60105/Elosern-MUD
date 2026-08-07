@@ -10,10 +10,12 @@ Define the player-facing game command reference under `docs/` and the repository
 The documentation SHALL provide a player-facing reference of every in-game keyboard command under
 `docs/game/`, covering every project-authored command mounted on the `CharacterCmdSet` in
 `commands/default_cmdsets.py`, the `character` command mounted on the `CharacterCreationCmdSet` in
-`commands/character_creation.py`, the `XYZGridCmdSet` contrib commands, and an enumerated index of
-the Evennia default commands retained through `super()` on the character and account cmdsets.
-Pre-login commands of the `UnloggedinCmdSet` are outside the in-game input surface and are not
-required.
+`commands/character_creation.py`, the project-owned XYZGrid cmdset, the localized zh-tw wrappers of
+the Evennia default commands (看, 說明, 說, 動作, 拿, 丟, 給, 回家, 耳語, 暱稱, 設定描述, 登出, 在線,
+離開角色, 進入世界, 傳訊, 密碼, 選項, 連線, 色彩, 樣式, 降權, 地圖, 前往) as canonical entries with
+their retained English aliases, and an enumerated index of the Evennia default commands still
+retained untranslated through `super()` on the character and account cmdsets. Pre-login commands of
+the `UnloggedinCmdSet` are outside the in-game input surface and are not required.
 
 #### Scenario: Every mounted project command is documented
 
@@ -27,21 +29,29 @@ required.
 - **THEN** the reference SHALL document `character` as one entry whose syntax covers
   `character preset <key>` and `character create` and whose description explains the interactive
   wizard and the `cancel` escape, and SHALL state that the creation cmdset replaces other game
-  commands while `help` and `quit` remain available
+  commands while the localized `說明` and `登出` (aliases `help` and `quit`) remain available
 
 #### Scenario: Contrib commands are documented
 
 - **WHEN** a player looks up movement commands
-- **THEN** the `XYZGridCmdSet` contrib commands (`goto`, `map`, `@teleport`, `@open`) SHALL
-  appear as canonical entries with their keys, aliases, and syntax
+- **THEN** the project-owned XYZGrid commands appear as canonical entries: the native
+  `@teleport`/`@open` with their keys, aliases, and syntax, and the localized `前往` (alias `goto`)
+  and `地圖` (alias `map`) superseding the English-keyed contrib commands `goto`/`map`
 
-#### Scenario: Evennia defaults are enumerated
+#### Scenario: Localized default commands are enumerated
+
+- **WHEN** the reference covers the localized Evennia defaults
+- **THEN** it SHALL enumerate the complete key set of the localized wrapper commands (看, 說明, 說,
+  動作, 拿, 丟, 給, 回家, 耳語, 暱稱, 設定描述, 登出, 在線, 離開角色, 進入世界, 傳訊, 密碼, 選項,
+  連線, 色彩, 樣式, 降權, 地圖, 前往) in an index table with one-line descriptions, each mapping to
+  its canonical entry
+
+#### Scenario: Retained Evennia defaults are enumerated
 
 - **WHEN** the reference covers retained Evennia defaults
-- **THEN** it SHALL enumerate the complete key sets of the default character and account cmdsets
-  (such as `look`, `get`, `drop`, `say`, `pose`, `whisper`, `give`, `help`, `ic`/`ooc`, `who`,
-  `quit`) in index tables with one-line descriptions, and SHALL point to the Evennia documentation
-  for full details
+- **THEN** it SHALL enumerate the key sets of the default character and account cmdsets that remain
+  untranslated — the upstream key sets minus the localized set — in index tables with one-line
+  descriptions, and SHALL point to the Evennia documentation for full details
 
 #### Scenario: Overview groups commands by category
 
@@ -52,11 +62,11 @@ required.
 ### Requirement: Accurate command details
 
 The reference entry for each project-authored and contrib command SHALL state the command's
-primary key, its aliases (including Traditional Chinese aliases), its argument syntax, its
-availability context, and a non-empty Traditional Chinese description. The key and aliases SHALL
-match the command class definition, the syntax and context SHALL match the curated command
-manifest in `tests/test_command_docs.py`, and admin commands SHALL carry their permission
-requirement.
+primary key, its aliases (including Traditional Chinese aliases and, for localized wrappers, the
+retained full English alias set), its argument syntax, its availability context, and a non-empty
+Traditional Chinese description. The key and aliases SHALL match the command class definition, the
+syntax and context SHALL match the curated command manifest in `tests/test_command_docs.py`, and
+admin commands SHALL carry their permission requirement.
 
 #### Scenario: Key and aliases match the command class
 
@@ -121,8 +131,10 @@ the curated manifest.
 #### Scenario: Default command index stays complete
 
 - **WHEN** the contract test runs
-- **THEN** the key set of each enumerated Evennia default index table SHALL equal the keys of the
-  corresponding Evennia default cmdset
+- **THEN** the key set of each enumerated Evennia default index table SHALL equal the corresponding
+  upstream default cmdset key set minus the localized set (the retained untranslated defaults), the
+  localized index table SHALL equal the mounted localized wrapper key set, and the XYZGrid
+  enumeration SHALL equal the key set of the project-owned mounted XYZGrid cmdset
 
 #### Scenario: Sidebar, overview, and agent guide stay consistent
 

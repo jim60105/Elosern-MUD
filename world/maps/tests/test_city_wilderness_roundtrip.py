@@ -20,7 +20,7 @@ class CityWildernessRoundTripTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_all()
         sync_grid()
         sync_wilderness()

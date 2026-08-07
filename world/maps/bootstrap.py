@@ -14,6 +14,12 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.maps.altoria_capital import XYMAP_DATA_LIST
 from world.maps.instance import register_instance_reclamation
+from world.maps.limbo import (
+    LIMBO_ALIAS,
+    LIMBO_DESC,
+    LIMBO_KEY,
+    LIMBO_LEGACY_KEY,
+)
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -111,12 +117,61 @@ def sync_service_interiors() -> None:
 
 EXIT_TO_CITY = {
     "key": "南門",
-    "aliases": ["south gate", "altoria"],
+    "aliases": ["王都", "城門"],
 }
 EXIT_TO_LIMBO = {
     "key": "離開王都",
-    "aliases": ["leave", "limbo"],
+    "aliases": ["回虛境"],
 }
+
+
+def sync_limbo() -> None:
+    """Converge the starting room (Limbo) onto its zh-tw identity idempotently.
+
+    Runs on every server start before ``sync_grid()`` (localize-limbo-zhtw
+    D-2). Mirrors the in-place description rewrite of ``sync_service_
+    interiors()``: the authored zh-tw key, alias, and description are
+    re-affirmed on every call. A legacy English-keyed room (as created by
+    Evennia's first-boot setup) is renamed in place so existing developer
+    databases converge without a wipe. When both a canonical and a legacy room
+    exist, the canonical room wins and the legacy room is left untouched with
+    a warning -- never a silent arbitrary pick. A missing room degrades to a
+    warning, never a raise.
+
+    The canonical lookup is restricted to the ``Room`` typeclass by ``db_key``
+    (never the alias-inclusive ``search_object``), so a non-room object that
+    happens to share the key or the ``limbo`` alias can never be rewritten or
+    bridged.
+    """
+
+    limbo = Room.objects.filter(db_key=LIMBO_KEY)
+    # Legacy lookup matches the db_key exactly: Evennia's alias-inclusive
+    # search would also match the canonical room through its ``limbo`` alias.
+    legacy = Room.objects.filter(db_key=LIMBO_LEGACY_KEY)
+    if not limbo:
+        if not legacy:
+            log_warn(
+                f"sync_limbo: no starting room keyed {LIMBO_KEY!r} found; "
+                "skipping the starting-room sync."
+            )
+            return
+        room = legacy[0]
+        room.key = LIMBO_KEY
+    else:
+        room = limbo[0]
+        if len(limbo) > 1:
+            log_warn(
+                f"sync_limbo: {len(limbo)} rooms keyed {LIMBO_KEY!r} exist; "
+                f"using dbref #{room.id} as the starting room."
+            )
+        if legacy:
+            log_warn(
+                f"sync_limbo: a legacy room keyed {LIMBO_LEGACY_KEY!r} coexists with the "
+                f"canonical {LIMBO_KEY!r} room; leaving the legacy room in place."
+            )
+    room.aliases.add(LIMBO_ALIAS)
+    room.db.desc = LIMBO_DESC
+    room.save()
 
 
 def _existing_exit(location, destination):
@@ -133,17 +188,28 @@ def _existing_exit(location, destination):
 
 
 def _ensure_exit(location, destination, key, aliases):
-    """Create ``key``/``aliases`` exit from ``location`` to ``destination`` if missing."""
+    """Create or reconcile ``key``/``aliases`` exit from ``location`` to ``destination``.
 
-    if _existing_exit(location, destination):
+    When the exit already exists, its key and aliases are rewritten in place
+    to the authored values on every call, so a pre-existing exit converges on
+    the zh-tw bridge surface without being rebuilt (localize-limbo-zhtw D-3).
+    """
+
+    exit_obj = _existing_exit(location, destination)
+    if exit_obj is None:
+        create_object(
+            Exit,
+            key=key,
+            aliases=aliases,
+            location=location,
+            destination=destination,
+        )
         return
-    create_object(
-        Exit,
-        key=key,
-        aliases=aliases,
-        location=location,
-        destination=destination,
-    )
+    if exit_obj.key != key or set(exit_obj.aliases.all()) != set(aliases):
+        exit_obj.key = key
+        exit_obj.aliases.clear()
+        exit_obj.aliases.add(*aliases)
+        exit_obj.save()
 
 
 def sync_grid() -> None:
@@ -164,10 +230,11 @@ def sync_grid() -> None:
 
     register_instance_reclamation()
 
-    limbo = search_object("Limbo", exact=True)
+    limbo = Room.objects.filter(db_key=LIMBO_KEY)
     if not limbo:
-        log_warn("sync_grid: no room keyed 'Limbo' found; skipping the bridging exits.")
+        log_warn(f"sync_grid: no room keyed {LIMBO_KEY!r} found; skipping the bridging exits.")
         return
+    limbo = limbo[0]
 
     south_gate = grid.get_room(SOUTH_GATE_XYZ).first()
     if south_gate is None:
@@ -177,8 +244,8 @@ def sync_grid() -> None:
         )
         return
 
-    _ensure_exit(limbo[0], south_gate, **EXIT_TO_CITY)
-    _ensure_exit(south_gate, limbo[0], **EXIT_TO_LIMBO)
+    _ensure_exit(limbo, south_gate, **EXIT_TO_CITY)
+    _ensure_exit(south_gate, limbo, **EXIT_TO_LIMBO)
 
 
 GATE_EXIT = {

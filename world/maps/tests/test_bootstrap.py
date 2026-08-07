@@ -13,7 +13,8 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.maps.altoria_capital import XYMAP_DATA
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
+from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
 SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
@@ -40,7 +41,7 @@ class GridBootstrapTests(EvenniaTest):
         return XYZExit.objects.all_family().count()
 
     def _bridging_exits(self):
-        limbo = search_object("Limbo", exact=True)
+        limbo = search_object(LIMBO_KEY, exact=True)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         targets = [obj for obj in (limbo[0] if limbo else None, south_gate) if obj is not None]
         return [
@@ -52,7 +53,7 @@ class GridBootstrapTests(EvenniaTest):
     @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
     @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
     def test_sync_grid_creates_thirteen_rooms_and_twenty_six_exits(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         self.assertEqual(self._count_grid_rooms(), 13)
@@ -61,7 +62,7 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 26)
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         first_ids = {
             room.xyz: room.id
@@ -87,7 +88,7 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(self._count_grid_rooms(), 13)
 
     def test_in_place_update_changes_desc_without_new_room(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         south_gate = GridRoom.objects.get(db_key="南門")
@@ -111,7 +112,7 @@ class GridBootstrapTests(EvenniaTest):
 
     @covers_requirement("scene-archetype-mixin::gridroom-is-retrofitted-onto-scenearchetypemixin-without-changing-its-contract")
     def test_anchor_room_matches_placement_registry_after_sync(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         placement = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
@@ -122,7 +123,7 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(room.anchor_key, "capital_altoria")
 
     def test_bridging_exits_bind_limbo_and_south_gate_idempotently(self):
-        limbo = create_object(Room, key="Limbo", location=None)
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
@@ -141,7 +142,7 @@ class GridBootstrapTests(EvenniaTest):
         )
 
     def test_bridging_lookup_is_by_key_not_dbref(self):
-        limbo = create_object(Room, key="Limbo", location=None)
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         dbref2 = self.room2
@@ -150,7 +151,7 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual([exit_obj.key for exit_obj in limbo.exits], ["南門"])
 
     def test_north_gate_is_a_dead_end(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
@@ -182,7 +183,7 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(len(search_script("lore:anchor_placements:capital_altoria")), 1)
 
     def test_at_server_start_with_limbo_creates_bridging_exits(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         at_server_start()
 
         self.assertEqual(self._count_grid_rooms(), 13)
@@ -213,7 +214,7 @@ class WildernessBootstrapTests(EvenniaTest):
         return script, gates
 
     def test_sync_wilderness_creates_script_and_gate_with_anchor_key(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
 
@@ -224,7 +225,7 @@ class WildernessBootstrapTests(EvenniaTest):
         self.assertEqual(gates[0].key, "荒野")
 
     def test_sync_wilderness_is_idempotent(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
         sync_wilderness()
@@ -270,7 +271,7 @@ class WildernessBootstrapTests(EvenniaTest):
         # create a retained room, wipe its non-persistent description (as a
         # restart does -- ndb values are not stored), then re-run
         # sync_wilderness() and confirm the deterministic description returns.
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
         from evennia.contrib.grid.wilderness.wilderness import (  # noqa: F811
@@ -294,7 +295,7 @@ class WildernessBootstrapTests(EvenniaTest):
         self.assertEqual(room.scene_archetype, "western_hills_valleys")
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
         # Misconfigure the gate's anchor_key, then re-run and confirm it heals.
@@ -310,7 +311,7 @@ class WildernessBootstrapTests(EvenniaTest):
     def test_sync_wilderness_leaves_same_key_foreign_exit_alone(self):
         from typeclasses.exits import Exit
 
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
         # Plant a plain Exit that occupies the gate key.

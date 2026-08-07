@@ -31,7 +31,7 @@ class ServiceContentIsolation(QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
         register_catalog()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()
         self._previous_catalog = CATALOG

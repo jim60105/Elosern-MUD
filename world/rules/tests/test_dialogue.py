@@ -196,7 +196,7 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
             sync_service_interiors,
         )
 
-        self.hall_room = co(Room, key="Limbo", location=None)
+        self.hall_room = co(Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()
         from world.quests.catalog import register_catalog

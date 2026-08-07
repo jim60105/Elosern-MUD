@@ -13,6 +13,7 @@ from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
 from world.maps.altoria_capital import XYMAP_DATA_LIST
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
@@ -25,7 +26,7 @@ class SampleCityCostedExitTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="Room3", location=None)
 
     def _intra_city_exits(self):
         # all_family() counts CostedXYZExit (exact-typeclass all() filters them out).
@@ -86,7 +87,7 @@ class SampleCityCostedExitTests(EvenniaTest):
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
         sync_grid()
         limbo = self.room2
-        limbo.key = "Limbo"
+        limbo.key = LIMBO_KEY
         limbo.save()
         sync_grid()
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()

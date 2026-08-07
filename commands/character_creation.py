@@ -1,8 +1,9 @@
 """Player-facing character creation command and pending command gate."""
 
-from evennia import CmdSet, Command, default_cmds
+from evennia import CmdSet, Command
 from evennia.commands.cmdhandler import CMD_NOMATCH
 
+from commands.localized import CmdHelp, CmdQuit
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.character_creation import (
@@ -180,5 +181,5 @@ class CharacterCreationCmdSet(CmdSet):
     def at_cmdset_creation(self) -> None:
         self.add(CmdCharacter)
         self.add(CmdCreationRequired)
-        self.add(default_cmds.CmdHelp)
-        self.add(default_cmds.CmdQuit)
+        self.add(CmdHelp)
+        self.add(CmdQuit)

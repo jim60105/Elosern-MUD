@@ -14,8 +14,14 @@ class XyzGridCmdSetTests(EvenniaTest):
         cmdset = CharacterCmdSet()
         cmdset.at_cmdset_creation()
         keys = {cmd.key for cmd in cmdset.commands}
-        self.assertIn("map", keys)
-        self.assertIn("goto", keys)
+        # The localized wrappers replace the English-keyed contrib commands
+        # (localize-limbo-zhtw); the builder commands stay native.
+        self.assertIn("地圖", keys)
+        self.assertIn("前往", keys)
+        self.assertNotIn("map", keys)
+        self.assertNotIn("goto", keys)
+        self.assertIn("@teleport", keys)
+        self.assertIn("@open", keys)
 
     def test_xyzgrid_launcher_command_resolves(self):
         module_path, _, attr = settings.EXTRA_LAUNCHER_COMMANDS["xyzgrid"].rpartition(".")

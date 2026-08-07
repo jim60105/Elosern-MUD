@@ -705,7 +705,7 @@ class LocalMapPresenterTests(EvenniaTest):
         super().setUp()
         self.room1.key = "Room1"
         self.room1.save()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
@@ -938,7 +938,7 @@ class LocalMapWildernessTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()

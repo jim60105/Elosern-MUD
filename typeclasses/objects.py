@@ -8,6 +8,8 @@ with a location in the game world (like Characters, Rooms, Exits).
 
 """
 
+from collections import defaultdict
+
 from evennia.objects.objects import DefaultObject
 
 
@@ -21,6 +23,173 @@ class ObjectParent:
     take precedence.
 
     """
+
+    # Localized appearance layer (localize-limbo-zhtw D-4): the zh-tw frame
+    # below is shared by the text 看 command, the ``at_look`` seam, and the
+    # webclient explore-look action, so no entry path renders English frame
+    # strings ("Exits:", "Characters:", "You see ...").
+    default_description = "你沒有看到什麼特別的。"
+
+    def get_display_exits(self, looker, **kwargs):
+        """Zh-tw exits line: 「出口：南門、北門」 (localize-limbo-zhtw)."""
+        exits = self.filter_visible(
+            self.contents_get(content_type="exit"), looker, **kwargs
+        )
+        exit_names = [exi.get_display_name(looker, **kwargs) for exi in exits]
+        if not exit_names:
+            return ""
+        return f"|w出口：|n {'、'.join(exit_names)}"
+
+    def get_display_characters(self, looker, **kwargs):
+        """Zh-tw characters line: 「人物：南門守衛」 (localize-limbo-zhtw)."""
+        characters = self.filter_visible(
+            self.contents_get(content_type="character"), looker, **kwargs
+        )
+        character_names = [
+            char.get_display_name(looker, **kwargs) for char in characters
+        ]
+        if not character_names:
+            return ""
+        return f"|w人物：|n {'、'.join(character_names)}"
+
+    def get_display_things(self, looker, **kwargs):
+        """Zh-tw things line: 「你看見：…」 (localize-limbo-zhtw)."""
+        things = self.filter_visible(
+            self.contents_get(content_type="object"), looker, **kwargs
+        )
+        grouped_things = defaultdict(list)
+        for thing in things:
+            grouped_things[thing.get_display_name(looker, **kwargs)].append(thing)
+        thing_names = []
+        for thingname, thinglist in sorted(grouped_things.items()):
+            nthings = len(thinglist)
+            thing = thinglist[0]
+            _, plural = thing.get_numbered_name(nthings, looker, key=thingname)
+            thing_names.append(thingname if nthings == 1 else plural)
+        if not thing_names:
+            return ""
+        return f"|w你看見：|n {'、'.join(thing_names)}"
+
+    def get_numbered_name(self, count, looker, **kwargs):
+        """Zh-tw numbered name without English articles/inflection.
+
+        Chinese has no articles; a group of identical things renders as
+        ``{count} 個 {name}`` (localize-limbo-zhtw). Unlike the upstream
+        implementation, no singular/plural aliases are registered, since the
+        inflect machinery is English-specific.
+        """
+        key = kwargs.get("key", self.get_display_name(looker))
+        plural = f"{count} 個 {key}"
+        if kwargs.get("no_article") and count == 1:
+            if kwargs.get("return_string"):
+                return key
+            return key, key
+        if kwargs.get("return_string"):
+            return key if count == 1 else plural
+        return key, plural
+
+    def at_say(
+        self,
+        message,
+        msg_self=None,
+        msg_location=None,
+        receivers=None,
+        msg_receivers=None,
+        **kwargs,
+    ):
+        """Zh-tw say/whisper echoes (localize-limbo-zhtw D-4).
+
+        Port of ``DefaultObject.at_say`` with Traditional Chinese frames, so
+        the 說 and 耳語 commands (and any other verbal path) never render
+        English ("You say...", "<name> says..."). The {self} marker resolves
+        to 「你」.
+        """
+        from evennia.utils.utils import make_iter
+
+        msg_type = "say"
+        if kwargs.get("whisper", False):
+            msg_type = "whisper"
+            msg_self = (
+                '{self} 對 {all_receivers} 悄聲說：「|n{speech}|n」'
+                if msg_self is True
+                else msg_self
+            )
+            msg_receivers = msg_receivers or '{object} 悄聲對你說：「|n{speech}|n」'
+            msg_location = None
+        else:
+            msg_self = '{self} 說：「|n{speech}|n」' if msg_self is True else msg_self
+            msg_location = msg_location or '{object} 說：「{speech}」'
+            msg_receivers = msg_receivers or message
+
+        custom_mapping = kwargs.get("mapping", {})
+        receivers = make_iter(receivers) if receivers else None
+        location = self.location
+
+        if msg_self:
+            self_mapping = {
+                "self": "你",
+                "object": self.get_display_name(self),
+                "location": location.get_display_name(self) if location else None,
+                "receiver": None,
+                "all_receivers": (
+                    "、".join(recv.get_display_name(self) for recv in receivers)
+                    if receivers
+                    else None
+                ),
+                "speech": message,
+            }
+            self_mapping.update(custom_mapping)
+            self.msg(text=(msg_self.format_map(self_mapping), {"type": msg_type}), from_obj=self)
+
+        if receivers and msg_receivers:
+            receiver_mapping = {
+                "self": "你",
+                "object": None,
+                "location": None,
+                "receiver": None,
+                "all_receivers": None,
+                "speech": message,
+            }
+            for receiver in make_iter(receivers):
+                individual_mapping = {
+                    "object": self.get_display_name(receiver),
+                    "location": location.get_display_name(receiver),
+                    "receiver": receiver.get_display_name(receiver),
+                    "all_receivers": (
+                        "、".join(recv.get_display_name(recv) for recv in receivers)
+                        if receivers
+                        else None
+                    ),
+                }
+                receiver_mapping.update(individual_mapping)
+                receiver_mapping.update(custom_mapping)
+                receiver.msg(
+                    text=(msg_receivers.format_map(receiver_mapping), {"type": msg_type}),
+                    from_obj=self,
+                )
+        if self.location and msg_location:
+            location_mapping = {
+                "self": "你",
+                "object": self,
+                "location": location,
+                "all_receivers": "、".join(str(recv) for recv in receivers)
+                if receivers
+                else None,
+                "receiver": None,
+                "speech": message,
+            }
+            location_mapping.update(custom_mapping)
+            exclude = []
+            if msg_self:
+                exclude.append(self)
+            if receivers:
+                exclude.extend(receivers)
+            self.location.msg_contents(
+                text=(msg_location, {"type": msg_type}),
+                from_obj=self,
+                exclude=exclude,
+                mapping=location_mapping,
+            )
 
 
 class Object(ObjectParent, DefaultObject):

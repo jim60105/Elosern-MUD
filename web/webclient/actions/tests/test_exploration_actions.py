@@ -411,6 +411,7 @@ class ExplorationActionAdapterTests(EvenniaTest):
         self.assertEqual(self.player.first_arrival_seen, before)
 
     @covers_requirement("webclient-exploration-menu::explore-look-reuses-the-command-appearance-path-and-preserves-onboarding-look-hooks")
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
     def test_look_at_room_advances_the_onboarding_look_beat(self):
         sync_grid()
         gate = self.room1

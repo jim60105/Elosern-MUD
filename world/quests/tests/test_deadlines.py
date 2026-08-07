@@ -164,7 +164,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTest):
 class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_quest_runtime()
         self.player = create_object(PlayerCharacter, key="reclaim-player")

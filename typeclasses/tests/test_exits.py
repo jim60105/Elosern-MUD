@@ -26,7 +26,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()

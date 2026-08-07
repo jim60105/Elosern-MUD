@@ -106,6 +106,7 @@ def at_server_start():
     from world.lore.sync import sync_all
     from world.maps.bootstrap import (
         sync_grid,
+        sync_limbo,
         sync_service_interiors,
         sync_wilderness,
     )
@@ -118,6 +119,7 @@ def at_server_start():
     # only through read_world_clock() and must never create it.
     get_world_clock()
     sync_all()
+    sync_limbo()
     sync_grid()
     sync_wilderness()
     sync_service_interiors()

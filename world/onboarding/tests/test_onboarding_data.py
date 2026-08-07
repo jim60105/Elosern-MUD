@@ -64,6 +64,11 @@ class SceneBeatTests(unittest.TestCase):
         self.assertEqual(BEAT_REGISTRY[LOOK_BEAT_ID].trigger, TriggerKind.COMMAND_LOOK)
         self.assertEqual(BEAT_REGISTRY[LOOK_BEAT_ID].next_beat_id, GUIDANCE_BEAT_ID)
 
+    def test_look_beat_prompts_the_localized_look_command(self):
+        prose = BEAT_REGISTRY[LOOK_BEAT_ID].prose
+        self.assertIn("先用「看」看看四周", prose)
+        self.assertNotIn("look 看看", prose)
+
     def test_guidance_beat_prompts_two_step_route_to_guild(self):
         prose = BEAT_REGISTRY[GUIDANCE_BEAT_ID].prose
         self.assertIn("先向北走到南大道", prose)

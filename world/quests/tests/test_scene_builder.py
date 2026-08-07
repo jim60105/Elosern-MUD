@@ -210,7 +210,7 @@ class SceneBuilderIsolation(QuestRegistryIsolation):
 class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
         self.assertIsNotNone(self.anchor)
@@ -536,7 +536,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
 class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
         self.player = create_object(PlayerCharacter, key="offline-scene-player")

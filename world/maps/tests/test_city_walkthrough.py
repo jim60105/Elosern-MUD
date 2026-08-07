@@ -6,13 +6,14 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+from world.maps.limbo import LIMBO_KEY
 from world.lore.sync import sync_all
 
 
 class SampleCityWalkthroughTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        self.room2.key = "Limbo"
+        self.room2.key = LIMBO_KEY
         self.room2.save()
         sync_all()
         sync_grid()

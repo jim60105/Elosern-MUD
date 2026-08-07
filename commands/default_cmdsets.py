@@ -15,7 +15,6 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 """
 
 from evennia import default_cmds
-from evennia.contrib.grid.xyzgrid.commands import XYZGridCmdSet
 
 from commands.action import CmdCast
 from commands.art import CmdArtRequeue, CmdArtRetry, CmdArtRun, CmdArtStatus
@@ -37,9 +36,94 @@ from commands.guild import (
     CmdGuildShow,
     CmdGuildTurnIn,
 )
+from commands.localized import (
+    CmdColorTest,
+    CmdDrop,
+    CmdGet,
+    CmdGive,
+    CmdHelp,
+    CmdHome,
+    CmdIC,
+    CmdLook,
+    CmdNick,
+    CmdOOC,
+    CmdOOCLook,
+    CmdOption,
+    CmdPage,
+    CmdPassword,
+    CmdPose,
+    CmdQuell,
+    CmdQuit,
+    CmdSay,
+    CmdSessions,
+    CmdSetDesc,
+    CmdStyle,
+    CmdWhisper,
+    CmdWho,
+    ProjectXYZGridCmdSet,
+)
 from commands.scene import CmdEnterScene
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
+
+# The stock Evennia default keys replaced by the localized zh-tw wrappers
+# (commands/localized/). After ``super().at_cmdset_creation()`` the originals
+# are removed so no English-keyed variant ever matches in normal play.
+_LOCALIZED_ORIGINALS = (
+    "look",
+    "help",
+    "say",
+    "pose",
+    "get",
+    "drop",
+    "give",
+    "home",
+    "whisper",
+    "nick",
+    "setdesc",
+    "quit",
+    "who",
+    "ooc",
+    "ic",
+    "page",
+    "password",
+    "option",
+    "sessions",
+    "color",
+    "style",
+    "quell",
+)
+
+_LOCALIZED_CHARACTER_WRAPPERS = (
+    CmdLook,
+    CmdHelp,
+    CmdSay,
+    CmdPose,
+    CmdGet,
+    CmdDrop,
+    CmdGive,
+    CmdHome,
+    CmdWhisper,
+    CmdNick,
+    CmdSetDesc,
+)
+
+_LOCALIZED_ACCOUNT_WRAPPERS = (
+    CmdOOCLook,
+    CmdHelp,
+    CmdQuit,
+    CmdWho,
+    CmdOOC,
+    CmdIC,
+    CmdPage,
+    CmdPassword,
+    CmdOption,
+    CmdSessions,
+    CmdColorTest,
+    CmdStyle,
+    CmdQuell,
+    CmdNick,
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -56,6 +140,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         Populates the cmdset
         """
         super().at_cmdset_creation()
+        for key in _LOCALIZED_ORIGINALS:
+            self.remove(key)
+        for wrapper in _LOCALIZED_CHARACTER_WRAPPERS:
+            self.add(wrapper)
         self.add(CmdCast)
         self.add(CmdArtStatus)
         self.add(CmdArtRun)
@@ -83,7 +171,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdSell)
         self.add(CmdInventory)
         self.add(CmdsTalk)
-        self.add(XYZGridCmdSet)
+        self.add(ProjectXYZGridCmdSet)
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
@@ -101,9 +189,10 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         Populates the cmdset
         """
         super().at_cmdset_creation()
-        #
-        # any commands you add below will overload the default ones.
-        #
+        for key in _LOCALIZED_ORIGINALS:
+            self.remove(key)
+        for wrapper in _LOCALIZED_ACCOUNT_WRAPPERS:
+            self.add(wrapper)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

@@ -61,7 +61,7 @@ class OnboardingJourneyMixin:
 
         register_catalog()
         register_catalog_offers(get_catalog())
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()
         sync_guard_npc()

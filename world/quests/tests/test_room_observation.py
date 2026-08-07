@@ -55,7 +55,7 @@ def escort_stage(destination, index: int = 0):
 class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         self.player = create_object(PlayerCharacter, key="room-player")
         self.player.race = "human"
@@ -226,7 +226,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
 class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()

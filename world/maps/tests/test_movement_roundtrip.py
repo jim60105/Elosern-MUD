@@ -9,6 +9,7 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
 from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.limbo import LIMBO_KEY
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -23,11 +24,11 @@ class MovementLineageRoundTripTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key=LIMBO_KEY, location=None)
         sync_all()
         sync_grid()
         sync_wilderness()
-        self.limbo = search_object("Limbo", exact=True)[0]
+        self.limbo = search_object(LIMBO_KEY, exact=True)[0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
         self.gate = [

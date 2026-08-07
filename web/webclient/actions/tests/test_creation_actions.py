@@ -339,7 +339,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
         from evennia.utils.create import create_object as _co
         from typeclasses.rooms import Room
 
-        _co(Room, key="Limbo", location=None)
+        _co(Room, key="虛境", location=None)
         sync_grid()
         from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 

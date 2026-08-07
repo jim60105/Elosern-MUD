@@ -224,7 +224,7 @@ class CharacterActivationTests(EvenniaTest):
         from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
         from world.rules.onboarding import relocate_to_starting_location
 
-        _co(Room, key="Limbo", location=None)
+        _co(Room, key="虛境", location=None)
         sync_grid()
         from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 

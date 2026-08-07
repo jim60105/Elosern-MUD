@@ -51,7 +51,7 @@ LOOK_BEAT = Beat(
     beat_id=LOOK_BEAT_ID,
     prose=(
         "守衛打量了你一眼，開口說道：「你是新來的冒險者吧？"
-        "先用 look 看看四周，熟悉一下這座城門。之後我會告訴你該往哪裡走。」"
+        "先用「看」看看四周，熟悉一下這座城門。之後我會告訴你該往哪裡走。」"
     ),
     trigger=TriggerKind.COMMAND_LOOK,
     next_beat_id=GUIDANCE_BEAT_ID,

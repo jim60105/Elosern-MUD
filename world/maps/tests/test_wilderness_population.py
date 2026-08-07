@@ -333,7 +333,7 @@ class OnboardingHuntIntegrationTests(QuestRegistryIsolation, EvenniaCommandTestM
 
     def setUp(self):
         super().setUp()
-        create_object(Room, key="Limbo", location=None)
+        create_object(Room, key="虛境", location=None)
         sync_all()
         sync_grid()
         sync_wilderness()

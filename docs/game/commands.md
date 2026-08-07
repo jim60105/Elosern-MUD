@@ -9,14 +9,25 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`進入`](/game/command-reference?id=進入) | 進入任務場景。 |
-| [`goto`](/game/command-reference?id=goto) | 沿最短路徑自動移動。 |
-| [`map`](/game/command-reference?id=map) | 檢視地圖。 |
+| [`前往`](/game/command-reference?id=前往) | 沿最短路徑自動移動。 |
+| [`地圖`](/game/command-reference?id=地圖) | 檢視地圖。 |
+| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象。 |
+| [`回家`](/game/command-reference?id=回家) | 返回重生點。 |
+
+## 說明與幫助
+
+| 指令 | 說明 |
+| --- | --- |
+| [`說明`](/game/command-reference?id=說明) | 開啟說明系統。 |
 
 ## 對話
 
 | 指令 | 說明 |
 | --- | --- |
 | [`talk`](/game/command-reference?id=talk) | 與 NPC 交談。 |
+| [`說`](/game/command-reference?id=說) | 在房間內說話。 |
+| [`動作`](/game/command-reference?id=動作) | 以第三人稱演出動作。 |
+| [`耳語`](/game/command-reference?id=耳語) | 私下對特定對象說話。 |
 
 ## 時間跳躍
 
@@ -63,12 +74,33 @@
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包與背包。 |
+| [`拿`](/game/command-reference?id=拿) | 撿起地上的物品。 |
+| [`丟`](/game/command-reference?id=丟) | 丟棄背包中的物品。 |
+| [`給`](/game/command-reference?id=給) | 將物品交給他人。 |
 
-## 角色建立
+## 角色建立與個人化
 
 | 指令 | 說明 |
 | --- | --- |
 | [`character`](/game/command-reference?id=character) | 建立角色或使用預設角色。 |
+| [`設定描述`](/game/command-reference?id=設定描述) | 設定你的個人描述。 |
+| [`暱稱`](/game/command-reference?id=暱稱) | 建立或檢視個人暱稱。 |
+
+## 帳號與連線
+
+| 指令 | 說明 |
+| --- | --- |
+| [`登出`](/game/command-reference?id=登出) | 登出遊戲。 |
+| [`在線`](/game/command-reference?id=在線) | 檢視線上玩家列表。 |
+| [`離開角色`](/game/command-reference?id=離開角色) | 離開角色身分（OOC）。 |
+| [`進入世界`](/game/command-reference?id=進入世界) | 附身角色進入遊戲。 |
+| [`傳訊`](/game/command-reference?id=傳訊) | 傳送私人訊息。 |
+| [`密碼`](/game/command-reference?id=密碼) | 變更你的密碼。 |
+| [`選項`](/game/command-reference?id=選項) | 檢視與設定帳號選項。 |
+| [`連線`](/game/command-reference?id=連線) | 檢視目前的連線。 |
+| [`色彩`](/game/command-reference?id=色彩) | 測試與調整色彩。 |
+| [`樣式`](/game/command-reference?id=樣式) | 調整文字樣式。 |
+| [`降權`](/game/command-reference?id=降權) | 暫時以較低權限行動。 |
 
 ## 管理員
 
