@@ -86,11 +86,11 @@
     var root = makeElement("div", "elosern elosern-header");
     var title = makeElement("div", "header-title");
     var meta = makeElement("div", "header-meta");
-    var mode = makeElement("span", "header-mode");
+    var location = makeElement("span", "header-location");
     var clock = makeElement("span", "header-clock");
     var conn = makeElement("span", "header-conn");
     setText(title, GAME_TITLE);
-    meta.appendChild(mode);
+    meta.appendChild(location);
     meta.appendChild(clock);
     meta.appendChild(conn);
     root.appendChild(title);
@@ -98,7 +98,14 @@
     container.getElement().append(root);
 
     var unsubscribe = subscribeState(function (state) {
-      setText(mode, state.mode ? "模式：" + state.mode : "模式：--");
+      // The current location comes from the synced status panel; the raw
+      // mode label is gone (the dock's content already identifies the mode).
+      var panel = state.panels && state.panels["status"];
+      var locationLabel = null;
+      if (panel && panel.available === true && panel.actor && panel.actor.location) {
+        locationLabel = panel.actor.location.label;
+      }
+      setText(location, locationLabel ? locationLabel : "位置：--");
       var time = state.serverTime;
       setText(
         clock,
@@ -106,7 +113,17 @@
           ? time.season_label + " " + time.day_in_season + " 日 · " + pad2(time.hour) + ":" + pad2(time.minute)
           : "時間：--"
       );
-      setText(conn, state.connected ? "已連線" : "未連線");
+      // Connection state: an ok-green dot plus a label when connected; the
+      // non-ok state keeps a dot + border + label pairing, never color alone.
+      if (state.connected) {
+        root.classList.add("connected");
+        root.classList.remove("disconnected");
+        setText(conn, "● 已連線");
+      } else {
+        root.classList.add("disconnected");
+        root.classList.remove("connected");
+        setText(conn, "○ 未連線");
+      }
     });
     unsubscribers.push(unsubscribe);
   }
@@ -115,11 +132,22 @@
     var root = makeElement("div", "elosern elosern-narrative");
     root.setAttribute("role", "log");
     root.setAttribute("aria-label", "敘事紀錄");
+    // Programmatically focusable so keyboard activation of the unread marker
+    // can move focus here before the marker hides (focus must never vanish
+    // into a hidden element).
+    root.setAttribute("tabindex", "-1");
+    // The live-region wrapper announces count changes; the inner button is
+    // the labeled, actionable jump control.
     var unread = makeElement("div", "narrative-unread");
     unread.id = "narrative-unread";
     unread.setAttribute("role", "status");
     unread.setAttribute("aria-live", "polite");
-    setText(unread, "");
+    unread.setAttribute("aria-atomic", "true");
+    unread.setAttribute("data-count", "0");
+    var button = makeElement("button", "narrative-unread-button");
+    button.type = "button";
+    setText(button, "");
+    unread.appendChild(button);
     narrativeUnreadElement = unread;
     root.appendChild(unread);
     container.getElement().append(root);
@@ -138,6 +166,7 @@
       narrativeUnread = 0;
       updateUnread();
     });
+    button.addEventListener("keydown", activateUnreadMarker);
   }
 
   function atNarrativeBottom() {
@@ -150,9 +179,39 @@
     );
   }
 
+  // The unread marker is a labeled control that states its count and its jump
+  // action; the wrapper hides entirely at count 0 (no empty pill). Keyboard
+  // activation moves focus to the narrative pane before the marker hides so
+  // focus never drops into the void; pointer activation leaves focus alone.
   function updateUnread() {
-    if (narrativeUnreadElement) {
-      setText(narrativeUnreadElement, narrativeUnread > 0 ? "未讀 " + narrativeUnread : "");
+    if (!narrativeUnreadElement) {
+      return;
+    }
+    var button = narrativeUnreadElement.querySelector(".narrative-unread-button");
+    if (narrativeUnread > 0) {
+      narrativeUnreadElement.setAttribute("data-count", String(narrativeUnread));
+      if (button) {
+        setText(button, "↓ " + narrativeUnread + " 則新訊息（點擊返回最新）");
+      }
+    } else {
+      narrativeUnreadElement.setAttribute("data-count", "0");
+      if (button) {
+        setText(button, "");
+      }
+    }
+  }
+
+  // Keyboard activation (Enter/Space on the focused marker button) jumps to
+  // the bottom like a click, then parks focus on the narrative pane.
+  function activateUnreadMarker(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (narrativeDiv) {
+        narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+        narrativeUnread = 0;
+        updateUnread();
+        narrativeDiv.focus();
+      }
     }
   }
 
@@ -197,6 +256,9 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+      var heading = makeElement("div", "status-heading");
+      setText(heading, "角色狀態");
+      root.appendChild(heading);
       var actor = panel.actor;
       var actorLine = makeElement("div", "status-actor");
       var name = makeElement("span", "status-name");
@@ -219,6 +281,18 @@
         setText(value, gauge.current + " / " + gauge.maximum);
         row.appendChild(label);
         row.appendChild(value);
+        // The mockup gauge bar: an accessible width-based element that
+        // complements the mandated numeric text (it never replaces it).
+        var bar = makeElement("div", "resource-bar resource-bar-" + key);
+        var fill = makeElement("div", "resource-bar-fill");
+        var percent = 0;
+        if (gauge.maximum > 0) {
+          percent = Math.max(0, Math.min(100, Math.round((gauge.current / gauge.maximum) * 100)));
+        }
+        fill.style.width = percent + "%";
+        fill.setAttribute("role", "presentation");
+        bar.appendChild(fill);
+        row.appendChild(bar);
         resources.appendChild(row);
       });
       root.appendChild(resources);
@@ -315,7 +389,11 @@
     var root = makeElement("div", "elosern elosern-drawer");
     var prompt = makeElement("div", "prompt");
     promptDiv = prompt;
-    var field = makeElement("textarea", "inputfield form-control");
+    // No `form-control` class: Bootstrap is not loaded by this page, and the
+    // field routes through the plugin `onKeydown` contract even when it was
+    // focused by a pointer click (the routing gate in elosern_ui treats the
+    // drawer field as the open drawer).
+    var field = makeElement("textarea", "inputfield");
     field.setAttribute("aria-label", "指令輸入");
     field.setAttribute("spellcheck", "false");
     field.id = "inputfield";
@@ -328,8 +406,10 @@
     setText(button, ">");
 
     var wrapper = makeElement("div", "inputfieldwrapper");
-    wrapper.appendChild(button);
+    // Field first, then the fixed-width send button: the flex row lays them
+    // out left-to-right exactly like the mockup's prompt line.
     wrapper.appendChild(field);
+    wrapper.appendChild(button);
 
     var drawerOpen = false;
 
@@ -465,6 +545,10 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+
+      var heading = makeElement("div", "local-map-heading");
+      setText(heading, "附近地圖");
+      root.appendChild(heading);
 
       var title = makeElement("div", "local-map-title");
       setText(title, model.title || "區域地圖");
@@ -999,12 +1083,21 @@
     }
   }
 
+  function hasBoxDrawing(text) {
+    // Box-drawing glyph range (─ │ ┌ └ ┼ …) marks ASCII map art lines, which
+    // must keep the monospace stack for column alignment.
+    return /[\u2500-\u257f]/.test(text || "");
+  }
+
   function appendNarrative(text) {
     if (!narrativeDiv) {
       return false;
     }
     var wasAtBottom = atNarrativeBottom();
     var line = makeElement("div", "out");
+    if (hasBoxDrawing(text)) {
+      line.classList.add("map-art");
+    }
     renderConvertedText(line, text);
     narrativeDiv.appendChild(line);
     if (wasAtBottom) {

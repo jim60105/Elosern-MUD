@@ -1,26 +1,42 @@
 /* ---
 
-  Elosern ink-night / vermilion desktop theme.
+  Elosern ink-night / seal-red desktop theme (owner desktop mockup,
+  `.superpowers/brainstorm/1320174-1785662962/content/layout-interaction-design.html`).
 
-  Charcoal and near-black backgrounds with warm paper-gray text; vermilion
+  Near-black charcoal surfaces with warm paper-gray text; a deep seal red
   marks active focus, current position, and critical warnings. Focus never
   relies on color alone: every focused control gains a shape/border indicator.
-  Reduced-motion preference disables nonessential transitions. The shell
-  targets desktop viewports (1440x900 and 1280x720) with internal scroll areas
-  so every surface stays reachable.
+  The deep seal-red token is restricted to fills, borders, and large/bold text
+  and symbols (≈2.9:1 on ink); small red text on dark surfaces uses the
+  text-safe warning/HP tokens. Reduced-motion preference disables nonessential
+  transitions. The shell targets desktop viewports (1440x900 and 1280x720)
+  with internal scroll areas so every surface stays reachable.
 
 --- */
 
 :root {
-  --elm-ink: #171512;            /* charcoal near-black page */
-  --elm-ink-panel: #1f1c18;      /* raised panels and headers */
-  --elm-ink-raise: #2a2621;      /* hover/active surface */
-  --elm-border: #3a342c;         /* warm gray-brown borders */
-  --elm-paper: #ece7db;          /* warm paper gray text */
-  --elm-paper-dim: #9c958a;      /* secondary text */
-  --elm-vermilion: #e05c3a;      /* seal red accent */
-  --elm-vermilion-dim: #b3442a;
-  --elm-focus-ring: #ff8a5c;     /* lighter vermilion for focus shapes */
+  --elm-ink: #0d0d0c;            /* near-black page */
+  --elm-ink-panel: #151513;      /* narrative reading surface */
+  --elm-ink-raise: #1b1a17;      /* raised panels (status/map) */
+  --elm-ink-dock: #211c18;       /* action dock surface */
+  --elm-ink-header: #171715;     /* header strip */
+  --elm-border: #514c43;         /* warm gray-brown borders */
+  --elm-border-dim: #3c3933;     /* disabled cells */
+  --elm-border-art: #5b574f;     /* art panel frame */
+  --elm-paper: #e5e0d5;          /* warm paper gray text */
+  --elm-paper-dim: #aaa395;      /* secondary text */
+  --elm-cursor: #d4c9b5;         /* input cursor / prompt */
+  --elm-vermilion: #a9322a;      /* deep seal red accent (fills/borders/large text only) */
+  --elm-vermilion-dim: #8a2820;
+  --elm-hp: #b3483e;             /* HP gauge fill */
+  --elm-warn: #b97c73;           /* small warning text on dark surfaces */
+  --elm-ok: #709676;             /* connection-ok indicator */
+  --elm-focus-ring: #e89a6b;     /* lighter vermilion for focus shapes (>=3:1 on ink and fill) */
+  --elm-art-gradient: linear-gradient(160deg, #273028, #73593e);  /* scene placeholder */
+  --elm-portrait-gradient: linear-gradient(160deg, #756b61, #292722);  /* portrait placeholder */
+  --elm-serif: "Noto Serif TC", "PMingLiU", "Noto Sans TC", serif;
+  --elm-mono: "DejaVu Sans Mono", "Noto Sans Mono CJK TC", Consolas,
+    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
 }
 
 html, body {
@@ -45,7 +61,6 @@ a:focus-visible,
 button:focus-visible,
 textarea:focus-visible,
 input:focus-visible,
-.lm_tab:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--elm-focus-ring);
   outline-offset: 2px;
@@ -71,7 +86,7 @@ input:focus-visible,
   justify-content: space-between;
   gap: 1rem;
   overflow: hidden;
-  background: var(--elm-ink-panel);
+  background: var(--elm-ink-header);
   border-bottom: 1px solid var(--elm-border);
   font-size: .9em;
 }
@@ -86,14 +101,32 @@ input:focus-visible,
 
 .elosern-header .header-meta {
   display: flex;
+  align-items: center;
   gap: 1rem;
   color: var(--elm-paper-dim);
+  white-space: nowrap;
 }
 
+.elosern-header .header-location {
+  color: var(--elm-paper);
+}
+
+/* Connection state: dot + label pairing, never color alone. The connected
+   state uses the ok-green token; the disconnected state keeps a bordered
+   dot + label. */
 .elosern-header .header-conn {
-  color: var(--elm-vermilion);
-  border: 1px solid var(--elm-vermilion-dim);
+  border: 1px solid var(--elm-border);
   padding: 0 .35rem;
+}
+
+.elosern-header.connected .header-conn {
+  color: var(--elm-ok);
+  border-color: var(--elm-ok);
+}
+
+.elosern-header.disconnected .header-conn {
+  color: var(--elm-warn);
+  border-color: var(--elm-border-dim);
 }
 
 /* Narrative: primary reading surface */
@@ -101,11 +134,11 @@ input:focus-visible,
   overflow-y: auto;
   overflow-x: hidden;
   overflow-wrap: break-word;
-  /* Monospace-first so the portal's box/ASCII map art stays column-aligned;
-     CJK glyphs fall through to a CJK face and remain double-width in
-     practice, the standard arrangement for a CJK MUD client. */
-  font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK TC", Consolas,
-    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
+  /* Serif prose per the mockup's reading face; lines carrying box-drawing /
+     ASCII map art keep a monospace-first stack (marked `.map-art` by the
+     append path) so column alignment survives, and command/system echoes
+     keep the UI mono face. */
+  font-family: var(--elm-serif);
 }
 
 .elosern-narrative .out,
@@ -113,6 +146,17 @@ input:focus-visible,
 .elosern-narrative .sys,
 .elosern-narrative .err {
   margin: 0 0 .15rem 0;
+}
+
+/* Box/ASCII map art (detected by the box-drawing glyph range in the append
+   path) stays monospace-first so columns align; CJK glyphs fall through to
+   a CJK face and remain double-width in practice, the standard arrangement
+   for a CJK MUD client. */
+.elosern-narrative .map-art,
+.elosern-narrative .inp,
+.elosern-narrative .sys,
+.elosern-narrative .err {
+  font-family: var(--elm-mono);
 }
 
 /* Placeholders must not fabricate art or map data */
@@ -136,6 +180,13 @@ input:focus-visible,
  * Status panel.
  * ---------------------------------------------------------------- */
 
+.elosern-status .status-heading {
+  font-family: var(--elm-serif);
+  font-weight: 700;
+  margin-bottom: .25rem;
+  color: var(--elm-paper);
+}
+
 .elosern-status .status-actor {
   margin-bottom: .5rem;
 }
@@ -158,10 +209,10 @@ input:focus-visible,
 
 .elosern-status .resource {
   border: 1px solid var(--elm-border);
-  background: var(--elm-ink-panel);
+  background: var(--elm-ink-raise);
   padding: .3rem .5rem;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: baseline;
   gap: .5rem;
 }
@@ -177,6 +228,34 @@ input:focus-visible,
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: .02em;
+}
+
+/* The mockup gauge bars: accessible width-based fills that complement the
+   mandated numeric text (HP fill is the palette's HP red; MP/SP derive from
+   the paper/warning families). */
+.elosern-status .resource-bar {
+  grid-column: 1 / -1;
+  height: .45rem;
+  background: var(--elm-ink);
+  border: 1px solid var(--elm-border-dim);
+  overflow: hidden;
+}
+
+.elosern-status .resource-bar-fill {
+  height: 100%;
+  background: var(--elm-paper-dim);
+}
+
+.elosern-status .resource-bar-hp .resource-bar-fill {
+  background: var(--elm-hp);
+}
+
+.elosern-status .resource-bar-mp .resource-bar-fill {
+  background: var(--elm-warn);
+}
+
+.elosern-status .resource-bar-sp .resource-bar-fill {
+  background: var(--elm-ok);
 }
 
 .elosern-status .status-conditions {
@@ -212,8 +291,9 @@ input:focus-visible,
 .elosern-status .status-disguise,
 .elosern-status .status-combat {
   margin-top: .4rem;
-  color: var(--elm-vermilion);
-  border: 1px solid var(--elm-vermilion-dim);
+  /* Small text on dark stays text-safe; the deep seal red carries the border. */
+  color: var(--elm-warn);
+  border: 1px solid var(--elm-vermilion);
   padding: .2rem .4rem;
   width: fit-content;
 }
@@ -222,20 +302,25 @@ input:focus-visible,
  * Action dock.
  * ---------------------------------------------------------------- */
 
+/* The mockup's command surface: `#211c18` surface with a 1px seal-red frame,
+   a guidance line naming the shortcuts, and grid buttons. */
 .elosern-action-dock {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: .35rem;
-  background: var(--elm-ink-panel);
-  border-top: 1px solid var(--elm-border);
+  background: var(--elm-ink-dock);
+  border: 1px solid var(--elm-vermilion);
+  border-top: 1px solid var(--elm-vermilion);
   overflow: hidden;
 }
 
 .elosern-action-dock .action-guidance {
   margin: 0;
   color: var(--elm-paper-dim);
-  font-size: .9em;
+  /* The mockup's guidance line: 11px dim text naming the shortcuts. */
+  font-size: 11px;
+  line-height: 1.4em;
 }
 
 /* Disabled controls keep a programmatically associated explanation. */
@@ -245,41 +330,104 @@ input:focus-visible,
   color: var(--elm-paper-dim);
 }
 
+/* Visually hidden description elements (disabled-reason association at
+   depths where no visible detail pane exists). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The mockup split: item grid on the left, detail pane on the right
+   (dock-level ≈1.35fr / 0.9fr). */
+.exploration-layout,
+.combat-layout,
+.services-layout,
+.character-layout,
+.creation-layout {
+  display: grid;
+  grid-template-columns: 1.35fr 0.9fr;
+  gap: .5rem;
+  min-height: 0;
+}
+
+.exploration-layout .exploration-menu,
+.combat-layout .combat-controls,
+.services-layout .services-menu,
+.character-layout .character-menu,
+.creation-layout .creation-body {
+  min-width: 0;
+  min-height: 0;
+}
+
+.exploration-layout .exploration-detail,
+.combat-layout .combat-detail,
+.services-layout .services-detail,
+.character-layout .character-detail,
+.creation-layout .creation-detail {
+  min-width: 0;
+  border-left: 1px solid var(--elm-border-dim);
+  padding-left: .5rem;
+}
+
 /* ---------------------------------------------------------------- *
  * Shared dock rows (webclient-pointer-activation). Every dock surface
  * renders through DockSurface.renderRows; these rules style the one
- * row model. Focus is indicated by an outline plus a leading glyph,
- * never by color alone.
+ * row model. Focus is a seal-red fill plus a leading glyph, never
+ * color alone.
  * ---------------------------------------------------------------- */
+
+.dock-grid {
+  display: grid;
+  gap: 7px;
+}
 
 .elosern-action-dock .dock-row {
   color: var(--elm-paper);
-  background: var(--elm-ink-panel, #1c1c1c);
-  border: 1px solid var(--elm-border, #3a3a3a);
+  background: var(--elm-ink-panel);
+  border: 1px solid var(--elm-border);
   padding: .2rem .6rem;
   cursor: pointer;
+  text-align: center;
 }
 
 .elosern-action-dock .dock-row.focused {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  background: var(--elm-vermilion);
+  border-color: var(--elm-vermilion);
+  color: var(--elm-paper);
+  outline: 2px solid var(--elm-focus-ring);
   outline-offset: 2px;
-  border-style: double;
 }
 
 .elosern-action-dock .dock-row.focused::before {
-  content: "▸ ";
+  content: "▶ ";
+}
+
+/* AREA candidate selection marker: a leading check (paired with the text and
+   an ok-green border, never color alone). */
+.elosern-action-dock .dock-row.selected {
+  border-color: var(--elm-ok);
 }
 
 .elosern-action-dock .dock-row.disabled {
   color: var(--elm-paper-dim);
+  border-color: var(--elm-border-dim);
   border-style: dashed;
+  background: var(--elm-ink);
 }
 
 /* The listbox container is the single tab stop; its focus ring is the
    composite widget's focus indication (rows themselves stay out of the
    sequential navigation order). */
 .elosern-action-dock [role="listbox"]:focus {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 2px solid var(--elm-focus-ring);
   outline-offset: 2px;
 }
 
@@ -301,17 +449,21 @@ input:focus-visible,
 }
 
 .elosern-drawer .inputfieldwrapper {
-  position: relative;
+  /* Flex row, not absolute-position width arithmetic: the field grows, the
+     button keeps a fixed 2rem width, and border-box keeps every border
+     inside the wrapper so the field/button row stays aligned at both
+     supported viewports. */
+  display: flex;
+  box-sizing: border-box;
+  gap: 0;
   height: calc(100% - 1.5rem);
+  align-items: stretch;
 }
 
 .elosern-drawer .inputsend {
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 1;
-  height: 100%;
-  width: 2rem;
+  flex: 0 0 2rem;
+  align-self: stretch;
+  box-sizing: border-box;
   color: var(--elm-paper);
   background-color: var(--elm-ink-raise);
   border: 1px solid var(--elm-border);
@@ -320,13 +472,14 @@ input:focus-visible,
 
 .elosern-drawer .inputsend:hover,
 .elosern-drawer .inputsend:focus-visible {
-  background-color: var(--elm-vermilion-dim);
+  background-color: var(--elm-vermilion);
   color: var(--elm-paper);
 }
 
 .elosern-drawer .inputfield {
-  height: 100%;
-  width: calc(100% - 2.25rem);
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
   padding: .25rem .5rem;
   background-color: var(--elm-ink);
   color: var(--elm-paper);
@@ -350,6 +503,9 @@ input:focus-visible,
   border-left: 3px solid var(--elm-vermilion);
   padding-left: .5rem;
   font-size: .9em;
+  /* A live region is announcement-only; it must never intercept pointer
+     events over the dock cells. */
+  pointer-events: none;
 }
 
 /* ---------------------------------------------------------------- *
@@ -369,12 +525,22 @@ input:focus-visible,
 
 /* ---------------------------------------------------------------- *
  * Safe overflow on the supported desktop viewports. The layout fills the
- * viewport and scrolls internally; nothing essential is hidden at 1280x720.
+ * viewport and scrolls internally; nothing essential is hidden at 1280x720 —
+ * the header keeps its location, world time, and connection dot at every
+ * supported viewport, tightening spacing instead of dropping fields.
  * ---------------------------------------------------------------- */
 
 @media screen and (max-width: 1400px) {
-  .elosern-header .header-clock {
-    display: none;
+  .elosern-header .header-meta {
+    gap: .6rem;
+    font-size: .92em;
+  }
+
+  .elosern-header .header-location {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -398,7 +564,7 @@ input:focus-visible,
   z-index: 2000;
   display: none;
   background: rgba(10, 10, 12, 0.82);
-  color: var(--elm-paper, #e8e0d2);
+  color: var(--elm-paper, #e5e0d5);
   font: 1.05rem/1.5 var(--elm-ui-face, sans-serif);
   text-align: center;
   padding: 2rem;
@@ -408,7 +574,7 @@ input:focus-visible,
   margin-top: 18vh;
   font-size: 1.4rem;
   font-weight: 600;
-  color: var(--elm-vermilion, #c84a2e);
+  color: var(--elm-vermilion, #a9322a);
 }
 
 #elosern-offline-overlay[data-visible="true"] {
@@ -416,7 +582,7 @@ input:focus-visible,
 }
 
 /* ---------------------------------------------------------------- *
- * Narrative unread marker (5.5).
+ * Narrative unread marker (5.5): a labeled control hidden when empty.
  * ---------------------------------------------------------------- */
 
 .elosern-narrative {
@@ -428,19 +594,36 @@ input:focus-visible,
   top: 0;
   z-index: 5;
   align-self: flex-start;
-  background: var(--elm-vermilion, #c84a2e);
-  color: var(--elm-ink, #121212);
-  font-weight: 600;
-  padding: .2rem .6rem;
-  border-radius: 0 0 .25rem .25rem;
-  cursor: pointer;
   width: -moz-fit-content;
   width: fit-content;
 }
 
+.narrative-unread[data-count="0"] {
+  display: none;
+}
+
+.narrative-unread-button {
+  background: var(--elm-vermilion);
+  color: var(--elm-paper);
+  border: 1px solid var(--elm-border);
+  font-weight: 600;
+  padding: .2rem .6rem;
+  border-radius: 0 0 .25rem .25rem;
+  cursor: pointer;
+}
+
+.narrative-unread-button:hover {
+  background: var(--elm-vermilion-dim);
+}
+
+.narrative-unread-button:focus-visible {
+  outline: 2px solid var(--elm-focus-ring);
+  outline-offset: 2px;
+}
+
 /* Action dock is always reachable and has a visible focus shape. */
 .elosern-action-dock:focus {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 2px solid var(--elm-focus-ring, #e89a6b);
   outline-offset: 2px;
 }
 
@@ -455,21 +638,23 @@ input:focus-visible,
 }
 
 .elosern-action-dock .combat-heading {
+  font-family: var(--elm-serif);
   color: var(--elm-paper);
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: .3rem;
 }
 
 .elosern-action-dock .combat-recovery {
-  color: var(--elm-vermilion, #ff5c4d);
-  border: 1px solid var(--elm-vermilion-dim, #5c2a26);
+  /* Small text on dark stays text-safe; the deep seal red carries the border. */
+  color: var(--elm-warn);
+  border: 1px solid var(--elm-vermilion);
   padding: .3rem .5rem;
 }
 
 .elosern-action-dock .combat-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: .35rem;
+  gap: 7px;
   margin-bottom: .3rem;
 }
 
@@ -480,7 +665,8 @@ input:focus-visible,
 }
 
 .elosern-action-dock .combat-live {
-  color: var(--elm-vermilion, #ff5c4d);
+  /* The action-result live region: text stays text-safe on dark. */
+  color: var(--elm-warn);
   min-height: 1.2rem;
 }
 
@@ -505,8 +691,17 @@ input:focus-visible,
  * ---------------------------------------------------------------- */
 
 .elosern-action-dock .services-heading {
+  font-family: var(--elm-serif);
   color: var(--elm-paper);
-  font-weight: 600;
+  font-weight: 700;
+  margin-bottom: .3rem;
+}
+
+.elosern-action-dock .exploration-heading,
+.elosern-action-dock .character-heading {
+  font-family: var(--elm-serif);
+  color: var(--elm-paper);
+  font-weight: 700;
   margin-bottom: .3rem;
 }
 
@@ -515,7 +710,7 @@ input:focus-visible,
 .elosern-action-dock .character-menu {
   display: flex;
   flex-wrap: wrap;
-  gap: .35rem;
+  gap: 7px;
   margin-bottom: .3rem;
 }
 
@@ -530,7 +725,7 @@ input:focus-visible,
 .elosern-action-dock .services-quantity {
   margin: .3rem 0;
   padding: .3rem .5rem;
-  border: 1px solid var(--elm-border, #3a3a3a);
+  border: 1px solid var(--elm-border, #514c43);
 }
 
 .elosern-action-dock .services-quantity-value {
@@ -541,11 +736,11 @@ input:focus-visible,
 .elosern-action-dock .services-confirm {
   margin: .3rem 0;
   padding: .3rem .5rem;
-  border: 2px double var(--elm-vermilion, #ff5c4d);
+  border: 2px double var(--elm-vermilion, #a9322a);
 }
 
 .elosern-action-dock .services-live {
-  color: var(--elm-vermilion, #ff5c4d);
+  color: var(--elm-warn);
   min-height: 1.2rem;
 }
 
@@ -569,6 +764,15 @@ input:focus-visible,
   overflow: auto;
   color: var(--elm-paper);
   font-size: .85em;
+  background: var(--elm-ink-raise);
+  border: 1px solid var(--elm-border);
+}
+
+.local-map-heading {
+  font-family: var(--elm-serif);
+  font-weight: 700;
+  margin-bottom: .25rem;
+  color: var(--elm-paper);
 }
 
 .local-map-title {
@@ -593,7 +797,7 @@ input:focus-visible,
   position: absolute;
   transform: translate(-50%, -50%);
   background: transparent;
-  border: 1px solid var(--elm-border, #3a3a3a);
+  border: 1px solid var(--elm-border, #514c43);
   color: var(--elm-paper);
   padding: 0 .3rem;
   min-width: 1rem;
@@ -625,8 +829,8 @@ input:focus-visible,
 .node-border-dashed { border-style: dashed; }
 
 .node-current {
-  color: var(--elm-vermilion, #ff5c4d);
-  border-color: var(--elm-vermilion, #ff5c4d);
+  color: var(--elm-vermilion, #a9322a);
+  border-color: var(--elm-vermilion, #a9322a);
   font-weight: bold;
 }
 .node-visible_visited {
@@ -635,18 +839,18 @@ input:focus-visible,
 }
 .node-visible_unvisited {
   color: var(--elm-paper-dim);
-  border-color: var(--elm-border, #3a3a3a);
+  border-color: var(--elm-border, #514c43);
 }
 .node-remembered {
   color: var(--elm-paper-dim);
-  border-color: var(--elm-focus-ring, #ff8a5c);
+  border-color: var(--elm-focus-ring, #e89a6b);
 }
 .node-anchor {
-  outline: 1px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 1px solid var(--elm-focus-ring, #e89a6b);
 }
 .node-focusable:focus,
 .node-focusable:focus-visible {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 2px solid var(--elm-focus-ring, #e89a6b);
   outline-offset: 2px;
 }
 
@@ -658,14 +862,14 @@ input:focus-visible,
 }
 
 .local-map-edge {
-  stroke: var(--elm-border, #3a3a3a);
+  stroke: var(--elm-border, #514c43);
   stroke-width: 2;
 }
 .local-map-edge.edge-known {
   stroke: var(--elm-paper-dim);
 }
 .local-map-edge.edge-traversable {
-  stroke: var(--elm-focus-ring, #ff8a5c);
+  stroke: var(--elm-focus-ring, #e89a6b);
 }
 
 /* Remembered remote nodes: a bounded focusable list below the canvas. */
@@ -723,15 +927,16 @@ input:focus-visible,
 }
 
 .elosern-action-dock .creation-heading {
+  font-family: var(--elm-serif);
   color: var(--elm-paper);
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: .3rem;
 }
 
 .elosern-action-dock .creation-body {
   display: flex;
   flex-wrap: wrap;
-  gap: .35rem;
+  gap: 7px;
   margin-bottom: .3rem;
 }
 
@@ -739,8 +944,8 @@ input:focus-visible,
    the row model (modal form fields own their own keys). */
 .elosern-action-dock .creation-control {
   color: var(--elm-paper);
-  background: var(--elm-ink-panel, #1c1c1c);
-  border: 1px solid var(--elm-border, #3a3a3a);
+  background: var(--elm-ink-panel, #151513);
+  border: 1px solid var(--elm-border, #514c43);
   padding: .2rem .6rem;
   cursor: pointer;
 }
@@ -754,14 +959,14 @@ input:focus-visible,
 }
 
 .elosern-action-dock .creation-live {
-  color: var(--elm-vermilion, #ff5c4d);
+  color: var(--elm-warn);
   min-height: 1.2rem;
 }
 
 .elosern-action-dock .creation-confirm {
   margin: .3rem 0;
   padding: .3rem .5rem;
-  border: 2px double var(--elm-vermilion, #ff5c4d);
+  border: 2px double var(--elm-vermilion, #a9322a);
   width: 100%;
 }
 
@@ -791,20 +996,21 @@ input:focus-visible,
 .elosern-action-dock .creation-field input[type="text"],
 .elosern-action-dock .creation-field input[type="number"] {
   color: var(--elm-paper);
-  background: var(--elm-ink-panel, #1c1c1c);
-  border: 1px solid var(--elm-border, #3a3a3a);
+  background: var(--elm-ink-panel, #151513);
+  border: 1px solid var(--elm-border, #514c43);
   padding: .15rem .4rem;
   min-width: 6rem;
 }
 
 .elosern-action-dock .creation-field input:focus,
 .elosern-action-dock .creation-field input:focus-visible {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 2px solid var(--elm-focus-ring, #e89a6b);
   outline-offset: 2px;
 }
 
 .elosern-action-dock .creation-field-message {
-  color: var(--elm-vermilion, #ff5c4d);
+  /* Field validation text is small red text on dark: text-safe token. */
+  color: var(--elm-warn);
   font-size: .85em;
 }
 
@@ -820,12 +1026,12 @@ input:focus-visible,
   align-items: center;
   gap: .2rem;
   color: var(--elm-paper);
-  border: 1px solid var(--elm-border, #3a3a3a);
+  border: 1px solid var(--elm-border, #514c43);
   padding: .15rem .4rem;
 }
 
 .elosern-action-dock .creation-radio:focus-within {
-  outline: 2px solid var(--elm-focus-ring, #ff8a5c);
+  outline: 2px solid var(--elm-focus-ring, #e89a6b);
   outline-offset: 2px;
 }
 
@@ -888,7 +1094,7 @@ input:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--elm-border);
+  border: 1px dashed var(--elm-border-art);
   color: var(--elm-paper-dim);
   text-align: center;
 }
@@ -897,8 +1103,11 @@ input:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--elm-border);
-  color: var(--elm-paper-dim);
+  /* The mockup's truthful scene placeholder: the green-brown gradient with
+     the scene label bottom-left (the caption below carries the label). */
+  background: var(--elm-art-gradient);
+  border: 1px solid var(--elm-border-art);
+  color: var(--elm-paper);
   text-align: center;
   flex: 1 1 auto;
 }
@@ -939,7 +1148,8 @@ input:focus-visible,
   background: rgba(0, 0, 0, .25);
 }
 
-/* Contextual 3:4 portrait overlay at bottom right. */
+/* Contextual 3:4 portrait overlay at bottom right with the mockup's 2px
+   seal-red frame. */
 .elosern-art .art-portrait {
   position: absolute;
   right: .5rem;
@@ -949,7 +1159,7 @@ input:focus-visible,
   display: flex;
   flex-direction: column;
   background: rgba(0, 0, 0, .72);
-  border: 1px solid var(--elm-border);
+  border: 2px solid var(--elm-vermilion);
   border-radius: .25rem;
   overflow: hidden;
 }

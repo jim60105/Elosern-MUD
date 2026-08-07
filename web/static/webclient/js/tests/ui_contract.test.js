@@ -118,6 +118,80 @@ test("narrative preserves scrollback position with an unread count", () => {
   assert.match(source, /wasAtBottom/);
 });
 
+test("drawer field Enter routes through the plugin onKeydown contract", () => {
+  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
+  // The routing gate treats the drawer's own field as the open drawer
+  // (pointer-focused field: Enter sends, Escape restores dock focus).
+  assert.match(source, /isDrawerField\(event\.target\)/);
+  assert.match(source, /drawer\.isOpen\(\) \|\| isDrawerField\(/);
+  // No direct listener is bound on the field: exactly one send path exists,
+  // owned by the drawer component and dispatched through the plugin handler.
+  assert.strictEqual(
+    /document\.addEventListener\(\s*["']keydown["']/.test(source),
+    false,
+    "keydown must keep flowing through the plugin contract"
+  );
+  const drawer = read("web/static/webclient/js/plugins/goldenlayout.js");
+  const sendOccurrences = (drawer.match(/plugin_handler\.onSend\(text\)/g) || []).length;
+  assert.strictEqual(
+    sendOccurrences,
+    1,
+    "the drawer must own exactly one send implementation"
+  );
+});
+
+test("the rest-duration form never swallows keys typed in the drawer field", () => {
+  const source = read("web/static/webclient/js/plugins/exploration_dock.js");
+  assert.match(source, /closest\(\s*["']\.inputfieldwrapper["']\s*\)/);
+});
+
+test("seal-red small text is never used on dark surfaces", () => {
+  // The deep seal-red token (≈2.9:1 on ink) is restricted to fills, borders,
+  // and large/bold text and symbols. A dark-surface `color:` declaration that
+  // uses the token -- or its raw hex -- would fail the contrast floor, so the
+  // repository contract rejects it. The only deep seal-red *text* uses are
+  // the current map node (large/bold with a shape companion) and the offline
+  // overlay title (1.4rem bold).
+  const files = [
+    "web/static/webclient/css/elosern.css",
+    "web/static/webclient/css/goldenlayout.css",
+  ];
+  // The project CSS is hand-written and unminified: rules end at the first
+  // `}` that closes the opening `{`, and no declaration string contains a
+  // literal `{` or `}`.
+  function selectorsWithRedTextColor(css) {
+    const selectors = [];
+    const pattern = /([^{}]*)\{([^{}]*)\}/g;
+    let match;
+    while ((match = pattern.exec(css)) !== null) {
+      const selector = match[1].trim();
+      const body = match[2];
+      // A declaration-boundary match so `border-left-color:
+      // var(--elm-vermilion)` (an approved border role) is not mistaken for
+      // a text color.
+      if (/(?:^|[;\n])\s*color:\s*var\(--elm-vermilion/.test(body)) {
+        selectors.push(selector);
+      }
+    }
+    return selectors;
+  }
+  for (const rel of files) {
+    const css = read(rel);
+    for (const selector of selectorsWithRedTextColor(css)) {
+      assert.match(
+        selector,
+        /node-current|offline-title/,
+        `${rel}: deep seal-red text is allowed only on the current map node and the offline title (large/bold roles); offending rule selector: ${selector}`
+      );
+    }
+    assert.strictEqual(
+      /(?:^|[;\n])\s*color:\s*#a9322a/.test(css),
+      false,
+      `${rel}: the raw deep seal-red hex must never be used as text color`
+    );
+  }
+});
+
 test("creation dock and menu insert text via text APIs and never trust HTML", () => {
   const dock = read("web/static/webclient/js/plugins/creation_dock.js");
   const menu = read("web/static/webclient/js/elosern/creation_menu.js");

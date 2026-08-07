@@ -5,7 +5,11 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import store_state
+from .browser_helpers import (
+    install_outbound_recorder,
+    sent_action_count,
+    store_state,
+)
 
 REQUIRED_SURFACES = (
     ".elosern-header",
@@ -67,8 +71,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertTrue(current.isdigit(), f"current not numeric: {current!r}")
             self.assertTrue(maximum.isdigit(), f"maximum not numeric: {maximum!r}")
 
+        # The mockup gauge bars complement the mandated numeric text.
+        bars = page.locator(".resource-bar").all_inner_texts()
+        self.assertEqual(len(bars), 3, "hp, mp, sp gauge bars")
+
         header_conn = page.locator(".header-conn").inner_text()
-        self.assertEqual(header_conn, "已連線")
+        self.assertIn("已連線", header_conn)
 
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
@@ -281,6 +289,11 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         narrative = page.locator(".elosern-narrative")
 
+        # The marker is absent entirely while the count is zero.
+        marker = page.locator("#narrative-unread")
+        self.assertEqual(marker.count(), 1)
+        self.assertEqual(marker.get_attribute("data-count"), "0")
+
         # Guarantee overflow so the narrative can be scrolled up.
         page.evaluate(
             "() => { for (let i = 0; i < 80; i++) { "
@@ -301,11 +314,11 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             "() => Elosern.goldenlayout.onText(['unread probe line'], {})"
         )
         page.wait_for_function(
-            "() => (document.getElementById('narrative-unread').textContent || '')"
-            ".indexOf('未讀') !== -1"
+            "() => document.getElementById('narrative-unread')"
+            ".getAttribute('data-count') !== '0'"
         )
-        unread = page.locator("#narrative-unread").inner_text()
-        self.assertRegex(unread, r"未讀 \d+")
+        unread = page.locator("#narrative-unread .narrative-unread-button").inner_text()
+        self.assertRegex(unread, r"↓ \d+ 則新訊息（點擊返回最新）")
 
         # The viewport must not have been forced to the bottom.
         scroll_top_after = page.evaluate(
@@ -313,26 +326,300 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         self.assertEqual(scroll_top_after, 0)
 
-        # Scrolling to the bottom clears the unread marker.
-        page.evaluate(
-            "() => { const el = document.querySelector('.elosern-narrative'); "
-            "el.scrollTop = el.scrollHeight; }"
-        )
+        # Clicking the marker jumps to the bottom, clears the count, and hides
+        # the marker.
+        page.locator(".narrative-unread-button").click()
         page.wait_for_function(
-            "() => (document.getElementById('narrative-unread').textContent || '')"
-            " === ''"
+            "() => document.getElementById('narrative-unread')"
+            ".getAttribute('data-count') === '0'"
         )
-        self.assertEqual(page.locator("#narrative-unread").inner_text(), "")
+        self.assertEqual(
+            page.locator("#narrative-unread").get_attribute("data-count"),
+            "0",
+        )
 
     @covers_requirement(
-        "webclient-status-presentation::server-time-and-location-are-read-only-presentation-data"
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
     )
-    def test_header_shows_mode_and_server_time(self):
+    def test_unread_marker_keyboard_activation_moves_focus_to_narrative(self):
+        page = self.logged_in_page()
+        # Guarantee overflow and scroll up so an unread count accumulates.
+        page.evaluate(
+            "() => { for (let i = 0; i < 80; i++) { "
+            "Elosern.goldenlayout.onText(['filler line ' + i], {}); } }"
+        )
+        page.wait_for_timeout(300)
+        page.evaluate(
+            "() => { const el = document.querySelector('.elosern-narrative'); "
+            "el.scrollTop = 0; }"
+        )
+        page.evaluate(
+            "() => Elosern.goldenlayout.onText(['unread probe line'], {})"
+        )
+        page.wait_for_function(
+            "() => document.getElementById('narrative-unread')"
+            ".getAttribute('data-count') !== '0'"
+        )
+        # Keyboard activation (Enter on the focused marker button) jumps to the
+        # bottom and parks focus on the narrative pane, never a hidden element.
+        page.locator(".narrative-unread-button").focus()
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "() => document.activeElement === "
+            "document.querySelector('.elosern-narrative')"
+        )
+        self.assertEqual(
+            page.locator("#narrative-unread").get_attribute("data-count"),
+            "0",
+        )
+
+    @covers_requirement(
+        "webclient-status-presentation::server-time-and-location-are-read-only-presentation-data",
+        "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
+    )
+    def test_header_shows_location_time_and_connection_dot(self):
         page = self.logged_in_page()
         state = store_state(page)
         self.assertEqual(state["mode"], "exploration")
-        self.assertEqual(page.locator(".header-mode").inner_text(), "模式：exploration")
         self.assertIsNotNone(state["serverTime"])
+
+        # The header identifies location, world time, and the connected state;
+        # the raw mode label is gone (the dock content identifies the mode).
+        header = page.locator(".elosern-header")
+        self.assertEqual(header.evaluate("el => el.classList.contains('connected')"), True)
+        location = page.locator(".header-location").inner_text()
+        self.assertNotEqual(location, "位置：--", "location must be synced")
+        self.assertTrue(location.strip())
+        clock = page.locator(".header-clock").inner_text()
+        self.assertRegex(clock, r"\d+ 日 · \d{2}:\d{2}")
+        conn = page.locator(".header-conn").inner_text()
+        self.assertIn("●", conn)
+        self.assertIn("已連線", conn)
+        self.assertEqual(page.locator(".header-mode").count(), 0, "no raw mode label")
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+    )
+    def test_pointer_focused_field_sends_on_enter(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        narrative_before = page.locator(".elosern-narrative").inner_text()
+
+        # A direct pointer click into the drawer field never opens the drawer;
+        # Enter must still send exactly one ordinary text message through the
+        # single drawer-owned path, clear the field, and keep focus in it.
+        page.locator("#inputfield").click()
+        self.assertFalse(page.evaluate("Elosern.drawer.isOpen()"))
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
+            arg=narrative_before.__len__(),
+        )
+        self.assertEqual(
+            page.evaluate("document.getElementById('inputfield').value"),
+            "",
+            "the field must clear after a pointer-focused send",
+        )
+        self.assertTrue(
+            page.evaluate(
+                "document.activeElement === document.getElementById('inputfield')"
+            ),
+            "focus stays in the field after an input-area send",
+        )
+        sends = [
+            args[0]
+            for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmd == "text"
+        ]
+        self.assertEqual(len(sends), 1, "exactly one text message is sent")
+        self.assertTrue(any("look" in str(item) for item in sends))
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+    )
+    def test_shift_enter_in_field_inserts_newline_without_sending(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        narrative_before = page.locator(".elosern-narrative").inner_text()
+        page.locator("#inputfield").click()
+        page.keyboard.type("first line")
+        page.keyboard.press("Shift+Enter")
+        page.keyboard.type("second line")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
+            arg=narrative_before.__len__(),
+        )
+        sends = [
+            args[0]
+            for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmd == "text"
+        ]
+        self.assertEqual(len(sends), 1, "Shift+Enter must not send")
+        self.assertIn("first line\nsecond line", str(sends[0]))
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+    )
+    def test_open_rest_form_never_swallows_drawer_field_enter(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        # The Wait/休息 entry is always the last root cell (5-7 cells
+        # depending on quest/inventory capability availability).
+        page.evaluate("document.getElementById('action-dock').focus()")
+        cell_count = page.evaluate(
+            "document.querySelectorAll('#action-dock [data-item-key]').length"
+        )
+        for _ in range(cell_count - 1):
+            page.keyboard.press("ArrowRight")
+        page.keyboard.press("Enter")  # Wait/休息
+        page.keyboard.press("ArrowDown")  # 等待至正午
+        page.keyboard.press("ArrowDown")  # 休息一段時間
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "() => document.getElementById('exploration-rest-form') !== null"
+        )
+        # Click into the drawer field and send: the rest form's capture-phase
+        # handler must yield, and the command travels as ordinary text (never
+        # an explore.wait submission).
+        page.locator("#inputfield").click()
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(300)
+        self.assertEqual(
+            sent_action_count(page, "explore.wait"),
+            0,
+            "the rest form must not swallow the drawer send",
+        )
+        sends = [
+            args[0]
+            for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmd == "text"
+        ]
+        self.assertTrue(
+            any("look" in str(item) for item in sends),
+            "the command must travel through the text transport",
+        )
+
+    @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
+    )
+    def test_drawer_field_button_alignment_at_both_viewports(self):
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            page.wait_for_timeout(200)
+            geometry = page.evaluate(
+                """() => {
+                  const field = document.getElementById('inputfield');
+                  const button = document.querySelector('.inputsend');
+                  const wrapper = document.querySelector('.inputfieldwrapper');
+                  const rect = (el) => {
+                    const r = el.getBoundingClientRect();
+                    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+                  };
+                  return { field: rect(field), button: rect(button), wrapper: rect(wrapper) };
+                }"""
+            )
+            for edge in ("top", "bottom"):
+                self.assertLessEqual(
+                    abs(geometry["button"][edge] - geometry["field"][edge]),
+                    1.0,
+                    f"{edge} edges must align at {viewport}",
+                )
+            # The button sits flush at the wrapper's right edge and directly
+            # abuts the field (the 0.25rem ragged gap is gone), and neither
+            # child extends outside the wrapper.
+            self.assertLessEqual(
+                abs(geometry["button"]["right"] - geometry["wrapper"]["right"]),
+                1.0,
+                f"the button must sit flush in the wrapper at {viewport}",
+            )
+            self.assertLessEqual(
+                abs(geometry["field"]["right"] - geometry["button"]["left"]),
+                1.0,
+                f"the field must abut the button without a gap at {viewport}",
+            )
+            self.assertLessEqual(
+                geometry["field"]["left"],
+                geometry["wrapper"]["right"],
+                "the field must stay inside the wrapper",
+            )
+            self.assertGreaterEqual(
+                geometry["field"]["left"],
+                geometry["wrapper"]["left"],
+                "the field must not extend outside the wrapper",
+            )
+            self.assertLessEqual(
+                geometry["button"]["right"],
+                geometry["wrapper"]["right"] + 1.0,
+                "the button must stay inside the wrapper",
+            )
+
+    @covers_requirement(
+        "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
+        "webclient-desktop-shell::theme-and-controls-remain-accessible",
+    )
+    def test_action_dock_renders_the_mockup_command_surface(self):
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            dock = page.locator("#action-dock")
+            self.assertTrue(dock.is_visible())
+            # Seal-red frame + guidance line naming the shortcuts.
+            frame = page.evaluate(
+                """() => {
+                  const style = getComputedStyle(document.getElementById('action-dock'));
+                  return { borderTop: style.borderTopColor,
+                           background: style.backgroundColor };
+                }"""
+            )
+            self.assertEqual(frame["borderTop"], "rgb(169, 50, 42)")
+            guidance = page.locator("#action-dock-guidance").inner_text()
+            for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 開啟指令"):
+                self.assertIn(keyword, guidance)
+            # The root is one equal-width row of grid cells with the mockup
+            # chrome: focused cell = seal-red fill + leading glyph. The cell
+            # count varies 5-7 with quest/inventory capability availability.
+            cells = page.locator("#action-dock [data-item-key]")
+            self.assertGreaterEqual(cells.count(), 5)
+            self.assertLessEqual(cells.count(), 7)
+            focused = page.locator("#action-dock .dock-row.focused").first
+            self.assertEqual(
+                focused.evaluate(
+                    "el => getComputedStyle(el).backgroundColor"
+                ),
+                "rgb(169, 50, 42)",
+                "the focused cell carries the seal-red fill",
+            )
+            self.assertTrue(
+                "▶" in focused.evaluate("el => getComputedStyle(el, '::before').content"),
+                "the focused cell carries the leading glyph",
+            )
+            # The mockup root draws no visible detail pane; opening a submenu
+            # reveals the grid + detail split.
+            self.assertEqual(page.locator(".exploration-detail").count(), 0)
+            page.keyboard.press("Enter")  # Move
+            page.wait_for_function(
+                "() => document.getElementById('exploration-detail') !== null"
+            )
+            detail = page.locator("#exploration-detail")
+            self.assertTrue(detail.is_visible())
+            self.assertEqual(
+                page.evaluate(
+                    "document.querySelector('.exploration-menu')"
+                    ".classList.contains('dock-grid')"
+                ),
+                True,
+                "submenu item lists render as a CSS grid",
+            )
+            # The detail pane names the focused item's next key action.
+            page.evaluate("Elosern.keyboard.focusItemByKey('back')")
+            page.wait_for_timeout(120)
+            self.assertIn(
+                "返回上一層",
+                detail.inner_text(),
+                "the detail pane names the back cell's next key action",
+            )
 
 
 if __name__ == "__main__":

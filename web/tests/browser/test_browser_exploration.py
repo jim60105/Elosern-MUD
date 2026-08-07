@@ -90,8 +90,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
     def _open_root(self, page, index):
         self._reset_root(page)
+        # The exploration root is a single seven-column row (mockup grid), so
+        # horizontal arrows move across it; submenus are 2-column grids.
         for _ in range(index):
-            _press(page, "ArrowDown")
+            _press(page, "ArrowRight")
         _press(page, "Enter")
 
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
@@ -203,9 +205,9 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         self._open_root(page, 2)  # Interact
-        _press(page, "ArrowDown")  # the bard (LLMNPC)
+        _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowDown")  # 自由交談 (after the scripted affordance)
+        _press(page, "ArrowRight")  # 自由交談 (second grid column)
         _press(page, "Enter")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
@@ -234,9 +236,9 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         # Open free-form dialogue but cancel with Escape without sending.
         self._open_root(page, 2)  # Interact
-        _press(page, "ArrowDown")  # the bard (LLMNPC)
+        _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowDown")  # 自由交談
+        _press(page, "ArrowRight")  # 自由交談 (second grid column)
         _press(page, "Enter")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
@@ -284,8 +286,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         self._open_root(page, 2)  # Interact
-        _press(page, "ArrowDown")  # the bard
-        _press(page, "ArrowDown")  # the goblin
+        _press(page, "ArrowDown")  # the goblin (second grid row, first column)
         _press(page, "Enter")
         _press(page, "Enter")  # 戰鬥 (engage)
         deadline = time.monotonic() + 30
@@ -311,7 +312,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # daypart boundary rejects before any clock advance.
         time_before = store_state(page)["serverTime"]
         self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至黎明
+        _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
         _press(page, "Enter")
         deadline = time.monotonic() + 20
         result = None
@@ -327,10 +328,8 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # The bounded custom-duration form is parsed server-side and rejected
         # by the same safety gate.
         self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至黎明
-        _press(page, "ArrowDown")  # 等待至正午
-        _press(page, "ArrowDown")  # 等待至黃昏
-        _press(page, "ArrowDown")  # 休息一段時間
+        _press(page, "ArrowDown")  # 等待至正午 (second grid row)
+        _press(page, "ArrowDown")  # 休息一段時間 (third grid row)
         _press(page, "Enter")
         page.wait_for_function(
             "() => document.getElementById('exploration-rest-form') !== null"
@@ -365,7 +364,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         time_before = store_state(page)["serverTime"]
         self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至黎明
+        _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
         _press(page, "Enter")
         deadline = time.monotonic() + 20
         ok = None
@@ -492,6 +491,123 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.move"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
+
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    def test_pointer_back_cell_returns_to_the_root_without_an_action(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        # Pointer: open Look, then click its final back cell.
+        page.locator('[data-item-key="look"]').click()
+        page.wait_for_function(
+            "() => document.getElementById('exploration-detail') !== null"
+        )
+        page.locator('[data-item-key="back"]').click()
+        page.wait_for_function(
+            "() => { const keys = Array.from("
+            "document.querySelectorAll('#action-dock [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'));"
+            "return keys.indexOf('move') !== -1 && keys.indexOf('look') !== -1; }"
+        )
+        # The root cells render again, no ui_action was sent, and no drawer
+        # text was submitted.
+        keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+        )
+        self.assertEqual(
+            keys,
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+        )
+        self.assertEqual(sent_action_count(page), 0)
+        self.assertEqual(
+            page.evaluate("Elosern.keyboard.depth()"),
+            1,
+            "the back cell pops exactly one router frame",
+        )
+
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    def test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        # Interact -> the guard -> 交談 (scripted keywords): two levels deep.
+        panel = self._exploration_panel(page)
+        guard_identity = panel["interact"][0]["identity"]
+        self._open_root(page, 2)  # Interact
+        _press(page, "Enter")  # the guard (first present target)
+        _press(page, "Enter")  # 交談 (first affordance)
+        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 4)
+        _press(page, "Escape")  # back to the target-affordance menu
+        page.wait_for_timeout(80)
+        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 3)
+        target_keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+        )
+        # The guard's affordance menu: the scripted-talk entry plus the final
+        # back cell (the exploration fixture carries no guild navigate entry).
+        self.assertEqual(
+            target_keys,
+            ["talk-scripted", "back"],
+            "the target-affordance cells must render after one Escape",
+        )
+        self.assertEqual(
+            page.evaluate("Elosern.explorationDock._currentMenuKey"),
+            "target-" + str(guard_identity),
+        )
+        _press(page, "Escape")  # back to the Interact target list
+        page.wait_for_timeout(80)
+        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 2)
+        interact_keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+        )
+        expected_interact = [
+            "target-" + str(target["identity"]) for target in panel["interact"]
+        ]
+        expected_interact.append("back")
+        self.assertEqual(
+            interact_keys,
+            expected_interact,
+            "the Interact list cells must render after the second Escape",
+        )
+        self.assertEqual(page.evaluate("Elosern.explorationDock._currentMenuKey"), "interact")
+        self.assertEqual(sent_action_count(page), 0)
+
+    @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
+    def test_escape_from_quests_service_submenu_leaves_root_clean(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        # Quests opens a re-homed services submenu; Escape must return to the
+        # exploration root without corrupting or re-rendering exploration
+        # cells (the shared-router regression).
+        self._open_root(page, 4)  # Quests
+        self.assertEqual(
+            page.evaluate("Elosern.serviceDock.isActive()"),
+            True,
+            "the services dock must own the surface inside Quests",
+        )
+        _press(page, "Escape")
+        page.wait_for_timeout(120)
+        self.assertEqual(page.evaluate("Elosern.serviceDock.isActive()"), False)
+        keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+        )
+        self.assertEqual(
+            keys,
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+            "the exploration root cells must render after Escape from Quests",
+        )
+        self.assertEqual(
+            page.evaluate("Elosern.explorationDock._currentMenuKey"),
+            "root",
+        )
 
 
 if __name__ == "__main__":

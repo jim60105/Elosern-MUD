@@ -27,6 +27,18 @@
     );
   }
 
+  // The drawer's own textarea (inside `.inputfieldwrapper`). Focusing it by
+  // pointer never opens the drawer, so the routing gate must treat the field
+  // itself as the open drawer: Enter sends, Escape restores dock focus.
+  function isDrawerField(target) {
+    return !!(
+      target &&
+      target.id === "inputfield" &&
+      target.closest &&
+      target.closest(".inputfieldwrapper")
+    );
+  }
+
   function getKeyboard() {
     return (
       window.Elosern &&
@@ -89,12 +101,14 @@
       }
       return true;
     }
-    if (drawer && drawer.isOpen()) {
-      // The open drawer owns its field. Enter sends and Escape cancels; every
-      // other key typed into the drawer is claimed (without preventDefault,
-      // so normal editing proceeds) so the plugin handler reports no
-      // unhandled keydown while the player types. The stock command-history
-      // recall keys are not claimed and keep their turn.
+    if (drawer && (drawer.isOpen() || isDrawerField(event.target))) {
+      // The open drawer (or the drawer field focused by any means -- a `/`
+      // keystroke, a dock-borrowed free-form dialogue, or a direct pointer
+      // click) owns its field. Enter without Shift sends and Escape cancels;
+      // every other key typed into the field is claimed (without
+      // preventDefault, so normal editing proceeds) so the plugin handler
+      // reports no unhandled keydown while the player types. The stock
+      // command-history recall keys are not claimed and keep their turn.
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         drawer.send();
@@ -115,7 +129,12 @@
       return false;
     }
     if (keyboard) {
-      var repeat = event.repeat;
+      // jQuery (the vendored 3.2.1) drops the native `repeat` flag from its
+      // synthesized event objects; the original event keeps it, so held-key
+      // suppression must read through `originalEvent`.
+      var repeat =
+        !!event.repeat ||
+        !!(event.originalEvent && event.originalEvent.repeat);
       var key = event.key || (event.which === 13 ? "Enter" : null);
       if (!key) {
         return false;
@@ -208,6 +227,8 @@
 
   // On focus or a disabled confirm, show the focused entry's explanation in
   // the combat detail pane (created by the combat dock) without any packet.
+  // The pane names the focused item, its cost/availability, and the next key
+  // action, matching the mockup's detail pane.
   function renderCombatDetail(payload) {
     var detail = document.getElementById("combat-detail");
     if (!detail) {
@@ -225,6 +246,18 @@
         "";
     } else {
       text = item.description || "";
+      if (item.costText) {
+        text += (text ? "　" : "") + item.costText;
+      }
+      if (item.actionId === "toggle-target") {
+        text += (text ? "　" : "") + "Space → 選擇目標";
+      } else if (item.confirm || item.key === "area-confirm") {
+        text += (text ? "　" : "") + "Enter → 確認施展";
+      } else if (item.actionId === "open-skill") {
+        text += (text ? "　" : "") + "Enter → 開啟";
+      } else if (item.actionId) {
+        text += (text ? "　" : "") + "Enter → 執行";
+      }
     }
     setSafeText(detail, text);
   }
@@ -329,14 +362,15 @@
       }
     }
     // Exploration dock navigation events (submenus, targets, keyword buttons,
-    // character root, re-homed service submenus, free-form dialogue) are owned
-    // by the exploration dock.
+    // the final back row, character root, re-homed service submenus, free-form
+    // dialogue) are owned by the exploration dock.
     var exploration = getExploration();
     if (exploration && exploration.isActive && exploration.isActive()) {
       if (
         item.openSubmenu ||
         item.openTarget ||
         item.openKeywords ||
+        item.goBack ||
         item.openCharacter ||
         item.openServiceSubmenu ||
         item.openRestForm ||
@@ -445,6 +479,12 @@
         return;
       }
       window.Elosern.CombatMenu.toggleArea(combat, skillKey, item.payload.identity);
+      // The toggle is client-local; re-render the current frame so the
+      // selection marker updates without any router event.
+      var combatDock = window.Elosern && window.Elosern.combatDock;
+      if (combatDock && typeof combatDock.refreshRows === "function") {
+        combatDock.refreshRows();
+      }
     }
   }
 

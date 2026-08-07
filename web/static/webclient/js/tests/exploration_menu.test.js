@@ -121,10 +121,64 @@ test("move rows disable without the local-map current_node", () => {
 test("look items cover the room marker plus entities and objects", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), {});
   const keys = model.menus.look.items.map((item) => item.key);
-  assert.deepEqual(keys, ["look-room", "entity-5", "object-6"]);
+  assert.deepEqual(keys, ["look-room", "entity-5", "object-6", "back"]);
   assert.deepEqual(model.menus.look.items[0].payload, { room: true });
   assert.deepEqual(model.menus.look.items[1].payload, { target_id: 5 });
   assert.deepEqual(model.menus.look.items[2].payload, { target_id: 6 });
+});
+
+test("every exploration submenu ends with an enabled back row", () => {
+  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
+  ["move", "look", "interact", "wait"].forEach((key) => {
+    const items = model.menus[key].items;
+    const back = items[items.length - 1];
+    assert.equal(back.key, "back", `${key} must end with the back row`);
+    assert.equal(back.label, "返回上一層");
+    assert.equal(back.enabled, true);
+    assert.equal(back.goBack, true);
+    assert.equal(back.actionId, null, "the back row never submits an action");
+  });
+  // Dynamic menus (target affordances, scripted keywords) also end with it.
+  const target = ExplorationMenu.targetById(model, 5);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  assert.equal(targetMenu.items[targetMenu.items.length - 1].key, "back");
+  const scripted = ExplorationMenu.scriptedAffordanceFor(target);
+  const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
+  assert.equal(keywordMenu.items[keywordMenu.items.length - 1].key, "back");
+});
+
+test("the root menu never gains a back row", () => {
+  const model = ExplorationMenu.buildMenus(validPanel(), {});
+  const keys = model.menus.root.items.map((item) => item.key);
+  assert.deepEqual(keys, ["move", "look", "interact", "character", "quests", "inventory", "wait"]);
+  assert.ok(keys.indexOf("back") === -1);
+});
+
+test("parentKeyFor maps every submenu key to its parent", () => {
+  assert.equal(ExplorationMenu.parentKeyFor("move"), "root");
+  assert.equal(ExplorationMenu.parentKeyFor("look"), "root");
+  assert.equal(ExplorationMenu.parentKeyFor("interact"), "root");
+  assert.equal(ExplorationMenu.parentKeyFor("wait"), "root");
+  assert.equal(ExplorationMenu.parentKeyFor("target-5"), "interact");
+  assert.equal(ExplorationMenu.parentKeyFor("keywords-5"), "target-5");
+  assert.equal(ExplorationMenu.parentKeyFor("root"), "root");
+  assert.equal(ExplorationMenu.parentKeyFor("unknown-key"), "root");
+});
+
+test("menu models carry the mockup grid geometry", () => {
+  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
+  assert.equal(model.menus.root.grid, true);
+  assert.equal(model.menus.root.gridCols, 7);
+  ["move", "look", "interact", "wait"].forEach((key) => {
+    assert.equal(model.menus[key].grid, true, `${key} must be a grid`);
+    assert.equal(model.menus[key].gridCols, 2, `${key} must use 2 columns`);
+  });
+  const target = ExplorationMenu.targetById(model, 5);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  assert.equal(targetMenu.gridCols, 2);
+  const scripted = ExplorationMenu.scriptedAffordanceFor(target);
+  const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
+  assert.equal(keywordMenu.gridCols, 2);
 });
 
 test("interact targets open their server-authored affordances", () => {
@@ -163,7 +217,7 @@ test("scripted keyword buttons submit explore.talk_scripted with the server IDs"
   assert.ok(scripted);
   const keywordMenu = ExplorationMenu.keywordMenuFor(model, target, scripted);
   const keywordKeys = keywordMenu.items.map((item) => item.key);
-  assert.deepEqual(keywordKeys, ["kw-公會", "kw-再見"]);
+  assert.deepEqual(keywordKeys, ["kw-公會", "kw-再見", "back"]);
   assert.deepEqual(keywordMenu.items[0].payload, { npc_id: 5, keyword_id: "公會" });
   assert.equal(keywordMenu.items[0].actionId, "explore.talk_scripted");
 });

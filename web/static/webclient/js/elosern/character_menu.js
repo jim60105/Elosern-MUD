@@ -91,7 +91,7 @@
     items.push(displayItem("guild-rank", "階級：" + rankText, null));
     items.push(displayItem("guild-merit", "功績：" + ((guild && guild.merit) || 0), null));
     items.push(displayItem("wallet", "錢包：" + ((panel && panel.wallet) || 0) + " 銅", null));
-    return { items: items, focusKey: null, panel: panel };
+    return { items: items, focusKey: null, panel: panel, grid: true, gridCols: 2 };
   }
 
   return {

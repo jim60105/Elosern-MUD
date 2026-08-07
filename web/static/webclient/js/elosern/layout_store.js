@@ -61,7 +61,7 @@
   // dock are non-closable; narrative is the primary, largest surface.
   var DEFAULT_LAYOUT_CONFIG = {
     settings: {
-      hasHeaders: true,
+      hasHeaders: false,
       constrainDragToContainer: true,
       reorderEnabled: false,
       selectionEnabled: false,

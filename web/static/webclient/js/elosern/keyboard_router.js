@@ -249,6 +249,12 @@
       if (key === ESCAPE) {
         return escape();
       }
+      // Held or repeated Space is suppressed too: with AREA candidate grids
+      // now rendered, a held Space must not repeatedly toggle candidates.
+      if (key === SPACE && repeat) {
+        emit("repeat-suppressed", { key: SPACE });
+        return true;
+      }
       if (key === SPACE) {
         emit("space", { item: itemAt(current(), current() ? current().focusRow : 0, current() ? current().focusCol : 0) });
         return true;

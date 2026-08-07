@@ -180,6 +180,51 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control",
+        "webclient-desktop-shell::theme-and-controls-remain-accessible",
+    )
+    def test_ui_contract_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/ui_contract.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "UI contract Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus"
+    )
+    def test_exploration_menu_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/exploration_menu.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "exploration-menu Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
     )
     def test_local_map_lattice_node_suite_passes(self):

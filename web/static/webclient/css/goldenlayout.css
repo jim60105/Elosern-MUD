@@ -3,8 +3,10 @@
   GoldenLayout shell overrides for the Elosern WebClient.
 
   Anchors the GoldenLayout container to the full viewport and styles the
-  headers/tabs with the ink-night palette. The theme variables are defined in
-  elosern.css; this file only positions the layout surfaces.
+  layout surfaces with the ink-night palette. The theme variables are defined
+  in elosern.css; this file only positions the layout surfaces. No tab-header
+  rules exist: the shell mounts with `settings.hasHeaders: false`, so the
+  GoldenLayout tab strip (and its dead overrides) is gone entirely.
 
 --- */
 
@@ -24,54 +26,11 @@ label {
   display: block;
 }
 
-.lm_header {
-  background: var(--elm-ink-panel, #1f1c18);
-  border-bottom: 1px solid var(--elm-border, #3a342c);
-}
-
-.lm_header .lm_tab {
-  padding-right: 6px;
-  padding-left: 3px;
-  padding-bottom: 5px;
-  padding-top: 0px;
-  margin-top: 1px;
-  margin-right: 5px;
-  color: var(--elm-paper-dim, #9c958a);
-  background: var(--elm-ink-panel, #1f1c18);
-  border-top: 1px solid var(--elm-border, #3a342c);
-  border-right: 1px solid var(--elm-border, #3a342c);
-}
-
-.lm_header .lm_tab.lm_active {
-  color: var(--elm-paper, #ece7db);
-  background: var(--elm-ink-raise, #2a2621);
-  box-shadow: inset 0 2px 0 0 var(--elm-vermilion, #e05c3a);
-}
-
-.lm_title {
-  text-align: center;
-  margin-right: 2px;
-  padding-right: 8px;
-}
-
-.lm_close_tab {
-  opacity: 1 !important;
-  background-image: none !important;
-  top: 0px !important;
-  right: 0px !important;
-}
-
-.lm_close_tab:before {
-  font-size: 1.15em;
-  width: 1.15em;
-  content: "\2715";
-}
-
 .lm_content {
-  background: var(--elm-ink, #171512);
-  color: var(--elm-paper, #ece7db);
+  background: var(--elm-ink);
+  color: var(--elm-paper);
 }
 
 .lm_splitter {
-  background: var(--elm-ink-raise, #2a2621);
+  background: var(--elm-ink-raise);
 }

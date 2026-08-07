@@ -57,16 +57,34 @@
   // `<idPrefix>-<index>` that `aria-activedescendant` references.
   // `options.nonSubmitting` renders display-only rows (e.g. the character
   // panel): focusable, without the disabled marker, and carrying no action.
+  // When the menu carries grid geometry (`grid` + `gridCols`), the container
+  // becomes a CSS grid whose column count matches the menu, so router
+  // geometry and the visible cells agree; `gridCols` must equal the CSS
+  // `repeat()` count.
   function renderRows(container, items, options) {
     options = options || {};
     var focusKey = options.focusKey == null ? null : options.focusKey;
     var idPrefix = options.idPrefix || "row";
     var nonSubmitting = !!options.nonSubmitting;
+    var menu = options.menu || null;
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
     container.setAttribute("role", "listbox");
     container.setAttribute("tabindex", "0");
+    if (menu && menu.grid && menu.gridCols > 0) {
+      if (container.style) {
+        container.style.display = "grid";
+        container.style.gridTemplateColumns = "repeat(" + menu.gridCols + ", 1fr)";
+      }
+      container.classList.add("dock-grid");
+    } else {
+      if (container.style) {
+        container.style.display = "";
+        container.style.gridTemplateColumns = "";
+      }
+      container.classList.remove("dock-grid");
+    }
 
     var focusedId = null;
     var rows = [];
@@ -88,8 +106,31 @@
           row.classList.add("disabled");
           row.setAttribute("aria-disabled", "true");
           setText(row, item.label + DISABLED_SUFFIX);
+          // The disabled reason stays programmatically associated with the
+          // cell at every navigation depth (a visible detail pane mirrors it
+          // where one exists; the element itself is visually hidden so the
+          // association holds even at the exploration root, which draws no
+          // detail pane).
+          var reason =
+            (item.disabledReason && item.disabledReason.message) ||
+            item.description;
+          if (reason) {
+            var desc = makeElement("span", "dock-row-reason");
+            desc.id = idPrefix + "-desc-" + i;
+            desc.classList.add("visually-hidden");
+            setText(desc, reason);
+            row.appendChild(desc);
+            row.setAttribute("aria-describedby", desc.id);
+          }
         } else {
-          setText(row, item.label);
+          // AREA candidate rows carry a live selection marker (the combat
+          // dock refreshes the frame after a client-local toggle).
+          if (item.selected) {
+            row.classList.add("selected");
+            setText(row, "✓ " + item.label);
+          } else {
+            setText(row, item.label);
+          }
         }
       }
       if (key === focusKey) {
@@ -111,6 +152,25 @@
     } else {
       container.removeAttribute("aria-activedescendant");
     }
+  }
+
+  // Render the dock's shortcut guidance line (mockup chrome): a per-surface
+  // prefix plus the shared shortcut legend. Docks that own the action-dock
+  // DOM rebuild it, so each dock renders its own guidance through this helper
+  // (the foundation paragraph survives only until the first dock mounts).
+  function renderGuidance(root, prefix) {
+    var existing = document.getElementById("action-dock-guidance");
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+    var guidance = makeElement("p", "action-guidance");
+    guidance.id = "action-dock-guidance";
+    var note = makeElement("span", "action-guidance-note");
+    note.id = "action-dock-description";
+    setText(note, (prefix ? prefix + "　" : "") + "方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令");
+    guidance.appendChild(note);
+    root.insertBefore(guidance, root.firstChild);
+    return guidance;
   }
 
   // The single delegated pointer bridge on #action-dock.
@@ -163,6 +223,7 @@
   window.Elosern = window.Elosern || {};
   window.Elosern.DockSurface = {
     renderRows: renderRows,
+    renderGuidance: renderGuidance,
     installPointerBridge: installPointerBridge,
     DISABLED_SUFFIX: DISABLED_SUFFIX,
   };

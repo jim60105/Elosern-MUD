@@ -151,15 +151,21 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.renderGuidance(root, "服務");
+      }
       var heading = makeElement("div", "services-heading");
       setText(heading, "服務");
       root.appendChild(heading);
 
+      // The mockup split: item grid on the left, detail pane on the right.
+      var layout = makeElement("div", "services-layout");
       var menu = makeElement("div", "services-menu");
       menu.setAttribute("role", "group");
       menu.setAttribute("aria-label", "服務選單");
-      root.appendChild(menu);
-      root.appendChild(this._buildDetailPane());
+      layout.appendChild(menu);
+      layout.appendChild(this._buildDetailPane());
+      root.appendChild(layout);
 
       var live = makeElement("div", "services-live elosern-live");
       live.id = "elosern-action-live";
@@ -188,6 +194,13 @@
       return (menu && menu.items) || [];
     },
 
+    _currentMenu: function () {
+      if (!this._model) {
+        return null;
+      }
+      return this._model.menus[this._currentMenuKey] || null;
+    },
+
     _renderMenuItems: function (menu, panel) {
       if (!window.Elosern || !window.Elosern.DockSurface) {
         return;
@@ -195,6 +208,7 @@
       window.Elosern.DockSurface.renderRows(menu, this._currentItems(), {
         focusKey: this._focusKey,
         idPrefix: "services-row",
+        menu: this._currentMenu(),
       });
     },
 

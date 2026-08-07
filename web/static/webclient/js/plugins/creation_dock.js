@@ -183,19 +183,26 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.renderGuidance(root, "創建");
+      }
       var heading = makeElement("div", "creation-heading");
       setText(heading, "建立你的角色");
       root.appendChild(heading);
 
+      // The mockup split: the item grid / form on the left, detail pane on
+      // the right.
+      var layout = makeElement("div", "creation-layout");
       var body = makeElement("div", "creation-body");
       body.id = "creation-body";
-      root.appendChild(body);
+      layout.appendChild(body);
 
       var detail = makeElement("div", "creation-detail");
       detail.id = "creation-detail";
       detail.setAttribute("role", "region");
       detail.setAttribute("aria-label", "角色建立說明");
-      root.appendChild(detail);
+      layout.appendChild(detail);
+      root.appendChild(layout);
 
       var live = makeElement("div", "creation-live elosern-live");
       live.id = "elosern-action-live";
@@ -235,6 +242,7 @@
       window.Elosern.DockSurface.renderRows(body, this._currentItems(), {
         focusKey: this._focusKey,
         idPrefix: "creation-row",
+        menu: this._model.menus.root,
       });
     },
 
@@ -245,6 +253,7 @@
       window.Elosern.DockSurface.renderRows(body, this._currentItems(), {
         focusKey: this._focusKey,
         idPrefix: "creation-row",
+        menu: this._model.menus.presets,
       });
     },
 
@@ -276,7 +285,6 @@
         idPrefix: "creation-row",
       });
     },
-
     _renderCustomForm: function (body, panel) {
       var self = this;
       if (!this._customState) {

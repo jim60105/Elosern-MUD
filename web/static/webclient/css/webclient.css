@@ -61,11 +61,11 @@ div {
     white-space: pre-wrap;
 }
 
-/* Error messages (red/vermilion) */
-.err { color: #e05c3a; }
+/* Error messages (small red text on dark: text-safe warning token) */
+.err { color: #b97c73; }
 
 /* Prompt base (paper white) */
-.prompt { color: #ece7db; }
+.prompt { color: #e5e0d5; }
 
 .underline { text-decoration: underline; }
 

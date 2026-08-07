@@ -369,7 +369,7 @@
       panel: panel,
       menus: {
         root: { items: rootItems(panel), focusKey: null },
-        presets: { items: presetItems(panel), focusKey: null },
+        presets: { items: presetItems(panel), focusKey: null, grid: true, gridCols: 2 },
       },
     };
   }

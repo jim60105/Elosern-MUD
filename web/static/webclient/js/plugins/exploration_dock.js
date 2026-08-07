@@ -68,6 +68,9 @@
     _ownsKeyboard: false,
     _model: null,
     _currentMenuKey: "root",
+    // Mirrors the router's frame stack so the dock always knows its menu
+    // identity at every depth (the router exposes no menu-key getter).
+    _menuStack: ["root"],
     _focusKey: null,
     _pendingFreeform: null,
     _characterActive: false,
@@ -91,6 +94,7 @@
         keyboard.reset(this._model.menus.root);
       }
       this._currentMenuKey = "root";
+      this._menuStack = ["root"];
       this._focusKey = null;
       this._characterActive = false;
       var services = getServices();
@@ -117,6 +121,7 @@
 
     _discardLocalState: function () {
       this._currentMenuKey = "root";
+      this._menuStack = ["root"];
       this._focusKey = null;
       this._pendingFreeform = null;
       this._characterActive = false;
@@ -153,6 +158,7 @@
       this._mounted = true;
       root.setAttribute("data-mode", "exploration");
       this._currentMenuKey = "root";
+      this._menuStack = ["root"];
       this._renderDock(root, panel);
       var keyboard = getKeyboard();
       if (keyboard) {
@@ -215,15 +221,27 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.renderGuidance(root, "附近動作");
+      }
       var heading = makeElement("div", "exploration-heading");
       setText(heading, "探索");
       root.appendChild(heading);
 
+      var layout = makeElement("div", "exploration-layout");
       var menu = makeElement("div", "exploration-menu");
       menu.setAttribute("role", "group");
       menu.setAttribute("aria-label", "探索選單");
-      root.appendChild(menu);
-      root.appendChild(this._buildDetailPane());
+      layout.appendChild(menu);
+      // The mockup root is hint line + buttons only: no visible detail pane at
+      // depth 1 (disabled rows keep their visually hidden description elements
+      // via the shared renderer). Submenus show the detail pane beside the
+      // item grid.
+      var atRoot = this._currentMenuKey === "root";
+      if (!atRoot) {
+        layout.appendChild(this._buildDetailPane());
+      }
+      root.appendChild(layout);
 
       var live = makeElement("div", "exploration-live elosern-live");
       live.id = "elosern-action-live";
@@ -250,6 +268,13 @@
       return (menu && menu.items) || [];
     },
 
+    _currentMenu: function () {
+      if (!this._model) {
+        return null;
+      }
+      return this._model.menus[this._currentMenuKey] || null;
+    },
+
     _renderMenuItems: function (menu, panel) {
       if (!window.Elosern || !window.Elosern.DockSurface) {
         return;
@@ -257,6 +282,7 @@
       window.Elosern.DockSurface.renderRows(menu, this._currentItems(), {
         focusKey: this._focusKey,
         idPrefix: "exploration-row",
+        menu: this._currentMenu(),
       });
     },
 
@@ -284,6 +310,25 @@
             "";
         } else {
           text = focused.description || "";
+          // The detail pane names the next key action (mockup: "Enter →
+          // 選擇目標"): the focused item's availability and its key path.
+          if (focused.goBack) {
+            text += (text ? "　" : "") + "Enter → 返回上一層";
+          } else if (focused.openTarget) {
+            text += (text ? "　" : "") + "Enter → 選擇目標";
+          } else if (focused.openKeywords) {
+            text += (text ? "　" : "") + "Enter → 選擇話題";
+          } else if (focused.openServiceSubmenu) {
+            text += (text ? "　" : "") + "Enter → 開啟服務";
+          } else if (focused.freeform) {
+            text += (text ? "　" : "") + "Enter → 開啟對話";
+          } else if (focused.openRestForm) {
+            text += (text ? "　" : "") + "Enter → 輸入秒數";
+          } else if (focused.openSubmenu) {
+            text += (text ? "　" : "") + "Enter → 開啟";
+          } else if (focused.actionId) {
+            text += (text ? "　" : "") + "Enter → 執行";
+          }
         }
       }
       setText(detail, text);
@@ -297,8 +342,44 @@
       var menuEl = root.querySelector(".exploration-menu");
       if (menuEl) {
         this._renderMenuItems(menuEl, this._model.panel);
+        this._syncDetailPane(root);
+        this._renderFocusHint();
+        return;
       }
-      this._renderFocusHint();
+      // Never rebuild over another mode's dock: the combat/creation docks set
+      // `data-mode` before they render, so the surface is theirs.
+      if (root.getAttribute("data-mode") !== "exploration") {
+        return;
+      }
+      // The surface is owned by a re-homed services/character sub-dock while
+      // it is active; never rebuild over it. Once it leaves, the depth-1
+      // router event (or resetToRoot) rebuilds the exploration dock.
+      var services = getServices();
+      var character = getCharacter();
+      if (
+        (services && services.isActive && services.isActive()) ||
+        (character && character.isActive && character.isActive())
+      ) {
+        return;
+      }
+      this._renderDock(root, this._model.panel);
+    },
+
+    // The mockup draws a detail pane beside the item grid for every submenu
+    // but not for the root; keep the DOM faithful so the pane appears and
+    // disappears with navigation depth.
+    _syncDetailPane: function (root) {
+      var layout = root.querySelector(".exploration-layout");
+      if (!layout) {
+        return;
+      }
+      var atRoot = this._currentMenuKey === "root";
+      var detail = layout.querySelector(".exploration-detail");
+      if (atRoot && detail) {
+        layout.removeChild(detail);
+      } else if (!atRoot && !detail) {
+        layout.appendChild(this._buildDetailPane());
+      }
     },
 
     // Router event bridge called by elosern_ui.js.
@@ -311,10 +392,22 @@
         this._focusKey = item ? item.key : this._focusKey;
         this._refresh();
       } else if (name === "menu-closed" || name === "escape-root") {
-        // Returning to the exploration root (keyboard depth 1) tears down any
-        // active service/character sub-view and re-renders the root.
         var keyboard = getKeyboard();
         var depth = keyboard ? keyboard.depth() : 0;
+        if (depth > 1) {
+          // An intermediate-depth Escape (look → target → Escape) pops one
+          // router frame; mirror the pop in the dock's stack so the rendered
+          // cells and the detail pane track the router's current menu.
+          if (this._menuStack.length > 1) {
+            this._menuStack.pop();
+          }
+          this._currentMenuKey =
+            this._menuStack[this._menuStack.length - 1] || "root";
+          this._refresh();
+          return;
+        }
+        // Returning to the exploration root (keyboard depth 1) tears down any
+        // active service/character sub-view and re-renders the root.
         if (depth <= 1) {
           var services = getServices();
           if (services && services.isActive && services.isActive()) {
@@ -326,12 +419,36 @@
           }
           this._characterActive = false;
           this._currentMenuKey = "root";
+          this._menuStack = ["root"];
           this._focusKey =
             keyboard && keyboard.currentItem() ? keyboard.currentItem().key : null;
           var root = el("action-dock");
           var menuEl = root && root.querySelector(".exploration-menu");
           if (menuEl) {
             this._renderMenuItems(menuEl, this._model && this._model.panel);
+            this._syncDetailPane(root);
+          } else if (
+            root &&
+            this._model &&
+            // Same ownership guards as `_refresh`: never rebuild over another
+            // mode's dock or over a sub-dock that is still active.
+            root.getAttribute("data-mode") === "exploration" &&
+            !(
+              services &&
+              services.isActive &&
+              services.isActive()
+            ) &&
+            !(
+              character &&
+              character.isActive &&
+              character.isActive()
+            )
+          ) {
+            // The surface was owned by a re-homed service/character sub-view
+            // that has just left: rebuild the exploration dock so the
+            // rendered cells track the router frame again.
+            this._renderDock(root, this._model.panel);
+            return;
           }
           this._renderFocusHint();
         }
@@ -344,8 +461,33 @@
       if (!keyboard || !this._model) {
         return;
       }
+      if (item.goBack) {
+        // The back row (a normal row, so it reached here through the shared
+        // pointer/keyboard submit gate) pops exactly one router frame: mirror
+        // the pop in the dock's stack, then rely on the router's synchronous
+        // `focus` event to re-render the parent's cells. The explicit
+        // `_refresh` is only a fallback when popMenu() reports it could not
+        // pop (the root has no parent).
+        if (this._menuStack.length > 1) {
+          this._menuStack.pop();
+        }
+        var parentKey = this._menuStack[this._menuStack.length - 1] || "root";
+        if (this._model.menus[parentKey]) {
+          this._currentMenuKey = parentKey;
+        } else {
+          this._currentMenuKey =
+            window.Elosern.ExplorationMenu.parentKeyFor(this._currentMenuKey) ||
+            "root";
+        }
+        if (keyboard.popMenu()) {
+          return;
+        }
+        this._refresh();
+        return;
+      }
       if (item.openSubmenu) {
         this._currentMenuKey = item.openSubmenu;
+        this._menuStack.push(item.openSubmenu);
         keyboard.pushMenu(this._model.menus[item.openSubmenu]);
         this._refresh();
         return;
@@ -356,6 +498,7 @@
           var targetMenu = window.Elosern.ExplorationMenu.targetMenuFor(this._model, target);
           this._model.menus["target-" + target.identity] = targetMenu;
           this._currentMenuKey = "target-" + target.identity;
+          this._menuStack.push("target-" + target.identity);
           keyboard.pushMenu(targetMenu);
           this._refresh();
         }
@@ -372,6 +515,7 @@
           );
           this._model.menus["keywords-" + focusedTarget.identity] = keywordMenu;
           this._currentMenuKey = "keywords-" + focusedTarget.identity;
+          this._menuStack.push("keywords-" + focusedTarget.identity);
           keyboard.pushMenu(keywordMenu);
           this._refresh();
         }
@@ -434,6 +578,18 @@
       this._restKeydownBound = function (event) {
         var form = self._restForm;
         if (!form) {
+          return;
+        }
+        // The drawer field must keep its plugin-contract routing even while
+        // the rest form is open: this capture-phase handler fires before
+        // Evennia's bubble-phase dispatch, so a key typed (or Enter pressed)
+        // in the drawer field is ignored here and reaches routeKeyboard.
+        var target = event.target;
+        if (
+          target &&
+          target.closest &&
+          target.closest(".inputfieldwrapper")
+        ) {
           return;
         }
         var key = event.key;
@@ -632,6 +788,7 @@
               currentNode: dock._currentNodeFrom(state),
             });
             dock._currentMenuKey = "root";
+            dock._menuStack = ["root"];
             dock._renderDock(root, panel);
             var keyboard = getKeyboard();
             if (keyboard && epochChanged) {

@@ -106,24 +106,26 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
 
         The standalone Services root no longer exists: guild/shop are reached
         through Interact -> the local host -> its navigate-kind service entry,
-        and inventory through the exploration root's Inventory entry.
+        and inventory through the exploration root's Inventory entry. The root
+        is a single seven-column row (grid geometry), so horizontal arrows
+        move across it; submenus are 2-column grids.
         """
         page.evaluate("document.getElementById('action-dock').focus()")
         if surface_key == "inventory":
             # Move, Look, Interact, Character, Quests, Inventory
             for _ in range(5):
-                _press(page, "ArrowDown")
+                _press(page, "ArrowRight")
             _press(page, "Enter")
             return self._services_panel(page)
         # guild/shop: Interact -> first target -> navigate service entry.
-        _press(page, "ArrowDown")  # Look
-        _press(page, "ArrowDown")  # Interact
+        _press(page, "ArrowRight")  # Look
+        _press(page, "ArrowRight")  # Interact
         _press(page, "Enter")  # open Interact
         _press(page, "Enter")  # select the first present target
         if surface_key == "guild":
             # The guild staff carries scripted talk first; the navigate entry
-            # follows it.
-            _press(page, "ArrowDown")
+            # follows it in the second grid column.
+            _press(page, "ArrowRight")
         _press(page, "Enter")  # open the service submenu
         return self._services_panel(page)
 
@@ -182,7 +184,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["board_total"], 1)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowDown")  # board
+        _press(page, "ArrowRight")  # board (second grid column)
         _press(page, "Enter")
         _press(page, "Enter")  # accept the eligible offer row
         self._wait_panel(page, lambda p: p["pagination"]["quest_total"] == 1)
@@ -207,11 +209,12 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["quest_total"], 1)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowDown")  # board
-        _press(page, "ArrowDown")  # quests
+        _press(page, "ArrowRight")  # board (second grid column)
+        _press(page, "ArrowDown")  # exam_start (second grid row)
+        _press(page, "ArrowLeft")  # quests (second grid row, first column)
         _press(page, "Enter")
         _press(page, "Enter")  # the quest row
-        _press(page, "ArrowDown")  # 放棄
+        _press(page, "ArrowRight")  # 放棄 (second grid column)
         _press(page, "Enter")  # open confirmation screen
         page.wait_for_timeout(400)
         # No mutation may be sent before the explicit confirmation.
@@ -235,12 +238,12 @@ class GuildTurninJourneys(ServicesBrowserTest):
         self.assertEqual(panel["player"]["wallet"], 1000)
 
         self._open_guild_menu(page)
-        _press(page, "ArrowDown")  # board
-        _press(page, "ArrowDown")  # quests
+        _press(page, "ArrowRight")  # board (second grid column)
+        _press(page, "ArrowDown")  # exam_start (second grid row)
+        _press(page, "ArrowLeft")  # quests (second grid row, first column)
         _press(page, "Enter")
         _press(page, "Enter")  # the quest row
-        _press(page, "ArrowDown")  # 詳情
-        _press(page, "ArrowDown")  # 回報
+        _press(page, "ArrowDown")  # 回報 (first column, second row)
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["wallet"] == 1050)
         self.assertEqual(sent_action_count(page, "guild.quest_turnin"), 1)
@@ -265,9 +268,8 @@ class GuildExamJourney(ServicesBrowserTest):
         self.assertTrue(panel["guild"]["rank"]["eligible"])
 
         self._open_guild_menu(page)
-        _press(page, "ArrowDown")  # board
-        _press(page, "ArrowDown")  # quests
-        _press(page, "ArrowDown")  # exam_start
+        _press(page, "ArrowRight")  # board (second grid column)
+        _press(page, "ArrowDown")  # exam_start (second grid row, second column)
         _press(page, "Enter")
         # The exam transitions the shell into the ordinary combat menu and the
         # services dock must tear down.
@@ -360,7 +362,7 @@ class ShopJourneys(ServicesBrowserTest):
         # The merchant is at its meal stock cap, so the sellable row is the
         # held healing_potion (stock 3/5, sellable and offered).
         self._open_surface(page, "shop")
-        _press(page, "ArrowDown")  # 販賣
+        _press(page, "ArrowRight")  # 販賣 (second grid column)
         _press(page, "Enter")
         _press(page, "Enter")  # healing_potion sell row
         _press(page, "1", wait_ms=40)

@@ -143,7 +143,8 @@
   // can reach -- the root actions, Skills, a target list, a shorthand choice,
   // the Forfeit confirmation -- is pushed onto the router stack, so the rows
   // on screen are always exactly the items the router will navigate, explain,
-  // and submit.
+  // and submit. AREA candidate rows carry the live selection marker from the
+  // skill's authoritative selection state.
   function renderCombatRows(controls) {
     var keyboard = getKeyboard();
     if (!keyboard || !window.Elosern || !window.Elosern.DockSurface) {
@@ -153,11 +154,35 @@
     if (!frame) {
       return;
     }
+    var combat = window.Elosern._combat;
+    var skill =
+      combat && combat.focusSkillKey
+        ? combat.skillByKey[combat.focusSkillKey]
+        : null;
+    frame.items.forEach(function (item) {
+      if (item.actionId === "toggle-target" && skill) {
+        item.selected = skill.selected.indexOf(item.payload.identity) !== -1;
+      }
+    });
     var focused = keyboard.currentItem();
     window.Elosern.DockSurface.renderRows(controls, frame.items, {
       focusKey: focused && focused.key !== undefined ? focused.key : null,
       idPrefix: "combat-row",
+      menu: frame,
     });
+  }
+
+  // Re-render the current frame's rows in place (used after a client-local
+  // AREA toggle so the selection marker updates without a router event).
+  function refreshRows() {
+    var root = el("action-dock");
+    if (!root || root.getAttribute("data-mode") !== "combat") {
+      return;
+    }
+    var controls = root.querySelector(".combat-controls");
+    if (controls) {
+      renderCombatRows(controls);
+    }
   }
 
   function renderCombatDock(root, panel) {
@@ -169,6 +194,10 @@
     }
     while (root.firstChild) {
       root.removeChild(root.firstChild);
+    }
+
+    if (window.Elosern && window.Elosern.DockSurface) {
+      window.Elosern.DockSurface.renderGuidance(root, "技能");
     }
 
     var session = panel.session;
@@ -190,16 +219,19 @@
       return;
     }
 
+    // The mockup split: item grid on the left, detail pane on the right.
+    var layout = makeElement("div", "combat-layout");
     var controls = makeElement("div", "combat-controls");
     controls.setAttribute("aria-label", "戰鬥動作");
-    root.appendChild(controls);
+    layout.appendChild(controls);
     renderCombatRows(controls);
 
     var detail = makeElement("div", "combat-detail");
     detail.id = "combat-detail";
     detail.setAttribute("role", "region");
     detail.setAttribute("aria-label", "動作說明");
-    root.appendChild(detail);
+    layout.appendChild(detail);
+    root.appendChild(layout);
 
     var live = makeElement("div", "combat-live");
     live.id = "elosern-action-live";
@@ -356,6 +388,7 @@
   // through combat target descriptors switches the client-local portrait
   // without sending any packet.
   plugin.publishFocusForItem = publishFocusForItem;
+  plugin.refreshRows = refreshRows;
   if (window.plugin_handler) {
     window.plugin_handler.add("elosern_combat_dock", plugin);
   }

@@ -79,6 +79,27 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self.assertEqual(saved["dimensions"]["narrative"], 55)
         self.assertTrue(saved["tabs"]["status"])
 
+    @covers_requirement(
+        "webclient-desktop-shell::the-webclient-loads-a-local-desktop-goldenlayout-shell"
+    )
+    def test_mounted_shell_renders_no_goldenlayout_tab_strip(self):
+        page = self.logged_in_page()
+        page.wait_for_function(
+            "() => document.getElementById('action-dock') !== null"
+        )
+        # `settings.hasHeaders: false` hides the tab strip entirely: no
+        # visible `.lm_header` element exists anywhere (GoldenLayout keeps the
+        # hidden header nodes in the DOM), while every required surface is
+        # present and self-identifying.
+        self.assertEqual(
+            page.locator(".lm_header:visible").count(),
+            0,
+            "the GoldenLayout tab strip must not render visibly",
+        )
+        for component in REQUIRED_COMPONENTS:
+            count = self._count_component(page, component)
+            self.assertEqual(count, 1, f"required component {component} missing")
+
     def test_migration_registry_migrates_known_prior_version(self):
         page = self.logged_in_page()
         # A stored prior version (0) with a known migration is migrated to the

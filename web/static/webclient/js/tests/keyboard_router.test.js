@@ -228,7 +228,85 @@ test("two consecutive pointer confirms both submit (no repeat guard)", () => {
   assert.strictEqual(events.filter((e) => e.name === "submit").length, 2);
 });
 
-test("held Enter suppression is unchanged for keyboard confirms", () => {
+test("odd-count 2-column grid: final cell sits bottom-left and empty cells do not move", () => {
+  const { router, events } = makeRouter();
+  const items = [];
+  for (let i = 0; i < 7; i += 1) {
+    items.push({ key: "g" + i, label: "g" + i, enabled: true });
+  }
+  router.pushMenu({ grid: true, gridCols: 2, items });
+  events.length = 0;
+
+  // ArrowUp from the first cell wraps to the bottom-left final cell.
+  router.handle("ArrowUp");
+  assert.strictEqual(events[events.length - 1].payload.row, 3);
+  assert.strictEqual(events[events.length - 1].payload.col, 0);
+  assert.strictEqual(router.currentItem().key, "g6");
+
+  // ArrowDown wraps back to the first cell.
+  router.handle("ArrowDown");
+  assert.strictEqual(router.currentItem().key, "g0");
+
+  // The missing bottom-right cell (row 3, col 1) never receives focus:
+  // ArrowRight from the final cell returns false without moving.
+  router.handle("ArrowUp"); // back to g6 (3,0)
+  events.length = 0;
+  const moved = router.handle("ArrowRight");
+  assert.strictEqual(moved, false);
+  assert.strictEqual(router.currentItem().key, "g6");
+  assert.strictEqual(events.length, 0, "an empty cell must not move or emit");
+
+  // ArrowLeft from the final cell also hits the empty right column and
+  // stays put; ArrowUp reaches g4 in the previous row, then ArrowRight to g5.
+  router.handle("ArrowLeft");
+  assert.strictEqual(router.currentItem().key, "g6");
+  router.handle("ArrowUp");
+  assert.strictEqual(router.currentItem().key, "g4");
+  router.handle("ArrowRight");
+  assert.strictEqual(router.currentItem().key, "g5");
+
+  // Down from the final cell wraps to the first row.
+  router.focusItemByKey("g6");
+  router.handle("ArrowDown");
+  assert.strictEqual(router.currentItem().key, "g0");
+});
+
+test("focusItemByKey resolves odd-count grid cells by row and column", () => {
+  const { router, events } = makeRouter();
+  const items = [];
+  for (let i = 0; i < 7; i += 1) {
+    items.push({ key: "g" + i, label: "g" + i, enabled: true });
+  }
+  router.pushMenu({ grid: true, gridCols: 2, items });
+  events.length = 0;
+  const moved = router.focusItemByKey("g6");
+  assert.strictEqual(moved, true);
+  assert.strictEqual(events[0].payload.row, 3);
+  assert.strictEqual(events[0].payload.col, 0);
+  assert.strictEqual(router.currentItem().key, "g6");
+  assert.strictEqual(router.focusItemByKey("g7"), false);
+});
+
+test("repeated Space is suppressed while a single Space emits once", () => {
+  const { router, events } = makeRouter();
+  router.pushMenu({ items: [{ key: "area-x", label: "x", enabled: true }] });
+  events.length = 0;
+  router.handle(" ");
+  assert.strictEqual(events.filter((e) => e.name === "space").length, 1);
+  router.handle(" ", true);
+  router.handle(" ", true);
+  assert.strictEqual(
+    events.filter((e) => e.name === "repeat-suppressed").length,
+    2,
+    "held Space must not repeatedly toggle AREA candidates"
+  );
+  assert.strictEqual(events.filter((e) => e.name === "space").length, 1);
+  // A fresh deliberate press still emits.
+  router.handle(" ");
+  assert.strictEqual(events.filter((e) => e.name === "space").length, 2);
+});
+
+test("repeated Enter suppression is unchanged for keyboard confirms", () => {
   const { router, events } = makeRouter();
   router.pushMenu({ items: [{ key: "cast", label: "cast", enabled: true }] });
   events.length = 0;

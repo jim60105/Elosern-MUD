@@ -114,7 +114,13 @@
       if (!this._pushedMenu) {
         var keyboard = getKeyboard();
         if (keyboard) {
-          this._pushedMenu = { items: model.items };
+          // The router frame carries the model's grid geometry so keyboard
+          // navigation matches the rendered 2-column cell grid.
+          this._pushedMenu = {
+            items: model.items,
+            grid: model.grid || null,
+            gridCols: model.gridCols || null,
+          };
           keyboard.pushMenu(this._pushedMenu);
         }
       }
@@ -125,19 +131,26 @@
       while (root.firstChild) {
         root.removeChild(root.firstChild);
       }
+      if (window.Elosern && window.Elosern.DockSurface) {
+        window.Elosern.DockSurface.renderGuidance(root, "角色");
+      }
       var heading = makeElement("div", "character-heading");
       setText(heading, "角色狀態");
       root.appendChild(heading);
 
+      // The mockup split: display-only item grid on the left, detail pane on
+      // the right.
+      var layout = makeElement("div", "character-layout");
       var menu = makeElement("div", "character-menu");
       menu.setAttribute("aria-label", "角色狀態");
-      root.appendChild(menu);
+      layout.appendChild(menu);
 
       var detail = makeElement("div", "character-detail");
       detail.id = "character-detail";
       detail.setAttribute("role", "region");
       detail.setAttribute("aria-label", "說明");
-      root.appendChild(detail);
+      layout.appendChild(detail);
+      root.appendChild(layout);
 
       var live = makeElement("div", "character-live elosern-live");
       live.id = "elosern-action-live";
@@ -147,12 +160,14 @@
 
       // Display-only rows: focusable through the shared surface (a click moves
       // router focus and updates the detail pane) but marked non-submitting,
-      // so no row carries an action and nothing is ever submitted.
+      // so no row carries an action and nothing is ever submitted. They render
+      // as grid cells (character-menu model carries the grid geometry).
       if (window.Elosern && window.Elosern.DockSurface) {
         window.Elosern.DockSurface.renderRows(menu, model.items, {
           focusKey: this._focusKey,
           idPrefix: "character-row",
           nonSubmitting: true,
+          menu: model,
         });
       }
     },

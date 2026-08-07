@@ -40,6 +40,41 @@
     };
   }
 
+  // The final cell of every exploration submenu: a pointer affordance that
+  // pops exactly one router frame back to the parent menu (Escape remains
+  // the keyboard fast path). Never rendered on the root, which has no
+  // parent to return to.
+  function backItem() {
+    return {
+      key: "back",
+      label: "返回上一層",
+      enabled: true,
+      actionId: null,
+      payload: null,
+      goBack: true,
+    };
+  }
+
+  // Parent mapping for the back row and dock stack bookkeeping. Unknown keys
+  // fall back to the root so a stale key can never throw.
+  function parentKeyFor(menuKey) {
+    if (
+      menuKey === "move" ||
+      menuKey === "look" ||
+      menuKey === "interact" ||
+      menuKey === "wait"
+    ) {
+      return "root";
+    }
+    if (menuKey && menuKey.indexOf("target-") === 0) {
+      return "interact";
+    }
+    if (menuKey && menuKey.indexOf("keywords-") === 0) {
+      return "target-" + menuKey.slice("keywords-".length);
+    }
+    return "root";
+  }
+
   function disabledItem(key, label, message) {
     return {
       key: key,
@@ -146,6 +181,7 @@
         payload: { sleep: true },
       },
     ];
+    items.push(backItem());
     return items;
   }
 
@@ -179,6 +215,7 @@
     if (items.length === 0) {
       items.push(disabledItem("move-empty", "這裡沒有可以通行的出口。", null));
     }
+    items.push(backItem());
     return items;
   }
 
@@ -220,6 +257,7 @@
         description: null,
       });
     });
+    items.push(backItem());
     return items;
   }
 
@@ -246,6 +284,7 @@
     if (items.length === 0) {
       items.push(disabledItem("interact-empty", "這裡沒有可以互動的對象。", null));
     }
+    items.push(backItem());
     return items;
   }
 
@@ -323,7 +362,8 @@
     if (items.length === 0) {
       items.push(disabledItem("target-empty", "此對象沒有可用的互動。", null));
     }
-    return { items: items, focusKey: null, target: target };
+    items.push(backItem());
+    return { items: items, focusKey: null, target: target, grid: true, gridCols: 2 };
   }
 
   function keywordMenuFor(model, target, scriptedAffordance) {
@@ -344,7 +384,8 @@
     if (items.length === 0) {
       items.push(disabledItem("keywords-empty", "對方目前沒有可以交談的話題。", null));
     }
-    return { items: items, focusKey: null, target: target };
+    items.push(backItem());
+    return { items: items, focusKey: null, target: target, grid: true, gridCols: 2 };
   }
 
   // -------------------------------------------------------------------------
@@ -358,11 +399,11 @@
       panel: panel,
       currentNode: currentNode,
       menus: {
-        root: { items: rootItems(panel), focusKey: null },
-        move: { items: moveItems(panel, currentNode), focusKey: null },
-        look: { items: lookItems(panel), focusKey: null },
-        interact: { items: interactItems(panel), focusKey: null },
-        wait: { items: waitItems(), focusKey: null },
+        root: { items: rootItems(panel), focusKey: null, grid: true, gridCols: 7 },
+        move: { items: moveItems(panel, currentNode), focusKey: null, grid: true, gridCols: 2 },
+        look: { items: lookItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        interact: { items: interactItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        wait: { items: waitItems(), focusKey: null, grid: true, gridCols: 2 },
       },
     };
     return model;
@@ -400,6 +441,7 @@
     waitItems: waitItems,
     targetMenuFor: targetMenuFor,
     keywordMenuFor: keywordMenuFor,
+    parentKeyFor: parentKeyFor,
     targetById: targetById,
     scriptedAffordanceFor: scriptedAffordanceFor,
   };

@@ -135,8 +135,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         target = self._basic_attack_target_identity(page)
 
         # Root: first item is Attack. Open it, then the single target.
-        self._press(page, "ArrowDown")  # skills
-        self._press(page, "ArrowUp")  # back to attack
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "ArrowLeft")  # back to attack
         self._press(page, "Enter")  # open attack
         self._press(page, "Enter")  # select the first valid target
 
@@ -154,7 +154,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         target = self._fire_ball_identity(page)
 
-        self._press(page, "ArrowDown")  # skills
+        self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills list
         # Skills list starts at fire_ball (first owned active skill).
         self._press(page, "Enter")  # open fire_ball targets
@@ -172,11 +172,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # status_disguise is the third owned skill in the skills list.
-        self._press(page, "ArrowDown")  # skills
+        # status_disguise is the third owned skill (first column, second row
+        # of the 2-column skills grid).
+        self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # wind_blade
-        self._press(page, "ArrowDown")  # status_disguise
+        self._press(page, "ArrowDown")  # status_disguise (second grid row)
         self._press(page, "Enter")  # open status_disguise
         self._press(page, "Enter")  # confirm self-cast
 
@@ -194,12 +194,12 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # concentration is the fourth owned active skill in the skills list.
-        self._press(page, "ArrowDown")  # skills
+        # concentration is the fourth owned active skill (second grid row,
+        # second column).
+        self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # wind_blade
-        self._press(page, "ArrowDown")  # status_disguise
-        self._press(page, "ArrowDown")  # concentration
+        self._press(page, "ArrowDown")  # status_disguise (second grid row)
+        self._press(page, "ArrowRight")  # concentration (second grid column)
         self._press(page, "Enter")  # open concentration (NONE)
         self._press(page, "Enter")  # confirm the single 施展 item
 
@@ -218,15 +218,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         # Skills -> wind_blade (AREA) -> all-enemies shorthand -> confirm.
-        self._press(page, "ArrowDown")  # skills
+        self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # wind_blade
+        self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")  # open wind_blade
-        # AREA menu: candidate targets, then shorthands, then confirm.
-        self._press(page, "ArrowDown")  # first shorthand
+        # AREA grid: candidate targets (col 0) then shorthands, then confirm.
+        self._press(page, "ArrowRight")  # first shorthand
         self._press(page, "Enter")  # choose shorthand
-        self._press(page, "ArrowDown")  # second shorthand (if present)
-        self._press(page, "ArrowDown")  # confirm
+        self._press(page, "ArrowDown")  # confirm (second grid row)
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -242,10 +241,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowDown")  # skills
-        self._press(page, "ArrowDown")  # items (disabled)
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "ArrowRight")  # items (disabled)
         self._press(page, "Enter")
-        self._press(page, "ArrowDown")  # defend (disabled)
+        self._press(page, "ArrowRight")  # defend (disabled)
         self._press(page, "Enter")
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
@@ -255,10 +254,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowDown")
-        self._press(page, "ArrowDown")
-        self._press(page, "ArrowDown")
-        self._press(page, "ArrowDown")  # flee is the last root item
+        self._press(page, "ArrowRight")
+        self._press(page, "ArrowRight")
+        self._press(page, "ArrowRight")
+        self._press(page, "ArrowRight")  # flee is the last root cell
         self._press(page, "Enter")
 
         actions = self._ui_actions(page)
@@ -273,9 +272,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
-        # Root order: attack, skills, items, defend, flee, forfeit.
-        for _ in range(5):
-            self._press(page, "ArrowDown")
+        # Root grid: attack..flee in the first row, forfeit below the first
+        # cell (six items across five columns).
+        self._press(page, "ArrowDown")  # forfeit (second grid row)
         self._press(page, "Enter")  # open the secondary Forfeit menu
         self.assertEqual(
             sent_action_count(page), 0, "opening Forfeit must not mutate"
@@ -310,16 +309,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             p["identity"] for p in panel["participants"] if p["team"] == "foes"
         ]
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
-        wind = next(s for s in panel["skills"] if s["key"] == "wind_blade")
 
-        self._press(page, "ArrowDown")  # skills
+        self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # wind_blade
+        self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")  # open wind_blade target menu
-        # AREA menu: candidate targets first, then shorthands, then confirm.
+        # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         self._press(page, "Space")  # toggle the explicit candidate
-        for _ in range(len(wind["shorthands"]) + 1):
-            self._press(page, "ArrowDown")  # past shorthands to confirm
+        # The confirm cell sits at the second grid row, second column.
+        self._press(page, "ArrowRight")
+        self._press(page, "ArrowDown")
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -335,14 +334,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowDown")  # skills
-        self._press(page, "ArrowDown")  # items (disabled)
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "ArrowRight")  # items (disabled)
         detail = page.evaluate(
             "document.getElementById('combat-detail').innerText"
         )
         self.assertIn("道具功能尚未開放", detail)
         self._press(page, "Enter")  # disabled confirm -> explanation, no packet
-        self._press(page, "ArrowDown")  # defend (disabled)
+        self._press(page, "ArrowRight")  # defend (disabled)
         self._press(page, "Enter")
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
@@ -419,8 +418,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertIn("-10%", conditions)
         # Action controls stay usable and disabled entries explain themselves.
         self.assertTrue(page.locator(".combat-controls").is_visible())
-        self._press(page, "ArrowDown")  # skills
-        self._press(page, "ArrowDown")  # items (disabled)
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "ArrowRight")  # items (disabled)
         self.assertIn(
             "道具功能尚未開放",
             page.evaluate("document.getElementById('combat-detail').innerText"),
@@ -430,3 +429,123 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                           "document.getElementById('action-dock').clientWidth"),
             True,
         )
+
+    @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
+    def test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports(self):
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            install_outbound_recorder(page)
+            self._engage(page)
+            # The dock body carries the split: item grid left, detail pane
+            # right.
+            self.assertEqual(page.locator(".combat-layout").count(), 1)
+            self.assertTrue(page.locator(".combat-controls").is_visible())
+            self.assertTrue(page.locator("#combat-detail").is_visible())
+            # The skills submenu renders a 2-column grid with a detail pane
+            # naming the focused skill's cost and the next key action.
+            self._press(page, "ArrowRight")  # skills
+            self._press(page, "Enter")
+            self.assertEqual(
+                page.evaluate(
+                    "document.querySelector('.combat-controls')"
+                    ".classList.contains('dock-grid')"
+                ),
+                True,
+                "the skills list must render as a CSS grid",
+            )
+            self.assertEqual(
+                page.evaluate(
+                    "getComputedStyle(document.querySelector('.combat-controls'))"
+                    ".gridTemplateColumns.split(' ').length"
+                ),
+                2,
+                "the skills grid must use two columns",
+            )
+            page.wait_for_timeout(150)
+            detail = page.evaluate(
+                "document.getElementById('combat-detail').innerText"
+            )
+            self.assertIn("MP ", detail, "the detail pane names the skill cost")
+            self.assertIn("Enter → 開啟", detail, "the detail pane names the next key action")
+            focused = page.locator(".combat-controls .dock-row.focused").first
+            self.assertTrue(
+                "▶" in focused.evaluate("el => getComputedStyle(el, '::before').content")
+            )
+            self.assertEqual(
+                focused.evaluate("el => getComputedStyle(el).backgroundColor"),
+                "rgb(169, 50, 42)",
+            )
+            # Disabled cells are dimmed (dimmer border + dimmer text) but
+            # still focusable for their explanation.
+            self._press(page, "Escape")
+            self._press(page, "ArrowRight")  # skills
+            self._press(page, "ArrowRight")  # items (disabled)
+            disabled = page.locator(".combat-controls .dock-row.disabled").first
+            self.assertEqual(disabled.get_attribute("aria-disabled"), "true")
+            self.assertEqual(disabled.get_attribute("tabindex"), "-1")
+            self.assertNotEqual(
+                page.evaluate(
+                    "() => { const el = document.querySelector("
+                    "'.combat-controls .dock-row.disabled');"
+                    "return getComputedStyle(el).borderColor; }"
+                ),
+                "rgb(81, 76, 67)",
+                "disabled cells use the dimmer border",
+            )
+
+    @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
+    @covers_requirement("webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe")
+    def test_area_space_selects_once_even_when_held(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        panel = self._combat_panel(page)
+        enemy_ids = [
+            p["identity"] for p in panel["participants"] if p["team"] == "foes"
+        ]
+        self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
+
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "Enter")
+        self._press(page, "ArrowRight")  # wind_blade
+        self._press(page, "Enter")
+
+        # Space once toggles the candidate: the selection marker appears and
+        # the client-local selection has exactly one identity.
+        self._press(page, "Space")
+        marker = page.locator(".combat-controls .dock-row.selected")
+        self.assertEqual(marker.count(), 1)
+        self.assertTrue(marker.first.inner_text().startswith("✓"))
+        selected_count = page.evaluate(
+            "() => Elosern._combat.skillByKey['wind_blade'].selected.length"
+        )
+        self.assertEqual(selected_count, 1)
+
+        # Held/repeated Space is suppressed by the router: a synthetic repeat
+        # keydown must not toggle again.
+        page.evaluate(
+            """() => {
+              document.dispatchEvent(new KeyboardEvent('keydown', {
+                key: ' ', repeat: true, bubbles: true, cancelable: true,
+              }));
+            }"""
+        )
+        page.wait_for_timeout(150)
+        selected_count = page.evaluate(
+            "() => Elosern._combat.skillByKey['wind_blade'].selected.length"
+        )
+        self.assertEqual(
+            selected_count, 1, "held Space must not repeatedly toggle candidates"
+        )
+
+        # Confirm casts exactly the one selected target.
+        self._press(page, "ArrowRight")  # shorthand column
+        self._press(page, "ArrowDown")  # confirm cell
+        self._press(page, "Enter")
+        actions = self._ui_actions(page)
+        self.assertGreaterEqual(len(actions), 1, actions)
+        envelope = actions[0][1][0]
+        self.assertEqual(envelope["action_id"], "combat.cast")
+        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)

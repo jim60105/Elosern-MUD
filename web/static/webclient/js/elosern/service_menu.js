@@ -463,20 +463,20 @@
       surfaces: present,
       menus: {
         root: { items: rootItems(panel), focusKey: null },
-        guild: { items: guildItems(panel), focusKey: null },
-        board: { items: boardItems(panel), focusKey: null },
-        quests: { items: questItems(panel), focusKey: null },
-        shop: { items: shopItems(panel), focusKey: null },
-        stock: { items: stockItems(panel), focusKey: null },
-        sell: { items: sellableItems(panel), focusKey: null },
-        inventory: { items: inventoryItems(panel), focusKey: null },
+        guild: { items: guildItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        board: { items: boardItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        quests: { items: questItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        shop: { items: shopItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        stock: { items: stockItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        sell: { items: sellableItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        inventory: { items: inventoryItems(panel), focusKey: null, grid: true, gridCols: 2 },
       },
     };
     return model;
   }
 
   function questMenuFor(model, questRow) {
-    return { items: questDetailMenu(model.panel, questRow), focusKey: null };
+    return { items: questDetailMenu(model.panel, questRow), focusKey: null, grid: true, gridCols: 2 };
   }
 
   return {

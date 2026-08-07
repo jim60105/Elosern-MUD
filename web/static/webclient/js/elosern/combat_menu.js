@@ -253,10 +253,14 @@
       root: {
         items: rootItems(panel),
         focusKey: state.focusKey || null,
+        grid: true,
+        gridCols: 5,
       },
       skills: {
         items: skillItems(skills, state.focusIdentity, state.page || 0),
         focusKey: state.focusKey || null,
+        grid: true,
+        gridCols: 2,
       },
       forfeit: {
         items: [
@@ -264,6 +268,8 @@
           { key: "cancel-forfeit", label: "取消", enabled: true, actionId: null, payload: null },
         ],
         focusKey: null,
+        grid: true,
+        gridCols: 2,
       },
     };
 
@@ -295,6 +301,8 @@
       items: targetItemsFor(skill, combat.participants),
       focusKey: null,
       skillKey: skillKey,
+      grid: true,
+      gridCols: 2,
     };
   }
 

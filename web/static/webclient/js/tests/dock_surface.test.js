@@ -208,6 +208,88 @@ test("renderRows falls back to the first row when no focusKey matches", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Grid rendering mode (mockup dock cells).
+// ---------------------------------------------------------------------------
+
+test("renderRows renders a CSS grid when the menu carries grid geometry", () => {
+  installDomDouble();
+  const DockSurface = loadDockSurface();
+  const container = new FakeElement("div");
+  const menu = { grid: true, gridCols: 2, items: [] };
+  DockSurface.renderRows(container, items(["a", "b", "c"]), {
+    menu,
+    idPrefix: "row",
+  });
+  assert.equal(container.classList.names.has("dock-grid"), true);
+  assert.equal(container.getAttribute("role"), "listbox");
+  assert.equal(container.children.length, 3);
+});
+
+test("renderRows clears the grid mode for list menus", () => {
+  installDomDouble();
+  const DockSurface = loadDockSurface();
+  const container = new FakeElement("div");
+  DockSurface.renderRows(container, items(["a"]), {
+    menu: { grid: true, gridCols: 2 },
+    idPrefix: "row",
+  });
+  assert.equal(container.classList.names.has("dock-grid"), true);
+  DockSurface.renderRows(container, items(["a"]), { idPrefix: "row" });
+  assert.equal(container.classList.names.has("dock-grid"), false);
+});
+
+test("renderRows associates the disabled reason via aria-describedby", () => {
+  installDomDouble();
+  const DockSurface = loadDockSurface();
+  const container = new FakeElement("div");
+  DockSurface.renderRows(
+    container,
+    [
+      { key: "items", label: "道具", enabled: false, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
+      { key: "attack", label: "攻擊", enabled: true },
+      { key: "defend", label: "防禦", enabled: false, description: "防禦功能尚未開放。" },
+      { key: "flee", label: "逃跑", enabled: false },
+    ],
+    { focusKey: "attack", idPrefix: "combat-row" }
+  );
+  const [itemsRow, attackRow, defendRow, fleeRow] = container.children;
+  // Disabled with a server reason: aria-describedby points at a stable
+  // visually hidden description element carrying the reason text.
+  assert.equal(itemsRow.getAttribute("aria-disabled"), "true");
+  assert.equal(itemsRow.getAttribute("aria-describedby"), "combat-row-desc-0");
+  const desc0 = itemsRow.children.find((child) => child.id === "combat-row-desc-0");
+  assert.ok(desc0);
+  assert.equal(desc0.classList.names.has("visually-hidden"), true);
+  assert.equal(desc0.textContent, "道具功能尚未開放。");
+  // Disabled with only a description field: still associated.
+  assert.equal(defendRow.getAttribute("aria-describedby"), "combat-row-desc-2");
+  // Disabled without any reason text: no dangling association.
+  assert.equal(fleeRow.getAttribute("aria-describedby"), null);
+  // Enabled rows carry no disabled association.
+  assert.equal(attackRow.getAttribute("aria-describedby"), null);
+  assert.equal(attackRow.getAttribute("aria-disabled"), null);
+});
+
+test("renderRows marks selected AREA candidates with a check prefix", () => {
+  installDomDouble();
+  const DockSurface = loadDockSurface();
+  const container = new FakeElement("div");
+  DockSurface.renderRows(
+    container,
+    [
+      { key: "area-1", label: "哥布林", enabled: true, selected: true },
+      { key: "area-2", label: "狼", enabled: true },
+    ],
+    { idPrefix: "combat-row" }
+  );
+  const [selected, plain] = container.children;
+  assert.equal(selected.classList.names.has("selected"), true);
+  assert.equal(selected.textContent, "✓ 哥布林");
+  assert.equal(plain.classList.names.has("selected"), false);
+  assert.equal(plain.textContent, "狼");
+});
+
+// ---------------------------------------------------------------------------
 // Pointer bridge activation predicate.
 // ---------------------------------------------------------------------------
 
