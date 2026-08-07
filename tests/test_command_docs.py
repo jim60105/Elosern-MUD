@@ -190,14 +190,21 @@ def mounted_command_classes() -> dict[str, object]:
 
 
 def parse_canonical_entries(text: str) -> dict[str, dict[str, str]]:
-    """Parse the `### <key>` canonical sections of the reference page."""
+    """Parse the `### <key>` canonical sections of the reference page.
+
+    Any other heading level closes the current canonical section, so rows
+    belonging to the `##`-level index tables are never attributed to it.
+    """
     entries: dict[str, dict[str, str]] = {}
     current: str | None = None
     for line in text.splitlines():
-        heading = CANONICAL_HEADING.match(line)
-        if heading:
-            current = heading.group(1).strip().strip("`")
-            entries.setdefault(current, {})
+        if line.startswith("#"):
+            heading = CANONICAL_HEADING.match(line)
+            if heading:
+                current = heading.group(1).strip().strip("`")
+                entries.setdefault(current, {})
+            else:
+                current = None
             continue
         if current is None:
             continue
@@ -219,7 +226,11 @@ def parse_aliases(content: str) -> set[str]:
 
 
 def parse_default_tables(text: str) -> dict[str, dict[str, str]]:
-    """Parse the `##`-level Evennia default index tables (rows `| key | 描述 |`)."""
+    """Parse the `##`-level Evennia default index tables.
+
+    Data rows are shaped `| `key` | 描述 |`; the GFM header (`| 指令 | 描述 |`)
+    and delimiter rows are skipped because their first cell is not backticked.
+    """
     tables: dict[str, dict[str, str]] = {}
     current: str | None = None
     for line in text.splitlines():
@@ -233,9 +244,10 @@ def parse_default_tables(text: str) -> dict[str, dict[str, str]]:
         row = TABLE_ROW.match(line.strip())
         if row is None:
             continue
-        key = row.group(1).strip().strip("`")
-        if key:
-            tables[current][key] = row.group(2).strip()
+        first = row.group(1).strip()
+        if not (first.startswith("`") and first.endswith("`")):
+            continue
+        tables[current][first.strip("`")] = row.group(2).strip()
     return tables
 
 
@@ -249,10 +261,15 @@ def docsify_slug(key: str) -> str:
 
 
 def parse_overview_links(text: str) -> dict[str, str]:
-    """Return key -> anchor fragment for every reference link in the overview."""
+    """Return key -> anchor fragment for every reference link in the overview.
+
+    Links use root-relative docsify routes (``/game/command-reference?id=``);
+    a page-relative href such as ``command-reference#`` would resolve against
+    the site root instead of the current page directory.
+    """
     return {
         match.group(1): match.group(2)
-        for match in re.finditer(r"\[`([^`]+)`\]\(command-reference#([^)]+)\)", text)
+        for match in re.finditer(r"\[`([^`]+)`\]\(/game/command-reference\?id=([^)]+)\)", text)
     }
 
 

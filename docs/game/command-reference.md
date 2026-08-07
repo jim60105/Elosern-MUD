@@ -350,6 +350,8 @@
 
 以下為保留的 Evennia 預設角色指令。完整說明請見 [Evennia 官方文件](https://evennia.com/docs/latest/Components/Commands.html)。
 
+| 指令 | 描述 |
+| --- | --- |
 | `@about` | 檢視 Evennia 版本與平台資訊 |
 | `@accounts` | 列出所有帳號（管理員） |
 | `@alias` | 建立或檢視指令的個人別名 |
@@ -412,6 +414,8 @@
 
 以下為保留的 Evennia 預設帳號指令；帳號指令與角色指令會在附身角色時合併。完整說明請見 [Evennia 官方文件](https://evennia.com/docs/latest/Components/Commands.html)。
 
+| 指令 | 描述 |
+| --- | --- |
 | `@channel` | 管理聊天頻道 |
 | `@examine` | 檢視帳號詳細資料 |
 | `@py` | 執行 Python 程式碼（管理員） |
