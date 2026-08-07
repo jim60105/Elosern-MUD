@@ -229,7 +229,10 @@
   }
 
   // Browser wiring: binds the DOM-independent client to Evennia.msg and the
-  // store controller, and updates the KeyboardRouter submission gate.
+  // store controller, and updates the KeyboardRouter submission gate. The
+  // optional `echo` callback (one text line per dispatched mutation) is
+  // invoked exactly when `submit` dispatches a real request; locked and
+  // duplicate submits never echo (design D4).
   function createBrowserActions(options) {
     options = options || {};
     var evennia = options.evennia;
@@ -237,6 +240,7 @@
     var router = options.router || null; // window.Elosern.KeyboardRouter instance
     var liveRegion = options.liveRegion || null; // element for notices
     var keyboard = options.keyboard || null; // keyboard_router bridge
+    var echo = options.echo || null; // function(text) -> void
 
     function send(messageName, args) {
       evennia.msg(messageName, args, {});
@@ -249,6 +253,25 @@
     function setRouterLock() {
       if (keyboard) {
         keyboard.setMutationInFlight(client.isInFlight());
+      }
+    }
+
+    // Resolve one display command line through the presentation-only catalog
+    // and echo it exactly when the request dispatched. `display` is the
+    // bounded descriptor attached to the menu item at build time; actions the
+    // catalog can resolve without descriptors (wait daypart, forfeit, guild,
+    // creation) echo too, while actions whose required label is missing
+    // resolve to null and stay silent (D4).
+    function echoIfDispatched(actionId, payload, display, requestId) {
+      if (requestId === null || !echo) {
+        return;
+      }
+      var line = null;
+      if (window.Elosern && window.Elosern.CommandEcho) {
+        line = window.Elosern.CommandEcho.commandLine(actionId, payload, display || {});
+      }
+      if (line) {
+        echo(line);
       }
     }
 
@@ -282,8 +305,9 @@
       sync: function () {
         client.sync();
       },
-      submit: function (actionId, payload) {
+      submit: function (actionId, payload, display) {
         var requestId = client.submit(actionId, payload);
+        echoIfDispatched(actionId, payload, display, requestId);
         setRouterLock();
         return requestId;
       },

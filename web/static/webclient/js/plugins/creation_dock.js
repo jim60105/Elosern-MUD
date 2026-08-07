@@ -64,6 +64,7 @@
     _customState: null,
     _customDirty: false,
     _pendingActivate: null,
+    _pendingActivateKey: null,
     _confirmItems: [],
     _keydownBound: null,
     _formKeyBound: null,
@@ -80,6 +81,7 @@
       this._customState = null;
       this._customDirty = false;
       this._pendingActivate = null;
+      this._pendingActivateKey = null;
       this._confirmItems = [];
       this._focusKey = null;
       this._unbindFormKeys();
@@ -105,6 +107,7 @@
       if (draft && draft.mode === "preset") {
         this._view = "confirm";
         this._pendingActivate = "preset";
+        this._pendingActivateKey = draft.preset_key || null;
         this._confirmItems = window.Elosern.CreationMenu.activateConfirm(
           draft.preset_key
         ).items;
@@ -553,6 +556,7 @@
 
     _openResetConfirm: function () {
       this._pendingActivate = "reset";
+      this._pendingActivateKey = null;
       this._confirmItems = window.Elosern.CreationMenu.confirmMenu(
         "確認清除角色草稿？此操作無法回復。",
         window.Elosern.CreationMenu.RESET_ACTION,
@@ -613,6 +617,7 @@
       var payload = window.Elosern.CreationMenu.customPayload(state);
       actions.submit(window.Elosern.CreationMenu.CUSTOM_ACTION, payload);
       this._pendingActivate = "custom";
+      this._pendingActivateKey = null;
       this._confirmItems = window.Elosern.CreationMenu.activateConfirm(null).items;
       this._view = "confirm";
       var keyboard = getKeyboard();
@@ -687,6 +692,7 @@
           // clearing the saved server wizard draft.
           this._view = this._pendingActivate === "preset" ? "presets" : "custom";
           this._pendingActivate = null;
+          this._pendingActivateKey = null;
           this._confirmItems = [];
           this._customDirty = false;
         }
@@ -743,6 +749,7 @@
           });
         }
         this._pendingActivate = "preset";
+        this._pendingActivateKey = item.presetKey;
         this._confirmItems = window.Elosern.CreationMenu.activateConfirm(
           item.presetKey
         ).items;
@@ -757,7 +764,11 @@
       ) {
         var submitActions = getActions();
         if (submitActions) {
-          submitActions.submit(item.actionId, item.payload || {});
+          var display =
+            item.actionId === window.Elosern.CreationMenu.ACTIVATE_ACTION
+              ? { presetKey: this._pendingActivateKey || null }
+              : { actionLabel: "清除草稿" };
+          submitActions.submit(item.actionId, item.payload || {}, display);
         }
         return;
       }
@@ -765,6 +776,7 @@
         keyboard.popMenu();
         this._view = this._pendingActivate === "preset" ? "presets" : "custom";
         this._pendingActivate = null;
+        this._pendingActivateKey = null;
         this._refreshDock();
         return;
       }

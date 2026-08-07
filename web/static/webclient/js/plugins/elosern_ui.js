@@ -91,14 +91,33 @@
   function routeKeyboard(event) {
     var keyboard = getKeyboard();
     var drawer = getDrawer();
-    // `/` opens the drawer outside editable fields.
-    if (event.key === "/" && !isEditable(event.target)) {
+    // `/` toggles the drawer outside editable fields (D1): the routing gate
+    // decides open vs close because only the browser knows the drawer's DOM
+    // state; the router just re-emits the intent. While an editable control
+    // is focused (the drawer field, a creation form, a rest form) the slash
+    // stays ordinary text and never closes the drawer. The rest form is a
+    // div-based keyboard surface, so the exploration dock reports its editing
+    // state explicitly.
+    var exploration = getExploration();
+    var restFormEditing =
+      !!exploration &&
+      typeof exploration.isEditingRestForm === "function" &&
+      exploration.isEditingRestForm();
+    if (event.key === "/" && !isEditable(event.target) && !restFormEditing) {
       event.preventDefault();
-      if (keyboard) {
+      if (drawer && drawer.isOpen()) {
+        drawer.close(true);
+      } else if (keyboard) {
         keyboard.handle("/");
       } else if (drawer) {
         drawer.open();
       }
+      return true;
+    }
+    if (restFormEditing && event.key === "/") {
+      // The rest form owns the keyboard while it is open; the slash is
+      // claimed (never a drawer toggle) and left un-prevented so nothing is
+      // swallowed by the routing gate.
       return true;
     }
     if (drawer && (drawer.isOpen() || isDrawerField(event.target))) {
@@ -266,7 +285,9 @@
     if (window.Elosern && window.Elosern.KeyboardRouter) {
       var router = window.Elosern.KeyboardRouter.createRouter({
         onEvent: function (name, payload) {
-          if (name === "open-drawer") {
+          if (name === "toggle-drawer") {
+            // The routing gate already resolved the drawer's current state:
+            // when this event fires, the drawer is closed and must open.
             var drawer = getDrawer();
             if (drawer) {
               drawer.open();
@@ -442,14 +463,19 @@
       if (skill && skill.targetSpec === "area") {
         var payload = window.Elosern.CombatMenu.areaPayload(skill);
         if (payload && actions) {
-          actions.submit("combat.cast", payload);
+          // Compose the chosen shorthand (or none) into the display
+          // descriptor so the echoed cast line names the actual target.
+          actions.submit("combat.cast", payload, {
+            skillLabel: skill.label,
+            targetLabel: skill.shorthand || null,
+          });
         }
         return;
       }
     }
     if (item.actionId) {
       if (actions) {
-        actions.submit(item.actionId, item.payload || {});
+        actions.submit(item.actionId, item.payload || {}, item.commandDisplay || null);
       }
     }
   }
@@ -497,6 +523,12 @@
       controller: window.Elosern.StateController,
       keyboard: getKeyboard(),
       liveRegion: el("elosern-action-live") || null,
+      // Every dispatched mutation echoes its resolved command line into the
+      // narrative once (D4); the goldenlayout facade owns the append path.
+      echo:
+        window.Elosern && window.Elosern.narrativeInput
+          ? window.Elosern.narrativeInput.appendInput
+          : null,
     });
     window.Elosern.actions = actions;
 

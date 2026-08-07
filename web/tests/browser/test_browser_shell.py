@@ -29,7 +29,18 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         for selector in REQUIRED_SURFACES:
             locator = page.locator(selector)
             self.assertEqual(locator.count(), 1, f"missing surface {selector}")
-            self.assertTrue(locator.is_visible(), f"{selector} is not visible")
+            if selector != "#inputfield":
+                self.assertTrue(locator.is_visible(), f"{selector} is not visible")
+        # The command drawer defaults to closed: the input row exists in the
+        # DOM but is hidden behind the actionable entry button (D2).
+        self.assertFalse(
+            page.locator("#inputfield").is_visible(),
+            "the drawer input row must be hidden by default",
+        )
+        entry = page.locator(".drawer-entry")
+        self.assertEqual(entry.count(), 1)
+        self.assertTrue(entry.is_visible(), "the entry button is visible by default")
+        self.assertEqual(entry.get_attribute("aria-expanded"), "false")
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
@@ -405,11 +416,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         narrative_before = page.locator(".elosern-narrative").inner_text()
 
-        # A direct pointer click into the drawer field never opens the drawer;
-        # Enter must still send exactly one ordinary text message through the
-        # single drawer-owned path, clear the field, and keep focus in it.
-        page.locator("#inputfield").click()
-        self.assertFalse(page.evaluate("Elosern.drawer.isOpen()"))
+        # A pointer activation of the drawer's entry button opens and focuses
+        # the field; Enter must send exactly one ordinary text message through
+        # the single drawer-owned path, clear the field, and keep focus in it.
+        page.locator(".drawer-entry").click()
+        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_function(
@@ -442,7 +456,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         narrative_before = page.locator(".elosern-narrative").inner_text()
-        page.locator("#inputfield").click()
+        page.locator(".drawer-entry").click()
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
         page.keyboard.type("first line")
         page.keyboard.press("Shift+Enter")
         page.keyboard.type("second line")
@@ -480,10 +497,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => document.getElementById('exploration-rest-form') !== null"
         )
-        # Click into the drawer field and send: the rest form's capture-phase
-        # handler must yield, and the command travels as ordinary text (never
-        # an explore.wait submission).
-        page.locator("#inputfield").click()
+        # Open the drawer through its entry button and send: the rest form's
+        # capture-phase handler must yield, and the command travels as
+        # ordinary text (never an explore.wait submission).
+        page.locator(".drawer-entry").click()
+        page.wait_for_function(
+            "() => document.activeElement === document.getElementById('inputfield')"
+        )
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_timeout(300)
@@ -508,6 +528,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_drawer_field_button_alignment_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)
+            # The field is hidden until the drawer opens; open it through the
+            # entry button before measuring the field/button alignment.
+            page.locator(".drawer-entry").click()
+            page.wait_for_function(
+                "() => document.activeElement === document.getElementById('inputfield')"
+            )
             page.wait_for_timeout(200)
             geometry = page.evaluate(
                 """() => {

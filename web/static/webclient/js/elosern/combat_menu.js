@@ -96,7 +96,7 @@
       { key: "skills", label: "技能", enabled: true, actionId: null, payload: null },
       { key: "items", label: "道具", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
       { key: "defend", label: "防禦", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
-      { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {} },
+      { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" } },
       { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null },
     ];
   }
@@ -162,6 +162,7 @@
           enabled: true,
           actionId: "combat.cast",
           payload: { skill_key: skill.key },
+          commandDisplay: { skillLabel: skill.label },
         },
       ];
     }
@@ -173,6 +174,7 @@
           enabled: true,
           actionId: "combat.cast",
           payload: { skill_key: skill.key },
+          commandDisplay: { skillLabel: skill.label },
         },
       ];
     }
@@ -192,6 +194,10 @@
           enabled: true,
           actionId: "combat.cast",
           payload: { skill_key: skill.key, target_ids: [participant.identity] },
+          commandDisplay: {
+            skillLabel: skill.label,
+            targetLabel: participant.display_name,
+          },
         });
       });
       return items;
@@ -231,6 +237,10 @@
       actionId: "combat.cast",
       payload: null,
       confirm: true,
+      // The AREA payload is computed at submit time (areaPayload); the
+      // descriptor carries the skill label so the catalog can resolve the
+      // echo line, with the chosen shorthand composed in by the submit path.
+      commandDisplay: { skillLabel: skill.label },
     });
     return items;
   }

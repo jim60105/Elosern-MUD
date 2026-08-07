@@ -321,7 +321,11 @@
           var item = self._quantityItem;
           var actions = getActions();
           if (item && actions) {
-            actions.submit(item.actionId, { item_key: item.itemKey, quantity: value });
+            actions.submit(
+              item.actionId,
+              { item_key: item.itemKey, quantity: value },
+              item.commandDisplay || null
+            );
           }
           self._quantity = null;
           self._quantityItem = null;

@@ -148,6 +148,21 @@ input:focus-visible,
   margin: 0 0 .15rem 0;
 }
 
+/* A player input line reads as UI text, not prose: the mono face plus a
+   subtle seal-red left accent mark it as the player's own command line. */
+.elosern-narrative .inp {
+  border-left: 2px solid var(--elm-vermilion-dim);
+  padding-left: .4rem;
+}
+
+/* The hairline separating system/server prose from each player input line
+   (D5): one element per input event, never before the very first line. */
+.elosern-narrative .narrative-divider {
+  height: 0;
+  border-top: 1px solid var(--elm-border-dim);
+  margin: .3rem 0 .25rem 0;
+}
+
 /* Box/ASCII map art (detected by the box-drawing glyph range in the append
    path) stays monospace-first so columns align; CJK glyphs fall through to
    a CJK face and remain double-width in practice, the standard arrangement
@@ -438,6 +453,37 @@ input:focus-visible,
 .elosern-drawer {
   padding: .3rem .6rem;
   overflow: hidden;
+}
+
+/* The drawer defaults to closed (D2): the input row is hidden behind an
+   actionable entry button until the player opens the drawer with `/` or a
+   pointer activation. `data-open` is the single source of the visible state,
+   kept in sync with the entry button's `aria-expanded`. */
+.elosern-drawer .drawer-entry {
+  display: none;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: var(--elm-paper);
+  background-color: var(--elm-ink-raise);
+  border: 1px solid var(--elm-border);
+  cursor: pointer;
+  font-size: .95em;
+}
+
+.elosern-drawer .drawer-entry:hover,
+.elosern-drawer .drawer-entry:focus-visible {
+  background-color: var(--elm-vermilion);
+  color: var(--elm-paper);
+}
+
+.elosern-drawer[data-open="false"] .drawer-entry {
+  display: block;
+}
+
+.elosern-drawer[data-open="false"] .prompt,
+.elosern-drawer[data-open="false"] .inputfieldwrapper {
+  display: none;
 }
 
 .elosern-drawer .prompt {

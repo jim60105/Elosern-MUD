@@ -88,12 +88,17 @@ test("disabled item explains without sending", () => {
   assert.strictEqual(events.some((e) => e.name === "submit"), false);
 });
 
-test("slash opens the command drawer", () => {
+test("slash emits a toggle event each press", () => {
   const { router, events } = makeRouter();
   router.pushMenu({ items: [Router.menuItem("a", true)] });
   events.length = 0;
   router.handle("/");
-  assert.strictEqual(events[0].name, "open-drawer");
+  assert.strictEqual(events[0].name, "toggle-drawer");
+  // The router never decides open vs close; every press re-emits the toggle
+  // and the browser gate resolves the drawer's current state.
+  router.handle("/");
+  assert.strictEqual(events[1].name, "toggle-drawer");
+  assert.strictEqual(events.filter((e) => e.name === "toggle-drawer").length, 2);
 });
 
 test("space is reserved for multi-select and emits a space event", () => {

@@ -117,7 +117,11 @@ def login_and_open(page: Page, webclient_url: str, base_url: str) -> None:
 def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
     """Wait until the shell surfaces render and the store is active and unlocked."""
     for selector in REQUIRED_SURFACES:
-        page.wait_for_selector(selector, timeout=timeout)
+        # The drawer input row exists in the DOM but is hidden by default
+        # (behind the entry button), so existence, not visibility, is the
+        # shell-ready signal for it.
+        state = "attached" if selector == "#inputfield" else "visible"
+        page.wait_for_selector(selector, timeout=timeout, state=state)
     page.wait_for_selector(".resource-value", timeout=timeout)
     page.wait_for_function(
         """() => {

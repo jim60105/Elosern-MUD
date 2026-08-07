@@ -209,6 +209,9 @@
       };
       if (canSubmit) {
         item.payload = { exit_ref: row.exit_ref, current_node: currentNode };
+        // Exit traversal has no `move` command; the server label is the
+        // documented action description fed to the command-line catalog.
+        item.commandDisplay = { exitLabel: row.label };
       }
       items.push(item);
     });
@@ -234,6 +237,7 @@
         actionId: "explore.look",
         payload: { room: true },
         description: look.room.display_name || null,
+        commandDisplay: { room: true },
       });
     }
     (look.entities || []).forEach(function (entity) {
@@ -245,6 +249,7 @@
         payload: { target_id: entity.identity },
         kind: entity.kind,
         description: null,
+        commandDisplay: { targetLabel: entity.display_name },
       });
     });
     (look.objects || []).forEach(function (obj) {
@@ -255,6 +260,7 @@
         actionId: "explore.look",
         payload: { target_id: obj.identity },
         description: null,
+        commandDisplay: { targetLabel: obj.display_name },
       });
     });
     items.push(backItem());
@@ -328,6 +334,7 @@
             payload: null,
             freeform: true,
             npcId: target.identity,
+            npcLabel: target.display_name,
             description: null,
             disabledReason: affordance.disabled_reason || null,
           });
@@ -343,6 +350,11 @@
               : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
             disabledReason: affordance.disabled_reason || null,
           });
+          if (affordance.enabled) {
+            items[items.length - 1].commandDisplay = {
+              targetLabel: target.display_name,
+            };
+          }
         }
       } else if (affordance.kind === "navigate") {
         // A navigate-kind service affordance is dock-navigation only; it is
@@ -379,6 +391,10 @@
         actionId: "explore.talk_scripted",
         payload: { npc_id: target.identity, keyword_id: keyword.keyword_id },
         description: null,
+        commandDisplay: {
+          npcLabel: target.display_name,
+          keywordLabel: keyword.label,
+        },
       };
     });
     if (items.length === 0) {

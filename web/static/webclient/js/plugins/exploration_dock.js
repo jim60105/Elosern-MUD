@@ -530,7 +530,10 @@
         return;
       }
       if (item.freeform) {
-        this._pendingFreeform = { npcId: item.npcId };
+        this._pendingFreeform = {
+          npcId: item.npcId,
+          npcLabel: item.npcLabel || null,
+        };
         this._openFreeformDrawer();
         return;
       }
@@ -539,7 +542,7 @@
         return;
       }
       if (item.actionId && actions) {
-        actions.submit(item.actionId, item.payload || {});
+        actions.submit(item.actionId, item.payload || {}, item.commandDisplay || null);
       }
     },
 
@@ -549,6 +552,13 @@
       this._restForm = { raw: "", max: 43200 };
       this._renderRestForm();
       this._bindRestKeys();
+    },
+
+    // The rest form is a div-based keyboard surface (not a real input), so the
+    // `/` routing gate treats it as an editable control: a slash while the
+    // rest form is open must never toggle the command drawer.
+    isEditingRestForm: function () {
+      return this._restForm !== null;
     },
 
     _renderRestForm: function () {
@@ -706,8 +716,11 @@
       this._pendingFreeform = null;
     },
 
-    // Called by elosern_ui when the drawer sends text; returns true when the
-    // text was consumed as a free-form dialogue action.
+    // Called by the drawer when it sends text while a free-form dialogue is
+    // pending. Owns the submit and the echo (D4): returns the request id when
+    // the action dispatched (the drawer then clears the field and closes), or
+    // `false` when the client is locked so the typed speech stays in the
+    // field and the drawer stays open -- nothing is silently lost.
     consumeFreeformText: function (text) {
       if (!this._pendingFreeform || !text || !text.trim()) {
         return false;
@@ -716,10 +729,16 @@
       if (!actions) {
         return false;
       }
-      var payload = { npc_id: this._pendingFreeform.npcId, speech: text };
-      actions.submit("explore.talk_freeform", payload);
+      var pending = this._pendingFreeform;
+      var payload = { npc_id: pending.npcId, speech: text };
+      var requestId = actions.submit("explore.talk_freeform", payload, {
+        npcLabel: pending.npcLabel || null,
+      });
+      if (requestId === null) {
+        return false;
+      }
       this._pendingFreeform = null;
-      return true;
+      return requestId;
     },
 
     hasPendingFreeform: function () {

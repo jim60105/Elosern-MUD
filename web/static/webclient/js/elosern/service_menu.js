@@ -303,6 +303,7 @@
       if (buy.enabled) {
         item.actionId = buy.action_id;
         item.itemKey = row.item_key;
+        item.commandDisplay = { itemLabel: row.display_name };
       }
       items.push(item);
     });
@@ -339,6 +340,7 @@
       if (sell.enabled) {
         item.actionId = sell.action_id;
         item.itemKey = row.item_key;
+        item.commandDisplay = { itemLabel: row.display_name };
       }
       items.push(item);
     });

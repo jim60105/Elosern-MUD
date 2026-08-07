@@ -260,7 +260,7 @@
         return true;
       }
       if (key === SLASH) {
-        emit("open-drawer", {});
+        emit("toggle-drawer", {});
         return true;
       }
       if (key === ARROW_UP || key === ARROW_DOWN || key === ARROW_LEFT || key === ARROW_RIGHT) {

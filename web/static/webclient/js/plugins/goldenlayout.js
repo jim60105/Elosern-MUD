@@ -411,7 +411,20 @@
     wrapper.appendChild(field);
     wrapper.appendChild(button);
 
+    // The drawer defaults to closed: a real, focusable entry button is the
+    // only visible element until the player opens it (D2). The button carries
+    // the drawer's expanded state and opens + focuses the field on activation.
+    var entry = makeElement("button", "drawer-entry");
+    entry.type = "button";
+    entry.setAttribute("aria-expanded", "false");
+    setText(entry, "指令輸入（/）");
+
     var drawerOpen = false;
+
+    function syncState() {
+      root.setAttribute("data-open", drawerOpen ? "true" : "false");
+      entry.setAttribute("aria-expanded", drawerOpen ? "true" : "false");
+    }
 
     function isOpen() {
       return drawerOpen;
@@ -419,6 +432,7 @@
 
     function open() {
       drawerOpen = true;
+      syncState();
       field.focus();
       return true;
     }
@@ -427,6 +441,7 @@
     // back to the menu surface after Escape or a dock-borrowed send).
     function close(restoreFocus) {
       drawerOpen = false;
+      syncState();
       if (restoreFocus) {
         var dock = document.getElementById("action-dock");
         if (dock && dock.focus) {
@@ -450,21 +465,33 @@
       // Free-form dialogue intercepts the drawer: the exploration dock holds
       // the server-authored NPC reference and submits `explore.talk_freeform`
       // with the typed speech instead of sending ordinary text. A consumed
-      // send closes the drawer and returns focus to the dock that borrowed it.
+      // send closes the drawer and returns focus to the dock that borrowed
+      // it. While a dialogue is pending, the send is never ordinary text, so
+      // a locked client keeps the speech in the field and the drawer open
+      // instead of silently losing it (D4).
       var exploration = window.Elosern && window.Elosern.explorationDock;
-      if (
-        exploration &&
-        typeof exploration.consumeFreeformText === "function" &&
-        exploration.consumeFreeformText(text)
-      ) {
-        field.value = "";
-        close(true);
-        return true;
+      var hasPendingFreeform =
+        !!exploration &&
+        typeof exploration.hasPendingFreeform === "function" &&
+        exploration.hasPendingFreeform();
+      if (hasPendingFreeform) {
+        if (exploration.consumeFreeformText(text)) {
+          field.value = "";
+          close(true);
+          return true;
+        }
+        // Locked: the speech stays in the field and the drawer stays open.
+        return false;
       }
       if (window.plugin_handler && typeof window.plugin_handler.onSend === "function") {
         window.plugin_handler.onSend(text);
       } else if (window.Evennia) {
         window.Evennia.msg("text", [text], {});
+      }
+      // An ordinary send echoes the exact raw typed text into the narrative
+      // once per deliberate send (D4); the echo is pure presentation.
+      if (window.Elosern && window.Elosern.narrativeInput) {
+        window.Elosern.narrativeInput.appendInput(text);
       }
       field.value = "";
       // A send routed as ordinary text releases the borrowed-drawer reference
@@ -493,8 +520,16 @@
       send();
     });
 
+    // Pointer activation of the entry button opens and focuses the field, so
+    // the pointer-opened field sends on Enter through the single send path.
+    entry.addEventListener("click", function () {
+      open();
+    });
+
+    root.appendChild(entry);
     root.appendChild(prompt);
     root.appendChild(wrapper);
+    syncState();
     container.getElement().append(root);
 
     window.Elosern = window.Elosern || {};
@@ -997,7 +1032,7 @@
     actions.submit("explore.move", {
       exit_ref: node.action.exit_ref,
       current_node: currentNode,
-    });
+    }, { exitLabel: node.label });
   }
 
   function registerComponents(layout) {
@@ -1111,6 +1146,34 @@
     return true;
   }
 
+  // One player input line in the narrative (D5): a `.narrative-divider`
+  // hairline before the line unless the log has no prior lines, then a `.inp`
+  // line whose text is inserted as a single literal text node -- client-
+  // authored text must never enter the markup allowlist pipeline. One input
+  // event (divider + line) counts as exactly one unread increment and one
+  // scroll-keep event, exactly like one server line.
+  function appendInput(text) {
+    if (!narrativeDiv) {
+      return false;
+    }
+    var wasAtBottom = atNarrativeBottom();
+    var hasPriorLine =
+      narrativeDiv.querySelector(".out, .inp, .sys, .err") !== null;
+    if (hasPriorLine) {
+      narrativeDiv.appendChild(makeElement("div", "narrative-divider"));
+    }
+    var line = makeElement("div", "inp");
+    line.appendChild(document.createTextNode(text == null ? "" : String(text)));
+    narrativeDiv.appendChild(line);
+    if (wasAtBottom) {
+      narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    } else {
+      narrativeUnread += 1;
+      updateUnread();
+    }
+    return true;
+  }
+
   function onText(args, kwargs) {
     if (!Array.isArray(args) || typeof args[0] !== "string") {
       return false;
@@ -1212,6 +1275,13 @@
   if (typeof window !== "undefined") {
     window.Elosern = window.Elosern || {};
     window.Elosern.goldenlayout = plugin;
+    // One shared narrative append path for player input lines: the action
+    // client (dispatch echo) and the drawer (ordinary send echo) both route
+    // through this facade so scroll-keep and the unread marker stay single-
+    // owner (D5).
+    window.Elosern.narrativeInput = {
+      appendInput: appendInput,
+    };
   }
   if (typeof window !== "undefined" && window.plugin_handler) {
     window.plugin_handler.add("goldenlayout", plugin);
