@@ -108,6 +108,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",
+                "${PROMPTS_DIR:-./prompts}:/app/prompts:ro",
             },
         )
         self.assertEqual(
@@ -121,6 +122,24 @@ class ContainerContractTests(unittest.TestCase):
         self.assertTrue(bootstrap["tty"])
         self.assertEqual(bootstrap["volumes"], ["evennia-db:/app/server/db"])
         self.assertIn("evennia createsuperuser", " ".join(bootstrap["command"]))
+
+    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    def test_prompt_files_are_baked_and_mounted_read_only(self):
+        compose = yaml.safe_load(_read("compose.yaml"))
+        volumes = compose["services"]["evennia"]["volumes"]
+        self.assertIn("${PROMPTS_DIR:-./prompts}:/app/prompts:ro", volumes)
+        self.assertNotIn("/app/prompts:rw", " ".join(volumes))
+
+        containerfile = _read("Containerfile")
+        layout = _stage(containerfile, "app-layout")
+        self.assertIn("COPY --chown=root:0 prompts/ /app/prompts/", layout)
+
+        ignored = set(_read(".containerignore").splitlines())
+        self.assertNotIn("prompts/", ignored)
+        self.assertFalse(
+            [line for line in ignored if "prompts" in line],
+            "the build context must include the prompt data folder",
+        )
 
     @covers_requirement("container-image::container-ignore-file-excludes-non-build-context-files")
     def test_containerignore_excludes_repository_secrets_caches_and_development_paths(self):

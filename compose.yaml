@@ -29,6 +29,7 @@ services:
       - evennia-logs:/app/server/logs
       - evennia-static:/app/server/.static
       - evennia-media:/app/server/.media
+      - ${PROMPTS_DIR:-./prompts}:/app/prompts:ro
 
   # First run only: podman compose --profile bootstrap run --rm bootstrap
   bootstrap:

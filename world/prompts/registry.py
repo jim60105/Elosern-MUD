@@ -1,0 +1,60 @@
+"""The code-defined prompt-key registry: files, placeholder allowlists, bounds.
+
+``world/prompts/`` is a read-only registry package: the initial prompt text
+ships in the top-level ``prompts/*.yaml`` data folder, and this module is the
+code-side contract the loader validates every YAML file against. Each key
+declares its file, the placeholder tokens it allows (wired to the concrete data
+each caller passes), and a maximum text length, so admins edit only the ``text``
+block while the loader still catches typos like ``{nmme}``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PromptSpec:
+    """The code-side contract for one prompt key.
+
+    Attributes:
+        key: The dotted ``file.domain`` key that consumers render.
+        file: The ``*.yaml`` file under the prompt root that owns this key.
+        allowed_placeholders: the ``{token}`` forms the loader permits in the
+            text and ``render_prompt`` will substitute.
+        max_length: the upper bound in characters on the prompt text.
+    """
+
+    key: str
+    file: str
+    allowed_placeholders: tuple[str, ...] = ()
+    max_length: int = 4096
+
+
+def _build() -> dict[str, PromptSpec]:
+    """Build the keyed spec registry; one entry per layer or domain."""
+    specs = (
+        PromptSpec("narrator.system", "narrator.yaml"),
+        PromptSpec("npc_dialogue.system", "npc_dialogue.yaml", ("name", "desc", "location")),
+        PromptSpec("scenario_director.system", "scenario_director.yaml"),
+        PromptSpec("npc.thinking", "npc.yaml", ("name",)),
+        PromptSpec("art.style", "art.yaml"),
+        PromptSpec(
+            "art.character_description",
+            "art.yaml",
+            ("race", "name", "age", "style"),
+        ),
+        PromptSpec(
+            "art.monster_description",
+            "art.yaml",
+            ("description", "display_name", "examples"),
+        ),
+        # Forward-declared seam: registered and validated, but no runtime
+        # consumer calls it yet (the character-creation feature is deterministic
+        # until its generative task here).
+        PromptSpec("character_creation.system", "character_creation.yaml"),
+    )
+    return {spec.key: spec for spec in specs}
+
+
+PROMPT_SPECS: dict[str, PromptSpec] = _build()

@@ -79,6 +79,16 @@ ART_WORKER_CMD = [sys.executable, "-m", "tools.art_worker"]
 # Bounded wall-clock budget for one worker invocation (seconds).
 ART_WORKER_TIMEOUT_SECONDS = 60
 
+######################################################################
+# Prompt library (prompt-library)
+######################################################################
+
+# Root directory of the admin-facing prompt data folder, the sole source of
+# every LLM prompt the application owns. Overridable via the PROMPT_ROOT
+# environment variable for bare-metal or nonstandard layouts; the compose
+# runtime bind-mounts the host folder here read-only at /app/prompts.
+PROMPT_ROOT = os.environ.get("PROMPT_ROOT", os.path.join(GAME_DIR, "prompts"))
+
 # Periodic queue drain control. When ART_SCHEDULER_ENABLED is False the
 # ArtDrainScript never drains; records stay missing/pending and placeholders
 # remain.

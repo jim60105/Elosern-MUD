@@ -1,0 +1,6 @@
+schema_version: 1
+prompts:
+  art.style: approved visual style
+  art.character_description: |-
+    A {race} adult named {name} ({age}) in the {style}.
+  art.monster_description: "{description} ({display_name}；例如：{examples})"

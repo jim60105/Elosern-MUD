@@ -124,6 +124,22 @@ def at_server_start():
     sync_quest_runtime()
     sync_guild_economy()
     sync_guard_npc()
+
+    # Prompt library: validate every YAML prompt file and mark broken keys
+    # unavailable. Failures are bounded per key and logged; server startup
+    # always continues (design D3), so a broken prompt never takes the
+    # deterministic game offline. The wrapper is a last-resort guard: even an
+    # unforeseen loader failure must not abort startup.
+    from evennia import logger as evennia_logger
+    from world.prompts.loader import load_prompt_library
+
+    try:
+        load_prompt_library()
+    except Exception as exc:
+        evennia_logger.log_err(
+            f"prompt library load failed; continuing with degraded prompts: {exc}"
+        )
+
     _register_narrator_layer()
     _register_npc_dialogue_layer()
     _register_scenario_director_layer()

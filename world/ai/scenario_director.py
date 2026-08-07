@@ -48,6 +48,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.prompts.loader import PromptUnavailableError, render_prompt
 
 # Hard prompt bounds (design D2): per-field string-length caps and a bounded
 # total serialized size, so a pathological request cannot produce an unbounded
@@ -61,24 +62,6 @@ MAX_SCENE_SENTENCE_LENGTH = 500
 _CJK_START = "\u4e00"
 _CJK_END = "\u9fff"
 _TEMPLATE_PLACEHOLDER_RE = re.compile(r"\{actor\}|\{target\}|\{data\[[^\]]*\]\}")
-
-_SYSTEM_MESSAGE = (
-    "你是《伊洛瑟恩大陸》的任務企劃（ScenarioDirector）。請以正體中文，"
-    "根據請求設計一個冒險者公會任務的提案。你只能引用世界上真實存在的內容："
-    "不得編造任何公會階級、場景類型、NPC 階級、怪物階級、物品、地點或獎勵。"
-    "只輸出一個 JSON 物件，其結構必須符合 QuestBlueprint："
-    '{"name": "…", "quest_type": "採集/討伐/護衛/探索/緊急", "rank": "F", '
-    '"issuer": "guild_branch_…", "stages": [{"index": 0, "objective": '
-    '{"kind": "defeat/reach_location/escort/acquire", "quantity": 1, '
-    '"monster_tier": null, "item_key": null}, "location_req": {"layer": '
-    '"anchor/grid/instance", "archetype": "…", "anchor_key": null, '
-    '"anchor_near": null, "xyz": null, "scene_sentence": null}, "npc_req": '
-    '[{"role": "…", "tier": "…", "disposition": null}]}], "reward": '
-    '{"copper": 100, "items": [{"item_key": "healing_potion", "quantity": 1}], '
-    '"merit": 25}, "failure": {"deadline_hours": 72, "conditions": []}}。'
-    "stage 的 index 必須從 0 開始連續遞增。"
-)
-
 
 class BlueprintQuestType(StrEnum):
     """The closed five-value quest classification mirrored from the runtime type."""
@@ -936,7 +919,7 @@ def build_scenario_prompt(
     Identical input always produces byte-identical prompts with no live entity
     references.
     """
-    system = {"role": "system", "content": _SYSTEM_MESSAGE}
+    system = {"role": "system", "content": render_prompt("scenario_director.system")}
     user = {"role": "user", "content": _bounded_context(context)}
     return system, user
 
@@ -1109,7 +1092,10 @@ def generate_quest_blueprint(client: Any, *, context: dict[str, Any]):
             "generate_quest_blueprint requires an injected client; got None"
         )
     _require_registered()
-    system, user = build_scenario_prompt(context)
+    try:
+        system, user = build_scenario_prompt(context)
+    except PromptUnavailableError:
+        return _draw_template(context)
     descriptor = ChatRequestDescriptor(messages=(system, user), schema_id="scenario_director")
     text = yield guarded_call("scenario_director", client, descriptor)
     if text is _SCENARIO_DIRECTOR_DEGRADED:

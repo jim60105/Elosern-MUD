@@ -18,10 +18,7 @@ import unicodedata
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-
-# The approved visual style is fixed so every description is stable across
-# reloads and the store's source-description hash is meaningful.
-_APPROVED_STYLE = "approved visual style"
+from world.prompts.loader import PromptUnavailableError, render_prompt
 
 
 class ArtSubjectError(ValueError):
@@ -127,15 +124,26 @@ def _race_label(entity) -> str:
 def character_description(entity, age: int) -> str:
     """One deterministic adult-safe description for a character portrait.
 
-    The template covers only stable, validated identity: the display name,
-    race/subrace label, and the adult age. Persona text, secret state, mutable
-    combat resources, and disguised stats are never included (design D6).
+    The template (rendered from the prompt library) covers only stable,
+    validated identity: the display name, race/subrace label, the adult age,
+    and the approved-visual-style fragment. Persona text, secret state, mutable
+    combat resources, and disguised stats are never included (design D6). A
+    broken library key degrades to a deterministic registry-driven fallback
+    (design D3) so the art pipeline never stalls.
     """
-    display_name = entity.db.display_name or entity.key or "<unknown>"
-    return (
-        f"A {_race_label(entity)} adult named {display_name} "
-        f"({age}) in the {_APPROVED_STYLE}."
-    )
+    race = _race_label(entity)
+    name = entity.db.display_name or entity.key or "<unknown>"
+    try:
+        style = render_prompt("art.style")
+        return render_prompt(
+            "art.character_description",
+            race=race,
+            name=name,
+            age=str(age),
+            style=style,
+        )
+    except PromptUnavailableError:
+        return f"{name}（{race}，成年，{age} 歲）"
 
 
 def scene_description(subject: ArtSubject) -> str:
@@ -148,7 +156,15 @@ def monster_description(subject: ArtSubject) -> str:
     """The deterministic bestiary description for a generic-monster subject."""
     tier = MONSTER_TIER_REGISTRY[subject.key]
     examples = "、".join(tier.example_monsters_zh)
-    return f"{tier.description} ({tier.display_name_zh}；例如：{examples})"
+    try:
+        return render_prompt(
+            "art.monster_description",
+            description=tier.description,
+            display_name=tier.display_name_zh,
+            examples=examples,
+        )
+    except PromptUnavailableError:
+        return tier.description
 
 
 def description_for(subject: ArtSubject, *, entity=None, age=None) -> str:

@@ -40,6 +40,7 @@ from world.ai.schemas.registry import (
     _OUTPUT_SCHEMAS,
     register_output_schema,
 )
+from world.prompts.loader import PromptUnavailableError, render_prompt
 
 # Hard prompt bounds (design D2): a fixed maximum memory-line window with an
 # explicit truncation marker, per-field string-length caps, and a bounded total
@@ -282,17 +283,15 @@ def _bounded_serialization(payload: Mapping[str, Any]) -> str:
 
 
 def _system_message(npc_context: Mapping[str, Any]) -> str:
+    """Render the NPC dialogue system template with the capped identity values."""
     name = _cap_string(str(npc_context.get("name", "")))
     desc = _cap_string(str(npc_context.get("desc", "")))
     location = _cap_string(str(npc_context.get("location", "")))
-    return (
-        f"你是《伊洛瑟恩大陸》中的 {name}。{desc}。目前位於{location}。"
-        "你只能根據自己確實能觀察到的情況回應；"
-        "玩家在你面前展現出的樣貌，就是你所見到的真實。"
-        "請以正體中文和對方說話，並只輸出一個 JSON 物件："
-        '{"speech": "你要說的話", "intent": {"kind": "..."}}。'
-        "不得虛構任何結果、數字、對話或世界狀態；"
-        "你沒有把握能確實執行的行為，不要寫進 intent。"
+    return render_prompt(
+        "npc_dialogue.system",
+        name=name,
+        desc=desc,
+        location=location,
     )
 
 
@@ -430,7 +429,10 @@ def generate_npc_reply(
             "generate_npc_reply requires an injected client; got None"
         )
     _require_registered()
-    system, user = build_npc_dialogue_prompt(npc_context, player_context, memory)
+    try:
+        system, user = build_npc_dialogue_prompt(npc_context, player_context, memory)
+    except PromptUnavailableError:
+        return None
     descriptor = ChatRequestDescriptor(messages=(system, user), schema_id="npc_dialogue")
     text = yield guarded_call("npc_dialogue", client, descriptor)
     if text is _NPC_DIALOGUE_DEGRADED:

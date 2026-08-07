@@ -31,6 +31,7 @@ from world.ai.guardrail import (
     register_semantic_validator,
 )
 from world.ai.schemas import ChatRequestDescriptor
+from world.prompts.loader import PromptUnavailableError, render_prompt
 
 # Hard prompt bounds (design D2): a fixed maximum entry count, per-field
 # string-length caps, and a bounded total serialized size.
@@ -53,13 +54,6 @@ _TRUNCATION_MARKER = "…"
 _CJK_START = "\u4e00"
 _CJK_END = "\u9fff"
 _TEMPLATE_PLACEHOLDER_RE = re.compile(r"\{actor\}|\{target\}|\{data\[[^\]]*\]\}")
-
-_SYSTEM_MESSAGE = (
-    "你是《伊洛瑟恩大陸》的旁白敘述者。請以正體中文，將底下的事件紀錄改寫成流暢的散文敘事。"
-    "必須嚴格忠於紀錄：只能描述實際發生的事件，不得虛構任何事件、結果、數字或狀態。"
-    "只輸出敘事散文本身，不要加上任何標題、前言、註解或元資訊。"
-)
-
 
 class NarratorClientRequiredError(TypeError):
     """Raised when ``narrate_event_logs`` is called with an explicit ``None`` client."""
@@ -280,7 +274,7 @@ def build_narrator_prompt(
     ``text_template``) with stable sorted JSON serialization, bounded by the
     module's hard caps.
     """
-    system = {"role": "system", "content": _SYSTEM_MESSAGE}
+    system = {"role": "system", "content": render_prompt("narrator.system")}
     user = {"role": "user", "content": _bounded_serialization(event_logs)}
     return system, user
 
@@ -384,7 +378,10 @@ def narrate_event_logs(event_logs: Iterable[Any], client: Any):
         )
     if not _fits_within_bounds(logs):
         return renderer(logs)
-    system, user = build_narrator_prompt(logs)
+    try:
+        system, user = build_narrator_prompt(logs)
+    except PromptUnavailableError:
+        return renderer(logs)
     descriptor = ChatRequestDescriptor(messages=(system, user))
     result = yield guarded_call("narrator", client, descriptor)
     if result is _NARRATOR_DEGRADED:

@@ -64,7 +64,10 @@ accepted by the runtime quest registry, and the two types SHALL NOT be interchan
 
 ### Requirement: ScenarioDirector prompt construction is deterministic, bounded, and faithful
 `world/ai/scenario_director.py::build_scenario_prompt(context)` SHALL return a (system, user) message
-pair. The system message SHALL fix the director role in 伊洛瑟恩大陸, the 正體中文 language, the
+pair. The system message SHALL be loaded from the prompt library's `scenario_director.system` key
+via `render_prompt("scenario_director.system")` — the library is the sole source of the system
+prompt text, and the module SHALL NOT embed it as a Python constant. The system message SHALL fix
+the director role in 伊洛瑟恩大陸, the 正體中文 language, the
 fidelity rule (reference only known world content, never invent ranks, archetypes, NPC tiers, item
 keys, or rewards), and the JSON output contract that is the `QuestBlueprint` shape. The user message
 SHALL serialize the request context (requested quest type, allowed rank, issuer branch, anchor)
@@ -89,6 +92,11 @@ references, so identical input always produces byte-identical prompts.
 - **WHEN** the serialized user message is inspected for a request naming branch
   `guild_branch_altoria` and anchor `capital_altoria`
 - **THEN** it contains those keys and contains no live entity object anywhere in the serialization
+
+#### Scenario: The system message is sourced from the prompt library
+- **WHEN** the ScenarioDirector system message is inspected
+- **THEN** it equals `render_prompt("scenario_director.system")` and the prompt-library file is the
+  only place its text is defined
 
 ### Requirement: generate_quest_blueprint runs the guarded pipeline and enforces the request context
 `world/ai/scenario_director.py::generate_quest_blueprint(client, *, context)` SHALL require the

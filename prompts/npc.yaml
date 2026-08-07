@@ -1,0 +1,3 @@
+schema_version: 1
+prompts:
+  npc.thinking: "（{name} 沉思片刻……）"

@@ -59,6 +59,10 @@ COPY --chown=root:0 commands/ /app/commands/
 COPY --chown=root:0 typeclasses/ /app/typeclasses/
 COPY --chown=root:0 world/ /app/world/
 COPY --chown=root:0 tools/ /app/tools/
+# Admin-facing prompt data: baked defaults survive image-only runs; the compose
+# bind mount below overrides them read-only. World-readable so an external art
+# worker can reuse the shipped fragments (design D11, unchanged worker contract).
+COPY --chown=root:0 prompts/ /app/prompts/
 
 RUN find /app -type d -exec chmod 0755 {} + && \
     find /app -type f -exec chmod 0644 {} + && \

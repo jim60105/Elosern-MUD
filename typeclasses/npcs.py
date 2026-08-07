@@ -15,9 +15,6 @@ class NPC(LivingEntity):
     schedule: Any | None = AttributeProperty(default=None)
 
 
-_DEFAULT_THINKING_MESSAGES = ("（{name} 沉思片刻……）",)
-
-
 def _swallow_cancelled(failure):
     """Trap a timer cancellation so no CancelledError leaks to the speaker."""
     from twisted.internet.defer import CancelledError
@@ -47,7 +44,9 @@ class LLMNPC(NPC):
     chat_memory: dict = AttributeProperty(default=dict)
     max_chat_memory_size: int = AttributeProperty(default=12)
     thinking_timeout: float = AttributeProperty(default=2.0)
-    thinking_messages: tuple = AttributeProperty(default=_DEFAULT_THINKING_MESSAGES)
+    # Per-entity thinking feedback override; unset falls back to the prompt
+    # library's npc.thinking key.
+    thinking_messages: tuple | None = AttributeProperty(default=None)
 
     def _memory_key(self, character: Any) -> str:
         """Return the stable per-character memory partition key.
@@ -90,9 +89,22 @@ class LLMNPC(NPC):
         }
 
     def _thinking_text(self) -> str:
-        messages = self.db.thinking_messages or _DEFAULT_THINKING_MESSAGES
-        template = messages[0] if messages else _DEFAULT_THINKING_MESSAGES[0]
-        return str(template).format(name=self.key)
+        """Render the thinking feedback shown to the speaker.
+
+        A per-entity ``thinking_messages`` override tuple wins when set (each
+        template may use ``{name}``); otherwise the text falls back to the
+        prompt library's ``npc.thinking`` key. An unavailable library key
+        degrades to an empty string (no echo), never an exception.
+        """
+        messages = self.db.thinking_messages
+        if messages:
+            return str(messages[0]).format(name=self.key)
+        from world.prompts.loader import PromptUnavailableError, render_prompt
+
+        try:
+            return render_prompt("npc.thinking", name=self.key)
+        except PromptUnavailableError:
+            return ""
 
     @defer.inlineCallbacks
     def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):

@@ -24,7 +24,17 @@ Defines the narrator layer that maps deterministic `EventLog` records to Traditi
 - **THEN** the call errbacks with a named `NarratorClientRequiredError` before any prompt build or transport interaction, rather than crashing inside the guarded pipeline
 
 ### Requirement: Narrator prompt construction is deterministic, bounded, and faithful
-`world/ai/narrator.py` SHALL provide `build_narrator_prompt(event_logs)` returning a system/user message pair. The prompt SHALL serialize the event record (actor, skill key, targets, time cost, and every entry's kind/actor/target/data and canonical `text_template`) with stable, sorted serialization so identical input produces byte-identical prompts. The prompt SHALL be bounded: a fixed maximum entry count, per-field string-length caps, and a bounded total size, so a large combat round cannot produce an unbounded prompt. It SHALL contain only entity keys and plain JSON-compatible data — never live entity references — and SHALL instruct the model to narrate exactly the recorded events without inventing outcomes, numbers, or state.
+`world/ai/narrator.py` SHALL provide `build_narrator_prompt(event_logs)` returning a system/user
+message pair. The system message SHALL be loaded from the prompt library's `narrator.system` key
+via `render_prompt("narrator.system")`; the library is the sole source of the narrator's system
+prompt text, and the module SHALL NOT embed it as a Python constant. The user message SHALL
+serialize the event record (actor, skill key, targets, time cost, and every entry's
+kind/actor/target/data and canonical `text_template`) with stable, sorted serialization so
+identical input produces byte-identical prompts. The prompt SHALL be bounded: a fixed maximum
+entry count, per-field string-length caps, and a bounded total size, so a large combat round
+cannot produce an unbounded prompt. It SHALL contain only entity keys and plain JSON-compatible
+data — never live entity references — and SHALL instruct the model to narrate exactly the recorded
+events without inventing outcomes, numbers, or state.
 
 #### Scenario: Identical EventLogs produce identical prompts
 - **WHEN** `build_narrator_prompt()` is called twice with the same event data
@@ -49,6 +59,10 @@ Defines the narrator layer that maps deterministic `EventLog` records to Traditi
 #### Scenario: Input exceeding the prompt bounds degrades to the full deterministic template
 - **WHEN** `narrate_event_logs()` is called with more EventLogs or entries than the prompt bounds allow, under a client that would otherwise return prose
 - **THEN** the Deferred resolves to the injected template renderer's output for the full event set instead of narrating a truncated record
+
+#### Scenario: The system message is sourced from the prompt library
+- **WHEN** the narrator system message is inspected
+- **THEN** it equals `render_prompt("narrator.system")` and the prompt-library file is the only place its text is defined
 
 ### Requirement: Narrator degrades to deterministic template rendering when the pipeline fails
 The `narrator` layer SHALL register a guardrail degrade fallback so that when the layer profile is disabled, a transport failure occurs, or validation retries are exhausted, `narrate_event_logs()` resolves to the deterministic template rendering of the same EventLogs via the injected template renderer, and SHALL NOT raise into the caller or leave the game blocked. The template renderer SHALL be injected through `register_narrator(template_renderer)` from a site that may import `world.rules`; `world/ai/narrator.py` itself SHALL NOT import any `world.rules` module.
