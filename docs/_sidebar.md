@@ -1,5 +1,9 @@
 - [文件首頁](/)
 
+- 遊戲指令
+  - [指令總覽](/game/commands)
+  - [指令參考](/game/command-reference)
+
 - 遊戲主持人
   - [總覽與工作原則](/gm/overview)
   - [角色建立與匯入](/gm/characters)

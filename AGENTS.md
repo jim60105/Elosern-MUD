@@ -74,6 +74,11 @@ The main code areas are:
   top-level `tests/` for repository-wide checks.
 - Tests must be deterministic. Use fixed inputs or seeds, never live LLM,
   Stable Diffusion, or other network services.
+- Player-facing command documentation is part of the command surface: any
+  change that adds, removes, renames, or alters a player command (key, alias,
+  syntax, or availability context) MUST update `docs/game/commands.md` and
+  `docs/game/command-reference.md` in the same change and keep
+  `tests/test_command_docs.py` green.
 - Write code comments, docstrings, commit messages, and technical documentation
   in English. Preserve canonical Traditional Chinese lore terms and use
   Traditional Chinese for player-facing game prose.
