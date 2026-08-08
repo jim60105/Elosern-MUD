@@ -53,7 +53,12 @@ def _fastest_pursuer_agility(
     battlefield: combat.Battlefield,
     actor: Any,
 ) -> float | None:
-    """Return the fastest living, present member of the opposing team."""
+    """Return the fastest living, present member of the opposing team.
+
+    Knocked-out members are excluded through the shared predicate, so an
+    inactive floored companion never keeps a fleeing monster (or player) from
+    an automatic success (party-combat D-2).
+    """
     actor_team = battlefield.team_of(str(actor.key))
     values = [
         _adjusted_agility(battlefield.roster[key])
@@ -62,6 +67,7 @@ def _fastest_pursuer_agility(
         for key in members
         if key in battlefield.roster
         and key not in battlefield.fled
+        and not battlefield.is_knocked_out(key)
         and combat._stored_hp(battlefield.roster[key]) > 0
     ]
     return max(values, default=None)

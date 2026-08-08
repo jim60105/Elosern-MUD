@@ -562,6 +562,7 @@ _ENTRY_TEMPLATES = {
     "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
     "skill_practice": "{actor} 累積了技能熟練度。",
     "combat_kill_xp": "",
+    "knocked_out_mark": "",
 }
 
 
@@ -631,6 +632,8 @@ def _entries_from_effect(
             ),
         }
     elif kind == "combat_kill_xp":
+        return ()
+    elif kind == "knocked_out_mark":
         return ()
     else:
         data = {}
@@ -717,7 +720,9 @@ def _step7_build_event_log(
         entries: list[EventEntry] = []
         projected: dict[int, float] = {}
         defeated_ids: set[int] = set()
-        nonlethal = bool(_event_context(request).get("nonlethal", False))
+        event_context = _event_context(request)
+        nonlethal = bool(event_context.get("nonlethal", False))
+        nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
         for effect in pending:
             entries.extend(
                 _entries_from_effect(
@@ -734,7 +739,7 @@ def _step7_build_event_log(
                 int(parts[4]),
                 projected,
                 defeated_ids,
-                nonlethal=nonlethal,
+                nonlethal=nonlethal or str(effect.entity.key) in nonlethal_keys,
             )
             if defeated is not None:
                 entries.append(defeated)
@@ -755,7 +760,9 @@ def _step7_build_event_log(
 def _logged_targets(pending: list[PendingEffect]) -> tuple[str, ...]:
     targets: list[str] = []
     for effect in pending:
-        if effect.description.startswith(("resource_spend|", "combat_kill_xp|")):
+        if effect.description.startswith(
+            ("resource_spend|", "combat_kill_xp|", "knocked_out_mark|")
+        ):
             continue
         key = effect.description.split("|", 2)[1]
         if key not in targets:
@@ -873,7 +880,12 @@ _ENTITY_SURFACES = frozenset({"traits", "sexual", "buffs", "skill_grants", "prog
 def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
     """Snapshot the aggregated declared surfaces of one touched object."""
     if _is_battlefield_like(obj):
-        return {"battlefield": frozenset(obj.fled)}
+        return {
+            "battlefield": (
+                frozenset(obj.fled),
+                frozenset(getattr(obj, "knocked_out", ())),
+            )
+        }
     snapshot: dict[str, Any] = {}
     if surfaces & _ENTITY_SURFACES:
         snapshot["entity"] = _snapshot_entity_state(obj)
@@ -891,7 +903,16 @@ def _restore_touched(
 ) -> None:
     """Restore an object's aggregated declared surfaces by shape."""
     if _is_battlefield_like(obj):
-        obj.fled = set(snapshot.get("battlefield", frozenset(obj.fled)))
+        fled, knocked_out = snapshot.get(
+            "battlefield",
+            (
+                frozenset(obj.fled),
+                frozenset(getattr(obj, "knocked_out", ())),
+            ),
+        )
+        obj.fled = set(fled)
+        if hasattr(obj, "knocked_out"):
+            obj.knocked_out = set(knocked_out)
         return
     if "entity" in snapshot:
         _restore_entity_state(obj, snapshot["entity"])

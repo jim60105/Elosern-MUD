@@ -25,12 +25,18 @@ def _living_members(
     battlefield: Battlefield,
     team_key: str,
 ) -> tuple[Any, ...]:
-    """Return a team's living, present, non-fled members in stable order."""
+    """Return a team's living, present, non-fled members in stable order.
+
+    Knocked-out members are excluded through the shared predicate so overwhelm
+    classification never counts a nonlethally floored combatant's power
+    (party-combat D-2).
+    """
     return tuple(
         battlefield.roster[key]
         for key in sorted(battlefield.teams[team_key])
         if key in battlefield.roster
         and key not in battlefield.fled
+        and not battlefield.is_knocked_out(key)
         and combat._stored_hp(battlefield.roster[key]) > 0
     )
 

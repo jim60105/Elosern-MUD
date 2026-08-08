@@ -25,21 +25,21 @@ Define atomic ActionResolver support for battlefield-level mutations.
 declaration from the caller
 `world/rules/action.py`'s commit-time snapshot/restore dispatch SHALL detect a `Battlefield`-shaped
 object (duck-typed: an object exposing both a `fled` and a `roster` attribute) and snapshot/restore
-exactly its `fled` set, falling back to the existing per-entity snapshot/restore path for any object
-that is not battlefield-shaped. `world/rules/action.py` SHALL NOT import `world.rules.combat.Battlefield`
-to make this determination.
+exactly its `fled` and `knocked_out` sets, falling back to the existing per-entity snapshot/restore
+path for any object that is not battlefield-shaped. `world/rules/action.py` SHALL NOT import
+`world.rules.combat.Battlefield` to make this determination.
 
-#### Scenario: A Battlefield object is snapshotted by its fled set
+#### Scenario: A Battlefield object is snapshotted by its fled and knocked_out sets
 - **WHEN** a `PendingEffect` whose `entity` field is a `Battlefield`-shaped object is staged for commit
-- **THEN** the commit mechanism's snapshot of that object captures the exact contents of its `fled` set
-  before any effect in the same commit applies
+- **THEN** the commit mechanism's snapshot of that object captures the exact contents of its `fled`
+  and `knocked_out` sets before any effect in the same commit applies
 
 #### Scenario: A LivingEntity is still snapshotted by the pre-existing per-entity path
 - **WHEN** a `PendingEffect` whose `entity` field is an ordinary `LivingEntity` is staged for commit,
   alongside a `PendingEffect` whose `entity` field is a `Battlefield`-shaped object, in the same commit
 - **THEN** the `LivingEntity`'s `traits`/`sexual`/`buffs`/`skill_grants` are snapshotted via the
-  existing, unmodified per-entity mechanism, and the `Battlefield`'s `fled` set is snapshotted via the
-  new battlefield-shaped path — both within the same `_commit()` call
+  existing, unmodified per-entity mechanism, and the `Battlefield`'s `fled` and `knocked_out` sets are
+  snapshotted via the new battlefield-shaped path — both within the same `_commit()` call
 
 #### Scenario: No isinstance check against Battlefield exists in action.py
 - **WHEN** `world/rules/action.py`'s source is inspected
@@ -48,17 +48,17 @@ to make this determination.
 
 ### Requirement: A commit failure rolls back a battlefield mutation exactly as it rolls back an entity
 mutation
-When one `PendingEffect`'s `apply()` raises mid-commit, any `Battlefield.fled` mutation already applied
-by an earlier `PendingEffect` in the same commit SHALL be reversed, restoring `fled` to its exact
-pre-commit contents, using the same all-or-nothing guarantee action-resolver's existing entity-state
-rollback already provides.
+When one `PendingEffect`'s `apply()` raises mid-commit, any `Battlefield.fled` or
+`Battlefield.knocked_out` mutation already applied by an earlier `PendingEffect` in the same commit
+SHALL be reversed, restoring both sets to their exact pre-commit contents, using the same
+all-or-nothing guarantee action-resolver's existing entity-state rollback already provides.
 
 #### Scenario: A battlefield mutation is rolled back when a later effect in the same commit fails
-- **WHEN** a commit stages a successful disengage effect (adding a key to `battlefield.fled`) followed
-  by a second, synthetic `PendingEffect` whose `apply()` raises
-- **THEN** `resolve()` returns `ActionResult(outcome="rejected", reason=RejectReason.COMMIT_FAILED)`, and
-  the fleeing entity's key is absent from `battlefield.fled` after the call — the disengage effect's own
-  already-applied mutation was reversed
+- **WHEN** a commit stages a successful knockout effect (adding a key to `battlefield.knocked_out`)
+  followed by a second, synthetic `PendingEffect` whose `apply()` raises
+- **THEN** `resolve()` returns `ActionResult(outcome="rejected", reason=RejectReason.COMMIT_FAILED)`,
+  and the knocked-out key is absent from `battlefield.knocked_out` after the call — the earlier
+  effect's own already-applied mutation was reversed
 
 #### Scenario: The existing entity-rollback tests still pass unmodified
 - **WHEN** action-resolver's own pre-existing atomicity test suite (fault injection at each of the eight

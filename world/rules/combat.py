@@ -35,11 +35,19 @@ _PERCENT_RE = re.compile(r"([+-]\d+)%")
 
 @dataclass
 class Battlefield:
-    """A live, two-team combat roster."""
+    """A live, two-team combat roster.
+
+    ``fled`` and ``knocked_out`` are the battlefield's persistent in-battle
+    state sets (party-combat D-2): ``knocked_out`` holds the roster keys
+    knocked out nonlethally at damage-commit time, so initiative, action
+    provision, target selection, overwhelm classification, and terminal checks
+    share one predicate instead of re-reading raw HP.
+    """
 
     teams: dict[str, frozenset[str]]
     roster: dict[str, Any]
     fled: set[str] = field(default_factory=set)
+    knocked_out: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         if len(self.teams) != 2:
@@ -61,6 +69,10 @@ class Battlefield:
             (team for team, members in self.teams.items() if key in members),
             None,
         )
+
+    def is_knocked_out(self, key: str) -> bool:
+        """Whether one roster key is marked knocked out on the battlefield."""
+        return key in self.knocked_out
 
 
 class BattlefieldActionContext:
@@ -237,10 +249,21 @@ def _handle_damage(
     effect_id: str,
     event_context: dict[str, Any],
 ) -> list[PendingEffect]:
-    """Stage d100 hit and damage results; commit only the computed hp delta."""
+    """Stage d100 hit and damage results; commit only the computed hp delta.
+
+    The nonlethal policy is per-damaged-target (party-combat D-3): the
+    session-wide ``nonlethal`` flag (examinations) protects every target, while
+    ``nonlethal_keys`` protects only the named entities (allied companions in a
+    hostile session). A protected crossing floors HP at 1; a crossing protected
+    by the per-entity key set also stages a battlefield ``knocked_out`` mark
+    inside the same commit, so the in-round initiative, targeting, overwhelm,
+    and terminal consumers observe the knockout through the shared predicate.
+    """
     _, school = _parse_damage_effect(effect_id)
     attack_key = "atk_phys" if school == "physical" else "magic_level"
-    nonlethal = bool(event_context.get("nonlethal", False))
+    session_nonlethal = bool(event_context.get("nonlethal", False))
+    nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
+    battlefield = event_context.get("battlefield")
     pending: list[PendingEffect] = []
     for target in targets:
         raw_roll = roll_d100()
@@ -254,25 +277,54 @@ def _handle_damage(
                 round(attack * multiplier) - defense,
                 int(COMBAT_YAML["damage"]["floor"]),
             )
-        apply = (
-            lambda target=target, amount=amount: (
-                _apply_hp_delta_nonlethal(target, -amount)
-                if nonlethal
-                else _apply_hp_delta(target, -amount)
-            )
-            if hit
-            else _noop
-        )
+        key = str(target.key)
+        protected = session_nonlethal or key in nonlethal_keys
+        marked: list[str] = []
+
+        def apply(
+            target=target,
+            amount=amount,
+            hit=hit,
+            key=key,
+            protected=protected,
+            marked=marked,
+        ) -> None:
+            if not hit:
+                _noop()
+                return
+            if not protected:
+                _apply_hp_delta(target, -amount)
+                return
+            before = _stored_trait_value(target.traits.hp)
+            _apply_hp_delta_nonlethal(target, -amount)
+            if before > 0 and before - amount <= 0 and key in nonlethal_keys:
+                marked.append(key)
+
         pending.append(
             PendingEffect(
                 entity=target,
                 description=(
-                    f"damage|{target.key}|{raw_roll}|{int(hit)}|{amount}"
+                    f"damage|{key}|{raw_roll}|{int(hit)}|{amount}"
                 ),
                 surfaces=frozenset(),
                 apply=apply,
             )
         )
+        if key in nonlethal_keys and battlefield is not None:
+            # One battlefield-shaped effect per protected target: the commit's
+            # duck-typed snapshot/restore dispatch captures ``fled`` and
+            # ``knocked_out`` by shape, so a later commit failure rolls the
+            # mark back with the HP floor (battlefield-commit-surface).
+            pending.append(
+                PendingEffect(
+                    entity=battlefield,
+                    description=f"knocked_out_mark|{key}",
+                    surfaces=frozenset(),
+                    apply=lambda marked=marked: (
+                        battlefield.knocked_out.update(marked)
+                    ),
+                )
+            )
     return pending
 
 
@@ -289,7 +341,9 @@ def roll_initiative(battlefield: Battlefield) -> list[str]:
     scores = {
         key: entity.skills.effective_value("agility") * weight + roll_d100()
         for key, entity in battlefield.roster.items()
-        if key not in battlefield.fled and _stored_hp(entity) > 0
+        if key not in battlefield.fled
+        and not battlefield.is_knocked_out(key)
+        and _stored_hp(entity) > 0
     }
     return sorted(scores, key=lambda key: (-scores[key], key))
 
@@ -312,6 +366,7 @@ def default_attack_policy(
         for key in enemy_team
         if key not in battlefield.fled
         and key in battlefield.roster
+        and not battlefield.is_knocked_out(key)
         and _stored_hp(battlefield.roster[key]) > 0
     ]
     if not candidates:
@@ -376,7 +431,11 @@ def run_round(
     logs: list[EventLog] = []
     for key in roll_initiative(battlefield):
         entity = battlefield.roster[key]
-        if key in battlefield.fled or _stored_hp(entity) <= 0:
+        if (
+            key in battlefield.fled
+            or battlefield.is_knocked_out(key)
+            or _stored_hp(entity) <= 0
+        ):
             continue
         modifiers = evaluate_combat_modifiers(entity)
         if modifiers.get("actions_per_turn", 1) == 0:
@@ -398,6 +457,7 @@ def is_battle_over(battlefield: Battlefield) -> bool:
         not any(
             key not in battlefield.fled
             and key in battlefield.roster
+            and not battlefield.is_knocked_out(key)
             and _stored_hp(battlefield.roster[key]) > 0
             for key in members
         )

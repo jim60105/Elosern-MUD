@@ -1,5 +1,6 @@
 """Deterministic safety checks for explicit time skips."""
 
+from collections.abc import Iterable
 from enum import StrEnum
 from typing import Any
 
@@ -23,6 +24,29 @@ def register_active_battlefield(battlefield: Battlefield) -> None:
 def unregister_active_battlefield(entity: Any) -> None:
     """Remove one combatant's transient battlefield lookup on settlement."""
     _BATTLEFIELDS.pop(str(entity.key), None)
+
+
+def unregister_participants(dbrefs: Iterable[int]) -> None:
+    """Remove every registration whose roster contains any participant dbref.
+
+    Settlement cleanup for a session whose participant objects cannot all be
+    resolved (party-combat D-5): a deleted participant's key can no longer be
+    looked up through its object, but its battlefield registration still holds
+    every roster key -- so this scan purges the whole session's keys at once,
+    and a stale key can never survive to block a later object that reuses it.
+    """
+    wanted = {int(dbref) for dbref in dbrefs}
+    stale = [
+        key
+        for key, battlefield in _BATTLEFIELDS.items()
+        if any(
+            isinstance(getattr(entity, "pk", None), int)
+            and int(entity.pk) in wanted
+            for entity in battlefield.roster.values()
+        )
+    ]
+    for key in stale:
+        _BATTLEFIELDS.pop(key, None)
 
 
 def _active_battlefield_for(actor: Any) -> Battlefield | None:

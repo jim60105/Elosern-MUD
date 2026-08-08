@@ -157,6 +157,33 @@ def live_companions(player: Any) -> list[Any]:
     return companions
 
 
+def combat_companions(player: Any) -> list[Any]:
+    """Return the bound, co-located, living, non-knocked-out companions.
+
+    Engagement collection for party-combat D-1: resolves through
+    ``live_companions`` (stale dbids, non-NPC entries, and backref mismatches
+    skipped) and keeps only companions sharing the player's room whose stored
+    HP is above the nonlethal floor (1). A knocked-out companion therefore
+    stays out of a new engagement until ordinary clock-driven regen lifts its
+    HP above 1 (party-combat D-2). Returns in deterministic party order and
+    never raises.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(player, PlayerCharacter):
+        return []
+    from world.rules.action import _stored_trait_value
+
+    companions: list[Any] = []
+    for npc in live_companions(player):
+        try:
+            if npc.location is player.location and _stored_trait_value(npc.traits.hp) > 1:
+                companions.append(npc)
+        except Exception:
+            continue
+    return companions
+
+
 def follow_companions(
     player: Any,
     source_location: Any,

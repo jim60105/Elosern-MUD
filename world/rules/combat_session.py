@@ -386,13 +386,32 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
         for dbref in record.fled_ids
         if dbref in key_by_pk
     }
+    battlefield.knocked_out = {
+        key_by_pk[dbref]
+        for dbref in record.knocked_out_ids
+        if dbref in key_by_pk
+    }
     return battlefield
 
 
 def _context_for(battlefield: Battlefield, record: CombatSessionRecord) -> BattlefieldActionContext:
+    """Build the session's action context with its nonlethal policy.
+
+    Examinations keep the session-wide ``nonlethal`` flag unchanged. Hostile
+    sessions carry ``nonlethal_keys`` naming the allied companions, so damage
+    floors companions at 1 HP and marks them knocked out per target while
+    monsters stay lethal (party-combat D-3).
+    """
     event_context: dict[str, Any] = {"battlefield": battlefield}
     if record.mode == "guild_exam":
         event_context["nonlethal"] = True
+    elif len(record.player_ids) > 1:
+        companion_pks = set(record.player_ids[1:])
+        event_context["nonlethal_keys"] = frozenset(
+            key
+            for key, entity in battlefield.roster.items()
+            if int(entity.pk) in companion_pks
+        )
     return BattlefieldActionContext(battlefield, event_context=event_context)
 
 
@@ -415,6 +434,7 @@ def _basic_attack_request(
         for key in enemy_keys
         if key in battlefield.roster
         and key not in battlefield.fled
+        and not battlefield.is_knocked_out(key)
         and _stored_trait_value(battlefield.roster[key].traits.hp) > 0
     ]
     if not candidates:
@@ -487,23 +507,40 @@ def _persist(actor: Any, record: CombatSessionRecord) -> None:
     actor.db.active_combat = to_storage(record)
 
 
-def clear_session(actor: Any, battlefield: Battlefield | None = None) -> None:
-    """Clear session/context state and skip-safety registration."""
+def clear_session(
+    actor: Any,
+    battlefield: Battlefield | None = None,
+    record: CombatSessionRecord | None = None,
+) -> None:
+    """Clear session/context state and skip-safety registration.
+
+    Every persisted participant is unregistered (party-combat D-5): when the
+    battlefield cannot be reconstructed, the record's participant dbrefs still
+    release surviving companions and monsters from skip safety, and the
+    participant scan purges even a deleted participant's stale key, so no
+    registration of the session survives settlement.
+    """
+    from world.rules.skip_safety import unregister_participants
+
     actor.db.active_combat = None
     actor.ndb.action_context = None
     unregister_active_battlefield(actor)
     if battlefield is not None:
         for key in list(battlefield.roster):
             unregister_active_battlefield(battlefield.roster[key])
+    if record is not None:
+        unregister_participants((*record.player_ids, *record.enemy_ids))
 
 
 def engage(actor: Any, target: Any) -> dict[str, Any]:
     """Create one persistent hostile session for a present living monster.
 
     Validates a PlayerCharacter with no active session and a living hostile
-    ``Monster`` in the same room. Registers the reconstructed battlefield with
-    skip safety and records the initial overwhelm classification, but runs no
-    action before the player chooses one.
+    ``Monster`` in the same room. Every bound companion that is co-located,
+    living, and not knocked out joins the session's allied team in
+    deterministic party order (party-combat D-1). Registers the reconstructed
+    battlefield with skip safety and records the initial overwhelm
+    classification, but runs no action before the player chooses one.
     """
     if not isinstance(actor, PlayerCharacter):
         raise CombatSessionError(SessionReason.NOT_A_PLAYER)
@@ -516,11 +553,16 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
     if _stored_trait_value(target.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.TARGET_DEAD)
 
+    from world.rules.party import combat_companions
+
+    companions = [
+        int(companion.pk) for companion in combat_companions(actor)
+    ]
     record = CombatSessionRecord(
         session_id=session_id_for(actor, "hostile"),
         mode="hostile",
         room_id=int(actor.location.pk),
-        player_ids=(int(actor.pk),),
+        player_ids=(int(actor.pk), *companions),
         enemy_ids=(int(target.pk),),
         fled_ids=(),
         knocked_out_ids=(),
@@ -537,7 +579,13 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
 
 
 def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
-    """Return the dbrefs of entities marked knocked out by the round's logs."""
+    """Return the dbrefs of entities marked knocked out by the round.
+
+    Merges the round's ``target_knocked_out`` log identities with the
+    battlefield's in-round ``knocked_out`` markings, so exam-flag knockouts
+    (persisted from logs only) and per-entity companion knockouts (marked at
+    damage-commit time) both survive the round-end persistence.
+    """
     knocked = set()
     for event_log in logs:
         for entry in event_log.entries:
@@ -546,6 +594,10 @@ def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
             target_id = entry.data.get("target_id")
             if isinstance(target_id, int):
                 knocked.add(target_id)
+    for key in battlefield.knocked_out:
+        entity = battlefield.roster.get(key)
+        if entity is not None:
+            knocked.add(int(entity.pk))
     return tuple(sorted(knocked))
 
 
@@ -633,8 +685,23 @@ def submit_player_action(
     return _continue_or_settle(actor, new_record, battlefield, logs)
 
 
-def _team_living(battlefield: Battlefield, team: str, record: CombatSessionRecord | None = None) -> bool:
-    knocked = set(record.knocked_out_ids) if record is not None else set()
+def _team_living(
+    battlefield: Battlefield,
+    team: str,
+    record: CombatSessionRecord,
+) -> bool:
+    """Return whether a team has any living, present, active member.
+
+    The persisted ``knocked_out_ids`` (exam knockouts and the previous round's
+    markings) and the battlefield's in-round ``knocked_out`` set (marked at
+    damage-commit time) both count, so a knocked-out member is never "living"
+    through either source (party-combat D-2).
+    """
+    knocked = set(record.knocked_out_ids) | {
+        int(entity.pk)
+        for key, entity in battlefield.roster.items()
+        if key in battlefield.knocked_out and key in battlefield.roster
+    }
     return any(
         key in battlefield.roster
         and key not in battlefield.fled
@@ -649,12 +716,24 @@ def _terminal_outcome(
     battlefield: Battlefield,
     record: CombatSessionRecord,
 ) -> str | None:
-    """Return the deterministic terminal outcome, or ``None`` to continue."""
+    """Return the deterministic terminal outcome, or ``None`` to continue.
+
+    Player-centric (party-combat D-4): the session ends on the player's flee,
+    knockout, or death even when companions stand; only the foes team decides
+    victory. A knocked-out companion is battlefield state, never a terminal
+    condition.
+    """
     player_team = battlefield.team_of(str(actor.key))
     foe_team = next(team for team in battlefield.teams if team != player_team)
     if str(actor.key) in battlefield.fled:
         return "fled"
-    if not _team_living(battlefield, player_team, record):
+    player_key = str(actor.key)
+    player_defeated = (
+        _stored_trait_value(actor.traits.hp) <= 0
+        or player_key in battlefield.knocked_out
+        or int(actor.pk) in record.knocked_out_ids
+    )
+    if player_defeated:
         return "defeat" if record.mode == "hostile" else "exam_failed"
     if not _team_living(battlefield, foe_team, record):
         return "victory" if record.mode == "hostile" else "exam_passed"
@@ -707,12 +786,12 @@ def settle_session(
         # The exam terminal state is persisted and idempotent by exam ID; clear
         # the session before advancing time so a clock failure cannot cause a
         # second advance for the same rounds on a retry.
-        clear_session(actor, battlefield)
+        clear_session(actor, battlefield, record)
     events = settle_combat_result(
         SimpleNamespace(total_seconds=record.rounds_elapsed * _ROUND_SECONDS),
         [actor],
     )
-    clear_session(actor, battlefield)
+    clear_session(actor, battlefield, record)
     return {
         "outcome": outcome,
         "rounds_elapsed": record.rounds_elapsed,

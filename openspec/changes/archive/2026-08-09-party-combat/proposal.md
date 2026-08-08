@@ -49,15 +49,19 @@ engagements as allies, act through the deterministic behavior policy, and can ne
 - `action-resolution-pipeline`: The nonlethal policy requirement changes — the context MAY carry
   per-entity `nonlethal_keys` alongside the session-wide flag, and knockout projection consults
   the key set.
+- `battlefield-commit-surface`: The battlefield-shaped snapshot/restore requirement changes —
+  the commit mechanism snapshots and restores the `knocked_out` set beside `fled`.
 
 ## Impact
 
 - **New code**: companion-resolution helpers in `world/rules/party.py`, `world/rules/tests/`
   combat-party test modules.
 - **Modified**: `world/rules/combat_session.py` (`engage` participant collection, the non-player
-  action provider, per-entity nonlethal context), `world/rules/combat.py` /
-  `world/rules/action.py` (per-entity nonlethal projection and knockout emission), and the three
-  delta specs.
+  action provider, per-entity nonlethal context, player-centric terminal rules, participant
+  cleanup), `world/rules/combat.py` / `world/rules/action.py` (per-entity nonlethal projection,
+  knockout emission, battlefield knockout state), `world/rules/monster_behaviour.py`,
+  `world/rules/overwhelm.py`, and `world/rules/targeting.py` (knocked-out exclusion), and the
+  four delta specs.
 - **Dependencies**: `party-core` (binding), `party-follow` (co-location), `player-combat-session`,
   `monster-behaviour` (the policy pipeline), `action-resolution-pipeline` (the nonlethal policy).
 - **Out of scope**: quest assistance and the +2 completion bonus (`party-quest`), companion
