@@ -256,6 +256,50 @@ class GuildTurninJourneys(ServicesBrowserTest):
         self.assertEqual(payload, {"quest_id": "introductory_hunt:1"})
 
 
+class GuildDialogueTurninJourneys(ServicesBrowserTest):
+    """The guild staff's 回報 dialogue chip reports reportable quests."""
+
+    SERVICES_MODE = "guild_completed_quest"
+
+    @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
+    def test_turnin_keyword_reports_listing_without_state_change(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        self.assertEqual(panel["player"]["wallet"], 1000)
+        self.assertEqual(panel["guild"]["quests"][0]["state"], "completed")
+
+        # Interact -> the guild staff (first present target) -> 交談 -> 回報.
+        page.evaluate("document.getElementById('action-dock').focus()")
+        _press(page, "ArrowRight")  # Look
+        _press(page, "ArrowRight")  # Interact
+        _press(page, "Enter")  # open Interact
+        _press(page, "Enter")  # select the guild staff
+        _press(page, "Enter")  # 交談 (scripted affordance)
+        _press(page, "ArrowDown")  # 公會 (second keyword row)
+        _press(page, "ArrowDown")  # 回報 (third keyword row)
+        _press(page, "Enter")  # tap the 回報 chip
+        page.wait_for_function(
+            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
+            arg="可以交回",
+        )
+        sent = page.evaluate("window.__elosernSent || []")
+        talk = [
+            args[0]
+            for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "explore.talk_scripted"
+        ]
+        self.assertEqual(len(talk), 1)
+        self.assertEqual(talk[0]["payload"]["keyword_id"], "回報")
+        # The listing never settles: wallet, quest state, and claims stay put
+        # and no turn-in action crosses the wire.
+        self.assertEqual(sent_action_count(page, "guild.quest_turnin"), 0)
+        panel = self._wait_services_available(page)
+        self.assertEqual(panel["player"]["wallet"], 1000)
+        self.assertEqual(panel["guild"]["quests"][0]["state"], "completed")
+        self.assertTrue(panel["guild"]["quests"][0]["turnin"]["enabled"])
+
+
 class GuildExamJourney(ServicesBrowserTest):
     SERVICES_MODE = "guild_exam"
 

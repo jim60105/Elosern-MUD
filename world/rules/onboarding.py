@@ -220,15 +220,16 @@ def talk_response(npc: Any, character: Any, keyword: str) -> str | None:
     can produce the no-response line. Unknown keywords yield the
     no-understanding line and cause NO state change. A known keyword on an
     ``OnboardingGuide`` host is recorded on the player's ``guide_progress``;
-    scripted dialogue hosts never write state.
+    scripted dialogue hosts never write state (the ``guild_staff`` ``回報``
+    keyword resolves its read-only listing with ``character`` as the actor).
     """
     from world.rules.dialogue import dialogue_response as resolve_response
 
     if not is_guide_host(npc):
-        return resolve_response(npc, keyword)
+        return resolve_response(npc, character, keyword)
     component = npc.components.get(OnboardingGuide.get_component_slot())
     dialogue_key = component.dialogue_key or GUARD_DIALOGUE_KEY
-    response = resolve_response(npc, keyword)
+    response = resolve_response(npc, character, keyword)
     if not dialogue_has_keyword(dialogue_key, keyword):
         return response
     progress = GuideProgress.from_storage(

@@ -1,12 +1,4 @@
-# scripted-dialogue Specification
-
-## Purpose
-
-Let service NPCs (such as guild staff) answer authored `talk` lines and teach
-players the relevant commands through a generic, immutable, keyed dialogue
-mechanism that causes no state change.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Scripted dialogue hosts answer authored talk lines
 An NPC carrying a `ScriptedDialogue` component SHALL answer known keywords with

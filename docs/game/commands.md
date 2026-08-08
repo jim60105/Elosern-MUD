@@ -24,7 +24,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`talk`](/game/command-reference?id=talk) | 與 NPC 交談。 |
+| [`talk`](/game/command-reference?id=talk) | 與 NPC 交談；對公會職員說「回報」可交回完成任務。 |
 | [`說`](/game/command-reference?id=說) | 在房間內說話。 |
 | [`動作`](/game/command-reference?id=動作) | 以第三人稱演出動作。 |
 | [`耳語`](/game/command-reference?id=耳語) | 私下對特定對象說話。 |

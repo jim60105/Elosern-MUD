@@ -33,6 +33,7 @@ class DialogueDefinition:
 
 GUARD_DIALOGUE_KEY = "south_gate_guard"
 GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
+GUILD_STAFF_TURNIN_KEYWORD = "回報"
 
 NO_UNDERSTANDING_LINE = "對方皺起眉頭：「我不太明白你的意思。」"
 
@@ -67,7 +68,8 @@ GUILD_STAFF_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "任務",
         "「用 guild list 查看任務板上適合你階級的委託，用 guild accept "
-        "<任務名> 接取，完成後用 guild turnin <任務編號> 回報。」",
+        "<任務名> 接取，完成後回來對我說『回報』並指定任務編號，"
+        "或直接用 guild turnin <任務編號> 交回任務。」",
     ),
     KeywordResponse(
         "公會",
@@ -78,7 +80,14 @@ GUILD_STAFF_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "工會",
         "「你是想問冒險者公會的事吧？用 guild 相關命令可以註冊、接取"
-        "任務、查看進度與回報。」",
+        "任務、查看進度與回報；完成任務後對我說『回報』再指定任務編號，"
+        "即可交回任務。」",
+    ),
+    KeywordResponse(
+        "回報",
+        "「想交回任務，得先成為註冊冒險者（guild register）。註冊後完成"
+        "委託，對我說『回報』並指定任務編號，或直接用 guild turnin "
+        "<任務編號>。」",
     ),
     KeywordResponse(
         "再見",
@@ -97,7 +106,8 @@ DIALOGUE_TABLE: MappingProxyType = MappingProxyType(
                 "櫃檯的公會職員抬起頭：「歡迎來到冒險者公會。想成為冒險者，"
                 "就用 guild register 註冊；之後用 guild list 查看任務、"
                 "guild accept 接取、guild log 與 guild show 查看進度，"
-                "完成後以 guild turnin 回報，還有 guild abandon 與 guild merit。」"
+                "完成後對我說『回報』並指定任務編號（或直接用 guild "
+                "turnin），還有 guild abandon 與 guild merit。」"
             ),
             responses=GUILD_STAFF_RESPONSES,
         ),

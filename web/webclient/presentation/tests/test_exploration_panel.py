@@ -810,6 +810,7 @@ class ExplorationPresenterTests(EvenniaTest):
         keyword_ids = [keyword["keyword_id"] for keyword in target["keywords"]]
         self.assertIn("註冊", keyword_ids)
         self.assertIn("任務", keyword_ids)
+        self.assertIn("回報", keyword_ids)
         # A scripted-only host offers no free-form affordance.
         self.assertFalse(
             any(

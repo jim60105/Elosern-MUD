@@ -377,3 +377,80 @@ def turn_in_quest(
         "items": [str(item.item_key) for item in reward.items],
         "onboarding_completed": onboarding_completed,
     }
+
+
+_NO_LOCAL_STAFF_LINE = "這裡沒有公會服務人員。"
+_NOTHING_REPORTABLE_LINE = "「目前沒有可以交回的任務。」"
+
+
+def reportable_quest_summary(actor: Any, npc: Any) -> str | None:
+    """Return the Traditional Chinese reportable-quest listing for dialogue.
+
+    Enforces the same local-host rule as every guild service command: the
+    unique ``GuildStaff`` host in the actor's room is resolved through
+    ``resolve_local_service_host`` and the talked-to ``npc`` must be that
+    host; an absent or ambiguous host yields the standard rejection line for
+    every caller, registered or not. For the unique host the listing
+    intersects parsed records (state ``COMPLETED``), a registered offer for
+    the record's definition at the staff's branch, and the actor's reward
+    claims, ordered deterministically by ``(accepted_tick, quest_id)``.
+    Returns ``None`` only for a non-player or unregistered member, letting
+    the caller fall back to the authored register-first line. Read-only:
+    never writes state.
+    """
+    from world.quests.runtime import QuestState, definition_for, read_records
+    from world.rules.guild_offers import GuildOfferNotFound, get_guild_offer
+
+    if not isinstance(actor, PlayerCharacter):
+        return None
+    try:
+        staff = resolve_local_service_host(actor, GuildStaff)
+    except GuildServiceError:
+        return _NO_LOCAL_STAFF_LINE
+    if staff is not npc:
+        return _NO_LOCAL_STAFF_LINE
+    if parse_guild_registration(actor) is None:
+        return None
+    guild_staff = staff.components.get(GuildStaff.get_component_slot())
+    branch_key = guild_staff.branch_key
+    if not isinstance(branch_key, str) or not branch_key:
+        return _NO_LOCAL_STAFF_LINE
+
+    records = read_records(actor)
+    claims = set(parse_reward_claims(actor))
+    reportable: list[Any] = []
+    for record in records:
+        if record.state is not QuestState.COMPLETED or record.quest_id in claims:
+            continue
+        try:
+            get_guild_offer(record.definition_key, branch_key)
+        except GuildOfferNotFound:
+            continue
+        reportable.append(record)
+    reportable.sort(key=lambda record: (record.accepted_tick, record.quest_id))
+    if not reportable:
+        return _NOTHING_REPORTABLE_LINE
+    lines = [f"「你有 {len(reportable)} 個任務可以交回：」"]
+    for record in reportable:
+        definition = definition_for(record)
+        lines.append(f"任務編號 {record.quest_id}（{definition.display_name}）")
+    lines.append("「用『回報 <任務編號>』告訴我，我會為你結算。」")
+    return "\n".join(lines)
+
+
+def dialogue_turn_in(actor: Any, npc: Any, quest_id: str) -> dict[str, Any]:
+    """Turn in one quest through a dialogue host, enforcing the sole-host rule.
+
+    Resolves the unique local ``GuildStaff`` host and requires the talked-to
+    ``npc`` to be that host before delegating to ``turn_in_quest``, so the
+    dialogue surface obeys the same local-host rule as ``guild turnin`` and
+    can never settle against a remote or ambiguous staff. Host-resolution
+    failures raise ``GuildServiceError`` exactly as the guild commands do, so
+    the caller can render the standard rejection line.
+    """
+    if not isinstance(actor, PlayerCharacter):
+        raise GuildError(RegistrationReason.NOT_A_PLAYER)
+    staff = resolve_local_service_host(actor, GuildStaff)
+    if staff is not npc:
+        raise GuildServiceError("dialogue host is not the local service host")
+    return turn_in_quest(actor, staff, quest_id)

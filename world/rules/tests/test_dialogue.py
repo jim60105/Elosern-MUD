@@ -17,6 +17,7 @@ from world.onboarding.guide import GuideProgress
 from world.onboarding.guide_dialogue import (
     GUARD_DIALOGUE_KEY,
     GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
     NO_UNDERSTANDING_LINE,
 )
 from world.rules.dialogue import (
@@ -55,18 +56,18 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_scripted_host_answers_known_keyword(self):
         host = self._scripted_host()
-        response = dialogue_response(host, "公會")
+        response = dialogue_response(host, self.player, "公會")
         self.assertIn("guild list", response)
 
     @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
     def test_unknown_keyword_yields_no_understanding(self):
         host = self._scripted_host()
-        self.assertEqual(dialogue_response(host, "謎語"), NO_UNDERSTANDING_LINE)
+        self.assertEqual(dialogue_response(host, self.player, "謎語"), NO_UNDERSTANDING_LINE)
 
     @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
     def test_missing_table_yields_no_understanding_and_no_greeting(self):
         host = self._scripted_host(dialogue_key="no_such_table")
-        self.assertEqual(dialogue_response(host, "公會"), NO_UNDERSTANDING_LINE)
+        self.assertEqual(dialogue_response(host, self.player, "公會"), NO_UNDERSTANDING_LINE)
         self.assertIsNone(greeting_for(host))
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
@@ -107,7 +108,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         plain = create_object(NPC, key="plain")
         self.assertFalse(is_dialogue_host(plain))
         self.assertIsNone(resolve_dialogue_component(plain))
-        self.assertIsNone(dialogue_response(plain, "公會"))
+        self.assertIsNone(dialogue_response(plain, self.player, "公會"))
         self.assertIsNone(greeting_for(plain))
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
@@ -119,9 +120,40 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player.apply_race_baseline()
         player.guide_progress = GuideProgress.active().to_storage()
         host = self._scripted_host()
-        dialogue_response(host, "公會")
+        dialogue_response(host, player, "公會")
         greeting_for(host)
         self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_guild_staff_turnin_keyword_for_unregistered_member_falls_back_to_authored_line(self):
+        # The host must be the sole local staff (the sole-host rule applies to
+        # every caller), so an unregistered member still resolves the listing
+        # path and gets the authored register-first line, never the listing.
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.components import GuildStaff
+        from typeclasses.rooms import Room
+
+        room = create_object(Room, key="hall")
+        player = create_object(PlayerCharacter, key="unregistered-talker")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.guide_progress = GuideProgress.active().to_storage()
+        player.location = room
+        host = self._scripted_host()
+        host.location = room
+        host.components.add(
+            GuildStaff.create(host, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        response = dialogue_response(host, player, GUILD_STAFF_TURNIN_KEYWORD)
+        self.assertIn("guild register", response)
+        self.assertNotIn("可以交回", response)
+        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_turnin_keyword_on_non_guild_host_is_an_unknown_keyword(self):
+        guard = self._guard()
+        response = dialogue_response(guard, self.player, GUILD_STAFF_TURNIN_KEYWORD)
+        self.assertEqual(response, NO_UNDERSTANDING_LINE)
 
     @covers_requirement(
         "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",

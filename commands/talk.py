@@ -1,9 +1,26 @@
-"""Player-facing ``talk`` command for deterministic NPC dialogue (D5/D4)."""
+"""Player-facing ``talk`` command for deterministic NPC dialogue (D5/D4).
+
+On a ``guild_staff`` dialogue host the keyword ``回報`` is an action keyword:
+``talk <npc> 回報`` lists reportable quests (read-only), while
+``talk <npc> 回報 <quest_id>`` turns that quest in through the deterministic
+``dialogue_turn_in`` service. Every other keyword resolves exactly as before.
+"""
 
 from evennia import Command
 
+from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
-from world.rules.dialogue import greeting_for, is_dialogue_host
+from world.onboarding.guide_dialogue import (
+    GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
+)
+from world.rules.dialogue import dialogue_key_for, greeting_for, is_dialogue_host
+from world.rules.guild import (
+    GuildDataError,
+    GuildServiceError,
+    RewardClaimError,
+    dialogue_turn_in,
+)
 from world.rules.onboarding import (
     current_guide_prompt,
     is_guide_host,
@@ -61,7 +78,23 @@ class CmdsTalk(Command):
         npc = resolved
 
         if keyword:
-            response = talk_response(npc, self.caller, keyword)
+            kw_parts = keyword.split(maxsplit=1)
+            action_keyword = kw_parts[0]
+            quest_id = kw_parts[1] if len(kw_parts) > 1 else ""
+            if (
+                action_keyword == GUILD_STAFF_TURNIN_KEYWORD
+                and dialogue_key_for(npc) == GUILD_STAFF_DIALOGUE_KEY
+                and getattr(npc, "components", None) is not None
+                and npc.components.has(GuildStaff.name)
+                and quest_id
+            ):
+                self._turn_in_quest(npc, quest_id)
+                return
+            try:
+                response = talk_response(npc, self.caller, keyword)
+            except (RewardClaimError, GuildDataError) as error:
+                self.caller.msg(f"無法回報任務：{error}")
+                return
             if response is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
@@ -88,3 +121,22 @@ class CmdsTalk(Command):
             return
 
         self.caller.msg(_NO_RESPONSE)
+
+    def _turn_in_quest(self, npc: NPC, quest_id: str) -> None:
+        """Turn in one quest through the local guild-staff dialogue host."""
+        try:
+            result = dialogue_turn_in(self.caller, npc, quest_id)
+        except GuildServiceError:
+            self.caller.msg("這裡沒有公會服務人員。")
+            return
+        except (RewardClaimError, GuildDataError) as error:
+            self.caller.msg(f"無法回報任務：{error}")
+            return
+        self.caller.msg(
+            f"你回報了任務 {result['quest_id']}，獲得 {result['copper']} 銅、"
+            f"功績 {result['merit']} 與道具 {result['items']}。"
+        )
+        if result.get("onboarding_completed"):
+            self.caller.msg(
+                "你的第一個日子在這裡圓滿結束。冒險者，歡迎正式踏入伊洛瑟恩大陸。"
+            )

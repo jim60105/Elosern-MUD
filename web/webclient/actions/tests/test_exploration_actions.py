@@ -467,6 +467,24 @@ class ExplorationActionAdapterTests(EvenniaTest):
         # A scripted host never writes guide state.
         self.assertFalse(self.player.guide_progress)
 
+    @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
+    def test_turnin_keyword_flows_through_the_shared_dialogue_resolution(self):
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        from typeclasses.components import GuildStaff
+
+        host.components.add(
+            GuildStaff.create(host, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        result = _talk_scripted_adapter(
+            self.player, {"npc_id": int(host.pk), "keyword_id": "回報"}
+        )
+        self.assertEqual(result["outcome"], "success")
+        # The unregistered player receives the authored register-first line
+        # through the shared resolution; no claim or quest state can change.
+        self.assertIn("guild register", result["message"])
+        self.assertFalse(self.player.guide_progress)
+
     def test_unregistered_keyword_rejects_without_writing(self):
         host = create_object(NPC, key="南門守衛", location=self.room1)
         from typeclasses.components import OnboardingGuide

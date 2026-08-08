@@ -240,10 +240,22 @@ class GuildStaffDialogueTests(unittest.TestCase):
 
     def test_guild_staff_answers_known_keywords(self):
         definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
-        for keyword in ("公會", "任務", "註冊", "再見"):
+        for keyword in ("公會", "任務", "註冊", "回報", "再見"):
             with self.subTest(keyword=keyword):
                 response = dialogue_response(GUILD_STAFF_DIALOGUE_KEY, keyword)
                 self.assertNotEqual(response, NO_UNDERSTANDING_LINE)
+
+    def test_guild_staff_teaches_the_dialogue_turnin_path(self):
+        definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        combined = definition.greeting + "".join(
+            entry.response for entry in definition.responses
+        )
+        self.assertIn("回報", combined)
+        self.assertIn("任務編號", combined)
+
+    def test_turnin_keyword_response_teaches_register_first(self):
+        response = dialogue_response(GUILD_STAFF_DIALOGUE_KEY, "回報")
+        self.assertIn("guild register", response)
 
 
 class GuidePromptTests(unittest.TestCase):

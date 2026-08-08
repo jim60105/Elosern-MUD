@@ -60,7 +60,7 @@ LOCALIZED_TABLE_HEADING = "本地化預設指令（Localized zh-tw Defaults）"
 # categories) is verified against the command classes instead.
 EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "talk": {
-        "syntax": "talk <npc>、talk <npc> <keyword>",
+        "syntax": "talk <npc>、talk <npc> <keyword> [<quest_id>]",
         "context": "一般（需有交談對象）",
     },
     "rest": {"syntax": "rest <數字><s|m|h|d>", "context": "一般"},
