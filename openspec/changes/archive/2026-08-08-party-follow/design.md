@@ -40,14 +40,24 @@ coordinate API.
 
 ### D-1: One follow function, three hook sites
 
-`world/rules/party.py::follow_companions(player, source_location, *, destination=None,
-wilderness_coordinates=None, wilderness_name=WILDERNESS_NAME)` is called from:
+`world/rules/party.py::follow_companions(player, source_location, *,
+destination=None, wilderness_coordinates=None, wilderness_source_coordinates=
+None, wilderness_name=WILDERNESS_NAME)` is called from:
 
 1. `MovementCostMixin.at_post_traverse` — `destination` mode for grid/instance/base exits.
 2. `WildernessGateExit.at_traverse` success branch — `wilderness_coordinates=entry.wilderness_xy`.
 3. `WildernessReturnExit.at_traverse` — the ordinary-step branch passes
-   `wilderness_coordinates=target_location.coordinates`; the return branch passes
-   `destination=grid_room`.
+   `wilderness_coordinates=traversing_object.location.coordinates` (the player's post-move
+   coordinates; the contrib recycles the old room during `move_obj`, so the exit's own
+   `target_location.coordinates` is gone by the time follow runs) plus
+   `wilderness_source_coordinates=current`; the return branch passes `destination=grid_room`
+   plus `wilderness_source_coordinates=current`.
+
+The `wilderness_source_coordinates` hint exists because the contrib's room recycling runs
+`WildernessScript._destroy_room` when the player steps or leaves: companions still in the old
+room have no account, so the room is recycled and the companions are left with `location=None`
+while remaining registered in the script's `itemcoordinates` at the pre-move coordinates.
+Co-location therefore checks both the room and the registration (D-3).
 
 One function keeps the follow contract (co-located filter, per-companion failure capture,
 single notification) in one place; the three call sites are thin and each covered by an
@@ -64,17 +74,28 @@ quest, onboarding, art, or interaction observer fires for an NPC. The follow con
 claim `quiet=True` suppresses `at_object_receive` — it claims the observers that would fire for
 NPCs are none, which is verified by test.
 
+When a companion leaves the wilderness for a grid destination, `move_to` runs after the contrib
+already recycled its room (location `None`), so the normal `WildernessRoom.at_object_leave`
+cleanup never fires and the companion would stay registered in `itemcoordinates`. The follow
+function therefore calls `script.at_post_object_leave(companion)` itself after a successful
+`move_to`, so the wilderness bookkeeping is cleared exactly like an ordinary departure and the
+companion is never re-summoned into the wilderness by a later `set_active_coordinates`.
+
 ### D-3: Safe companion resolution reuses the party-core contract
 
 `follow_companions` resolves the party through the safe bound-companion accessor (skipping stale
 dbids, non-NPC entries, and backref mismatches, per `party-core`'s purge contract), so a deleted
-NPC's leftover entry can never raise from the traversal hook or block the other companions.
+NPC's leftover entry can never raise from the traversal hook or block the other companions. The
+resolver is per-entry exception-isolated: a non-numeric leftover entry, an unreadable backref,
+or any other corrupt record degrades to that entry being skipped, never a raise.
 
 ### D-4: Failures are collected, named, and reported once
 
-Each companion move runs in its own try/except; failures append the companion's key to a list.
-After all moves, if the list is non-empty, the player receives one fixed Traditional Chinese
-「跟丟了」 line naming the failed companions. The hook never raises.
+Each companion's co-location check and move run in their own try/except; failures append the
+companion's key to a list. After all moves, if the list is non-empty, the player receives one
+fixed Traditional Chinese 「跟丟了」 line naming the failed companions. The hook never raises:
+resolution, co-location, the moves, and the notification itself are all exception-isolated —
+a failed notification is logged and swallowed rather than bubbled into a successful traversal.
 
 ## Risks / Trade-offs
 

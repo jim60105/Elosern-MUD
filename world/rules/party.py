@@ -9,11 +9,20 @@ dbid (a deleted NPC) as an absent companion. The party auto-leave recheck
 (``world/rules/affinity.py``) and the dialogue intent applier
 (``world/rules/npc_intents.py``) route through this module, so no other code
 can create or remove a binding.
+
+Companion follow (party-follow D-1) is the same module's read-only movement
+contract: ``follow_companions`` moves every co-located companion of a
+``PlayerCharacter`` through the shared exit success paths -- never a teleport
+or spawn -- with no clock charge, no announce messages, and the party binding
+left untouched.
 """
 
 from typing import Any
 
 from django.db import transaction
+from evennia.utils.logger import log_warn
+
+from world.maps.wilderness_provider import WILDERNESS_NAME
 
 PARTY_MAX_COMPANIONS = 4
 
@@ -37,6 +46,11 @@ LEAVE_DISMISSED_MESSAGE = "你解散了與她的隊伍。"
 AUTO_LEAVE_MESSAGE = "她與你的羈絆淡去，隊伍解散了。"
 DEGRADED_ACCEPT_MESSAGE = "她願意與你同行。"
 DEGRADED_REJECT_MESSAGE = "她搖了搖頭，婉拒了你的邀請。"
+
+# Fixed player-facing follow lines (party-follow D-4): one 跟丟了 notification
+# per traversal naming every left-behind companion; the names are joined with
+# 、 so a single template serves one or many failures.
+FOLLOW_LOST_MESSAGE = "你跟丟了{names}。"
 
 JOIN_REJECTION_MESSAGES: dict[str, str] = {
     REASON_PARTY_FULL: PARTY_FULL_MESSAGE,
@@ -107,6 +121,153 @@ def is_companion(npc: Any, player: Any) -> bool:
     live companion.
     """
     return npc.pk in party_ids(player)
+
+
+def live_companions(player: Any) -> list[Any]:
+    """Resolve the live companion NPC objects of ``player`` (safe accessor).
+
+    Skips stale dbids (deleted NPCs), non-NPC entries, and backref mismatches
+    (an NPC whose ``party_member`` points at a different player), so a corrupt
+    leftover entry can never raise from a traversal hook or block the other
+    companions (party-follow D-3). Each entry is exception-isolated: a malformed
+    stored record degrades to that entry being skipped, never a raise.
+    """
+    from typeclasses.npcs import NPC
+
+    raw = player.db.party
+    if not raw:
+        return []
+    companions: list[Any] = []
+    for entry in raw:
+        try:
+            dbid = int(entry)
+        except (TypeError, ValueError):
+            # A non-numeric leftover entry is skipped, never a raise.
+            continue
+        try:
+            obj = _resolve_live_object(dbid)
+            if not isinstance(obj, NPC):
+                continue
+            member = obj.db.party_member
+            if member is not None and int(member) != int(player.pk):
+                continue
+            companions.append(obj)
+        except Exception:
+            continue
+    return companions
+
+
+def follow_companions(
+    player: Any,
+    source_location: Any,
+    *,
+    destination: Any | None = None,
+    wilderness_coordinates: tuple[int, int] | None = None,
+    wilderness_source_coordinates: tuple[int, int] | None = None,
+    wilderness_name: str = WILDERNESS_NAME,
+) -> None:
+    """Move every co-located companion of ``player`` to its new location.
+
+    Called from the exit traversal success paths only (party-follow D-1):
+    grid/instance/base exits through the shared ``at_post_traverse`` hook,
+    the wilderness gate entry, the ordinary wilderness step, and the
+    wilderness return. Only companions co-located with the player move; a
+    bound companion elsewhere is never pulled. Co-location is room-based
+    (``npc.location is source_location``) and, in wilderness mode, also
+    registration-based: the contrib recycles a wilderness room as soon as no
+    account is inside it, so companions left in that room end up with
+    ``location=None`` while still registered in the script's
+    ``itemcoordinates`` at the source coordinates (``wilderness_source_
+    coordinates``).
+
+    Grid and instance destinations use quiet ``move_to`` (no announce
+    messages, and the project's arrival observers are all
+    ``PlayerCharacter``-gated); a companion leaving the wilderness through a
+    grid destination is deregistered from the script's ``itemcoordinates``
+    after a successful move, so ``move_to`` never strands it in the
+    wilderness bookkeeping. Wilderness entry and steps go through the
+    provider's coordinate API (``enter_wilderness``), never a plain
+    ``move_to`` into a wilderness room. No world-clock charge occurs here --
+    the clock advances only on the player's own traversal -- and the party
+    binding is never changed. A companion whose move fails stays put and the
+    player receives one fixed Traditional Chinese 「跟丟了」 notification
+    naming every left-behind companion, exactly once per traversal.
+
+    Never raises from a traversal hook: stale and corrupt entries are skipped
+    by ``live_companions``, each companion's resolution, co-location check,
+    and move are exception-isolated, and the notification itself is isolated
+    -- a failure at any point degrades to fewer (or no) companion moves and
+    a missing (or logged) notification, never a broken traversal.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(player, PlayerCharacter):
+        return
+    companions: list[Any] = []
+    for npc in live_companions(player):
+        try:
+            if _companion_co_located(
+                npc, source_location, wilderness_source_coordinates
+            ):
+                companions.append(npc)
+        except Exception:
+            continue
+    if not companions:
+        return
+    left_behind: list[Any] = []
+    for npc in companions:
+        try:
+            if destination is not None:
+                moved = npc.move_to(destination, quiet=True)
+                if moved and npc.ndb.wilderness is not None:
+                    # Leaving the wilderness: clear the script's registration
+                    # so the companion is not stranded in the bookkeeping.
+                    npc.ndb.wilderness.at_post_object_leave(npc)
+            else:
+                from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+                moved = enter_wilderness(
+                    npc, coordinates=wilderness_coordinates, name=wilderness_name
+                )
+        except Exception:
+            moved = False
+        if not moved:
+            left_behind.append(npc)
+    if not left_behind:
+        return
+    try:
+        names = "、".join(npc.key or f"#{npc.pk}" for npc in left_behind)
+        player.msg(FOLLOW_LOST_MESSAGE.format(names=names))
+    except Exception as error:
+        # A failed notification must never break the player's traversal.
+        log_warn(
+            "party follow: failed to notify the player about left-behind "
+            "companions ({error}); companion moves already applied.",
+            error=error,
+        )
+
+
+def _companion_co_located(
+    npc: Any,
+    source_location: Any,
+    wilderness_source_coordinates: tuple[int, int] | None,
+) -> bool:
+    """Whether ``npc`` was in the same room as the player before the move.
+
+    Room-based match covers grid/instance/base moves and wilderness rooms
+    that survived recycling; the registration match covers companions whose
+    wilderness room the contrib recycled (location ``None`` but still tracked
+    in the script's ``itemcoordinates`` at the source coordinates).
+    """
+    if npc.location is source_location:
+        return True
+    if wilderness_source_coordinates is None:
+        return False
+    wilderness = npc.ndb.wilderness
+    return (
+        wilderness is not None
+        and wilderness.itemcoordinates.get(npc) == wilderness_source_coordinates
+    )
 
 
 def join_party(npc: Any, player: Any) -> None:
