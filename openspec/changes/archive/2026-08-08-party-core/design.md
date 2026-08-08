@@ -42,9 +42,10 @@ and idempotent.
 The invite flow cannot reuse `at_talked_to` blindly: it resolves to `None` both when the AI
 declines-with-intent-kept and when the layer degrades, so "didn't join" must not be read as
 "offline". The seam gains a structured exchange helper, `run_npc_exchange(speech, character,
-client)` in `typeclasses/npcs.py`, returning a frozen `DialogueExchangeResult(degraded: bool,
-reply: NPCDialogueReply | None)` that performs the memory append and thinking timer but applies
-nothing. `at_talked_to` becomes a thin composition of the helper plus intent application (its
+client, *, reactor=None)` in `typeclasses/npcs.py`, returning a frozen
+`DialogueExchangeResult(degraded: bool, reply: NPCDialogueReply | None)` that performs the memory
+append and thinking timer (the optional `reactor` passthrough keeps the timer deterministic in
+tests, exactly as `at_talked_to`'s) but applies nothing. `at_talked_to` becomes a thin composition of the helper plus intent application (its
 observable behavior is unchanged), and the `invite` adapter uses the helper directly: on
 `degraded=True` it applies the fixed threshold; otherwise it shows the speech and routes the
 reply's intent through `apply_npc_intent`. The client comes from the existing composition root

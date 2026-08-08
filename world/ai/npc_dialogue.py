@@ -2,7 +2,7 @@
 
 The ``npc_dialogue`` layer maps an NPC dialogue context to a validated frozen
 ``NPCDialogueReply`` through the shared validation-retry-degrade guardrail
-(design §7.5). The intent kind is restricted to a seven-kind whitelist; the
+(design §7.5). The intent kind is restricted to an eight-kind whitelist; the
 deterministic engine verifies each intent before applying it (see
 ``world/rules/npc_intents.py``). When the caller injects the NPC's affinity
 context (affinity-ai), it is serialized into the user payload for the model
@@ -64,7 +64,7 @@ MAX_SPEECH_LENGTH = 2000
 # shape.
 MAX_RELATION_DELTA = 10
 
-# The seven whitelisted intent kinds (design §7.4).
+# The eight whitelisted intent kinds (design §7.4).
 NPC_INTENT_KINDS = (
     "give_item",
     "take_item",
@@ -72,6 +72,7 @@ NPC_INTENT_KINDS = (
     "request_guild_exam",
     "adjust_relation",
     "reveal_lore",
+    "party_invite",
     "none",
 )
 
@@ -111,6 +112,7 @@ NPC_DIALOGUE_OUTPUT_SCHEMA: dict[str, Any] = {
             "properties": {
                 "kind": {"type": "string", "enum": list(NPC_INTENT_KINDS)},
                 "delta": {"type": "integer", "minimum": 0, "maximum": MAX_RELATION_DELTA},
+                "accept": {"type": "boolean"},
             },
         },
     },
@@ -155,7 +157,7 @@ def _validate_intent_kind(parsed: Any) -> list[str]:
         return ["dialogue intent must be an object"]
     kind = intent.get("kind")
     if kind not in NPC_INTENT_KINDS:
-        return [f"dialogue intent.kind {kind!r} is outside the seven-kind whitelist"]
+        return [f"dialogue intent.kind {kind!r} is outside the eight-kind whitelist"]
     return []
 
 
@@ -219,6 +221,20 @@ def _validate_relation_payload(parsed: Any) -> list[str]:
     return []
 
 
+def _validate_party_payload(parsed: Any) -> list[str]:
+    intent = parsed.get("intent") if isinstance(parsed, Mapping) else None
+    if not isinstance(intent, Mapping) or intent.get("kind") != "party_invite":
+        return []
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"accept"}:
+        return [
+            "party_invite must carry exactly one payload field, accept"
+        ]
+    if not isinstance(payload["accept"], bool):
+        return ["party_invite accept must be a boolean"]
+    return []
+
+
 def _make_no_affinity_leak_validator(
     value: Any, cap: Any
 ) -> Callable[[Any], list[str]]:
@@ -277,6 +293,7 @@ _VALIDATORS: dict[str, Any] = {
     "exam_payload_shape": _validate_exam_payload,
     "item_payload_shape": _validate_item_payload,
     "relation_payload_shape": _validate_relation_payload,
+    "party_payload_shape": _validate_party_payload,
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 

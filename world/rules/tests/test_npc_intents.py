@@ -406,6 +406,94 @@ class AdjustRelationIntentTests(EvenniaTest):
         self.assertFalse(self.npc.relations.has_record(self.player))
 
 
+class PartyInviteIntentTests(EvenniaTest):
+    """The party_invite intent routes through the party membership module."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="party intent room")
+        self.player = create_object(PlayerCharacter, key="party intent player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.npc = create_object(NPC, key="party intent npc", location=self.room)
+
+    def _invite_intent(self, accept):
+        return {"kind": "party_invite", "accept": accept}
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_accepted_invite_routes_through_join_party(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._invite_intent(True))
+        self.assertTrue(outcome.applied)
+        from world.rules.party import is_companion
+
+        self.assertTrue(is_companion(self.npc, self.player))
+        self.assertEqual(int(self.npc.db.party_member), int(self.player.pk))
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_declined_invite_is_an_applied_no_op(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._invite_intent(False))
+        self.assertTrue(outcome.applied)
+        from world.rules.party import is_companion
+
+        self.assertFalse(is_companion(self.npc, self.player))
+        self.assertIsNone(self.npc.db.party_member)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_malformed_invite_payloads_are_rejected_without_state_change(self):
+        for intent in (
+            {"kind": "party_invite"},
+            {"kind": "party_invite", "accept": "yes"},
+            {"kind": "party_invite", "accept": 1},
+            {"kind": "party_invite", "accept": True, "extra": 1},
+        ):
+            with self.subTest(intent=intent):
+                outcome = apply_npc_intent(self.npc, self.player, intent)
+                self.assertFalse(outcome.applied)
+                from world.rules.party import is_companion
+
+                self.assertFalse(is_companion(self.npc, self.player))
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_remote_join_gate_failure_discards_only_the_intent(self):
+        other = create_object(Room, key="remote room")
+        far = create_object(NPC, key="far npc", location=other)
+        outcome = apply_npc_intent(far, self.player, self._invite_intent(True))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "not_co_located")
+        self.assertIsNone(far.db.party_member)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_full_party_gate_failure_surfaces_the_distinct_reason(self):
+        from world.rules.party import PARTY_MAX_COMPANIONS, join_party
+
+        for index in range(PARTY_MAX_COMPANIONS):
+            join_party(
+                create_object(NPC, key=f"companion {index}", location=self.room),
+                self.player,
+            )
+        outcome = apply_npc_intent(self.npc, self.player, self._invite_intent(True))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "party_full")
+        self.assertIsNone(self.npc.db.party_member)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_duplicate_join_gate_failure_surfaces_the_distinct_reason(self):
+        from world.rules.party import join_party
+
+        join_party(self.npc, self.player)
+        outcome = apply_npc_intent(self.npc, self.player, self._invite_intent(True))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "already_companion")
+        self.assertEqual(int(self.npc.db.party_member), int(self.player.pk))
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_non_npc_target_is_rejected_without_state_change(self):
+        outcome = apply_npc_intent(self.player, self.player, self._invite_intent(True))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "not_npc")
+
+
 class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):
     """A second-side ACQUIRE failure restores both entities' quest surfaces too."""
 

@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
+from django.db import transaction
 from evennia.utils.logger import log_warn
 
 from world.rules.affinity_config import AffinityStage, get_config
@@ -154,13 +155,17 @@ class AffinityChangeOutcome:
     ``delta_used`` is the actually applied amount (0 when rejected, capped out,
     or at the natural cap); ``budget_capped`` means the daily budget limited or
     blocked the delta; ``source_rejected`` means the source or owner was
-    invalid and nothing was written.
+    invalid and nothing was written; ``auto_leave_notification`` carries the
+    party auto-leave line when a negative delta ended a companion party -- the
+    caller sends it only after its own transaction commits (the writer never
+    notifies).
     """
 
     delta_used: int
     applied: bool
     budget_capped: bool
     source_rejected: bool
+    auto_leave_notification: str | None = None
 
     @classmethod
     def rejected(cls) -> "AffinityChangeOutcome":
@@ -172,13 +177,27 @@ class AffinityChangeOutcome:
         )
 
 
-def run_auto_leave_recheck(npc: Any, player: Any) -> None:
-    """Party auto-leave recheck seam, invoked after every negative delta.
+def run_auto_leave_recheck(npc: Any, player: Any) -> str | None:
+    """The wired party auto-leave rule, run after every negative delta.
 
-    No party system exists yet; the future party change wires its leave rule
-    here without touching the writer. Must remain deterministic and
-    side-effect free until then.
+    When ``npc`` is a bound companion of ``player`` and its affinity toward
+    the player dropped below the invite threshold, the party ends through the
+    sole-writer ``leave_party`` and the notification line is returned for the
+    caller to send only after its own transaction commits. Returns ``None``
+    when no party ends. Deterministic and side-effect free for non-companions.
+    A failed leave raises so the caller's transaction rolls back the whole
+    negative-delta operation -- "affinity below threshold but still bound" is
+    unreachable.
     """
+    from world.rules.affinity_config import get_config
+    from world.rules.party import AUTO_LEAVE_MESSAGE, is_companion, leave_party
+
+    if not is_companion(npc, player):
+        return None
+    if npc.relations.affinity_for(player) >= get_config().invite_threshold:
+        return None
+    leave_party(npc, player, reason="affinity_below_threshold")
+    return AUTO_LEAVE_MESSAGE
 
 
 def _current_day() -> int:
@@ -218,14 +237,25 @@ def apply_affinity_change(
     if delta < 0:
         new_value = max(record.value + delta, 0)
         applied = new_value - record.value
-        if applied != 0:
-            handler._save(player, replace(record, value=new_value))
-        run_auto_leave_recheck(npc, player)
+        notification = None
+        with transaction.atomic():
+            if applied != 0:
+                handler._save(player, replace(record, value=new_value))
+            try:
+                notification = run_auto_leave_recheck(npc, player)
+            except Exception:
+                # A failed auto-leave must roll back the whole negative-delta
+                # operation: restore the in-process surface explicitly (the
+                # savepoint restores the database writes) and propagate so
+                # callers see the operation fail.
+                handler._save(player, record)
+                raise
         return AffinityChangeOutcome(
             delta_used=applied,
             applied=applied != 0,
             budget_capped=False,
             source_rejected=False,
+            auto_leave_notification=notification,
         )
 
     capped = source is not AffinitySource.QUEST_COMPLETION

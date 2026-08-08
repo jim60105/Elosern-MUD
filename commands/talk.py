@@ -36,17 +36,26 @@ _NO_RESPONSE = "對方沒有理會你。"
 _USAGE = "用法：talk <npc> 或 talk <npc> <keyword>"
 
 
-def _resolve_npc(caller, raw_target: str) -> NPC | None | str:
+def _resolve_npc(
+    caller,
+    raw_target: str,
+    *,
+    missing: str = _MISSING_TARGET,
+    ambiguous: str = _AMBIGUOUS_TARGET,
+    not_npc: str = _NOT_NPC,
+) -> NPC | None | str:
     """Resolve a talk target to an NPC, or a reason string on failure.
 
-    Returns the NPC on success; ``_MISSING_TARGET``, ``_AMBIGUOUS_TARGET``, or
-    ``_NOT_NPC`` on a resolution failure.
+    Returns the NPC on success; ``missing``, ``ambiguous``, or ``not_npc`` on
+    a resolution failure. The message overrides let sibling commands
+    (``invite``/``leave``) reuse the exact resolution rules with their own
+    target wording; the defaults keep ``talk``'s behavior unchanged.
     """
     if not raw_target:
-        return _MISSING_TARGET
+        return missing
     location = caller.location
     if location is None:
-        return _NOT_NPC
+        return not_npc
     matches = [
         obj
         for obj in location.contents
@@ -56,9 +65,9 @@ def _resolve_npc(caller, raw_target: str) -> NPC | None | str:
         )
     ]
     if not matches:
-        return _NOT_NPC
+        return not_npc
     if len(matches) > 1:
-        return _AMBIGUOUS_TARGET
+        return ambiguous
     return matches[0]
 
 

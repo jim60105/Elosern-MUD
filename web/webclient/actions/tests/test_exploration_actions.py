@@ -33,6 +33,8 @@ from web.webclient.actions.exploration_actions import (
     _engage_adapter,
     _look_adapter,
     _move_adapter,
+    _party_invite_adapter,
+    _party_leave_adapter,
     _present_by_id,
     _resolve_exit,
     _talk_freeform_adapter,
@@ -41,6 +43,8 @@ from web.webclient.actions.exploration_actions import (
     validate_engage_payload,
     validate_look_payload,
     validate_move_payload,
+    validate_party_invite_payload,
+    validate_party_leave_payload,
     validate_talk_freeform_payload,
     validate_talk_scripted_payload,
     validate_wait_payload,
@@ -155,6 +159,41 @@ class ExplorationValidatorTests(unittest.TestCase):
             with self.assertRaises(ExplorationActionError):
                 validate_talk_freeform_payload(bad)
 
+    def test_party_invite_payload_exact(self):
+        self.assertEqual(
+            validate_party_invite_payload({"npc_id": 3, "message": ""}),
+            {"npc_id": 3, "message": ""},
+        )
+        self.assertEqual(
+            validate_party_invite_payload({"npc_id": 3, "message": "你願意嗎？"}),
+            {"npc_id": 3, "message": "你願意嗎？"},
+        )
+        for bad in (
+            None,
+            {"npc_id": 3},
+            {"npc_id": 3, "message": None},
+            {"npc_id": 3, "message": "你" * (MAX_SPEECH_CODE_POINTS + 1)},
+            {"npc_id": 0, "message": ""},
+            {"npc_id": 3, "message": "", "extra": 1},
+        ):
+            with self.assertRaises(ExplorationActionError):
+                validate_party_invite_payload(bad)
+
+    def test_party_leave_payload_exact(self):
+        self.assertEqual(
+            validate_party_leave_payload({"npc_id": 9}), {"npc_id": 9}
+        )
+        for bad in (
+            None,
+            {"npc_id": 0},
+            {"npc_id": "9"},
+            {"npc_id": True},
+            {},
+            {"npc_id": 9, "x": 1},
+        ):
+            with self.assertRaises(ExplorationActionError):
+                validate_party_leave_payload(bad)
+
     def test_engage_payload_exact(self):
         self.assertEqual(validate_engage_payload({"monster_id": 9}), {"monster_id": 9})
         for bad in (
@@ -202,6 +241,8 @@ class ExplorationValidatorTests(unittest.TestCase):
                 validate_look_payload,
                 validate_talk_scripted_payload,
                 validate_talk_freeform_payload,
+                validate_party_invite_payload,
+                validate_party_leave_payload,
                 validate_engage_payload,
                 validate_wait_payload,
             ):
@@ -686,6 +727,167 @@ class ExplorationActionAdapterTests(EvenniaTest):
             )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "dialogue_failed")
+
+    # ------------------------------------------------------------------
+    # explore.party_invite / explore.party_leave
+    # ------------------------------------------------------------------
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_accept_joins_and_notifies(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(
+                speech="我願意與你同行。",
+                intent={"kind": "party_invite", "accept": True},
+            ),
+        )
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(self.player, "msg") as msg:
+            result = await_result(
+                _party_invite_adapter(
+                    self.player, {"npc_id": int(npc.pk), "message": "你願意嗎？"}
+                )
+            )
+        self.assertEqual(result["outcome"], "success")
+        from world.rules.party import JOINED_MESSAGE, is_companion
+
+        self.assertTrue(is_companion(npc, self.player))
+        texts = " ".join(str(call.args[0]) for call in msg.call_args_list if call.args)
+        self.assertIn(JOINED_MESSAGE, texts)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_offline_threshold_decides_with_no_client_call(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(npc, self.player, AffinitySource.QUEST_COMPLETION, 70)
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch(
+                "web.webclient.actions.dialogue_composition.build_dialogue_client",
+                return_value=client,
+            ):
+                result = await_result(
+                    _party_invite_adapter(
+                        self.player, {"npc_id": int(npc.pk), "message": ""}
+                    )
+                )
+        self.assertEqual(result["outcome"], "success")
+        from world.rules.party import is_companion
+
+        self.assertTrue(is_companion(npc, self.player))
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_offline_below_threshold_rejects(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch(
+                "web.webclient.actions.dialogue_composition.build_dialogue_client",
+                return_value=client,
+            ):
+                result = await_result(
+                    _party_invite_adapter(
+                        self.player, {"npc_id": int(npc.pk), "message": ""}
+                    )
+                )
+        self.assertEqual(result["outcome"], "success")
+        from world.rules.party import is_companion
+
+        self.assertFalse(is_companion(npc, self.player))
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_full_party_rejects_before_the_ai_call(self):
+        from world.rules.party import PARTY_MAX_COMPANIONS, join_party
+
+        for index in range(PARTY_MAX_COMPANIONS):
+            join_party(
+                create_object(LLMNPC, key=f"同伴{index}", location=self.room1),
+                self.player,
+            )
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        client = FakeLLMClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            result = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": ""}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "party_full")
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_already_companion_rejects_before_the_ai_call(self):
+        from world.rules.party import join_party
+
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        join_party(npc, self.player)
+        client = FakeLLMClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            result = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": ""}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_companion")
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_non_llm_npc_rejects(self):
+        npc = create_object(NPC, key="普通村民", location=self.room1)
+        client = FakeLLMClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            result = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": ""}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-leave-dismisses-a-bound-companion-without-affinity-change")
+    def test_party_leave_dismisses_without_affinity_change(self):
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+        from world.rules.party import is_companion, join_party
+
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        apply_affinity_change(npc, self.player, AffinitySource.QUEST_COMPLETION, 55)
+        join_party(npc, self.player)
+        before = npc.relations.affinity_for(self.player)
+        result = _party_leave_adapter(
+            self.player, {"npc_id": int(npc.pk)}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertFalse(is_companion(npc, self.player))
+        self.assertIsNone(npc.db.party_member)
+        self.assertEqual(npc.relations.affinity_for(self.player), before)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-leave-dismisses-a-bound-companion-without-affinity-change")
+    def test_party_leave_unbound_target_rejects(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        result = _party_leave_adapter(
+            self.player, {"npc_id": int(npc.pk)}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "not_companion")
+
+    @covers_requirement("webclient-exploration-menu::explore-party-leave-dismisses-a-bound-companion-without-affinity-change")
+    def test_party_leave_tampered_npc_id_rejects(self):
+        result = _party_leave_adapter(self.player, {"npc_id": 999999})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
 
     # ------------------------------------------------------------------
     # explore.engage

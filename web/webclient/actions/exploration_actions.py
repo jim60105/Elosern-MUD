@@ -1,15 +1,15 @@
 """Exact exploration action payload validators and narrow adapters.
 
-The six production exploration actions are ``explore.move``, ``explore.look``,
-``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.engage``, and
-``explore.wait``. Each validator enforces an exact bounded payload shape; each
-adapter re-resolves every referenced identity from the actor's **current**
-location's present contents and re-verifies the exact eligibility at commit
-time, calls only public deterministic APIs, and never assigns ``.db``
-attributes, location, knowledge, traits, dialogue, quests, inventory, combat,
-or time directly. No payload accepts an actor, host, session, destination room,
-price, stock, or clock field, and no action routes through the text command
-parser.
+The eight production exploration actions are ``explore.move``, ``explore.look``,
+``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
+``explore.party_leave``, ``explore.engage``, and ``explore.wait``. Each
+validator enforces an exact bounded payload shape; each adapter re-resolves
+every referenced identity from the actor's **current** location's present
+contents and re-verifies the exact eligibility at commit time, calls only
+public deterministic APIs, and never assigns ``.db`` attributes, location,
+knowledge, traits, dialogue, quests, inventory, party, combat, or time
+directly. No payload accepts an actor, host, session, destination room, price,
+stock, or clock field, and no action routes through the text command parser.
 """
 
 from typing import Any
@@ -30,7 +30,15 @@ from world.rules.map_knowledge import (
     encode_room,
     encode_wild,
 )
+from world.rules.npc_intents import apply_npc_intent
 from world.rules.onboarding import run_scripted_talk
+from world.rules.party import (
+    PARTY_MAX_COMPANIONS,
+    PartyJoinError,
+    is_companion,
+    join_party,
+    party_size,
+)
 from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
@@ -148,6 +156,38 @@ def validate_talk_freeform_payload(payload: Any) -> dict[str, Any]:
             payload["speech"], "speech", MAX_SPEECH_CODE_POINTS
         ),
     }
+
+
+def validate_party_invite_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.party_invite`` payload.
+
+    The invitation message mirrors the free-form speech bound and may be empty
+    (the message is optional in the ``invite`` command surface).
+    """
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.party_invite payload must be an object")
+    if set(payload) != {"npc_id", "message"}:
+        raise ExplorationActionError(
+            "explore.party_invite requires exactly npc_id and message"
+        )
+    message = payload["message"]
+    if not isinstance(message, str):
+        raise ExplorationActionError("explore.party_invite message must be a string")
+    if sum(1 for _ in message) > MAX_SPEECH_CODE_POINTS:
+        raise ExplorationActionError("explore.party_invite message exceeds its bound")
+    return {
+        "npc_id": _require_positive_int(payload["npc_id"], "npc_id"),
+        "message": message,
+    }
+
+
+def validate_party_leave_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.party_leave`` payload."""
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.party_leave payload must be an object")
+    if set(payload) != {"npc_id"}:
+        raise ExplorationActionError("explore.party_leave requires exactly npc_id")
+    return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
 
 
 def validate_engage_payload(payload: Any) -> dict[str, Any]:
@@ -386,6 +426,110 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     return deferred
 
 
+def _party_invite_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
+    """Propose a party through the guarded dialogue seam (party-core D-2).
+
+    Re-resolves a present ``LLMNPC`` and re-verifies the deterministic gate
+    (no existing binding, party not full) synchronously; the Deferred settles
+    after the structured exchange. On the degraded terminal the fixed
+    threshold decides; otherwise the speech is shown and the verified
+    ``party_invite`` intent is applied through the deterministic applier --
+    an AI decision is never overridden by the threshold.
+    """
+    npc = _resolve_llm_npc(actor, payload["npc_id"])
+    if npc is None:
+        return _rejected("no_npc", "這裡沒有可以邀請的對象。")
+    if is_companion(npc, actor):
+        from world.rules.party import ALREADY_COMPANION_MESSAGE
+
+        return _rejected("already_companion", ALREADY_COMPANION_MESSAGE)
+    if party_size(actor) >= PARTY_MAX_COMPANIONS:
+        from world.rules.party import PARTY_FULL_MESSAGE
+
+        return _rejected("party_full", PARTY_FULL_MESSAGE)
+    from web.webclient.actions.dialogue_composition import build_dialogue_client
+
+    client = build_dialogue_client()
+    deferred = npc.run_npc_exchange(payload["message"], actor, client)
+
+    def _on_success(result: Any) -> dict[str, Any]:
+        message = _render_invite_outcome(npc, actor, result)
+        return _success("invited", message, AFFECTED_FULL)
+
+    def _on_failure(failure: Any) -> dict[str, Any]:
+        failure.trap(Exception)
+        return _rejected("invite_failed", "邀請失敗，請稍後再試。")
+
+    deferred.addCallbacks(_on_success, _on_failure)
+    return deferred
+
+
+def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
+    """Render one invite exchange into the player's feedback text.
+
+    Mirrors the ``invite`` command's rendering so the two transports never
+    drift: the degraded terminal applies the fixed threshold, otherwise the
+    speech is shown and the verified intent is applied deterministically.
+    """
+    from world.rules.party import (
+        DEGRADED_ACCEPT_MESSAGE,
+        DEGRADED_REJECT_MESSAGE,
+        JOINED_MESSAGE,
+        JOIN_REJECTION_MESSAGES,
+        REFUSED_MESSAGE,
+    )
+
+    if result.degraded:
+        from world.rules.affinity_config import get_config
+
+        affinity = npc.relations.affinity_for(actor)
+        if affinity < get_config().invite_threshold:
+            actor.msg(f"{npc.key}說：{DEGRADED_REJECT_MESSAGE}")
+            return "她婉拒了你的邀請。"
+        try:
+            join_party(npc, actor)
+        except PartyJoinError as error:
+            line = JOIN_REJECTION_MESSAGES.get(error.reason, REFUSED_MESSAGE)
+            actor.msg(line)
+            return line
+        actor.msg(f"{npc.key}說：{DEGRADED_ACCEPT_MESSAGE}")
+        actor.msg(JOINED_MESSAGE)
+        return JOINED_MESSAGE
+
+    actor.msg(f"{npc.key}說：{result.reply.speech}")
+    intent = result.reply.intent
+    outcome = apply_npc_intent(npc, actor, intent)
+    if not (isinstance(intent, dict) and intent.get("kind") == "party_invite"):
+        return result.reply.speech
+    if intent.get("accept") is True:
+        if outcome.applied:
+            actor.msg(JOINED_MESSAGE)
+            return JOINED_MESSAGE
+        line = JOIN_REJECTION_MESSAGES.get(outcome.reason or "", REFUSED_MESSAGE)
+        actor.msg(line)
+        return line
+    actor.msg(REFUSED_MESSAGE)
+    return REFUSED_MESSAGE
+
+
+def _party_leave_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    """Dismiss a bound companion through the membership module (party-core)."""
+    from world.rules.party import (
+        LEAVE_DISMISSED_MESSAGE,
+        NOT_COMPANION_MESSAGE,
+        leave_party,
+    )
+
+    npc = _resolve_npc(actor, payload["npc_id"])
+    if npc is None:
+        return _rejected("no_npc", "這裡沒有這個對象。")
+    if not is_companion(npc, actor):
+        return _rejected("not_companion", NOT_COMPANION_MESSAGE)
+    leave_party(npc, actor, reason="dismissed")
+    actor.msg(LEAVE_DISMISSED_MESSAGE)
+    return _success("left", LEAVE_DISMISSED_MESSAGE, AFFECTED_FULL)
+
+
 def _engage_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Re-resolve a present monster and delegate to the existing engage contract."""
     monster = _resolve_monster(actor, payload["monster_id"])
@@ -443,6 +587,8 @@ __all__ = [
     "validate_engage_payload",
     "validate_look_payload",
     "validate_move_payload",
+    "validate_party_invite_payload",
+    "validate_party_leave_payload",
     "validate_talk_freeform_payload",
     "validate_talk_scripted_payload",
     "validate_wait_payload",

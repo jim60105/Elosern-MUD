@@ -36,6 +36,8 @@ from commands.guild import (
     CmdGuildShow,
     CmdGuildTurnIn,
 )
+from commands.invite import CmdInvite
+from commands.leave import CmdLeave
 from commands.localized import (
     CmdColorTest,
     CmdDrop,
@@ -171,6 +173,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdSell)
         self.add(CmdInventory)
         self.add(CmdsTalk)
+        self.add(CmdInvite)
+        self.add(CmdLeave)
         self.add(ProjectXYZGridCmdSet)
 
 

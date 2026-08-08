@@ -70,14 +70,14 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 
 ### Requirement: Intent extraction is whitelisted and shape-validated per kind
 
-The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the seven whitelisted kinds `give_item` / `take_item` / `offer_quest` / `request_guild_exam` / `adjust_relation` / `reveal_lore` / `none`. The `request_guild_exam` intent SHALL carry exactly one payload field, `target_rank`; `give_item` and `take_item` SHALL carry `item_key` and a positive `qty`; `adjust_relation` SHALL carry exactly one payload field, `delta`, a non-negative integer with `0 <= delta <= 10`. Outputs whose kind is outside the whitelist or whose payload violates the per-kind shape SHALL be rejected by a semantic validator and retried within the budget. Whitelisting an intent kind SHALL mean the shape is accepted for extraction; it does not guarantee the intent is executable (executability is decided by the deterministic applier).
+The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the eight whitelisted kinds `give_item` / `take_item` / `offer_quest` / `request_guild_exam` / `adjust_relation` / `reveal_lore` / `party_invite` / `none`. The `request_guild_exam` intent SHALL carry exactly one payload field, `target_rank`; `give_item` and `take_item` SHALL carry `item_key` and a positive `qty`; `adjust_relation` SHALL carry exactly one payload field, `delta`, a non-negative integer with `0 <= delta <= 10`; `party_invite` SHALL carry exactly one payload field, `accept`, a boolean. Outputs whose kind is outside the whitelist or whose payload violates the per-kind shape SHALL be rejected by a semantic validator and retried within the budget. Whitelisting an intent kind SHALL mean the shape is accepted for extraction; it does not guarantee the intent is executable (executability is decided by the deterministic applier).
 
 #### Scenario: A whitelisted intent with a valid payload passes
-- **WHEN** the model returns an intent such as `{"kind": "give_item", "item_key": "healing_potion", "qty": 1}`, `{"kind": "request_guild_exam", "target_rank": "E"}`, or `{"kind": "adjust_relation", "delta": 3}`
+- **WHEN** the model returns an intent such as `{"kind": "give_item", "item_key": "healing_potion", "qty": 1}`, `{"kind": "request_guild_exam", "target_rank": "E"}`, `{"kind": "adjust_relation", "delta": 3}`, or `{"kind": "party_invite", "accept": true}`
 - **THEN** the intent passes semantic validation and proceeds to deterministic verification
 
 #### Scenario: An unknown kind is rejected and retried
-- **WHEN** the model returns an `intent.kind` outside the seven-kind whitelist
+- **WHEN** the model returns an `intent.kind` outside the eight-kind whitelist
 - **THEN** the output is treated as a validation failure, the error is appended, and the pipeline retries within the budget
 
 #### Scenario: A malformed exam payload is rejected
@@ -88,9 +88,13 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the s
 - **WHEN** the model returns `adjust_relation` with `delta` below 0, above 10, fractional, or with any extra payload field
 - **THEN** the output is rejected by the per-kind semantic validator and retried rather than passed to the engine
 
+#### Scenario: A malformed party-invite payload is rejected
+- **WHEN** the model returns `party_invite` with a non-boolean `accept`, a missing `accept`, or any extra payload field
+- **THEN** the output is rejected by the per-kind semantic validator and retried rather than passed to the engine
+
 ### Requirement: Intent application is deterministic, verified, and non-escalating
 
-`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it, using existing deterministic APIs only. `request_guild_exam` SHALL delegate to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`, which rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination; the AI SHALL NOT be able to choose examiner stats, waive a gate, promote the player, or start combat directly. `give_item` and `take_item` SHALL verify that the giver actually holds the requested item quantity and SHALL transfer it through the validated inventory-planning boundary as one all-or-nothing operation whose failure restores both entities' database and in-process state. `adjust_relation` SHALL verify the bounded `delta` payload and delegate to `world/rules/affinity.py::apply_affinity_change(npc, player, "ai_dialogue", delta)` from `affinity-system`; the AI SHALL NOT choose a delta outside 0–10, and the applier SHALL report the actually applied amount (`IntentOutcome.delta_used`): a partially budget-applied delta SHALL be reported as applied with its applied amount, while a fully blocked or rejected delta (applied amount 0) SHALL be discarded as an intent with the speech kept. **Illegal or unverifiable intent SHALL be discarded while the speech is kept** — the world is never changed by an intent the NPC could not perform.
+`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it, using existing deterministic APIs only. `request_guild_exam` SHALL delegate to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`, which rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination; the AI SHALL NOT be able to choose examiner stats, waive a gate, promote the player, or start combat directly. `give_item` and `take_item` SHALL verify that the giver actually holds the requested item quantity and SHALL transfer it through the validated inventory-planning boundary as one all-or-nothing operation whose failure restores both entities' database and in-process state. `adjust_relation` SHALL verify the bounded `delta` payload and delegate to `world/rules/affinity.py::apply_affinity_change(npc, player, "ai_dialogue", delta)` from `affinity-system`; the AI SHALL NOT choose a delta outside 0–10, and the applier SHALL report the actually applied amount (`IntentOutcome.delta_used`): a partially budget-applied delta SHALL be reported as applied with its applied amount, while a fully blocked or rejected delta (applied amount 0) SHALL be discarded as an intent with the speech kept. `party_invite` SHALL verify the boolean `accept` payload and, on `accept: true`, delegate to `world/rules/party.py::join_party(npc, player)` from `party-core`, which rechecks co-location, the NPC target, the absence of an existing binding, and the 4-companion bound; on `accept: false` it SHALL report an applied no-op. **Illegal or unverifiable intent SHALL be discarded while the speech is kept** — the world is never changed by an intent the NPC could not perform.
 
 #### Scenario: A guild exam intent is routed through the deterministic gate
 - **WHEN** the extracted intent is `request_guild_exam` with a `target_rank`
@@ -127,6 +131,18 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the s
 #### Scenario: A zero delta creates no affinity record
 - **WHEN** the extracted intent is `adjust_relation` with `delta` 0, including for a recordless player on a later world day
 - **THEN** the intent is discarded (`applied=False`), the writer is not invoked, and no affinity record is created or modified
+
+#### Scenario: An accepted party invite routes through join_party
+- **WHEN** the extracted intent is `party_invite` with `accept: true`
+- **THEN** `apply_npc_intent` delegates to `join_party(npc, player)`, which applies its own co-location, target, binding, and party-bound checks and creates the binding on success
+
+#### Scenario: A declined party invite is an applied no-op
+- **WHEN** the extracted intent is `party_invite` with `accept: false`
+- **THEN** the outcome reports applied without any membership change
+
+#### Scenario: A join gate failure discards only the intent
+- **WHEN** `join_party` rejects the request (remote NPC, full party, or duplicate binding)
+- **THEN** the intent is discarded, the speech is preserved, and no binding changes
 
 #### Scenario: A whitelisted but not-yet-executable intent is rejected without state change
 - **WHEN** the extracted intent is `offer_quest` or `reveal_lore` and passes extraction shape validation

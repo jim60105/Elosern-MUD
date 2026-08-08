@@ -144,6 +144,8 @@ class RegistryTests(unittest.TestCase):
                     "explore.look",
                     "explore.talk_scripted",
                     "explore.talk_freeform",
+                    "explore.party_invite",
+                    "explore.party_leave",
                     "explore.engage",
                     "explore.wait",
                 }

@@ -2,10 +2,10 @@
 
 Covers prompt construction (deterministic, bounded, disguised-stats and
 affinity-context injection, entity-key-only), the guarded reply entry point,
-the seven-kind intent whitelist and per-kind payload semantic validators
-(including the bounded ``adjust_relation`` delta and the affinity no-leak
-check), degrade-to-``None`` behaviour, registration semantics, and the
-startup wiring.
+the eight-kind intent whitelist and per-kind payload semantic validators
+(including the bounded ``adjust_relation`` delta, the boolean ``party_invite``
+accept, and the affinity no-leak check), degrade-to-``None`` behaviour,
+registration semantics, and the startup wiring.
 """
 
 import dataclasses
@@ -275,6 +275,51 @@ class AffinityValidatorUnitTests(unittest.TestCase):
         self.assertEqual(validate({"speech": "好感 2 點。"}), [])
         other = npc_dialogue._make_no_affinity_leak_validator(2, 99)
         self.assertTrue(other({"speech": "好感 2 點。"}))
+
+
+class PartyInviteValidatorUnitTests(unittest.TestCase):
+    """Direct shape tests for the party_invite semantic validator."""
+
+    def test_party_payload_requires_exactly_one_boolean_accept(self):
+        for valid in (True, False):
+            with self.subTest(accept=valid):
+                self.assertEqual(
+                    npc_dialogue._validate_party_payload(
+                        {"speech": "s", "intent": {"kind": "party_invite", "accept": valid}}
+                    ),
+                    [],
+                )
+        for bad in (
+            {"kind": "party_invite"},
+            {"kind": "party_invite", "accept": "yes"},
+            {"kind": "party_invite", "accept": 1},
+            {"kind": "party_invite", "accept": True, "extra": 1},
+        ):
+            with self.subTest(intent=bad):
+                self.assertTrue(
+                    npc_dialogue._validate_party_payload({"speech": "s", "intent": bad})
+                )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_party_validator_ignores_other_intent_kinds(self):
+        for intent in (
+            {"kind": "none"},
+            {"kind": "request_guild_exam", "target_rank": "E"},
+            {"kind": "adjust_relation", "delta": 3},
+        ):
+            with self.subTest(intent=intent):
+                self.assertEqual(
+                    npc_dialogue._validate_party_payload(
+                        {"speech": "s", "intent": intent}
+                    ),
+                    [],
+                )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_whitelist_and_schema_carry_party_invite(self):
+        self.assertIn("party_invite", npc_dialogue.NPC_INTENT_KINDS)
+        properties = npc_dialogue.NPC_DIALOGUE_OUTPUT_SCHEMA["properties"]["intent"]["properties"]
+        self.assertEqual(properties["accept"], {"type": "boolean"})
 
 
 class ReplyEntryPointTests(unittest.TestCase):
@@ -592,6 +637,42 @@ class ValidatorRetryTests(unittest.TestCase):
                 reply = self._run(client)
                 self.assertEqual(len(client.calls), 2)
                 self.assertIn("delta", client.calls[1].messages[-1]["content"])
+                self.assertEqual(reply.intent, {"kind": "none"})
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_valid_party_invite_payload_passes_on_the_first_attempt(self):
+        for accept in (True, False):
+            with self.subTest(accept=accept):
+                client = FakeLLMClient()
+                client.add_response(
+                    lambda d: True,
+                    _reply_text(intent={"kind": "party_invite", "accept": accept}),
+                )
+                reply = self._run(client)
+                self.assertEqual(
+                    reply.intent, {"kind": "party_invite", "accept": accept}
+                )
+                self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_malformed_party_invite_payload_is_rejected_and_retried(self):
+        for intent in (
+            {"kind": "party_invite", "accept": "yes"},
+            {"kind": "party_invite", "accept": 1},
+            {"kind": "party_invite"},
+            {"kind": "party_invite", "accept": True, "extra": 1},
+        ):
+            with self.subTest(intent=intent):
+                client = FakeLLMClient()
+                client.add_response(
+                    lambda d: len(d.messages) == 2, _reply_text(intent=intent)
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3, _reply_text()
+                )
+                reply = self._run(client)
+                self.assertEqual(len(client.calls), 2)
+                self.assertIn("accept", client.calls[1].messages[-1]["content"])
                 self.assertEqual(reply.intent, {"kind": "none"})
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")

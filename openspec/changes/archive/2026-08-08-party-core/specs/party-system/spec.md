@@ -38,12 +38,13 @@ under re-application, and SHALL survive reloads.
 ### Requirement: The invite command proposes a party through the AI-judged dialogue seam
 The character cmdset SHALL provide `invite <npc> [訊息]` (aliases 邀請, 組隊) that resolves a local
 NPC target (absent or ambiguous targets produce Traditional Chinese errors, mirroring `talk`),
-preflights the deterministic gate (NPC, not already a companion, party not full), and then sends
-the player's invitation message through the guarded dialogue seam with the NPC's affinity context;
-a webclient action SHALL offer the same flow with the injected client. The reply's speech SHALL be
-shown to the player. A `party_invite {accept: true}` intent SHALL be verified and applied through
-`join_party` (rechecking co-location, binding, and the 4-companion bound) and the player SHALL be
-notified of the joined companion; `accept: false` SHALL notify of the refusal and change nothing;
+preflights the deterministic gate (an NPC with an eligible free-form dialogue surface — an
+`LLMNPC` — not already a companion, party not full), and then sends the player's invitation
+message through the guarded dialogue seam with the NPC's affinity context; a webclient action
+SHALL offer the same flow with the injected client. The reply's speech SHALL be shown to the
+player. A `party_invite {accept: true}` intent SHALL be verified and applied through `join_party`
+(rechecking co-location, binding, and the 4-companion bound) and the player SHALL be notified of
+the joined companion; `accept: false` SHALL notify of the refusal and change nothing;
 any illegal or unverifiable intent SHALL keep the speech and change nothing. When the dialogue
 layer is disabled, unreachable, or retry-exhausted, the invitation SHALL degrade to a fixed
 threshold decision (`affinity >= 70`, the 羈絆 stage floor) with deterministic accept/reject
@@ -76,6 +77,10 @@ lines; the AI, when present, SHALL NOT be bound by that threshold.
 
 #### Scenario: Inviting an already-bound companion reports a clear result
 - **WHEN** a player invites an NPC that is already a companion
+- **THEN** the invite is rejected before any dialogue call with a Traditional Chinese message and no state changes
+
+#### Scenario: A non-dialogue NPC cannot be invited
+- **WHEN** a player invites a present NPC without an eligible free-form dialogue surface
 - **THEN** the invite is rejected before any dialogue call with a Traditional Chinese message and no state changes
 
 #### Scenario: A party filled after the AI accepted is surfaced to the player
@@ -119,13 +124,15 @@ affinity delta, when the NPC is a bound companion and the NPC's affinity toward 
 below the invite threshold (70), the hook SHALL call `leave_party(npc, player,
 reason="affinity_below_threshold")` as part of the affinity write's transaction — a failed leave
 SHALL roll back the entire negative-delta operation so "affinity below threshold but still bound"
-is unreachable — and SHALL notify the player only after the outer transaction commits. A negative
-delta that leaves affinity at or above the threshold SHALL NOT end the party.
+is unreachable — and the write API SHALL return the auto-leave notification line, which the
+caller SHALL send to the player only after its own transaction commits. The writer SHALL never
+send the notification itself. A negative delta that leaves affinity at or above the threshold
+SHALL NOT end the party.
 
 #### Scenario: Below-threshold affinity ends the party
 - **WHEN** a bound companion's affinity drops from 70 to 69 through a negative delta
-- **THEN** the party binding is removed with the auto-leave reason and the player is notified
-  after the write commits
+- **THEN** the party binding is removed with the auto-leave reason, the write API returns the
+  notification line, and the caller notifies the player only after the write commits
 
 #### Scenario: At-threshold affinity keeps the party
 - **WHEN** a bound companion's affinity drops to exactly 70 through a negative delta

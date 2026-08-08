@@ -3,8 +3,9 @@
 Covers the ``at_talked_to`` seam: valid-reply presentation and verified-intent
 application, degraded greeting-or-silence, per-character chat-memory trimming,
 the thinking-timer contract on a deterministic clock, the explicit ``None``
-client rejection, and the deferred-import rule that keeps the typeclass free of
-module-scope generative imports.
+client rejection, the deferred-import rule that keeps the typeclass free of
+module-scope generative imports, and the structured ``run_npc_exchange``
+helper (party-core D-2) that separates the exchange from intent application.
 """
 
 import json
@@ -84,6 +85,73 @@ class _HeldClient:
     def get_response(self, descriptor):
         self.calls.append(descriptor)
         return self.deferred
+
+
+class DialogueExchangeHelperTests(EvenniaTest):
+    """The structured ``run_npc_exchange`` helper (party-core D-2)."""
+
+    def setUp(self):
+        super().setUp()
+        _reset_all()
+        register_npc_dialogue()
+        self.player = create_object(PlayerCharacter, key="exchange player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.npc = create_object(LLMNPC, key="交換精靈", location=self.room1)
+
+    def tearDown(self):
+        _reset_all()
+        super().tearDown()
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_returns_a_reply_and_applies_no_intent(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(
+                speech="我會考慮看看。",
+                intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+            ),
+        )
+        self.npc.db.inventory = ["healing_potion"]
+        result = await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
+        self.assertFalse(result.degraded)
+        self.assertEqual(result.reply.speech, "我會考慮看看。")
+        self.assertEqual(result.reply.intent["kind"], "give_item")
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        lines = self.npc._chat_lines(self.player)
+        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我會考慮看看。"])
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_exchange_marks_the_degraded_terminal_explicitly(self):
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            result = await_result(
+                self.npc.run_npc_exchange("請與我同行", self.player, client)
+            )
+        self.assertTrue(result.degraded)
+        self.assertIsNone(result.reply)
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_rejects_an_explicit_none_client(self):
+        d = self.npc.run_npc_exchange("請與我同行", self.player, None)
+        failure = await_result(d)
+        self.assertTrue(failure.check(NPCDialogueClientRequiredError))
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_appends_only_the_reply_never_the_degraded_greeting(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="我願意與你同行。", intent={"kind": "none"}),
+        )
+        await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
+        lines = self.npc._chat_lines(self.player)
+        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我願意與你同行。"])
 
 
 class LLMNPCSeamTests(EvenniaTest):

@@ -76,11 +76,12 @@ def build_production_action_registry() -> ActionRegistry:
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
     the four creation adapters (``creation.preset``, ``creation.custom``,
-    ``creation.activate``, ``creation.reset``), and the six exploration
+    ``creation.activate``, ``creation.reset``), and the eight exploration
     adapters (``explore.move``, ``explore.look``, ``explore.talk_scripted``,
-    ``explore.talk_freeform``, ``explore.engage``, ``explore.wait``). Each
-    action binds one exact payload validator and one narrow deterministic
-    adapter; no action routes through the text parser.
+    ``explore.talk_freeform``, ``explore.party_invite``, ``explore.party_leave``,
+    ``explore.engage``, ``explore.wait``). Each action binds one exact payload
+    validator and one narrow deterministic adapter; no action routes through
+    the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _cast_adapter,
@@ -104,12 +105,16 @@ def build_production_action_registry() -> ActionRegistry:
         _engage_adapter,
         _look_adapter,
         _move_adapter,
+        _party_invite_adapter,
+        _party_leave_adapter,
         _talk_freeform_adapter,
         _talk_scripted_adapter,
         _wait_adapter,
         validate_engage_payload,
         validate_look_payload,
         validate_move_payload,
+        validate_party_invite_payload,
+        validate_party_leave_payload,
         validate_talk_freeform_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
@@ -281,6 +286,24 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_talk_freeform_adapter,
             # Full snapshot so an applied intent (including a mode change)
             # refreshes atomically (design D5).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.party_invite",
+            validate_payload=validate_party_invite_payload,
+            adapter=_party_invite_adapter,
+            # Full snapshot so an applied membership binding refreshes
+            # atomically (party-core D-2).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.party_leave",
+            validate_payload=validate_party_leave_payload,
+            adapter=_party_leave_adapter,
             affected_panels=(),
         )
     )

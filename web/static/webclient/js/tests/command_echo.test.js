@@ -49,6 +49,39 @@ test("explore.talk_freeform resolves to talk <NPC> <speech>", () => {
   );
 });
 
+test("explore.party_invite without a message resolves to invite <NPC>", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.party_invite",
+      { npc_id: "innkeeper", message: "" },
+      { npcLabel: "艾洛希雅" }
+    ),
+    "invite 艾洛希雅"
+  );
+});
+
+test("explore.party_invite with a message resolves to invite <NPC> <message>", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.party_invite",
+      { npc_id: "innkeeper", message: "你願意嗎" },
+      { npcLabel: "艾洛希雅" }
+    ),
+    "invite 艾洛希雅 你願意嗎"
+  );
+});
+
+test("explore.party_leave resolves to leave <NPC>", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.party_leave",
+      { npc_id: "innkeeper" },
+      { npcLabel: "艾洛希雅" }
+    ),
+    "leave 艾洛希雅"
+  );
+});
+
 test("explore.engage resolves to engage <target>", () => {
   assert.strictEqual(
     Echo.commandLine(

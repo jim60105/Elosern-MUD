@@ -4,10 +4,10 @@ This module is the deterministic engine's side of the dialogue contract: it
 verifies an extracted ``intent`` against the world before applying it and
 discards illegal or unverifiable intents while the speech is kept. It performs
 verification and application only through existing deterministic APIs -- the
-guild-exam trigger, the inventory-planning boundary, and the sole-writer
-affinity API. ``offer_quest`` and ``reveal_lore`` are whitelisted by the
-schema but rejected here behind forward-declared seams until their
-deterministic capability surfaces exist.
+guild-exam trigger, the inventory-planning boundary, the sole-writer affinity
+API, and the party-membership module. ``offer_quest`` and ``reveal_lore`` are
+whitelisted by the schema but rejected here behind forward-declared seams until
+their deterministic capability surfaces exist.
 
 Single-writer invariant: this module is part of the deterministic core and the
 sole writer of any state this change causes; the generative reply layer never
@@ -69,6 +69,8 @@ def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
         return _apply_guild_exam(npc, player, intent)
     if kind == "adjust_relation":
         return _apply_adjust_relation(npc, player, intent)
+    if kind == "party_invite":
+        return _apply_party_invite(npc, player, intent)
     if kind in ("give_item", "take_item"):
         return _apply_item_transfer(kind, npc, player, intent)
     if kind in _FORWARD_DECLARED_KINDS:
@@ -113,6 +115,32 @@ def _apply_adjust_relation(npc: Any, player: Any, intent: dict[str, Any]) -> Int
     if outcome.budget_capped:
         return IntentOutcome(False, "affinity daily budget exhausted", delta_used=0)
     return IntentOutcome(False, "affinity delta applied nothing", delta_used=0)
+
+
+def _apply_party_invite(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
+    """Route a ``party_invite`` intent through the party-membership module.
+
+    ``accept: false`` is an applied no-op; ``accept: true`` delegates to
+    ``join_party``, which rechecks the target, co-location, the absence of an
+    existing binding, and the 4-companion bound. A join-gate rejection
+    discards only the intent with the stable reason surfaced in
+    ``IntentOutcome.reason`` so callers can render distinct feedback.
+    """
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"accept"}:
+        return IntentOutcome(False, "party_invite must carry exactly accept")
+    accept = payload["accept"]
+    if not isinstance(accept, bool):
+        return IntentOutcome(False, "party_invite accept must be a boolean")
+    if not accept:
+        return IntentOutcome(True, "party invite declined")
+    from world.rules.party import PartyJoinError, join_party
+
+    try:
+        join_party(npc, player)
+    except PartyJoinError as error:
+        return IntentOutcome(False, error.reason)
+    return IntentOutcome(True, "party joined")
 
 
 def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:

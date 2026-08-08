@@ -850,6 +850,79 @@ class ExplorationPresenterTests(EvenniaTest):
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(plain.pk))
         self.assertEqual(target["affordances"], [])
+        action_ids = {
+            a.get("action_id") for a in target["affordances"] if a.get("action_id")
+        }
+        self.assertNotIn("explore.party_invite", action_ids)
+        self.assertNotIn("explore.party_leave", action_ids)
+
+    @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
+    def test_unbound_generative_npc_offers_an_enabled_invite(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.south_gate)
+        payload = self._render()
+        target = next(t for t in payload["interact"] if t["identity"] == int(npc.pk))
+        invite = next(
+            a for a in target["affordances"]
+            if a["action_id"] == "explore.party_invite"
+        )
+        self.assertTrue(invite["enabled"])
+        self.assertIsNone(invite["disabled_reason"])
+        self.assertNotIn(
+            "explore.party_leave",
+            {a["action_id"] for a in target["affordances"] if a.get("action_id")},
+        )
+
+    @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
+    def test_full_party_disables_the_invite_with_the_reason(self):
+        from world.rules.party import PARTY_MAX_COMPANIONS, join_party
+
+        for index in range(PARTY_MAX_COMPANIONS):
+            join_party(
+                create_object(LLMNPC, key=f"同伴{index}", location=self.south_gate),
+                self.player,
+            )
+        npc = create_object(LLMNPC, key="對話精靈", location=self.south_gate)
+        payload = self._render()
+        target = next(t for t in payload["interact"] if t["identity"] == int(npc.pk))
+        invite = next(
+            a for a in target["affordances"]
+            if a["action_id"] == "explore.party_invite"
+        )
+        self.assertFalse(invite["enabled"])
+        self.assertEqual(invite["disabled_reason"]["code"], "party_full")
+        self.assertIn("滿", invite["disabled_reason"]["message"])
+
+    @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
+    def test_bound_companion_offers_leave_and_never_invite(self):
+        from world.rules.party import join_party
+
+        npc = create_object(LLMNPC, key="對話精靈", location=self.south_gate)
+        join_party(npc, self.player)
+        payload = self._render()
+        target = next(t for t in payload["interact"] if t["identity"] == int(npc.pk))
+        action_ids = {
+            a["action_id"] for a in target["affordances"] if a.get("action_id")
+        }
+        self.assertIn("explore.party_leave", action_ids)
+        self.assertNotIn("explore.party_invite", action_ids)
+        leave = next(
+            a for a in target["affordances"] if a["action_id"] == "explore.party_leave"
+        )
+        self.assertTrue(leave["enabled"])
+
+    @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
+    def test_bound_plain_npc_offers_leave_too(self):
+        from world.rules.party import join_party
+
+        plain = create_object(NPC, key="路人", location=self.south_gate)
+        join_party(plain, self.player)
+        payload = self._render()
+        target = next(t for t in payload["interact"] if t["identity"] == int(plain.pk))
+        action_ids = {
+            a["action_id"] for a in target["affordances"] if a.get("action_id")
+        }
+        self.assertIn("explore.party_leave", action_ids)
+        self.assertNotIn("explore.party_invite", action_ids)
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_service_affordance_is_navigate_kind_and_host_bound(self):
