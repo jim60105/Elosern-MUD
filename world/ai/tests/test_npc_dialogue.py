@@ -1,9 +1,11 @@
 """Tests for the NPC dialogue generative layer (npc-dialogue).
 
-Covers prompt construction (deterministic, bounded, disguised-stats injection,
-entity-key-only), the guarded reply entry point, the seven-kind intent
-whitelist and per-kind payload semantic validators, degrade-to-``None``
-behaviour, registration semantics, and the startup wiring.
+Covers prompt construction (deterministic, bounded, disguised-stats and
+affinity-context injection, entity-key-only), the guarded reply entry point,
+the seven-kind intent whitelist and per-kind payload semantic validators
+(including the bounded ``adjust_relation`` delta and the affinity no-leak
+check), degrade-to-``None`` behaviour, registration semantics, and the
+startup wiring.
 """
 
 import dataclasses
@@ -12,6 +14,7 @@ from unittest.mock import patch
 import unittest
 
 from django.test import override_settings
+from twisted.internet import defer
 
 from world.ai import guardrail
 from world.ai import npc_dialogue
@@ -89,8 +92,20 @@ def _reply_text(speech="艾洛希雅對你點頭。", intent=None):
     )
 
 
+class _HeldDialogueClient:
+    """Dialogue test double whose response is a Deferred the test resolves."""
+
+    def __init__(self):
+        self.deferred = defer.Deferred()
+        self.calls = []
+
+    def get_response(self, descriptor):
+        self.calls.append(descriptor)
+        return self.deferred
+
+
 class NPCDialoguePromptTests(unittest.TestCase):
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_identical_inputs_produce_byte_identical_prompts(self):
         first = build_npc_dialogue_prompt(
             _npc_context(), _player_context(), _memory()
@@ -104,7 +119,7 @@ class NPCDialoguePromptTests(unittest.TestCase):
         self.assertEqual(first[0]["content"], second[0]["content"])
         self.assertEqual(first[1]["content"], second[1]["content"])
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_disguised_stats_are_injected_so_a_disguised_elf_reads_as_weak(self):
         disguised = {"atk_phys": 5, "agility": 6, "defense": 6}
         system, user = build_npc_dialogue_prompt(
@@ -115,7 +130,7 @@ class NPCDialoguePromptTests(unittest.TestCase):
         self.assertIn("atk_phys", user["content"])
         self.assertNotIn("10000", user["content"])
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_oversized_memory_is_truncated_deterministically_with_a_marker(self):
         memory = [f"對話 {i}" for i in range(1, MAX_MEMORY_LINES * 3 + 1)]
         system, user = build_npc_dialogue_prompt(
@@ -127,7 +142,7 @@ class NPCDialoguePromptTests(unittest.TestCase):
         self.assertEqual(parsed["memory"][-1], "對話 36")
         self.assertEqual(parsed["memory"][-2], "對話 35")
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_prompt_is_bounded_and_contains_no_live_entity_reference(self):
         memory = [f"x" * 500 for _ in range(MAX_MEMORY_LINES * 2)]
         system, user = build_npc_dialogue_prompt(
@@ -141,7 +156,7 @@ class NPCDialoguePromptTests(unittest.TestCase):
             max(len(line) for line in parsed["memory"]), 201
         )
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_system_message_fixes_role_language_and_output_contract(self):
         system, _ = build_npc_dialogue_prompt(
             _npc_context(), _player_context(), _memory()
@@ -154,13 +169,112 @@ class NPCDialoguePromptTests(unittest.TestCase):
         self.assertIn("intent", content)
         self.assertIn("不得虛構", content)
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_prompt_uses_entity_keys_with_no_true_stats_present(self):
         system, user = build_npc_dialogue_prompt(
             _npc_context(), _player_context(), _memory()
         )
         self.assertIn("薇歐蕾", user["content"])
         self.assertNotIn("atk_phys", system["content"])
+
+
+class AffinityPromptTests(unittest.TestCase):
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_affinity_block_carries_the_true_value_cap_and_stage(self):
+        context = {"value": 55, "cap": 99, "stage": "信賴"}
+        system, user = build_npc_dialogue_prompt(
+            _npc_context(), _player_context(), _memory(), affinity_context=context
+        )
+        parsed = json.loads(user["content"])
+        self.assertEqual(
+            parsed["player"]["affinity"],
+            {"value": 55, "cap": 99, "stage": "信賴"},
+        )
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_recordless_player_omits_the_affinity_block(self):
+        _, user = build_npc_dialogue_prompt(
+            _npc_context(),
+            _player_context(),
+            _memory(),
+            affinity_context=None,
+        )
+        parsed = json.loads(user["content"])
+        self.assertNotIn("affinity", parsed["player"])
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_prompts_stay_byte_identical_with_and_without_the_block(self):
+        context = {"value": 55, "cap": 99, "stage": "信賴"}
+        first = build_npc_dialogue_prompt(
+            _npc_context(), _player_context(), _memory(), affinity_context=context
+        )
+        second = build_npc_dialogue_prompt(
+            _npc_context(), _player_context(), _memory(), affinity_context=context
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(first[1]["content"], second[1]["content"])
+        without = build_npc_dialogue_prompt(_npc_context(), _player_context(), _memory())
+        plain = build_npc_dialogue_prompt(
+            _npc_context(), _player_context(), _memory(), affinity_context=None
+        )
+        self.assertEqual(without, plain)
+        self.assertNotEqual(first[1]["content"], without[1]["content"])
+        self.assertIn('"affinity"', first[1]["content"])
+
+
+class AffinityValidatorUnitTests(unittest.TestCase):
+    """Direct shape tests for the adjust_relation and no-leak validators."""
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_relation_payload_requires_exactly_one_integer_delta_in_range(self):
+        valid = {"kind": "adjust_relation", "delta": 3}
+        self.assertEqual(
+            npc_dialogue._validate_relation_payload({"speech": "s", "intent": valid}), []
+        )
+        for bad in (
+            {"kind": "adjust_relation", "delta": -1},
+            {"kind": "adjust_relation", "delta": 11},
+            {"kind": "adjust_relation", "delta": 1.5},
+            {"kind": "adjust_relation", "delta": True},
+            {"kind": "adjust_relation"},
+            {"kind": "adjust_relation", "delta": 3, "extra": 1},
+        ):
+            with self.subTest(intent=bad):
+                self.assertTrue(
+                    npc_dialogue._validate_relation_payload(
+                        {"speech": "s", "intent": bad}
+                    )
+                )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_relation_validator_ignores_other_intent_kinds(self):
+        for intent in (
+            {"kind": "none"},
+            {"kind": "request_guild_exam", "target_rank": "E"},
+            {"kind": "give_item", "item_key": "x", "qty": 1},
+        ):
+            with self.subTest(intent=intent):
+                self.assertEqual(
+                    npc_dialogue._validate_relation_payload(
+                        {"speech": "s", "intent": intent}
+                    ),
+                    [],
+                )
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_no_leak_validator_rejects_value_and_cap_substrings(self):
+        validate = npc_dialogue._make_no_affinity_leak_validator(55, 99)
+        self.assertEqual(validate({"speech": "你是我的信賴。"}), [])
+        self.assertTrue(validate({"speech": "好感 55 點。"}))
+        self.assertTrue(validate({"speech": "上限是 99。"}))
+        self.assertTrue(validate({"speech": "好感是 ５５ 點。"}))
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_no_leak_validator_is_bound_to_its_own_call_numbers(self):
+        validate = npc_dialogue._make_no_affinity_leak_validator(55, 99)
+        self.assertEqual(validate({"speech": "好感 2 點。"}), [])
+        other = npc_dialogue._make_no_affinity_leak_validator(2, 99)
+        self.assertTrue(other({"speech": "好感 2 點。"}))
 
 
 class ReplyEntryPointTests(unittest.TestCase):
@@ -421,6 +535,163 @@ class ValidatorRetryTests(unittest.TestCase):
                 memory=_memory(),
             )
             return await_result(d)
+
+    def _run_with_affinity(self, client, affinity, **profiles):
+        with override_settings(LLM_PROFILES=_raw(**profiles)):
+            d = generate_npc_reply(
+                client,
+                npc_context=_npc_context(),
+                player_context=_player_context(),
+                memory=_memory(),
+                affinity_context=affinity,
+            )
+            return await_result(d)
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_valid_adjust_relation_delta_passes_on_the_first_attempt(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(intent={"kind": "adjust_relation", "delta": 3}),
+        )
+        reply = self._run(client)
+        self.assertEqual(reply.intent, {"kind": "adjust_relation", "delta": 3})
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_out_of_range_delta_payload_is_rejected_and_retried(self):
+        for bad in (-1, 11, 1.5, True):
+            with self.subTest(delta=bad):
+                client = FakeLLMClient()
+                client.add_response(
+                    lambda d: len(d.messages) == 2,
+                    _reply_text(intent={"kind": "adjust_relation", "delta": bad}),
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3, _reply_text()
+                )
+                reply = self._run(client)
+                self.assertEqual(len(client.calls), 2)
+                self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+                self.assertEqual(reply.intent, {"kind": "none"})
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_missing_or_extra_delta_payload_is_rejected_and_retried(self):
+        for intent in (
+            {"kind": "adjust_relation"},
+            {"kind": "adjust_relation", "delta": 3, "extra": 1},
+        ):
+            with self.subTest(intent=intent):
+                client = FakeLLMClient()
+                client.add_response(
+                    lambda d: len(d.messages) == 2, _reply_text(intent=intent)
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3, _reply_text()
+                )
+                reply = self._run(client)
+                self.assertEqual(len(client.calls), 2)
+                self.assertIn("delta", client.calls[1].messages[-1]["content"])
+                self.assertEqual(reply.intent, {"kind": "none"})
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_speech_echoing_the_secret_value_is_rejected_and_retried(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我對你的好感已經到了 55 點。"),
+        )
+        client.add_response(lambda d: len(d.messages) == 3, _reply_text())
+        reply = self._run_with_affinity(
+            client, {"value": 55, "cap": 99, "stage": "信賴"}
+        )
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+        self.assertEqual(reply.speech, "艾洛希雅對你點頭。")
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_speech_mentioning_only_the_stage_name_passes(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="你是我信賴的人。"),
+        )
+        reply = self._run_with_affinity(
+            client, {"value": 55, "cap": 99, "stage": "信賴"}
+        )
+        self.assertEqual(reply.speech, "你是我信賴的人。")
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_leak_exhausts_retries_and_degrades_never_presenting_the_number(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="我對你的好感是 55 點。"),
+        )
+        result = self._run_with_affinity(
+            client,
+            {"value": 55, "cap": 99, "stage": "信賴"},
+            npc_dialogue={"max_retries": 1},
+        )
+        self.assertIsNone(result)
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_no_affinity_context_disables_the_leak_check(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="我對你的好感是 55 點。"),
+        )
+        reply = self._run(client)
+        self.assertEqual(reply.speech, "我對你的好感是 55 點。")
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_fullwidth_digit_echo_is_rejected_and_retried(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我對你的好感是 ５５ 點。"),
+        )
+        client.add_response(lambda d: len(d.messages) == 3, _reply_text())
+        reply = self._run_with_affinity(
+            client, {"value": 55, "cap": 99, "stage": "信賴"}
+        )
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+        self.assertEqual(reply.speech, "艾洛希雅對你點頭。")
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_interleaved_calls_keep_their_own_leak_context(self):
+        client_a = _HeldDialogueClient()
+        client_b = _HeldDialogueClient()
+        d_a = generate_npc_reply(
+            client_a,
+            npc_context=_npc_context(),
+            player_context=_player_context(),
+            memory=_memory(),
+            affinity_context={"value": 55, "cap": 99, "stage": "信賴"},
+        )
+        d_b = generate_npc_reply(
+            client_b,
+            npc_context=_npc_context(),
+            player_context=_player_context(),
+            memory=_memory(),
+            affinity_context={"value": 2, "cap": 99, "stage": "初識"},
+        )
+        # Each reply echoes the OTHER call's secret number: a per-call leak
+        # validator must be the only check that applies, so both pass with no
+        # retry. A module-global context would cross-contaminate the two calls.
+        client_a.deferred.callback(_reply_text(speech="我的好感是 2 點。"))
+        client_b.deferred.callback(_reply_text(speech="我的好感是 55 點。"))
+        reply_a = await_result(d_a)
+        reply_b = await_result(d_b)
+        self.assertEqual(reply_a.speech, "我的好感是 2 點。")
+        self.assertEqual(reply_b.speech, "我的好感是 55 點。")
+        self.assertEqual(len(client_a.calls), 1)
+        self.assertEqual(len(client_b.calls), 1)
 
     @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
     def test_unknown_intent_kind_is_rejected_and_retried_with_error_appended(self):

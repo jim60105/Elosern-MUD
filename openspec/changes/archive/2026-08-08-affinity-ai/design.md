@@ -69,13 +69,17 @@ unchanged.
 
 ### D-5: Numeric affinity values are kept out of player-facing speech deterministically
 
-Prompt instructions alone cannot guarantee secrecy, so the layer adds the semantic validator
-`no_affinity_leak`: when an affinity context is present, a reply whose speech contains the
-affinity value or the cap as a decimal integer substring is treated as a validation failure,
-appended to the retry errors, and retried within the budget; on budget exhaustion the call
-degrades to `None` (greeting or silence), never presenting a leak. Stage names remain allowed in
-speech — they are the sanctioned player-facing form. The validator runs only when the affinity
-block was injected, so ordinary dialogue is unaffected.
+Prompt instructions alone cannot guarantee secrecy, so the layer adds a no-leak semantic
+validator: when an affinity context is present, a reply whose speech contains the affinity value
+or the cap as a decimal integer substring is treated as a validation failure, appended to the
+retry errors, and retried within the budget; on budget exhaustion the call degrades to `None`
+(greeting or silence), never presenting a leak. The validator is a per-call closure bound to the
+call's own numbers and carried by the request descriptor
+(`ChatRequestDescriptor.semantic_validators`) rather than registered globally, so interleaved
+concurrent dialogue calls can never observe another call's affinity context, and the check
+silently no-ops for ordinary dialogue (no block injected). Speech is NFKC-normalized before the
+substring search so fullwidth decimal digits cannot bypass the check. Stage names remain allowed
+in speech — they are the sanctioned player-facing form.
 
 ## Risks / Trade-offs
 

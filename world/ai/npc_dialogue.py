@@ -4,13 +4,16 @@ The ``npc_dialogue`` layer maps an NPC dialogue context to a validated frozen
 ``NPCDialogueReply`` through the shared validation-retry-degrade guardrail
 (design §7.5). The intent kind is restricted to a seven-kind whitelist; the
 deterministic engine verifies each intent before applying it (see
-``world/rules/npc_intents.py``). This module is generative and read-only: it
-never mutates state, never imports a state writer, a typeclass, or a live
-transport, and it consumes the client through the injected protocol exactly
-like ``narrator.py``. When the layer is disabled, the transport fails, or the
-validation retries are exhausted, ``generate_npc_reply`` resolves to ``None``
--- the single public degraded marker -- so the caller can fall back to the
-NPC's authored greeting or silence and the game stays fully playable offline.
+``world/rules/npc_intents.py``). When the caller injects the NPC's affinity
+context (affinity-ai), it is serialized into the user payload for the model
+and a no-leak semantic validator keeps the secret numbers out of player-facing
+speech. This module is generative and read-only: it never mutates state, never
+imports a state writer, a typeclass, or a live transport, and it consumes the
+client through the injected protocol exactly like ``narrator.py``. When the
+layer is disabled, the transport fails, or the validation retries are
+exhausted, ``generate_npc_reply`` resolves to ``None`` -- the single public
+degraded marker -- so the caller can fall back to the NPC's authored greeting
+or silence and the game stays fully playable offline.
 
 Boundary contract (``tests/test_ai_transport_contract.py``): this module imports
 no state writer, no live transport, and no socket.
@@ -20,8 +23,9 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,6 +57,12 @@ MAX_TOTAL_SIZE = 12000
 
 # Accepted-speech bound used by the length semantic validator (design D4).
 MAX_SPEECH_LENGTH = 2000
+
+# The affinity-delta bound for the adjust_relation intent (affinity-ai D-1):
+# the schema bounds the value when present, and the per-kind semantic
+# validator plus the deterministic applier enforce the exact single-field
+# shape.
+MAX_RELATION_DELTA = 10
 
 # The seven whitelisted intent kinds (design §7.4).
 NPC_INTENT_KINDS = (
@@ -100,6 +110,7 @@ NPC_DIALOGUE_OUTPUT_SCHEMA: dict[str, Any] = {
             "required": ["kind"],
             "properties": {
                 "kind": {"type": "string", "enum": list(NPC_INTENT_KINDS)},
+                "delta": {"type": "integer", "minimum": 0, "maximum": MAX_RELATION_DELTA},
             },
         },
     },
@@ -186,6 +197,62 @@ def _validate_item_payload(parsed: Any) -> list[str]:
     return []
 
 
+def _validate_relation_payload(parsed: Any) -> list[str]:
+    intent = parsed.get("intent") if isinstance(parsed, Mapping) else None
+    if not isinstance(intent, Mapping) or intent.get("kind") != "adjust_relation":
+        return []
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"delta"}:
+        return [
+            "adjust_relation must carry exactly one payload field, delta"
+        ]
+    delta = payload["delta"]
+    if (
+        isinstance(delta, bool)
+        or not isinstance(delta, int)
+        or not (0 <= delta <= MAX_RELATION_DELTA)
+    ):
+        return [
+            "adjust_relation delta must be an integer between 0 and "
+            f"{MAX_RELATION_DELTA}"
+        ]
+    return []
+
+
+def _make_no_affinity_leak_validator(
+    value: Any, cap: Any
+) -> Callable[[Any], list[str]]:
+    """Return a per-call semantic validator bound to this call's secret numbers.
+
+    The validator is carried by the request descriptor (not registered), so an
+    interleaved second dialogue call can never observe another call's affinity
+    numbers, and ordinary dialogue without an injected block is untouched.
+    Speech is NFKC-normalized so fullwidth decimal digits (U+FF10-FF19) fold
+    into ASCII and cannot bypass the decimal-substring check; stage names are
+    unaffected and remain the sanctioned player-facing form.
+    """
+    def validate(parsed: Any) -> list[str]:
+        speech = parsed.get("speech") if isinstance(parsed, Mapping) else None
+        if not isinstance(speech, str):
+            return []
+        normalized = unicodedata.normalize("NFKC", speech)
+        leaked = {
+            str(number)
+            for number in (value, cap)
+            if isinstance(number, int)
+            and not isinstance(number, bool)
+            and str(number) in normalized
+        }
+        if not leaked:
+            return []
+        return [
+            "dialogue speech echoes the secret affinity number(s): "
+            + ", ".join(sorted(leaked))
+        ]
+
+    return validate
+
+
 def _validate_no_template_placeholder(parsed: Any) -> list[str]:
     search_text = ""
     if isinstance(parsed, Mapping):
@@ -209,6 +276,7 @@ _VALIDATORS: dict[str, Any] = {
     "intent_kind_whitelist": _validate_intent_kind,
     "exam_payload_shape": _validate_exam_payload,
     "item_payload_shape": _validate_item_payload,
+    "relation_payload_shape": _validate_relation_payload,
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 
@@ -299,6 +367,7 @@ def build_npc_dialogue_prompt(
     npc_context: Mapping[str, Any],
     player_context: Mapping[str, Any],
     memory: Any,
+    affinity_context: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build a deterministic (system, user) message pair for NPC dialogue.
 
@@ -307,14 +376,19 @@ def build_npc_dialogue_prompt(
     no-invention fidelity rule. The user message serializes the player's
     identity and ``disguised_stats`` (the values the NPC perceives) plus the
     bounded chat-memory window, using stable sorted JSON serialization with
-    ``ensure_ascii=False``. Identical input always produces byte-identical
-    prompts with no live entity references.
+    ``ensure_ascii=False``. An optional ``affinity_context`` block
+    (``player.affinity`` carrying the true value, cap, and stage name) is
+    injected through the same per-field bounds; ``None`` omits the block.
+    Identical input always produces byte-identical prompts with no live
+    entity references.
     """
     system = {"role": "system", "content": _system_message(npc_context)}
     player = {
         "name": _cap_string(str(player_context.get("name", ""))),
         "disguised_stats": _cap_value(player_context.get("disguised_stats", {})),
     }
+    if affinity_context is not None:
+        player["affinity"] = _cap_value(dict(affinity_context))
     payload = {
         "player": player,
         "memory": _bounded_memory(memory),
@@ -405,6 +479,7 @@ def generate_npc_reply(
     npc_context: Mapping[str, Any],
     player_context: Mapping[str, Any],
     memory: Any,
+    affinity_context: Mapping[str, Any] | None = None,
 ):
     """Run the npc_dialogue layer's guarded pipeline for one NPC reply.
 
@@ -418,6 +493,11 @@ def generate_npc_reply(
         player_context: The speaking player's plain-data identity and
             ``disguised_stats`` (what the NPC perceives).
         memory: The bounded chat-memory window lines for this conversation.
+        affinity_context: The NPC's read-only affinity context for the
+            speaking player (true value, cap, stage), injected as
+            ``player.affinity`` in the user payload; ``None`` omits the block.
+            While set, the no-leak validator rejects any reply whose speech
+            echoes the value or cap as a decimal integer substring.
 
     Returns:
         A Deferred resolving to a frozen ``NPCDialogueReply`` on success, or to
@@ -430,10 +510,27 @@ def generate_npc_reply(
         )
     _require_registered()
     try:
-        system, user = build_npc_dialogue_prompt(npc_context, player_context, memory)
+        system, user = build_npc_dialogue_prompt(
+            npc_context,
+            player_context,
+            memory,
+            affinity_context=affinity_context,
+        )
     except PromptUnavailableError:
         return None
-    descriptor = ChatRequestDescriptor(messages=(system, user), schema_id="npc_dialogue")
+    extra_validators = None
+    if affinity_context is not None:
+        context = dict(affinity_context)
+        extra_validators = {
+            "no_affinity_leak": _make_no_affinity_leak_validator(
+                context.get("value"), context.get("cap")
+            )
+        }
+    descriptor = ChatRequestDescriptor(
+        messages=(system, user),
+        schema_id="npc_dialogue",
+        semantic_validators=extra_validators,
+    )
     text = yield guarded_call("npc_dialogue", client, descriptor)
     if text is _NPC_DIALOGUE_DEGRADED:
         return None

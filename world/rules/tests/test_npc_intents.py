@@ -3,8 +3,9 @@
 Covers ``apply_npc_intent``: the ``request_guild_exam`` routing through
 ``start_guild_exam`` with ``requested_by="npc_intent"``, every failed exam gate
 discarding only the intent, the atomic give/take item transfer primitive, the
-forward-declared kind rejections, and the boundary rule that this module never
-imports the generative package.
+``adjust_relation`` routing through the sole-writer affinity API with the
+applied-amount report, the remaining forward-declared kind rejections, and the
+boundary rule that this module never imports the generative package.
 """
 
 import inspect
@@ -295,7 +296,7 @@ class ItemIntentTests(EvenniaTest):
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_forward_declared_kinds_are_rejected_with_no_state_change(self):
-        for kind in ("offer_quest", "adjust_relation", "reveal_lore"):
+        for kind in ("offer_quest", "reveal_lore"):
             with self.subTest(kind=kind):
                 outcome = apply_npc_intent(self.npc, self.player, {"kind": kind})
                 self.assertFalse(outcome.applied)
@@ -305,6 +306,104 @@ class ItemIntentTests(EvenniaTest):
     def test_non_mapping_intent_is_rejected(self):
         outcome = apply_npc_intent(self.npc, self.player, "not-a-dict")
         self.assertFalse(outcome.applied)
+
+
+class AdjustRelationIntentTests(EvenniaTest):
+    """The adjust_relation intent routes through the sole affinity writer."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="affinity room")
+        self.player = create_object(PlayerCharacter, key="affinity player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.npc = create_object(NPC, key="affinity npc", location=self.room)
+
+    def _relation_intent(self, delta):
+        return {"kind": "adjust_relation", "delta": delta}
+
+    def _record(self):
+        return self.npc.relations._load(self.player)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_full_delta_applies_through_the_writer_and_reports_the_amount(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent(5))
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.delta_used, 5)
+        record = self._record()
+        self.assertEqual(record.value, 5)
+        self.assertEqual(record.daily_gain, 5)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_partial_budget_delta_applies_what_remains_and_reports_it(self):
+        first = apply_npc_intent(self.npc, self.player, self._relation_intent(3))
+        self.assertTrue(first.applied)
+        self.assertEqual(first.delta_used, 3)
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent(4))
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.delta_used, 2)
+        record = self._record()
+        self.assertEqual(record.value, 5)
+        self.assertEqual(record.daily_gain, 5)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_zero_budget_delta_is_discarded_with_no_state_change(self):
+        first = apply_npc_intent(self.npc, self.player, self._relation_intent(5))
+        self.assertTrue(first.applied)
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent(3))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.delta_used, 0)
+        self.assertIn("budget", outcome.reason)
+        record = self._record()
+        self.assertEqual(record.value, 5)
+        self.assertEqual(record.daily_gain, 5)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_malformed_delta_payloads_are_rejected_without_state_change(self):
+        for intent in (
+            {"kind": "adjust_relation"},
+            {"kind": "adjust_relation", "delta": -1},
+            {"kind": "adjust_relation", "delta": 11},
+            {"kind": "adjust_relation", "delta": 1.5},
+            {"kind": "adjust_relation", "delta": True},
+            {"kind": "adjust_relation", "delta": "3"},
+            {"kind": "adjust_relation", "delta": 3, "extra": 1},
+        ):
+            with self.subTest(intent=intent):
+                outcome = apply_npc_intent(self.npc, self.player, intent)
+                self.assertFalse(outcome.applied)
+                self.assertEqual(outcome.delta_used, 0)
+                self.assertIsNone(self._record())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_non_npc_target_is_rejected_without_state_change(self):
+        outcome = apply_npc_intent(self.player, self.player, self._relation_intent(1))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.delta_used, 0)
+        self.assertIn("NPC", outcome.reason)
+        self.assertIsNone(self.player.relations._load(self.player))
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_zero_delta_intent_is_discarded_with_no_state_change(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent(0))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.delta_used, 0)
+        self.assertIsNone(self._record())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_zero_delta_on_a_later_world_day_creates_no_record(self):
+        from world.rules.clock import CLOCK_YAML, get_world_clock
+
+        day_seconds = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
+        clock = get_world_clock()
+        self.addCleanup(clock._persist, 0)
+        clock._persist(day_seconds)
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent(0))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.delta_used, 0)
+        self.assertIsNone(self._record())
+        self.assertFalse(self.npc.relations.has_record(self.player))
 
 
 class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):
@@ -377,6 +476,15 @@ class ApplierBoundaryTests(unittest.TestCase):
         self.assertNotIn("world.ai", source)
         self.assertNotIn("import ollama", source.lower())
         self.assertNotIn("llm_client", source.lower())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_adjust_relation_delegates_only_through_the_affinity_writer(self):
+        from world.rules import npc_intents
+
+        source = inspect.getsource(npc_intents)
+        self.assertIn(
+            "from world.rules.affinity import apply_affinity_change", source
+        )
 
 
 if __name__ == "__main__":

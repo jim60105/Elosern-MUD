@@ -102,6 +102,24 @@ class LLMNPC(NPC):
             "disguised_stats": dict(character.db.disguised_stats or {}),
         }
 
+    def _affinity_context(self, character: Any) -> dict[str, Any] | None:
+        """The NPC's own affinity context for ``character``, read-only.
+
+        Gated on ``has_record`` so a recordless player yields ``None`` (the
+        prompt block is omitted). Only read APIs are used -- this never
+        creates, persists, or mutates an affinity record, and a corrupted
+        stored record degrades through the tolerant parser instead of
+        crashing the talk.
+        """
+        handler = self.relations
+        if not handler.has_record(character):
+            return None
+        return {
+            "value": handler.affinity_for(character),
+            "cap": handler.cap_for(character),
+            "stage": handler.stage_for(character).name,
+        }
+
     def _thinking_text(self) -> str:
         """Render the thinking feedback shown to the speaker.
 
@@ -123,6 +141,11 @@ class LLMNPC(NPC):
     @defer.inlineCallbacks
     def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):
         """Handle a player addressing this NPC through the guarded dialogue seam.
+
+        The prompt carries the NPC's own affinity context for the speaker
+        (read-only; a recordless player gets no block), the guarded pipeline
+        resolves the reply, the degraded outcome maps to the authored greeting
+        or silence, and a verified intent is applied deterministically.
 
         Args:
             speech: The player's line.
@@ -171,6 +194,7 @@ class LLMNPC(NPC):
                 npc_context=self._npc_context(),
                 player_context=self._player_context(character),
                 memory=self._chat_lines(character),
+                affinity_context=self._affinity_context(character),
             )
         finally:
             if thinking_defer is not None and not thinking_defer.called:

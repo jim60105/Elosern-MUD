@@ -2,7 +2,8 @@
 
 ``guarded_call`` is one generic pipeline: resolve the layer profile, call the
 injected client, validate the returned text against the declared output schema
-and every registered semantic validator, retry up to ``1 + max_retries`` total
+and every registered semantic validator (plus any per-call validators carried
+by the request descriptor), retry up to ``1 + max_retries`` total
 calls with the validation errors appended, and degrade to the layer's
 registered fallback when the budget is exhausted or a transport failure occurs.
 Semantic validators and degrade fallbacks are registered per layer by name so
@@ -76,12 +77,19 @@ def _jsonschema_errors(instance: Any, schema: Mapping[str, Any]) -> list[str]:
     return [error.message for error in validator.iter_errors(instance)]
 
 
-def _validate_output(layer: str, text: str, output_schema: Mapping[str, Any] | None) -> list[str]:
+def _validate_output(
+    layer: str,
+    text: str,
+    output_schema: Mapping[str, Any] | None,
+    extra_validators: Mapping[str, SemanticValidator] | None = None,
+) -> list[str]:
     """Validate one returned text; raise ``LLMTransportError`` if unparseable.
 
     When an output schema is declared, the text must parse as JSON; an
     unparseable body is a transport failure per the guardrail contract and
-    degrades immediately rather than entering the retry loop.
+    degrades immediately rather than entering the retry loop. Per-call
+    semantic validators carried by the request descriptor run after the
+    layer's registered ones.
     """
     if output_schema is not None:
         try:
@@ -96,6 +104,9 @@ def _validate_output(layer: str, text: str, output_schema: Mapping[str, Any] | N
         errors = []
     for validator in _semantic_validators.get(layer, {}).values():
         errors.extend(validator(parsed))
+    if extra_validators:
+        for validator in extra_validators.values():
+            errors.extend(validator(parsed))
     return errors
 
 
@@ -129,14 +140,22 @@ def guarded_call(layer: str, client: Any, descriptor: ChatRequestDescriptor):
     messages = descriptor.messages
     for attempt in range(budget):
         attempt_descriptor = ChatRequestDescriptor(
-            messages, output_schema, descriptor.schema_id
+            messages,
+            output_schema,
+            descriptor.schema_id,
+            descriptor.semantic_validators,
         )
         try:
             text = yield client.get_response(attempt_descriptor)
         except LLMTransportError:
             return _degrade(layer)
         try:
-            errors = _validate_output(layer, text, output_schema)
+            errors = _validate_output(
+                layer,
+                text,
+                output_schema,
+                attempt_descriptor.semantic_validators,
+            )
         except LLMTransportError:
             return _degrade(layer)
         if not errors:

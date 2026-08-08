@@ -1,14 +1,17 @@
 """Layer-neutral per-call request descriptor for generative calls.
 
 Both the client and the guardrail accept this descriptor so a guarded call can
-carry the chat messages plus, optionally, an output jsonschema and a schema
-identifier. Later layers (changes 18-21) supply their own output schemas
-through this transmission contract without touching either module.
+carry the chat messages plus, optionally, an output jsonschema, a schema
+identifier, and per-call semantic validators. Later layers (changes 18-21)
+supply their own output schemas through this transmission contract without
+touching either module; the per-call validators let a layer bind a check to
+one specific call's data (e.g. the affinity no-leak check) without module
+global state.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +23,7 @@ class ChatRequestDescriptor:
     messages: tuple[dict[str, str], ...] = field(default_factory=tuple)
     output_schema: Mapping[str, Any] | None = None
     schema_id: str | None = None
+    semantic_validators: Mapping[str, Callable[[Any], list[str]]] | None = None
 
     def __post_init__(self) -> None:
         if not self.messages:
@@ -33,3 +37,7 @@ class ChatRequestDescriptor:
                 raise ValueError("every message must carry string role and content")
         if self.output_schema is not None and not isinstance(self.output_schema, Mapping):
             raise ValueError("output_schema must be a mapping when provided")
+        if self.semantic_validators is not None and not isinstance(
+            self.semantic_validators, Mapping
+        ):
+            raise ValueError("semantic_validators must be a mapping when provided")

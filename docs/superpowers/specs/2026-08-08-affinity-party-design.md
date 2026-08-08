@@ -208,7 +208,7 @@ degraded path uses the threshold.
 ### 5.1 Prompt context
 
 `build_npc_dialogue_prompt` gains an optional `affinity_context` block injected into the user
-payload: `{"affinity": 42, "affinity_cap": 99, "affinity_stage": "信賴"}`. The NPC sees the true
+payload: `{"affinity": 55, "affinity_cap": 99, "affinity_stage": "信賴"}`. The NPC sees the true
 value (it must decide deltas and invitations); the player never sees it.
 
 ### 5.2 Intent changes

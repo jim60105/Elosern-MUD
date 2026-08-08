@@ -24,8 +24,10 @@ outcomes, express only what the NPC could perceive — including reading the pla
 `disguised_stats` as the truth — choose `adjust_relation` deltas from the supplied affinity
 context within the bounded 0–10 range, and treat the numeric affinity value and cap as secrets
 never spoken aloud. A reply whose speech contains the affinity value or the cap as a decimal
-integer substring SHALL be treated as a validation failure, retried within the budget, and on
-budget exhaustion degrade to `None` rather than present the leak; stage names SHALL remain
+integer substring (fullwidth digit forms folded via NFKC normalization) SHALL be treated as a
+validation failure, retried within the budget, and on budget exhaustion degrade to `None` rather
+than present the leak; the check SHALL be bound to the individual call's own numbers through the
+request descriptor so interleaved calls never cross-contaminate, and stage names SHALL remain
 allowed in speech. Identical input SHALL produce byte-identical prompts with
 no live entity references.
 
@@ -34,8 +36,8 @@ no live entity references.
 - **THEN** the prompt carries the disguised values so the model describes the player as the NPC perceives them, not the player's true traits
 
 #### Scenario: The affinity context reaches the model as plain data
-- **WHEN** a prompt is built for an NPC holding an affinity record of value 42 with cap 99 toward the player
-- **THEN** the user payload carries `player.affinity` with `value: 42`, `cap: 99`, and the 信賴
+- **WHEN** a prompt is built for an NPC holding an affinity record of value 55 with cap 99 toward the player
+- **THEN** the user payload carries `player.affinity` with `value: 55`, `cap: 99`, and the 信賴
   stage name, and building the prompt persists no affinity state
 
 #### Scenario: A player without a record gets no affinity block
@@ -46,6 +48,16 @@ no live entity references.
 - **WHEN** a reply's speech contains the affinity value or cap as a decimal integer substring
 - **THEN** the output is rejected by the no-leak semantic validator, the error is appended, and
   the pipeline retries within the budget instead of presenting the leak
+
+#### Scenario: A fullwidth digit echo is folded and retried
+- **WHEN** a reply's speech echoes the affinity value in fullwidth digits such as ５５
+- **THEN** NFKC normalization folds the digits and the output is rejected and retried like any
+  decimal-substring leak
+
+#### Scenario: Interleaved calls keep their own leak numbers
+- **WHEN** two dialogue calls with different affinity contexts run concurrently
+- **THEN** each reply is validated only against its own call's value and cap, never the other
+  call's numbers
 
 #### Scenario: A stage name in speech is allowed
 - **WHEN** a reply's speech mentions the stage name 信賴 but no affinity number
@@ -142,6 +154,12 @@ by an intent the NPC could not perform.
 #### Scenario: A fully budget-capped delta discards only the intent
 - **WHEN** the extracted intent is `adjust_relation` with an in-range delta and no budget remains
 - **THEN** the intent is discarded with a capped outcome (`applied=False`), the speech is preserved, and no affinity state changes
+
+#### Scenario: A zero delta creates no affinity record
+- **WHEN** the extracted intent is `adjust_relation` with `delta` 0, including for a recordless
+  player on a later world day
+- **THEN** the intent is discarded (`applied=False`), the writer is not invoked, and no affinity
+  record is created or modified
 
 #### Scenario: A whitelisted but not-yet-executable intent is rejected without state change
 - **WHEN** the extracted intent is `offer_quest` or `reveal_lore` and passes extraction shape validation

@@ -16,22 +16,17 @@ through the deterministic writer, bounded by the daily budget, with the speech a
   exactly one field, `delta`, a non-negative integer bounded to 0–10; the output jsonschema and a
   per-kind semantic validator enforce the bound, so an out-of-range delta is retried, never passed
   to the engine.
-- **Apply the delta through the deterministic writer.** `world/rules/npc_intents.py` routes
-  `adjust_relation` to `apply_affinity_change(npc, player, "ai_dialogue", delta)` from
-  `affinity-system`. An applied delta changes affinity; a delta blocked by the daily budget, an
-  out-of-range payload, or a non-NPC target is discarded as an intent while the speech is kept —
-  the world is never changed by an intent the NPC could not perform. The numeric cap is never
-  rendered to the player.
 - **Inject affinity context into the dialogue prompt.** `build_npc_dialogue_prompt` gains an
   affinity context block (`player.affinity = {"value", "cap", "stage"}`) in the user payload,
   capped by the same per-field bounds as every other input; `LLMNPC.at_talked_to` reads the NPC's
   own affinity record for the speaking player through the relations handler (read-only, never
   persisting, omitted for recordless players) and passes it in. Identical input stays
   byte-identical.
-- **Keep the numbers out of player-facing speech.** A new no-leak semantic validator rejects a
-  reply whose speech echoes the affinity value or cap as a decimal integer substring, retries it
-  within the budget, and degrades to greeting/silence rather than present the leak; stage names
-  remain the sanctioned player-facing form.
+- **Keep the numbers out of player-facing speech.** A per-call no-leak semantic validator (bound
+  to the call's own numbers through the request descriptor, never module-global) rejects a reply
+  whose speech echoes the affinity value or cap as a decimal integer substring — fullwidth digit
+  forms folded via NFKC — retries it within the budget, and degrades to greeting/silence rather
+  than present the leak; stage names remain the sanctioned player-facing form.
 - **Apply the delta through the deterministic writer.** `world/rules/npc_intents.py` routes
   `adjust_relation` to `apply_affinity_change(npc, player, "ai_dialogue", delta)` from
   `affinity-system`. The applier reports the actually applied amount (`IntentOutcome.delta_used`):

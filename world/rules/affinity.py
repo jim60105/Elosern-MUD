@@ -135,6 +135,11 @@ class RelationHandler:
         record = self._load(player)
         return record.value if record is not None else 0
 
+    def cap_for(self, player: Any) -> int:
+        """The record's natural cap for ``player``, or the default when absent."""
+        record = self._load(player)
+        return record.cap if record is not None else NATURAL_CAP
+
     def stage_for(self, player: Any) -> AffinityStage:
         """The resolved stage for ``player`` (defaults for recordless players)."""
         record = self._load(player)
