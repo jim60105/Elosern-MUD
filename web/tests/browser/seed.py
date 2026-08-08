@@ -369,9 +369,9 @@ def _exploration_fixture(character) -> None:
     from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
     from evennia.utils.create import create_object
     from evennia.utils.search import search_object_by_tag
-    from typeclasses.components import ScriptedDialogue
+    from typeclasses.components import OnboardingGuide, ScriptedDialogue
     from typeclasses.monsters import Monster
-    from typeclasses.npcs import LLMNPC
+    from typeclasses.npcs import LLMNPC, NPC
     from world.maps.bootstrap import (
         SOUTH_GATE_XYZ,
         sync_grid,
@@ -397,6 +397,23 @@ def _exploration_fixture(character) -> None:
     character.first_arrival_seen = False
     character.save()
     record_arrival(character)
+
+    guard = next(
+        (
+            obj
+            for obj in south_gate.contents
+            if isinstance(obj, NPC)
+            and getattr(obj, "components", None) is not None
+            and obj.components.has(OnboardingGuide.name)
+        ),
+        None,
+    )
+    if guard is not None:
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(
+            guard, character, AffinitySource.QUEST_COMPLETION, 50
+        )
 
     bard = create_object(LLMNPC, key="吟遊詩人", location=south_gate)
     bard.components.add(

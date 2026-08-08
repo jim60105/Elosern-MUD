@@ -403,6 +403,32 @@ class ExplorationActionAdapterTests(EvenniaTest):
         msg.assert_called_once()
         self.assertIn("路人", str(msg.call_args[0][0]))
 
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_look_at_npc_shows_the_affinity_stage_line(self):
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        target = create_object(NPC, key="店長", location=self.room1)
+        target.db.desc = "一位笑容可掬的店長。"
+        apply_affinity_change(target, self.player, AffinitySource.QUEST_COMPLETION, 50)
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"target_id": int(target.pk)})
+        self.assertEqual(result["outcome"], "success")
+        appearance = str(msg.call_args[0][0])
+        self.assertIn("她看著你的眼神裡帶著信賴。", appearance)
+        self.assertNotIn("50", appearance)
+        self.assertNotIn("99", appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_look_at_recordless_monster_renders_no_stage_line(self):
+        monster = create_object(Monster, key="野狼", location=self.room1)
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"target_id": int(monster.pk)})
+        self.assertEqual(result["outcome"], "success")
+        appearance = str(msg.call_args[0][0])
+        self.assertNotIn("信賴", appearance)
+        self.assertNotIn("羈絆", appearance)
+        self.assertIsNone(monster.db.relations_data)
+
     def test_look_at_absent_target_rejects_without_onboarding_write(self):
         before = self.player.first_arrival_seen
         result = _look_adapter(self.player, {"target_id": 999999})
@@ -509,7 +535,7 @@ class ExplorationActionAdapterTests(EvenniaTest):
         )
         host.location = create_object(Room, key="別處", location=None)
         with patch(
-            "web.webclient.actions.exploration_actions.talk_response"
+            "web.webclient.actions.exploration_actions.run_scripted_talk"
         ) as talk:
             result = _talk_scripted_adapter(
                 self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
@@ -535,7 +561,7 @@ class ExplorationActionAdapterTests(EvenniaTest):
             OnboardingGuide.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
         )
         with patch(
-            "web.webclient.actions.exploration_actions.talk_response",
+            "web.webclient.actions.exploration_actions.run_scripted_talk",
             side_effect=RuntimeError("boom"),
         ):
             result = _talk_scripted_adapter(
@@ -543,7 +569,7 @@ class ExplorationActionAdapterTests(EvenniaTest):
             )
         self.assertEqual(result["code"], "dialogue_failed")
         with patch(
-            "web.webclient.actions.exploration_actions.talk_response",
+            "web.webclient.actions.exploration_actions.run_scripted_talk",
             return_value=None,
         ):
             result = _talk_scripted_adapter(

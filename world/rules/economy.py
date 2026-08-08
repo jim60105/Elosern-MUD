@@ -14,6 +14,7 @@ from typing import Any
 from django.db import transaction
 
 from typeclasses.components import Merchant
+from typeclasses.npcs import NPC
 from world.lore.items import ITEM_REGISTRY
 from world.rules.clock import CLOCK_YAML, get_world_clock
 from world.rules.guild_config import get_catalog
@@ -48,9 +49,9 @@ class TradeReason(StrEnum):
 
 
 def _require_local_merchant(actor: Any, merchant_host: Any) -> Any:
-    if merchant_host is None or not hasattr(merchant_host, "components"):
+    if merchant_host is None or not isinstance(merchant_host, NPC):
         raise TradeError(TradeReason.NO_MERCHANT)
-    if not merchant_host.components.has(Merchant.name):
+    if not hasattr(merchant_host, "components") or not merchant_host.components.has(Merchant.name):
         raise TradeError(TradeReason.NO_MERCHANT)
     if actor.location is None or merchant_host.location != actor.location:
         raise TradeError(TradeReason.REMOTE_MERCHANT)
@@ -132,6 +133,7 @@ def _snapshot_trade(actor: Any, merchant: Any) -> dict[str, Any]:
         "quest_log": attribute_snapshot(actor, "quest_log"),
         "merchant_stock": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::merchant_stock"),
         "last_restock_day": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::last_restock_day"),
+        "merchant_relations": attribute_snapshot(merchant.host, "relations_data"),
         "traits": snapshot_traits(actor),
     }
 
@@ -150,6 +152,9 @@ def _restore_trade(actor: Any, merchant: Any, snapshot: dict[str, Any]) -> None:
         merchant.host,
         f"{merchant.get_component_slot()}::last_restock_day",
         snapshot["last_restock_day"],
+    )
+    restore_attribute_best_effort(
+        merchant.host, "relations_data", snapshot["merchant_relations"]
     )
     restore_traits(actor, snapshot["traits"])
 
@@ -198,6 +203,9 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
         new_stock = dict(stock)
         new_stock[item_key] -= quantity
         merchant.merchant_stock = new_stock
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
 
     def restore():
         _restore_trade(actor, merchant, snapshot)
@@ -267,6 +275,9 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
         new_stock = dict(stock)
         new_stock[item_key] = new_stock.get(item_key, 0) + quantity
         merchant.merchant_stock = new_stock
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
 
     def restore():
         _restore_trade(actor, merchant, snapshot)

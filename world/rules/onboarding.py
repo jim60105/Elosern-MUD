@@ -7,11 +7,12 @@ which never imports this module — the dependency direction is
 ``rules -> onboarding`` only, preserving the single-writer invariant.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from evennia.utils.logger import log_warn
 
-from typeclasses.components import OnboardingGuide
+from typeclasses.components import GuildStaff, OnboardingGuide
 from typeclasses.npcs import NPC
 from world.maps.bootstrap import SOUTH_GATE_XYZ
 from world.onboarding.guide import (
@@ -23,7 +24,11 @@ from world.onboarding.guide import (
     next_beat_output,
     room_entry_decision,
 )
-from world.onboarding.guide_dialogue import GUARD_DIALOGUE_KEY
+from world.onboarding.guide_dialogue import (
+    GUARD_DIALOGUE_KEY,
+    GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
+)
 from world.onboarding.scenes import (
     GUIDANCE_BEAT_ID,
     GUILD_EXTERIOR_ROOM_KEY,
@@ -213,31 +218,86 @@ def is_guide_host(npc: Any) -> bool:
 
 
 def talk_response(npc: Any, character: Any, keyword: str) -> str | None:
-    """Return the authored response for ``keyword`` on ``npc``.
+    """Pure actor-aware resolution of one keyword on ``npc``; never writes state.
 
     ``npc`` must be a dialogue host (``OnboardingGuide`` or
-    ``ScriptedDialogue``); an NPC without one returns ``None`` so the command
+    ``ScriptedDialogue``); an NPC without one returns ``None`` so the caller
     can produce the no-response line. Unknown keywords yield the
-    no-understanding line and cause NO state change. A known keyword on an
-    ``OnboardingGuide`` host is recorded on the player's ``guide_progress``;
-    scripted dialogue hosts never write state (the ``guild_staff`` ``回報``
-    keyword resolves its read-only listing with ``character`` as the actor).
+    no-understanding line. The ``guild_staff`` ``回報`` keyword resolves its
+    read-only reportable-quest listing with ``character`` as the actor. The
+    deterministic talk writer (``run_scripted_talk``) is the only path that
+    writes guide progress or affinity.
     """
     from world.rules.dialogue import dialogue_response as resolve_response
 
-    if not is_guide_host(npc):
-        return resolve_response(npc, character, keyword)
-    component = npc.components.get(OnboardingGuide.get_component_slot())
-    dialogue_key = component.dialogue_key or GUARD_DIALOGUE_KEY
-    response = resolve_response(npc, character, keyword)
-    if not dialogue_has_keyword(dialogue_key, keyword):
-        return response
-    progress = GuideProgress.from_storage(
-        getattr(character, "guide_progress", None) or None
-    )
-    if progress is not None:
-        _write_progress(character, progress.with_keyword(keyword))
-    return response
+    return resolve_response(npc, character, keyword)
+
+
+@dataclass(frozen=True)
+class ScriptedTalkResult:
+    """One applied scripted talk: the response and whether the gain was capped."""
+
+    response: str
+    budget_capped: bool
+
+
+def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkResult | None:
+    """Apply one known-keyword scripted talk atomically and return the result.
+
+    Shared by the text ``talk`` command and the webclient
+    ``explore.talk_scripted`` path. A known keyword commits any ``guide_progress``
+    update and the +1 ``talk`` affinity gain with the host in one transaction,
+    restoring both surfaces on failure; unknown keywords and componentless
+    hosts return their line without writing anything. The ``guild_staff``
+    ``回報`` action keyword is the authored exception: it resolves its
+    read-only listing purely and never grants affinity (turn-in rewards follow
+    the guild settlement contract).
+    """
+    from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.dialogue import dialogue_key_for, dialogue_response
+    from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+
+    response = dialogue_response(npc, character, keyword)
+    if response is None:
+        return None
+    if is_guide_host(npc):
+        component = npc.components.get(OnboardingGuide.get_component_slot())
+        dialogue_key = component.dialogue_key or GUARD_DIALOGUE_KEY
+    else:
+        dialogue_key = dialogue_key_for(npc)
+    if (
+        dialogue_key == GUILD_STAFF_DIALOGUE_KEY
+        and keyword == GUILD_STAFF_TURNIN_KEYWORD
+        and getattr(npc, "components", None) is not None
+        and npc.components.has(GuildStaff.name)
+    ):
+        return ScriptedTalkResult(response=response, budget_capped=False)
+    if dialogue_key is None or not dialogue_has_keyword(dialogue_key, keyword):
+        return ScriptedTalkResult(response=response, budget_capped=False)
+
+    progress_update = None
+    if is_guide_host(npc):
+        progress = GuideProgress.from_storage(
+            getattr(character, "guide_progress", None) or None
+        )
+        if progress is not None:
+            progress_update = progress.with_keyword(keyword)
+    progress_snapshot = attribute_snapshot(character, "guide_progress")
+    relations_snapshot = attribute_snapshot(npc, "relations_data")
+    try:
+        from django.db import transaction
+
+        with transaction.atomic():
+            if progress_update is not None:
+                _write_progress(character, progress_update)
+            outcome = apply_affinity_change(
+                npc, character, AffinitySource.TALK, 1
+            )
+    except Exception:
+        restore_attribute_best_effort(character, "guide_progress", progress_snapshot)
+        restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
+        raise
+    return ScriptedTalkResult(response=response, budget_capped=outcome.budget_capped)
 
 
 def current_guide_prompt(character: Any) -> str | None:

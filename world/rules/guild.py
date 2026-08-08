@@ -15,6 +15,7 @@ from django.db import transaction
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
+from typeclasses.npcs import NPC
 from world.rules.clock import get_world_clock
 from world.rules.surfaces import attribute_snapshot
 from world.rules.traits import get_display_value
@@ -132,18 +133,20 @@ def parse_guild_registration(actor: Any) -> dict[str, Any]:
     }
 
 
-def _registration_snapshot(actor: Any) -> dict[str, Any]:
+def _registration_snapshot(actor: Any, staff: Any) -> dict[str, Any]:
     return {
         "registration": attribute_snapshot(actor, "guild_registration"),
         "rank": attribute_snapshot(actor, "guild_rank"),
+        "staff_relations": attribute_snapshot(staff, "relations_data"),
     }
 
 
-def _restore_registration(actor: Any, snapshot: dict[str, Any]) -> None:
+def _restore_registration(actor: Any, staff: Any, snapshot: dict[str, Any]) -> None:
     from world.rules.surfaces import restore_attribute_best_effort
 
     restore_attribute_best_effort(actor, "guild_registration", snapshot["registration"])
     restore_attribute_best_effort(actor, "guild_rank", snapshot["rank"])
+    restore_attribute_best_effort(staff, "relations_data", snapshot["staff_relations"])
     try:
         actor.attributes.reset_cache()
     except Exception:
@@ -185,6 +188,8 @@ def register_adventurer(
             raise GuildError(RegistrationReason.REMOTE_STAFF)
     if staff is None:
         staff = resolve_local_service_host(actor, GuildStaff)
+    if not isinstance(staff, NPC):
+        raise GuildError(RegistrationReason.NO_STAFF)
     if not hasattr(staff, "components") or not staff.components.has(GuildStaff.name):
         raise GuildError(RegistrationReason.NO_STAFF)
     if actor.location is None or staff.location != actor.location:
@@ -195,7 +200,7 @@ def register_adventurer(
     if not isinstance(branch_key, str) or not branch_key:
         raise GuildDataError("GuildStaff component has no branch_key")
 
-    snapshot = _registration_snapshot(actor)
+    snapshot = _registration_snapshot(actor, staff)
     try:
         with transaction.atomic():
             actor.db.guild_registration = {
@@ -207,8 +212,11 @@ def register_adventurer(
                 },
             }
             actor.guild_rank = "F"
+            from world.rules.affinity import AffinitySource, apply_affinity_change
+
+            apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
     except Exception:
-        _restore_registration(actor, snapshot)
+        _restore_registration(actor, staff, snapshot)
         raise
     parsed = parse_guild_registration(actor)
     if parsed is None:

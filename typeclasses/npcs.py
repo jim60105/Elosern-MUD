@@ -14,6 +14,20 @@ class NPC(LivingEntity):
     dialogue_memory: Any | None = AttributeProperty(default=None)
     schedule: Any | None = AttributeProperty(default=None)
 
+    def get_display_desc(self, looker=None, **kwargs) -> str:
+        """Append the affinity stage line to the ordinary zh-tw description.
+
+        The stage line is rendered by the shared appearance layer (the same
+        frame the text 看 command, the ``at_look`` hook, and the webclient
+        explore-look action use); entities without an affinity record for the
+        looker render no line and the read never persists.
+        """
+        desc = super().get_display_desc(looker, **kwargs)
+        from world.rules.affinity import affinity_stage_line
+
+        line = affinity_stage_line(self, looker)
+        return f"{desc}\n{line}" if line else desc
+
 
 def _swallow_cancelled(failure):
     """Trap a timer cancellation so no CancelledError leaks to the speaker."""

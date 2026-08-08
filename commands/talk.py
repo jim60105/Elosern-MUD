@@ -14,6 +14,7 @@ from world.onboarding.guide_dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
+from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.dialogue import dialogue_key_for, greeting_for, is_dialogue_host
 from world.rules.guild import (
     GuildDataError,
@@ -24,6 +25,7 @@ from world.rules.guild import (
 from world.rules.onboarding import (
     current_guide_prompt,
     is_guide_host,
+    run_scripted_talk,
     talk_response,
 )
 
@@ -91,14 +93,15 @@ class CmdsTalk(Command):
                 self._turn_in_quest(npc, quest_id)
                 return
             try:
-                response = talk_response(npc, self.caller, keyword)
+                result = run_scripted_talk(npc, self.caller, keyword)
             except (RewardClaimError, GuildDataError) as error:
                 self.caller.msg(f"無法回報任務：{error}")
                 return
-            if response is None:
+            if result is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
-            self.caller.msg(f"{npc.key}說：{response}")
+            hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
+            self.caller.msg(f"{npc.key}說：{result.response}{hint}")
             return
 
         if is_guide_host(npc):

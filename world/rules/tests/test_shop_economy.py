@@ -69,7 +69,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         tick = hour * 3600
         return WorldClock(tick)
 
-    @covers_requirement("shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically")
+    @covers_requirement("shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically", "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_successful_purchase_uses_integer_copper(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             result = buy(self.player, self.merchant_npc, "meal", 2)
@@ -78,6 +78,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         self.assertEqual(list_items(self.player), ["meal", "meal"])
         stock = parse_merchant_stock(self.merchant)
         self.assertEqual(stock["meal"], 18)
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
 
     def test_insufficient_funds_changes_nothing(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
@@ -87,6 +88,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, 100)
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(parse_merchant_stock(self.merchant)["plain_sword"], 1)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
     def test_insufficient_stock_changes_nothing(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
@@ -106,6 +108,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
             list_items(self.player),
             ["plain_sword", "plain_sword", "plain_sword"],
         )
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
     def test_successful_sale_credits_exact_copper(self):
         self.player.db.wallet = 0
@@ -116,6 +119,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, 100)
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(parse_merchant_stock(self.merchant)["healing_potion"], 5)
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
 
     @covers_requirement("shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained")
     def test_unknown_or_unsellable_item_rejected(self):
@@ -151,12 +155,29 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
             buy(self.player, self.merchant_npc, "meal", 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.REMOTE_MERCHANT)
 
+    @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
+    def test_non_npc_merchant_host_is_rejected_before_any_write(self):
+        from typeclasses.monsters import Monster
+
+        fake = create_object(Monster, key="fake merchant", location=self.store)
+        fake.components.add(
+            Merchant.create(fake, service_id="m", shop_key="altoria_general_store")
+        )
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with self.assertRaises(TradeError) as ctx:
+                buy(self.player, fake, "meal", 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.NO_MERCHANT)
+        self.assertEqual(self.player.db.wallet, 100)
+        self.assertEqual(list_items(self.player), [])
+        self.assertFalse(fake.relations.has_record(self.player))
+
     def test_fault_injection_restores_every_trade_surface(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             snapshot = (
                 self.player.db.wallet,
                 list(self.player.db.inventory or []),
                 parse_merchant_stock(self.merchant)["meal"],
+                self.merchant_npc.db.relations_data,
             )
 
             class FakeAtomic:
@@ -174,6 +195,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
                     self.player.db.wallet,
                     list(self.player.db.inventory or []),
                     parse_merchant_stock(self.merchant)["meal"],
+                    self.merchant_npc.db.relations_data,
                 ),
                 snapshot,
             )

@@ -240,6 +240,8 @@ def start_guild_exam(
         raise GuildExamError(ExamReason.ACTIVE_COMBAT)
     if parse_guild_registration(actor) is None:
         raise GuildExamError(ExamReason.UNREGISTERED)
+    if not isinstance(examiner, NPC):
+        raise GuildExamError(ExamReason.NO_EXAMINER)
     if not hasattr(examiner, "components") or not examiner.components.has(GuildExaminer.name):
         raise GuildExamError(ExamReason.NO_EXAMINER)
     if actor.location is None or examiner.location != actor.location:
@@ -284,6 +286,7 @@ def start_guild_exam(
     record_snapshot = attribute_snapshot(actor, "guild_exams")
     session_snapshot = attribute_snapshot(actor, "active_combat")
     rank_snapshot = attribute_snapshot(actor, "guild_rank")
+    examiner_relations = attribute_snapshot(examiner, "relations_data")
     try:
         from django.db import transaction
 
@@ -316,12 +319,16 @@ def start_guild_exam(
 
             battlefield = reconstruct_battlefield(actor, session)
             register_active_battlefield(battlefield)
+            from world.rules.affinity import AffinitySource, apply_affinity_change
+
+            apply_affinity_change(examiner, actor, AffinitySource.GUILD, 1)
     except Exception:
         from world.rules.surfaces import restore_attribute_best_effort
 
         restore_attribute_best_effort(actor, "guild_exams", record_snapshot)
         restore_attribute_best_effort(actor, "active_combat", session_snapshot)
         restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
+        restore_attribute_best_effort(examiner, "relations_data", examiner_relations)
         try:
             opponent.delete()
         except Exception:

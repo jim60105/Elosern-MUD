@@ -19,6 +19,7 @@ from twisted.internet.defer import Deferred
 from typeclasses.rooms import GridRoom, TerrainRoom
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.onboarding.guide_dialogue import DIALOGUE_TABLE
+from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
 from world.rules.dialogue import dialogue_key_for, is_dialogue_host
@@ -29,7 +30,7 @@ from world.rules.map_knowledge import (
     encode_room,
     encode_wild,
 )
-from world.rules.onboarding import talk_response
+from world.rules.onboarding import run_scripted_talk
 from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
@@ -348,12 +349,13 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
     if payload["keyword_id"] not in keyword_ids:
         return _rejected("unregistered_keyword", "對方不明白這個話題。")
     try:
-        response = talk_response(npc, actor, payload["keyword_id"])
+        result = run_scripted_talk(npc, actor, payload["keyword_id"])
     except Exception:
         return _rejected("dialogue_failed", "交談失敗。")
-    if response is None:
+    if result is None:
         return _rejected("no_response", "對方沒有理會你。")
-    message = f"{npc.key}說：{response}"
+    hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
+    message = f"{npc.key}說：{result.response}{hint}"
     actor.msg(message)
     return _success("talked", message, AFFECTED_FULL)
 

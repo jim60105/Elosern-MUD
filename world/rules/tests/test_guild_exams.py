@@ -125,8 +125,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
 
         write_counter_trait(self.player, "guild_merit", amount)
 
-    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
-    @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself", "guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session", "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_command_trigger_starts_an_eligible_exam(self):
         self._give_merit(50)
         record = start_guild_exam(
@@ -143,6 +142,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
         self.assertEqual(opponent.location, self.hall)
+        self.assertEqual(self.examiner.relations.affinity_for(self.player), 1)
 
     def test_npc_intent_has_no_extra_authority(self):
         # No merit -> rejected identically for both requesters.
@@ -176,6 +176,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         with self.assertRaises(GuildExamError) as ctx:
             start_guild_exam(self.player, self.examiner, "E")
         self.assertEqual(ctx.exception.args[0], ExamReason.ACTIVE_COMBAT)
+        self.assertEqual(self.examiner.relations.affinity_for(self.player), 1)
 
     def test_remote_examiner_is_rejected(self):
         other = create_object(Room, key="elsewhere")

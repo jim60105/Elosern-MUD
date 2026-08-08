@@ -11,13 +11,14 @@ from typeclasses.entities import LivingEntity
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.objects import ObjectParent
+from world.rules.affinity import RelationHandler
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
 from world.rules.sexual_state import SexualState
 
 
 class LivingEntityTests(EvenniaTest):
-    @covers_requirement("living-entity-hierarchy::livingentity-is-the-shared-base-for-characters-npcs-and-monsters", "living-entity-hierarchy::non-trait-livingentity-handlers-are-declared-seams-not-implementations")
+    @covers_requirement("living-entity-hierarchy::livingentity-is-the-shared-base-for-characters-npcs-and-monsters", "living-entity-hierarchy::livingentity-non-trait-handlers-are-working-implementations-except-persona-which-remains-a-declared-seam")
     def test_every_subclass_instantiates_and_exposes_handlers_and_remaining_seams(self):
         for typeclass in (LivingEntity, PlayerCharacter, NPC, Monster):
             with self.subTest(typeclass=typeclass.__name__):
@@ -28,8 +29,8 @@ class LivingEntityTests(EvenniaTest):
                 self.assertIsNone(entity.race)
                 self.assertIsNone(entity.subrace)
                 self.assertIsInstance(entity.sexual, SexualState)
-                for seam in ("relations", "persona"):
-                    self.assertIsNone(getattr(entity, seam))
+                self.assertIsInstance(entity.relations, RelationHandler)
+                self.assertIsNone(entity.persona)
                 self.assertIsInstance(entity.buffs, BuffHandler)
                 self.assertIsInstance(entity.equipment, EquipmentHandler)
                 self.assertIsInstance(entity.skills, SkillHandler)

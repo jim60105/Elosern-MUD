@@ -10,6 +10,9 @@ fails before replacement. Board listing filters by canonical guild rank only.
 from dataclasses import dataclass
 from typing import Any
 
+from django.db import transaction
+
+from typeclasses.npcs import NPC
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -220,14 +223,33 @@ def accept_guild_offer(
 ) -> Any:
     """Validate board eligibility, then delegate acceptance to the quest runtime.
 
-    The guild layer never constructs or mutates quest records itself.
+    The guild layer never constructs or mutates quest records itself. The
+    quest-record creation and the +1 ``guild`` affinity gain with the issuing
+    host commit in one all-or-nothing operation: the actor's quest-log surface
+    and the host's affinity record are snapshotted before the writes and
+    restored on any failure.
     """
+    from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+
     offers = list_guild_offers(actor, staff)
     if not any(offer.definition_key == definition_key for offer in offers):
         raise BoardAccessError(f"offer {definition_key!r} is not board-eligible")
+    if not isinstance(staff, NPC):
+        raise BoardAccessError("no local GuildStaff host")
     from world.quests.runtime import accept_quest
 
-    return accept_quest(actor, definition_key)
+    quest_log_snapshot = attribute_snapshot(actor, "quest_log")
+    relations_snapshot = attribute_snapshot(staff, "relations_data")
+    try:
+        with transaction.atomic():
+            record = accept_quest(actor, definition_key)
+            apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
+    except Exception:
+        restore_attribute_best_effort(actor, "quest_log", quest_log_snapshot)
+        restore_attribute_best_effort(staff, "relations_data", relations_snapshot)
+        raise
+    return record
 
 
 def abandon_guild_quest(actor: Any, staff: Any, quest_id: str) -> Any:

@@ -29,10 +29,10 @@ from world.rules.onboarding import (
     maybe_play_arrival,
     observe_room_entry,
     relocate_to_starting_location,
+    run_scripted_talk,
     set_onboarded,
     snapshot_for,
     sync_guard_npc,
-    talk_response,
 )
 
 
@@ -177,25 +177,30 @@ class OnboardingStateServiceTests(OnboardingGridMixin, EvenniaTest):
         set_onboarded(self.player)
         self.assertTrue(self.player.onboarded)
 
-    def test_talk_response_requires_component_and_updates_progress(self):
+    def test_run_scripted_talk_requires_component(self):
         npc = create_object(NPC, key="plain-npc")
-        self.player.guide_progress = GuideProgress.active().to_storage()
-        self.assertIsNone(talk_response(npc, self.player, "公會"))
+        progress = GuideProgress.active().to_storage()
+        self.player.guide_progress = progress
+        self.assertIsNone(run_scripted_talk(npc, self.player, "公會"))
+        self.assertEqual(self.player.guide_progress, progress)
 
-    def test_talk_response_known_and_unknown_keywords(self):
+    def test_run_scripted_talk_known_and_unknown_keywords(self):
         guard = create_object(NPC, key="guard")
         guard.components.add(OnboardingGuide.create(guard, dialogue_key=GUARD_DIALOGUE_KEY))
         self.player.guide_progress = GuideProgress.active().to_storage()
-        response = talk_response(guard, self.player, "公會")
-        self.assertIn("冒險者公會", response)
+        result = run_scripted_talk(guard, self.player, "公會")
+        self.assertIn("冒險者公會", result.response)
         self.assertEqual(
             snapshot_for(self.player).guide_progress.seen_keywords, ("公會",)
         )
-        unknown = talk_response(guard, self.player, "謎語")
-        self.assertIn("明白", unknown)
+        self.assertEqual(guard.relations.affinity_for(self.player), 1)
+        unknown = run_scripted_talk(guard, self.player, "謎語")
+        self.assertIn("明白", unknown.response)
         self.assertEqual(
             snapshot_for(self.player).guide_progress.seen_keywords, ("公會",)
         )
+        self.assertEqual(guard.relations.affinity_for(self.player), 1)
+        self.assertTrue(guard.relations.has_record(self.player))
 
 
 class GuardSyncTests(OnboardingGridMixin, EvenniaTest):

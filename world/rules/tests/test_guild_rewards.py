@@ -219,19 +219,26 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
         with self.assertRaises(BoardAccessError):
             list_guild_offers(other, self.staff)
 
+    @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_eligible_offer_creates_normal_quest_record(self):
         record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
         self.assertEqual(record.definition_key, "introductory_hunt")
+        # Registration granted +1; acceptance grants another +1.
+        self.assertEqual(self.staff.relations.affinity_for(self.player), 2)
 
     @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
     def test_over_rank_direct_acceptance_is_rejected_before_quest_mutation(self):
         e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier="low")),)))
         register_guild_offer(_offer(e_definition.key, copper=100))
         before = [dict(e) for e in (self.player.db.quest_log or [])]
+        before_affinity = self.staff.relations.affinity_for(self.player)
         with self.assertRaises(BoardAccessError):
             accept_guild_offer(self.player, self.staff, e_definition.key)
         self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], before)
+        self.assertEqual(
+            self.staff.relations.affinity_for(self.player), before_affinity
+        )
 
     def test_abandonment_delegates_to_quest_runtime(self):
         record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
@@ -239,6 +246,37 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
         self.assertEqual(failed.state, QuestState.FAILED)
         self.assertEqual(failed.failure_reason, "abandoned")
         self.assertEqual(len(self.player.db.quest_log), 1)
+        # Abandonment grants no further affinity; the acceptance gain stands.
+        self.assertEqual(self.staff.relations.affinity_for(self.player), 2)
+
+    def test_failed_acceptance_restores_every_surface(self):
+        quest_log_before = [dict(e) for e in (self.player.db.quest_log or [])]
+        relations_before = self.staff.db.relations_data
+
+        class FakeAtomic:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                raise RuntimeError("db failure")
+
+        with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
+            with self.assertRaises(RuntimeError):
+                accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], quest_log_before)
+        self.assertEqual(self.staff.db.relations_data, relations_before)
+
+    def test_affinity_write_failure_after_acceptance_restores_every_surface(self):
+        quest_log_before = [dict(e) for e in (self.player.db.quest_log or [])]
+        relations_before = self.staff.db.relations_data
+        with patch(
+            "world.rules.affinity.apply_affinity_change",
+            side_effect=RuntimeError("affinity write failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], quest_log_before)
+        self.assertEqual(self.staff.db.relations_data, relations_before)
 
 
 class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
