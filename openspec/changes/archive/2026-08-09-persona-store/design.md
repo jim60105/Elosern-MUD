@@ -56,13 +56,16 @@ Constraints:
 `get(field: str) -> Any | None`:
 
 - `get` returns the stored value verbatim for an existing key; `None` for a missing key, a
-  non-dict record, or a missing record — never raising.
+  non-mapping record, or a missing record — never raising. Evennia materializes stored persona
+  dicts as dbserialize mapping wrappers, so any `Mapping` counts as a record.
 - `flatten` emits one labeled section per present field in declared field order (性格：… /
   人生經歷：… / 習慣：…). Only non-empty `str` fields produce a section; `None`, numeric, or
   container values are treated as absent — never raising.
 - Per-field string cap and a combined block cap, following the project's `_cap_string` idiom for
-  LLM-bound text.
-- Missing record, non-dict record, or no section-producing fields → `None` (no block), never an
+  LLM-bound text. The constructor validates both caps as positive integers and raises `ValueError`
+  on invalid configuration (a programming error); the record-data truncation path itself never
+  raises.
+- Missing record, non-mapping record, or no section-producing fields → `None` (no block), never an
   exception.
 - Field order and caps are call-site-configurable so the dialogue-injection change can adjust them
   without touching this module's behavior.
