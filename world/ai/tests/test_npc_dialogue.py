@@ -402,6 +402,97 @@ class OfferQuestValidatorUnitTests(unittest.TestCase):
         self.assertEqual(npc_dialogue.MAX_INTENT_KEY_LENGTH, 64)
 
 
+class RevealLoreValidatorUnitTests(unittest.TestCase):
+    """Direct shape tests for the reveal_lore semantic validator."""
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_valid_reveal_lore_payload_passes(self):
+        self.assertEqual(
+            npc_dialogue._validate_reveal_lore_payload(
+                {
+                    "speech": "s",
+                    "intent": {"kind": "reveal_lore", "category": "race", "key": "elf"},
+                }
+            ),
+            [],
+        )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_reveal_lore_field_boundary_is_exactly_64_code_points(self):
+        bound = "k" * npc_dialogue.MAX_INTENT_KEY_LENGTH
+        over = "k" * (npc_dialogue.MAX_INTENT_KEY_LENGTH + 1)
+        self.assertEqual(
+            npc_dialogue._validate_reveal_lore_payload(
+                {
+                    "speech": "s",
+                    "intent": {"kind": "reveal_lore", "category": "race", "key": bound},
+                }
+            ),
+            [],
+        )
+        self.assertTrue(
+            npc_dialogue._validate_reveal_lore_payload(
+                {
+                    "speech": "s",
+                    "intent": {"kind": "reveal_lore", "category": "race", "key": over},
+                }
+            )
+        )
+        self.assertTrue(
+            npc_dialogue._validate_reveal_lore_payload(
+                {
+                    "speech": "s",
+                    "intent": {
+                        "kind": "reveal_lore",
+                        "category": "c" * (npc_dialogue.MAX_INTENT_KEY_LENGTH + 1),
+                        "key": "elf",
+                    },
+                }
+            )
+        )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_malformed_reveal_lore_payloads_are_rejected(self):
+        for bad in (
+            {"kind": "reveal_lore"},
+            {"kind": "reveal_lore", "category": "race"},
+            {"kind": "reveal_lore", "category": "", "key": "elf"},
+            {"kind": "reveal_lore", "category": "   ", "key": "elf"},
+            {"kind": "reveal_lore", "category": "race", "key": ""},
+            {"kind": "reveal_lore", "category": "race", "key": 3},
+            {"kind": "reveal_lore", "category": True, "key": "elf"},
+            {"kind": "reveal_lore", "category": "race", "key": "elf", "extra": 1},
+        ):
+            with self.subTest(intent=bad):
+                self.assertTrue(
+                    npc_dialogue._validate_reveal_lore_payload(
+                        {"speech": "s", "intent": bad}
+                    )
+                )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_reveal_lore_validator_ignores_other_intent_kinds(self):
+        for intent in (
+            {"kind": "none"},
+            {"kind": "request_guild_exam", "target_rank": "E"},
+            {"kind": "adjust_relation", "delta": 3},
+            {"kind": "party_invite", "accept": True},
+            {"kind": "offer_quest", "quest_key": "forest_clearing"},
+        ):
+            with self.subTest(intent=intent):
+                self.assertEqual(
+                    npc_dialogue._validate_reveal_lore_payload(
+                        {"speech": "s", "intent": intent}
+                    ),
+                    [],
+                )
+
+    @covers_requirement("npc-dialogue::intent-extraction-is-whitelisted-and-shape-validated-per-kind")
+    def test_whitelist_and_schema_carry_reveal_lore(self):
+        self.assertIn("reveal_lore", npc_dialogue.NPC_INTENT_KINDS)
+        self.assertEqual(npc_dialogue.MAX_INTENT_KEY_LENGTH, 64)
+
+
 class ReplyEntryPointTests(unittest.TestCase):
     def setUp(self):
         _reset_all()

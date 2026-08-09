@@ -265,6 +265,27 @@ def _validate_offer_quest_payload(parsed: Any) -> list[str]:
     return []
 
 
+def _validate_reveal_lore_payload(parsed: Any) -> list[str]:
+    intent = parsed.get("intent") if isinstance(parsed, Mapping) else None
+    if not isinstance(intent, Mapping) or intent.get("kind") != "reveal_lore":
+        return []
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"category", "key"}:
+        return [
+            "reveal_lore must carry exactly two payload fields, category and key"
+        ]
+    for field in ("category", "key"):
+        value = payload[field]
+        if not isinstance(value, str) or not value.strip():
+            return [f"reveal_lore {field} must be a non-empty string"]
+        if len(value) > MAX_INTENT_KEY_LENGTH:
+            return [
+                f"reveal_lore {field} must be at most "
+                f"{MAX_INTENT_KEY_LENGTH} code points"
+            ]
+    return []
+
+
 def _make_no_leak_validator(
     secrets: frozenset[str], *, secret_label: str = "secret number(s)"
 ) -> Callable[[Any], list[str]]:
@@ -338,6 +359,7 @@ _VALIDATORS: dict[str, Any] = {
     "relation_payload_shape": _validate_relation_payload,
     "party_payload_shape": _validate_party_payload,
     "offer_quest_payload_shape": _validate_offer_quest_payload,
+    "reveal_lore_payload_shape": _validate_reveal_lore_payload,
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 

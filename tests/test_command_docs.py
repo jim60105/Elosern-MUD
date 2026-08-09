@@ -68,6 +68,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（需有可邀請的 NPC）",
     },
     "leave": {"syntax": "leave <npc>", "context": "一般（需有同伴）"},
+    "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
     "rest": {"syntax": "rest <數字><s|m|h|d>", "context": "一般"},
     "sleep": {"syntax": "sleep", "context": "一般"},
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},

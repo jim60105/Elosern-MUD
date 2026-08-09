@@ -5,9 +5,9 @@ Covers ``apply_npc_intent``: the ``request_guild_exam`` routing through
 discarding only the intent, the atomic give/take item transfer primitive, the
 ``adjust_relation`` routing through the sole-writer affinity API with the
 applied-amount report, the ``offer_quest`` routing through the guild-offer
-surface with its atomic acceptance and rejection paths, the remaining
-forward-declared kind rejection, and the boundary rule that this module never
-imports the generative package.
+surface with its atomic acceptance and rejection paths, the ``reveal_lore``
+routing through the lore codex sole writer, and the boundary rule that this
+module never imports the generative package.
 """
 
 import inspect
@@ -303,10 +303,14 @@ class ItemIntentTests(EvenniaTest):
         return list(entity.db.inventory or [])
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
-    def test_forward_declared_kinds_are_rejected_with_no_state_change(self):
+    def test_no_forward_declared_kinds_remain(self):
+        from world.rules import npc_intents
+
+        self.assertEqual(npc_intents._FORWARD_DECLARED_KINDS, ())
         outcome = apply_npc_intent(self.npc, self.player, {"kind": "reveal_lore"})
         self.assertFalse(outcome.applied)
-        self.assertIn("no deterministic capability surface yet", outcome.reason)
+        self.assertIn("must carry exactly category and key", outcome.reason)
+        self.assertIsNone(self.player.db.lore_discovered)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_non_mapping_intent_is_rejected(self):
@@ -705,6 +709,98 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTest):
                 self.assertIsNotNone(outcome.reason)
                 self.assertEqual(self._records(), [])
                 self.assertEqual(self._affinity().value, 1)
+
+
+class RevealLoreIntentTests(EvenniaTest):
+    """The reveal_lore intent records discoveries through the codex writer."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="lore intent room")
+        self.player = create_object(PlayerCharacter, key="lore intent player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.npc = create_object(NPC, key="lore intent npc", location=self.room)
+
+    def _reveal_intent(self, category="race", key="elf"):
+        return {"kind": "reveal_lore", "category": category, "key": key}
+
+    def _discovered(self):
+        return set(self.player.db.lore_discovered or ())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_verified_reveal_records_the_discovery(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._reveal_intent())
+        self.assertTrue(outcome.applied)
+        self.assertEqual(self._discovered(), {"race:elf"})
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_reveal_grants_no_affinity(self):
+        apply_npc_intent(self.npc, self.player, self._reveal_intent())
+        self.assertIsNone(self.npc.relations._load(self.player))
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_repeat_reveal_is_an_applied_no_op(self):
+        first = apply_npc_intent(self.npc, self.player, self._reveal_intent())
+        second = apply_npc_intent(self.npc, self.player, self._reveal_intent())
+        self.assertTrue(first.applied)
+        self.assertTrue(second.applied)
+        self.assertEqual(self._discovered(), {"race:elf"})
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_unknown_category_discards_only_the_intent(self):
+        outcome = apply_npc_intent(self.npc, self.player, self._reveal_intent("bogus"))
+        self.assertFalse(outcome.applied)
+        self.assertIn("unknown lore category", outcome.reason)
+        self.assertEqual(self._discovered(), set())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_unresolvable_key_discards_only_the_intent(self):
+        outcome = apply_npc_intent(
+            self.npc, self.player, self._reveal_intent("race", "bogus")
+        )
+        self.assertFalse(outcome.applied)
+        self.assertIn("no lore entry", outcome.reason)
+        self.assertEqual(self._discovered(), set())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_malformed_reveal_payloads_are_rejected_without_state_change(self):
+        for intent in (
+            {"kind": "reveal_lore"},
+            {"kind": "reveal_lore", "category": "race"},
+            {"kind": "reveal_lore", "category": "", "key": "elf"},
+            {"kind": "reveal_lore", "category": "race", "key": 3},
+            {"kind": "reveal_lore", "category": "race", "key": "elf", "extra": 1},
+            {"kind": "reveal_lore", "category": "c" * 65, "key": "elf"},
+            {"kind": "reveal_lore", "category": "race", "key": "k" * 65},
+        ):
+            with self.subTest(intent=intent):
+                outcome = apply_npc_intent(self.npc, self.player, intent)
+                self.assertFalse(outcome.applied)
+                self.assertIsNotNone(outcome.reason)
+                self.assertEqual(self._discovered(), set())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_64_code_point_boundary_passes_the_applier_shape_check(self):
+        bound = "k" * 64
+        outcome = apply_npc_intent(
+            self.npc, self.player, self._reveal_intent("race", bound)
+        )
+        self.assertFalse(outcome.applied)
+        self.assertIn("no lore entry", outcome.reason)
+        self.assertEqual(self._discovered(), set())
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_persistence_failure_discards_only_the_intent(self):
+        def flaky_writer(*args, **kwargs):
+            raise RuntimeError("attribute write failure")
+
+        with patch("world.rules.lore_knowledge.record_lore_reveal", side_effect=flaky_writer):
+            outcome = apply_npc_intent(self.npc, self.player, self._reveal_intent())
+        self.assertFalse(outcome.applied)
+        self.assertIn("failed and was discarded", outcome.reason)
+        self.assertIsNone(self.player.db.lore_discovered)
 
 
 class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):

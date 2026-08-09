@@ -5,9 +5,8 @@ verifies an extracted ``intent`` against the world before applying it and
 discards illegal or unverifiable intents while the speech is kept. It performs
 verification and application only through existing deterministic APIs -- the
 guild-exam trigger, the inventory-planning boundary, the sole-writer affinity
-API, the party-membership module, and the guild-offer surface.
-``reveal_lore`` is whitelisted by the schema but rejected here behind a
-forward-declared seam until its deterministic capability surface exists.
+API, the party-membership module, the guild-offer surface, and the lore codex
+sole writer.
 
 Single-writer invariant: this module is part of the deterministic core and the
 sole writer of any state this change causes; the generative reply layer never
@@ -29,7 +28,9 @@ from world.rules.surfaces import (
     snapshot_traits,
 )
 
-_FORWARD_DECLARED_KINDS = ("reveal_lore",)
+# No intent kind is forward-declared anymore: every whitelisted kind has a
+# deterministic capability surface.
+_FORWARD_DECLARED_KINDS: tuple[str, ...] = ()
 
 _INVENTORY_SURFACE_KEYS = ("inventory", "quest_log")
 
@@ -75,6 +76,8 @@ def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
         return _apply_party_invite(npc, player, intent)
     if kind == "offer_quest":
         return _apply_offer_quest(npc, player, intent)
+    if kind == "reveal_lore":
+        return _apply_reveal_lore(npc, player, intent)
     if kind in ("give_item", "take_item"):
         return _apply_item_transfer(kind, npc, player, intent)
     if kind in _FORWARD_DECLARED_KINDS:
@@ -227,6 +230,51 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     if affinity_capped:
         return IntentOutcome(True, "quest assigned; affinity credit capped")
     return IntentOutcome(True, "quest assigned")
+
+
+def _apply_reveal_lore(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
+    """Record one discovered lore entry through the codex sole writer.
+
+    Payload is exactly ``{"category": str, "key": str}`` (bounded). The
+    category must be in the codex's closed mapping and the key must resolve
+    in that category's registry; the reveal then records the namespaced
+    entry through ``record_lore_reveal`` and grants no affinity -- the speech
+    is the reward. A repeat reveal is an applied no-op. Any payload,
+    verification, or record failure discards only the intent.
+    """
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"category", "key"}:
+        return IntentOutcome(False, "reveal_lore must carry exactly category and key")
+    category = payload["category"]
+    key = payload["key"]
+    if not isinstance(category, str) or not category.strip():
+        return IntentOutcome(False, "reveal_lore category must be a non-empty string")
+    if not isinstance(key, str) or not key.strip():
+        return IntentOutcome(False, "reveal_lore key must be a non-empty string")
+    if len(category) > _MAX_INTENT_KEY_LENGTH or len(key) > _MAX_INTENT_KEY_LENGTH:
+        return IntentOutcome(
+            False,
+            f"reveal_lore category and key must be at most "
+            f"{_MAX_INTENT_KEY_LENGTH} code points",
+        )
+
+    from world.rules.lore_knowledge import (
+        LoreCategoryError,
+        LoreKeyError,
+        LoreRecordError,
+        record_lore_reveal,
+    )
+
+    try:
+        record_lore_reveal(player, category, key)
+    except (LoreCategoryError, LoreKeyError, LoreRecordError) as error:
+        return IntentOutcome(False, _reason_text(error))
+    except Exception:
+        # Defensive: a genuine persistence failure must never bubble out of
+        # the dialogue path -- it discards only the intent, keeps the speech,
+        # and reports a safe diagnostic.
+        return IntentOutcome(False, "lore reveal failed and was discarded")
+    return IntentOutcome(True, "lore entry revealed")
 
 
 def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
