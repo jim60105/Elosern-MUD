@@ -69,6 +69,20 @@ Per-NPC storage (`npc.db.schedule`, JSON-safe, schema-versioned):
 - template reference: `{"schema_version": 1, "template": "guard", "overrides": {...}}`
 - full custom list: `{"schema_version": 1, "entries": [...]}` (special NPCs)
 
+> **Amended 2026-08-09 (rubber-duck review).** Four clarifications:
+> 1. Templates gain an optional `default_state` field (vocabulary-validated, default `None`);
+>    a successful `move` settlement sets `schedule_state` to the template's `default_state` —
+>    move entries themselves never carry a `state` field.
+> 2. Schedules are assigned through one validated API,
+>    `set_npc_schedule(npc, schedule)` (the sole writer of `npc.db.schedule`), which validates,
+>    records an `effective_from_tick` (the assignment world tick), and maintains a persistent
+>    `schedule` tag on the NPC. Settlement queries by that tag, so post-startup spawned or
+>    reassigned NPCs are always found.
+> 3. Only occurrences with `due_tick >= effective_from_tick` settle — assigning a schedule
+>    mid-day never replays entries whose due moment already passed.
+> 4. `ScheduledEvent`s carry JSON-safe payloads (stable NPC identity; `state` or `from`/`to`
+>    target) and `due_tick = day_start + tick_offset`, never the settlement end tick.
+
 Runtime state: `npc.db.schedule_state` (current state value or `None`), written exclusively by
 `world/rules/npc_schedules.py`.
 
@@ -86,12 +100,17 @@ def interaction_reason(npc, interaction_kind) -> str | None:
 
 - Registered through `register_event_source("npc_schedules", settle_npc_schedules)` so the stage
   order in `_STAGE_ORDER` becomes fully real.
-- Scans NPCs carrying schedule data (startup-synchronized index or on-demand tag query) and, for
-  each entry with `start_tick < day_start(entry_day) + tick_offset <= end_tick`, settles it:
+- Scans NPCs carrying the persistent `schedule` tag (maintained by the validated assignment API and
+  startup sync) and, for each entry with `start_tick < day_start(entry_day) + tick_offset <= end_tick`
+  and `due_tick >= effective_from_tick`, settles it:
   - `move`: resolve destination → find the real Exit from the NPC's current room that leads to it
-    → traverse (locks and vetoes apply) → on success update `schedule_state` (e.g. back to the
-    template's duty state) and emit `npc_arrived`; on failure skip with a diagnostic.
+    → traverse (locks and vetoes apply) → on success set `schedule_state` to the template's
+    `default_state` and emit `npc_arrived`; on failure skip with a bounded diagnostic only (no
+    failure event).
   - `state`: update `schedule_state` and emit `npc_state_changed`.
+- Due occurrences settle in `(due_tick, npc_stable_id, entry_index)` order, so one multi-day
+  `advance()` produces the same locations as repeated day-by-day advances; duplicate `tick_offset`s
+  within one NPC use stable entry-index tie-break.
 - Multi-day skips use boundary arithmetic (per-entry day math), never per-second iteration,
   mirroring caravan/shop settlement.
 
@@ -101,6 +120,16 @@ def interaction_reason(npc, interaction_kind) -> str | None:
 before proceeding. A non-`None` result returns the existing stable-rejection path with the authored
 Traditional Chinese line (e.g. 她現在正忙著整理貨架，沒有理會你。). A `None` result means the
 interaction proceeds exactly as today.
+
+> **Amended 2026-08-09 (rubber-duck review).** The gate is consulted at **every** surface that
+> resolves a local NPC host and performs a service transaction — the Telnet commands *and* the
+> WebClient service action adapters (`shop.buy` / `shop.sell` / guild operations) — so a busy
+> merchant cannot be traded through the browser while blocked by the command path. The
+> interaction kinds are enumerated (`talk`, `engage`, `service_shop`, `service_guild`) with their
+> exact consult points. `engage` is declared as a gate kind but is currently unreachable: the
+> engagement surface rejects non-hostile targets (`SessionReason.NOT_HOSTILE`) before any
+> schedule check, and the schedule model is NPC-only; the kind is carried so a future
+> NPC-combat change inherits the gate.
 
 ---
 
