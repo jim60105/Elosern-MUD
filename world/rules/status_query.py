@@ -16,6 +16,21 @@ from world.rules.combat_modifiers import matched_combat_modifiers
 from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
 from world.rules.status_display import display_for
 
+# Stable Traditional Chinese labels for the canonical trait keys, shared by
+# every presentation surface: the WebClient character panel and the
+# displayed-stats block appended on ``look <target>`` (displayed-stats-view
+# A2). Consumers must read this map instead of duplicating the labels.
+TRAIT_LABELS = {
+    "hp": "生命",
+    "mp": "魔力",
+    "sp": "耐力",
+    "atk_phys": "攻擊",
+    "agility": "敏捷",
+    "defense": "防禦",
+    "magic_level": "魔法階級",
+    "guild_merit": "功績",
+}
+
 _GAUGE_KEYS = ("hp", "mp", "sp")
 _STATIC_KEYS = ("atk_phys", "agility", "defense")
 _COUNTER_KEYS = ("magic_level", "guild_merit")

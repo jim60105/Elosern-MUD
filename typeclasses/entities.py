@@ -88,3 +88,18 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         from world.rules.traits import initial_trait_config
 
         self._apply_trait_config(initial_trait_config(self.race, self.subrace, tier))
+
+    def get_display_desc(self, looker=None, **kwargs) -> str:
+        """Append the displayed-stats block to the ordinary zh-tw description.
+
+        The block is rendered by the shared appearance layer (the same frame
+        the text 看 command, the ``at_look`` hook, and the webclient
+        explore-look action use); an entity without a single valid displayed
+        row renders no block, and the onboarding look beat is untouched (the
+        block is part of the appearance, not of beat detection).
+        """
+        desc = super().get_display_desc(looker, **kwargs)
+        from world.rules.displayed_stats import display_stat_block
+
+        block = display_stat_block(self)
+        return f"{desc}\n{block}" if block else desc

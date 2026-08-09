@@ -1,5 +1,6 @@
 """Deterministic entity-trait construction from design section 5.2."""
 
+from collections.abc import Mapping
 from typing import Any
 
 from evennia.contrib.rpg.traits import GaugeTrait
@@ -193,10 +194,14 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     """Read a possibly disguised base stat for exactly three display consumers.
 
     The only permitted callers are appearance rendering (``look``), guild
-    registration records, and appraisal items. Combat, resolution, and damage
-    must read true traits directly and must never call this function.
+    registration records, and appraisal items. Appearance rendering is
+    implemented through the ``look <target>`` displayed-stats block
+    (``world.rules.displayed_stats.display_stat_block``); appraisal items
+    remain a forward-declared seam. A non-mapping ``disguised_stats`` record
+    reads as "no disguise" and falls back to the true trait value. Combat,
+    resolution, and damage must read true traits directly and must never call this function.
     """
-    disguised = entity.db.disguised_stats or {}
-    if trait_key in disguised:
+    disguised = entity.db.disguised_stats
+    if isinstance(disguised, Mapping) and trait_key in disguised:
         return disguised[trait_key]
     return getattr(entity.traits, trait_key).value

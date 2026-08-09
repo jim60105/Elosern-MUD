@@ -30,6 +30,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.rules.status_query import (
     CharacterReadModel,
     StatusQueryError,
+    TRAIT_LABELS,
     build_character_read_model,
 )
 from world.skills.registry import SKILL_REGISTRY
@@ -45,18 +46,6 @@ MAX_KEY_CODE_POINTS = 64
 MAX_LABEL_CODE_POINTS = 128
 MAX_DESCRIPTION_CODE_POINTS = 256
 MAX_SLOT_CODE_POINTS = 32
-
-# Stable Traditional Chinese labels for the canonical trait keys.
-TRAIT_LABELS = {
-    "hp": "生命",
-    "mp": "魔力",
-    "sp": "耐力",
-    "atk_phys": "攻擊",
-    "agility": "敏捷",
-    "defense": "防禦",
-    "magic_level": "魔法階級",
-    "guild_merit": "功績",
-}
 
 _DISGUISE_DESCRIPTION = (
     "目前以偽裝的外貌示人，以下是他人所見的數值。真實數值不因此改變。"

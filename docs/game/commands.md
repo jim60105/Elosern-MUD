@@ -11,7 +11,7 @@
 | [`進入`](/game/command-reference?id=進入) | 進入任務場景。 |
 | [`前往`](/game/command-reference?id=前往) | 沿最短路徑自動移動。 |
 | [`地圖`](/game/command-reference?id=地圖) | 檢視地圖。 |
-| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象。 |
+| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象；查看對象時顯示對方當前所見的戰鬥數值。 |
 | [`回家`](/game/command-reference?id=回家) | 返回重生點。 |
 
 ## 說明與幫助
