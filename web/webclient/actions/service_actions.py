@@ -39,6 +39,7 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
+from world.rules.npc_schedules import interaction_reason
 from world.rules.service_messages import rejection_code, rejection_message
 
 # Wire limits (equal to or below the protocol identifier bound).
@@ -172,6 +173,19 @@ def _rejected(reason: Any) -> dict[str, Any]:
     return {"outcome": "rejected", "code": code, "message": rejection_message(reason)}
 
 
+def _schedule_rejected(host: Any, interaction_kind: str) -> dict[str, Any] | None:
+    """Return the stable schedule-gate rejection for ``host``, or ``None``.
+
+    Mirrors the Telnet surfaces: a schedule-blocked host (a busy or resting
+    NPC) refuses the service with the gate's stable Traditional Chinese line
+    under the stable ``schedule_blocked`` code, and no transaction occurs.
+    """
+    reason = interaction_reason(host, interaction_kind)
+    if reason is None:
+        return None
+    return {"outcome": "rejected", "code": "schedule_blocked", "message": reason}
+
+
 def _success(code: str, message: str, affected: tuple[str, ...]) -> dict[str, Any]:
     return {
         "outcome": "success",
@@ -204,6 +218,9 @@ def _guild_register_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, An
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(staff, "service_guild")
+    if blocked is not None:
+        return blocked
     try:
         record = register_adventurer(actor, staff)
     except (GuildDataError, GuildError) as error:
@@ -219,6 +236,9 @@ def _quest_accept_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(staff, "service_guild")
+    if blocked is not None:
+        return blocked
     try:
         record = accept_guild_offer(actor, staff, definition_key)
     except (
@@ -240,6 +260,9 @@ def _quest_abandon_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(staff, "service_guild")
+    if blocked is not None:
+        return blocked
     try:
         record = abandon_guild_quest(actor, staff, quest_id)
     except (QuestNotFound, QuestDataError) as error:
@@ -255,6 +278,9 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(staff, "service_guild")
+    if blocked is not None:
+        return blocked
     try:
         result = turn_in_quest(actor, staff, quest_id)
     except (RewardClaimError, GuildDataError, QuestDataError) as error:
@@ -277,6 +303,9 @@ def _exam_start_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     )
     if examiner is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(examiner, "service_guild")
+    if blocked is not None:
+        return blocked
     if parse_guild_registration(actor) is None:
         return _rejected("unregistered")
     expected = _exact_next_rank(getattr(actor, "guild_rank", None))
@@ -300,6 +329,9 @@ def _buy_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     )
     if merchant_host is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(merchant_host, "service_shop")
+    if blocked is not None:
+        return blocked
     try:
         result = buy(actor, merchant_host, item_key, quantity)
     except TradeError as error:
@@ -321,6 +353,9 @@ def _sell_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     )
     if merchant_host is None:
         return _rejected(reason)
+    blocked = _schedule_rejected(merchant_host, "service_shop")
+    if blocked is not None:
+        return blocked
     try:
         result = sell(actor, merchant_host, item_key, quantity)
     except TradeError as error:

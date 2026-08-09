@@ -47,11 +47,14 @@ deterministic and offline-playable: no LLM and no image-generation service parti
 
 ```yaml
 schema_version: 1
+states: [duty, resting, busy]
 templates:
   guard:
-    - { tick_offset: 21600, kind: move,  target: "north_gate" }
-    - { tick_offset: 50400, kind: state, state: "resting" }
-    - { tick_offset: 64800, kind: move,  target: "barracks" }
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: move,  target: "north_gate" }
+      - { tick_offset: 50400, kind: state, state: "resting" }
+      - { tick_offset: 64800, kind: move,  target: "barracks" }
 ```
 
 Entry fields:
@@ -114,6 +117,19 @@ def interaction_reason(npc, interaction_kind) -> str | None:
 - Multi-day skips use boundary arithmetic (per-entry day math), never per-second iteration,
   mirroring caravan/shop settlement.
 
+> **Amended 2026-08-09 (npc-schedule-runtime rubber-duck review).** Four settlement-mechanics
+> clarifications, all recorded in the runtime change's design D6:
+> 1. The stable NPC identity is the persistent primary key (`npc_id`), used for ordering and
+>    event payloads; the display key is a secondary payload field (keys are not unique).
+> 2. An occurrence due exactly at a window's start settles only when the schedule was assigned at
+>    that same tick (`effective_from_tick == start_tick`); otherwise the preceding window already
+>    settled it, so the `>=` gate and the `(start_tick, end_tick]` window are consistent.
+> 3. Only exits with the stock `DefaultExit.at_traverse` are schedule routes; the wilderness
+>    exits' overridden `at_traverse` ignores the requested destination, so a redirecting exit is
+>    skipped, never traversed.
+> 4. Per-NPC parse and occurrence construction are exception-isolated exactly like occurrence
+>    settlement, so one damaged NPC can never raise out of the clock source.
+
 ### 3.3 Interaction gating
 
 `talk` (scripted and free-form), `engage`, and NPC-hosted services query `interaction_reason()`
@@ -130,6 +146,17 @@ interaction proceeds exactly as today.
 > engagement surface rejects non-hostile targets (`SessionReason.NOT_HOSTILE`) before any
 > schedule check, and the schedule model is NPC-only; the kind is carried so a future
 > NPC-combat change inherits the gate.
+
+> **Amended 2026-08-09 (npc-schedule-runtime review).** Two consult-point clarifications, both
+> recorded in the runtime change's design D4:
+> 1. The `talk` gate covers the WebClient `explore.talk_scripted` action as well as the text
+>    `talk` command — both surfaces share the deterministic `run_scripted_talk` writer and both
+>    grant the +1 affinity, so gating only the text command would leave a browser bypass.
+> 2. The free-form consult point is `LLMNPC.at_talked_to` (the free-form talk seam). Its direct
+>    `run_npc_exchange` callers are the party-invite surface (`explore.party_invite` / the
+>    `invite` command); party invite is a distinct interaction kind that is not enumerated in the
+>    runtime change, so it needs no gate there and a busy NPC can still be invited — the invite
+>    adapters render a structured `DialogueExchangeResult`, which has no blocked representation.
 
 ---
 

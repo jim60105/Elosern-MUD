@@ -50,7 +50,8 @@ states at fixed world times, and schedule states gate NPC-directed interactions.
 - `world/rules/npc_schedules.py`: settlement, movement, state, event emission, `interaction_reason()`
 - `world/rules/clock.py`: `npc_schedules` source registration (mechanism unchanged)
 - `typeclasses/exits.py`: no change — the shared traversal path is reused as-is
-- Talk entry points (`commands/talk.py`, `typeclasses/npcs.py`), NPC-hosted service commands
+- Talk entry points (`commands/talk.py`, `typeclasses/npcs.py`,
+  `web/webclient/actions/exploration_actions.py`), NPC-hosted service commands
   (`commands/economy.py`, `commands/guild.py`), and the WebClient service action adapters
   (`web/webclient/actions/service_actions.py`): schedule-gate consultation
 - `world/rules/rulebook/npc_schedules.yaml` (from `npc-schedule-model`): consumed, not changed

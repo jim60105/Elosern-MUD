@@ -12,11 +12,12 @@ change.
 
 ## What Changes
 
-- **New rulebook data**: `world/rules/rulebook/npc_schedules.yaml` with `schema_version: 1` and a
-  `templates:` mapping of role templates (`guard`, `storekeeper`, `resident`, ...). Each template is
-  an ordered list of entries: `{tick_offset, kind: move|state, target?, state?}` where
-  `tick_offset` is seconds since world-day start and entries repeat daily; templates may declare an
-  optional `default_state` (vocabulary-validated) that a successful move settlement writes.
+- **New rulebook data**: `world/rules/rulebook/npc_schedules.yaml` with `schema_version: 1`, a
+  declared bounded state vocabulary, and a `templates:` mapping of role templates (`guard`,
+  `storekeeper`, `resident`, ...). Each template maps to `{default_state?, entries: [...]}`:
+  `entries` is an ordered list of `{tick_offset, kind: move|state, target?, state?}` where
+  `tick_offset` is seconds since world-day start and entries repeat daily; `default_state` is
+  optional (vocabulary-validated) and a successful move settlement writes it.
 - **Per-NPC storage**: `npc.db.schedule` accepts exactly two validated shapes — a template reference
   (`{"schema_version": 1, "template": <key>, "overrides": {...}}`) or a full custom list
   (`{"schema_version": 1, "entries": [...]}`). Special NPCs (event or major characters) use the

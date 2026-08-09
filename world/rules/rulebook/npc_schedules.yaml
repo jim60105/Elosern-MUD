@@ -1,0 +1,36 @@
+# NPC schedule role templates (npc-schedule-model D1-D3).
+#
+# Entries repeat every world day. tick_offset is seconds since the world-day
+# start, resolved through the existing clock day math, in [0, day_seconds).
+# A move entry carries a stable target key (resolved by the runtime through
+# the lore registries); a state entry carries a bounded state value from the
+# top-level `states` vocabulary. A template MAY declare a default_state (also
+# vocabulary-validated) that a successful move settlement writes; a move entry
+# itself never carries a state field. The validator in
+# world/rules/npc_schedules.py is the authoritative reader of this file.
+schema_version: 1
+
+# Bounded schedule-state vocabulary shared by `state` entry values and
+# template `default_state` values.
+states:
+  - duty
+  - resting
+  - busy
+
+templates:
+  guard:
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: move, target: "north_gate" }
+      - { tick_offset: 50400, kind: state, state: "resting" }
+      - { tick_offset: 64800, kind: move, target: "barracks" }
+  storekeeper:
+    entries:
+      - { tick_offset: 28800, kind: state, state: "busy" }
+      - { tick_offset: 50400, kind: state, state: "resting" }
+      - { tick_offset: 64800, kind: state, state: "busy" }
+  resident:
+    entries:
+      - { tick_offset: 25200, kind: move, target: "market_square" }
+      - { tick_offset: 50400, kind: state, state: "resting" }
+      - { tick_offset: 61200, kind: move, target: "residence" }

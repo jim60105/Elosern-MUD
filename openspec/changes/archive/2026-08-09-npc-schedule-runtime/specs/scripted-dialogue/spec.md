@@ -48,6 +48,53 @@ turn-in paths are all bypassed for the blocked interaction.
   keyword
 - **THEN** the host gives the no-understanding line and no state changes
 
+#### Scenario: Componentless NPC still yields no response
+- **WHEN** the player talks to an NPC that carries neither dialogue component
+- **THEN** the player receives the no-response line and no state changes
+
+#### Scenario: Guard keyword tracking and affinity commit together
+- **WHEN** the player talks to the South Gate guard with a known guard keyword
+- **THEN** the guard answers from the authored table, records the keyword on
+  `guide_progress`, and the guard's affinity value rises by 1 in one transaction; an unknown
+  guard keyword records nothing and grants no affinity
+
+#### Scenario: A failed guard talk write restores both surfaces
+- **WHEN** persistence is fault-injected after `guide_progress` is written and before the
+  affinity gain commits
+- **THEN** `guide_progress` and the affinity record — and their in-process caches — equal their
+  pre-talk values
+
+#### Scenario: Guild staff 回報 keyword lists reportable quests read-only
+- **WHEN** a registered player with completed, unclaimed quests talks to the
+  guild staff with the keyword `回報` and no quest id
+- **THEN** the staff answers with the deterministic reportable-quest listing in
+  `(accepted_tick, quest_id)` order and no quest, wallet, inventory, merit, or
+  claim state changes
+
+#### Scenario: Guild staff 回報 with a quest id turns the quest in
+- **WHEN** the player talks to the guild staff with `回報 <quest_id>` naming a
+  reportable quest
+- **THEN** the staff turns the quest in through `turn_in_quest`, paying the
+  exact reward once and answering with the same success or rejection prose as
+  `guild turnin`, including the onboarding-completion line
+
+#### Scenario: Guild staff 回報 without a reportable quest says so
+- **WHEN** a registered player with no completed-and-unclaimed quests talks to
+  the guild staff with the keyword `回報`
+- **THEN** the staff answers that there is nothing to report and no state
+  changes
+
+#### Scenario: Unregistered player asking 回報 gets guidance, no state change
+- **WHEN** a player without a guild registration talks to the guild staff with
+  the keyword `回報`
+- **THEN** the staff answers with the authored register-first guidance and no
+  quest, wallet, inventory, merit, or claim state changes
+
+#### Scenario: 回報 on a non-guild host stays a plain unknown keyword
+- **WHEN** the player talks to any dialogue host other than the `guild_staff`
+  host with the keyword `回報`
+- **THEN** the host gives the no-understanding line and no state changes
+
 #### Scenario: A schedule-blocked host does not answer and writes nothing
 - **WHEN** the player talks to a scripted dialogue host whose schedule state blocks `talk`
 - **THEN** the player receives the stable schedule rejection line, and no affinity, guide

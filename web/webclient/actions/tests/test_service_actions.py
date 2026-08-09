@@ -150,6 +150,76 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(result["code"], "no_staff")
         self.assertIsNone(self.player.db.guild_registration)
 
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_merchant_rejects_buy_without_a_transaction(self):
+        self.player.location = self.store
+        self.merchant_npc.db.schedule_state = "busy"
+        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 2})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertIn("她現在正忙著", result["message"])
+        self.assertEqual(self.player.db.wallet, 1000)
+        self.assertEqual(self.merchant.merchant_stock["meal"], 20)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_resting_merchant_rejects_sell_without_a_transaction(self):
+        self.player.location = self.store
+        self.player.db.inventory = ["meal", "meal"]
+        self.merchant_npc.db.schedule_state = "resting"
+        result = _sell_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertEqual(self.player.db.wallet, 1000)
+        from world.skills.equipment import list_items
+
+        self.assertEqual(list_items(self.player), ["meal", "meal"])
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_staff_rejects_register_without_state_change(self):
+        self.staff.db.schedule_state = "busy"
+        result = _guild_register_adapter(self.player, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertIsNone(self.player.db.guild_registration)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_staff_rejects_turnin_without_a_claim(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        records = read_records(self.player)
+        from world.quests.runtime import fulfill_record
+
+        completed = fulfill_record(records[0], QUEST_DEFINITION_REGISTRY["introductory_hunt"])
+        from world.quests.transitions import apply_quest_log_replacement
+
+        apply_quest_log_replacement(self.player, [completed])
+        self.staff.db.schedule_state = "busy"
+        result = _quest_turnin_adapter(self.player, {"quest_id": record.quest_id})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertEqual(self.player.db.wallet, 1000)
+        self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_staff_rejects_quest_accept_without_a_log_change(self):
+        self._register()
+        self.staff.db.schedule_state = "resting"
+        result = _quest_accept_adapter(
+            self.player, {"definition_key": "introductory_hunt"}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertEqual(read_records(self.player), [])
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_examiner_rejects_exam_start_without_a_session(self):
+        self._register()
+        self.examiner.db.schedule_state = "busy"
+        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertIsNone(self.player.db.active_combat)
+
     def test_quest_accept_success_and_log_update(self):
         self._register()
         result = _quest_accept_adapter(self.player, {"definition_key": "introductory_hunt"})

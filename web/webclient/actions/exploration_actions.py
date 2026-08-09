@@ -31,6 +31,7 @@ from world.rules.map_knowledge import (
     encode_wild,
 )
 from world.rules.npc_intents import apply_npc_intent
+from world.rules.npc_schedules import interaction_reason
 from world.rules.onboarding import run_scripted_talk
 from world.rules.party import (
     PARTY_MAX_COMPANIONS,
@@ -377,6 +378,9 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有這個對象。")
+    reason = interaction_reason(npc, "talk")
+    if reason is not None:
+        return _rejected("schedule_blocked", reason)
     if not is_dialogue_host(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
     dialogue_key = dialogue_key_for(npc)
@@ -403,13 +407,17 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
 def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     """Run the guarded dialogue seam through the injected client (design D5/D6).
 
-    Re-resolves a present ``LLMNPC`` synchronously so a tampered or non-eligible
-    NPC rejects before any client or transport work; the Deferred settles after
-    the seam finishes (offline degrade, memory, and verified-intent included).
+    Re-resolves a present ``LLMNPC`` synchronously so a tampered, ineligible,
+    or schedule-blocked NPC rejects before any client or transport work; the
+    Deferred settles after the seam finishes (offline degrade, memory, and
+    verified-intent included).
     """
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以自由交談的對象。")
+    reason = interaction_reason(npc, "talk")
+    if reason is not None:
+        return _rejected("schedule_blocked", reason)
     from web.webclient.actions.dialogue_composition import build_dialogue_client
 
     client = build_dialogue_client()

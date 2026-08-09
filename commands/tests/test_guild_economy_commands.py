@@ -31,6 +31,7 @@ from world.rules.guild_config import CATALOG, load_catalog_into_cache
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY, register_guild_offer
 from world.rules.surfaces import write_counter_trait
 from world.rules.combat_session import engage
+from world.skills.equipment import list_items
 
 
 class CommandIsolation(QuestRegistryIsolation):
@@ -248,6 +249,104 @@ class EconomyCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest
             self.call(CmdBuy(), "meal 2", "你買了 2 個")
             self.call(CmdSell(), "meal 1", "你賣了 1 個")
         self.assertEqual(self.char1.db.wallet, 500 - 20 + 5)
+
+
+class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
+    """Schedule-state gating on the command surfaces (npc-schedule-runtime D4).
+
+    A busy/resting merchant or guild host refuses the transaction on every
+    command surface with the stable rejection line and no state change; an
+    unblocked host behaves exactly as before (covered by the flow tests).
+    """
+
+    BLOCKED = "她現在正忙著，沒有理會你。"
+
+    def setUp(self):
+        super().setUp()
+        self.store = create_object(Room, key="store")
+        self.char1.location = self.store
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.char1.db.wallet = 500
+        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant = Merchant.create(
+            self.merchant_npc,
+            service_id="merchant",
+            shop_key="altoria_general_store",
+        )
+        self.merchant_npc.components.add(self.merchant)
+        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+        self.hall = create_object(Room, key="guild hall")
+        self.staff = create_object(NPC, key="staff", location=self.hall)
+        self.staff.components.add(
+            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        from world.rules.guild_config import register_catalog_offers
+
+        register_catalog_offers(load_catalog_into_cache())
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_merchant_blocks_buy_without_a_transaction(self):
+        self.merchant_npc.db.schedule_state = "busy"
+        self.call(CmdBuy(), "meal 2", self.BLOCKED)
+        self.assertEqual(self.char1.db.wallet, 500)
+        self.assertEqual(self.merchant.merchant_stock["meal"], 20)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_resting_merchant_blocks_sell_without_a_transaction(self):
+        self.merchant_npc.db.schedule_state = "resting"
+        self.char1.db.inventory = ["meal"]
+        self.call(CmdSell(), "meal 1", self.BLOCKED)
+        self.assertEqual(self.char1.db.wallet, 500)
+        self.assertEqual(list_items(self.char1), ["meal"])
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_guild_host_blocks_register_without_state_change(self):
+        self.char1.location = self.hall
+        self.staff.db.schedule_state = "busy"
+        self.call(CmdGuildRegister(), "", self.BLOCKED)
+        self.assertIsNone(self.char1.db.guild_registration)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_guild_host_blocks_turnin_without_a_claim(self):
+        from world.rules.guild import register_adventurer
+
+        self.char1.location = self.hall
+        register_adventurer(self.char1, self.staff)
+        from world.quests.runtime import accept_quest, fulfill_record, read_records
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+        record = accept_quest(self.char1, "introductory_hunt")
+        completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY["introductory_hunt"])
+        from world.quests.transitions import apply_quest_log_replacement
+
+        apply_quest_log_replacement(self.char1, [completed])
+        self.staff.db.schedule_state = "busy"
+        self.call(CmdGuildTurnIn(), completed.quest_id, self.BLOCKED)
+        self.assertEqual(read_records(self.char1), [completed])
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_examiner_blocks_the_exam_command_without_a_session(self):
+        from typeclasses.components import GuildExaminer
+
+        self.char1.location = self.hall
+        examiner = create_object(NPC, key="examiner", location=self.hall)
+        examiner.components.add(
+            GuildExaminer.create(
+                examiner, service_id="examiner", branch_key="guild_branch_altoria"
+            )
+        )
+        examiner.db.schedule_state = "busy"
+        self.call(CmdGuildExam(), "E", self.BLOCKED)
+        self.assertIsNone(self.char1.db.active_combat)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_duty_state_does_not_block_shop_buy(self):
+        self.merchant_npc.db.schedule_state = "duty"
+        with patch("world.rules.economy.get_world_clock") as clock:
+            clock.return_value.tick = 12 * 3600
+            self.call(CmdBuy(), "meal 2", "你買了 2 個")
+        self.assertEqual(self.char1.db.wallet, 480)
 
 
 if __name__ == "__main__":

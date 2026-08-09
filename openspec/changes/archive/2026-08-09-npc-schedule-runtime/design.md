@@ -81,8 +81,15 @@ event** — the `ScheduledEvent` stream contains only successful `npc_departed` 
 Traditional Chinese rejection reason when the NPC's `schedule_state` blocks the interaction kind;
 `None` means proceed. The interaction kinds and their exact consult points are enumerated:
 
-- `talk` — the scripted-talk command path (`commands/talk.py`) and the free-form seam
-  (`LLMNPC.at_talked_to` / `run_npc_exchange`);
+- `talk` — the scripted-talk command path (the text `talk` command in
+  `commands/talk.py` **and** the WebClient `explore.talk_scripted` action in
+  `web/webclient/actions/exploration_actions.py`, which share the deterministic
+  `run_scripted_talk` writer) and the free-form seam (`LLMNPC.at_talked_to`).
+  The seam's direct `run_npc_exchange` callers are the party-invite surface
+  (`explore.party_invite` / the `invite` command); party invite is a distinct
+  interaction kind that is not enumerated in this change, so it needs no gate
+  here and a busy NPC can still be invited (recorded as a dated amendment in
+  the superpowers design);
 - `service_shop` — the shop buy/sell commands (`commands/economy.py`) **and** the WebClient
   `shop.buy` / `shop.sell` action adapters (`web/webclient/actions/service_actions.py`);
 - `service_guild` — the guild operation commands (`commands/guild.py`) **and** the WebClient
@@ -109,6 +116,29 @@ changes** — no affinity gain, no guide progress, no memory append, no intent a
 - Alternatives: partial processing with affinity withheld — rejected: the scripted-dialogue spec's
   known-keyword path grants affinity; a blocked interaction is not an answered interaction.
 - Why: keeps the gate side-effect-free and trivially testable.
+
+### D6: Rubber-duck review amendments (2026-08-09)
+
+Four corrections from the post-implementation critique, all reflected in the delta specs:
+
+1. **Stable identity is the primary key, not the display key.** Ordering and event payloads use
+   `npc_id` (the persistent integer primary key) as the stable NPC identity; the display `npc`
+   key is carried as a secondary payload field. Display keys are not guaranteed unique and may
+   change, which would break `(due_tick, npc_stable_id, entry_index)` determinism and event
+   attribution.
+2. **Same-tick assignment settles the occurrence due at the assignment tick.** `_due_occurrences`
+   settles an occurrence due exactly at `start_tick` when `effective_from_tick == start_tick`:
+   the assignment happened at that moment, so the preceding consecutive window could not have
+   settled it. Any other start-boundary occurrence is skipped (already settled). The spec's
+   `>=` and window clauses are therefore consistent.
+3. **Redirecting exits are never schedule routes.** `_first_traversable_exit` admits only exits
+   whose `at_traverse` is the stock `DefaultExit.at_traverse` implementation; the wilderness
+   exits override it to ignore the requested destination (coordinate-based movement), so
+   traversing one could relocate the NPC to a room the schedule never named. A failed traversal
+   is detected by relocation and skips with no location/state change.
+4. **Work-list construction is per-NPC exception-isolated.** Parse and occurrence building for
+   each tagged NPC are wrapped with the same bounded-log-skip contract as occurrence
+   settlement, so one damaged NPC can never raise out of the clock source.
 
 ## Risks / Trade-offs
 

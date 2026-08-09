@@ -40,7 +40,11 @@ migration is required.
 
 `world/rules/rulebook/npc_schedules.yaml` defines role templates as ordered
 entry lists; an NPC references one with optional `overrides`, or stores a full
-custom `entries` list for special NPCs.
+custom `entries` list for special NPCs. Each template maps to
+`{default_state?, entries: [...]}`: `entries` is the ordered entry list and
+`default_state` is an optional vocabulary-validated value that a successful
+`move` settlement writes (never settable on individual entries). The rulebook
+also declares the bounded state vocabulary as a top-level `states` list.
 
 - Alternatives: (a) pure per-NPC attribute schedules with no shared templates —
   rejected: duplicates the same data per NPC and misses the D9 "balance is
@@ -85,9 +89,14 @@ sync treating any malformed stored value as "no schedule".
 
 ### D4: Template overrides are a shallow per-entry merge
 
-`overrides` replaces whole entries by index (bounded count) or by entry id;
-fields not mentioned in an override entry keep template values. Overrides that
-reference a non-existent entry index reject.
+`overrides` replaces whole entries by string-form entry index (bounded count);
+fields not mentioned in an override entry keep template values, and the merged
+entry is validated under the same entry rules. Overrides that reference a
+non-existent entry index reject. Because fields not mentioned are kept, an
+override cannot change an entry's `kind` — the merged entry would still carry
+the base kind's forbidden field (or miss the new kind's required one) and
+fails the same per-kind validation; the full custom `entries` shape exists for
+genuinely different NPCs.
 
 - Alternatives: deep field-level merge — rejected: more surface area than the
   first consumer needs, harder to validate; a full custom `entries` list exists
@@ -98,7 +107,8 @@ reference a non-existent entry index reject.
 ### D5: Startup sync is idempotent and shared with the runtime's needs
 
 The sync pass loads and validates the rulebook, confirms every NPC's stored
-schedule shape (repairing nothing — rejection means "no schedule"), and
+schedule shape (repairing nothing — rejection degrades the NPC to the
+canonical no-schedule state: `db.schedule = None` and no `schedule` tag), and
 confirms the persistent `schedule` tag on every schedule-bearing NPC so the
 runtime's tag query finds them. Sync failures log and degrade.
 
@@ -135,6 +145,29 @@ scan).
   concern.
 - [Very large custom entry lists bloat `db.schedule`] → Bounded entry count in
   validation.
+
+## Rubber-duck amendments (2026-08-09)
+
+Reviewed after implementation; four decisions hardened the contract:
+
+- **Uniform rulebook failures.** `load_rulebook()` raises only
+  `ScheduleRulebookError`: unreadable files, invalid YAML, and rulebook
+  entries violating the entry shape rules are all wrapped, so callers can
+  always distinguish rulebook failure from per-NPC storage failure. Entry
+  shape errors (`ScheduleEntryError`) are reserved for per-NPC schedules.
+- **The effective tick is part of the stored unit.** A stored schedule is
+  valid only together with a non-boolean integer
+  `npc.db.schedule_effective_from_tick`; storage written outside the
+  assignment API (valid schedule with missing/string tick) is malformed:
+  the consumer parser resolves it to no-schedule and startup sync degrades it
+  like any other malformed schedule.
+- **Rulebook failure deactivates the layer, not the data.** When the rulebook
+  cannot load, sync removes every `schedule` tag (the runtime's index) while
+  preserving stored schedules; fixing the file and restarting re-enables them.
+- **Startup is structurally unblockable.** The sync pass wraps the whole
+  walk in an outer guard and each NPC's handling in its own guard; a
+  persistence failure at any level is logged and skipped, never propagated
+  out of the startup hook.
 
 ## Migration Plan
 

@@ -234,6 +234,18 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(len(lines), 1)
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_schedule_blocked_seam_shows_the_stable_reason_and_runs_nothing(self):
+        self.npc.db.schedule_state = "busy"
+        client = FakeLLMClient()
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        texts = _msg_texts(msg)
+        self.assertEqual(texts, ["她現在正忙著，沒有理會你。"])
+        self.assertEqual(len(client.calls), 0)
+        self.assertEqual(self.npc._chat_lines(self.player), [])
+        self.assertEqual(_inventory(self.player), [])
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
     def test_thinking_feedback_sends_one_message_after_timeout_and_cancels(self):
         from twisted.internet import task
 

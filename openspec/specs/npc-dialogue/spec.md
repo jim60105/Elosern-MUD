@@ -167,10 +167,12 @@ When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `gen
 #### Scenario: Offline dialogue with no greeting is silence
 - **WHEN** the LLM is offline and the NPC has no authored greeting
 - **THEN** the NPC stays silent and no state changes
-
 ### Requirement: The LLMNPC entity provides chat memory, thinking state, and a dialogue seam
 
-`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass carrying persistent per-character chat memory, a bounded memory window, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`.
+`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass carrying persistent per-character chat memory, a bounded memory window, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`. Before invoking the guarded pipeline, the seam SHALL consult
+`world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
+that stable rejection line and SHALL NOT build a prompt, run the pipeline, append memory, or
+apply an intent.
 
 #### Scenario: A reply is recorded and a verified intent is applied
 - **WHEN** the player talks to an `LLMNPC` and the guarded pipeline resolves a valid `NPCDialogueReply`
@@ -195,6 +197,10 @@ When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `gen
 #### Scenario: Importing the typeclass does not break degradation
 - **WHEN** `typeclasses.npcs` is imported (its generative and applier imports deferred to the server-ready call path) and the server then runs with the `npc_dialogue` layer disabled
 - **THEN** the seam still degrades cleanly to greeting or silence without a logger failure, and no module-scope import chain reaches the guardrail or the applier
+
+#### Scenario: A schedule-blocked seam shows the stable reason and runs nothing
+- **WHEN** the player talks to an `LLMNPC` whose schedule state blocks `talk`
+- **THEN** the stable rejection line is presented, and no prompt is built, no pipeline runs, no memory is appended, and no intent is applied
 
 ### Requirement: The generative dialogue layer preserves the transport and single-writer boundaries
 

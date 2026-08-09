@@ -31,7 +31,16 @@ class DialogueExchangeResult:
 
 
 class NPC(LivingEntity):
-    """A non-player living entity with deferred dialogue and schedule seams."""
+    """A non-player living entity with dialogue and schedule seams.
+
+    ``schedule`` (``AttributeProperty``) carries the NPC's deterministic
+    schedule: ``None`` (no schedule), a validated template reference, or a
+    full custom entry list -- see ``world.rules.npc_schedules`` for the
+    storage contract. It is written only through ``set_npc_schedule``, which
+    also records the assignment tick and the persistent ``schedule`` tag. The
+    runtime-state attribute ``schedule_state`` is declared there (current
+    state value or ``None``) and written only by the schedule-runtime change.
+    """
 
     dialogue_memory: Any | None = AttributeProperty(default=None)
     schedule: Any | None = AttributeProperty(default=None)
@@ -297,6 +306,9 @@ class LLMNPC(NPC):
     def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):
         """Handle a player addressing this NPC through the guarded dialogue seam.
 
+        Before any prompt construction or transport work, the seam consults
+        the schedule gate (``world.rules.npc_schedules.interaction_reason``);
+        a blocked NPC presents the stable rejection line and runs nothing.
         The prompt carries the NPC's own affinity context for the speaker
         (read-only; a recordless player gets no block), the guarded pipeline
         resolves the reply, the degraded outcome maps to the authored greeting
@@ -320,6 +332,14 @@ class LLMNPC(NPC):
         """
         from world.ai.npc_dialogue import NPCDialogueClientRequiredError
         from world.rules.npc_intents import apply_npc_intent
+        from world.rules.npc_schedules import interaction_reason
+
+        reason = interaction_reason(self, "talk")
+        if reason is not None:
+            # A schedule-blocked NPC never builds a prompt, runs a pipeline,
+            # appends memory, or applies an intent (npc-schedule-runtime D4/D5).
+            character.msg(reason)
+            return
 
         if client is None:
             raise NPCDialogueClientRequiredError(
