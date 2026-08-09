@@ -4,10 +4,10 @@ This module is the deterministic engine's side of the dialogue contract: it
 verifies an extracted ``intent`` against the world before applying it and
 discards illegal or unverifiable intents while the speech is kept. It performs
 verification and application only through existing deterministic APIs -- the
-guild-exam trigger and the inventory-planning boundary -- and never constructs
-or mutates state itself. ``offer_quest``, ``adjust_relation``, and
-``reveal_lore`` are whitelisted by the schema but rejected here behind
-forward-declared seams until their deterministic capability surfaces exist.
+guild-exam trigger, the inventory-planning boundary, the sole-writer affinity
+API, and the party-membership module. ``offer_quest`` and ``reveal_lore`` are
+whitelisted by the schema but rejected here behind forward-declared seams until
+their deterministic capability surfaces exist.
 
 Single-writer invariant: this module is part of the deterministic core and the
 sole writer of any state this change causes; the generative reply layer never
@@ -19,6 +19,7 @@ from typing import Any
 
 from django.db import transaction
 
+from world.rules.affinity import apply_affinity_change
 from world.rules.equipment import InventoryError, plan_inventory_delta
 from world.rules.guild_exams import GuildExamError, start_guild_exam
 from world.rules.surfaces import (
@@ -28,17 +29,26 @@ from world.rules.surfaces import (
     snapshot_traits,
 )
 
-_FORWARD_DECLARED_KINDS = ("offer_quest", "adjust_relation", "reveal_lore")
+_FORWARD_DECLARED_KINDS = ("offer_quest", "reveal_lore")
 
 _INVENTORY_SURFACE_KEYS = ("inventory", "quest_log")
+
+_MAX_RELATION_DELTA = 10
 
 
 @dataclass(frozen=True)
 class IntentOutcome:
-    """The deterministic result of attempting to apply one NPC intent."""
+    """The deterministic result of attempting to apply one NPC intent.
+
+    ``delta_used`` reports the actually applied affinity amount and is only
+    filled by the ``adjust_relation`` path: a partial application reports
+    ``applied=True`` with the applied amount, while a fully blocked or
+    rejected delta reports ``applied=False`` with ``delta_used`` 0.
+    """
 
     applied: bool
     reason: str | None = None
+    delta_used: int | None = None
 
 
 def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
@@ -57,6 +67,10 @@ def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
         return IntentOutcome(True)
     if kind == "request_guild_exam":
         return _apply_guild_exam(npc, player, intent)
+    if kind == "adjust_relation":
+        return _apply_adjust_relation(npc, player, intent)
+    if kind == "party_invite":
+        return _apply_party_invite(npc, player, intent)
     if kind in ("give_item", "take_item"):
         return _apply_item_transfer(kind, npc, player, intent)
     if kind in _FORWARD_DECLARED_KINDS:
@@ -69,6 +83,64 @@ def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
 
 def _payload_without_kind(intent: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in intent.items() if key != "kind"}
+
+
+def _apply_adjust_relation(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"delta"}:
+        return IntentOutcome(False, "adjust_relation must carry exactly delta", delta_used=0)
+    delta = payload["delta"]
+    if (
+        isinstance(delta, bool)
+        or not isinstance(delta, int)
+        or not (0 <= delta <= _MAX_RELATION_DELTA)
+    ):
+        return IntentOutcome(
+            False,
+            f"adjust_relation delta must be an integer in 0..{_MAX_RELATION_DELTA}",
+            delta_used=0,
+        )
+    if delta == 0:
+        # A zero delta is a rejected intent: skip the writer entirely so no
+        # record is ever materialized (e.g. by the writer's lazy day-tick
+        # reset) and no affinity state changes.
+        return IntentOutcome(False, "affinity delta applied nothing", delta_used=0)
+    outcome = apply_affinity_change(npc, player, "ai_dialogue", delta)
+    if outcome.delta_used > 0:
+        return IntentOutcome(True, delta_used=outcome.delta_used)
+    if outcome.source_rejected:
+        return IntentOutcome(
+            False, "affinity write rejected the NPC or source", delta_used=0
+        )
+    if outcome.budget_capped:
+        return IntentOutcome(False, "affinity daily budget exhausted", delta_used=0)
+    return IntentOutcome(False, "affinity delta applied nothing", delta_used=0)
+
+
+def _apply_party_invite(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
+    """Route a ``party_invite`` intent through the party-membership module.
+
+    ``accept: false`` is an applied no-op; ``accept: true`` delegates to
+    ``join_party``, which rechecks the target, co-location, the absence of an
+    existing binding, and the 4-companion bound. A join-gate rejection
+    discards only the intent with the stable reason surfaced in
+    ``IntentOutcome.reason`` so callers can render distinct feedback.
+    """
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"accept"}:
+        return IntentOutcome(False, "party_invite must carry exactly accept")
+    accept = payload["accept"]
+    if not isinstance(accept, bool):
+        return IntentOutcome(False, "party_invite accept must be a boolean")
+    if not accept:
+        return IntentOutcome(True, "party invite declined")
+    from world.rules.party import PartyJoinError, join_party
+
+    try:
+        join_party(npc, player)
+    except PartyJoinError as error:
+        return IntentOutcome(False, error.reason)
+    return IntentOutcome(True, "party joined")
 
 
 def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:

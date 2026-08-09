@@ -13,7 +13,11 @@ webclient `explore.look` action SHALL all produce the same zh-tw appearance. The
 label its exits as 「出口」 (never `Exits:`), its contents/characters sections with zh-tw headers
 (never `Characters:` or `You see`), and the default description of an un-described object SHALL be
 zh-tw (never `You see nothing special.`). No English frame string SHALL appear in the appearance
-of a room or object.
+of a room or object. The appearance of an NPC SHALL additionally include one affinity stage line
+(for example 「她看著你的眼神裡帶著信賴。」) rendered by the shared layer from the NPC's affinity
+record for the looking player, identical across all three entry paths; the numeric affinity value,
+cap, and threshold SHALL never appear, and entities without an affinity record SHALL render no
+stage line.
 
 #### Scenario: The text look command shows a zh-tw frame
 
@@ -32,3 +36,15 @@ of a room or object.
 - **WHEN** a player looks while the onboarding arrival beat is active
 - **THEN** the look still flows through the character's `at_look` hook (the look beat completes as
   before) and the presented appearance is the zh-tw frame
+
+#### Scenario: NPC appearance includes the affinity stage line on every path
+
+- **WHEN** a player looks at an NPC holding an affinity record at the 信賴 stage through the text
+  look command, the `at_look` hook, and the webclient explore-look action
+- **THEN** all three outputs contain the same stage flavor line for 信賴 and no numeric value, cap,
+  or threshold appears in any of them
+
+#### Scenario: Recordless entities render no affinity line
+
+- **WHEN** a player looks at a monster or an NPC with no affinity record
+- **THEN** the appearance contains no affinity line on any entry path

@@ -1974,6 +1974,8 @@
   var EXPLORATION_ACTION_IDS = [
     "explore.talk_scripted",
     "explore.talk_freeform",
+    "explore.party_invite",
+    "explore.party_leave",
     "explore.engage",
   ];
   var EXPLORATION_SURFACES = ["guild", "shop"];

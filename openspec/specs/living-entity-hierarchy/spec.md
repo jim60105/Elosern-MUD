@@ -58,20 +58,28 @@ design doc §5.2 names for that class.
   defaults to `None` until a caller assigns a real `MonsterTier` key and explicitly populates
   traits, while `loot_table` and `behaviour_tree` carry only default placeholder values
 
-### Requirement: Non-trait LivingEntity handlers are declared seams, not implementations
-`LivingEntity` SHALL declare `sexual`, `buffs`, `equipment`, `skills`, `relations`, and `persona`
-as placeholder attributes defaulting to `None`, and SHALL NOT implement any behavior for them.
-Only the `traits` handler is a working implementation after this change.
+### Requirement: LivingEntity non-trait handlers are working implementations except persona, which remains a declared seam
+`LivingEntity` SHALL expose `traits`, `sexual`, `buffs`, `equipment`, `skills`, and `relations`
+as working handlers (each owned by its capability change: traits by entity-traits, sexual by the
+sexual-state handler, buffs by the buff-handler integration, equipment and skills by
+equipment-inventory and the skill handler, relations by the affinity capability). `persona` SHALL
+remain a placeholder attribute defaulting to `None` with no behavior implemented.
 
-#### Scenario: Non-trait handlers exist but default to None
+#### Scenario: Non-trait handlers exist as working implementations
 - **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected
-- **THEN** `entity.sexual`, `entity.buffs`, `entity.equipment`, `entity.skills`,
-  `entity.relations`, and `entity.persona` are all present as attributes and all equal `None`
+- **THEN** `entity.traits` is a `TraitHandler`, `entity.sexual` is a `SexualState`,
+  `entity.buffs` is a `BuffHandler`, `entity.equipment` is an `EquipmentHandler`,
+  `entity.skills` is a `SkillHandler`, and `entity.relations` is a `RelationHandler` backed by the
+  `relations_data` attribute
 
-#### Scenario: No handler class is authored for a deferred concern
+#### Scenario: persona remains a declared seam
+- **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected
+- **THEN** `entity.persona` is present as an attribute and equals `None`
+
+#### Scenario: No PersonaStore implementation is authored
 - **WHEN** the codebase added by this change is inspected
-- **THEN** it contains no `SexualState`, `BuffHandler`, `EquipmentHandler`, `SkillHandler`,
-  `RelationHandler`, or `PersonaStore` class definition — those are owned by later changes
+- **THEN** it contains no `PersonaStore` class definition — persona stays a forward-declared seam
+  owned by a later change
 
 ### Requirement: Quest logs, dialogue memory, loot tables, and behaviour trees are not built
 This change SHALL NOT implement quest-log progression, dialogue-memory storage/retrieval

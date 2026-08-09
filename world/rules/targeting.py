@@ -221,8 +221,14 @@ def expand_target_shorthand(
     if shorthand not in {"all-enemies", "all-allies", "all"}:
         _rejection("target_spec_mismatch", f"unknown shorthand {shorthand!r}")
     roster = list(battlefield.roster.values())
+    # Knocked-out combatants are never selectable, through any shorthand
+    # (party-combat D-2). The read is duck-typed so non-combat or fake
+    # battlefields without the knockout state keep the pre-existing behavior.
+    knocked_out = frozenset(getattr(battlefield, "knocked_out", ()))
     if shorthand == "all":
-        return roster
+        return [
+            target for target in roster if str(target.key) not in knocked_out
+        ]
     wanted = (
         {Relation.ENEMY}
         if shorthand == "all-enemies"
@@ -232,4 +238,5 @@ def expand_target_shorthand(
         target
         for target in roster
         if context.relation_to(actor, target) in wanted
+        and str(target.key) not in knocked_out
     ]

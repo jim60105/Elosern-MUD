@@ -8,8 +8,11 @@ with stable dbref identity, one transition per event, and instance-pin release o
 ### Requirement: DEFEAT progress is planned automatically from committed player action events
 The quest event-effect planner SHALL inspect `target_defeated` entries produced by an
 `ActionResolver` request. It SHALL advance only active DEFEAT stages owned by the request actor when the
-actor is a `PlayerCharacter`. A bound-target objective SHALL match `data["target_id"]` against the
-record's `objective_target_ids`; an unbound objective SHALL match its declared `monster_tier`. Display
+actor is a `PlayerCharacter`, and SHALL additionally advance the owner's matching stage when the request
+actor is a bound companion of the owner (per the party binding) and is not knocked out; a companion's
+entries SHALL follow the same aggregation, cap, and one-transition rules as the owner's own. A
+bound-target objective SHALL match `data["target_id"]` against the record's `objective_target_ids`; an
+unbound objective SHALL match its declared `monster_tier`. Display
 keys SHALL NOT be used as entity identity. The resulting quest mutation SHALL commit in the same action
 transaction as lethal damage. The planner SHALL aggregate every matching defeat entry in one EventLog
 per quest, cap progress at the current objective quantity, perform at most one stage transition, and
@@ -24,8 +27,17 @@ discard surplus kills rather than applying them to the next stage.
 - **WHEN** two monsters share a display key but only one dbref is in `objective_target_ids`
 - **THEN** defeating the unbound monster does not advance the quest and defeating the bound monster does
 
+#### Scenario: A bound companion's kill advances the owner's objective
+- **WHEN** a bound, non-knocked-out companion defeats a monster matching the owner's active DEFEAT stage
+- **THEN** the owner's quest progress advances in the same action transaction with the same cap and
+  one-transition rules
+
+#### Scenario: A knocked-out companion's kill grants no credit
+- **WHEN** a knocked-out companion defeats a matching-tier monster
+- **THEN** the owner's quest progress is unchanged
+
 #### Scenario: Another character's action grants no ordinary kill credit
-- **WHEN** an NPC, companion, or different `PlayerCharacter` defeats a matching-tier monster
+- **WHEN** an NPC that is not a bound companion, a different `PlayerCharacter`, or a monster defeats a matching-tier monster
 - **THEN** the quest owner's ordinary DEFEAT progress is unchanged
 
 #### Scenario: Quest planner failure rejects the complete action
@@ -43,7 +55,11 @@ discard surplus kills rather than applying them to the next stage.
 `QuestObservableRoomMixin.at_object_receive()` SHALL call its parent hook and then
 `observe_room_entry(self, obj)` for a `PlayerCharacter`. `GridRoom` SHALL adopt the mixin and
 `AnchorRoom` SHALL inherit it. `InstanceRoom` SHALL adopt it while preserving its existing interacted
-flag behavior. REACH SHALL match an anchor key, exact XYZ tuple, or bound instance dbref. ESCORT SHALL
+flag behavior. REACH SHALL match an anchor key, exact XYZ tuple, or bound instance dbref. Arrival
+observation SHALL advance when the player is the arriving object and at least one bound companion
+is present in the destination room — already there or arriving with the player — and SHALL be
+re-run once after companion follow moves complete so first-arrival co-presence is visible, with
+the one-transition rule making the repeated observation idempotent. ESCORT SHALL
 additionally require at least one protected entity and require every protected entity to be alive and
 present in the destination room.
 
@@ -58,6 +74,12 @@ present in the destination room.
 #### Scenario: Bound instance arrival uses the accepted record
 - **WHEN** the player enters the `InstanceRoom` whose dbref is stored in the current record
 - **THEN** a BOUND_INSTANCE REACH stage advances
+
+#### Scenario: Companion co-presence satisfies arrival
+- **WHEN** the player arrives at a matching destination and at least one bound companion is
+  present there after the follow moves complete
+- **THEN** the REACH or ESCORT stage advances exactly once, and the repeated post-follow
+  observation advances nothing a second time
 
 #### Scenario: Escort requires every protected entity alive and present
 - **WHEN** the player reaches an ESCORT destination while one protected entity is absent or has zero HP

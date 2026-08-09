@@ -49,6 +49,8 @@ _CHARACTER_CONSTANTS = (
 _EXPLORATION_FRAGMENTS = (
     '"explore.talk_scripted"',
     '"explore.talk_freeform"',
+    '"explore.party_invite"',
+    '"explore.party_leave"',
     '"explore.engage"',
     '"guild"',
     '"shop"',

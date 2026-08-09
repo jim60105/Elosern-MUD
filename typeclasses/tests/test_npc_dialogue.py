@@ -3,8 +3,9 @@
 Covers the ``at_talked_to`` seam: valid-reply presentation and verified-intent
 application, degraded greeting-or-silence, per-character chat-memory trimming,
 the thinking-timer contract on a deterministic clock, the explicit ``None``
-client rejection, and the deferred-import rule that keeps the typeclass free of
-module-scope generative imports.
+client rejection, the deferred-import rule that keeps the typeclass free of
+module-scope generative imports, and the structured ``run_npc_exchange``
+helper (party-core D-2) that separates the exchange from intent application.
 """
 
 import json
@@ -33,6 +34,7 @@ from world.ai.npc_dialogue import (
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
+from world.rules.affinity import apply_affinity_change
 
 from tools.spec_traceability import covers_requirement
 
@@ -83,6 +85,73 @@ class _HeldClient:
     def get_response(self, descriptor):
         self.calls.append(descriptor)
         return self.deferred
+
+
+class DialogueExchangeHelperTests(EvenniaTest):
+    """The structured ``run_npc_exchange`` helper (party-core D-2)."""
+
+    def setUp(self):
+        super().setUp()
+        _reset_all()
+        register_npc_dialogue()
+        self.player = create_object(PlayerCharacter, key="exchange player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.npc = create_object(LLMNPC, key="交換精靈", location=self.room1)
+
+    def tearDown(self):
+        _reset_all()
+        super().tearDown()
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_returns_a_reply_and_applies_no_intent(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(
+                speech="我會考慮看看。",
+                intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+            ),
+        )
+        self.npc.db.inventory = ["healing_potion"]
+        result = await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
+        self.assertFalse(result.degraded)
+        self.assertEqual(result.reply.speech, "我會考慮看看。")
+        self.assertEqual(result.reply.intent["kind"], "give_item")
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        lines = self.npc._chat_lines(self.player)
+        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我會考慮看看。"])
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_exchange_marks_the_degraded_terminal_explicitly(self):
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            result = await_result(
+                self.npc.run_npc_exchange("請與我同行", self.player, client)
+            )
+        self.assertTrue(result.degraded)
+        self.assertIsNone(result.reply)
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_rejects_an_explicit_none_client(self):
+        d = self.npc.run_npc_exchange("請與我同行", self.player, None)
+        failure = await_result(d)
+        self.assertTrue(failure.check(NPCDialogueClientRequiredError))
+
+    @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
+    def test_exchange_appends_only_the_reply_never_the_degraded_greeting(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="我願意與你同行。", intent={"kind": "none"}),
+        )
+        await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
+        lines = self.npc._chat_lines(self.player)
+        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我願意與你同行。"])
 
 
 class LLMNPCSeamTests(EvenniaTest):
@@ -200,6 +269,97 @@ class LLMNPCSeamTests(EvenniaTest):
         d = self.npc.at_talked_to("你好", self.player, None)
         failure = await_result(d)
         self.assertTrue(failure.check(NPCDialogueClientRequiredError))
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_seam_injects_affinity_context_without_persisting(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        before = dict(self.npc.db.relations_data or {})
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertEqual(
+            parsed["player"]["affinity"],
+            {"value": 2, "cap": 99, "stage": "初識"},
+        )
+        self.assertEqual(dict(self.npc.db.relations_data or {}), before)
+        self.assertIn("我會記住你的心意。", " ".join(_msg_texts(msg)))
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_recordless_player_yields_no_affinity_block_and_no_record(self):
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertNotIn("affinity", parsed["player"])
+        self.assertFalse(self.npc.relations.has_record(self.player))
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_corrupted_relations_record_still_lets_the_talk_complete(self):
+        self.npc.db.relations_data = {str(self.player.pk): "corrupted"}
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertIn("我會記住你的心意。", " ".join(_msg_texts(msg)))
+        self.assertEqual(
+            self.npc.db.relations_data, {str(self.player.pk): "corrupted"}
+        )
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_adjust_relation_flows_prompt_to_applier_to_record(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(
+                speech="我會記住你的心意。",
+                intent={"kind": "adjust_relation", "delta": 3},
+            ),
+        )
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertEqual(parsed["player"]["affinity"]["value"], 2)
+        self.assertIn("我會記住你的心意。", " ".join(_msg_texts(msg)))
+        record = self.npc.relations._load(self.player)
+        self.assertEqual(record.value, 5)
+        self.assertEqual(record.daily_gain, 5)
+
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    def test_leak_echo_reply_retries_and_never_presents_the_number(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        before = dict(self.npc.db.relations_data or {})
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我對你的好感是 2 點。"),
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3,
+            _reply_text(speech="我會記住你的心意。"),
+        )
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 2)
+        texts = " ".join(_msg_texts(msg))
+        self.assertIn("我會記住你的心意。", texts)
+        self.assertNotIn("2 點", texts)
+        self.assertEqual(dict(self.npc.db.relations_data or {}), before)
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_offline_profile_leaves_affinity_unchanged(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        before = dict(self.npc.db.relations_data or {})
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch.object(self.player, "msg"):
+                await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 0)
+        self.assertEqual(dict(self.npc.db.relations_data or {}), before)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 2)
 
 
 class LLMNPCDeferredImportTests(unittest.TestCase):

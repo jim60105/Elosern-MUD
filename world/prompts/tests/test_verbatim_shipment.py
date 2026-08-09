@@ -46,6 +46,10 @@ _NPC_DIALOGUE_TEMPLATE = (
     "玩家在你面前展現出的樣貌，就是你所見到的真實。"
     "請以正體中文和對方說話，並只輸出一個 JSON 物件："
     '{"speech": "你要說的話", "intent": {"kind": "..."}}。'
+    "若玩家資料裡提供你對她的好感度，"
+    "你可以依此決定是否送出 intent 為 adjust_relation、"
+    "delta 為 0 到 10 之間整數的好感度調整；"
+    "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
     "不得虛構任何結果、數字、對話或世界狀態；"
     "你沒有把握能確實執行的行為，不要寫進 intent。"
 )
@@ -74,7 +78,7 @@ class VerbatimShipmentTests(unittest.TestCase):
         self.assertIn("QuestBlueprint", system)
         self.assertIn("不得編造", system)
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_npc_dialogue_system_template_is_shipped_verbatim(self):
         rendered = render_prompt(
             "npc_dialogue.system",
@@ -122,7 +126,7 @@ class VerbatimShipmentTests(unittest.TestCase):
             "A 貓人族 adult named 艾琳 (24) in the approved visual style.",
         )
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_npc_dialogue_render_equals_the_original_rendered_constant(self):
         rendered = render_prompt(
             "npc_dialogue.system",
@@ -137,6 +141,10 @@ class VerbatimShipmentTests(unittest.TestCase):
             "玩家在你面前展現出的樣貌，就是你所見到的真實。"
             "請以正體中文和對方說話，並只輸出一個 JSON 物件："
             '{"speech": "你要說的話", "intent": {"kind": "..."}}。'
+            "若玩家資料裡提供你對她的好感度，"
+            "你可以依此決定是否送出 intent 為 adjust_relation、"
+            "delta 為 0 到 10 之間整數的好感度調整；"
+            "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
             "不得虛構任何結果、數字、對話或世界狀態；"
             "你沒有把握能確實執行的行為，不要寫進 intent。",
         )
@@ -186,7 +194,7 @@ class LibrarySourceTests(unittest.TestCase):
         )
         self.assertEqual(system["content"], render_prompt("scenario_director.system"))
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_npc_dialogue_renders_from_the_library_solely(self):
         from world.ai.npc_dialogue import build_npc_dialogue_prompt
 

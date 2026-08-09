@@ -147,7 +147,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.assertEqual(result, _join_renderer((_log(),)))
         self.assertEqual(len(client.calls), 0)
 
-    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats")
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
     def test_broken_npc_dialogue_key_resolves_to_none_greeting_marker(self):
         self._break_npc_dialogue()
         self.load()

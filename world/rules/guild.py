@@ -15,6 +15,7 @@ from django.db import transaction
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
+from typeclasses.npcs import NPC
 from world.rules.clock import get_world_clock
 from world.rules.surfaces import attribute_snapshot
 from world.rules.traits import get_display_value
@@ -132,18 +133,20 @@ def parse_guild_registration(actor: Any) -> dict[str, Any]:
     }
 
 
-def _registration_snapshot(actor: Any) -> dict[str, Any]:
+def _registration_snapshot(actor: Any, staff: Any) -> dict[str, Any]:
     return {
         "registration": attribute_snapshot(actor, "guild_registration"),
         "rank": attribute_snapshot(actor, "guild_rank"),
+        "staff_relations": attribute_snapshot(staff, "relations_data"),
     }
 
 
-def _restore_registration(actor: Any, snapshot: dict[str, Any]) -> None:
+def _restore_registration(actor: Any, staff: Any, snapshot: dict[str, Any]) -> None:
     from world.rules.surfaces import restore_attribute_best_effort
 
     restore_attribute_best_effort(actor, "guild_registration", snapshot["registration"])
     restore_attribute_best_effort(actor, "guild_rank", snapshot["rank"])
+    restore_attribute_best_effort(staff, "relations_data", snapshot["staff_relations"])
     try:
         actor.attributes.reset_cache()
     except Exception:
@@ -185,6 +188,8 @@ def register_adventurer(
             raise GuildError(RegistrationReason.REMOTE_STAFF)
     if staff is None:
         staff = resolve_local_service_host(actor, GuildStaff)
+    if not isinstance(staff, NPC):
+        raise GuildError(RegistrationReason.NO_STAFF)
     if not hasattr(staff, "components") or not staff.components.has(GuildStaff.name):
         raise GuildError(RegistrationReason.NO_STAFF)
     if actor.location is None or staff.location != actor.location:
@@ -195,7 +200,7 @@ def register_adventurer(
     if not isinstance(branch_key, str) or not branch_key:
         raise GuildDataError("GuildStaff component has no branch_key")
 
-    snapshot = _registration_snapshot(actor)
+    snapshot = _registration_snapshot(actor, staff)
     try:
         with transaction.atomic():
             actor.db.guild_registration = {
@@ -207,8 +212,11 @@ def register_adventurer(
                 },
             }
             actor.guild_rank = "F"
+            from world.rules.affinity import AffinitySource, apply_affinity_change
+
+            apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
     except Exception:
-        _restore_registration(actor, snapshot)
+        _restore_registration(actor, staff, snapshot)
         raise
     parsed = parse_guild_registration(actor)
     if parsed is None:
@@ -263,8 +271,9 @@ def turn_in_quest(
     Requires a valid registration, local GuildStaff, a parsed ``COMPLETED``
     record with the exact quest ID, a registered offer for that definition at
     the staff's branch, and the quest ID absent from reward claims. All reward
-    surfaces (wallet, inventory, ACQUIRE quest log, merit, claims) commit in
-    one transaction with full cache restoration.
+    surfaces (wallet, inventory, ACQUIRE quest log, merit, claims) and every
+    then-in-party companion's +2 ``quest_completion`` affinity commit in one
+    transaction with full cache restoration (party-quest D-3).
     """
     from world.quests.runtime import QuestState, find_record, read_records
     from world.rules.guild_offers import (
@@ -313,6 +322,16 @@ def turn_in_quest(
         ),
     )
 
+    # The then-in-party companion list is precomputed once, so a membership
+    # change mid-transaction cannot alter who earns the quest-completion
+    # bonus (party-quest D-3). The gain constant comes from the affinity
+    # rulebook, never duplicated here.
+    from world.rules.affinity_config import get_config
+    from world.rules.party import live_companions
+
+    companions = live_companions(actor)
+    companion_gain = get_config().quest_completion_gain
+
     snapshots = snapshot_attributes(
         actor,
         ("wallet", "inventory", "quest_log", "guild_reward_claims"),
@@ -324,6 +343,15 @@ def turn_in_quest(
 
     for room, _, _ in pin_operations:
         pin_snapshots[id(room)] = snapshot_pin_reasons(room)
+
+    # Every affected companion's affinity surface joins the snapshot set. The
+    # relation handler reads through the stored ``relations_data`` attribute
+    # with no separate cache, so restoring the attribute is the whole
+    # in-process story (Evennia's attribute cache is reset on failure by the
+    # best-effort restorer).
+    companion_snapshots = {
+        npc.pk: attribute_snapshot(npc, "relations_data") for npc in companions
+    }
 
     onboarding_completed = False
 
@@ -346,6 +374,10 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         actor.db.guild_reward_claims = [*claims, quest_id]
+        from world.rules.affinity import apply_affinity_change
+
+        for npc in companions:
+            apply_affinity_change(npc, actor, "quest_completion", companion_gain)
         nonlocal onboarding_completed
         if record.definition_key == "introductory_hunt" and not actor.onboarded:
             from world.rules.onboarding import set_onboarded
@@ -363,6 +395,10 @@ def turn_in_quest(
 
         for room, _, _ in pin_operations:
             restore_pin_reasons(room, pin_snapshots[id(room)])
+        for npc in companions:
+            restore_attribute_best_effort(
+                npc, "relations_data", companion_snapshots[npc.pk]
+            )
 
     try:
         with transaction.atomic():

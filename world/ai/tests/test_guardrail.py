@@ -76,6 +76,38 @@ class GuardrailRegistrationTests(unittest.TestCase):
             await_result(d)
         self.assertEqual(order, ["first", "second"])
 
+    @covers_requirement("guardrail::semantic-validators-are-pluggable-and-layer-scoped")
+    def test_per_call_validators_retry_within_the_budget(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 1,
+            json.dumps({"secret": 42}),
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            json.dumps({"secret": "ok"}),
+        )
+        per_call = {
+            "no_leak": lambda parsed: (
+                ["echoes the secret"] if parsed.get("secret") == 42 else []
+            )
+        }
+        with override_settings(LLM_PROFILES=_raw()):
+            d = guarded_call(
+                "narrator",
+                client,
+                ChatRequestDescriptor(
+                    messages=({"role": "user", "content": "x"},),
+                    output_schema={"type": "object"},
+                    semantic_validators=per_call,
+                ),
+            )
+            text = await_result(d)
+        self.assertEqual(json.loads(text), {"secret": "ok"})
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+        self.assertIn("echoes the secret", client.calls[1].messages[-1]["content"])
+
     def test_duplicate_semantic_validator_is_rejected(self):
         validator = lambda parsed: []
         register_semantic_validator("narrator", "dup", validator)

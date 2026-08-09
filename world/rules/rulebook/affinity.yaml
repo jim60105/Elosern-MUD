@@ -1,0 +1,50 @@
+# Hidden NPC-to-player affinity balance data (affinity-system D-4).
+# The numeric value is never rendered; stages carry the Traditional Chinese
+# display names and the authored look-flavor templates. The loader in
+# world/rules/affinity_config.py validates the canonical floor sequence and
+# fails closed on any deviation.
+
+# The affinity value at or above which an NPC may invite the player into its
+# party while the player is offline (consumed by the future party change).
+invite_threshold: 70
+
+# Daily budget shared by the capped positive sources (talk / trade / guild /
+# ai_dialogue), lazily reset on the first capped positive delta of a new world
+# day. quest_completion is exempt from this budget.
+daily_interaction_cap: 5
+
+# The fixed affinity gain granted to every in-party companion when the player
+# turns in a guild quest (consumed by the future party-quest change).
+quest_completion_gain: 2
+
+# Exactly seven stages. Floors must equal 0/10/30/50/70/90/100, strictly
+# increasing, no duplicates. Values >= 100 resolve to the topmost stage.
+stages:
+  - id: acquaintance
+    floor: 0
+    name: 初識
+    look_flavor: 她只是隨意地看了你一眼，就像看待每個擦肩而過的陌生人。
+  - id: familiar
+    floor: 10
+    name: 熟識
+    look_flavor: 她認出了你，向你點頭打了個招呼。
+  - id: warm
+    floor: 30
+    name: 親睦
+    look_flavor: 她見到你時，嘴角浮起了一抹淺淺的笑意。
+  - id: trusted
+    floor: 50
+    name: 信賴
+    look_flavor: 她看著你的眼神裡帶著信賴。
+  - id: bonded
+    floor: 70
+    name: 羈絆
+    look_flavor: 她看見你時，眼底閃過一絲安心的光芒。
+  - id: beloved
+    floor: 90
+    name: 至愛
+    look_flavor: 她凝視你的目光裡滿是溫柔與眷戀。
+  - id: absolute_bond
+    floor: 100
+    name: 絕對羈絆
+    look_flavor: 她的一切心思都繫在你身上，眼中唯有你。

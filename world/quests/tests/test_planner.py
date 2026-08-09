@@ -11,7 +11,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
-from typeclasses.rooms import InstanceRoom
+from typeclasses.rooms import InstanceRoom, Room
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage, QuestType
 from world.quests.planner import quest_event_effect_planner
@@ -27,6 +27,8 @@ from world.rules.action import (
     register_event_effect_planner,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.party import join_party
+from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 
 from ._fixtures import (
@@ -47,6 +49,18 @@ CLAW_SKILL = SkillDef(
     target_spec=TargetSpec.SINGLE,
     cost={},
     usable_out_of_combat=False,
+    element=None,
+    effects=["damage:dark:physical"],
+)
+
+STRIKE_SKILL = SkillDef(
+    key="strike",
+    label="突襲",
+    description="測試用：對單一敵人造成物理傷害，且可在非戰鬥場合使用。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={},
+    usable_out_of_combat=True,
     element=None,
     effects=["damage:dark:physical"],
 )
@@ -284,6 +298,161 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         stored = self._records()[0]
         self.assertEqual(stored["state"], "in_progress")
         self.assertEqual(room.db.pin_reasons, room_pins_before)
+
+
+class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTest):
+    """Companion DEFEAT credit for the quest owner (party-quest task 1.3)."""
+
+    def setUp(self):
+        super().setUp()
+        register_event_effect_planner("quest", quest_event_effect_planner)
+        SKILL_REGISTRY["claw"] = CLAW_SKILL
+        SKILL_REGISTRY["strike"] = STRIKE_SKILL
+        self.room = create_object(Room, key="companion-room")
+        self.player = create_object(PlayerCharacter, key="companion-owner")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
+        self.two_stage = register(
+            quest(
+                "two_stage",
+                stages=(
+                    QuestStage(0, defeat(quantity=1)),
+                    QuestStage(1, defeat(quantity=1)),
+                ),
+            )
+        )
+
+    def tearDown(self):
+        from world.rules.action import _EVENT_EFFECT_PLANNERS
+
+        _EVENT_EFFECT_PLANNERS.pop("quest", None)
+        SKILL_REGISTRY.pop("claw", None)
+        SKILL_REGISTRY.pop("strike", None)
+        super().tearDown()
+
+    def _monster(self, key: str, hp: int = 1, tier: str = "low") -> Monster:
+        monster = create_object(Monster, key=key)
+        monster.threat_tier = tier
+        monster.apply_monster_tier("floor")
+        monster.traits.hp._data["current"] = hp
+        return monster
+
+    def _companion(self, key: str) -> NPC:
+        npc = create_object(NPC, key=key, location=self.room)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        npc.traits.hp._data["current"] = 1
+        npc.db.skills = {"active": ["claw"], "passive": []}
+        join_party(npc, self.player)
+        return npc
+
+    def _field(self, actor, targets, *, knocked_out: frozenset[str] = frozenset()):
+        return Battlefield(
+            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
+            {actor.key: actor, **{t.key: t for t in targets}},
+            knocked_out=set(knocked_out),
+        )
+
+    def _resolve(self, actor, skill_key, targets, field):
+        request = ActionRequest(
+            actor, skill_key, targets, BattlefieldActionContext(field)
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            return ActionResolver.resolve(request)
+
+    def _records(self):
+        return [to_storage(record) for record in read_records(self.player)]
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_bound_companion_kill_advances_owner_objective(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        companion = self._companion("first")
+        prey = self._monster("prey")
+        field = self._field(companion, [prey])
+        result = self._resolve(companion, "claw", [prey], field)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 1)
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_knocked_out_companion_kill_grants_no_credit(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        companion = self._companion("ko")
+        prey = self._monster("prey-ko")
+        field = self._field(
+            companion, [prey], knocked_out=frozenset({companion.key})
+        )
+        result = self._resolve(companion, "claw", [prey], field)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_unbound_npc_kill_grants_no_credit(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        outsider = create_object(NPC, key="outsider", location=self.room)
+        outsider.race = "human"
+        outsider.apply_race_baseline()
+        outsider.db.skills = {"active": ["claw"], "passive": []}
+        prey = self._monster("prey-unbound")
+        field = self._field(outsider, [prey])
+        result = self._resolve(outsider, "claw", [prey], field)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    def test_backref_mismatch_kill_grants_no_credit(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        # The NPC claims the player as its owner but is absent from the
+        # player's party list: the one-sided binding must fail closed.
+        impostor = create_object(NPC, key="impostor", location=self.room)
+        impostor.race = "human"
+        impostor.apply_race_baseline()
+        impostor.db.skills = {"active": ["claw"], "passive": []}
+        impostor.db.party_member = self.player.pk
+        prey = self._monster("prey-mismatch")
+        field = self._field(impostor, [prey])
+        result = self._resolve(impostor, "claw", [prey], field)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    def test_no_battlefield_credit_request_fails_closed(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        companion = self._companion("striker")
+        companion.db.skills = {"active": ["strike"], "passive": []}
+        prey = self._monster("prey-ambush")
+        prey.location = self.room
+        request = ActionRequest(
+            companion, "strike", [prey], RoomActionContext(self.room)
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_companion_area_defeat_aggregates_without_skipping_stages(self):
+        accept_quest(self.player, self.two_stage.key)
+        companion = self._companion("reaver")
+        companion.db.skills = {"active": ["wind_blade"], "passive": []}
+        monsters = [self._monster(f"c-m{i}") for i in range(3)]
+        field = self._field(companion, monsters)
+        result = self._resolve(companion, "wind_blade", monsters, field)
+        self.assertEqual(result.outcome, "success")
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_index"], 1)
+        self.assertEqual(stored["stage_progress"], 0)
 
 
 if __name__ == "__main__":

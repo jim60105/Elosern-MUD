@@ -36,9 +36,15 @@ class MovementCostMixin:
         super().at_post_traverse(traversing_object, source_location, **kwargs)
         from world.rules.map_knowledge import record_arrival
         from world.rules.movement import charge_movement
+        from world.rules.party import follow_companions
 
         charge_movement(traversing_object, self.movement_cost_key)
         record_arrival(traversing_object)
+        follow_companions(
+            traversing_object,
+            source_location,
+            destination=traversing_object.location,
+        )
 
 
 class Exit(MovementCostMixin, ObjectParent, DefaultExit):
@@ -116,9 +122,16 @@ class WildernessGateExit(Exit):
         traversing_object.at_post_move(None)
         from world.rules.map_knowledge import record_arrival
         from world.rules.movement import charge_movement
+        from world.rules.party import follow_companions
 
         charge_movement(traversing_object, "wilderness_move")
         record_arrival(traversing_object)
+        follow_companions(
+            traversing_object,
+            source_location,
+            wilderness_coordinates=entry.wilderness_xy,
+            wilderness_name=WILDERNESS_NAME,
+        )
         return True
 
 
@@ -149,9 +162,16 @@ class WildernessReturnExit(WildernessExit):
                     return False
                 from world.rules.map_knowledge import record_arrival
                 from world.rules.movement import charge_movement
+                from world.rules.party import follow_companions
 
                 charge_movement(traversing_object, "wilderness_move")
                 record_arrival(traversing_object)
+                follow_companions(
+                    traversing_object,
+                    self.location,
+                    destination=grid_room,
+                    wilderness_source_coordinates=current,
+                )
                 return True
         # ORDINARY wilderness movement -- every coordinate/direction that is not
         # a registered gateway. Not free: a successful step still pays
@@ -160,7 +180,14 @@ class WildernessReturnExit(WildernessExit):
         if result:
             from world.rules.map_knowledge import record_arrival
             from world.rules.movement import charge_movement
+            from world.rules.party import follow_companions
 
             charge_movement(traversing_object, "wilderness_move")
             record_arrival(traversing_object)
+            follow_companions(
+                traversing_object,
+                self.location,
+                wilderness_coordinates=traversing_object.location.coordinates,
+                wilderness_source_coordinates=current,
+            )
         return result

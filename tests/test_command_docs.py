@@ -63,6 +63,11 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "talk <npc>、talk <npc> <keyword> [<quest_id>]",
         "context": "一般（需有交談對象）",
     },
+    "invite": {
+        "syntax": "invite <npc> [訊息]",
+        "context": "一般（需有可邀請的 NPC）",
+    },
+    "leave": {"syntax": "leave <npc>", "context": "一般（需有同伴）"},
     "rest": {"syntax": "rest <數字><s|m|h|d>", "context": "一般"},
     "sleep": {"syntax": "sleep", "context": "一般"},
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},

@@ -277,3 +277,86 @@ test("engage submits explore.engage only when enabled", () => {
   assert.equal(engage.actionId, "explore.engage");
   assert.deepEqual(engage.payload, { monster_id: 10 });
 });
+
+test("party invite submits explore.party_invite with the server NPC id", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 11,
+        display_name: "艾洛希雅",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.party_invite",
+            label: "邀請",
+            enabled: true,
+            disabled_reason: null,
+          },
+        ],
+      },
+    ],
+  });
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 11);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const invite = targetMenu.items.find((item) => item.key === "party-invite");
+  assert.equal(invite.actionId, "explore.party_invite");
+  assert.deepEqual(invite.payload, { npc_id: 11, message: "" });
+});
+
+test("a disabled party invite keeps its reason and never submits", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 11,
+        display_name: "艾洛希雅",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.party_invite",
+            label: "邀請",
+            enabled: false,
+            disabled_reason: { code: "party_full", message: "你的隊伍已經滿了（最多 4 人）。" },
+          },
+        ],
+      },
+    ],
+  });
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 11);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const invite = targetMenu.items.find((item) => item.key === "party-invite");
+  assert.equal(invite.enabled, false);
+  assert.equal(invite.actionId, null);
+  assert.equal(invite.payload, null);
+  assert.match(invite.description, /滿/);
+});
+
+test("party leave submits explore.party_leave with the server NPC id", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 12,
+        display_name: "艾洛希雅",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.party_leave",
+            label: "解散",
+            enabled: true,
+            disabled_reason: null,
+          },
+        ],
+      },
+    ],
+  });
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 12);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const leave = targetMenu.items.find((item) => item.key === "party-leave");
+  assert.equal(leave.actionId, "explore.party_leave");
+  assert.deepEqual(leave.payload, { npc_id: 12 });
+});

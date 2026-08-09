@@ -47,7 +47,7 @@ class GuildRegistrationTests(EvenniaTest):
     def _register(self, **kwargs):
         return register_adventurer(self.player, **kwargs)
 
-    @covers_requirement("guild-registration::registration-grants-f-rank-and-records-one-displayed-stat-snapshot")
+    @covers_requirement("guild-registration::registration-grants-f-rank-and-records-one-displayed-stat-snapshot", "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_undisguised_character_registers_at_f_with_true_snapshot(self):
         record = self._register(staff=self.staff)
         self.assertEqual(self.player.guild_rank, "F")
@@ -61,6 +61,7 @@ class GuildRegistrationTests(EvenniaTest):
             record["displayed_stats"]["atk_phys"],
             get_display_value(self.player, "atk_phys"),
         )
+        self.assertEqual(self.staff.relations.affinity_for(self.player), 1)
 
     def test_disguise_affects_only_the_registration_snapshot(self):
         self.player.traits.atk_phys.base = 88
@@ -84,11 +85,12 @@ class GuildRegistrationTests(EvenniaTest):
         original = (
             self.player.db.guild_registration,
             self.player.guild_rank,
+            self.staff.db.relations_data,
         )
         # Fault-inject the transaction context: the writer body runs and sets
-        # both fields, then the fake atomic exits with an error. The handler
-        # must restore both the database and the in-process attribute caches
-        # to their pre-registration values.
+        # both fields plus the affinity gain, then the fake atomic exits with
+        # an error. The handler must restore the database and the in-process
+        # attribute caches to their pre-registration values.
         class FakeAtomic:
             def __enter__(self):
                 return self
@@ -100,7 +102,11 @@ class GuildRegistrationTests(EvenniaTest):
             with self.assertRaises(RuntimeError):
                 register_adventurer(self.player, staff=self.staff)
         self.assertEqual(
-            (self.player.db.guild_registration, self.player.guild_rank),
+            (
+                self.player.db.guild_registration,
+                self.player.guild_rank,
+                self.staff.db.relations_data,
+            ),
             original,
         )
 

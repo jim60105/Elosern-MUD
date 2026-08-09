@@ -181,7 +181,11 @@ def _living_enemies(
     battlefield: Battlefield,
     actor: Any,
 ) -> list[Any]:
-    """Return living, non-fled members of the opposing team."""
+    """Return living, non-fled members of the opposing team.
+
+    Knocked-out members are excluded through the shared predicate, so opposing
+    combatants never select a knocked-out companion (party-combat D-2).
+    """
     actor_team = battlefield.team_of(str(actor.key))
     enemy_keys = next(
         (
@@ -196,6 +200,7 @@ def _living_enemies(
         for key in enemy_keys
         if key in battlefield.roster
         and key not in battlefield.fled
+        and not battlefield.is_knocked_out(key)
         and combat._stored_hp(battlefield.roster[key]) > 0
     ]
 

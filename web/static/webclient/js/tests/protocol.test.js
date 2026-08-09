@@ -2302,6 +2302,63 @@ test("affordance shapes are exact in the exploration panel", () => {
       })
     )
   );
+  // explore.party_kick is outside the closed action set.
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            affordances: [
+              {
+                kind: "action",
+                action_id: "explore.party_kick",
+                label: "踢出",
+                enabled: true,
+                disabled_reason: null,
+              },
+            ],
+          }),
+        ],
+      })
+    )
+  );
+});
+
+test("party invite and leave affordances are closed exploration actions", () => {
+  assert.ok(
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            keywords: [],
+            affordances: [
+              validExplorationAffordance({
+                action_id: "explore.party_invite",
+                label: "邀請",
+              }),
+            ],
+          }),
+        ],
+      })
+    )
+  );
+  assert.ok(
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            keywords: [],
+            affordances: [
+              validExplorationAffordance({
+                action_id: "explore.party_leave",
+                label: "解散",
+              }),
+            ],
+          }),
+        ],
+      })
+    )
+  );
 });
 
 test("exploration portrait_ref must be null and entries exact", () => {

@@ -169,6 +169,21 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             arg="南門",
         )
 
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_look_at_guard_shows_the_affinity_stage_line(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        self._open_root(page, 1)  # Look
+        _press(page, "ArrowRight")  # the guard (first present entity)
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "explore.look"), 1)
+        page.wait_for_function(
+            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
+            arg="她看著你的眼神裡帶著信賴。",
+        )
+
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_scripted_keyword_dialogue_completes(self):
         page = self.logged_in_page()

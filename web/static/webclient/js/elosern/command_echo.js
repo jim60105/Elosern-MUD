@@ -97,6 +97,20 @@
       }
       return join(["talk", npc, speech]);
     },
+    "explore.party_invite": function (payload, display) {
+      var npc = label(display && display.npcLabel);
+      if (npc === null) {
+        return null;
+      }
+      var message = payloadText(payload && payload.message);
+      return message === null
+        ? join(["invite", npc])
+        : join(["invite", npc, message]);
+    },
+    "explore.party_leave": function (payload, display) {
+      var npc = label(display && display.npcLabel);
+      return npc === null ? null : join(["leave", npc]);
+    },
     "explore.engage": function (payload, display) {
       var target = label(display && display.targetLabel);
       return target === null ? null : join(["engage", target]);

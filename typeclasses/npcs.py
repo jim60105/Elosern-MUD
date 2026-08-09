@@ -1,5 +1,6 @@
 """NPC typeclasses from design section 5.2 (entity-traits) and §7.4 (npc-dialogue)."""
 
+from dataclasses import dataclass
 from typing import Any
 
 from evennia.typeclasses.attributes import AttributeProperty
@@ -8,11 +9,53 @@ from twisted.internet import defer
 from .entities import LivingEntity
 
 
+@dataclass(frozen=True)
+class DialogueExchangeResult:
+    """One structured dialogue exchange: the degraded terminal or a reply.
+
+    ``degraded=True`` means the guarded layer resolved to its public ``None``
+    marker and ``reply`` is ``None``; the caller decides the fallback behavior
+    (the authored greeting or the party-invite threshold). A degraded outcome
+    is never silently treated as a declined intent. ``reply`` is typed loosely
+    so this module needs no module-scope generative import.
+    """
+
+    degraded: bool
+    reply: Any | None
+
+
 class NPC(LivingEntity):
     """A non-player living entity with deferred dialogue and schedule seams."""
 
     dialogue_memory: Any | None = AttributeProperty(default=None)
     schedule: Any | None = AttributeProperty(default=None)
+
+    def at_object_delete(self) -> bool:
+        """Free every party binding this NPC holds before the object is removed.
+
+        Runs the party module's purge API (party-core D-6) so instance
+        reclamation, scene teardown, and ordinary deletes never leave a stale
+        dbid consuming a player's companion slot. Returns ``True`` so the
+        delete proceeds (Evennia aborts when this hook is falsy).
+        """
+        from world.rules.party import purge_npc_memberships
+
+        purge_npc_memberships(self)
+        return True
+
+    def get_display_desc(self, looker=None, **kwargs) -> str:
+        """Append the affinity stage line to the ordinary zh-tw description.
+
+        The stage line is rendered by the shared appearance layer (the same
+        frame the text 看 command, the ``at_look`` hook, and the webclient
+        explore-look action use); entities without an affinity record for the
+        looker render no line and the read never persists.
+        """
+        desc = super().get_display_desc(looker, **kwargs)
+        from world.rules.affinity import affinity_stage_line
+
+        line = affinity_stage_line(self, looker)
+        return f"{desc}\n{line}" if line else desc
 
 
 def _swallow_cancelled(failure):
@@ -88,6 +131,24 @@ class LLMNPC(NPC):
             "disguised_stats": dict(character.db.disguised_stats or {}),
         }
 
+    def _affinity_context(self, character: Any) -> dict[str, Any] | None:
+        """The NPC's own affinity context for ``character``, read-only.
+
+        Gated on ``has_record`` so a recordless player yields ``None`` (the
+        prompt block is omitted). Only read APIs are used -- this never
+        creates, persists, or mutates an affinity record, and a corrupted
+        stored record degrades through the tolerant parser instead of
+        crashing the talk.
+        """
+        handler = self.relations
+        if not handler.has_record(character):
+            return None
+        return {
+            "value": handler.affinity_for(character),
+            "cap": handler.cap_for(character),
+            "stage": handler.stage_for(character).name,
+        }
+
     def _thinking_text(self) -> str:
         """Render the thinking feedback shown to the speaker.
 
@@ -107,33 +168,41 @@ class LLMNPC(NPC):
             return ""
 
     @defer.inlineCallbacks
-    def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):
-        """Handle a player addressing this NPC through the guarded dialogue seam.
+    def run_npc_exchange(self, speech: str, character: Any, client: Any, *, reactor=None):
+        """Run one guarded dialogue exchange without applying anything.
+
+        Performs the same steps ``at_talked_to`` used to: rejects an explicit
+        ``None`` client, appends the speaker's line to the per-character chat
+        memory, arms and cancels the thinking timer, and resolves the reply
+        through the guarded dialogue layer. The NPC's reply speech is appended
+        to memory when one exists. Nothing is applied: intent application and
+        degrade fallbacks are the caller's decision, which is what lets the
+        ``invite`` adapter apply the fixed threshold only on the degraded
+        terminal.
 
         Args:
-            speech: The player's line.
+            speech: The speaker's line.
             character: The speaking player character.
             client: The injected client protocol; an explicit ``None`` errbacks
                 with ``NPCDialogueClientRequiredError`` before any prompt
                 construction or transport work.
             reactor: Optional Twisted reactor for the thinking timer; tests
-                inject ``twisted.internet.task.Clock`` for determinism and the
-                global reactor is used when omitted.
+                inject ``twisted.internet.task.Clock`` for determinism.
 
         Returns:
-            A Deferred resolving after the reply is presented (or the degraded
-            greeting/silence is rendered) and a verified intent is applied.
+            A Deferred resolving to a frozen :class:`DialogueExchangeResult`
+            carrying ``degraded=True`` and ``reply=None`` when the guarded
+            layer degraded, or ``degraded=False`` with the validated reply.
         """
         from twisted.internet import task as twisted_task
         from world.ai.npc_dialogue import (
             NPCDialogueClientRequiredError,
             generate_npc_reply,
         )
-        from world.rules.npc_intents import apply_npc_intent
 
         if client is None:
             raise NPCDialogueClientRequiredError(
-                "at_talked_to requires an injected client; got None"
+                "run_npc_exchange requires an injected client; got None"
             )
 
         if reactor is None:
@@ -157,12 +226,52 @@ class LLMNPC(NPC):
                 npc_context=self._npc_context(),
                 player_context=self._player_context(character),
                 memory=self._chat_lines(character),
+                affinity_context=self._affinity_context(character),
             )
         finally:
             if thinking_defer is not None and not thinking_defer.called:
                 thinking_defer.cancel()
 
         if reply is None:
+            return DialogueExchangeResult(degraded=True, reply=None)
+        self._append_memory(character, self, reply.speech)
+        return DialogueExchangeResult(degraded=False, reply=reply)
+
+    @defer.inlineCallbacks
+    def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):
+        """Handle a player addressing this NPC through the guarded dialogue seam.
+
+        The prompt carries the NPC's own affinity context for the speaker
+        (read-only; a recordless player gets no block), the guarded pipeline
+        resolves the reply, the degraded outcome maps to the authored greeting
+        or silence, and a verified intent is applied deterministically. This
+        is a thin composition of :meth:`run_npc_exchange` plus presentation
+        and intent application.
+
+        Args:
+            speech: The player's line.
+            character: The speaking player character.
+            client: The injected client protocol; an explicit ``None`` errbacks
+                with ``NPCDialogueClientRequiredError`` before any prompt
+                construction or transport work.
+            reactor: Optional Twisted reactor for the thinking timer; tests
+                inject ``twisted.internet.task.Clock`` for determinism and the
+                global reactor is used when omitted.
+
+        Returns:
+            A Deferred resolving after the reply is presented (or the degraded
+            greeting/silence is rendered) and a verified intent is applied.
+        """
+        from world.ai.npc_dialogue import NPCDialogueClientRequiredError
+        from world.rules.npc_intents import apply_npc_intent
+
+        if client is None:
+            raise NPCDialogueClientRequiredError(
+                "at_talked_to requires an injected client; got None"
+            )
+
+        result = yield self.run_npc_exchange(speech, character, client, reactor=reactor)
+        if result.degraded:
             from world.rules.dialogue import greeting_for
 
             greeting = greeting_for(self)
@@ -170,6 +279,5 @@ class LLMNPC(NPC):
                 character.msg(f"{self.key}說：{greeting}")
             return
 
-        character.msg(f"{self.key}說：{reply.speech}")
-        self._append_memory(character, self, reply.speech)
-        apply_npc_intent(self, character, reply.intent)
+        character.msg(f"{self.key}說：{result.reply.speech}")
+        apply_npc_intent(self, character, result.reply.intent)

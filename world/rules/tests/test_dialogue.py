@@ -27,7 +27,7 @@ from world.rules.dialogue import (
     is_dialogue_host,
     resolve_dialogue_component,
 )
-from world.rules.onboarding import snapshot_for, talk_response
+from world.rules.onboarding import run_scripted_talk, snapshot_for
 
 
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -158,6 +158,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
         "onboarding-guide::talk-behaves-predictably-for-any-npc",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
     )
     def test_guard_known_keyword_writes_progress_and_unknown_writes_nothing(self):
         from typeclasses.characters import PlayerCharacter
@@ -167,12 +168,63 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player.apply_race_baseline()
         player.guide_progress = GuideProgress.active().to_storage()
         guard = self._guard()
-        response = talk_response(guard, player, "公會")
-        self.assertIn("冒險者公會", response)
+        result = run_scripted_talk(guard, player, "公會")
+        self.assertIn("冒險者公會", result.response)
+        self.assertFalse(result.budget_capped)
         self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ("公會",))
-        unknown = talk_response(guard, player, "謎語")
-        self.assertIn("明白", unknown)
+        self.assertEqual(guard.relations.affinity_for(player), 1)
+        unknown = run_scripted_talk(guard, player, "謎語")
+        self.assertIn("明白", unknown.response)
         self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ("公會",))
+        self.assertEqual(guard.relations.affinity_for(player), 1)
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_failed_guard_talk_write_restores_both_surfaces(self):
+        from unittest.mock import patch
+
+        from typeclasses.characters import PlayerCharacter
+
+        player = create_object(PlayerCharacter, key="guard-talker")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.guide_progress = GuideProgress.active().to_storage()
+        guard = self._guard()
+        progress_before = player.guide_progress
+        relations_before = guard.db.relations_data
+
+        class FakeAtomic:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                raise RuntimeError("db failure")
+
+        with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
+            with self.assertRaises(RuntimeError):
+                run_scripted_talk(guard, player, "公會")
+        self.assertEqual(player.guide_progress, progress_before)
+        self.assertEqual(guard.db.relations_data, relations_before)
+        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
+
+    @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
+    def test_budget_capped_talk_presents_the_non_numeric_hint(self):
+        from commands.talk import CmdsTalk
+        from typeclasses.characters import PlayerCharacter
+
+        guard = self._guard()
+        guard.location = self.room1
+        player = create_object(PlayerCharacter, key="capped-talker")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.guide_progress = GuideProgress.active().to_storage()
+        player.location = self.room1
+        for _ in range(5):
+            self.call(CmdsTalk(), f"{guard.key} 公會", caller=player)
+        from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
+
+        output = self.call(CmdsTalk(), f"{guard.key} 公會", caller=player)
+        self.assertIn(AFFINITY_DAILY_CAP_HINT, output)
+        self.assertEqual(guard.relations.affinity_for(player), 5)
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
     def test_every_taught_guild_command_resolves_to_a_registered_command(self):

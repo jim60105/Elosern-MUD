@@ -3,7 +3,7 @@
 Pure-logic branch tests mirroring ``test_command_branch_behaviour.py``: the
 ``回報`` keyword on a ``guild_staff`` dialogue host routes to
 ``dialogue_turn_in`` when a quest id follows, and otherwise flows through the
-shared ``talk_response`` resolution unchanged.
+shared deterministic talk writer (``run_scripted_talk``) resolution unchanged.
 """
 
 from unittest import TestCase
@@ -20,6 +20,7 @@ from world.rules.guild import (
     GuildServiceError,
     RewardClaimError,
 )
+from world.rules.onboarding import ScriptedTalkResult
 
 _NO_RESPONSE = "對方沒有理會你。"
 
@@ -53,7 +54,7 @@ class TalkTurnInBranchTests(TestCase):
                 "items": ["healing_potion"],
                 "onboarding_completed": False,
             },
-        ) as turnin, patch("commands.talk.talk_response") as response:
+        ) as turnin, patch("commands.talk.run_scripted_talk") as response:
             command.func()
         turnin.assert_called_once_with(command.caller, npc, "quest-1")
         response.assert_not_called()
@@ -91,12 +92,17 @@ class TalkTurnInBranchTests(TestCase):
                 "無法回報任務", command.caller.msg.call_args.args[0]
             )
 
-    def test_turnin_keyword_without_quest_id_flows_through_talk_response(self):
+    def test_turnin_keyword_without_quest_id_flows_through_talk_writer(self):
         command = _command(f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}")
         npc = _staff_npc()
         with patch("commands.talk._resolve_npc", return_value=npc), patch(
             "commands.talk.dialogue_key_for", return_value=GUILD_STAFF_DIALOGUE_KEY
-        ), patch("commands.talk.talk_response", return_value="「目前沒有可以交回的任務。」") as response, patch(
+        ), patch(
+            "commands.talk.run_scripted_talk",
+            return_value=ScriptedTalkResult(
+                response="「目前沒有可以交回的任務。」", budget_capped=False
+            ),
+        ) as response, patch(
             "commands.talk.dialogue_turn_in"
         ) as turnin:
             command.func()
@@ -116,7 +122,7 @@ class TalkTurnInBranchTests(TestCase):
             command = _command(args)
             with patch("commands.talk._resolve_npc", return_value=npc), patch(
                 "commands.talk.dialogue_key_for", return_value=GUARD_DIALOGUE_KEY
-            ), patch("commands.talk.talk_response", return_value=None) as response, patch(
+            ), patch("commands.talk.run_scripted_talk", return_value=None) as response, patch(
                 "commands.talk.dialogue_turn_in"
             ) as turnin:
                 command.func()
@@ -133,7 +139,7 @@ class TalkTurnInBranchTests(TestCase):
         command = _command(f"吟遊詩人 {GUILD_STAFF_TURNIN_KEYWORD} quest-1")
         with patch("commands.talk._resolve_npc", return_value=npc), patch(
             "commands.talk.dialogue_key_for", return_value=GUILD_STAFF_DIALOGUE_KEY
-        ), patch("commands.talk.talk_response", return_value=None) as response, patch(
+        ), patch("commands.talk.run_scripted_talk", return_value=None) as response, patch(
             "commands.talk.dialogue_turn_in"
         ) as turnin:
             command.func()
@@ -151,12 +157,12 @@ class TalkTurnInBranchTests(TestCase):
             command.func()
         command.caller.msg.assert_called_once_with("這裡沒有公會服務人員。")
 
-    def test_talk_response_errors_on_turnin_keyword_are_reported(self):
+    def test_talk_writer_errors_on_turnin_keyword_are_reported(self):
         command = _command(f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}")
         with patch("commands.talk._resolve_npc", return_value=_staff_npc()), patch(
             "commands.talk.dialogue_key_for", return_value=GUILD_STAFF_DIALOGUE_KEY
         ), patch(
-            "commands.talk.talk_response", side_effect=RewardClaimError("malformed_claims")
+            "commands.talk.run_scripted_talk", side_effect=RewardClaimError("malformed_claims")
         ):
             command.func()
         self.assertIn(
@@ -168,7 +174,10 @@ class TalkTurnInBranchTests(TestCase):
         command = _command("公會職員 公會")
         with patch("commands.talk._resolve_npc", return_value=npc), patch(
             "commands.talk.dialogue_key_for", return_value=GUILD_STAFF_DIALOGUE_KEY
-        ), patch("commands.talk.talk_response", return_value="公會回應") as response, patch(
+        ), patch(
+            "commands.talk.run_scripted_talk",
+            return_value=ScriptedTalkResult(response="公會回應", budget_capped=False),
+        ) as response, patch(
             "commands.talk.dialogue_turn_in"
         ) as turnin:
             command.func()

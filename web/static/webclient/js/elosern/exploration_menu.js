@@ -338,6 +338,40 @@
             description: null,
             disabledReason: affordance.disabled_reason || null,
           });
+        } else if (affordance.action_id === "explore.party_invite") {
+          items.push({
+            key: "party-invite",
+            label: affordance.label || "邀請",
+            enabled: !!affordance.enabled,
+            actionId: affordance.enabled ? "explore.party_invite" : null,
+            payload: affordance.enabled ? { npc_id: target.identity, message: "" } : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+          if (affordance.enabled) {
+            items[items.length - 1].commandDisplay = {
+              targetLabel: target.display_name,
+            };
+          }
+        } else if (affordance.action_id === "explore.party_leave") {
+          items.push({
+            key: "party-leave",
+            label: affordance.label || "解散",
+            enabled: !!affordance.enabled,
+            actionId: affordance.enabled ? "explore.party_leave" : null,
+            payload: affordance.enabled ? { npc_id: target.identity } : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+          if (affordance.enabled) {
+            items[items.length - 1].commandDisplay = {
+              targetLabel: target.display_name,
+            };
+          }
         } else if (affordance.action_id === "explore.engage") {
           items.push({
             key: "engage",

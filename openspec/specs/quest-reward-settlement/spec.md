@@ -25,11 +25,14 @@ same definition SHALL remain independently claimable after completion.
 - **WHEN** `<definition>:2` is completed after `<definition>:1` was claimed
 - **THEN** the second ID can be claimed once without removing the first claim record
 
-### Requirement: Reward payout is one atomic copper, item, merit, acquisition, and claim transaction
+### Requirement: Reward payout is one atomic copper, item, merit, acquisition, claim, and affinity transaction
 Turn-in SHALL precompute non-negative integer wallet and merit values, repeated-key item additions,
-ACQUIRE progress for other active quests, and the replacement claims list. It SHALL commit wallet,
-inventory, `guild_merit`, quest log, and claims in one database transaction and restore every Evennia
-cache if any write fails. The completed quest record itself SHALL remain `COMPLETED` history.
+ACQUIRE progress for other active quests, the replacement claims list, and +2 affinity
+(`quest_completion` source, exempt from the daily cap) for every companion in the player's party at
+turn-in through the sole-writer affinity API (`world/rules/affinity.py`). It SHALL commit wallet,
+inventory, `guild_merit`, quest log, claims, and every affected companion's affinity record in one
+database transaction and restore every Evennia cache — including the affinity records — if any write
+fails. The completed quest record itself SHALL remain `COMPLETED` history.
 
 #### Scenario: Reward grants all configured surfaces
 - **WHEN** a reward has copper 50, two healing potions, and merit 25
@@ -40,10 +43,15 @@ cache if any write fails. The completed quest record itself SHALL remain `COMPLE
 - **WHEN** a claimed potion reward satisfies another active quest's current ACQUIRE objective
 - **THEN** that quest progress and every reward surface commit together
 
+#### Scenario: Turn-in rewards each then-in-party companion
+- **WHEN** a turn-in succeeds with two bound companions in the party
+- **THEN** each companion's affinity rises by 2 in the same transaction as the reward surfaces, and
+  a companion outside the party gains nothing
+
 #### Scenario: Fault at every write position restores all surfaces
-- **WHEN** each reward write is fault-injected to raise after any preceding writes
-- **THEN** database and in-process wallet, inventory, merit, quest log, and claims all equal their
-  pre-turn-in values
+- **WHEN** each reward or affinity write is fault-injected to raise after any preceding writes
+- **THEN** database and in-process wallet, inventory, merit, quest log, claims, and every
+  companion's affinity record all equal their pre-turn-in values
 
 ### Requirement: ACQUIRE is a closed inventory-backed quest objective
 Change 16 SHALL add `ObjectiveKind.ACQUIRE`. An ACQUIRE objective SHALL declare exactly one known

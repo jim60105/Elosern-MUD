@@ -76,7 +76,13 @@ MAX_KEYWORD_LABEL_CODE_POINTS = 128
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 
 ACTION_KINDS = ("action", "navigate")
-ACTION_IDS = ("explore.talk_scripted", "explore.talk_freeform", "explore.engage")
+ACTION_IDS = (
+    "explore.talk_scripted",
+    "explore.talk_freeform",
+    "explore.party_invite",
+    "explore.party_leave",
+    "explore.engage",
+)
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")
 
@@ -613,6 +619,49 @@ def _freeform_affordance(npc: Any) -> dict[str, Any]:
     }
 
 
+def _party_invite_affordance(npc: Any, actor: Any) -> dict[str, Any]:
+    """Build the invite affordance for a present unbound ``LLMNPC``.
+
+    Mirrors the ``invite`` command's deterministic preflight: the affordance
+    is disabled with the full-party reason when the actor's party is already
+    at the bound; it is never offered for an already-bound companion (the
+    caller decides that).
+    """
+    del npc
+    from world.rules.party import (
+        PARTY_FULL_MESSAGE,
+        PARTY_MAX_COMPANIONS,
+        party_size,
+    )
+
+    if party_size(actor) >= PARTY_MAX_COMPANIONS:
+        return {
+            "kind": "action",
+            "action_id": "explore.party_invite",
+            "label": "邀請",
+            "enabled": False,
+            "disabled_reason": {"code": "party_full", "message": PARTY_FULL_MESSAGE},
+        }
+    return {
+        "kind": "action",
+        "action_id": "explore.party_invite",
+        "label": "邀請",
+        "enabled": True,
+        "disabled_reason": None,
+    }
+
+
+def _party_leave_affordance() -> dict[str, Any]:
+    """Build the leave affordance for a present bound companion."""
+    return {
+        "kind": "action",
+        "action_id": "explore.party_leave",
+        "label": "解散",
+        "enabled": True,
+        "disabled_reason": None,
+    }
+
+
 def _engage_affordance(monster: Any) -> dict[str, Any]:
     living = getattr(getattr(monster, "traits", None), "hp", None) is not None and monster.traits.hp.value > 0
     if not living:
@@ -669,6 +718,8 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
     ]
     present.sort(key=lambda obj: (int(obj.pk),))
     targets: list[dict[str, Any]] = []
+    from world.rules.party import is_companion
+
     for obj in present[:MAX_INTERACT_TARGETS]:
         affordances: list[dict[str, Any]] = []
         target_keywords: list[dict[str, Any]] | None = None
@@ -677,6 +728,10 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
             target_keywords = _scripted_keywords(obj) or None
         if isinstance(obj, LLMNPC):
             affordances.append(_freeform_affordance(obj))
+        if isinstance(obj, NPC) and is_companion(obj, actor):
+            affordances.append(_party_leave_affordance())
+        elif isinstance(obj, LLMNPC):
+            affordances.append(_party_invite_affordance(obj, actor))
         if isinstance(obj, Monster):
             affordances.append(_engage_affordance(obj))
         if guild_host is not None and obj is guild_host:

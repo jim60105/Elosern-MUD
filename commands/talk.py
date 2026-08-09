@@ -14,6 +14,7 @@ from world.onboarding.guide_dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
+from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.dialogue import dialogue_key_for, greeting_for, is_dialogue_host
 from world.rules.guild import (
     GuildDataError,
@@ -24,6 +25,7 @@ from world.rules.guild import (
 from world.rules.onboarding import (
     current_guide_prompt,
     is_guide_host,
+    run_scripted_talk,
     talk_response,
 )
 
@@ -34,17 +36,26 @@ _NO_RESPONSE = "對方沒有理會你。"
 _USAGE = "用法：talk <npc> 或 talk <npc> <keyword>"
 
 
-def _resolve_npc(caller, raw_target: str) -> NPC | None | str:
+def _resolve_npc(
+    caller,
+    raw_target: str,
+    *,
+    missing: str = _MISSING_TARGET,
+    ambiguous: str = _AMBIGUOUS_TARGET,
+    not_npc: str = _NOT_NPC,
+) -> NPC | None | str:
     """Resolve a talk target to an NPC, or a reason string on failure.
 
-    Returns the NPC on success; ``_MISSING_TARGET``, ``_AMBIGUOUS_TARGET``, or
-    ``_NOT_NPC`` on a resolution failure.
+    Returns the NPC on success; ``missing``, ``ambiguous``, or ``not_npc`` on
+    a resolution failure. The message overrides let sibling commands
+    (``invite``/``leave``) reuse the exact resolution rules with their own
+    target wording; the defaults keep ``talk``'s behavior unchanged.
     """
     if not raw_target:
-        return _MISSING_TARGET
+        return missing
     location = caller.location
     if location is None:
-        return _NOT_NPC
+        return not_npc
     matches = [
         obj
         for obj in location.contents
@@ -54,9 +65,9 @@ def _resolve_npc(caller, raw_target: str) -> NPC | None | str:
         )
     ]
     if not matches:
-        return _NOT_NPC
+        return not_npc
     if len(matches) > 1:
-        return _AMBIGUOUS_TARGET
+        return ambiguous
     return matches[0]
 
 
@@ -91,14 +102,15 @@ class CmdsTalk(Command):
                 self._turn_in_quest(npc, quest_id)
                 return
             try:
-                response = talk_response(npc, self.caller, keyword)
+                result = run_scripted_talk(npc, self.caller, keyword)
             except (RewardClaimError, GuildDataError) as error:
                 self.caller.msg(f"無法回報任務：{error}")
                 return
-            if response is None:
+            if result is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
-            self.caller.msg(f"{npc.key}說：{response}")
+            hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
+            self.caller.msg(f"{npc.key}說：{result.response}{hint}")
             return
 
         if is_guide_host(npc):
