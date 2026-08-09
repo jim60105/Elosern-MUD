@@ -31,7 +31,16 @@ class DialogueExchangeResult:
 
 
 class NPC(LivingEntity):
-    """A non-player living entity with deferred dialogue and schedule seams."""
+    """A non-player living entity with dialogue and schedule seams.
+
+    ``schedule`` (``AttributeProperty``) carries the NPC's deterministic
+    schedule: ``None`` (no schedule), a validated template reference, or a
+    full custom entry list -- see ``world.rules.npc_schedules`` for the
+    storage contract. It is written only through ``set_npc_schedule``, which
+    also records the assignment tick and the persistent ``schedule`` tag. The
+    runtime-state attribute ``schedule_state`` is declared there (current
+    state value or ``None``) and written only by the schedule-runtime change.
+    """
 
     dialogue_memory: Any | None = AttributeProperty(default=None)
     schedule: Any | None = AttributeProperty(default=None)

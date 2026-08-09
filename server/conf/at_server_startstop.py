@@ -113,6 +113,7 @@ def at_server_start():
     from world.quests.bootstrap import sync_quest_runtime
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import sync_guild_economy
+    from world.rules.npc_schedules import sync_npc_schedules
     from world.rules.onboarding import sync_guard_npc
 
     # Deterministic startup owns the world-clock singleton; presentation reads
@@ -126,6 +127,7 @@ def at_server_start():
     sync_quest_runtime()
     sync_guild_economy()
     sync_guard_npc()
+    sync_npc_schedules()
 
     # Prompt library: validate every YAML prompt file and mark broken keys
     # unavailable. Failures are bounded per key and logged; server startup

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from world.rules import economy, guild, guild_config, guild_offers, guild_exams, combat_session
 from world.rules import guild_economy as guild_economy_sync
-from world.rules import caravan_arrivals, shop_hours
+from world.rules import caravan_arrivals, shop_hours, npc_schedules
 from world.rules import equipment
 from world.quests import acquire
 from typeclasses import components
@@ -28,6 +28,7 @@ class NoGenerativeImportTests(unittest.TestCase):
         guild_economy_sync,
         caravan_arrivals,
         shop_hours,
+        npc_schedules,
         equipment,
         acquire,
         components,
@@ -52,6 +53,13 @@ class NoGenerativeImportTests(unittest.TestCase):
         source = inspect.getsource(at_server_start)
         self.assertLess(source.index("sync_quest_runtime()"), source.index("sync_guild_economy()"))
         self.assertLess(source.index("sync_grid()"), source.index("sync_guild_economy()"))
+
+    def test_schedule_sync_runs_after_guard_npc_sync(self):
+        from server.conf.at_server_startstop import at_server_start
+
+        source = inspect.getsource(at_server_start)
+        self.assertLess(source.index("sync_guard_npc()"), source.index("sync_npc_schedules()"))
+        self.assertLess(source.index("sync_guild_economy()"), source.index("sync_npc_schedules()"))
 
 
 class CommandSetRegistrationTests(unittest.TestCase):

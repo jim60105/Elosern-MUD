@@ -1,5 +1,3 @@
-# NPC Schedule Model
-
 ## Purpose
 
 Define the deterministic NPC schedule data contract: immutable role templates,
@@ -7,20 +5,20 @@ per-NPC storage shapes, validation, and startup synchronization. This capability
 covers the data only — settlement, movement, and interaction gating are owned by
 the `npc-schedule-runtime` capability.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Role templates are immutable rulebook data with a fixed entry shape
 
 `world/rules/rulebook/npc_schedules.yaml` SHALL declare `schema_version: 1` and a
-`templates:` mapping of role templates. Each template SHALL be an ordered list of entries with
-exactly `{tick_offset, kind}` plus per-kind required fields: a `move` entry SHALL carry a `target`
-and SHALL NOT carry `state`; a `state` entry SHALL carry a `state` value and SHALL NOT carry a
-`target`. `tick_offset` SHALL be a non-negative integer strictly below the world day's seconds
-(resolved through the existing clock day math), and entries SHALL repeat every world day. A
-template SHALL MAY declare an optional `default_state` from the bounded state vocabulary; a
-successful `move` settlement writes that value, and `default_state` SHALL NOT be settable on
-individual entries. The declared state vocabulary for `state` SHALL be bounded and documented in
-the rulebook.
+`templates:` mapping of role templates. Each template SHALL be a mapping carrying an `entries`
+list of exactly `{tick_offset, kind}` entries plus per-kind required fields: a `move` entry SHALL
+carry a `target` and SHALL NOT carry `state`; a `state` entry SHALL carry a `state` value and
+SHALL NOT carry a `target`. `tick_offset` SHALL be a non-negative integer strictly below the
+world day's seconds (resolved through the existing clock day math), and entries SHALL repeat
+every world day. A template MAY declare an optional `default_state` from the bounded state
+vocabulary; a successful `move` settlement writes that value, and `default_state` SHALL NOT be
+settable on individual entries. The declared state vocabulary for `state` SHALL be bounded and
+documented in the rulebook.
 
 #### Scenario: The shipped rulebook loads and validates
 - **WHEN** the `npc_schedules.yaml` rulebook is loaded by the validator
@@ -59,7 +57,7 @@ of `npc.db.schedule`. The API SHALL accept exactly two shapes: a template refere
 (`{"schema_version": 1, "template": <key>, "overrides": {...}}`) or a full custom list
 (`{"schema_version": 1, "entries": [...]}`). A `None` value SHALL mean "no schedule". Any other
 shape — missing schema_version, both `template` and `entries` present, non-dict storage,
-non-integer entry counts beyond the bound — SHALL be rejected with a named error. The API SHALL
+entry counts beyond the bound — SHALL be rejected with a named error. The API SHALL
 record `effective_from_tick` (the current world tick at assignment) and SHALL maintain a
 persistent `schedule` tag on the NPC so settlement can find it regardless of when it was spawned
 or reassigned. Consumers reading a stored `db.schedule` SHALL validate it with the same parser;
@@ -83,6 +81,12 @@ a malformed stored value resolves to "no schedule".
 #### Scenario: An override referencing a missing entry index is rejected
 - **WHEN** an override key does not correspond to an entry index of the referenced template
 - **THEN** validation rejects the reference with a named error
+
+#### Scenario: A stored schedule missing its recorded effective tick is malformed
+- **WHEN** an NPC's `db.schedule` is a valid template reference or custom list but
+  `db.schedule_effective_from_tick` is missing or not an integer
+- **THEN** the consumer parser resolves the schedule to "no schedule" and startup sync degrades
+  it like any other malformed stored value
 
 #### Scenario: Clearing a schedule removes the tag
 - **WHEN** `set_npc_schedule(npc, None)` is called on a previously scheduled NPC

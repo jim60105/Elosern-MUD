@@ -47,11 +47,14 @@ deterministic and offline-playable: no LLM and no image-generation service parti
 
 ```yaml
 schema_version: 1
+states: [duty, resting, busy]
 templates:
   guard:
-    - { tick_offset: 21600, kind: move,  target: "north_gate" }
-    - { tick_offset: 50400, kind: state, state: "resting" }
-    - { tick_offset: 64800, kind: move,  target: "barracks" }
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: move,  target: "north_gate" }
+      - { tick_offset: 50400, kind: state, state: "resting" }
+      - { tick_offset: 64800, kind: move,  target: "barracks" }
 ```
 
 Entry fields:
