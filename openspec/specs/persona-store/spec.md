@@ -1,5 +1,9 @@
-## ADDED Requirements
+# persona-store Specification
 
+## Purpose
+Define the read-only `PersonaStore` handler that exposes an entity's verbatim persona record
+(keyed retrieval and bounded prompt-block flattening) and its mount on `LivingEntity.persona`.
+## Requirements
 ### Requirement: PersonaStore is a read-only handler over the verbatim persona record
 `world/rules/persona.py` SHALL provide a `PersonaStore` class constructed from a `LivingEntity`
 that reads the raw record from `entity.db.persona` and exposes keyed retrieval plus prompt-block
@@ -15,8 +19,8 @@ never modify traits, attributes beyond the single persona record, or the world c
 #### Scenario: Keyed retrieval follows a defined contract
 - **WHEN** `get(field)` is called for a field that exists in the record
 - **THEN** the handler returns that field's value verbatim (the raw stored value, whether text,
-  number, or container); `get(field)` for a missing key, a non-dict record, or a missing record
-  SHALL return `None` and never raise
+  number, or container); `get(field)` for a missing key, a non-mapping record, or a missing
+  record SHALL return `None` and never raise
 
 #### Scenario: The handler has no write surface
 - **WHEN** the public surface of `PersonaStore` is inspected
@@ -27,8 +31,8 @@ never modify traits, attributes beyond the single persona record, or the world c
 `PersonaStore.flatten(fields=("personality", "life_story", "habit"))` SHALL return a single string
 with one labeled section per present field in the declared field order (e.g. 性格：… /
 人生經歷：… / 習慣：…), each field string capped and the combined block capped at a total bound.
-A missing record, a non-dict record, or a record with none of the requested fields present SHALL
-return `None` and never raise.
+A missing record, a non-mapping record, or a record with none of the requested fields present
+SHALL return `None` and never raise.
 
 #### Scenario: Three present fields flatten in declared order with labels
 - **WHEN** a record contains all three fields and `flatten()` is called with the default fields
@@ -46,8 +50,8 @@ return `None` and never raise.
   fields produce sections
 
 #### Scenario: Missing or malformed records return None
-- **WHEN** `flatten()` is called for an entity with no persona record, a non-dict persona value,
-  or a dict with none of the requested fields
+- **WHEN** `flatten()` is called for an entity with no persona record, a non-mapping persona
+  value, or a mapping with none of the requested fields
 - **THEN** the result is `None` and no exception is raised
 
 #### Scenario: Field and block caps are enforced deterministically

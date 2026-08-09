@@ -58,12 +58,13 @@ design doc §5.2 names for that class.
   defaults to `None` until a caller assigns a real `MonsterTier` key and explicitly populates
   traits, while `loot_table` and `behaviour_tree` carry only default placeholder values
 
-### Requirement: LivingEntity non-trait handlers are working implementations except persona, which remains a declared seam
-`LivingEntity` SHALL expose `traits`, `sexual`, `buffs`, `equipment`, `skills`, and `relations`
-as working handlers (each owned by its capability change: traits by entity-traits, sexual by the
-sexual-state handler, buffs by the buff-handler integration, equipment and skills by
-equipment-inventory and the skill handler, relations by the affinity capability). `persona` SHALL
-remain a placeholder attribute defaulting to `None` with no behavior implemented.
+### Requirement: LivingEntity non-trait handlers are working implementations including persona
+`LivingEntity` SHALL expose `traits`, `sexual`, `buffs`, `equipment`, `skills`, `relations`, and
+`persona` as working handlers (each owned by its capability change: traits by entity-traits,
+sexual by the sexual-state handler, buffs by the buff-handler integration, equipment and skills by
+equipment-inventory and the skill handler, relations by the affinity capability, persona by the
+persona-store capability). `persona` SHALL be a `PersonaStore` mount backed by the verbatim
+`entity.db.persona` record.
 
 #### Scenario: Non-trait handlers exist as working implementations
 - **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected
@@ -72,14 +73,15 @@ remain a placeholder attribute defaulting to `None` with no behavior implemented
   `entity.skills` is a `SkillHandler`, and `entity.relations` is a `RelationHandler` backed by the
   `relations_data` attribute
 
-#### Scenario: persona remains a declared seam
+#### Scenario: persona is a working PersonaStore mount
 - **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected
-- **THEN** `entity.persona` is present as an attribute and equals `None`
+- **THEN** `entity.persona` is a `PersonaStore` instance reading the `entity.db.persona` record,
+  and its `flatten()` returns `None` when no persona record exists
 
-#### Scenario: No PersonaStore implementation is authored
-- **WHEN** the codebase added by this change is inspected
-- **THEN** it contains no `PersonaStore` class definition — persona stays a forward-declared seam
-  owned by a later change
+#### Scenario: The PersonaStore implementation is authored by its owning change
+- **WHEN** the codebase is inspected after the persona-store change lands
+- **THEN** `world/rules/persona.py` defines the `PersonaStore` class and no `AttributeProperty`
+  persona placeholder remains on `LivingEntity`
 
 ### Requirement: Quest logs, dialogue memory, loot tables, and behaviour trees are not built
 This change SHALL NOT implement quest-log progression, dialogue-memory storage/retrieval

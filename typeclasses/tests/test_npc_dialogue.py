@@ -270,7 +270,7 @@ class LLMNPCSeamTests(EvenniaTest):
         failure = await_result(d)
         self.assertTrue(failure.check(NPCDialogueClientRequiredError))
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_seam_injects_affinity_context_without_persisting(self):
         apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
         before = dict(self.npc.db.relations_data or {})
@@ -286,7 +286,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(dict(self.npc.db.relations_data or {}), before)
         self.assertIn("我會記住你的心意。", " ".join(_msg_texts(msg)))
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_recordless_player_yields_no_affinity_block_and_no_record(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
@@ -296,7 +296,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertNotIn("affinity", parsed["player"])
         self.assertFalse(self.npc.relations.has_record(self.player))
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_corrupted_relations_record_still_lets_the_talk_complete(self):
         self.npc.db.relations_data = {str(self.player.pk): "corrupted"}
         client = FakeLLMClient()
@@ -307,6 +307,169 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(
             self.npc.db.relations_data, {str(self.player.pk): "corrupted"}
         )
+
+    @covers_requirement("persona-dialogue-injection::persona-wiring-is-read-only-and-value-passing")
+    @covers_requirement("persona-dialogue-injection::the-npc-s-own-persona-feeds-the-dialogue-system-message")
+    @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    def test_seam_injects_both_persona_blocks_and_never_mutates_the_records(self):
+        self.npc.db.persona = {
+            "personality": "沉穩",
+            "life_story": "曾在邊境服役",
+            "habit": "清晨練劍",
+        }
+        self.player.db.persona = {"personality": "溫柔", "life_story": "商人世家"}
+        npc_before = dict(self.npc.db.persona)
+        player_before = dict(self.player.db.persona)
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        system = client.calls[0].messages[0]["content"]
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertIn("性格：沉穩", system)
+        self.assertIn("人生經歷：曾在邊境服役", system)
+        self.assertIn("習慣：清晨練劍", system)
+        self.assertEqual(parsed["player"]["persona"], "性格：溫柔\n人生經歷：商人世家")
+        self.assertNotIn("{persona}", system)
+        self.assertEqual(dict(self.npc.db.persona), npc_before)
+        self.assertEqual(dict(self.player.db.persona), player_before)
+
+    @covers_requirement("persona-dialogue-injection::the-npc-s-own-persona-feeds-the-dialogue-system-message")
+    @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    def test_seam_without_persona_injects_no_block_or_token(self):
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        system = client.calls[0].messages[0]["content"]
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertNotIn("{persona}", system)
+        self.assertNotIn("性格：", system)
+        self.assertNotIn("persona", parsed["player"])
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_disguised_npc_true_value_echo_is_rejected_and_disguised_value_passes(self):
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        self.npc.traits.atk_phys.base = 88
+        self.npc.db.disguised_stats = {"atk_phys": 60}
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我的真實攻擊是 88 點。"),
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3,
+            _reply_text(speech="我看你的攻擊大約是 60 點。"),
+        )
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 2)
+        texts = " ".join(_msg_texts(msg))
+        self.assertIn("我看你的攻擊", texts)
+        self.assertNotIn("真實攻擊是 88", texts)
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_disguise_leak_check_fires_without_any_affinity_record(self):
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        self.npc.traits.atk_phys.base = 88
+        self.npc.db.disguised_stats = {"atk_phys": 60}
+        self.assertFalse(self.npc.relations.has_record(self.player))
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我的真實攻擊是 88 點。"),
+        )
+        client.add_response(lambda d: len(d.messages) == 3, _reply_text())
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_hp_is_protected_at_its_current_gauge_value_not_the_maximum(self):
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        self.npc.traits.hp.base = 100
+        self.npc.traits.hp.current = 40
+        self.assertEqual(self.npc.traits.hp.value, 40)
+        self.assertNotEqual(self.npc.traits.hp.value, self.npc.traits.hp.max)
+        self.npc.db.disguised_stats = {"hp": 100}
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _reply_text(speech="我的體力只剩 40 點。"),
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3,
+            _reply_text(speech="我的體力是 100 點。"),
+        )
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_no_disguise_keeps_affinity_only_binding(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        self.npc.db.disguised_stats = None
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _reply_text(speech="我的真實攻擊是 88 點。"),
+        )
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 1)
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertEqual(parsed["player"]["affinity"]["value"], 2)
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_no_leak_secrets_bind_per_player_affinity_on_top_of_the_disguise_set(self):
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        true_atk = int(self.npc.traits.atk_phys.value)
+        self.npc.db.disguised_stats = {"atk_phys": true_atk + 10}
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        second = create_object(PlayerCharacter, key="second player")
+        second.race = "human"
+        second.apply_race_baseline()
+        second.location = self.room1
+        self.assertEqual(
+            self.npc._no_leak_secrets(self.player),
+            frozenset({"2", "99", str(true_atk)}),
+        )
+        self.assertEqual(
+            self.npc._no_leak_secrets(second), frozenset({str(true_atk)})
+        )
+
+    @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
+    def test_disguised_traitless_npc_skips_missing_traits_and_talks_normally(self):
+        self.npc.db.disguised_stats = {"atk_phys": 60}
+        self.assertEqual(self.npc.traits.all(), [])
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg") as msg:
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(len(client.calls), 1)
+        self.assertIn("我會記住你的心意。", " ".join(_msg_texts(msg)))
+
+    @covers_requirement("persona-dialogue-injection::persona-wiring-is-read-only-and-value-passing")
+    def test_building_a_prompt_persists_no_affinity_or_persona_state(self):
+        apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
+        self.npc.db.persona = {"personality": "沉穩"}
+        self.player.db.persona = {"habit": "夜間閱讀"}
+        relations_before = dict(self.npc.db.relations_data or {})
+        npc_persona_before = dict(self.npc.db.persona)
+        player_persona_before = dict(self.player.db.persona)
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertEqual(dict(self.npc.db.relations_data or {}), relations_before)
+        self.assertEqual(dict(self.npc.db.persona), npc_persona_before)
+        self.assertEqual(dict(self.player.db.persona), player_persona_before)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_adjust_relation_flows_prompt_to_applier_to_record(self):
@@ -328,7 +491,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(record.value, 5)
         self.assertEqual(record.daily_gain, 5)
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_leak_echo_reply_retries_and_never_presents_the_number(self):
         apply_affinity_change(self.npc, self.player, "ai_dialogue", 2)
         before = dict(self.npc.db.relations_data or {})

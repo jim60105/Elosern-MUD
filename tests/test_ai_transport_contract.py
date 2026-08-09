@@ -124,6 +124,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
                         )
 
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
+    @covers_requirement("persona-dialogue-injection::persona-wiring-is-read-only-and-value-passing")
     def test_no_ai_module_imports_a_state_writer(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))

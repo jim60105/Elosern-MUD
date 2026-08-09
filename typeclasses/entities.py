@@ -13,6 +13,7 @@ from evennia.utils import lazy_property
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
 from world.rules.affinity import RelationHandler
+from world.rules.persona import PersonaStore
 from world.rules.sexual_state import SexualState
 
 from .objects import ObjectParent
@@ -23,9 +24,6 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
 
     race: str | None = AttributeProperty(default=None)
     subrace: str | None = AttributeProperty(default=None)
-
-    # Declared handler seams; their owning changes replace these placeholders.
-    persona: Any | None = AttributeProperty(default=None)  # import-contract candidate
 
     @lazy_property
     def traits(self) -> TraitHandler:
@@ -51,6 +49,11 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
     def relations(self) -> RelationHandler:
         """Persistent per-player affinity store (hidden values)."""
         return RelationHandler(self)
+
+    @lazy_property
+    def persona(self) -> PersonaStore:
+        """Read-only verbatim persona-record handler (loader is the writer)."""
+        return PersonaStore(self)
 
     @lazy_property
     def skills(self) -> SkillHandler:

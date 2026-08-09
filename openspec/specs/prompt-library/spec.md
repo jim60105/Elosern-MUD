@@ -83,13 +83,23 @@ brace, so `{{name}}` and JSON example braces such as `{"name": "…"}` pass thro
 Supplied values whose names are not in the key's allowlist SHALL be rejected with a named error,
 never silently ignored, so a consumer typo such as `namme=` fails loudly. Identical text and
 values SHALL produce byte-identical output, and substitution SHALL be complete: every present
-allowlisted token SHALL be replaced exactly once.
+allowlisted token SHALL be replaced exactly once. The `npc_dialogue.system` key's allowlist SHALL
+be exactly `name`, `desc`, `location`, and `persona`. Callers of `npc_dialogue.system` SHALL pass
+`persona` on every call — the flattened block when one exists, or an empty string when not — so
+the `{persona}` token is always substituted and never left literal in rendered output.
 
 #### Scenario: Allowlisted placeholders are substituted
-- **WHEN** `render_prompt("npc_dialogue.system", name="艾洛西亞", desc="…", location="王都")` is
-  called
-- **THEN** the returned text contains the supplied values in place of `{name}`, `{desc}`, and
-  `{location}` exactly once each
+- **WHEN** `render_prompt("npc_dialogue.system", name="艾洛西亞", desc="…", location="王都",
+  persona="性格：…")` is called
+- **THEN** the returned text contains the supplied values in place of `{name}`, `{desc}`,
+  `{location}`, and `{persona}` exactly once each
+
+#### Scenario: An empty persona value substitutes without error
+- **WHEN** `render_prompt("npc_dialogue.system", name="艾洛西亞", desc="…", location="王都",
+  persona="")` is called
+- **THEN** the render succeeds and the `{persona}` token is replaced by the empty string — the
+  output equals the template text with only the identity placeholders filled, with no literal
+  `{persona}` remaining and no error raised
 
 #### Scenario: JSON braces in a prompt pass through untouched
 - **WHEN** a prompt containing `{"name": "…", "items": [{"item_key": "healing_potion"}]}` is
@@ -98,18 +108,16 @@ allowlisted token SHALL be replaced exactly once.
 
 #### Scenario: Double-braced tokens are literal text, not placeholders
 - **WHEN** a prompt contains `{{name}}` or `{{location}}`
-- **THEN** the rendered output keeps the literal braces and does not substitute the inner token
+- **THEN** those tokens are emitted literally, never substituted, regardless of supplied values
 
-#### Scenario: Unknown placeholder tokens are a load-time error, never a silent no-op
+#### Scenario: A placeholder outside the allowlist is rejected
 - **WHEN** a prompt text contains a `{token}` not in the key's allowlist
-- **THEN** `load_prompt_library()` rejects the file with a `PromptLibraryError` naming the token,
-  so a typo like `{nmme}` is caught before the server starts
+- **THEN** the loader rejects that key with a named `PromptLibraryError` naming the file, key,
+  and placeholder, and the key is marked unavailable without aborting startup
 
-#### Scenario: A consumer typo in supplied values is rejected
+#### Scenario: An unknown supplied value name is rejected
 - **WHEN** `render_prompt()` is called with a value whose name is not in the key's allowlist
-- **THEN** the call raises a named error identifying the unexpected value name instead of silently
-  dropping the data from the prompt
-
+- **THEN** a named error is raised and the value is never silently ignored
 ### Requirement: A validate CLI checks the library without starting the server
 `world/prompts/validate.py` SHALL provide a module entry point (`uv run --locked python -m
 world.prompts.validate`) that loads the prompt library from `PROMPT_ROOT` and prints either a

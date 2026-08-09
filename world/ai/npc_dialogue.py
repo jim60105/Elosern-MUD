@@ -7,7 +7,11 @@ deterministic engine verifies each intent before applying it (see
 ``world/rules/npc_intents.py``). When the caller injects the NPC's affinity
 context (affinity-ai), it is serialized into the user payload for the model
 and a no-leak semantic validator keeps the secret numbers out of player-facing
-speech. This module is generative and read-only: it never mutates state, never
+speech; persona-dialogue-injection extends the injected context with the
+NPC's own persona block (system message) and the speaking player's block
+(``player.persona``), and generalizes the no-leak validator to the caller's
+per-call secret set so true trait values under an active disguise stay secret.
+This module is generative and read-only: it never mutates state, never
 imports a state writer, a typeclass, or a live transport, and it consumes the
 client through the injected protocol exactly like ``narrator.py``. When the
 layer is disabled, the transport fails, or the validation retries are
@@ -235,38 +239,51 @@ def _validate_party_payload(parsed: Any) -> list[str]:
     return []
 
 
-def _make_no_affinity_leak_validator(
-    value: Any, cap: Any
+def _make_no_leak_validator(
+    secrets: frozenset[str], *, secret_label: str = "secret number(s)"
 ) -> Callable[[Any], list[str]]:
     """Return a per-call semantic validator bound to this call's secret numbers.
 
     The validator is carried by the request descriptor (not registered), so an
-    interleaved second dialogue call can never observe another call's affinity
-    numbers, and ordinary dialogue without an injected block is untouched.
-    Speech is NFKC-normalized so fullwidth decimal digits (U+FF10-FF19) fold
-    into ASCII and cannot bypass the decimal-substring check; stage names are
-    unaffected and remain the sanctioned player-facing form.
+    interleaved second dialogue call can never observe another call's secret
+    numbers, and ordinary dialogue without an injected set is untouched.
+    Secrets are plain decimal strings (the affinity value/cap plus true trait
+    values under an active disguise) supplied by the caller. Speech is
+    NFKC-normalized so fullwidth decimal digits (U+FF10-FF19) fold into ASCII
+    and cannot bypass the decimal-substring check; stage names are unaffected
+    and remain the sanctioned player-facing form.
     """
     def validate(parsed: Any) -> list[str]:
         speech = parsed.get("speech") if isinstance(parsed, Mapping) else None
         if not isinstance(speech, str):
             return []
         normalized = unicodedata.normalize("NFKC", speech)
-        leaked = {
-            str(number)
-            for number in (value, cap)
-            if isinstance(number, int)
-            and not isinstance(number, bool)
-            and str(number) in normalized
-        }
+        leaked = {number for number in secrets if number in normalized}
         if not leaked:
             return []
         return [
-            "dialogue speech echoes the secret affinity number(s): "
+            f"dialogue speech echoes the {secret_label}: "
             + ", ".join(sorted(leaked))
         ]
 
     return validate
+
+
+def _make_no_affinity_leak_validator(
+    value: Any, cap: Any
+) -> Callable[[Any], list[str]]:
+    """Return a per-call validator bound to exactly this call's affinity numbers.
+
+    Retained as the affinity call site's binding through the generalized
+    secret-set factory, keeping the original error text so existing affinity
+    behavior and tests are unchanged.
+    """
+    secrets = frozenset(
+        str(number)
+        for number in (value, cap)
+        if isinstance(number, int) and not isinstance(number, bool)
+    )
+    return _make_no_leak_validator(secrets, secret_label="secret affinity number(s)")
 
 
 def _validate_no_template_placeholder(parsed: Any) -> list[str]:
@@ -367,8 +384,16 @@ def _bounded_serialization(payload: Mapping[str, Any]) -> str:
             return text
 
 
-def _system_message(npc_context: Mapping[str, Any]) -> str:
-    """Render the NPC dialogue system template with the capped identity values."""
+def _system_message(
+    npc_context: Mapping[str, Any], npc_persona: str | None = None
+) -> str:
+    """Render the NPC dialogue system template with the capped identity values.
+
+    ``npc_persona`` is the speaking NPC's flattened persona block (already
+    bounded by the PersonaStore contract); it is substituted into the
+    ``{persona}`` placeholder on every call, using an empty string when absent
+    so the rendered message is byte-identical to the pre-persona baseline.
+    """
     name = _cap_string(str(npc_context.get("name", "")))
     desc = _cap_string(str(npc_context.get("desc", "")))
     location = _cap_string(str(npc_context.get("location", "")))
@@ -377,6 +402,7 @@ def _system_message(npc_context: Mapping[str, Any]) -> str:
         name=name,
         desc=desc,
         location=location,
+        persona=npc_persona or "",
     )
 
 
@@ -385,6 +411,9 @@ def build_npc_dialogue_prompt(
     player_context: Mapping[str, Any],
     memory: Any,
     affinity_context: Mapping[str, Any] | None = None,
+    *,
+    npc_persona: str | None = None,
+    player_persona: str | None = None,
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build a deterministic (system, user) message pair for NPC dialogue.
 
@@ -396,16 +425,23 @@ def build_npc_dialogue_prompt(
     ``ensure_ascii=False``. An optional ``affinity_context`` block
     (``player.affinity`` carrying the true value, cap, and stage name) is
     injected through the same per-field bounds; ``None`` omits the block.
-    Identical input always produces byte-identical prompts with no live
-    entity references.
+    Optional persona blocks (read-only context, already bounded by the
+    PersonaStore contract) feed the speaking NPC's flattened block into the
+    system message and the speaking player's flattened block as
+    ``player.persona`` beside ``player.affinity``; ``None`` substitutes an
+    empty ``{persona}`` value and omits the player block, keeping byte-identical
+    output when absent. Identical input always produces byte-identical prompts
+    with no live entity references.
     """
-    system = {"role": "system", "content": _system_message(npc_context)}
+    system = {"role": "system", "content": _system_message(npc_context, npc_persona)}
     player = {
         "name": _cap_string(str(player_context.get("name", ""))),
         "disguised_stats": _cap_value(player_context.get("disguised_stats", {})),
     }
     if affinity_context is not None:
         player["affinity"] = _cap_value(dict(affinity_context))
+    if player_persona is not None:
+        player["persona"] = player_persona
     payload = {
         "player": player,
         "memory": _bounded_memory(memory),
@@ -497,6 +533,9 @@ def generate_npc_reply(
     player_context: Mapping[str, Any],
     memory: Any,
     affinity_context: Mapping[str, Any] | None = None,
+    npc_persona: str | None = None,
+    player_persona: str | None = None,
+    no_leak_secrets: frozenset[str] | None = None,
 ):
     """Run the npc_dialogue layer's guarded pipeline for one NPC reply.
 
@@ -513,8 +552,18 @@ def generate_npc_reply(
         affinity_context: The NPC's read-only affinity context for the
             speaking player (true value, cap, stage), injected as
             ``player.affinity`` in the user payload; ``None`` omits the block.
-            While set, the no-leak validator rejects any reply whose speech
-            echoes the value or cap as a decimal integer substring.
+        npc_persona: The speaking NPC's flattened persona block (already
+            bounded by the PersonaStore contract), substituted into the
+            system message's ``{persona}`` placeholder; ``None`` substitutes
+            an empty string and keeps the pre-persona baseline byte-identical.
+        player_persona: The speaking player's flattened persona block,
+            serialized as ``player.persona`` beside ``player.affinity`` when
+            present; ``None`` omits the key.
+        no_leak_secrets: The caller's per-call secret set as plain decimal
+            strings. When non-empty the no-leak validator SHALL be installed
+            regardless of the affinity context (so disguise true values stay
+            protected without an affinity record); when absent, an affinity
+            context still binds exactly its own value and cap as before.
 
     Returns:
         A Deferred resolving to a frozen ``NPCDialogueReply`` on success, or to
@@ -532,11 +581,17 @@ def generate_npc_reply(
             player_context,
             memory,
             affinity_context=affinity_context,
+            npc_persona=npc_persona,
+            player_persona=player_persona,
         )
     except PromptUnavailableError:
         return None
     extra_validators = None
-    if affinity_context is not None:
+    if no_leak_secrets:
+        extra_validators = {
+            "no_leak": _make_no_leak_validator(no_leak_secrets)
+        }
+    elif affinity_context is not None:
         context = dict(affinity_context)
         extra_validators = {
             "no_affinity_leak": _make_no_affinity_leak_validator(

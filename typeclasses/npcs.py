@@ -1,12 +1,18 @@
 """NPC typeclasses from design section 5.2 (entity-traits) and §7.4 (npc-dialogue)."""
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any
 
 from evennia.typeclasses.attributes import AttributeProperty
 from twisted.internet import defer
 
 from .entities import LivingEntity
+
+# Trait keys whose true current values become no-leak secrets when the NPC
+# carries an active disguise (persona-dialogue-injection D2). ``hp`` binds its
+# current gauge value, never the maximum.
+_DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_level", "hp")
 
 
 @dataclass(frozen=True)
@@ -149,6 +155,49 @@ class LLMNPC(NPC):
             "stage": handler.stage_for(character).name,
         }
 
+    def _persona_block(self, character: Any) -> tuple[str | None, str | None]:
+        """Read-only persona blocks for the NPC and the speaking player.
+
+        Both come from ``PersonaStore.flatten()`` (already bounded by the
+        handler's contract); ``None`` when the record is absent or
+        content-free. This never creates, persists, or mutates a persona
+        record on either entity.
+        """
+        return self.persona.flatten(), character.persona.flatten()
+
+    def _no_leak_secrets(self, character: Any) -> frozenset[str]:
+        """Build the per-call no-leak secret set as plain decimal strings.
+
+        The set holds the NPC's affinity value and cap toward ``character``
+        when a record exists, plus the NPC's own true trait values for
+        ``_DISGUISE_SECRET_KEYS`` when the NPC carries a ``disguised_stats``
+        record whose value for that key differs from the true trait value
+        (``hp`` at its current gauge value, never the maximum). An NPC
+        without the trait, without a disguise, or without a record
+        contributes nothing; the set may be empty and the caller installs no
+        validator in that case. Reads only; never mutates state.
+        """
+        secrets: set[str] = set()
+        context = self._affinity_context(character)
+        if context is not None:
+            secrets.add(str(context["value"]))
+            secrets.add(str(context["cap"]))
+        disguised = self.db.disguised_stats or {}
+        if isinstance(disguised, Mapping):
+            traits = self.traits
+            for key in _DISGUISE_SECRET_KEYS:
+                trait = getattr(traits, key)
+                if trait is None or key not in disguised:
+                    continue
+                try:
+                    displayed = int(disguised[key])
+                    true_value = int(trait.value)
+                except (TypeError, ValueError):
+                    continue
+                if displayed != true_value:
+                    secrets.add(str(true_value))
+        return frozenset(secrets)
+
     def _thinking_text(self) -> str:
         """Render the thinking feedback shown to the speaker.
 
@@ -174,11 +223,13 @@ class LLMNPC(NPC):
         Performs the same steps ``at_talked_to`` used to: rejects an explicit
         ``None`` client, appends the speaker's line to the per-character chat
         memory, arms and cancels the thinking timer, and resolves the reply
-        through the guarded dialogue layer. The NPC's reply speech is appended
-        to memory when one exists. Nothing is applied: intent application and
-        degrade fallbacks are the caller's decision, which is what lets the
-        ``invite`` adapter apply the fixed threshold only on the degraded
-        terminal.
+        through the guarded dialogue layer -- supplying the NPC's and the
+        speaking player's persona blocks and the per-call no-leak secret set
+        (all read-only, mirroring the affinity context). The NPC's reply
+        speech is appended to memory when one exists. Nothing is applied:
+        intent application and degrade fallbacks are the caller's decision,
+        which is what lets the ``invite`` adapter apply the fixed threshold
+        only on the degraded terminal.
 
         Args:
             speech: The speaker's line.
@@ -220,6 +271,8 @@ class LLMNPC(NPC):
 
         self._append_memory(character, character, speech)
 
+        npc_persona, player_persona = self._persona_block(character)
+
         try:
             reply = yield generate_npc_reply(
                 client,
@@ -227,6 +280,9 @@ class LLMNPC(NPC):
                 player_context=self._player_context(character),
                 memory=self._chat_lines(character),
                 affinity_context=self._affinity_context(character),
+                npc_persona=npc_persona,
+                player_persona=player_persona,
+                no_leak_secrets=self._no_leak_secrets(character),
             )
         finally:
             if thinking_defer is not None and not thinking_defer.called:

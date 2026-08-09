@@ -22,6 +22,7 @@ class LoaderTraitTests(EvenniaTest):
         )
 
     @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
+    @covers_requirement("persona-store::livingentity-persona-mounts-the-personastore-handler")
     def test_loaded_traits_and_raw_seams_are_verbatim(self):
         record = example_record()
         entity = instantiate_character(record)
