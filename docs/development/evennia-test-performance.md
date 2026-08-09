@@ -1,7 +1,9 @@
 # Evennia Test Performance
 
 This report records the measured basis for the `optimize-evennia-testing`
-change. Durations are reference-machine observations, not portable limits.
+change. Durations are reference-machine observations, not portable limits. The
+general optimization playbook lives in the
+[Evennia 測試效能優化指南](evennia-testing-guide).
 
 ## Environment
 

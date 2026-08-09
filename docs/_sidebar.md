@@ -16,3 +16,4 @@
 
 - Developer guides
   - [OpenSpec test traceability](/development/spec-test-traceability)
+  - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
