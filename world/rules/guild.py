@@ -271,8 +271,9 @@ def turn_in_quest(
     Requires a valid registration, local GuildStaff, a parsed ``COMPLETED``
     record with the exact quest ID, a registered offer for that definition at
     the staff's branch, and the quest ID absent from reward claims. All reward
-    surfaces (wallet, inventory, ACQUIRE quest log, merit, claims) commit in
-    one transaction with full cache restoration.
+    surfaces (wallet, inventory, ACQUIRE quest log, merit, claims) and every
+    then-in-party companion's +2 ``quest_completion`` affinity commit in one
+    transaction with full cache restoration (party-quest D-3).
     """
     from world.quests.runtime import QuestState, find_record, read_records
     from world.rules.guild_offers import (
@@ -321,6 +322,16 @@ def turn_in_quest(
         ),
     )
 
+    # The then-in-party companion list is precomputed once, so a membership
+    # change mid-transaction cannot alter who earns the quest-completion
+    # bonus (party-quest D-3). The gain constant comes from the affinity
+    # rulebook, never duplicated here.
+    from world.rules.affinity_config import get_config
+    from world.rules.party import live_companions
+
+    companions = live_companions(actor)
+    companion_gain = get_config().quest_completion_gain
+
     snapshots = snapshot_attributes(
         actor,
         ("wallet", "inventory", "quest_log", "guild_reward_claims"),
@@ -332,6 +343,15 @@ def turn_in_quest(
 
     for room, _, _ in pin_operations:
         pin_snapshots[id(room)] = snapshot_pin_reasons(room)
+
+    # Every affected companion's affinity surface joins the snapshot set. The
+    # relation handler reads through the stored ``relations_data`` attribute
+    # with no separate cache, so restoring the attribute is the whole
+    # in-process story (Evennia's attribute cache is reset on failure by the
+    # best-effort restorer).
+    companion_snapshots = {
+        npc.pk: attribute_snapshot(npc, "relations_data") for npc in companions
+    }
 
     onboarding_completed = False
 
@@ -354,6 +374,10 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         actor.db.guild_reward_claims = [*claims, quest_id]
+        from world.rules.affinity import apply_affinity_change
+
+        for npc in companions:
+            apply_affinity_change(npc, actor, "quest_completion", companion_gain)
         nonlocal onboarding_completed
         if record.definition_key == "introductory_hunt" and not actor.onboarded:
             from world.rules.onboarding import set_onboarded
@@ -371,6 +395,10 @@ def turn_in_quest(
 
         for room, _, _ in pin_operations:
             restore_pin_reasons(room, pin_snapshots[id(room)])
+        for npc in companions:
+            restore_attribute_best_effort(
+                npc, "relations_data", companion_snapshots[npc.pk]
+            )
 
     try:
         with transaction.atomic():

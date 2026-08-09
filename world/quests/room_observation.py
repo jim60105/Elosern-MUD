@@ -50,17 +50,42 @@ def _escort_ready(room: Any, protected_entity_ids: tuple[int, ...]) -> bool:
     return True
 
 
+def _companion_present(room: Any, player: Any) -> bool:
+    """Whether at least one bound companion of ``player`` is in ``room``.
+
+    Co-presence is a safe-party read (party-quest D-2): stale, corrupt, or
+    mismatched entries are skipped by ``live_companions``, so a broken binding
+    can never block or falsely advance an arrival.
+    """
+    from world.rules.party import live_companions
+
+    for npc in live_companions(player):
+        if npc.location is room:
+            return True
+    return False
+
+
 def observe_room_entry(room: Any, obj: Any) -> None:
     """Advance a player's active REACH / ESCORT stages satisfied by this room.
 
-    Each quest transitions at most once per hook call; terminal records and
-    non-matching destinations are ignored.
+    Arrival advances only when the player is the arriving object and at least
+    one bound companion is present in the destination room -- already there or
+    arriving with the player (party-quest D-2); there is no companion-alone
+    entry point. Each quest transitions at most once per hook call; terminal
+    records and non-matching destinations are ignored.
     """
     from typeclasses.characters import PlayerCharacter
 
     if not isinstance(obj, PlayerCharacter):
         return
     records = read_records(obj)
+    if not any(
+        record.state is QuestState.IN_PROGRESS
+        for record in records
+    ):
+        return
+    if not _companion_present(room, obj):
+        return
     replacements: dict[str, Any] = {}
     pin_operations = []
     for record in records:

@@ -123,6 +123,34 @@ def is_companion(npc: Any, player: Any) -> bool:
     return npc.pk in party_ids(player)
 
 
+def bound_owner_of(npc: Any) -> Any | None:
+    """Resolve the player whose valid party contains ``npc``, or ``None``.
+
+    The bidirectional safe read used by quest DEFEAT credit (party-quest D-1):
+    the candidate owner is the NPC-side back-reference player, and the NPC
+    must also appear in that player's valid party list (``live_companions``),
+    so a mismatched, stale, or one-sided binding resolves to ``None`` and
+    never credits. Read-only and never raises.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from typeclasses.npcs import NPC
+
+    if not isinstance(npc, NPC):
+        return None
+    member = npc.db.party_member
+    if member is None:
+        return None
+    try:
+        player = _resolve_live_object(int(member))
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(player, PlayerCharacter):
+        return None
+    if npc not in live_companions(player):
+        return None
+    return player
+
+
 def live_companions(player: Any) -> list[Any]:
     """Resolve the live companion NPC objects of ``player`` (safe accessor).
 
@@ -216,9 +244,12 @@ def follow_companions(
     provider's coordinate API (``enter_wilderness``), never a plain
     ``move_to`` into a wilderness room. No world-clock charge occurs here --
     the clock advances only on the player's own traversal -- and the party
-    binding is never changed. A companion whose move fails stays put and the
-    player receives one fixed Traditional Chinese 「跟丟了」 notification
-    naming every left-behind companion, exactly once per traversal.
+    binding is never changed. After the companions' moves complete, the
+    player's quest arrival observation re-runs once so co-presence on the
+    first arrival is visible (party-quest D-2); the one-transition rule keeps
+    it idempotent. A companion whose move fails stays put and the player
+    receives one fixed Traditional Chinese 「跟丟了」 notification naming
+    every left-behind companion, exactly once per traversal.
 
     Never raises from a traversal hook: stale and corrupt entries are skipped
     by ``live_companions``, each companion's resolution, co-location check,
@@ -260,6 +291,7 @@ def follow_companions(
             moved = False
         if not moved:
             left_behind.append(npc)
+    _reobserve_quest_arrival(player)
     if not left_behind:
         return
     try:
@@ -272,6 +304,23 @@ def follow_companions(
             "companions ({error}); companion moves already applied.",
             error=error,
         )
+
+
+def _reobserve_quest_arrival(player: Any) -> None:
+    """Re-run the quest arrival observation after the companions' moves complete.
+
+    The player's own ``at_object_receive`` observation runs before the follow
+    moves, so a companion arriving *with* the player would be invisible to the
+    first observation; the re-run happens after the moves (party-quest D-2) and
+    the quest observer's one-transition rule makes the repeated observation
+    idempotent. Never raises from a traversal hook.
+    """
+    from world.quests.room_observation import observe_room_entry
+
+    try:
+        observe_room_entry(player.location, player)
+    except Exception as error:
+        log_warn(f"party follow: quest arrival re-observation failed ({error})")
 
 
 def _companion_co_located(

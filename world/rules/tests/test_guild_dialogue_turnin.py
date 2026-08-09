@@ -286,7 +286,7 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTest):
         with self.assertRaises(GuildServiceError):
             dialogue_turn_in(self.player, plain, quest_id)
 
-    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-and-claim-transaction")
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
     def test_reward_item_advances_another_acquire_quest_atomically(self):
         acquire_def = register(
             quest(

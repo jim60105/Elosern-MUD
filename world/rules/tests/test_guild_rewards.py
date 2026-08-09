@@ -24,6 +24,7 @@ from world.quests.tests._fixtures import (
     quest,
     register,
 )
+from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.guild import (
     RewardClaim,
     RewardClaimError,
@@ -43,6 +44,7 @@ from world.rules.guild_offers import (
     list_guild_offers,
     register_guild_offer,
 )
+from world.rules.party import join_party
 from world.rules.surfaces import read_counter_trait
 
 ALTORIA_BRANCH = "guild_branch_altoria"
@@ -312,6 +314,13 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
         apply_quest_log_replacement(self.player, new_records)
         return completed.quest_id
 
+    def _companion(self, key: str) -> NPC:
+        npc = create_object(NPC, key=key, location=self.hall)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        join_party(npc, self.player)
+        return npc
+
     def test_first_completed_acceptance_is_paid_once(self):
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
@@ -363,7 +372,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
             turn_in_quest(other, self.staff, quest_id)
         self.assertEqual(ctx.exception.args[0], RewardClaim.UNREGISTERED)
 
-    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-and-claim-transaction")
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
     def test_reward_item_advances_another_acquire_quest_atomically(self):
         from world.quests.tests._fixtures import acquire as _acquire
 
@@ -385,7 +394,110 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
         self.assertEqual(acquire_records[0].state, QuestState.COMPLETED)
         self.assertEqual(acquire_records[0].stage_progress, 2)
 
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
+    @covers_requirement("party-system::completing-a-quest-rewards-each-then-in-party-companion-with-affinity")
+    def test_turn_in_rewards_each_then_in_party_companion(self):
+        first = self._companion("first companion")
+        second = self._companion("second companion")
+        quest_id = self._complete()
+        result = turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(result["copper"], 50)
+        self.assertEqual(self.player.db.wallet, 50)
+        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
+        self.assertIn("healing_potion", self.player.db.inventory)
+        self.assertEqual(parse_reward_claims(self.player), [quest_id])
+        self.assertEqual(first.relations.affinity_for(self.player), 2)
+        self.assertEqual(second.relations.affinity_for(self.player), 2)
+
+    @covers_requirement("party-system::completing-a-quest-rewards-each-then-in-party-companion-with-affinity")
+    def test_out_of_party_companion_gains_nothing(self):
+        inside = self._companion("inside companion")
+        outside = create_object(NPC, key="outside companion")
+        outside.race = "human"
+        outside.apply_race_baseline()
+        apply_affinity_change(outside, self.player, AffinitySource.TALK, 3)
+        quest_id = self._complete()
+        turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(inside.relations.affinity_for(self.player), 2)
+        self.assertEqual(outside.relations.affinity_for(self.player), 3)
+
+    @covers_requirement("party-system::completing-a-quest-rewards-each-then-in-party-companion-with-affinity")
+    def test_quest_completion_bonus_bypasses_the_daily_cap(self):
+        from world.rules.clock import CLOCK_YAML, get_world_clock
+
+        day_seconds = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
+        # Pin the world day so the budget cannot be lazily reset mid-test.
+        get_world_clock()._persist(0)
+        companion = self._companion("capped companion")
+        for _ in range(5):
+            apply_affinity_change(companion, self.player, AffinitySource.TALK, 1)
+        quest_id = self._complete()
+        turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(companion.relations.affinity_for(self.player), 7)
+        record = companion.relations._load(self.player)
+        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_tick, 0)
+        self.assertEqual(get_world_clock().tick // day_seconds, 0)
+
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
+    @covers_requirement("party-system::completing-a-quest-rewards-each-then-in-party-companion-with-affinity")
+    def test_affinity_write_fault_restores_every_surface(self):
+        first = self._companion("rollback companion one")
+        second = self._companion("rollback companion two")
+        apply_affinity_change(first, self.player, AffinitySource.TALK, 2)
+        quest_id = self._complete()
+        reward_snapshot = (
+            self.player.db.wallet,
+            list(self.player.db.inventory or []),
+            read_counter_trait(self.player, "guild_merit"),
+            list(self.player.db.quest_log),
+            list(self.player.db.guild_reward_claims or []),
+        )
+        first_snapshot = (
+            first.db.relations_data,
+            first.relations.affinity_for(self.player),
+        )
+        second_snapshot = (
+            second.db.relations_data,
+            second.relations.affinity_for(self.player),
+        )
+        calls = {"n": 0}
+
+        def _failing_affinity(npc, player, source, delta):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("injected affinity write failure")
+            return apply_affinity_change(npc, player, source, delta)
+
+        with patch(
+            "world.rules.affinity.apply_affinity_change",
+            side_effect=_failing_affinity,
+        ):
+            with self.assertRaises(RuntimeError):
+                turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(
+            (
+                self.player.db.wallet,
+                list(self.player.db.inventory or []),
+                read_counter_trait(self.player, "guild_merit"),
+                list(self.player.db.quest_log),
+                list(self.player.db.guild_reward_claims or []),
+            ),
+            reward_snapshot,
+        )
+        self.assertEqual(
+            (first.db.relations_data, first.relations.affinity_for(self.player)),
+            first_snapshot,
+        )
+        self.assertEqual(
+            (second.db.relations_data, second.relations.affinity_for(self.player)),
+            second_snapshot,
+        )
+
+    @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
+    @covers_requirement("party-system::completing-a-quest-rewards-each-then-in-party-companion-with-affinity")
     def test_fault_at_every_write_position_restores_all_surfaces(self):
+        companion = self._companion("fault companion")
         quest_id = self._complete()
         snapshot = (
             self.player.db.wallet,
@@ -394,6 +506,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
             list(self.player.db.quest_log),
             list(self.player.db.guild_reward_claims or []),
         )
+        companion_snapshot = companion.db.relations_data
 
         class FakeAtomic:
             def __enter__(self):
@@ -415,6 +528,8 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
             ),
             snapshot,
         )
+        self.assertEqual(companion.db.relations_data, companion_snapshot)
+        self.assertEqual(companion.relations.affinity_for(self.player), 0)
 
 
 class RewardClaimsParsingTests(QuestRegistryIsolation, EvenniaTest):

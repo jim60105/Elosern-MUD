@@ -53,7 +53,7 @@ player's objectives, and every then-in-party companion earns +2 affinity at turn
 - **New code**: `world/rules/tests/` quest-party integration tests; party-side helper reads in
   `world/rules/party.py` (then-in-party companions at turn-in, bound-companion-of check).
 - **Modified**: the quest event-effect planner and room-arrival observation in `world/quests/`,
-  the reward settlement in `world/quests/` or `world/rules/guild_economy.py`, the affinity writer
+  the reward settlement in `world/rules/guild.py::turn_in_quest()`, the affinity writer
   call sites, and the three delta specs.
 - **Dependencies**: `party-core` (binding), `party-follow` (co-location), `party-combat`
   (knockout state — a knocked-out companion's kill credit is excluded by the same alive rules),
