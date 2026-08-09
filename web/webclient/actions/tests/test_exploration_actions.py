@@ -498,6 +498,48 @@ class ExplorationActionAdapterTests(EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "look_failed")
 
+    @covers_requirement("displayed-stats-view::explore-look-shows-the-identical-displayed-stats-block")
+    @covers_requirement("localized-appearance::target-appearance-includes-the-displayed-stats-block-on-every-entry-path")
+    def test_webclient_target_look_carries_the_identical_displayed_stats_block(self):
+        target = create_object(NPC, key="守衛", location=self.room1)
+        target.race = "human"
+        target.apply_race_baseline()
+        target.db.desc = "一位專注的守衛。"
+        target.db.disguised_stats = {"atk_phys": 60}
+        expected = self.player.at_look(target)
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"target_id": int(target.pk)})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(str(msg.call_args[0][0]), expected)
+        self.assertIn("攻擊：60", expected)
+        self.assertEqual(result["affected_panels"], ())
+
+    @covers_requirement("displayed-stats-view::explore-look-shows-the-identical-displayed-stats-block")
+    def test_webclient_room_look_carries_no_block_and_no_panel_replacement(self):
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"room": True})
+        self.assertEqual(result["outcome"], "success")
+        appearance = str(msg.call_args[0][0])
+        self.assertNotIn("攻擊：", appearance)
+        self.assertNotIn("敏捷：", appearance)
+        self.assertEqual(result["affected_panels"], ())
+
+    @covers_requirement("displayed-stats-view::the-displayed-stats-block-never-influences-resolution")
+    def test_webclient_look_publishes_the_block_only_in_the_narrative_text(self):
+        target = create_object(NPC, key="守衛", location=self.room1)
+        target.race = "human"
+        target.apply_race_baseline()
+        target.db.disguised_stats = {"atk_phys": 60}
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"target_id": int(target.pk)})
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn("攻擊：60", str(msg.call_args[0][0]))
+        self.assertEqual(
+            set(result),
+            {"outcome", "code", "message", "affected_panels"},
+            "the look result must publish no panel payload",
+        )
+
     # ------------------------------------------------------------------
     # explore.talk_scripted
     # ------------------------------------------------------------------

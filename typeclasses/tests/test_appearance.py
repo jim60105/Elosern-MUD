@@ -133,3 +133,98 @@ class AffinityStageLineTests(EvenniaTest):
             self.assertNotIn("99", appearance)
             self.assertNotIn("70", appearance)
             self.assertNotIn("cap", appearance)
+
+
+class DisplayedStatsBlockTests(EvenniaTest):
+    """The displayed-stats block rides the shared target-appearance path."""
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "測試房間"
+        self.room1.save()
+        self.char1.location = self.room1
+        self.npc = create_object("typeclasses.npcs.NPC", key="守衛", location=self.room1)
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        self.npc.db.desc = "一位專注的守衛。"
+        # Disguise the attack so the block visibly uses displayed values.
+        self.npc.db.disguised_stats = {"atk_phys": 60}
+
+    @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
+    def test_text_look_at_living_target_appends_the_block_after_the_description(self):
+        appearance = self.char1.at_look(self.npc)
+        self.assertIn("一位專注的守衛。", appearance)
+        self.assertIn("攻擊：60", appearance)
+        self.assertLess(
+            appearance.index("一位專注的守衛。"), appearance.index("攻擊：60")
+        )
+
+    @covers_requirement("displayed-stats-view::display-stat-block-renders-the-displayed-combat-five-through-the-disguise-accessor")
+    def test_block_ordering_is_description_then_block_then_affinity_stage_line(self):
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(
+            self.npc, self.char1, AffinitySource.QUEST_COMPLETION, 50
+        )
+        appearance = self.char1.at_look(self.npc)
+        self.assertLess(
+            appearance.index("一位專注的守衛。"), appearance.index("攻擊：60")
+        )
+        self.assertLess(
+            appearance.index("攻擊：60"),
+            appearance.index("她看著你的眼神裡帶著信賴。"),
+        )
+
+    @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
+    def test_player_and_monster_targets_show_the_block(self):
+        self.char2.race = "human"
+        self.char2.apply_race_baseline()
+        self.char2.location = self.room1
+        player_appearance = self.char1.at_look(self.char2)
+        self.assertIn("攻擊：", player_appearance)
+        monster = create_object(
+            "typeclasses.monsters.Monster", key="野狼", location=self.room1
+        )
+        monster.threat_tier = "low"
+        monster.apply_monster_tier()
+        monster_appearance = self.char1.at_look(monster)
+        self.assertIn("攻擊：", monster_appearance)
+
+    @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
+    def test_room_look_has_no_block(self):
+        appearance = self.char1.at_look(self.room1)
+        self.assertNotIn("攻擊：", appearance)
+        self.assertNotIn("敏捷：", appearance)
+
+    @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
+    def test_non_living_object_target_has_no_block(self):
+        thing = create_object(
+            "typeclasses.objects.Object", key="石頭", location=self.room1
+        )
+        appearance = self.char1.at_look(thing)
+        self.assertNotIn("攻擊：", appearance)
+
+    @covers_requirement("displayed-stats-view::display-stat-block-renders-the-displayed-combat-five-through-the-disguise-accessor")
+    def test_block_reads_displayed_values_never_true_values(self):
+        self.npc.traits.atk_phys.base = 88
+        appearance = self.char1.at_look(self.npc)
+        self.assertIn("攻擊：60", appearance)
+        self.assertNotIn("攻擊：88", appearance)
+
+    @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
+    def test_onboarding_look_beat_still_completes_with_the_block_present(self):
+        from world.maps.bootstrap import sync_grid
+        from world.rules.onboarding import GUIDANCE_BEAT_ID, LOOK_BEAT_ID
+
+        sync_grid()
+        gate = self.room1
+        gate.key = "南門"
+        gate.save()
+        self.char1.location = gate
+        self.char1.onboarding_beat = LOOK_BEAT_ID
+        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
+        self.char1.onboarded = False
+        appearance = self.char1.at_look(self.npc)
+        self.assertIn("攻擊：60", appearance)
+        self.assertTrue(self.char1.first_arrival_seen)
+        self.assertEqual(self.char1.onboarding_beat, GUIDANCE_BEAT_ID)

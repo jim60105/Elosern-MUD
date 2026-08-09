@@ -286,6 +286,13 @@ rendering, guild registration records, and appraisal items.
 > forward-declared seam: the main `disguised-stats-boundary` spec explicitly permits the deferral
 > ("Appearance and appraisal MAY remain deferred"), and the accessor's docstring plus its boundary
 > test keep the three-consumer contract in place for a future appraisal item.
+>
+> **Amended 2026-08-09 (displayed-stats-view).** Appearance rendering is implemented through the
+> `look <target>` displayed-stats block (`world/rules/displayed_stats.display_stat_block`): the
+> player reads any present living target's displayed combat five (`atk_phys`, `agility`,
+> `defense`, `magic_level`, `hp`) directly from the shared target-appearance path, with the
+> accessor hardened to treat a non-mapping `disguised_stats` record as "no disguise". Appraisal
+> items remain the forward-declared third consumer; the consumer wording is unchanged.
 
 ```python
 @dataclass(frozen=True)

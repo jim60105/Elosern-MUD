@@ -198,6 +198,9 @@ class RegistrationBoundaryScanTests(unittest.TestCase):
         self.assertIn("appraisal", doc)
         self.assertIn("combat", doc)
         self.assertIn("must never call this function", doc)
+        # Appearance rendering is the implemented look <target> block consumer.
+        self.assertIn("displayed-stats block", doc)
+        self.assertIn("forward-declared seam", doc)
 
     def test_only_registration_path_reads_disguise_in_guild_modules(self):
         import ast
