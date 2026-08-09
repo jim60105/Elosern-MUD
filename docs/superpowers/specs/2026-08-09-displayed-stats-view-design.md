@@ -32,11 +32,12 @@ first-class system mechanic — the player reads any present target's displayed 
 | # | Decision | Rationale |
 |---|---|---|
 | A1 | **The consumer is a `look <target>` stat block**, not an item or service. | Owner decision: displayed values are part of the system's surface, and viewing them is a free direct operation. |
-| A2 | **Block keys are the combat five: `atk_phys`, `agility`, `defense`, `magic_level`, `hp`**, all read through `get_display_value()`. | Isomorphic to the combat preview surface; disguised keys return disguised values and non-disguised keys return true values (existing function behavior). Excludes `mp`/`sp`/`guild_merit`. |
+| A2 | **Block keys are the combat five: `atk_phys`, `agility`, `defense`, `magic_level`, `hp`**, all read through `get_display_value()`, labelled with the canonical character-panel labels (`攻擊` / `敏捷` / `防禦` / `魔法階級` / `生命`). The `hp` row renders the gauge's current value. | Isomorphic to the combat preview surface; disguised keys return disguised values and non-disguised keys return true values (existing function behavior). Excludes `mp`/`sp`/`guild_merit`. |
 | A3 | **Applies to every present living entity** (NPC, player, monster). | One uniform semantics: any look-able target carries the block; no observer-resolution exceptions. |
 | A4 | **Telnet and WebClient share one renderer.** `look <target>` and `explore.look`'s target detail both render through the same function. | Presentation-layer consistency; the browser never recomputes values. |
 | A5 | **The onboarding `at_look` seam is untouched.** | The block is appended only on the target-detail path; the guide's `look` detection is unaffected. |
-| A6 | **The master design and main spec are amended.** §5.2's "appraisal items remain a forward-declared seam" is rewritten to name the `look <target>` block; `disguised-stats-boundary` receives the matching delta. | Documentation stays consistent with the implementation, per the project's amendment convention. |
+| A6 | **The block is the appearance-rendering consumer; the consumer wording is unchanged.** The three-consumer contract keeps its exact wording (appearance rendering, guild registration records, appraisal items); the block implements the appearance-rendering consumer, and appraisal items remain the forward-declared seam. `disguised-stats-boundary` receives the matching delta. | Corrected after rubber-duck review: the block is a look-path appearance consumer; counting it as both appearance rendering and a third consumer would misstate the implemented boundary. |
+| A7 | **The renderer lives in a new `world/rules/displayed_stats.py` module**, not the frozen no-create read model. `get_display_value()` is hardened to treat a non-mapping `disguised_stats` record as "no disguise". | `status_query.py` is frozen no-create ("never constructs `entity.traits`"); the accessor reads traits through the lazy handler, so the renderer needs a module not bound by that contract. |
 
 ---
 
@@ -44,7 +45,7 @@ first-class system mechanic — the player reads any present target's displayed 
 
 ### 3.1 Single renderer
 
-`world/rules/status_query.py` (the look/status read model):
+New module `world/rules/displayed_stats.py` (not the frozen no-create read model):
 
 ```python
 def display_stat_block(entity) -> str | None:
@@ -55,10 +56,14 @@ def display_stat_block(entity) -> str | None:
     """
 ```
 
-- Fixed order: `atk_phys`, `agility`, `defense`, `magic_level`, `hp`, one `label：value` row each.
+- Fixed order: `atk_phys`, `agility`, `defense`, `magic_level`, `hp`, one `label：value` row each,
+  using the canonical character-panel labels (`攻擊` / `敏捷` / `防禦` / `魔法階級` / `生命`).
 - Entities without a disguise still show the block (displayed values equal true values); non-living
   entities (objects, rooms) yield `None`.
-- Pure read: never touches traits, never writes attributes.
+- Pure read: never touches traits, never writes attributes. A missing or malformed trait row is
+  omitted, never fatal.
+- `get_display_value()` is hardened: a non-mapping `disguised_stats` record falls back to true
+  values instead of raising.
 
 ### 3.2 look integration
 
@@ -73,9 +78,10 @@ def display_stat_block(entity) -> str | None:
 
 ### 3.4 Contract update
 
-- `get_display_value()`'s docstring and the `disguised-stats-boundary` spec rename the three
-  consumers to "appearance rendering (`look`), guild registration records, and the `look <target>`
-  displayed-stats block".
+- `get_display_value()`'s docstring keeps the exact three-consumer wording (appearance rendering,
+  guild registration records, appraisal items) and adds that appearance rendering is implemented
+  through the `look <target>` displayed-stats block; the `disguised-stats-boundary` spec receives
+  the matching delta.
 - The forbidden-caller surface is unchanged: combat, resolution, and damage never call it.
 
 ---
@@ -84,10 +90,10 @@ def display_stat_block(entity) -> str | None:
 
 | Integration | Direction |
 |---|---|
-| `world/rules/status_query.py` | `display_stat_block()` renderer |
+| `world/rules/displayed_stats.py` (new) | `display_stat_block()` renderer |
+| `world/rules/traits.py` | Accessor hardened against non-mapping disguise records; docstring updated |
 | `look <target>` command path | Appends the block |
-| `web/webclient/actions/exploration_actions.py` | `explore.look` target detail appends the same block |
-| `world/rules/traits.py` | Docstring contract updated |
+| `web/webclient/actions/exploration_actions.py` | `explore.look` target detail appends the same block; no panel replacement |
 | Onboarding | `at_look` detection unchanged (regression test) |
 
 ---
