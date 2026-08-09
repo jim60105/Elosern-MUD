@@ -257,6 +257,12 @@ gates are rechecked. The browser never advances its own clock.
 Take/drop actions are registered only if their deterministic ownership/access API is explicitly included
 in the owning OpenSpec change. This design does not authorize a generic object mutation action.
 
+> **Amended 2026-08-09 (change `party-core`).** The action table gains `explore.party_invite` and
+> `explore.party_leave` — the WebClient surfaces for the party-core `invite` / `leave` commands.
+> The invite adapter submits the finite invitation request (no free speech) through the same
+> guarded dialogue seam, and both adapters go through the deterministic `world/rules/party.py`
+> APIs with the same re-verification (co-location, bound, membership) as the commands.
+
 ---
 
 ## 9. Error Handling

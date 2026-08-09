@@ -280,6 +280,13 @@ Trait types: `hp/mp/sp` are **gauges** (max + regen rate); `atk_phys/agility/def
 Per D2, `disguised_stats` lives in a separate attribute read by exactly three consumers: appearance
 rendering, guild registration records, and appraisal items.
 
+> **Amended 2026-08-09.** Two of D2's three `disguised_stats` consumers are live today: appearance
+> rendering (`look` / the status read model) and the guild-registration historical snapshot — the
+> only production `get_display_value()` call site. The appraisal-item consumer remains a
+> forward-declared seam: the main `disguised-stats-boundary` spec explicitly permits the deferral
+> ("Appearance and appraisal MAY remain deferred"), and the accessor's docstring plus its boundary
+> test keep the three-consumer contract in place for a future appraisal item.
+
 ```python
 @dataclass(frozen=True)
 class SkillDef:
@@ -297,6 +304,16 @@ turn scheduler and the out-of-combat command both call it.
 
 `PersonaStore` does three things and nothing else: persist imported fields verbatim, retrieve by
 key, flatten into prompt blocks. It never interprets content.
+
+> **Amended 2026-08-09.** The `PersonaStore` handler named in §5.2 is a forward-declared seam: only
+> the persist half exists (validated imports store `persona` verbatim on `entity.db.persona` via
+> `world/imports/loader.py`), while the `PersonaStore` class, keyed retrieval, and prompt-block
+> flattening are unimplemented and unclaimed. No main spec requires them: `import-schema` validates
+> persona only as an opaque object, `import-loader` reserves the bare `entity.persona` name for the
+> future handler, and the affinity-system change explicitly keeps persona the only `None` placeholder
+> seam. A future change that needs character personality as prompt material (for example
+> NPC-dialogue persona injection) should claim this seam; until then nothing in the game reads
+> persona.
 
 ### 5.3 Import contract
 
@@ -343,6 +360,11 @@ world/imports/
 | `disguised_stats` keys are a subset of `stats` keys | **Reject** |
 | `stats` fall inside the race's plausible band | Warn (prodigies legitimately exceed it) |
 | `persona` is a dict | Type only; contents never inspected |
+
+> **Amended 2026-08-09 (change `import-contract`).** The `magic_level` check is a hard **rejection**
+> when the value exceeds the race's magic cap — not a warning. It is the sole safeguard against
+> unachievable magic levels (import-contract D-14 judged a warning too easy to miss); the other
+> stats keep the warn-on-outside-band behavior for prodigies.
 
 Import is **all-or-nothing**. Failure reports which record, which field, and why. No partial import.
 
@@ -463,6 +485,17 @@ to-hit   d100 + attacker agility   vs   60 + defender agility
 damage   (atk_phys × roll multiplier) − defender defense, floor 1
 ```
 
+> **Amended 2026-08-09 (change `dice-combat`).** The to-hit defender constant is **51**, not 60, in
+> `rulebook/combat.yaml` (`defender_constant: 51`): dice-combat's D-2 recalibrated it against the
+> real stat bands so the inclusive 1..100 roll reaches exact 50% parity. The formula shape is
+> unchanged.
+>
+> **Amended 2026-08-09 (change `overwhelm-resolution`).** "Single-shot resolution, ends in one
+> round" is implemented as a bounded loop of ordinary rounds — `run_round()` reused with caps
+> (`max_rounds`, `max_estimated_rounds`) — whose EventLog is compressed by dropping redundant
+> hit-roll entries. A full-lifecycle EventLog is still produced for the Narrator (compression never
+> skips damage or outcome entries), and recomputation every round is unchanged.
+
 Overwhelm **compresses** combat, it does not skip it: a full EventLog is still produced so the
 Narrator can write the corresponding prose. Recomputing every round handles mid-fight power-tier
 shifts, such as dropping a disguise.
@@ -543,6 +576,12 @@ paralysis:
 Monsters are `LivingEntity` and therefore have `SexualState` too; baselines come from the bestiary,
 with most monsters at 普通 sensitivity and `shame` clamped to 無.
 
+> **Amended 2026-08-09.** Monster sexual-state baselines are a uniform generic baseline applied by
+> the `SexualState` mount — `shame` clamped to 無 and sensitivity defaulting to 普通 — rather than
+> per-archetype entries sourced from the bestiary registry. The observable contract is unchanged
+> ("most monsters at 普通 sensitivity, `shame` 無"); per-archetype bestiary baselines remain a
+> future seam if a monster archetype ever needs distinct sexual-state defaults.
+
 ### 6.5 World clock
 
 ```python
@@ -560,6 +599,12 @@ Three advance sources: **command defaults** (move 30s, converse 60s, cast 6s), *
 Due events settle in a **fixed order**, because order changes outcomes: HP/MP/SP regen → buff
 durations → sexual state decay → daily resets (`climax_today`) → caravan arrivals → shop hours →
 quest deadlines → NPC schedules.
+
+> **Amended 2026-08-09 (changes `character-progression`, `map-instance`).** The implemented
+> settlement order inserts two additional stages while preserving the sequence above as a strict
+> subsequence: `magic_study` (change 11b) runs between sexual-state decay and daily resets, and
+> `instance_reclamation` (change 14) runs after NPC schedules. The caravan-before-shop ordering is
+> unchanged and remains load-bearing.
 
 Explicit skips are gated: reject or shorten if the player is in combat, targeted by a hostile, or
 in an unsafe location. Otherwise players will `sleep 8h` in front of a monster.
@@ -601,6 +646,12 @@ Because the output is requirements, it is **fully validatable before it touches 
 legality, reward inside the `GuildRank` band for that rank, archetype known, NPC tier known, stage
 indices contiguous. Invalid output is retried or clamped rather than discovered post-corruption.
 
+> **Amended 2026-08-09 (change `scenario-director`).** The blueprint field in the example above is
+> named `quest_type` in the implementation (same five CJK values: 採集 / 討伐 / 護衛 / 探索 / 緊急).
+> The stage objective kinds implemented are `defeat`, `reach_location`, `escort`, and `acquire` —
+> the example shows only `reach_location`; the compiler maps each kind to one deterministic
+> lifecycle path.
+
 ### 7.2 SceneBuilder — requirements to prototypes
 
 Triggered when the player actually arrives, not when the quest is accepted. Emits a prototype dict
@@ -632,6 +683,13 @@ Intent whitelist: `give_item` / `take_item` / `offer_quest` / `request_guild_exa
 issue the quest, or is an eligible GuildExaminer. **Illegal intent is discarded while the speech is
 kept** — the NPC said something it could not do, but the world was not changed. That is the accepted
 failure mode.
+
+> **Amended 2026-08-09 (changes `affinity-ai`, `party-core`).** The whitelist grows to **eight**
+> kinds: `party_invite {accept: bool}` was added by party-core (the invitation is a conversation;
+> `accept: true` re-runs the deterministic party validation). `adjust_relation` is active with a
+> hard-bounded payload `delta: 0..10`, applied through `world/rules/affinity.py`'s sole writer;
+> `offer_quest` and `reveal_lore` remain whitelisted forward-declared kinds with no deterministic
+> capability surface yet. The discard-speech-kept failure mode is unchanged for every kind.
 
 The examination intent has exactly one payload field:
 
@@ -688,7 +746,6 @@ Keyed by archetype (D10). The engine never calls SD (D11).
 SceneArchetype registry
   key             "tavern_interior"
   scene_sentence  one-sentence natural-language scene description
-  image           path | None
 
 room → references archetype → registry lookup
    ↓ missing
@@ -699,6 +756,13 @@ internal client    reads queue → renders prompts from prompts/art.yaml → POS
    ↓
 any room referencing that archetype hits the cache
 ```
+
+> **Amended 2026-08-09 (change `art-assets`).** `SceneArchetype` carries **no `image` field**: the
+> registry stays immutable, and output identity is held by the art-store asset record instead
+> (art-assets design note). The §8.2 amendment's room-entry enqueue also has one documented
+> exception: `TerrainRoom` (wilderness) has no arrival hook — its scene archetypes are covered by
+> startup synchronization (art-assets D7), while grid and instance rooms enqueue on successful
+> arrival.
 
 **Worker contract** — the internal txt2img client (amended; see the D11 amendment):
 
@@ -731,6 +795,11 @@ layer; swapping the generator means changing `ART_SD_CLIENT` or the prompt text,
 A scheduler Script drains periodically (settings-configurable, disableable). The worker is
 serialized — one job at a time, queue locked — so overlapping schedules cannot saturate the GPU.
 Completed entries are idempotent and never regenerate.
+
+> **Amended 2026-08-09.** The scheduler Script is `world.art.scheduler.ArtDrainScript`, wired through
+> `settings.GLOBAL_SCRIPTS` with interval, per-drain limit, and enable flag from the `ART_SCHEDULER_*`
+> settings. It lives under `world/art/` with the rest of the art package; `typeclasses/scripts.py`
+> remains the stock Evennia base `Script` class.
 
 OOB push on room entry when an image exists; otherwise the panel keeps the previous image or shows
 a placeholder.

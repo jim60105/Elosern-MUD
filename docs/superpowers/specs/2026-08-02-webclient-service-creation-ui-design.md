@@ -60,6 +60,12 @@ Every service panel payload contains:
 Presenters resolve the service using the same local-host rules as commands. Zero or multiple eligible
 hosts produce an unavailable panel; the browser cannot select a global merchant or examiner dbref.
 
+> **Amended 2026-08-09 (change `webclient-service-menus`).** Host ambiguity degrades **per surface**
+> rather than the whole panel: the `services` panel carries three nullable surfaces (`guild` /
+> `shop` / `inventory`), and a surface with zero or multiple eligible hosts is `null` with a stable
+> reason (`no_local_service_host` / `ambiguous_service_host`) while the other surfaces keep
+> rendering (service-menus D1). The "no global merchant/examiner dbref" rule is unchanged.
+
 ---
 
 ## 4. Guild UI

@@ -151,6 +151,11 @@ The deterministic enqueue seams are:
 - startup synchronization scans existing explicit unique portrait policies, recovering an enqueue that
   failed after an earlier gameplay commit.
 
+> **Amended 2026-08-09 (change `art-assets`).** The room-entry seam above has one documented
+> exception: `TerrainRoom` (wilderness) carries no arrival hook, so its scene archetypes are
+> covered exclusively by startup synchronization (art-assets D7). `GridRoom` and `InstanceRoom`
+> enqueue on successful arrival as stated.
+
 Queue failure never rolls back character creation, import, NPC spawn, or movement. It logs a bounded
 diagnostic and leaves the asset missing for the next idempotent lifecycle ensure. Underage or invalid
 portrait data is a permanent eligibility rejection, not a transient queue failure. Generic bestiary

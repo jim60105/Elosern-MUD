@@ -225,6 +225,11 @@ follow Evennia's WebClient message conventions, but the logical envelopes are fi
 }
 ```
 
+> **Amended 2026-08-09 (change `webclient-combat-menu`).** The `context_actions` panel uses
+> `schema_version: 2` in the implementation — its payload is richer than the version-1 example
+> (participant tokens, recovery state, and the portrait catalog references added by the combat
+> panel). Presenter and validator are self-consistent; the other panels keep version 1.
+
 `ui.snapshot.v1` contains every panel allowed in the current mode. `ui.update.v1` carries the same
 top-level fields but contains only replacement payloads for named panels. The client applies an update
 only if its revision is newer than the currently rendered revision.
