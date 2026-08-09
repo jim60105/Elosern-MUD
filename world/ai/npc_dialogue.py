@@ -68,6 +68,12 @@ MAX_SPEECH_LENGTH = 2000
 # shape.
 MAX_RELATION_DELTA = 10
 
+# The quest-key bound for the offer_quest intent (dialogue-offer-quest D3):
+# the per-kind semantic validator and the deterministic applier enforce the
+# same 64-code-point cap, keeping the extracted shape and the engine in lock
+# step across the boundary.
+MAX_INTENT_KEY_LENGTH = 64
+
 # The eight whitelisted intent kinds (design §7.4).
 NPC_INTENT_KINDS = (
     "give_item",
@@ -239,6 +245,47 @@ def _validate_party_payload(parsed: Any) -> list[str]:
     return []
 
 
+def _validate_offer_quest_payload(parsed: Any) -> list[str]:
+    intent = parsed.get("intent") if isinstance(parsed, Mapping) else None
+    if not isinstance(intent, Mapping) or intent.get("kind") != "offer_quest":
+        return []
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"quest_key"}:
+        return [
+            "offer_quest must carry exactly one payload field, quest_key"
+        ]
+    quest_key = payload["quest_key"]
+    if not isinstance(quest_key, str) or not quest_key.strip():
+        return ["offer_quest quest_key must be a non-empty string"]
+    if len(quest_key) > MAX_INTENT_KEY_LENGTH:
+        return [
+            "offer_quest quest_key must be at most "
+            f"{MAX_INTENT_KEY_LENGTH} code points"
+        ]
+    return []
+
+
+def _validate_reveal_lore_payload(parsed: Any) -> list[str]:
+    intent = parsed.get("intent") if isinstance(parsed, Mapping) else None
+    if not isinstance(intent, Mapping) or intent.get("kind") != "reveal_lore":
+        return []
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"category", "key"}:
+        return [
+            "reveal_lore must carry exactly two payload fields, category and key"
+        ]
+    for field in ("category", "key"):
+        value = payload[field]
+        if not isinstance(value, str) or not value.strip():
+            return [f"reveal_lore {field} must be a non-empty string"]
+        if len(value) > MAX_INTENT_KEY_LENGTH:
+            return [
+                f"reveal_lore {field} must be at most "
+                f"{MAX_INTENT_KEY_LENGTH} code points"
+            ]
+    return []
+
+
 def _make_no_leak_validator(
     secrets: frozenset[str], *, secret_label: str = "secret number(s)"
 ) -> Callable[[Any], list[str]]:
@@ -311,6 +358,8 @@ _VALIDATORS: dict[str, Any] = {
     "item_payload_shape": _validate_item_payload,
     "relation_payload_shape": _validate_relation_payload,
     "party_payload_shape": _validate_party_payload,
+    "offer_quest_payload_shape": _validate_offer_quest_payload,
+    "reveal_lore_payload_shape": _validate_reveal_lore_payload,
     "no_template_placeholder": _validate_no_template_placeholder,
 }
 

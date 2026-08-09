@@ -43,6 +43,7 @@ gate, or choose the branch or offer identity.
 #### Scenario: An NPC without the branch's offer cannot assign the quest
 - **WHEN** the speaking NPC is not an `NPC`, lacks `GuildStaff`, or `get_guild_offer(quest_key,
   branch_key)` does not resolve, or the player is unregistered / rankless / below the quest band
+  / carries malformed registration data
 - **THEN** the applier returns `applied=False`, the speech is preserved, and no state changes
 
 ### Requirement: A verified offer_quest is assigned directly and atomically

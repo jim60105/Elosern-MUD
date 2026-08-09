@@ -68,6 +68,12 @@
 | [`guild request`](/game/command-reference?id=guild-request) | 委託公會規劃任務。 |
 | [`guild exam`](/game/command-reference?id=guild-exam) | 申請公會考核。 |
 
+## 知識圖鑑
+
+| 指令 | 說明 |
+| --- | --- |
+| [`lore`](/game/command-reference?id=lore) | 檢視已發現的知識圖鑑。 |
+
 ## 經濟
 
 | 指令 | 說明 |
