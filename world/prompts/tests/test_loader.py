@@ -85,6 +85,7 @@ class ValidLoadTests(unittest.TestCase):
             name="艾洛西亞",
             desc="南門的守衛",
             location="王都",
+            persona="",
         )
         self.assertEqual(text.count("艾洛西亞"), 1)
         self.assertEqual(text.count("南門的守衛"), 1)
@@ -94,12 +95,42 @@ class ValidLoadTests(unittest.TestCase):
         self.assertNotIn("{location}", text)
 
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
+    def test_persona_placeholder_is_allowlisted_and_substituted_exactly_once(self):
+        load_prompt_library(str(REPO_PROMPTS))
+        block = "性格：沉穩\n人生經歷：曾在邊境服役\n習慣：清晨練劍"
+        text = render_prompt(
+            "npc_dialogue.system",
+            name="艾洛西亞",
+            desc="南門的守衛",
+            location="王都",
+            persona=block,
+        )
+        self.assertEqual(text.count(block), 1)
+        self.assertNotIn("{persona}", text)
+
+    @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
+    def test_empty_persona_value_substitutes_without_error_or_literal_token(self):
+        load_prompt_library(str(REPO_PROMPTS))
+        text = render_prompt(
+            "npc_dialogue.system",
+            name="艾洛西亞",
+            desc="南門的守衛",
+            location="王都",
+            persona="",
+        )
+        self.assertNotIn("{persona}", text)
+        self.assertNotIn("性格：", text)
+        self.assertTrue(text.startswith("你是《伊洛瑟恩大陸》中的 艾洛西亞。"))
+
+    @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_double_braced_tokens_and_json_braces_pass_through(self):
         load_prompt_library(str(REPO_PROMPTS))
         scenario = render_prompt("scenario_director.system")
         self.assertIn('{"name": "…"', scenario)
         self.assertIn('"item_key": "healing_potion"', scenario)
-        dialogue = render_prompt("npc_dialogue.system", name="甲", desc="乙", location="丙")
+        dialogue = render_prompt(
+            "npc_dialogue.system", name="甲", desc="乙", location="丙", persona=""
+        )
         self.assertIn('{"speech": "你要說的話", "intent": {"kind": "..."}}', dialogue)
         thinking = render_prompt("npc.thinking", name="甲")
         self.assertEqual(thinking, "（甲 沉思片刻……）")

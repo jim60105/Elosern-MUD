@@ -41,6 +41,7 @@ _SCENARIO_DIRECTOR_SYSTEM = (
     "stage 的 index 必須從 0 開始連續遞增。"
 )
 _NPC_DIALOGUE_TEMPLATE = (
+    "{persona}"
     "你是《伊洛瑟恩大陸》中的 {name}。{desc}。目前位於{location}。"
     "你只能根據自己確實能觀察到的情況回應；"
     "玩家在你面前展現出的樣貌，就是你所見到的真實。"
@@ -78,17 +79,19 @@ class VerbatimShipmentTests(unittest.TestCase):
         self.assertIn("QuestBlueprint", system)
         self.assertIn("不得編造", system)
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_npc_dialogue_system_template_is_shipped_verbatim(self):
         rendered = render_prompt(
             "npc_dialogue.system",
             name="甲",
             desc="乙",
             location="丙",
+            persona="",
         )
         self.assertEqual(
             rendered,
-            _NPC_DIALOGUE_TEMPLATE.replace("{name}", "甲")
+            _NPC_DIALOGUE_TEMPLATE.replace("{persona}", "")
+            .replace("{name}", "甲")
             .replace("{desc}", "乙")
             .replace("{location}", "丙"),
         )
@@ -126,13 +129,14 @@ class VerbatimShipmentTests(unittest.TestCase):
             "A 貓人族 adult named 艾琳 (24) in the approved visual style.",
         )
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_npc_dialogue_render_equals_the_original_rendered_constant(self):
         rendered = render_prompt(
             "npc_dialogue.system",
             name="甲",
             desc="乙",
             location="丙",
+            persona="",
         )
         self.assertEqual(
             rendered,
@@ -194,7 +198,7 @@ class LibrarySourceTests(unittest.TestCase):
         )
         self.assertEqual(system["content"], render_prompt("scenario_director.system"))
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-and-affinity-context")
+    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_npc_dialogue_renders_from_the_library_solely(self):
         from world.ai.npc_dialogue import build_npc_dialogue_prompt
 
@@ -205,7 +209,13 @@ class LibrarySourceTests(unittest.TestCase):
         )
         self.assertEqual(
             system["content"],
-            render_prompt("npc_dialogue.system", name="甲", desc="乙", location="丙"),
+            render_prompt(
+                "npc_dialogue.system",
+                name="甲",
+                desc="乙",
+                location="丙",
+                persona="",
+            ),
         )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")

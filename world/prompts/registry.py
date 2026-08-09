@@ -35,7 +35,7 @@ def _build() -> dict[str, PromptSpec]:
     """Build the keyed spec registry; one entry per layer or domain."""
     specs = (
         PromptSpec("narrator.system", "narrator.yaml"),
-        PromptSpec("npc_dialogue.system", "npc_dialogue.yaml", ("name", "desc", "location")),
+        PromptSpec("npc_dialogue.system", "npc_dialogue.yaml", ("name", "desc", "location", "persona")),
         PromptSpec("scenario_director.system", "scenario_director.yaml"),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
         PromptSpec("art.style", "art.yaml"),
