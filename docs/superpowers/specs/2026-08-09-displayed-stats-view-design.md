@@ -44,7 +44,7 @@ first-class system mechanic — the player reads any present target's displayed 
 
 ### 3.1 Single renderer
 
-`world/rules/status_query.py` (or a small new `world/rules/appraisal_view.py`):
+`world/rules/status_query.py` (the look/status read model):
 
 ```python
 def display_stat_block(entity) -> str | None:
@@ -84,7 +84,7 @@ def display_stat_block(entity) -> str | None:
 
 | Integration | Direction |
 |---|---|
-| `world/rules/status_query.py` (or new module) | `display_stat_block()` renderer |
+| `world/rules/status_query.py` | `display_stat_block()` renderer |
 | `look <target>` command path | Appends the block |
 | `web/webclient/actions/exploration_actions.py` | `explore.look` target detail appends the same block |
 | `world/rules/traits.py` | Docstring contract updated |
