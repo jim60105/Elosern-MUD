@@ -79,11 +79,19 @@ def _require_int(value: Any, field: str, *, minimum: int) -> int:
     return value
 
 
-def load_config() -> AffinityConfig:
-    """Load and validate the affinity rulebook, failing closed on deviation."""
-    raw = yaml.safe_load(
-        (Path(__file__).parent / "rulebook" / "affinity.yaml").read_text(encoding="utf-8")
+def load_config(path: Path | None = None) -> AffinityConfig:
+    """Load and validate the affinity rulebook, failing closed on deviation.
+
+    ``path`` overrides the canonical rulebook location. Tests exercise deviant
+    rulebooks through a temporary copy so the shared source file is never
+    rewritten, which keeps parallel workers from racing on the file.
+    """
+    rulebook = (
+        Path(__file__).parent / "rulebook" / "affinity.yaml"
+        if path is None
+        else path
     )
+    raw = yaml.safe_load(rulebook.read_text(encoding="utf-8"))
     if not isinstance(raw, Mapping):
         raise _error("rulebook must be a mapping")
     raw = dict(raw)

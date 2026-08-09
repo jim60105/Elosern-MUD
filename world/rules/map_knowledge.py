@@ -111,11 +111,16 @@ def _registered_grid_bounds(z_map_key: str) -> tuple[int, int] | None:
     """Return ``(max_X, max_Y)`` for a registered grid map, or ``None``.
 
     Resolves through the live xyzgrid so the bounds are exactly the map's own
-    ``max_X``/``max_Y`` rather than a duplicated constant (design D2).
+    ``max_X``/``max_Y`` rather than a duplicated constant (design D2). The
+    lookup is read-only: a grid that has never been provisioned resolves to
+    ``None`` without creating the global grid script, so a pure validation
+    path can never write the database.
     """
     try:
-        from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
+        from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid, get_xyzgrid
 
+        if not XYZGrid.objects.exists():
+            return None
         xymap = get_xyzgrid().get_map(z_map_key)
     except Exception:
         return None

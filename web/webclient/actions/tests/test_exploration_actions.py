@@ -16,7 +16,7 @@ from unittest.mock import patch
 from django.test import override_settings
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
@@ -250,17 +250,15 @@ class ExplorationValidatorTests(unittest.TestCase):
                     validator({field: "x"})
 
 
-class ExplorationActionAdapterTests(EvenniaTest):
+class ExplorationActionAdapterTests(EvenniaTestCase):
     def setUp(self):
-        super().setUp()
         _reset_guardrail()
         register_npc_dialogue()
         from world.rules import skip_safety
 
         skip_safety._BATTLEFIELDS.clear()
         get_world_clock()
-        self.room1.key = "起點"
-        self.room1.save()
+        self.room1 = create_object(Room, key="起點")
         self.player = create_object(PlayerCharacter, key="探索行動測試")
         self.player.race = "human"
         self.player.apply_race_baseline()
@@ -274,7 +272,6 @@ class ExplorationActionAdapterTests(EvenniaTest):
             location=self.room1,
             destination=self.destination,
         )
-        self.player.save()
 
     def tearDown(self):
         from world.rules import skip_safety

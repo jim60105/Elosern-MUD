@@ -232,7 +232,7 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
         bad["reward"]["copper"] = 10_000
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(bad)
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, {})
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, dict(self._registry_items))
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_unknown_item_key_raises_with_no_registry_change(self):
@@ -240,7 +240,7 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
         bad["reward"]["items"] = [{"item_key": "bogus_potion", "quantity": 1}]
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(bad)
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, {})
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, dict(self._registry_items))
 
     @covers_requirement("scenario-director::the-canonical-payload-contract-is-versioned-and-shared-by-both-boundaries")
     def test_wilderness_layer_raises_a_named_error(self):
@@ -366,7 +366,7 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
     def test_raw_ai_shaped_dict_is_still_rejected_by_the_runtime_registry(self):
         with self.assertRaises(QuestDefinitionError):
             register_quest_definition(_defeat_payload())
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, {})
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, dict(self._registry_items))
 
 
 class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
@@ -378,8 +378,14 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         compiled = self._compiled()
         register_generated_quest(compiled)
         register_generated_quest(compiled)
-        self.assertEqual(len(QUEST_DEFINITION_REGISTRY), 1)
-        self.assertEqual(len(GUILD_OFFER_REGISTRY), 1)
+        self.assertEqual(
+            len(QUEST_DEFINITION_REGISTRY),
+            len(self._registry_items) + 1,
+        )
+        self.assertEqual(
+            len(GUILD_OFFER_REGISTRY),
+            len(self._offer_items) + 1,
+        )
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_conflicting_offer_rolls_back_the_definition_write(self):

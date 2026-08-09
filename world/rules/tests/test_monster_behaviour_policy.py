@@ -93,7 +93,13 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         actor.traits.mp = FakeGauge(0, 24)
         actor.traits.sp = FakeGauge(18, 18)
         enemies = [FakeEntity("one"), FakeEntity("two")]
-        request = monster_behaviour_policy(actor, _field(actor, enemies))
+        # The two affordable single-target physical skills tie on expected
+        # damage, so pin the dice tie-break to the first owned candidate.
+        with patch(
+            "world.rules.monster_behaviour.dice.roll_d100",
+            return_value=0,
+        ):
+            request = monster_behaviour_policy(actor, _field(actor, enemies))
         self.assertEqual(request.skill_key, "shadow_slash")
         self.assertNotEqual(request.targets, "all-enemies")
 

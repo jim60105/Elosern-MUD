@@ -16,8 +16,10 @@ from world.maps.bootstrap import (
     sync_service_interiors,
 )
 from world.quests.catalog import register_catalog
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_config import CATALOG
+from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.guild_economy import (
     GUILD_SERVICE_KEY,
     MERCHANT_SERVICE_KEY,
@@ -128,7 +130,16 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTest):
 class ServiceContentWithoutInteriorsTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         register_catalog()
+
+    def tearDown(self):
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._registry_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._offer_items)
+        super().tearDown()
 
     def test_sync_service_content_without_interiors_degrades_gracefully(self):
         # No sync_grid was run; interiors do not exist, so no hosts are created.

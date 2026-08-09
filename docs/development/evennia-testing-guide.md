@@ -8,7 +8,7 @@ Evennia 目前提供的 `EvenniaTest` 會在 `setUp()` 中建立 accounts、room
 
 本文以目前 Evennia `main`／latest 文件與 Django 6.0 測試框架為依據。本專案已套用本文第一階段優化（`EvenniaTestCase`、`setUpTestData()`、test-only settings），實測數據與最終取捨記錄於「[Evennia 測試效能報告](evennia-test-performance)」。
 
-!> **本專案目前不使用 `--parallel`**。平行 runner 曾因共享的 monster-skill registry 狀態造成 race condition，且失敗 traceback 無法被 pickle。除非有新的隔離證據，否則序列執行仍是本專案的標準做法，詳細分析見「[Evennia 測試效能報告](evennia-test-performance)」的 Parallel Evaluation 一節。
+!> **本專案已採用 `--parallel 4` 作為日常完整 suite 指令**。平行 runner 曾因測試非確定性（unseeded dice tie-break、共享 registry 未還原、直接覆寫共享 rulebook 檔）造成 race condition；這些問題已逐一修正（見「[Evennia 測試效能報告](evennia-test-performance)」的 Parallel Evaluation 一節），並以連續兩次全綠的完整 parallel run 作為證據。序列執行仍保留為最終 handoff 證據的標準做法。
 
 ## 先量測測試時間
 
@@ -1021,7 +1021,17 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
     world
 ```
 
-完整本機測試（序列執行，本專案不使用 `--parallel`）：
+完整本機測試（平行執行，實測 ~125s；最終 handoff 證據請改為下方序列指令）：
+
+```sh
+MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+    --settings test_settings.py \
+    --noinput \
+    --parallel 4 \
+    commands server typeclasses world web.webclient
+```
+
+完整本機測試（序列執行，最終 handoff 證據標準）：
 
 ```sh
 MUD_TEST_SETTINGS=1 uv run --locked evennia test \

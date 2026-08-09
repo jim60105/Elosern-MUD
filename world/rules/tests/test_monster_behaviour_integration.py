@@ -151,7 +151,14 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTest):
             {monster.key: monster, target.key: target},
         )
 
-        request = monster_behaviour_policy(monster, battlefield)
+        # The mid-tier pack-hunter profile picks by highest expected damage, and
+        # both affordable single-target physical skills tie at the same attack
+        # value, so the dice tie-break must be pinned for a deterministic test.
+        with patch(
+            "world.rules.monster_behaviour.dice.roll_d100",
+            return_value=0,
+        ):
+            request = monster_behaviour_policy(monster, battlefield)
         self.assertEqual(request.skill_key, "shadow_slash")
         with patch(
             "world.rules.combat.evaluate_combat_modifiers",

@@ -39,11 +39,19 @@ RULEBOOK = Path(__file__).resolve().parents[2] / "rules" / "rulebook" / "guild_e
 class CatalogRegistryIsolation(unittest.TestCase):
     def setUp(self):
         super().setUp()
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+        self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         self._catalog = CATALOG
+        register_catalog()
 
     def tearDown(self):
         global CATALOG
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._registry_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offer_items)
         CATALOG = self._catalog
@@ -261,11 +269,6 @@ class ShopRuleTests(unittest.TestCase):
 
 
 class CatalogLoadingTests(CatalogRegistryIsolation):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        register_catalog()
-
     def test_full_catalog_loads_and_joins_registries(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertIsInstance(catalog, GuildCatalog)

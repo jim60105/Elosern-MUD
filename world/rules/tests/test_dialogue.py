@@ -284,7 +284,11 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         sync_grid()
         sync_service_interiors()
         from world.quests.catalog import register_catalog
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
+        self._quest_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         register_catalog()
         from world.rules.guild_config import CATALOG, load_catalog_into_cache
 
@@ -298,6 +302,16 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
 
         sync_service_content()
         self.guild_master = NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first()
+
+    def tearDown(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._quest_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._offer_items)
+        super().tearDown()
 
     def test_sync_attaches_exactly_one_scripted_dialogue(self):
         from world.rules.guild_economy import sync_service_content

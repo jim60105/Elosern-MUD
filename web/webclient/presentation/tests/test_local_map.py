@@ -11,7 +11,7 @@ import types
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 from unittest.mock import patch
 
 from typeclasses.characters import PlayerCharacter
@@ -700,15 +700,21 @@ class LocalMapGridHelperTests(unittest.TestCase):
         self.assertEqual(builder.nodes[0]["action"]["exit_ref"], "1")
 
 
-class LocalMapPresenterTests(EvenniaTest):
-    def setUp(self):
-        super().setUp()
-        self.room1.key = "Room1"
-        self.room1.save()
+class LocalMapPresenterTests(EvenniaTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        cls._south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+
+    def setUp(self):
+        self.room1 = create_object(Room, key="Room1")
+        self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.south_gate = GridRoom.objects.get(id=self._south_gate.id)
 
     def _registry(self):
         return build_production_registry()
@@ -933,15 +939,24 @@ class LocalMapPresenterTests(EvenniaTest):
             self.assertIsNone(node["action"])
 
 
-class LocalMapWildernessTests(EvenniaTest):
+class LocalMapWildernessTests(EvenniaTestCase):
     """Wilderness-layer adapter tests (task 3.3)."""
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
+        cls._north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
+        cls._gate = [e for e in cls._north_gate.exits if e.key == "荒野"][0]
+
+    def setUp(self):
+        self.room1 = create_object(Room, key="Room1")
+        self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.north_gate = GridRoom.objects.get(id=self._north_gate.id)
         self.gate = [e for e in self.north_gate.exits if e.key == "荒野"][0]
 
     def _registry(self):

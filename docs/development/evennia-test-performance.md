@@ -118,8 +118,71 @@ the failure traceback from its worker. This is a correctness, isolation, and
 diagnostic failure, so parallel execution is rejected without spending more
 time on bare `--parallel`, clean-clone, evidence, or subprocess-coverage runs.
 
-Serial execution remains canonical. No CI or documented final command enables
-parallel workers. Removing duplicate managed-browser discovery is accepted
+### 2026-08: Parallel adopted after isolation fixes
+
+At 2,525 tests the serial suite had grown to ~1,033 s. Parallel was
+re-evaluated and the root causes of every observed failure were fixed:
+
+- **Non-deterministic dice tie-break**: the mid-tier `pack_hunter` monster
+  profile picks skills by highest expected damage, and two affordable
+  single-target physical skills tie, so `_choose_skill` resolves the tie with
+  `dice.roll_d100()`. The unseeded global PRNG state differs per worker, so
+  `test_depleted_resource_falls_back_and_resolves` and
+  `test_unaffordable_preference_falls_back_to_affordable_skill` asserted
+  `shadow_slash` but occasionally received `basic_attack`. Both tests now pin
+  the tie-break roll with `patch("world.rules.monster_behaviour.dice.roll_d100", return_value=0)`.
+- **Unpicklable failure tracebacks**: `tblib` (3.2.2) was added as a dev
+  dependency so Django can pickle worker tracebacks; failures are now
+  diagnosable in parallel mode.
+- **Shared-rulebook file race**: `AffinityConfigValidationTests` rewrote
+  `world/rules/rulebook/affinity.yaml` in place and restored it in
+  `tearDown`; parallel workers raced on the file and read deviant floors.
+  `load_config(path=...)` now accepts an explicit rulebook path and the tests
+  exercise deviant rulebooks from `TemporaryDirectory` copies. The shared
+  source file is never rewritten.
+- **Process-global quest/catalog registry leaks**: several test classes
+  registered `QUEST_DEFINITION_REGISTRY`/`GUILD_OFFER_REGISTRY`/`CATALOG`
+  without snapshot-restore (or snapshot after registering), leaking
+  `introductory_hunt` into whichever worker ran them. Fixed in
+  `test_onboarding_journey`, `test_guild_config`, `test_dialogue`,
+  `test_service_view`, `test_service_view_side_effects`,
+  `test_guild_economy_sync`, `test_party_offline_loop`,
+  `test_guild_registration`, and the converted `web.webclient` presenter/action
+  classes. The compile-boundary tests now assert registry-unchanged relative
+  to their own setUp snapshot instead of a literal empty registry, which is
+  the semantically correct contract.
+- **Read-path database write**: `map_knowledge._registered_grid_bounds` called
+  the xyzgrid contrib's `get_xyzgrid()`, which creates the global `XYZGrid`
+  script on a pure read. A pure `unittest.TestCase` runs with autocommit, so a
+  grammar test permanently committed the script and poisoned every later
+  `--keepdb` bootstrap run. The lookup now returns `None` when no grid has
+  been provisioned, so validation paths never write the database.
+- **Fixture-heavy presenter tests**: the `web.webclient` presentation and
+  action adapter classes (213 methods, ~1.8 s each because every test paid for
+  `sync_grid()`/`sync_wilderness()`) moved from `EvenniaTest` to
+  `EvenniaTestCase` with the expensive grid/wilderness/catalog sync hoisted to
+  class level and per-test entity creation. They now run in ~13 s serial and
+  are parallel-safe.
+
+Evidence runs (full 2,525-test suite, `--parallel 4 --noinput`, twice
+consecutively):
+
+| Run | Test time | Total time | Result |
+|---|---:|---:|---|
+| Parallel 1 | 125.423 s | 129.525 s | Pass |
+| Parallel 2 | 125.149 s | 129.153 s | Pass |
+
+This is an **~8.2x speedup** over the 1,033 s serial baseline. Serial remains
+canonical for final handoff evidence; the converted and newly isolated test
+classes also pass the full serial suite (measured 1,006–1,054 s across runs,
+with the same 1,146-test set at 354 s in the earlier phase-1 report). The
+retained `--keepdb` database stays clean after full runs: the
+`world.maps.tests.test_bootstrap` fresh-grid precondition now passes on
+repeated consecutive runs.
+
+Serial execution remains the handoff standard, but `--parallel 4 --noinput`
+is the documented default full-suite command during development. Removing
+duplicate managed-browser discovery is accepted
 separately only after the final serial evidence and aggregate coverage run
 passes.
 

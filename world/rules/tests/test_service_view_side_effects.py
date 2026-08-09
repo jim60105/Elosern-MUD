@@ -30,10 +30,10 @@ from world.rules.surfaces import write_counter_trait
 class ServicesViewSideEffectTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        register_catalog()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
+        register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
         get_world_clock()

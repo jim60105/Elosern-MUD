@@ -189,10 +189,10 @@ def quest_record(quest_id="introductory_hunt:1", state=QuestState.IN_PROGRESS, p
 
 class ServiceRegistryIsolation(unittest.TestCase):
     def setUp(self):
-        register_catalog()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
+        register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
         self._catalog_obj = catalog

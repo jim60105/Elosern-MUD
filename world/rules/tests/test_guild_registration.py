@@ -220,8 +220,12 @@ class RegistrationBoundaryScanTests(unittest.TestCase):
 class GuildServicePCIntegrationTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
         from world.quests.tests._fixtures import register_catalog_once
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
+        self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         register_catalog_once()
         import world.maps.bootstrap as bootstrap
 
@@ -232,6 +236,16 @@ class GuildServicePCIntegrationTests(EvenniaTest):
         self.player.apply_race_baseline()
         self.player.location = self.hall
         self.staff = _attach_staff(create_object(NPC, key="guild staff", location=self.hall))
+
+    def tearDown(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._registry_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._offer_items)
+        super().tearDown()
 
     def test_pipeline_flow_registers_then_returns_record(self):
         record = register_adventurer(self.player)

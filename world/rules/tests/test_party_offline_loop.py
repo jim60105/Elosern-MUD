@@ -78,6 +78,11 @@ class OfflinePartyQuestLoopTests(EvenniaCommandTestMixin, EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        self._quest_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         _reset_all()
         register_npc_dialogue()
         sync_quest_runtime()
@@ -114,6 +119,13 @@ class OfflinePartyQuestLoopTests(EvenniaCommandTestMixin, EvenniaTest):
         )
 
     def tearDown(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._quest_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._offer_items)
         _reset_all()
         super().tearDown()
 

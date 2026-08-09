@@ -11,7 +11,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
@@ -580,18 +580,16 @@ class ServicesSchemaTests(unittest.TestCase):
             validate_services(payload)
 
 
-class ServicesPresenterTests(EvenniaTest):
+class ServicesPresenterTests(EvenniaTestCase):
     def setUp(self):
-        super().setUp()
-        register_catalog()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
+        register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
         get_world_clock()
-        self.room1.key = "guild hall"
-        self.room1.save()
+        self.room1 = create_object(Room, key="guild hall")
 
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.room1)
@@ -997,14 +995,18 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             )
 
 
-class ServicesPresenterPrerequisiteTests(EvenniaTest):
+class ServicesPresenterPrerequisiteTests(EvenniaTestCase):
     """Global-prerequisite failures render the common unavailable form."""
+
+    def setUp(self):
+        self.room1 = create_object(Room, key="room")
+        self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
 
     def test_services_view_error_renders_unavailable(self):
         from unittest.mock import patch
 
-        self.room1.key = "room"
-        self.room1.save()
         actor = self.char1
         actor.location = self.room1
         context = PresentationContext(actor=actor, protocol_version=1)

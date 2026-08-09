@@ -15,7 +15,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
@@ -68,17 +68,15 @@ def _registration(rank="F"):
     }
 
 
-class ServiceActionBase(EvenniaTest):
+class ServiceActionBase(EvenniaTestCase):
     def setUp(self):
-        super().setUp()
-        register_catalog()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
+        register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
         get_world_clock()._persist(TICK_NOON)
-
         self.hall = create_object(Room, key="guild hall")
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.hall)

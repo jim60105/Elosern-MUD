@@ -8,6 +8,7 @@ one-to-one naming correspondence.
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import tempfile
 from pathlib import Path
 from unittest import TestCase
 
@@ -71,24 +72,12 @@ class AffinityStageBoundaryTests(TestCase):
 
 
 class AffinityConfigValidationTests(TestCase):
-    def _write_temporary(self, content: str) -> Path:
-        target = Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
-        self._original = target.read_text(encoding="utf-8")
-        target.write_text(content, encoding="utf-8")
-        return target
-
-    def tearDown(self):
-        target = Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
-        if hasattr(self, "_original"):
-            target.write_text(self._original, encoding="utf-8")
-        from world.rules import affinity_config
-
-        affinity_config._CONFIG = None
-
     def _load_deviant(self, content: str):
-        self._write_temporary(content)
-        with self.assertRaises(AffinityConfigError):
-            load_config()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "affinity.yaml"
+            path.write_text(content, encoding="utf-8")
+            with self.assertRaises(AffinityConfigError):
+                load_config(path=path)
 
     @covers_requirement("affinity-system::the-stage-ladder-maps-hidden-values-to-seven-traditional-chinese-stage-names")
     def test_deviant_floor_outside_canonical_set_is_rejected(self):

@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
@@ -701,29 +701,50 @@ class ExplorationSchemaTests(unittest.TestCase):
             validate_exploration(payload)
 
 
-class ExplorationPresenterTests(EvenniaTest):
+class ExplorationPresenterTests(EvenniaTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        get_world_clock()
+        sync_grid()
+
     def setUp(self):
-        super().setUp()
         from world.quests.catalog import register_catalog
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
         from world.rules.guild_config import (
+            CATALOG,
             load_catalog_into_cache,
             register_catalog_offers,
         )
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
+        self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._catalog = CATALOG
+        self._offers = list(GUILD_OFFER_REGISTRY.items())
         register_catalog()
         catalog = load_catalog_into_cache()
         register_catalog_offers(catalog)
-        get_world_clock()
-        self.room1.key = "南門"
-        self.room1.save()
-        sync_grid()
+        self.room1 = create_object(Room, key="南門")
         self.south_gate = self.room1
         self.player = create_object(PlayerCharacter, key="探索測試")
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.south_gate
         record_arrival(self.player)
-        self.player.save()
+
+    def tearDown(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        if hasattr(self, "_registry_items"):
+            import world.rules.guild_config as guild_config
+
+            QUEST_DEFINITION_REGISTRY.clear()
+            QUEST_DEFINITION_REGISTRY.update(self._registry_items)
+            GUILD_OFFER_REGISTRY.clear()
+            GUILD_OFFER_REGISTRY.update(self._offers)
+            guild_config.CATALOG = self._catalog
+        super().tearDown()
 
     def _registry(self):
         return build_production_registry()

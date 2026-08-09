@@ -59,6 +59,14 @@ class OnboardingJourneyMixin:
             register_catalog_offers,
         )
 
+        # Snapshot the process-global registries this setup populates so a
+        # parallel worker never sees another journey test's catalog entries
+        # (world.quests tests assert empty registries).
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        self._journey_quest_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._journey_offer_items = list(GUILD_OFFER_REGISTRY.items())
         register_catalog()
         register_catalog_offers(get_catalog())
         create_object(Room, key="虛境", location=None)
@@ -77,6 +85,16 @@ class OnboardingJourneyMixin:
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.gate
+
+    def tearDown(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._journey_quest_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._journey_offer_items)
+        super().tearDown()
 
     def _activate(self):
         activate_player_character(

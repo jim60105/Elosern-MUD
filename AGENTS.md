@@ -93,6 +93,7 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 ```sh
 uv sync --locked
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands server typeclasses world web.webclient
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 4 commands server typeclasses world web.webclient
 uv run --locked python -m unittest discover -s web/tests/browser -t .
 uv run --locked -m unittest discover -s tests -t .
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
@@ -111,9 +112,11 @@ profiling and parallel-evaluation commands.
 ### Test runtime budget (measured, do not waste wall-clock)
 
 The full Evennia suite (`evennia test ... commands server typeclasses web
-world`) takes roughly **5–10 minutes**; running all of `world` plus `commands`
-alone is ~4–5 minutes. The managed browser suite is the slowest thing in the
-repo and dominates total runtime:
+world`) takes roughly **17 minutes serial** (2,525 tests) and **~2 minutes with
+`--parallel 4`** (~125 s, measured twice consecutively green). Serial remains
+canonical for final handoff evidence, but `--parallel 4 --noinput` is the
+default full-suite command during development. The managed browser suite is
+the slowest thing in the repo and dominates total runtime:
 
 - Each Playwright test boots a real Evennia server. Foundation browser tests
   share one server per process (~30–40s each); **combat browser tests boot one
