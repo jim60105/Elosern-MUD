@@ -107,7 +107,7 @@ pipeline (actor from the session) and fills the draft form for confirmation.
 |---|---|
 | LLM offline / retry exhausted | Stable unavailable message; wizard unchanged |
 | Proposal references unregistered keys / out-of-band allocations | Retry; exhaustion degrades without filling the draft |
-| Persona text overlong / malformed | Truncated or discarded (per validation); the rest of the proposal proceeds |
+| Persona text overlong / malformed | The whole proposal fails validation → retry with the appended error; exhaustion degrades to the stable unavailable message. Partial proposals (race accepted but persona discarded) never proceed |
 | Mid-flow disconnect | Draft is persisted by the existing mechanism; reconnect resumes |
 | Activation failure | Existing all-or-nothing behavior; persona never half-written |
 
@@ -117,7 +117,7 @@ pipeline (actor from the session) and fills the draft form for confirmation.
 
 | Area | Method |
 |---|---|
-| Generative layer | `FakeLLMClient` replays: valid proposal fills the draft; unregistered race/skill rejects; out-of-band allocations reject; malformed persona discarded; offline degrade |
+| Generative layer | `FakeLLMClient` replays: valid proposal accepted; unregistered race/skill rejects; out-of-band allocations reject; invalid persona rejects the whole proposal; offline degrade |
 | Command | `character concept` success/failure/offline; command-docs drift contract green |
 | Activation | Persona written to `entity.db.persona` in import-card shape; no-persona draft writes nothing; adult gate regression (age 17/17 rejected) |
 | Guardrail | Malformed output leaves the DB untouched |
