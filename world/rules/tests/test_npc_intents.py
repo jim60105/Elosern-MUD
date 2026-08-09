@@ -4,8 +4,10 @@ Covers ``apply_npc_intent``: the ``request_guild_exam`` routing through
 ``start_guild_exam`` with ``requested_by="npc_intent"``, every failed exam gate
 discarding only the intent, the atomic give/take item transfer primitive, the
 ``adjust_relation`` routing through the sole-writer affinity API with the
-applied-amount report, the remaining forward-declared kind rejections, and the
-boundary rule that this module never imports the generative package.
+applied-amount report, the ``offer_quest`` routing through the guild-offer
+surface with its atomic acceptance and rejection paths, the remaining
+forward-declared kind rejection, and the boundary rule that this module never
+imports the generative package.
 """
 
 import inspect
@@ -32,6 +34,12 @@ from world.rules.combat_session import read_session
 from world.rules.guild import GuildDataError, register_adventurer
 from world.rules.guild_config import CATALOG
 from world.rules.guild_exams import ExamState, _read_exams
+from world.rules.guild_offers import (
+    GuildQuestOffer,
+    ItemQuantity,
+    QuestReward,
+    register_guild_offer,
+)
 from world.rules.npc_intents import (
     IntentOutcome,
     _apply_plan,
@@ -296,11 +304,9 @@ class ItemIntentTests(EvenniaTest):
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_forward_declared_kinds_are_rejected_with_no_state_change(self):
-        for kind in ("offer_quest", "reveal_lore"):
-            with self.subTest(kind=kind):
-                outcome = apply_npc_intent(self.npc, self.player, {"kind": kind})
-                self.assertFalse(outcome.applied)
-                self.assertIn("no deterministic capability surface yet", outcome.reason)
+        outcome = apply_npc_intent(self.npc, self.player, {"kind": "reveal_lore"})
+        self.assertFalse(outcome.applied)
+        self.assertIn("no deterministic capability surface yet", outcome.reason)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_non_mapping_intent_is_rejected(self):
@@ -492,6 +498,213 @@ class PartyInviteIntentTests(EvenniaTest):
         outcome = apply_npc_intent(self.player, self.player, self._invite_intent(True))
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "not_npc")
+
+
+class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTest):
+    """The offer_quest intent routes through the registered guild-offer surface."""
+
+    ALTORIA_BRANCH = "guild_branch_altoria"
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="offer quest room")
+        self.player = create_object(PlayerCharacter, key="offer quest player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.staff = create_object(NPC, key="offer staff", location=self.room)
+        self.staff.components.add(
+            GuildStaff.create(
+                self.staff, service_id="staff", branch_key=self.ALTORIA_BRANCH
+            )
+        )
+        register_adventurer(self.player, self.staff)
+        definition = _register_quest(_quest("forest_clearing", rank="F"))
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=definition.key,
+                issuer_branch_key=self.ALTORIA_BRANCH,
+                reward=QuestReward(copper=50, items=(), merit=25),
+            )
+        )
+        self.quest_key = definition.key
+
+    def _offer_intent(self, quest_key="forest_clearing"):
+        return {"kind": "offer_quest", "quest_key": quest_key}
+
+    def _affinity(self, player=None):
+        return self.staff.relations._load(player or self.player)
+
+    def _records(self):
+        return read_records(self.player)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-is-assigned-directly-and-atomically")
+    def test_verified_offer_assigns_the_quest_and_applies_guild_affinity(self):
+        outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.reason, "quest assigned")
+        records = self._records()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].definition_key, self.quest_key)
+        self.assertEqual(records[0].state, QuestState.IN_PROGRESS)
+        self.assertEqual(self._affinity().value, 2)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-is-assigned-directly-and-atomically")
+    def test_capped_affinity_write_commits_the_quest_without_rollback(self):
+        from world.rules.affinity import AffinityRecord
+
+        self.staff.db.relations_data = {
+            str(self.player.pk): AffinityRecord(
+                value=99, cap=99, daily_gain=0, daily_tick=0
+            ).to_storage()
+        }
+        outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertTrue(outcome.applied)
+        self.assertIn("capped", outcome.reason)
+        records = self._records()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].definition_key, self.quest_key)
+        self.assertEqual(self._affinity().value, 99)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_non_npc_speaker_is_rejected_without_state_change(self):
+        outcome = apply_npc_intent(self.player, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "offer_quest requires an NPC speaker")
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_speaker_without_guild_staff_is_rejected_without_state_change(self):
+        plain = create_object(NPC, key="plain npc", location=self.room)
+        outcome = apply_npc_intent(plain, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "offer_quest requires a GuildStaff speaker")
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_speaker_without_branch_key_is_rejected_without_state_change(self):
+        branchless = create_object(NPC, key="branchless staff", location=self.room)
+        branchless.components.add(
+            GuildStaff.create(branchless, service_id="branchless")
+        )
+        outcome = apply_npc_intent(branchless, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest requires a GuildStaff branch_key"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_unregistered_offer_is_rejected_without_state_change(self):
+        outcome = apply_npc_intent(
+            self.staff, self.player, self._offer_intent("unregistered_quest")
+        )
+        self.assertFalse(outcome.applied)
+        self.assertIn("no guild offer", outcome.reason)
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_unregistered_player_is_rejected_without_state_change(self):
+        other = create_object(PlayerCharacter, key="unregistered player")
+        other.race = "human"
+        other.apply_race_baseline()
+        other.location = self.room
+        outcome = apply_npc_intent(self.staff, other, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "actor is not registered")
+        self.assertEqual(read_records(other), [])
+        self.assertIsNone(self._affinity(other))
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_rankless_player_is_rejected_without_state_change(self):
+        self.player.guild_rank = None
+        outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "actor has no guild rank")
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_unknown_player_rank_is_rejected_without_state_change(self):
+        self.player.guild_rank = "Z"
+        outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertIn("unknown guild rank", outcome.reason)
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_malformed_registration_discards_only_the_intent(self):
+        self.player.db.guild_registration = {"branch_key": 123}
+        outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertIn("guild_registration", outcome.reason)
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_rank_below_the_quest_band_is_rejected_without_state_change(self):
+        definition = _register_quest(_quest("ranked_quest", rank="E"))
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=definition.key,
+                issuer_branch_key=self.ALTORIA_BRANCH,
+                reward=QuestReward(copper=200, items=(), merit=25),
+            )
+        )
+        outcome = apply_npc_intent(
+            self.staff, self.player, self._offer_intent(definition.key)
+        )
+        self.assertFalse(outcome.applied)
+        self.assertIn("not rank-eligible", outcome.reason)
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-is-assigned-directly-and-atomically")
+    def test_duplicate_quest_rejection_is_delegated_to_the_quest_runtime(self):
+        first = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertTrue(first.applied)
+        second = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertFalse(second.applied)
+        records = self._records()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(self._affinity().value, 2)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-is-assigned-directly-and-atomically")
+    def test_injected_commit_failure_restores_quest_log_and_affinity_record(self):
+        with patch(
+            "world.rules.npc_intents.apply_affinity_change",
+            side_effect=RuntimeError("affinity write failure"),
+        ):
+            outcome = apply_npc_intent(self.staff, self.player, self._offer_intent())
+        self.assertFalse(outcome.applied)
+        self.assertIn("rolled back", outcome.reason)
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+        self.staff.attributes.reset_cache()
+        self.player.attributes.reset_cache()
+        self.assertEqual(list(self.player.db.quest_log or []), [])
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-carries-exactly-one-quest-key-field")
+    def test_malformed_offer_payloads_are_rejected_without_state_change(self):
+        for intent in (
+            {"kind": "offer_quest"},
+            {"kind": "offer_quest", "quest_key": ""},
+            {"kind": "offer_quest", "quest_key": 3},
+            {"kind": "offer_quest", "quest_key": "x", "extra": 1},
+            {"kind": "offer_quest", "quest_key": "q" * 65},
+        ):
+            with self.subTest(intent=intent):
+                outcome = apply_npc_intent(self.staff, self.player, intent)
+                self.assertFalse(outcome.applied)
+                self.assertIsNotNone(outcome.reason)
+                self.assertEqual(self._records(), [])
+                self.assertEqual(self._affinity().value, 1)
 
 
 class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):

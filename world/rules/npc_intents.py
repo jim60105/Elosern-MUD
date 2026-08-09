@@ -5,9 +5,9 @@ verifies an extracted ``intent`` against the world before applying it and
 discards illegal or unverifiable intents while the speech is kept. It performs
 verification and application only through existing deterministic APIs -- the
 guild-exam trigger, the inventory-planning boundary, the sole-writer affinity
-API, and the party-membership module. ``offer_quest`` and ``reveal_lore`` are
-whitelisted by the schema but rejected here behind forward-declared seams until
-their deterministic capability surfaces exist.
+API, the party-membership module, and the guild-offer surface.
+``reveal_lore`` is whitelisted by the schema but rejected here behind a
+forward-declared seam until its deterministic capability surface exists.
 
 Single-writer invariant: this module is part of the deterministic core and the
 sole writer of any state this change causes; the generative reply layer never
@@ -29,11 +29,13 @@ from world.rules.surfaces import (
     snapshot_traits,
 )
 
-_FORWARD_DECLARED_KINDS = ("offer_quest", "reveal_lore")
+_FORWARD_DECLARED_KINDS = ("reveal_lore",)
 
 _INVENTORY_SURFACE_KEYS = ("inventory", "quest_log")
 
 _MAX_RELATION_DELTA = 10
+
+_MAX_INTENT_KEY_LENGTH = 64
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,8 @@ def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
         return _apply_adjust_relation(npc, player, intent)
     if kind == "party_invite":
         return _apply_party_invite(npc, player, intent)
+    if kind == "offer_quest":
+        return _apply_offer_quest(npc, player, intent)
     if kind in ("give_item", "take_item"):
         return _apply_item_transfer(kind, npc, player, intent)
     if kind in _FORWARD_DECLARED_KINDS:
@@ -143,6 +147,88 @@ def _apply_party_invite(npc: Any, player: Any, intent: dict[str, Any]) -> Intent
     return IntentOutcome(True, "party joined")
 
 
+def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
+    """Assign a registered guild offer through the guild-offer surface.
+
+    Payload is exactly ``{"quest_key": str}``. Verification order: the
+    speaking NPC carries ``GuildStaff`` with a ``branch_key``; a
+    ``GuildQuestOffer`` for ``quest_key`` is registered at that branch; and
+    the player is a registered member whose canonical rank is within the
+    offer's quest rank band (the same canonical eligibility ``list_guild_offers``
+    applies, including the unregistered and rankless rejection paths).
+    Duplicate-quest rejection is delegated to the quest runtime inside the
+    atomic acceptance, whose quest-log and relations surfaces are restored on
+    any failure -- a dialogue-assigned quest is economically and statefully
+    identical to a board-accepted one.
+    """
+    payload = _payload_without_kind(intent)
+    if set(payload) != {"quest_key"}:
+        return IntentOutcome(False, "offer_quest must carry exactly quest_key")
+    quest_key = payload["quest_key"]
+    if not isinstance(quest_key, str) or not quest_key.strip():
+        return IntentOutcome(False, "offer_quest quest_key must be a non-empty string")
+    if len(quest_key) > _MAX_INTENT_KEY_LENGTH:
+        return IntentOutcome(
+            False,
+            f"offer_quest quest_key must be at most {_MAX_INTENT_KEY_LENGTH} code points",
+        )
+
+    from typeclasses.components import GuildStaff
+    from typeclasses.npcs import NPC
+
+    if not isinstance(npc, NPC):
+        return IntentOutcome(False, "offer_quest requires an NPC speaker")
+    if not hasattr(npc, "components") or not npc.components.has(GuildStaff.name):
+        return IntentOutcome(False, "offer_quest requires a GuildStaff speaker")
+    guild_staff = npc.components.get(GuildStaff.get_component_slot())
+    branch_key = guild_staff.branch_key
+    if not isinstance(branch_key, str) or not branch_key:
+        return IntentOutcome(False, "offer_quest requires a GuildStaff branch_key")
+
+    from world.rules.guild import GuildDataError
+    from world.rules.guild_offers import (
+        BoardAccessError,
+        GuildOfferNotFound,
+        get_guild_offer,
+        list_guild_offers,
+    )
+
+    try:
+        get_guild_offer(quest_key, branch_key)
+    except GuildOfferNotFound:
+        return IntentOutcome(False, f"no guild offer {quest_key!r} at this branch")
+    try:
+        eligible = list_guild_offers(player, npc)
+    except (BoardAccessError, GuildDataError) as error:
+        return IntentOutcome(False, _reason_text(error))
+    if not any(offer.definition_key == quest_key for offer in eligible):
+        return IntentOutcome(False, f"quest {quest_key!r} is not rank-eligible")
+
+    from world.quests.runtime import accept_quest
+    from world.rules.affinity import AffinitySource
+
+    quest_log_snapshot = attribute_snapshot(player, "quest_log")
+    relations_snapshot = attribute_snapshot(npc, "relations_data")
+    affinity_capped = False
+    try:
+        with transaction.atomic():
+            accept_quest(player, quest_key)
+            outcome = apply_affinity_change(npc, player, AffinitySource.GUILD, 1)
+            if outcome.source_rejected:
+                # Defensive: the verified NPC and GUILD source cannot be
+                # rejected today; a future writer change must not turn a
+                # rejection into a silently misreported "capped" quest.
+                raise RuntimeError("affinity writer rejected the guild source")
+            affinity_capped = outcome.delta_used == 0
+    except Exception:
+        restore_attribute_best_effort(player, "quest_log", quest_log_snapshot)
+        restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
+        return IntentOutcome(False, "quest assignment failed and was rolled back")
+    if affinity_capped:
+        return IntentOutcome(True, "quest assigned; affinity credit capped")
+    return IntentOutcome(True, "quest assigned")
+
+
 def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
     payload = _payload_without_kind(intent)
     if set(payload) != {"target_rank"}:
@@ -162,7 +248,7 @@ def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOu
     return IntentOutcome(True)
 
 
-def _reason_text(error: GuildExamError) -> str:
+def _reason_text(error: Exception) -> str:
     if error.args:
         first = error.args[0]
         if isinstance(first, str):
