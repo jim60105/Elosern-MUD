@@ -2,8 +2,8 @@
 
 ## MODIFIED Requirements
 
-### Requirement: caravan_arrivals, shop_hours, and quest_deadlines are declared, registrable,
-no-op seams; npc_schedules is registered
+### Requirement: caravan_arrivals, shop_hours, quest_deadlines, and npc_schedules are declared,
+registrable, no-op seams
 
 `world/rules/clock.py` SHALL provide `register_event_source(kind, source)` as the only sanctioned
 way to attach a boundary-crossing event query for `caravan_arrivals`, `shop_hours`,

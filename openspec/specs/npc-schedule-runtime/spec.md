@@ -1,4 +1,3 @@
-# NPC Schedule Runtime
 
 ## Purpose
 
@@ -6,7 +5,7 @@ Define the runtime consumption of the NPC schedule model: the `npc_schedules` cl
 settlement of due move and state entries, deterministic events, failure isolation, and
 schedule-state interaction gating.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The npc_schedules clock source settles due schedule entries
 
@@ -15,20 +14,24 @@ register it through `world.rules.clock.register_event_source("npc_schedules", ..
 `npc_schedules` source. Settlement SHALL query NPCs carrying the persistent `schedule` tag (the
 `npc-schedule-model` assignment API and startup sync maintain it) and, for every occurrence with
 `start_tick < due_tick <= end_tick` and `due_tick >= effective_from_tick`, settle it in
-`(due_tick, npc_stable_id, entry_index)` order: a `move` entry SHALL resolve its target to a
-destination room, traverse the real Exit path from the NPC's current room (locks and vetoes
-apply), and on success set `schedule_state` to the referenced template's `default_state` and emit
-`npc_departed` / `npc_arrived` events; a `state` entry SHALL update `npc.db.schedule_state` and
-emit `npc_state_changed`. Multi-day skips SHALL use boundary arithmetic, not per-second iteration.
-An NPC with no schedule SHALL produce no entries and no events. Every event SHALL carry a
-JSON-safe payload (stable NPC identity; `state` or `from`/`to` target) and
-`due_tick = day_start + tick_offset`.
+`(due_tick, npc_stable_id, entry_index)` order — where `npc_stable_id` is the persistent primary
+key (`npc_id`), unique and JSON-safe where display keys are not. An occurrence due exactly at
+`start_tick` SHALL settle only when `effective_from_tick` equals that tick (the assignment
+happened at that same moment, so no earlier window could have settled it); any other occurrence at
+the start boundary was already settled by the preceding window. A `move` entry SHALL resolve its
+target to a destination room, traverse the real Exit path from the NPC's current room (locks and
+vetoes apply), and on success set `schedule_state` to the referenced template's `default_state`
+and emit `npc_departed` / `npc_arrived` events; a `state` entry SHALL update
+`npc.db.schedule_state` and emit `npc_state_changed`. Multi-day skips SHALL use boundary
+arithmetic, not per-second iteration. An NPC with no schedule SHALL produce no entries and no
+events. Every event SHALL carry a JSON-safe payload (the stable `npc_id`, a display `npc` key,
+and `state` or `from`/`to` target) and `due_tick = day_start + tick_offset`.
 
 #### Scenario: A due state entry updates the NPC's schedule state
 - **WHEN** an NPC with a schedule whose next `state` entry falls within `(start_tick, end_tick]`
   is settled
 - **THEN** `npc.db.schedule_state` holds the entry's state and the returned events include
-  `npc_state_changed` for that NPC with a payload naming the NPC and state
+  `npc_state_changed` for that NPC with a payload naming the NPC's `npc_id` and state
 
 #### Scenario: A due move entry relocates the NPC along a real Exit
 - **WHEN** an NPC's due `move` entry resolves to a destination with a traversable Exit from the
@@ -52,6 +55,11 @@ JSON-safe payload (stable NPC identity; `state` or `from`/`to` target) and
 - **WHEN** an NPC is assigned a schedule after some of that day's `tick_offset`s have passed
 - **THEN** only occurrences with `due_tick >= effective_from_tick` settle; the passed occurrences
   produce no events and no state change
+
+#### Scenario: A schedule assigned exactly at an entry's due tick settles that occurrence
+- **WHEN** an NPC is assigned a schedule at the exact world tick one of its entries is due
+- **THEN** that occurrence settles in the next advance (its due tick equals the assignment tick,
+  so no earlier window could have settled it), and occurrences due before the assignment never do
 
 #### Scenario: The stage source is the registered one
 - **WHEN** the clock's registered `npc_schedules` source is inspected
@@ -80,10 +88,11 @@ player's map-knowledge record, and the party-follow state unchanged.
 ### Requirement: A failed entry settles as a per-entry skip without blocking settlement
 
 A `move` entry whose target cannot resolve, whose room has no traversable Exit to the destination,
-whose Exit is locked, or whose destination is gone SHALL skip only that entry: a bounded diagnostic
-log, no location/state change, and **no failure event** — the event stream contains only successful
-occurrences. Settlement SHALL never raise from one NPC's failure and SHALL never roll back other
-NPCs.
+whose Exit is locked, whose destination is gone, or whose only candidate Exit is a redirecting
+non-standard traversal (an `at_traverse` that ignores the requested destination, such as the
+wilderness gates) SHALL skip only that entry: a bounded diagnostic log, no location/state change,
+and **no failure event** — the event stream contains only successful occurrences. Settlement SHALL
+never raise from one NPC's failure and SHALL never roll back other NPCs.
 
 #### Scenario: A locked Exit skips only that move entry
 - **WHEN** an NPC's due `move` entry points through a locked Exit while another NPC has a valid
@@ -94,6 +103,12 @@ NPCs.
 - **WHEN** an NPC's due `move` entry references a target that resolves to no room
 - **THEN** the entry is skipped, the NPC stays put, and no event for that move is emitted
 
+#### Scenario: A redirecting exit never moves the NPC off the scheduled route
+- **WHEN** an NPC's due `move` entry resolves to a destination whose only candidate Exit
+  overrides `at_traverse` to ignore the requested destination
+- **THEN** the entry is skipped, the NPC stays put (never relocated to an un-named room), and no
+  event for that move is emitted
+
 ### Requirement: Schedule state gates NPC-directed interactions at every host-resolving surface
 
 `world/rules/npc_schedules.py` SHALL provide
@@ -101,7 +116,10 @@ NPCs.
 does not block the interaction kind, otherwise a stable authored Traditional Chinese rejection
 reason. The consult points SHALL be enumerated per kind and SHALL cover every surface that
 resolves a local NPC host and performs a transaction: `talk` SHALL be consulted by the scripted-talk
-command path and the free-form dialogue seam (`LLMNPC.at_talked_to` / `run_npc_exchange`);
+command path — the text `talk` command and the WebClient `explore.talk_scripted` action — and the
+free-form dialogue seam (`LLMNPC.at_talked_to`; its direct `run_npc_exchange` callers are the
+party-invite surface, which is not an enumerated interaction kind and needs no gate in this
+change);
 `service_shop` SHALL be consulted by the shop buy/sell commands and the WebClient `shop.buy` /
 `shop.sell` action adapters; `service_guild` SHALL be consulted by the guild operation commands
 and the WebClient guild action adapters whenever the resolved local host is the NPC. A blocked
@@ -111,7 +129,8 @@ declared in the API; it SHALL be unreachable today because the engagement surfac
 non-hostile targets, and SHALL require no gate at that surface.
 
 #### Scenario: A busy schedule state blocks scripted talk with a stable reason
-- **WHEN** the player talks to a scripted-dialogue host whose `schedule_state` is `busy`
+- **WHEN** the player talks to a scripted-dialogue host whose `schedule_state` is `busy`,
+  through the text `talk` command or the WebClient `explore.talk_scripted` action
 - **THEN** the player receives the stable rejection line and no affinity, guide progress, memory,
   or intent state changes
 

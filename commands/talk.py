@@ -28,6 +28,7 @@ from world.rules.onboarding import (
     run_scripted_talk,
     talk_response,
 )
+from world.rules.npc_schedules import interaction_reason
 
 _MISSING_TARGET = "你想跟誰說話？請指定一個目標（talk <npc>）。"
 _AMBIGUOUS_TARGET = "這裡有好幾個目標，請說得更明確一些。"
@@ -87,6 +88,11 @@ class CmdsTalk(Command):
             self.caller.msg(resolved)
             return
         npc = resolved
+
+        reason = interaction_reason(npc, "talk")
+        if reason is not None:
+            self.caller.msg(reason)
+            return
 
         if keyword:
             kw_parts = keyword.split(maxsplit=1)

@@ -13,6 +13,7 @@ from world.rules.economy import (
 )
 from world.rules.guild_config import get_catalog
 from world.lore.items import ITEM_REGISTRY
+from world.rules.npc_schedules import interaction_reason
 from world.skills.equipment import list_items
 
 
@@ -73,6 +74,10 @@ class CmdBuy(_ShopCommandBase):
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
             return
+        reason = interaction_reason(merchant_host, "service_shop")
+        if reason is not None:
+            self.caller.msg(reason)
+            return
         parts = self.args.strip().split()
         if not parts:
             self.caller.msg("用法：buy <item_key> [數量]")
@@ -112,6 +117,10 @@ class CmdSell(_ShopCommandBase):
     def func(self) -> None:
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
+            return
+        reason = interaction_reason(merchant_host, "service_shop")
+        if reason is not None:
+            self.caller.msg(reason)
             return
         parts = self.args.strip().split()
         if not parts:

@@ -146,6 +146,12 @@ class CmdGuildExam(Command):
         examiner = self._resolve_examiner()
         if examiner is None:
             return
+        from world.rules.npc_schedules import interaction_reason
+
+        reason = interaction_reason(examiner, "service_guild")
+        if reason is not None:
+            self.caller.msg(reason)
+            return
         target_rank = self.args.strip().partition(" ")[0] or "E"
         try:
             record = start_guild_exam(

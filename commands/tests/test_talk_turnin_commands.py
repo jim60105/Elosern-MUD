@@ -173,3 +173,24 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
     def test_unknown_keyword_behaviour_is_unchanged(self):
         output = self.call(CmdsTalk(), "公會職員 謎語")
         self.assertIn("明白", output)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_host_blocks_scripted_talk_without_any_state_writes(self):
+        self.staff.db.schedule_state = "busy"
+        before = self.staff.relations.affinity_for(self.char1)
+        output = self.call(CmdsTalk(), "公會職員 公會")
+        self.assertIn("她現在正忙著，沒有理會你。", output)
+        self.assertEqual(self.staff.relations.affinity_for(self.char1), before)
+        self.assertNotIn("公會", (self.char1.guide_progress or {}).get("seen_keywords", []))
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_host_blocks_the_turnin_keyword_without_a_claim(self):
+        from commands.guild import CmdGuildAccept
+
+        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
+        quest_id = self._complete_intro_hunt()
+        self.staff.db.schedule_state = "resting"
+        output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
+        self.assertIn("她現在正忙著，沒有理會你。", output)
+        self.assertEqual(self.char1.db.wallet, 0)
+        self.assertEqual(read_records(self.char1)[0].state.value, "completed")

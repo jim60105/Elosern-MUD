@@ -583,9 +583,57 @@ class ScheduleStateWriterGuardTests(unittest.TestCase):
 
     @covers_requirement("npc-schedule-model::schedule-state-is-a-declared-attribute-contract")
     def test_schedule_state_contract_is_declared_without_a_writer(self):
+        # The model's public surface (assignment, parsing, sync, gating)
+        # declares the contract and never writes it; the runtime settlement
+        # owns every write (npc-schedule-runtime D2, sole writer).
+        from world.rules import npc_schedules
+
         source = self._module_source()
         self.assertIn("npc.db.schedule_state", source)
-        self.assertNotIn("db.schedule_state =", source)
+        for name in (
+            "set_npc_schedule",
+            "parse_stored_schedule",
+            "resolve_schedule",
+            "sync_npc_schedules",
+            "interaction_reason",
+        ):
+            with self.subTest(surface=name):
+                self.assertNotIn(
+                    "schedule_state =", inspect.getsource(getattr(npc_schedules, name))
+                )
+        settlement = inspect.getsource(npc_schedules._settle_occurrence)
+        self.assertIn("schedule_state =", settlement)
+
+    @covers_requirement("npc-schedule-model::schedule-state-is-a-declared-attribute-contract")
+    def test_no_production_module_outside_settlement_assigns_schedule_state(self):
+        # Repository-wide scan: the only production writer of
+        # ``schedule_state`` is the runtime settlement (``_settle_occurrence``
+        # in world/rules/npc_schedules.py). Everything else -- typeclasses,
+        # commands, web adapters, other rules -- may read the attribute but
+        # never assign it.
+        from world.rules import npc_schedules
+
+        settlement_source = inspect.getsource(npc_schedules._settle_occurrence)
+        self.assertIn("schedule_state =", settlement_source)
+        root = Path(__file__).resolve().parents[3]
+        offenders = []
+        for package in ("commands", "server", "typeclasses", "web", "world"):
+            base = root / package
+            if not base.exists():
+                continue
+            for path in base.rglob("*.py"):
+                if "/tests/" in str(path) or str(path).endswith("/tests.py"):
+                    continue
+                if path.name == "__init__.py":
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for line_number, line in enumerate(text.splitlines(), 1):
+                    stripped = line.strip()
+                    if "schedule_state =" in stripped and not stripped.startswith("#"):
+                        if str(path).endswith("world/rules/npc_schedules.py"):
+                            continue
+                        offenders.append(f"{path.relative_to(root)}:{line_number}")
+        self.assertEqual(offenders, [])
 
     def test_npc_typeclass_never_assigns_schedule_state(self):
         from typeclasses import npcs

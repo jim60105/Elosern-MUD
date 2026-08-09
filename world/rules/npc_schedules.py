@@ -1,12 +1,11 @@
-"""NPC schedule data model: rulebook templates, per-NPC storage, assignment.
+"""NPC schedule model and runtime: rulebook templates, storage, settlement, gating.
 
-This module owns the deterministic NPC schedule *data contract* only
-(OpenSpec change ``npc-schedule-model``): the ``rulebook/npc_schedules.yaml``
-template table, the two validated storage shapes of ``npc.db.schedule``, the
-sole assignment API, the consumer-side parser, and the idempotent startup
-synchronization. Nothing here settles schedules, moves NPCs, or gates
-interactions -- the companion ``npc-schedule-runtime`` change consumes this
-model.
+This module owns the deterministic NPC schedule contract (OpenSpec change
+``npc-schedule-model``) and its runtime consumption (``npc-schedule-runtime``):
+the ``rulebook/npc_schedules.yaml`` template table, the two validated storage
+shapes of ``npc.db.schedule``, the sole assignment API, the consumer-side
+parser, the idempotent startup synchronization, the ``npc_schedules`` clock
+source that settles due entries, and the schedule-state interaction gate.
 
 Storage contract
 ----------------
@@ -29,9 +28,10 @@ with a bounded diagnostic, never an exception.
 Runtime-state contract
 ----------------------
 ``npc.db.schedule_state`` is the single runtime-state attribute holding the
-NPC's current schedule state value or ``None`` when no state is active. This
-module declares the contract and never writes it; every write belongs to the
-``npc-schedule-runtime`` change.
+NPC's current schedule state value or ``None`` when no state is active. The
+model change declared the contract; settlement below is the sole writer (a
+``state`` entry writes its value, a successful ``move`` writes the referenced
+template's ``default_state``).
 """
 
 from collections.abc import Mapping, MutableSequence
@@ -43,7 +43,12 @@ import yaml
 from evennia.utils.logger import log_err, log_warn
 
 from typeclasses.npcs import NPC
-from world.rules.clock import CLOCK_YAML, get_world_clock
+from world.rules.clock import (
+    CLOCK_YAML,
+    ScheduledEvent,
+    get_world_clock,
+    register_event_source,
+)
 
 SCHEMA_VERSION = 1
 SCHEDULE_TAG = "schedule"
@@ -51,6 +56,9 @@ MAX_ENTRIES = 48
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 _ENTRY_FIELDS = frozenset({"tick_offset", "kind", "target", "state"})
 _KINDS = ("move", "state")
+_BLOCKING_STATES = frozenset({"busy", "resting"})
+_INTERACTION_KINDS = frozenset({"talk", "engage", "service_shop", "service_guild"})
+SCHEDULE_BLOCKED_REASON = "她現在正忙著，沒有理會你。"
 
 
 class ScheduleError(ValueError):
@@ -561,6 +569,7 @@ def sync_npc_schedules() -> None:
     The pass never raises and never blocks startup -- a failure at any level
     is bounded, logged, and skipped; re-running it over valid data is a no-op.
     """
+    register_npc_schedules()
     try:
         _sync_npc_schedules()
     except Exception as exc:
@@ -568,3 +577,266 @@ def sync_npc_schedules() -> None:
             f"npc_schedules: startup sync aborted "
             f"({_bounded_diagnostic(str(exc))}); startup continues"
         )
+
+
+def register_npc_schedules() -> None:
+    """Register the ``npc_schedules`` clock source idempotently.
+
+    Follows the composition-root pattern of the other world-event sources
+    (``register_caravan_arrivals`` / ``register_shop_hours``): the sync pass
+    that already runs at startup (after the guild-economy sync) attaches this
+    module's settlement as the stage's only source.
+    """
+    register_event_source("npc_schedules", settle_npc_schedules)
+
+
+def interaction_reason(npc: Any, interaction_kind: str) -> str | None:
+    """Return the stable rejection reason when the NPC's schedule state blocks a kind.
+
+    ``None`` means the interaction proceeds exactly as before. A ``busy`` or
+    ``resting`` ``schedule_state`` blocks every declared kind with one fixed
+    authored line (design S4: "a fixed stable rejection reason"); any other
+    state value -- or no schedule at all -- never blocks. The state is read
+    defensively (an NPC without the attribute reads as unblocked), and the
+    kind vocabulary is the enumerated surface contract (``talk``, ``engage``,
+    ``service_shop``, ``service_guild``); an unknown kind raises so a caller
+    typo fails loudly instead of silently opening a gate bypass.
+    """
+    if interaction_kind not in _INTERACTION_KINDS:
+        raise ScheduleError(f"unknown interaction kind {interaction_kind!r}")
+    state = getattr(getattr(npc, "db", None), "schedule_state", None)
+    if state in _BLOCKING_STATES:
+        return SCHEDULE_BLOCKED_REASON
+    return None
+
+
+def _resolve_destination(target: str) -> Any | None:
+    """Resolve a move entry's target to a destination room, or ``None``.
+
+    A dbref override (``#<id>``) resolves directly through the object
+    search; any other value is a stable key resolved through the anchor
+    registry -- the room whose ``db.anchor_key`` equals the target (the
+    design's "anchors, known NPC posts" resolution; NPC posts are a future
+    content concern with no registry yet). An unresolvable target returns
+    ``None`` so the caller skips the entry with a bounded diagnostic.
+    """
+    if target.startswith("#") and target[1:].isdigit():
+        from evennia.utils.search import search_object
+
+        matches = search_object(target)
+        return matches[0] if matches else None
+    from typeclasses.rooms import AnchorRoom
+
+    for room in AnchorRoom.objects.all():
+        if room.db.anchor_key == target:
+            return room
+    return None
+
+
+def _first_traversable_exit(npc: Any, destination: Any) -> Any | None:
+    """Return the first traversable real Exit from the NPC's room to ``destination``.
+
+    Candidates are the room's exits whose ``destination`` is the target room,
+    tried in stable key order; the first one whose ``traverse`` access check
+    passes wins (the design's "first traversable exit in stable order"
+    deterministic resolution for multiple exits to one destination). Only
+    exits with the stock ``DefaultExit.at_traverse`` implementation qualify:
+    the contrib wilderness exits override ``at_traverse`` to ignore the
+    requested destination (moving by coordinates instead), so traversing one
+    could relocate the NPC to a room the schedule never named -- a
+    redirecting exit is never a valid schedule route. A locked or missing
+    exit yields ``None`` and the entry is skipped.
+    """
+    from evennia.objects.objects import DefaultExit
+
+    if npc.location is None:
+        return None
+    candidates = [
+        exit_obj
+        for exit_obj in npc.location.exits
+        if exit_obj.destination is destination
+        and type(exit_obj).at_traverse is DefaultExit.at_traverse
+    ]
+    candidates.sort(key=lambda exit_obj: exit_obj.key or "")
+    for exit_obj in candidates:
+        if exit_obj.access(npc, "traverse"):
+            return exit_obj
+    return None
+
+
+def _skip_diagnostic(npc: Any, due_tick: int, entry_index: int, message: str) -> None:
+    """Log one bounded per-entry skip diagnostic (never raises)."""
+    log_warn(
+        f"npc_schedules: {npc.key or '?'} entry {entry_index} due {due_tick}: "
+        f"{_bounded_diagnostic(message)}; skipping"
+    )
+
+
+def _settle_occurrence(
+    npc: Any, parsed: ParsedSchedule, due_tick: int, entry_index: int, entry: ScheduleEntry
+) -> list[ScheduledEvent]:
+    """Settle one due occurrence; failures skip it and return no events.
+
+    A ``state`` entry writes ``npc.db.schedule_state`` and emits
+    ``npc_state_changed``. A ``move`` entry resolves its destination, walks
+    the real Exit path from the NPC's current room (locks and vetoes apply
+    exactly as for a player), and on success writes the referenced template's
+    ``default_state`` and emits ``npc_departed`` / ``npc_arrived``. Every
+    failure -- unresolvable target, no room, no traversable Exit, or a
+    blocked traversal -- logs a bounded diagnostic and skips only this entry
+    with no failure event and no location/state change. Event payloads carry
+    the stable NPC identity (the persistent ``npc_id`` primary key, JSON-safe)
+    plus the display key, and ``state`` or ``from``/``to`` target keys.
+    """
+    if entry.kind == "state":
+        npc.db.schedule_state = entry.state
+        return [
+            ScheduledEvent(
+                "npc_state_changed",
+                due_tick,
+                {"npc_id": int(npc.pk), "npc": npc.key or "", "state": entry.state},
+            )
+        ]
+    destination = _resolve_destination(entry.target)
+    if destination is None:
+        _skip_diagnostic(
+            npc, due_tick, entry_index, f"move target {entry.target!r} resolves to no room"
+        )
+        return []
+    source = npc.location
+    if source is None:
+        _skip_diagnostic(npc, due_tick, entry_index, "NPC is not in a room")
+        return []
+    if source is destination:
+        _skip_diagnostic(
+            npc, due_tick, entry_index, f"move target is the NPC's current room"
+        )
+        return []
+    exit_obj = _first_traversable_exit(npc, destination)
+    if exit_obj is None:
+        _skip_diagnostic(
+            npc, due_tick, entry_index, f"no traversable exit to {destination.key!r}"
+        )
+        return []
+    try:
+        # ``DefaultExit.at_traverse`` returns None on both branches (design
+        # map-movement-clock D-2); success is detected by the NPC actually
+        # relocating, exactly as the webclient move adapter does.
+        exit_obj.at_traverse(npc, destination)
+    except Exception as exc:
+        _skip_diagnostic(npc, due_tick, entry_index, f"traversal raised: {exc}")
+        return []
+    if npc.location is not destination:
+        # Only standard exits reach here, so a relocation to anywhere else
+        # means a vetoed or failed traversal -- never silently keep the NPC
+        # somewhere the schedule did not name.
+        _skip_diagnostic(
+            npc, due_tick, entry_index, f"traversal through {exit_obj.key or '?'} failed"
+        )
+        return []
+    npc.db.schedule_state = parsed.default_state
+    return [
+        ScheduledEvent(
+            "npc_departed",
+            due_tick,
+            {
+                "npc_id": int(npc.pk),
+                "npc": npc.key or "",
+                "from": getattr(source, "key", None),
+            },
+        ),
+        ScheduledEvent(
+            "npc_arrived",
+            due_tick,
+            {
+                "npc_id": int(npc.pk),
+                "npc": npc.key or "",
+                "to": getattr(destination, "key", None),
+            },
+        ),
+    ]
+
+
+def _due_occurrences(
+    parsed: ParsedSchedule, start_tick: int, end_tick: int
+) -> list[tuple[int, int, ScheduleEntry]]:
+    """Every ``(due_tick, entry_index, entry)`` occurrence in the settle window.
+
+    Boundary arithmetic only -- never per-second iteration. Entries repeat
+    every world day; each day from the start boundary through the end
+    boundary contributes occurrences with ``start_tick < due_tick <=
+    end_tick``, except that an occurrence due exactly at ``start_tick``
+    settles when ``effective_from_tick == start_tick``: the assignment
+    happened at that same moment, so no earlier window could have settled it.
+    Any other occurrence at the start boundary was already settled by the
+    preceding consecutive window. Occurrences due before the assignment's
+    ``effective_from_tick`` never settle (a mid-day assignment never replays
+    passed occurrences).
+    """
+    occurrences: list[tuple[int, int, ScheduleEntry]] = []
+    effective = parsed.effective_from_tick or 0
+    first_day = start_tick // _DAY_SECONDS
+    last_day = end_tick // _DAY_SECONDS
+    for day in range(first_day, last_day + 1):
+        day_start = day * _DAY_SECONDS
+        for index, entry in enumerate(parsed.entries):
+            due_tick = day_start + entry.tick_offset
+            if due_tick < start_tick or due_tick > end_tick:
+                continue
+            if due_tick == start_tick and effective != due_tick:
+                continue
+            if due_tick < effective:
+                continue
+            occurrences.append((due_tick, index, entry))
+    return occurrences
+
+
+def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]:
+    """Settle every due schedule occurrence in the settle window.
+
+    Registered as the ``npc_schedules`` clock source. Queries NPCs carrying
+    the persistent ``schedule`` tag (maintained by ``set_npc_schedule`` and
+    the startup sync -- no stale index, no fallback scan) and settles every
+    occurrence with ``start_tick < due_tick <= end_tick`` (plus the
+    same-tick assignment rule in ``_due_occurrences``) and ``due_tick >=
+    effective_from_tick`` in ``(due_tick, npc_stable_id, entry_index)``
+    order, so one multi-day ``advance()`` produces the same locations as
+    repeated day-by-day advances. The stable NPC identity for ordering and
+    event payloads is the persistent primary key (``npc_id``), which is
+    unique and JSON-safe where display keys are not.
+
+    An NPC without a schedule produces no entries and no events. One NPC's
+    failure never raises and never rolls back other NPCs or entries -- the
+    parse and occurrence build for every tagged NPC, and every occurrence
+    settlement, are individually exception-isolated with bounded logged
+    skips -- so the returned stream contains only successful
+    ``npc_departed`` / ``npc_arrived`` / ``npc_state_changed`` occurrences.
+    """
+    from evennia.utils.search import search_object_by_tag
+
+    tagged = [
+        npc for npc in search_object_by_tag(SCHEDULE_TAG) if isinstance(npc, NPC)
+    ]
+    work: list[tuple[int, int, int, Any, ParsedSchedule, ScheduleEntry]] = []
+    for npc in tagged:
+        try:
+            parsed = parse_stored_schedule(npc)
+            if parsed is None:
+                continue
+            for due_tick, entry_index, entry in _due_occurrences(
+                parsed, start_tick, end_tick
+            ):
+                work.append((due_tick, int(npc.pk), entry_index, npc, parsed, entry))
+        except Exception as exc:
+            log_warn(
+                f"npc_schedules: {npc.key or '?'} could not be read for settlement "
+                f"({_bounded_diagnostic(str(exc))}); skipping"
+            )
+    work.sort(key=lambda item: (item[0], item[1], item[2]))
+    events: list[ScheduledEvent] = []
+    for due_tick, _, entry_index, npc, parsed, entry in work:
+        try:
+            events.extend(_settle_occurrence(npc, parsed, due_tick, entry_index, entry))
+        except Exception as exc:
+            _skip_diagnostic(npc, due_tick, entry_index, f"unexpected failure: {exc}")
+    return events

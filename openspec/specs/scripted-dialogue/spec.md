@@ -9,6 +9,7 @@ mechanism that causes no state change.
 ## Requirements
 
 ### Requirement: Scripted dialogue hosts answer authored talk lines
+
 An NPC carrying a `ScriptedDialogue` component SHALL answer known keywords with
 the authored response and unknown keywords with the no-understanding line,
 without causing state change except that a known-keyword answer SHALL grant +1 affinity
@@ -28,6 +29,10 @@ guild service without granting the talk affinity, and `talk <guild-staff> 回報
 turn in exactly that quest through `turn_in_quest` with the same atomic exactly-once
 settlement and rejection semantics as `guild turnin`. Every other `guild_staff`
 keyword SHALL grant the same +1 affinity as any other known-keyword answer.
+Before answering, the scripted-talk entry path SHALL consult
+`world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
+that stable rejection line and SHALL write no state — the +1 affinity, guide progress, and
+turn-in paths are all bypassed for the blocked interaction.
 
 #### Scenario: Guild staff answers a known keyword
 - **WHEN** the player talks to the guild master with a keyword such as 公會 or 任務
@@ -96,6 +101,10 @@ keyword SHALL grant the same +1 affinity as any other known-keyword answer.
   host with the keyword `回報`
 - **THEN** the host gives the no-understanding line and no state changes
 
+#### Scenario: A schedule-blocked host does not answer and writes nothing
+- **WHEN** the player talks to a scripted dialogue host whose schedule state blocks `talk`
+- **THEN** the player receives the stable schedule rejection line, and no affinity, guide
+  progress, or turn-in state changes
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
 The dialogue-table registry SHALL be keyed by `dialogue_key` and SHALL hold only
 frozen `DialogueDefinition` values composed of an optional `greeting` and a

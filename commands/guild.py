@@ -34,6 +34,7 @@ from world.rules.guild_offers import (
     list_guild_offers,
 )
 from world.rules.guild_config import get_catalog
+from world.rules.npc_schedules import interaction_reason
 from world.rules.surfaces import read_counter_trait
 
 from server.ai_director_service import (
@@ -109,6 +110,19 @@ class _GuildCommandBase(Command):
             self.caller.msg("這裡沒有公會服務人員。")
             return None
 
+    def gate_staff(self, staff) -> bool:
+        """Present the schedule gate's stable rejection when the staff is busy.
+
+        Returns whether the interaction is blocked; the caller aborts before
+        any operation. The gate is an interaction-surface concern: the
+        deterministic guild APIs stay untouched (design D4).
+        """
+        reason = interaction_reason(staff, "service_guild")
+        if reason is None:
+            return False
+        self.caller.msg(reason)
+        return True
+
 
 class CmdGuildRegister(_GuildCommandBase):
     """Register as an adventurer at rank F."""
@@ -119,6 +133,8 @@ class CmdGuildRegister(_GuildCommandBase):
     def func(self) -> None:
         staff = self.resolve_staff()
         if staff is None:
+            return
+        if self.gate_staff(staff):
             return
         try:
             record = register_adventurer(self.caller, staff)
@@ -166,6 +182,8 @@ class CmdGuildAccept(_GuildCommandBase):
     def func(self) -> None:
         staff = self.resolve_staff()
         if staff is None:
+            return
+        if self.gate_staff(staff):
             return
         definition_key = self.args.strip().partition(" ")[0]
         if not definition_key:
@@ -262,6 +280,8 @@ class CmdGuildAbandon(_GuildCommandBase):
         staff = self.resolve_staff()
         if staff is None:
             return
+        if self.gate_staff(staff):
+            return
         quest_id = self.args.strip().partition(" ")[0]
         if not quest_id:
             self.caller.msg("用法：guild abandon <quest_id>")
@@ -283,6 +303,8 @@ class CmdGuildTurnIn(_GuildCommandBase):
     def func(self) -> None:
         staff = self.resolve_staff()
         if staff is None:
+            return
+        if self.gate_staff(staff):
             return
         quest_id = self.args.strip().partition(" ")[0]
         if not quest_id:
@@ -340,6 +362,8 @@ class CmdGuildRequest(_GuildCommandBase):
     def func(self) -> None:
         staff = self.resolve_staff()
         if staff is None:
+            return
+        if self.gate_staff(staff):
             return
         try:
             registration = parse_guild_registration(self.caller)

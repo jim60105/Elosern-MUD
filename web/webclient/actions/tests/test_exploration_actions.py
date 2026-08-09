@@ -725,6 +725,42 @@ class ExplorationActionAdapterTests(EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "dialogue_failed")
 
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_host_rejects_scripted_talk_without_a_transaction(self):
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.db.schedule_state = "busy"
+        with patch(
+            "web.webclient.actions.exploration_actions.run_scripted_talk"
+        ) as talk:
+            result = _talk_scripted_adapter(
+                self.player, {"npc_id": int(host.pk), "keyword_id": "任務"}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertIn("她現在正忙著", result["message"])
+        talk.assert_not_called()
+        self.assertFalse(self.player.guide_progress)
+
+    @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
+    def test_busy_host_rejects_freeform_talk_before_any_seam_work(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        npc.db.schedule_state = "resting"
+        client = FakeLLMClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(npc, "at_talked_to") as seam:
+            result = _talk_freeform_adapter(
+                self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "schedule_blocked")
+        self.assertIn("她現在正忙著", result["message"])
+        seam.assert_not_called()
+        self.assertEqual(len(client.calls), 0)
+        self.assertEqual(npc._chat_lines(self.player), [])
+
     # ------------------------------------------------------------------
     # explore.party_invite / explore.party_leave
     # ------------------------------------------------------------------
