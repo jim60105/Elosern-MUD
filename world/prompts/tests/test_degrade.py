@@ -118,6 +118,12 @@ class BoundedFailureDegradeTests(PromptFixture):
             "schema_version: 1\nprompts:\n  npc.thinking: （{name} {oops}）\n",
         )
 
+    def _break_character_creation(self):
+        self.write_file(
+            "character_creation.yaml",
+            "schema_version: 1\nprompts:\n  character_creation.system: 創角 {oops}。\n",
+        )
+
     def _break_art(self):
         self.write_file(
             "art.yaml",
@@ -237,6 +243,24 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
+    def test_broken_character_creation_key_degrades_to_the_unavailable_marker(self):
+        from world.ai.character_creation import (
+            generate_character_proposal,
+            register_character_creation,
+        )
+
+        self._break_character_creation()
+        self.load()
+        _reset_all()
+        register_character_creation()
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_character_proposal(client, concept="流浪的精靈劍士")
+            result = await_result(d)
+        self.assertIsNone(result)
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_render_of_broken_key_raises_named_error_for_loud_consumers(self):
         self._break_narrator()
         self.load()
@@ -276,6 +300,8 @@ class BoundedFailureDegradeTests(PromptFixture):
             "server.conf.at_server_startstop._register_npc_dialogue_layer"
         ), patch(
             "server.conf.at_server_startstop._register_scenario_director_layer"
+        ), patch(
+            "server.conf.at_server_startstop._register_character_creation_layer"
         ):
             hooks.at_server_start()
         register_narrator.assert_called_once()

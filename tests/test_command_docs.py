@@ -126,7 +126,11 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "管理員（需 Developer 權限）",
     },
     "character": {
-        "syntax": "character、character preset <key>、character create",
+        "syntax": "character、character preset <key>、character create、character concept <構想>",
+        "context": "角色建立（建立模式取代一般指令，仍可用 說明 與 登出）",
+    },
+    "character concept": {
+        "syntax": "character concept <構想>",
         "context": "角色建立（建立模式取代一般指令，仍可用 說明 與 登出）",
     },
     "前往": {
@@ -359,10 +363,20 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertEqual(parse_aliases(entry["別名"]), {"角色"})
         self.assertIn("character preset <key>", entry["語法"])
         self.assertIn("character create", entry["語法"])
+        self.assertIn("character concept <構想>", entry["語法"])
         self.assertIn("cancel", entry["說明"])
         self.assertIn("取代", entry["情境"])
         self.assertIn("說明", entry["情境"])
         self.assertIn("登出", entry["情境"])
+
+    @covers_requirement("game-command-docs::complete-command-reference")
+    def test_character_concept_entry_is_documented(self):
+        entry = self.entries["character concept"]
+        self.assertEqual(entry["指令"], "character concept")
+        self.assertEqual(parse_aliases(entry["別名"]), {"構想"})
+        self.assertIn("character concept <構想>", entry["語法"])
+        self.assertIn("生成不可用，請手動創角", entry["說明"])
+        self.assertIn("18", entry["說明"])
 
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_contrib_commands_are_documented(self):

@@ -52,10 +52,11 @@ def _build() -> dict[str, PromptSpec]:
         PromptSpec("art.scene_prompt", "art.yaml", ("description",)),
         PromptSpec("art.portrait_prompt", "art.yaml", ("description",)),
         PromptSpec("art.negative_prompt", "art.yaml"),
-        # Forward-declared seam: registered and validated, but no runtime
-        # consumer calls it yet (the character-creation feature is deterministic
-        # until its generative task here).
-        PromptSpec("character_creation.system", "character_creation.yaml"),
+        PromptSpec(
+            "character_creation.system",
+            "character_creation.yaml",
+            ("concept", "race_catalog"),
+        ),
     )
     return {spec.key: spec for spec in specs}
 

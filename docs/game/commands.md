@@ -91,6 +91,7 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`character`](/game/command-reference?id=character) | 建立角色或使用預設角色。 |
+| [`character concept`](/game/command-reference?id=character-concept) | 依角色構想生成提案，再完成建立。 |
 | [`設定描述`](/game/command-reference?id=設定描述) | 設定你的個人描述。 |
 | [`暱稱`](/game/command-reference?id=暱稱) | 建立或檢視個人暱稱。 |
 

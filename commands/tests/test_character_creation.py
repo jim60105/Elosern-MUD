@@ -9,7 +9,9 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from commands.character_creation import (
     ALLOCATION_AXIS_EXPLANATIONS,
+    MAX_CONCEPT_LENGTH,
     CmdCharacter,
+    CmdCharacterConcept,
     CharacterCreationCmdSet,
     creation_start_screen,
 )
@@ -17,6 +19,30 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+from world.ai.character_creation import CharacterProposal
+
+
+def _proposal(**overrides):
+    payload = {
+        "race_key": "human",
+        "subrace_key": None,
+        "allocations": {
+            "hp": 100,
+            "mp": 50,
+            "sp": 0,
+            "atk_phys": 10,
+            "agility": 10,
+            "defense": 11,
+        },
+        "suggested_skills": ("flight",),
+        "persona": {
+            "personality": "沉穩",
+            "life_story": "來自邊境的小村",
+            "habit": "清晨練劍",
+        },
+    }
+    payload.update(overrides)
+    return CharacterProposal(**payload)
 
 
 class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -224,3 +250,258 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("已建立", output)
         self.assertEqual(len(callbacks), 1)
         self.assertFalse(self.char1.creation_pending)
+
+
+def _fired_deferred(value):
+    from twisted.internet import defer
+
+    return defer.succeed(value)
+
+
+class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+    account_typeclass = Account
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        self.account.at_post_create_character(self.char1)
+        self._patch = patch(
+            "commands.character_creation.request_character_proposal"
+        )
+
+    def _propose(self, proposal):
+        patch_obj = self._patch.start()
+        patch_obj.return_value = _fired_deferred(proposal)
+        self.addCleanup(self._patch.stop)
+        return patch_obj
+
+    def _degrade(self):
+        patch_obj = self._patch.start()
+        patch_obj.return_value = _fired_deferred(None)
+        self.addCleanup(self._patch.stop)
+        return patch_obj
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_concept_guides_an_interactive_custom_activation(self):
+        self._propose(_proposal())
+        replies = ["自訂者", "20", "20"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("角色提案", output)
+        self.assertIn("human", output)
+        self.assertIn("flight", output)
+        self.assertIn("沉穩", output)
+        self.assertIn("已建立", output)
+        self.assertEqual(self.char1.key, "自訂者")
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.age, 20)
+        self.assertEqual(self.char1.apparent_age, 20)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_concept_alias_構想_reaches_the_same_flow(self):
+        self._propose(_proposal())
+        replies = ["自訂者", "20", "20"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("已建立", output)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_concept_path_cannot_bypass_the_adult_gate(self):
+        self._propose(_proposal())
+        replies = ["新冒險者", "17", "20"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("角色建立失敗", output)
+        self.assertTrue(self.char1.creation_pending)
+        self.assertEqual(self.char1.traits.all(), [])
+        self.assertIsNone(self.char1.age)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_concept_path_cannot_bypass_the_apparent_adult_gate(self):
+        self._propose(_proposal())
+        replies = ["新冒險者", "20", "17"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("角色建立失敗", output)
+        self.assertTrue(self.char1.creation_pending)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_empty_and_over_bound_concepts_are_rejected_before_any_call(self):
+        patch_obj = self._patch.start()
+        self.addCleanup(self._patch.stop)
+        output = self.call(CmdCharacterConcept(), "")
+        self.assertIn("用法", output)
+        patch_obj.assert_not_called()
+        output = self.call(
+            CmdCharacterConcept(), "構想 " + "長" * (MAX_CONCEPT_LENGTH + 1)
+        )
+        self.assertIn("構想過長", output)
+        patch_obj.assert_not_called()
+        self.assertTrue(self.char1.creation_pending)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_offline_degrade_returns_the_stable_message_and_changes_no_state(self):
+        self._degrade()
+        old_key = self.char1.key
+        output = self.call(CmdCharacterConcept(), "構想 流浪的精靈劍士")
+        self.assertIn("生成不可用，請手動創角", output)
+        self.assertEqual(self.char1.key, old_key)
+        self.assertTrue(self.char1.creation_pending)
+        self.assertEqual(self.char1.traits.all(), [])
+        self.assertIsNone(self.char1.db.portrait_policy)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_every_profile_failing_still_keeps_deterministic_creation_usable(self):
+        from django.test import override_settings
+
+        from world.ai import guardrail
+        from world.ai.character_creation import register_character_creation
+        from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+        from world.ai.profiles import default_profiles
+
+        guardrail._semantic_validators.clear()
+        guardrail._degrade_fallbacks.clear()
+        _OUTPUT_SCHEMAS.clear()
+        register_character_creation()
+        raw = default_profiles()
+        for values in raw.values():
+            values["enabled"] = False
+        self.addCleanup(guardrail._semantic_validators.clear)
+        self.addCleanup(guardrail._degrade_fallbacks.clear)
+        self.addCleanup(_OUTPUT_SCHEMAS.clear)
+        with override_settings(LLM_PROFILES=raw):
+            output = self.call(CmdCharacterConcept(), "構想 流浪的精靈劍士")
+        self.assertIn("生成不可用，請手動創角", output)
+        self.assertTrue(self.char1.creation_pending)
+        self.assertEqual(self.char1.traits.all(), [])
+        output = self.call(CmdCharacter(), "preset human_wanderer")
+        self.assertIn("已建立", output)
+        self.assertFalse(self.char1.creation_pending)
+
+    @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
+    def test_cancel_within_the_concept_flow_changes_nothing(self):
+        self._propose(_proposal())
+        replies = ["cancel", None]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("已取消", output)
+        self.assertTrue(self.char1.creation_pending)
+
+    @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
+    def test_deterministic_preset_and_custom_flows_still_work(self):
+        output = self.call(CmdCharacter(), "preset human_wanderer")
+        self.assertIn("已建立", output)
+        self.assertFalse(self.char1.creation_pending)
+
+    @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
+    def test_proposal_values_reach_the_ordinary_preflight(self):
+        self._propose(
+            _proposal(
+                race_key="elf",
+                subrace_key="fionnen",
+                allocations={
+                    "hp": 0,
+                    "mp": 0,
+                    "sp": 0,
+                    "atk_phys": 12,
+                    "agility": 12,
+                    "defense": 13,
+                },
+            )
+        )
+        replies = ["瑟芮雅", "180", "24"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 長壽的精靈守護者",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("已建立", output)
+        self.assertEqual(self.char1.race, "elf")
+        self.assertEqual(self.char1.subrace, "fionnen")
+        self.assertEqual(self.char1.age, 180)
+
+    def test_concept_bound_parity_with_the_layer(self):
+        from world.ai.character_creation import MAX_CONCEPT_LENGTH as layer_bound
+
+        self.assertEqual(MAX_CONCEPT_LENGTH, layer_bound)
+
+    def test_live_async_proposal_continues_interactively_when_it_fires(self):
+        from twisted.internet import defer
+
+        held = defer.Deferred()
+        patch_obj = self._patch.start()
+        patch_obj.return_value = held
+        self.addCleanup(self._patch.stop)
+        command = CmdCharacterConcept()
+        command.caller = self.char1
+        command.account = self.account
+        command.session = self.session
+        command.args = "構想 流浪的精靈劍士"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            with self.assertRaises(StopIteration):
+                next(generator)
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertIn("正在生成角色提案，請稍候……", messages)
+            held.callback(_proposal())
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertTrue(any("角色提案" in text for text in messages))
+            self.assertTrue(any("角色姓名" in text for text in messages))
+            self.char1.execute_cmd("自訂者", session=self.session)
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertTrue(any("實際年齡" in text for text in messages))
+            self.char1.execute_cmd("20", session=self.session)
+            self.char1.execute_cmd("20", session=self.session)
+            self.assertFalse(self.char1.creation_pending)
+            self.assertEqual(self.char1.key, "自訂者")
+            self.assertFalse(self.char1.cmdset.has("ConceptPrompt"))
+        finally:
+            self.char1.msg = original_msg
+
+    def test_stale_proposal_after_activation_is_ignored(self):
+        from twisted.internet import defer
+
+        held = defer.Deferred()
+        patch_obj = self._patch.start()
+        patch_obj.return_value = held
+        self.addCleanup(self._patch.stop)
+        command = CmdCharacterConcept()
+        command.caller = self.char1
+        command.account = self.account
+        command.session = self.session
+        command.args = "構想 流浪的精靈劍士"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            with self.assertRaises(StopIteration):
+                next(generator)
+            output = self.call(CmdCharacter(), "preset human_wanderer")
+            self.assertIn("已建立", output)
+            self.assertFalse(self.char1.creation_pending)
+            held.callback(_proposal())
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertIn("生成不可用，請手動創角", messages)
+            self.assertFalse(self.char1.cmdset.has("ConceptPrompt"))
+            self.assertNotIn("角色提案", messages)
+        finally:
+            self.char1.msg = original_msg

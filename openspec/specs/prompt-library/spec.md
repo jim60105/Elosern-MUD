@@ -7,10 +7,10 @@ Defines the prompt library: the top-level `prompts/` data folder as the sole sou
 ### Requirement: The prompt library is the single source of truth for every LLM prompt
 The project SHALL store all LLM prompt text in YAML files under one top-level `prompts/` directory
 in the repo root, one file per layer or domain: `narrator.yaml`, `npc_dialogue.yaml`,
-`scenario_director.yaml`, `npc.yaml`, `art.yaml`, and a forward-declared `character_creation.yaml`
-seam. Each file SHALL declare `schema_version: 1` and a `prompts:` mapping of prompt key to text
-block. The folder SHALL be the only place prompt text is defined; Python modules SHALL NOT contain
-prompt text constants, and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
+`scenario_director.yaml`, `npc.yaml`, `art.yaml`, and `character_creation.yaml`. Each file SHALL
+declare `schema_version: 1` and a `prompts:` mapping of prompt key to text block. The folder SHALL
+be the only place prompt text is defined; Python modules SHALL NOT contain prompt text constants,
+and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
 
 #### Scenario: Every generative layer has a prompt file
 - **WHEN** the `prompts/` directory is inspected
@@ -22,10 +22,10 @@ prompt text constants, and the removed hardcoded strings SHALL NOT be duplicated
 - **WHEN** the codebase is searched for the narrator or scenario-director system-message text
 - **THEN** the only occurrences are inside `prompts/*.yaml`, not in any Python module
 
-#### Scenario: The forward-declared character-creation key is registered but unused
+#### Scenario: The character-creation key is registered with its concept placeholders
 - **WHEN** the prompt registry is queried for `character_creation.system`
-- **THEN** the key exists with its default text and a guarded test proves registration, while no
-  runtime consumer calls it yet
+- **THEN** the key exists with its default text, its allowlist contains `concept` and
+  `race_catalog`, and the `character_creation` generative layer consumes it at runtime
 
 ### Requirement: The loader validates every prompt key and bounds failures to the affected layer
 `world/prompts/loader.py` SHALL expose `load_prompt_library(root: str | None = None)` that reads
@@ -40,8 +40,8 @@ keeping the last value. `server/conf/at_server_startstop.py::at_server_start()` 
 missing SHALL be marked unavailable without aborting server startup: the consuming generative
 layer SHALL resolve to its existing deterministic degrade path for as long as the key is
 unavailable, the named error SHALL be logged, and the deterministic game SHALL remain fully
-playable. The forward-declared `character_creation.system` seam SHALL be registered and validated,
-but its failure SHALL be a logged warning that never blocks startup. `render_prompt()` SHALL
+playable. The `character_creation.system` key SHALL be registered and validated, but its failure
+SHALL be a logged warning that never blocks startup. `render_prompt()` SHALL
 trigger a one-time auto-load on first use when no explicit load happened, and
 `reset_prompt_library()` SHALL clear the loaded registry for tests.
 

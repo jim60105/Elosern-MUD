@@ -172,11 +172,12 @@ def load_prompt_library(root: str | None = None) -> PromptLibrary:
     """Validate every ``prompts/*.yaml`` under root and install the frozen library.
 
     Never aborts server startup: a failing key is recorded with a named error,
-    logged, and marked unavailable so its consuming layer degrades. The unused
-    ``character_creation.system`` seam is logged as a warning and can never
-    block startup. An explicit ``root`` installs a library independent of the
-    setting (tests use fixture roots in ``try/finally``). The install is
-    guarded by a lock so concurrent callers cannot double-load.
+    logged, and marked unavailable so its consuming layer degrades. The
+    ``character_creation.system`` key is logged as a warning (its layer
+    degrades) and can never block startup. An explicit ``root`` installs a
+    library independent of the setting (tests use fixture roots in
+    ``try/finally``). The install is guarded by a lock so concurrent callers
+    cannot double-load.
     """
     with _LOCK:
         return _load(_prompt_root() if root is None else root)
@@ -297,7 +298,7 @@ def _finish_load(
     library = PromptLibrary(root=resolved_root, texts=texts, errors=errors)
     for key, error in sorted(errors.items()):
         if key == "character_creation.system":
-            logger.warning("%s (forward-declared seam)", error)
+            logger.warning("%s (consuming layer degrades)", error)
         else:
             logger.error("%s", error)
     logger.info(
