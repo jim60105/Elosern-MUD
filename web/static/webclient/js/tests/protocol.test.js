@@ -1922,6 +1922,86 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
+test("creation panel accepts a valid concept draft with the background indicator", () => {
+  const payload = validCreationPanel({
+    draft: {
+      mode: "concept",
+      stage: "concept_filled",
+      race: "human",
+      subrace: null,
+      allocations: {
+        hp: 50,
+        mp: 50,
+        sp: 50,
+        atk_phys: 10,
+        agility: 10,
+        defense: 11,
+      },
+      background_generated: true,
+    },
+  });
+  const validated = Protocol.validateCreationPanel(payload);
+  assert.equal(validated.draft.mode, "concept");
+  assert.equal(validated.draft.stage, "concept_filled");
+  assert.equal(validated.draft.background_generated, true);
+  assert.equal(validated.draft.allocations.hp, 50);
+  const badStage = validCreationPanel({
+    draft: {
+      mode: "concept",
+      stage: "custom_filled",
+      race: "human",
+      subrace: null,
+      allocations: {
+        hp: 50,
+        mp: 50,
+        sp: 50,
+        atk_phys: 10,
+        agility: 10,
+        defense: 11,
+      },
+      background_generated: true,
+    },
+  });
+  assert.throws(() => Protocol.validateCreationPanel(badStage), /stage/);
+  const badIndicator = validCreationPanel({
+    draft: {
+      mode: "concept",
+      stage: "concept_filled",
+      race: "human",
+      subrace: null,
+      allocations: {
+        hp: 50,
+        mp: 50,
+        sp: 50,
+        atk_phys: 10,
+        agility: 10,
+        defense: 11,
+      },
+      background_generated: "yes",
+    },
+  });
+  assert.throws(() => Protocol.validateCreationPanel(badIndicator), /boolean/);
+  const leakedPersona = validCreationPanel({
+    draft: {
+      mode: "concept",
+      stage: "concept_filled",
+      race: "human",
+      subrace: null,
+      allocations: {
+        hp: 50,
+        mp: 50,
+        sp: 50,
+        atk_phys: 10,
+        agility: 10,
+        defense: 11,
+      },
+      background_generated: true,
+      persona: { personality: "沉穩" },
+    },
+  });
+  assert.throws(() => Protocol.validateCreationPanel(leakedPersona), /unknown/);
+});
+
 test("creation panel enforces per-field bounds", () => {
   assert.throws(() =>
     Protocol.validateCreationPanel(validCreationPanel({ presets: [] }))
@@ -1944,6 +2024,7 @@ test("creation panel enforces per-field bounds", () => {
       race: "human",
       subrace: null,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0 },
+      background_generated: false,
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(underageDraft));
@@ -1957,6 +2038,7 @@ test("creation panel enforces per-field bounds", () => {
       race: "human",
       subrace: null,
       allocations: { hp: 0 },
+      background_generated: false,
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(badAllocations));

@@ -18,7 +18,7 @@ from typing import Any
 
 from django.conf import settings
 
-LAYER_NAMES = ("narrator", "npc_dialogue", "scenario_director", "scene_builder")
+LAYER_NAMES = ("narrator", "npc_dialogue", "scenario_director", "scene_builder", "character_creation")
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_CHAT_PATH = "/v1/chat/completions"

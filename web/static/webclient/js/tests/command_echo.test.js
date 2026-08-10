@@ -219,6 +219,14 @@ test("creation.custom resolves to character create", () => {
   assert.strictEqual(Echo.commandLine("creation.custom", {}, {}), "character create");
 });
 
+test("creation.concept resolves to the character concept command", () => {
+  assert.strictEqual(
+    Echo.commandLine("creation.concept", { concept: "流浪的精靈劍士" }, {}),
+    "character concept 流浪的精靈劍士"
+  );
+  assert.strictEqual(Echo.commandLine("creation.concept", { concept: "" }, {}), null);
+});
+
 test("creation.activate resolves through the draft path", () => {
   assert.strictEqual(
     Echo.commandLine("creation.activate", {}, { presetKey: "elf_mage" }),

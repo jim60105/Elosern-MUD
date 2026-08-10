@@ -59,23 +59,23 @@ class ValidLoadTests(unittest.TestCase):
         )
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
-    def test_character_creation_key_is_registered_but_unused(self):
+    def test_character_creation_key_is_registered_with_concept_placeholders(self):
         library = load_prompt_library(str(REPO_PROMPTS))
         self.assertIn("character_creation.system", library.texts)
         self.assertIn("character_creation.system", PROMPT_SPECS)
-        world_modules = [
-            path
-            for path in (REPO_PROMPTS.parent / "world").rglob("*.py")
-            if "prompts" not in path.parts and "tests" not in path.parts
-        ]
-        self.assertFalse(
-            [
-                str(path)
-                for path in world_modules
-                if "character_creation.system" in path.read_text(encoding="utf-8")
-            ],
-            "no runtime consumer may call the forward-declared character_creation key",
+        spec = PROMPT_SPECS["character_creation.system"]
+        self.assertEqual(
+            set(spec.allowed_placeholders), {"concept", "race_catalog"}
         )
+        text = render_prompt(
+            "character_creation.system",
+            concept="流浪的精靈劍士",
+            race_catalog="種族：human（…）",
+        )
+        self.assertIn("流浪的精靈劍士", text)
+        self.assertIn("種族：human（…）", text)
+        self.assertNotIn("{concept}", text)
+        self.assertNotIn("{race_catalog}", text)
 
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_allowlisted_placeholders_are_substituted_exactly_once(self):

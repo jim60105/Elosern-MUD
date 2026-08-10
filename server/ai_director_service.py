@@ -17,6 +17,7 @@ never to ``None`` and never to an unregistered definition.
 """
 
 from twisted.internet import defer
+from typing import Any
 
 
 class NoSuitableTemplateError(RuntimeError):
@@ -84,3 +85,51 @@ def request_generated_quest(client=None, *, context):
     compiled = compile_quest_blueprint(blueprint.to_payload())
     register_generated_quest(compiled)
     return compiled
+
+
+def build_character_creation_client() -> Any:
+    """Return the injected ``character_creation`` client for the concept seam.
+
+    Mirrors ``web.webclient.actions.dialogue_composition.build_dialogue_client``
+    and the ``request_generated_quest`` enabled-branch: the client is built
+    function-locally and only when the ``character_creation`` profile is
+    enabled, so a cold import of this module cannot bind the guardrail's
+    import-time logger or load the live transport when the layer is disabled.
+    When the profile is disabled a non-``None`` offline stub is returned whose
+    ``get_response`` fails loudly if it ever is called -- the guardrail
+    degrades before any transport work, so it never is. Transport ownership
+    stays in ``world/ai/client.py``; this module never imports or constructs a
+    transport at module scope.
+    """
+    from world.ai.profiles import get_profile
+
+    profile = get_profile("character_creation")
+    if profile.enabled:
+        from world.ai.client import OpenAICompatClient
+
+        return OpenAICompatClient(profile)
+    return _OfflineStubClient()
+
+
+def request_character_proposal(client=None, *, concept):
+    """Ask the character_creation layer for one validated concept proposal.
+
+    Args:
+        client: The injected client protocol, or ``None`` to build one from the
+            ``character_creation`` profile (enabled → ``OpenAICompatClient``,
+            disabled → the offline stub so the layer's required-client gate is
+            satisfied while the degrade path never touches the client).
+        concept: The player's free-form character idea.
+
+    Returns:
+        A Deferred resolving to the validated frozen ``CharacterProposal``, or
+        to ``None`` -- the single public degraded marker -- when the layer is
+        disabled, the prompt key is unavailable, the transport fails, or the
+        retry budget is exhausted. The deterministic creation wizard and the
+        adult gate are never touched on any degrade path.
+    """
+    if client is None:
+        client = build_character_creation_client()
+    from world.ai.character_creation import generate_character_proposal
+
+    return generate_character_proposal(client, concept=concept)

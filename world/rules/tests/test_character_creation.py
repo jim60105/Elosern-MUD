@@ -275,3 +275,105 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIsNotNone(self.character.traits.magic_level)
         self.assertIs(self.character.location, old_location)
         self.assertTrue(any("南門" in message for message in messages))
+
+
+PERSONA_BLOCK = {
+    "personality": "沉穩",
+    "life_story": "來自邊境的小村，靠磨劍維生",
+    "habit": "清晨練劍",
+}
+
+
+class PersonaActivationTests(EvenniaTest):
+    """Activation-time persona persistence (creation-persona-persistence D3)."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+
+    def request(self, **overrides):
+        values = {
+            "mode": "custom",
+            "display_name": "  新角色  ",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": None,
+            "allocations": balanced_allocations("human"),
+        }
+        values.update(overrides)
+        return CharacterCreationRequest(**values)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_concept_persona_persists_in_the_six_key_import_card_shape(self):
+        result = activate_player_character(
+            self.account, self.character, self.request(),
+            persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+        )
+        self.assertEqual(result.display_name, "新角色")
+        self.assertEqual(
+            self.character.db.persona,
+            {
+                "identity": {},
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村，靠磨劍維生",
+                "habit": "清晨練劍",
+                "appearance": {},
+                "social_connection": {},
+            },
+        )
+        self.assertFalse(self.character.creation_pending)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_persona_write_failure_rolls_back_the_whole_activation(self):
+        old_key = self.character.key
+
+        def fail(stage):
+            if stage == "persona":
+                raise RuntimeError("injected persona failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected persona failure"):
+            activate_player_character(
+                self.account, self.character, self.request(),
+                persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+                write_observer=fail,
+            )
+        self.assertEqual(self.character.key, old_key)
+        self.assertTrue(self.character.creation_pending)
+        self.assertIsNone(self.character.db.persona)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertIsNone(self.character.age)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_draft_without_persona_writes_nothing(self):
+        activate_player_character(
+            self.account, self.character, self.request(), sampler=lambda low, high: low
+        )
+        self.assertFalse(self.character.creation_pending)
+        self.assertFalse(self.character.attributes.has("persona"))
+
+    def test_malformed_persona_is_rejected_without_mutation(self):
+        cases = (
+            {"personality": "沉穩", "life_story": "故事"},
+            {"personality": "沉穩", "life_story": "故事", "habit": "習慣", "extra": "x"},
+            {"personality": "", "life_story": "故事", "habit": "習慣"},
+            {
+                "personality": "長" * 601,
+                "life_story": "故事",
+                "habit": "習慣",
+            },
+            {"personality": 5, "life_story": "故事", "habit": "習慣"},
+        )
+        for persona in cases:
+            with self.subTest(persona=persona), self.assertRaises(CharacterCreationError):
+                activate_player_character(
+                    self.account, self.character, self.request(),
+                    persona=persona, sampler=lambda low, high: low,
+                )
+            self.assertTrue(self.character.creation_pending)
+            self.assertEqual(self.character.traits.all(), [])
+            self.assertFalse(self.character.attributes.has("persona"))

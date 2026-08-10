@@ -387,6 +387,94 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertIsNone(self._creation_panel(page)["draft"])
 
 
+class ConceptCreationJourneys(CreationBrowserTest):
+    # Task 4.5: keyboard-only concept -> draft -> complete form -> activate at
+    # both supported desktop viewports with a deterministic placeholder. Each
+    # journey boots its own isolated server (the activated character state of
+    # one journey must never leak into the next login).
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_concept_field_journey_to_activation_at_1440x900(self):
+        self._concept_journey((1440, 900))
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_concept_field_journey_to_activation_at_1280x720(self):
+        self._concept_journey((1280, 720))
+
+    def _concept_journey(self, viewport):
+        page = self._login_creation(viewport)
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")
+
+        # Concept field: keyboard-first entry and apply (bounded text field).
+        page.evaluate("document.getElementById('creation-field-concept').focus()")
+        page.keyboard.type("流浪的精靈劍士")
+        page.evaluate("document.getElementById('creation-concept-submit').focus()")
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "creation.concept"), 1)
+        payloads = self._sent_payloads(page, "creation.concept")
+        self.assertEqual(payloads, [{"concept": "流浪的精靈劍士"}])
+
+        # The concept draft lands: the panel refresh pre-fills the finite
+        # controls and shows the non-content background indicator.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            panel = self._creation_panel(page)
+            if panel and panel.get("draft") and panel["draft"].get("mode") == "concept":
+                break
+            page.wait_for_timeout(250)
+        else:
+            raise AssertionError("concept draft never appeared")
+        panel = self._creation_panel(page)
+        self.assertEqual(panel["draft"]["race"], "human")
+        self.assertNotIn("persona", panel["draft"])
+        self.assertNotIn("personality", panel["draft"])
+        self.assertEqual(page.locator("#creation-concept-indicator").count(), 1)
+        # The pre-filled race radio and allocation fields come from the draft.
+        self.assertTrue(
+            page.evaluate("document.getElementById('creation-race-0').checked"),
+            "the concept race must be pre-selected",
+        )
+        self.assertEqual(
+            page.evaluate("document.getElementById('creation-field-hp').value"),
+            "50",
+        )
+
+        # Complete the form keyboard-only: name and both adult ages only; the
+        # finite controls are already filled from the concept draft.
+        page.evaluate("document.getElementById('creation-field-displayName').focus()")
+        page.keyboard.type("新冒險者")
+        _press(page, "Tab")  # name -> actual age
+        self.assertEqual(
+            page.evaluate("document.activeElement.id"),
+            "creation-field-age",
+            "Tab must move focus from the name field to the age field",
+        )
+        page.keyboard.type("24")
+        _press(page, "Tab")  # actual age -> apparent age
+        page.keyboard.type("24")
+        page.evaluate("document.getElementById('creation-submit').focus()")
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "creation.custom"), 1)
+        payloads = self._sent_payloads(page, "creation.custom")
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["race"], "human")
+        self.assertNotIn("persona", payloads[0])
+
+        # Confirmation screen, then activation hands off to exploration.
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        _press(page, "Enter")
+        self._wait_exploration(page)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 1)
+        self.assertNotEqual(self._dock_mode(page), "creation")
+        # No persona content ever reached the browser state.
+        serialized = __import__("json").dumps(store_state(page), ensure_ascii=False)
+        for fragment in ("personality", "life_story", "沉穩", "清晨練劍"):
+            self.assertNotIn(fragment, serialized)
+
+
 class ResetAndDraftJourneys(CreationBrowserTest):
     CREATION_DRAFT = True
 

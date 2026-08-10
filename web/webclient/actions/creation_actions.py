@@ -1,19 +1,22 @@
 """Exact creation action payload validators and narrow adapters.
 
-The four production creation actions are ``creation.preset``,
-``creation.custom``, ``creation.activate``, and ``creation.reset``. Each
-validator enforces an exact bounded payload shape; each adapter re-resolves the
-owning account from the authenticated session's puppet, verifies that the
-puppet is an owned ``PlayerCharacter`` still pending creation, and calls only
-the public deterministic creation-wizard APIs (``save_preset_draft``,
-``save_custom_draft``, ``activate_draft``, ``clear_draft``) plus the unchanged
-onboarding relocation/arrival functions. No adapter assigns ``.db`` attributes,
-traits, identity attributes, ``creation_pending``, or the draft directly, and
-no payload accepts an actor, account, session, host, persona, skill,
-equipment, magic-level, or calculated-stat field.
+The five production creation actions are ``creation.preset``,
+``creation.custom``, ``creation.concept``, ``creation.activate``, and
+``creation.reset``. Each validator enforces an exact bounded payload shape;
+each adapter re-resolves the owning account from the authenticated session's
+puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
+creation, and calls only the public deterministic creation-wizard APIs
+(``save_preset_draft``, ``save_custom_draft``, ``apply_concept_proposal``,
+``activate_draft``, ``clear_draft``) plus the unchanged onboarding
+relocation/arrival functions. No adapter assigns ``.db`` attributes, traits,
+identity attributes, ``creation_pending``, or the draft directly, and no
+payload accepts an actor, account, session, host, persona, skill, equipment,
+magic-level, or calculated-stat field.
 """
 
 from typing import Any
+
+from twisted.internet.defer import Deferred
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.character_creation import (
@@ -23,8 +26,11 @@ from world.rules.character_creation import (
 )
 from world.rules.creation_messages import rejection_code, rejection_message
 from world.rules.creation_wizard import (
+    ConceptDraftStaleError,
     activate_draft,
+    apply_concept_proposal,
     clear_draft,
+    draft_fingerprint,
     save_custom_draft,
     save_preset_draft,
 )
@@ -32,6 +38,10 @@ from world.rules.creation_wizard import (
 # Wire limits (equal to the deterministic bounds and the panel contract).
 MAX_KEY_CODE_POINTS = 64
 MAX_NAME_CODE_POINTS = 80
+# The concept bound mirrors the deterministic command bound
+# (``commands.character_creation.MAX_CONCEPT_LENGTH``) and the generative
+# layer's prompt cap; a parity test keeps all of them in lock step.
+MAX_CONCEPT_CODE_POINTS = 500
 # Structural age bounds. The 18 minimum is NOT enforced here: underage values
 # must reach the deterministic ``_validate_adult`` inside preflight so the
 # stable ``underage_age`` / ``underage_apparent_age`` codes come from the
@@ -86,6 +96,14 @@ def validate_creation_preset_payload(payload: dict[str, Any]) -> dict[str, Any]:
     body = _exact_single_field(payload, "preset_key")
     return {"preset_key": _require_non_empty_string(
         body["preset_key"], "preset_key", MAX_KEY_CODE_POINTS
+    )}
+
+
+def validate_creation_concept_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``creation.concept`` payload (one bounded concept)."""
+    body = _exact_single_field(payload, "concept")
+    return {"concept": _require_non_empty_string(
+        body["concept"], "concept", MAX_CONCEPT_CODE_POINTS
     )}
 
 
@@ -222,6 +240,70 @@ def _creation_custom_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, A
     return _success("custom_saved", message, AFFECTED_CREATION)
 
 
+def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
+    """Run the guarded concept seam and save the concept draft (D4).
+
+    Resolves the owning account synchronously so a tampered or unowned puppet
+    rejects before any client or transport work; the Deferred settles after
+    the guarded ``character_creation`` layer resolves. On a valid proposal
+    whose draft fingerprint still matches, the deterministic concept-apply
+    service saves the ``concept_filled`` draft (including the server-owned
+    persona block) and the ``creation`` panel refreshes. On degrade or a
+    stale fingerprint the stable outcome is returned with zero state change.
+    """
+    account = _pending_owner(actor)
+    if account is None:
+        return _rejected("ownership_rejected")
+    if not bool(getattr(actor, "creation_pending", False)):
+        return _rejected("already_complete")
+    from server.ai_director_service import request_character_proposal
+
+    fingerprint = draft_fingerprint(actor)
+    deferred = request_character_proposal(concept=payload["concept"])
+
+    def _on_success(proposal):
+        if proposal is None:
+            # The single public degraded marker of the guarded layer.
+            return _rejected("concept_unavailable")
+        # Re-authorize current domain state at completion: the character could
+        # have been activated or the ownership changed while the proposal was
+        # in flight (webclient-action-dispatch ownership contract).
+        current_account = _pending_owner(actor)
+        if current_account is None:
+            return _rejected("ownership_rejected")
+        if not bool(getattr(actor, "creation_pending", False)):
+            return _rejected("already_complete")
+        try:
+            apply_concept_proposal(
+                current_account,
+                actor,
+                {
+                    "race_key": proposal.race_key,
+                    "subrace_key": proposal.subrace_key,
+                    "allocations": dict(proposal.allocations),
+                    "persona": dict(proposal.persona),
+                },
+                expected_fingerprint=fingerprint,
+            )
+        except ConceptDraftStaleError:
+            return {
+                "outcome": "stale",
+                "code": "concept_stale",
+                "message": rejection_message("concept_stale"),
+            }
+        except CharacterCreationError as error:
+            return _rejected(error)
+        message = "構想已套用，請填寫姓名與年齡完成建立。"
+        return _success("concept_saved", message, AFFECTED_CREATION)
+
+    def _on_failure(failure):
+        failure.trap(Exception)
+        return _rejected("concept_unavailable")
+
+    deferred.addCallbacks(_on_success, _on_failure)
+    return deferred
+
+
 def _creation_activate_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Atomically activate the stored draft and hand off to exploration."""
     del payload
@@ -269,9 +351,11 @@ __all__ = [
     "APPARENT_AGE_MAXIMUM",
     "APPARENT_AGE_WIRE_MINIMUM",
     "CreationActionError",
+    "MAX_CONCEPT_CODE_POINTS",
     "MAX_KEY_CODE_POINTS",
     "MAX_NAME_CODE_POINTS",
     "validate_creation_activate_payload",
+    "validate_creation_concept_payload",
     "validate_creation_custom_payload",
     "validate_creation_preset_payload",
     "validate_creation_reset_payload",

@@ -128,6 +128,46 @@ _LLM_PROFILES["npc_dialogue"]["enabled"] = False
 LLM_PROFILES = _LLM_PROFILES
 
 
+# The concept journey is deterministic: ``creation.concept`` runs the guarded
+# ``character_creation`` layer through the composition root, which would
+# attempt a live transport in this fully offline harness. A deterministic
+# placeholder replaces the proposal call at the composition root so the
+# journey exercises the adapter, the fingerprint-protected apply service, the
+# concept draft form, and activation end to end without any LLM (the guarded
+# layer itself is covered by the unit suites). The Telnet command holds its
+# own module-level reference and is unaffected; the WebClient adapter imports
+# the function at call time and receives this placeholder.
+import server.ai_director_service as _ai_director  # noqa: E402
+
+
+def _browser_concept_proposal(client=None, *, concept):
+    """Return one fixed valid character proposal (deterministic placeholder)."""
+    del client, concept
+    from twisted.internet import defer
+
+    from world.ai.character_creation import CharacterProposal
+
+    return defer.succeed(
+        CharacterProposal(
+            race_key="human",
+            subrace_key=None,
+            allocations={
+                "hp": 50, "mp": 50, "sp": 50,
+                "atk_phys": 10, "agility": 10, "defense": 11,
+            },
+            suggested_skills=("flight",),
+            persona={
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村，靠磨劍維生",
+                "habit": "清晨練劍",
+            },
+        )
+    )
+
+
+_ai_director.request_character_proposal = _browser_concept_proposal
+
+
 # ---------------------------------------------------------------------------
 # Evennia 6.1 webclient session detection.
 #

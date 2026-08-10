@@ -138,6 +138,7 @@ class RegistryTests(unittest.TestCase):
                     "shop.sell",
                     "creation.preset",
                     "creation.custom",
+                    "creation.concept",
                     "creation.activate",
                     "creation.reset",
                     "explore.move",
