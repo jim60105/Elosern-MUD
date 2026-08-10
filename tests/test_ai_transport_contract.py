@@ -32,6 +32,13 @@ STATE_WRITER_MODULES = (
 )
 FORBIDDEN_FRAGMENTS = ("ollama", "llm_client", "world.ai")
 
+# Pure read-only rule modules that carry no state writes and no typeclasses:
+# ``world.quests.characterization`` is the shared blueprint-characterization
+# bound helper (blueprint-portrait-policy D3). ``world/ai`` imports it read-only
+# exactly as it already imports the ``world.lore`` registries, and it never
+# mutates state, so it is exempt from the state-writer ban.
+READ_ONLY_RULE_MODULES = ("world.quests.characterization",)
+
 DETERMINISTIC_PACKAGES = ("world/rules", "world/maps", "world/quests", "world/art", "commands")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +86,11 @@ def _imported_alias_names(tree: ast.Module) -> list[str]:
 def _imports_state_writer(tree: ast.Module) -> list[str]:
     banned = []
     for module in _imported_module_names(tree):
+        if any(
+            module == rule or module.startswith(rule + ".")
+            for rule in READ_ONLY_RULE_MODULES
+        ):
+            continue
         for prefix in STATE_WRITER_MODULES:
             if module == prefix or module.startswith(prefix + "."):
                 banned.append(module)

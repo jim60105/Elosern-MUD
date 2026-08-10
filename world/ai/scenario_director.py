@@ -49,6 +49,11 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
+from world.quests.characterization import (
+    characterize_errors,
+    duplicate_stable_key_errors,
+    race_lifespan_upper_bound,
+)
 
 # Hard prompt bounds (design D2): per-field string-length caps and a bounded
 # total serialized size, so a pathological request cannot produce an unbounded
@@ -142,12 +147,39 @@ class BlueprintLocation:
 
 
 @dataclass(frozen=True)
+class BlueprintPortrait:
+    """One named portrait policy reference: exactly one ``stable_key`` field.
+
+    ``stable_key`` means ``mode == "named"`` at spawn (design D2); there is no
+    ``mode`` field in the blueprint. Frozen so the blueprint's immutability
+    guard (``_reject_mutable_containers``) is preserved by construction.
+    """
+
+    stable_key: str
+
+    def __post_init__(self) -> None:
+        _reject_mutable_containers(self, type(self).__name__)
+
+
+@dataclass(frozen=True)
 class BlueprintNpcReq:
-    """One stage's NPC requirement: a role, a known NPC tier, and a disposition."""
+    """One stage's NPC requirement: role, tier, disposition, and optional
+    story-driven characterization (design D1).
+
+    ``display_name``, paired ``age``/``apparent_age``, and ``portrait`` are
+    optional per-occupant fields authored by the generative layer like speech
+    and bounded deterministically by the shared ``world.quests.characterization``
+    helper. ``portrait`` is a frozen value object so the immutability-by-
+    construction guard stays intact.
+    """
 
     role: str
     tier: str
     disposition: str | None = None
+    display_name: str | None = None
+    age: int | None = None
+    apparent_age: int | None = None
+    portrait: BlueprintPortrait | None = None
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
@@ -307,6 +339,30 @@ class QuestBlueprint:
                             "role": requirement.role,
                             "tier": requirement.tier,
                             "disposition": requirement.disposition,
+                            **(
+                                {"display_name": requirement.display_name}
+                                if requirement.display_name is not None
+                                else {}
+                            ),
+                            **(
+                                {"age": requirement.age}
+                                if requirement.age is not None
+                                else {}
+                            ),
+                            **(
+                                {"apparent_age": requirement.apparent_age}
+                                if requirement.apparent_age is not None
+                                else {}
+                            ),
+                            **(
+                                {
+                                    "portrait": {
+                                        "stable_key": requirement.portrait.stable_key
+                                    }
+                                }
+                                if requirement.portrait is not None
+                                else {}
+                            ),
                         }
                         for requirement in stage.npc_reqs
                     ],
@@ -360,6 +416,16 @@ class QuestBlueprint:
                         role=requirement["role"],
                         tier=requirement["tier"],
                         disposition=requirement.get("disposition"),
+                        display_name=requirement.get("display_name"),
+                        age=requirement.get("age"),
+                        apparent_age=requirement.get("apparent_age"),
+                        portrait=(
+                            BlueprintPortrait(
+                                stable_key=requirement["portrait"]["stable_key"]
+                            )
+                            if requirement.get("portrait") is not None
+                            else None
+                        ),
                     )
                     for requirement in stage.get("npc_req") or ()
                 ),
@@ -474,6 +540,17 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                 "role": {"type": "string"},
                                 "tier": {"type": "string"},
                                 "disposition": {"type": ["string", "null"]},
+                                "display_name": {"type": ["string", "null"]},
+                                "age": {"type": ["integer", "null"]},
+                                "apparent_age": {"type": ["integer", "null"]},
+                                "portrait": {
+                                    "type": ["object", "null"],
+                                    "required": ["stable_key"],
+                                    "properties": {
+                                        "stable_key": {"type": "string"},
+                                    },
+                                    "additionalProperties": False,
+                                },
                             },
                         },
                     },
@@ -622,6 +699,41 @@ def _validate_npc_tier_known(parsed: Any) -> list[str]:
             tier = requirement.get("tier")
             if not isinstance(tier, str) or tier not in NPC_TIER_REGISTRY:
                 errors.append(f"stage {index} unknown NPC tier {tier!r}")
+    return errors
+
+
+def _validate_npc_characterization(parsed: Any) -> list[str]:
+    """Validate every ``npc_req`` entry's optional characterization fields.
+
+    Delegates per-entry age/name/key rules and the cross-entry duplicate
+    ``stable_key`` agreement rule to the shared ``world.quests.characterization``
+    helper -- the single rule source both this guardrail and the deterministic
+    compiler call (design D3). The race-lifespan upper bound is resolved
+    through the tier's ``race_key``; an unknown tier is reported by
+    ``_validate_npc_tier_known``, so this validator skips it to avoid a second
+    (redundant) diagnostic.
+    """
+    errors: list[str] = []
+    entries: list[dict[str, Any]] = []
+    for index, stage in enumerate(_stages(parsed)):
+        if not isinstance(stage, dict):
+            continue
+        requirements = stage.get("npc_req")
+        if not isinstance(requirements, list):
+            continue
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                continue
+            entries.append(requirement)
+            tier = requirement.get("tier")
+            if not isinstance(tier, str) or tier not in NPC_TIER_REGISTRY:
+                continue
+            for message in characterize_errors(
+                requirement,
+                lifespan_upper_bound=race_lifespan_upper_bound(tier),
+            ):
+                errors.append(f"stage {index} {message}")
+    errors.extend(duplicate_stable_key_errors(entries))
     return errors
 
 
@@ -854,6 +966,7 @@ _VALIDATORS: dict[str, Any] = {
     "reward_items_known": _validate_reward_items_known,
     "archetype_known": _validate_archetype_known,
     "npc_tier_known": _validate_npc_tier_known,
+    "npc_characterization": _validate_npc_characterization,
     "monster_tier_known": _validate_monster_tier_known,
     "anchor_known": _validate_anchor_known,
     "defeat_selector": _validate_defeat_selector,

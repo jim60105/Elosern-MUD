@@ -31,6 +31,7 @@ from world.ai.scenario_director import (
     BlueprintLocation,
     BlueprintNpcReq,
     BlueprintObjective,
+    BlueprintPortrait,
     BlueprintReward,
     BlueprintStage,
     build_scenario_prompt,
@@ -199,6 +200,124 @@ class ScenarioDirectorProposalTypeTests(unittest.TestCase):
         rebuilt = QuestBlueprint.from_payload(round_tripped)
         self.assertEqual(rebuilt, blueprint)
         self.assertNotIn("object at", json.dumps(payload))
+
+
+class BlueprintCharacterizationTypeTests(unittest.TestCase):
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    def test_frozen_portrait_value_object_passes_the_immutability_guard(self):
+        from dataclasses import FrozenInstanceError
+
+        portrait = BlueprintPortrait(stable_key="library_keeper")
+        self.assertEqual(portrait.stable_key, "library_keeper")
+        with self.assertRaises(FrozenInstanceError):
+            portrait.stable_key = "changed"
+        requirement = BlueprintNpcReq(
+            role="librarian",
+            tier="civilian",
+            disposition=None,
+            display_name="莉絲·晨星",
+            age=68,
+            apparent_age=68,
+            portrait=portrait,
+        )
+        self.assertEqual(requirement.portrait.stable_key, "library_keeper")
+
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    def test_mutable_containers_are_still_rejected_under_a_portrait_field(self):
+        with self.assertRaises(TypeError):
+            BlueprintNpcReq(
+                role="librarian",
+                tier="civilian",
+                portrait={"stable_key": "library_keeper"},  # raw dict rejected
+            )
+
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    def test_round_trip_preserves_all_four_characterization_fields(self):
+        blueprint = _blueprint(
+            stages=(
+                BlueprintStage(
+                    index=0,
+                    objective=BlueprintObjective(
+                        kind="defeat", quantity=1, monster_tier=None
+                    ),
+                    location=BlueprintLocation(
+                        layer="instance",
+                        archetype="forest_path",
+                        anchor_key=None,
+                        anchor_near="capital_altoria",
+                        xyz=None,
+                        scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                    ),
+                    npc_reqs=(
+                        BlueprintNpcReq(
+                            role="bandit",
+                            tier="bandit",
+                            disposition=None,
+                            display_name="黑鬍",
+                            age=35,
+                            apparent_age=35,
+                            portrait=BlueprintPortrait(
+                                stable_key="forest_bandit_chief"
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )
+        payload = blueprint.to_payload()
+        round_tripped = json.loads(json.dumps(payload, ensure_ascii=False))
+        rebuilt = QuestBlueprint.from_payload(round_tripped)
+        requirement = rebuilt.stages[0].npc_reqs[0]
+        self.assertEqual(requirement.display_name, "黑鬍")
+        self.assertEqual(requirement.age, 35)
+        self.assertEqual(requirement.apparent_age, 35)
+        self.assertEqual(requirement.portrait.stable_key, "forest_bandit_chief")
+
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    def test_field_less_blueprint_round_trips_byte_identically(self):
+        plain = _blueprint()
+        payload = plain.to_payload()
+        rebuilt = QuestBlueprint.from_payload(payload)
+        self.assertEqual(rebuilt, plain)
+        self.assertEqual(payload["stages"][0]["npc_req"], [])
+        self.assertNotIn("display_name", payload["stages"][0])
+        self.assertNotIn("portrait", payload["stages"][0])
+
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    def test_characterization_differences_change_the_content_digest(self):
+        from world.quests.compile import compile_quest_blueprint
+
+        base = _blueprint()
+        base_payload = base.to_payload()
+        base_payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        base_payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        base_payload["stages"][0]["npc_req"] = [
+            {"role": "bandit", "tier": "bandit", "disposition": None}
+        ]
+        first = compile_quest_blueprint(base_payload)
+
+        changed = json.loads(json.dumps(base_payload))
+        changed["stages"][0]["npc_req"][0].update(
+            {
+                "display_name": "黑鬍",
+                "age": 35,
+                "apparent_age": 35,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        second = compile_quest_blueprint(changed)
+        self.assertNotEqual(first.definition.key, second.definition.key)
 
 
 class ScenarioDirectorPromptTests(unittest.TestCase):
@@ -556,6 +675,178 @@ class SceneBoundValidatorTests(unittest.TestCase):
         SCENE_REQUIREMENT_REGISTRY.clear()
 
 
+class CharacterizationValidatorTests(unittest.TestCase):
+    def setUp(self):
+        _reset_all()
+        register_scenario_director()
+
+    def tearDown(self):
+        _reset_all()
+
+    def _instance_bound_payload(self, **overrides):
+        payload = _payload()
+        payload["stages"][0]["objective"] = {
+            "kind": "defeat",
+            "quantity": 1,
+            "monster_tier": None,
+        }
+        payload["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "archetype": "forest_path",
+            "anchor_key": None,
+            "anchor_near": "capital_altoria",
+            "xyz": None,
+            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+        }
+        payload["stages"][0]["npc_req"] = [
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "黑鬍",
+                "age": 35,
+                "apparent_age": 35,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        ]
+        payload.update(overrides)
+        return payload
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_valid_named_occupant_with_ages_passes_validation(self):
+        payload = self._instance_bound_payload()
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_elven_tier_named_occupant_passes_within_the_elf_band(self):
+        payload = self._instance_bound_payload()
+        payload["stages"][0]["npc_req"][0]["tier"] = "elven_civilian"
+        payload["stages"][0]["npc_req"][0]["age"] = 300
+        payload["stages"][0]["npc_req"][0]["apparent_age"] = 300
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_unpaired_underage_or_non_integer_declarations_reject_and_retry(self):
+        def apply_bad(bad, fields):
+            entry = bad["stages"][0]["npc_req"][0]
+            if fields == "age_only":
+                del entry["apparent_age"]
+            elif fields == "apparent_only":
+                del entry["age"]
+            else:
+                entry.update(fields)
+
+        bad_cases = [
+            "age_only",
+            "apparent_only",
+            {"age": 17, "apparent_age": 17},
+            {"age": True, "apparent_age": 35},
+            {"age": 35, "apparent_age": 30.5},
+            {"age": None, "apparent_age": 35},
+            {"age": 120, "apparent_age": 120},
+        ]
+        for fields in bad_cases:
+            with self.subTest(fields=fields):
+                client = FakeLLMClient()
+                bad = self._instance_bound_payload()
+                apply_bad(bad, fields)
+                client.add_response(
+                    lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3,
+                    json.dumps(_payload(), ensure_ascii=False),
+                )
+                with override_settings(LLM_PROFILES=_raw()):
+                    d = generate_quest_blueprint(client, context=_context())
+                    result = await_result(d)
+                self.assertEqual(result, _blueprint())
+                self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_malformed_portrait_object_rejects_and_retries(self):
+        bad_portraits = [
+            "forest_bandit_chief",
+            {"stable_key": "ok", "mode": "named"},
+            {"stable_key": ""},
+            {"stable_key": "a:b"},
+        ]
+        for portrait in bad_portraits:
+            with self.subTest(portrait=portrait):
+                client = FakeLLMClient()
+                bad = self._instance_bound_payload()
+                bad["stages"][0]["npc_req"][0]["portrait"] = portrait
+                client.add_response(
+                    lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3,
+                    json.dumps(_payload(), ensure_ascii=False),
+                )
+                with override_settings(LLM_PROFILES=_raw()):
+                    d = generate_quest_blueprint(client, context=_context())
+                    result = await_result(d)
+                self.assertEqual(result, _blueprint())
+                self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_overlong_display_name_rejects_and_retries(self):
+        client = FakeLLMClient()
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["npc_req"][0]["display_name"] = "字" * 65
+        client.add_response(
+            lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False)
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_conflicting_duplicate_key_rejects_and_retries(self):
+        client = FakeLLMClient()
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["npc_req"].append(
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "另一個人",
+                "age": 40,
+                "apparent_age": 40,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False)
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_field_less_entries_validate_unchanged(self):
+        payload = self._instance_bound_payload()
+        payload["stages"][0]["npc_req"][0] = {
+            "role": "bandit",
+            "tier": "bandit",
+            "disposition": None,
+        }
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+
+
 class ScenarioDirectorRegistrationTests(unittest.TestCase):
     def setUp(self):
         _reset_all()
@@ -860,6 +1151,53 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
                 )
             ),
         )
+
+    @covers_requirement("blueprint-portrait-policy::the-hand-written-template-pool-may-carry-characterization-fields")
+    def test_valid_named_template_registers(self):
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        named = next(
+            entry
+            for entry in QUEST_TEMPLATE_POOL
+            if any(
+                requirement.portrait is not None
+                for stage in entry.stages
+                for requirement in stage.npc_reqs
+            )
+        )
+        payload = named.to_payload()
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+        from world.quests.compile import compile_quest_blueprint
+
+        compiled = compile_quest_blueprint(payload)
+        self.assertTrue(compiled.definition.key)
+
+    @covers_requirement("blueprint-portrait-policy::the-hand-written-template-pool-may-carry-characterization-fields")
+    def test_malformed_underage_template_is_rejected_at_registration(self):
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        named = next(
+            entry
+            for entry in QUEST_TEMPLATE_POOL
+            if any(
+                requirement.portrait is not None
+                for stage in entry.stages
+                for requirement in stage.npc_reqs
+            )
+        )
+        payload = named.to_payload()
+        for stage in payload["stages"]:
+            for requirement in stage.get("npc_req") or []:
+                if "age" in requirement:
+                    requirement["age"] = 17
+                    requirement["apparent_age"] = 17
+        errors = [
+            message
+            for validator_fn in scenario_director._VALIDATORS.values()
+            for message in validator_fn(payload)
+        ]
+        self.assertTrue(errors, "an underage template must be rejected at registration")
 
 
 class ScenarioDirectorStartupRegistrationTests(unittest.TestCase):

@@ -26,6 +26,7 @@ from world.ai.fake_client import FakeLLMClient
 from world.ai.scenario_director import (
     BlueprintLocation,
     BlueprintObjective,
+    BlueprintPortrait,
     BlueprintStage,
     QuestBlueprint,
     generate_quest_blueprint,
@@ -47,6 +48,7 @@ from world.quests.definitions import (
     QuestDefinition,
     QuestDefinitionError,
     QuestStage,
+    RoomLocator,
     register_quest_definition,
     validate_definition,
 )
@@ -131,6 +133,36 @@ def _acquire_payload(**overrides):
         "reward": {"copper": 50, "items": [], "merit": 25},
         "failure": {"deadline_hours": 72, "conditions": []},
     }
+    payload.update(overrides)
+    return payload
+
+
+def _characterized_payload(**overrides):
+    payload = _defeat_payload()
+    payload["stages"][0]["objective"] = {
+        "kind": "defeat",
+        "quantity": 1,
+        "monster_tier": None,
+    }
+    payload["stages"][0]["location_req"] = {
+        "layer": "instance",
+        "archetype": "forest_path",
+        "anchor_key": None,
+        "anchor_near": "capital_altoria",
+        "xyz": None,
+        "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+    }
+    payload["stages"][0]["npc_req"] = [
+        {
+            "role": "bandit",
+            "tier": "bandit",
+            "disposition": None,
+            "display_name": "黑鬍",
+            "age": 35,
+            "apparent_age": 35,
+            "portrait": {"stable_key": "forest_bandit_chief"},
+        }
+    ]
     payload.update(overrides)
     return payload
 
@@ -650,6 +682,120 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
         register_quest_definition(INTRODUCTORY_HUNT)
         self.assertEqual(scene_requirements_for(INTRODUCTORY_HUNT.key), ())
         self.assertNotIn(INTRODUCTORY_HUNT.key, SCENE_REQUIREMENT_REGISTRY)
+
+
+class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_compiled_requirement_preserves_the_optional_fields(self):
+        compiled = compile_quest_blueprint(_characterized_payload())
+        requirement = compiled.stage_requirements[0]
+        characterization = requirement.characterizations[0]
+        self.assertEqual(characterization.display_name, "黑鬍")
+        self.assertEqual(characterization.age, 35)
+        self.assertEqual(characterization.apparent_age, 35)
+        self.assertEqual(characterization.portrait_stable_key, "forest_bandit_chief")
+
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    def test_field_less_blueprint_compiles_to_unchanged_shape(self):
+        field_less = compile_quest_blueprint(_defeat_payload())
+        characterized = compile_quest_blueprint(_characterized_payload())
+        self.assertEqual(field_less.stage_requirements[0].npc_reqs, ())
+        self.assertEqual(field_less.stage_requirements[0].characterizations, ())
+
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    def test_characterization_differences_change_the_generated_key(self):
+        base = _characterized_payload()
+        first = compile_quest_blueprint(base)
+        changed = json.loads(json.dumps(base))
+        changed["stages"][0]["npc_req"][0]["display_name"] = "另一個人"
+        second = compile_quest_blueprint(changed)
+        self.assertNotEqual(first.definition.key, second.definition.key)
+
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
+    def test_malformed_characterization_rejects_before_registration(self):
+        def unpaired(entry):
+            del entry["apparent_age"]
+
+        def underage(entry):
+            entry.update(age=17, apparent_age=17)
+
+        def boolean(entry):
+            entry.update(age=True, apparent_age=35)
+
+        def out_of_band(entry):
+            entry.update(age=120, apparent_age=120)
+
+        def empty_key(entry):
+            entry.update(portrait={"stable_key": ""})
+
+        for mutate in (unpaired, underage, boolean, out_of_band, empty_key):
+            with self.subTest(mutate=mutate.__name__):
+                bad = _characterized_payload()
+                mutate(bad["stages"][0]["npc_req"][0])
+                with self.assertRaises(QuestCompileError):
+                    compile_quest_blueprint(bad)
+
+    @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
+    def test_conflicting_duplicate_stable_key_rejects_at_compile(self):
+        bad = _characterized_payload()
+        bad["stages"][0]["npc_req"].append(
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "另一個人",
+                "age": 40,
+                "apparent_age": 40,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    def test_elven_tier_characterization_validates_against_the_elf_band(self):
+        payload = _characterized_payload()
+        payload["stages"][0]["npc_req"][0]["tier"] = "elven_civilian"
+        payload["stages"][0]["npc_req"][0]["age"] = 300
+        payload["stages"][0]["npc_req"][0]["apparent_age"] = 300
+        compiled = compile_quest_blueprint(payload)
+        self.assertEqual(
+            compiled.stage_requirements[0].characterizations[0].age, 300
+        )
+
+    @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
+    def test_characterizations_must_stay_aligned_with_npc_reqs(self):
+        from world.quests.compile import (
+            StageNpcCharacterization,
+            StageSpawnRequirement,
+        )
+
+        with self.assertRaises(ValueError):
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.DEFEAT,
+                location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                archetype="forest_path",
+                anchor_near="capital_altoria",
+                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                npc_reqs=(("bandit", "bandit", None),),
+                characterizations=(
+                    StageNpcCharacterization(),
+                    StageNpcCharacterization(),
+                ),
+            )
+        StageSpawnRequirement(
+            index=0,
+            objective_kind=ObjectiveKind.DEFEAT,
+            location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+            archetype="forest_path",
+            anchor_near="capital_altoria",
+            scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+            npc_reqs=(("bandit", "bandit", None),),
+            characterizations=(StageNpcCharacterization(),),
+        )
 
 
 class SharedPayloadContractTests(CompileRegistryIsolation, unittest.TestCase):

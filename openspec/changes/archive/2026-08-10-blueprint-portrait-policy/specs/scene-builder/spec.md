@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: Anti-hallucination: the proposal never chooses mechanical numbers, stats, or class lineage
+### Requirement: Anti-hallucination: the proposal never chooses numbers, stats, or class lineage
 SceneBuilder SHALL accept from a stage's registered requirements only registry keys — archetype in
 `SCENE_ARCHETYPE_REGISTRY`, NPC tier in `NPC_TIER_REGISTRY`, monster tier in `MONSTER_TIER_REGISTRY`,
 anchor in `ANCHOR_PLACEMENT_REGISTRY`, and a layer — and SHALL derive every stored numeric stat

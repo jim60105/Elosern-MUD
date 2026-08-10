@@ -49,6 +49,24 @@ class NPCTierRegistryTests(unittest.TestCase):
         self.assertIn("civilian", NPC_TIER_REGISTRY)
         self.assertTrue(NPC_TIER_REGISTRY["civilian"].description)
 
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    def test_elven_tier_validates_and_resolves_to_the_elf_lifespan_band(self):
+        tier = NPC_TIER_REGISTRY["elven_civilian"]
+        self.assertEqual(tier.race_key, "elf")
+        self.assertEqual(tier.static_tier_key, "elf_common")
+        race = RACE_REGISTRY[tier.race_key]
+        static_tier = STATIC_TIER_REGISTRY[tier.static_tier_key]
+        self.assertEqual(static_tier.race_key, "elf")
+        self.assertEqual(race.key, "elf")
+        self.assertEqual(race.lifespan, (800, 1200))
+
+    @covers_requirement("scenario-director::scene-archetype-and-npc-tier-registries-are-immutable-lore-data")
+    def test_elven_tier_is_frozen(self):
+        from dataclasses import FrozenInstanceError
+
+        with self.assertRaises(FrozenInstanceError):
+            NPC_TIER_REGISTRY["elven_civilian"].display_name_zh = "changed"
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -439,6 +439,35 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
             )
 
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
+    def test_characterization_age_never_enters_a_stored_trait(self):
+        payload = _instance_bound_payload()
+        payload["stages"][0]["npc_req"][0].update(
+            {
+                "display_name": "黑鬍",
+                "age": 35,
+                "apparent_age": 35,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        record, _ = self._accept(payload)
+        result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
+        tier = NPC_TIER_REGISTRY["bandit"]
+        race = RACE_REGISTRY[tier.race_key]
+        values = build_initial_traits(tier.race_key, tier=tier.static_tier_key)
+        values["magic_level"] = race.starting_magic_level
+        config = trait_config_for_values(values, race.magic_cap)
+        for key in ("hp", "atk_phys", "agility", "defense", "magic_level"):
+            self.assertEqual(
+                getattr(npc.traits, key).base,
+                config[key]["base"],
+                key,
+            )
+        self.assertNotIn("35", str(npc.traits.hp.base))
+        self.assertNotEqual(npc.db.display_name, "黑鬍")
+        self.assertIsNone(npc.db.portrait_policy)
+
+    @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_unknown_tier_in_a_requirement_is_rejected_before_any_spawn(self):
         record, _ = self._accept(_instance_bound_payload())
         forged = (
