@@ -43,6 +43,11 @@ delta used, budget capped) so callers can render feedback.
   exhausted
 - **THEN** the value decreases, the daily counter stays exhausted, and the auto-leave hook runs
 
+#### Scenario: A friendly_fire source is accepted without budget interaction
+- **WHEN** a call supplies the `friendly_fire` source with a negative delta
+- **THEN** the penalty applies downward without consuming or resetting the daily budget, and the
+  outcome reports the applied amount
+
 #### Scenario: An unknown source is rejected without writing
 - **WHEN** a call supplies a source outside the closed set
 - **THEN** the outcome is rejected, no value or counter changes, and no record is created
@@ -50,8 +55,3 @@ delta used, budget capped) so callers can render feedback.
 #### Scenario: A non-NPC owner is rejected without writing
 - **WHEN** a call supplies a player or monster as the affinity owner
 - **THEN** the outcome is rejected and no state changes
-
-#### Scenario: A friendly_fire source is accepted without budget interaction
-- **WHEN** a call supplies the `friendly_fire` source with a negative delta
-- **THEN** the penalty applies downward without consuming or resetting the daily budget, and the
-  outcome reports the applied amount

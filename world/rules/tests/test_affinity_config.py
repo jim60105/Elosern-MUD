@@ -117,6 +117,40 @@ class AffinityConfigValidationTests(TestCase):
         ).read_text(encoding="utf-8")
         self._load_deviant(base + "\nunknown_field: 1\n")
 
+    def test_missing_friendly_fire_penalty_is_rejected(self):
+        base = (
+            Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
+        ).read_text(encoding="utf-8")
+        self._load_deviant(base.replace("friendly_fire_penalty_per_hit: 1\n", ""))
+
+    def test_non_positive_friendly_fire_penalty_is_rejected(self):
+        base = (
+            Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
+        ).read_text(encoding="utf-8")
+        self._load_deviant(
+            base.replace(
+                "friendly_fire_penalty_per_hit: 1",
+                "friendly_fire_penalty_per_hit: 0",
+            )
+        )
+        self._load_deviant(
+            base.replace(
+                "friendly_fire_penalty_per_hit: 1",
+                "friendly_fire_penalty_per_hit: -1",
+            )
+        )
+
+    def test_non_integer_friendly_fire_penalty_is_rejected(self):
+        base = (
+            Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
+        ).read_text(encoding="utf-8")
+        self._load_deviant(
+            base.replace(
+                "friendly_fire_penalty_per_hit: 1",
+                "friendly_fire_penalty_per_hit: many",
+            )
+        )
+
 
 class AffinityConfigConstantsTests(TestCase):
     def test_constants_come_from_yaml(self):
@@ -124,6 +158,7 @@ class AffinityConfigConstantsTests(TestCase):
         self.assertEqual(config.invite_threshold, 70)
         self.assertEqual(config.daily_interaction_cap, 5)
         self.assertEqual(config.quest_completion_gain, 2)
+        self.assertEqual(config.friendly_fire_penalty_per_hit, 1)
 
     def test_every_stage_id_has_exactly_one_named_test(self):
         names = [

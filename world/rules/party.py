@@ -447,3 +447,24 @@ def _write_binding(
         player.db.party = party_before
         npc.db.party_member = member_before
         raise PartyWriteError("write_failed", str(error)) from error
+
+
+def restore_membership_surfaces(
+    player: Any,
+    party_before: list[int],
+    members_before: dict[int, Any],
+) -> None:
+    """Restore the in-process party surfaces after a rolled-back transaction.
+
+    The idmapper attribute cache is not transaction-aware: a rolled-back
+    ``db.party`` / ``db.party_member`` write still leaves the post-write value
+    readable in-process. Callers that snapshot membership before an atomic
+    block invoke this helper in the failure path so readers never observe the
+    rolled-back state. Only this module assigns party attributes (party-core
+    single-writer contract).
+    """
+    player.db.party = list(party_before)
+    for npc_pk, member in members_before.items():
+        npc = _resolve_live_object(npc_pk)
+        if npc is not None:
+            npc.db.party_member = member

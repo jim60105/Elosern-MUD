@@ -22,7 +22,13 @@ class AffinityConfigError(ValueError):
 CANONICAL_FLOORS = (0, 10, 30, 50, 70, 90, 100)
 _STAGE_FIELDS = frozenset({"id", "floor", "name", "look_flavor"})
 _TOP_LEVEL_FIELDS = frozenset(
-    {"invite_threshold", "daily_interaction_cap", "quest_completion_gain", "stages"}
+    {
+        "invite_threshold",
+        "daily_interaction_cap",
+        "quest_completion_gain",
+        "friendly_fire_penalty_per_hit",
+        "stages",
+    }
 )
 
 
@@ -43,6 +49,7 @@ class AffinityConfig:
     invite_threshold: int
     daily_interaction_cap: int
     quest_completion_gain: int
+    friendly_fire_penalty_per_hit: int
     stages: tuple[AffinityStage, ...]
 
     def stage_for_value(self, value: int) -> AffinityStage:
@@ -111,6 +118,11 @@ def load_config(path: Path | None = None) -> AffinityConfig:
     quest_completion_gain = _require_int(
         raw["quest_completion_gain"], "quest_completion_gain", minimum=1
     )
+    friendly_fire_penalty_per_hit = _require_int(
+        raw["friendly_fire_penalty_per_hit"],
+        "friendly_fire_penalty_per_hit",
+        minimum=1,
+    )
 
     stages_raw = raw["stages"]
     if not isinstance(stages_raw, list):
@@ -164,6 +176,7 @@ def load_config(path: Path | None = None) -> AffinityConfig:
         invite_threshold=invite_threshold,
         daily_interaction_cap=daily_interaction_cap,
         quest_completion_gain=quest_completion_gain,
+        friendly_fire_penalty_per_hit=friendly_fire_penalty_per_hit,
         stages=tuple(stages),
     )
 

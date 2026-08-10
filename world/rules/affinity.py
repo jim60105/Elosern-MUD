@@ -34,6 +34,7 @@ class AffinitySource(StrEnum):
     GUILD = "guild"
     AI_DIALOGUE = "ai_dialogue"
     QUEST_COMPLETION = "quest_completion"
+    FRIENDLY_FIRE = "friendly_fire"
 
 
 @dataclass(frozen=True)
@@ -292,6 +293,24 @@ def apply_affinity_change(
         budget_capped=budget_capped,
         source_rejected=False,
     )
+
+
+def restore_relations_surfaces(snapshots: dict[int, Any]) -> None:
+    """Restore in-process ``relations_data`` surfaces after a rolled-back round.
+
+    The idmapper attribute cache is not transaction-aware: a rolled-back
+    ``relations_data`` write still leaves the post-write value readable
+    in-process. Callers that snapshot the records before an atomic block
+    invoke this helper in the failure path so readers never observe the
+    rolled-back state. The writer's own failure branch already restores the
+    failing record; this covers every earlier hit of the same round.
+    """
+    from evennia.objects.models import ObjectDB
+
+    for npc_pk, data in snapshots.items():
+        entity = ObjectDB.objects.filter(id=npc_pk).first()
+        if entity is not None:
+            entity.db.relations_data = data
 
 
 def affinity_stage_line(npc: Any, looker: Any) -> str:

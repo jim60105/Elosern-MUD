@@ -601,6 +601,81 @@ def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
     return tuple(sorted(knocked))
 
 
+def _scan_friendly_fire(
+    actor: Any,
+    battlefield: Battlefield,
+    logs: list[Any],
+) -> tuple[str, ...]:
+    """Apply per-hit friendly-fire penalties for one resolved player round.
+
+    Scans the round's damage events produced by the player's own action
+    (EventLogs whose ``actor`` is the player) against ally-side companion
+    NPCs: a hit qualifies when the target is an NPC in the snapshotted
+    ``player.db.party`` set and present on the battlefield. Each qualifying
+    hit calls the sole affinity writer once with the ``friendly_fire`` source
+    and the rulebook penalty, inside one transaction that also covers every
+    resulting auto-leave -- a failure rolls the whole round's affinity effects
+    back. Returns the auto-leave notification lines; the caller delivers them
+    only after the transaction commits (the writer never notifies).
+    """
+    from django.db import transaction
+
+    from typeclasses.npcs import NPC
+    from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.affinity_config import get_config
+    from world.rules.party import party_ids
+
+    companion_pks = set(party_ids(actor))
+    if not companion_pks:
+        return ()
+    player_key = str(actor.key)
+    hits: list[Any] = []
+    for event_log in logs:
+        if event_log.actor != player_key:
+            continue
+        for entry in event_log.entries:
+            if entry.kind != "damage":
+                continue
+            target = battlefield.roster.get(entry.target)
+            if (
+                target is None
+                or not isinstance(target, NPC)
+                or int(target.pk) not in companion_pks
+            ):
+                continue
+            hits.append(target)
+    if not hits:
+        return ()
+    penalty = get_config().friendly_fire_penalty_per_hit
+    notifications: list[str] = []
+    party_before = list(actor.db.party or ())
+    members_before = {
+        int(target.pk): target.db.party_member for target in hits
+    }
+    relations_before = {
+        int(target.pk): target.db.relations_data for target in hits
+    }
+    try:
+        with transaction.atomic():
+            for target in hits:
+                outcome = apply_affinity_change(
+                    target, actor, AffinitySource.FRIENDLY_FIRE, -penalty
+                )
+                if outcome.auto_leave_notification is not None:
+                    notifications.append(outcome.auto_leave_notification)
+    except Exception:
+        # The round's transaction rolled the database back; restore the
+        # in-process attribute surfaces so readers never observe the
+        # rolled-back values (the idmapper cache is not transaction-aware).
+        from world.rules.affinity import restore_relations_surfaces
+        from world.rules.party import restore_membership_surfaces
+
+        restore_membership_surfaces(actor, party_before, members_before)
+        restore_relations_surfaces(relations_before)
+        raise
+    return tuple(notifications)
+
+
 def submit_player_action(
     actor: Any,
     skill_key: str,
@@ -667,6 +742,9 @@ def submit_player_action(
         provider = _round_provider(actor, request, battlefield, record)
         logs = run_round(battlefield, provider)
         gained = 1
+
+    for line in _scan_friendly_fire(actor, battlefield, logs):
+        actor.msg(line)
 
     knocked = _knocked_out_ids(logs, battlefield)
     new_record = replace(

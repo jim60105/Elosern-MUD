@@ -17,6 +17,11 @@ daily_interaction_cap: 5
 # turns in a guild quest (consumed by the future party-quest change).
 quest_completion_gain: 2
 
+# The per-hit affinity penalty applied when a player combat action damages an
+# ally-side companion NPC (friendly fire). Applied as a negative delta through
+# the sole affinity writer; negative deltas never reset the daily budget.
+friendly_fire_penalty_per_hit: 1
+
 # Exactly seven stages. Floors must equal 0/10/30/50/70/90/100, strictly
 # increasing, no duplicates. Values >= 100 resolve to the topmost stage.
 stages:

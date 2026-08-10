@@ -119,6 +119,29 @@ class AffinityWriterTests(EvenniaTest):
         record = self.npc.relations._load(self.player)
         self.assertEqual(record.daily_gain, 5)
 
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_friendly_fire_source_applies_without_budget_interaction(self):
+        self._day_clock(0)
+        for _ in range(5):
+            apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
+        with patch(
+            "world.rules.affinity.run_auto_leave_recheck"
+        ) as recheck:
+            outcome = apply_affinity_change(
+                self.npc,
+                self.player,
+                AffinitySource.FRIENDLY_FIRE,
+                -1,
+            )
+        self.assertEqual(outcome.delta_used, -1)
+        self.assertTrue(outcome.applied)
+        self.assertFalse(outcome.budget_capped)
+        self.assertFalse(outcome.source_rejected)
+        recheck.assert_called_once_with(self.npc, self.player)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 4)
+        record = self.npc.relations._load(self.player)
+        self.assertEqual(record.daily_gain, 5)
+
     def test_negative_delta_floors_at_zero(self):
         apply_affinity_change(
             self.npc, self.player, AffinitySource.QUEST_COMPLETION, 1
