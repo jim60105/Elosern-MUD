@@ -8,6 +8,8 @@ end-to-end loop through the two new commands, and the repository boundary
 invariants (offline tests only, no live client, no startup re-sync).
 """
 
+from pathlib import Path
+import tempfile
 from unittest.mock import patch
 import unittest
 
@@ -26,11 +28,15 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, InstanceRoom, Room
 from world.ai.profiles import default_profiles
+from world.art.fake_sd_client import FakeSDWebUIClient
+from world.art.subjects import ArtSubjectKind
+from world.art.worker import drain_synchronous
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
+    StageNpcCharacterization,
     StageSpawnRequirement,
     compile_quest_blueprint,
     register_generated_quest,
@@ -464,8 +470,13 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
                 key,
             )
         self.assertNotIn("35", str(npc.traits.hp.base))
-        self.assertNotEqual(npc.db.display_name, "黑鬍")
-        self.assertIsNone(npc.db.portrait_policy)
+        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.db.age, 35)
+        self.assertEqual(npc.db.apparent_age, 35)
+        self.assertEqual(
+            npc.db.portrait_policy,
+            {"mode": "named", "stable_key": "forest_bandit_chief"},
+        )
 
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_unknown_tier_in_a_requirement_is_rejected_before_any_spawn(self):
@@ -499,67 +510,305 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
     @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_named_policy_occupant_schedules_after_commit_only(self):
-        record, _ = self._accept(_instance_bound_payload())
+        payload = _instance_bound_payload()
+        payload["stages"][0]["npc_req"][0].update(
+            {
+                "display_name": "黑鬍",
+                "age": 35,
+                "apparent_age": 35,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        record, _ = self._accept(payload)
 
-        def forged_spawn_npc(room, requirement, role, tier_key, disposition, position):
-            npc = create_object(NPC, key=f"named-{position}", location=room)
-            npc.race = "human"
-            npc.apply_race_baseline()
-            npc.db.age = 22
-            npc.db.apparent_age = 22
-            npc.db.portrait_policy = {"mode": "named", "stable_key": f"named-{position}"}
-            return npc
-
-        with (
-            patch(
-                "world.quests.scene_builder._spawn_npc",
-                side_effect=forged_spawn_npc,
-            ),
-            self.captureOnCommitCallbacks(execute=True) as callbacks,
-        ):
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         self.assertEqual(len(callbacks), 1)
         from world.art.store import ArtAssetRecord
 
         records = ArtAssetRecord.objects.filter(
-            db_key="art:portrait:character:named-0"
+            db_key="art:portrait:character:forest_bandit_chief"
         )
         self.assertEqual(records.count(), 1)
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
     @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
+    @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
     def test_rolled_back_materialization_emits_no_portrait_job(self):
-        record, _ = self._accept(_instance_bound_payload())
-
-        def forged_spawn_npc(room, requirement, role, tier_key, disposition, position):
-            npc = create_object(NPC, key=f"named-{position}", location=room)
-            npc.race = "human"
-            npc.apply_race_baseline()
-            npc.db.age = 22
-            npc.db.apparent_age = 22
-            npc.db.portrait_policy = {"mode": "named", "stable_key": f"named-{position}"}
-            return npc
+        payload = _instance_bound_payload()
+        payload["stages"][0]["npc_req"][0].update(
+            {
+                "display_name": "黑鬍",
+                "age": 35,
+                "apparent_age": 35,
+                "portrait": {"stable_key": "forest_bandit_chief"},
+            }
+        )
+        record, _ = self._accept(payload)
 
         with (
-            patch(
-                "world.quests.scene_builder._spawn_npc",
-                side_effect=forged_spawn_npc,
-            ),
             self.captureOnCommitCallbacks(execute=True) as callbacks,
-        ):
-            with patch(
+            patch(
                 "world.quests.scene_builder._bind_stage",
                 side_effect=RuntimeError("spawn failed"),
-            ):
-                with self.assertRaises(RuntimeError):
-                    materialize_stage(
-                        self.player, record.quest_id, origin_room=self.anchor
-                    )
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                materialize_stage(
+                    self.player, record.quest_id, origin_room=self.anchor
+                )
         self.assertEqual(callbacks, [])
         from world.art.store import ArtAssetRecord
 
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
+
+
+class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
+    def _characterized(self, **overrides):
+        payload = _instance_bound_payload()
+        payload["stages"][0]["npc_req"][0].update(overrides)
+        return payload
+
+    def _spawned_npc(self, payload):
+        record, _ = self._accept(payload)
+        result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        return next(obj for obj in result.room.contents if isinstance(obj, NPC))
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_full_characterization_is_materialized_fully(self):
+        npc = self._spawned_npc(
+            self._characterized(
+                display_name="黑鬍",
+                age=68,
+                apparent_age=68,
+                portrait={"stable_key": "forest_bandit_chief"},
+            )
+        )
+        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.db.age, 68)
+        self.assertEqual(npc.db.apparent_age, 68)
+        self.assertEqual(
+            npc.db.portrait_policy,
+            {"mode": "named", "stable_key": "forest_bandit_chief"},
+        )
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_portrait_only_occupant_receives_the_adult_baseline(self):
+        npc = self._spawned_npc(
+            self._characterized(portrait={"stable_key": "forest_bandit_chief"})
+        )
+        self.assertEqual(npc.db.age, 25)
+        self.assertEqual(npc.db.apparent_age, 25)
+        self.assertEqual(
+            npc.db.portrait_policy,
+            {"mode": "named", "stable_key": "forest_bandit_chief"},
+        )
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_baseline_is_valid_for_elven_occupants(self):
+        npc = self._spawned_npc(
+            self._characterized(
+                tier="elven_civilian",
+                portrait={"stable_key": "forest_elf_scout"},
+            )
+        )
+        self.assertEqual(npc.db.age, 25)
+        self.assertEqual(npc.db.apparent_age, 25)
+        from world.art.adult import portrait_eligibility
+
+        self.assertEqual(portrait_eligibility(npc), (25, 25))
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_name_only_occupant_is_named_but_portrait_less(self):
+        npc = self._spawned_npc(self._characterized(display_name="黑鬍"))
+        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertIsNone(npc.db.age)
+        self.assertIsNone(npc.db.apparent_age)
+        self.assertIsNone(npc.db.portrait_policy)
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_ages_only_occupant_sets_ages_but_no_policy(self):
+        npc = self._spawned_npc(self._characterized(age=40, apparent_age=40))
+        self.assertEqual(npc.db.age, 40)
+        self.assertEqual(npc.db.apparent_age, 40)
+        self.assertIsNone(npc.db.portrait_policy)
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_role_based_occupant_without_characterization_is_untouched(self):
+        npc = self._spawned_npc(self._characterized())
+        self.assertIsNone(npc.db.display_name)
+        self.assertIsNone(npc.db.age)
+        self.assertIsNone(npc.db.apparent_age)
+        self.assertIsNone(npc.db.portrait_policy)
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_a_portrait_bearing_occupant_always_carries_canonical_ages_before_policy(self):
+        """Repository guard: the policy is only materialized after the ages.
+
+        A forged requirement carrying a portrait but no ages still lands on the
+        deterministic baseline, so the art adult gate's canonical inputs are
+        guaranteed present on every spawn path that sets a policy.
+        """
+        record, _ = self._accept(_instance_bound_payload())
+        forged = (
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.DEFEAT,
+                location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                archetype="forest_path",
+                anchor_near="capital_altoria",
+                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                npc_reqs=(("bandit", "bandit", None),),
+                characterizations=(
+                    StageNpcCharacterization(portrait_stable_key="forged_key"),
+                ),
+            ),
+        )
+        SCENE_REQUIREMENT_REGISTRY[record.definition_key] = forged
+        result = materialize_stage(
+            self.player, record.quest_id, origin_room=self.anchor
+        )
+        npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
+        self.assertEqual(npc.db.age, 25)
+        self.assertEqual(npc.db.apparent_age, 25)
+        self.assertEqual(
+            npc.db.portrait_policy, {"mode": "named", "stable_key": "forged_key"}
+        )
+
+    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    def test_forged_invalid_characterization_is_rejected_before_any_spawn(self):
+        """Defense in depth: forged requirements cannot bypass the adult floor.
+
+        The compile boundary validated the accepted blueprint, but a forged
+        ``StageSpawnRequirement`` must still be re-checked: underage, non-int,
+        and unpaired ages would otherwise be written to a spawned NPC (a
+        permanently adult-gated occupant). Each forged shape raises before any
+        room or occupant is created.
+        """
+        forged_shapes = (
+            StageNpcCharacterization(age=17, apparent_age=17),
+            StageNpcCharacterization(age="30", apparent_age="30"),
+            StageNpcCharacterization(age=30, apparent_age=None),
+            StageNpcCharacterization(age=True, apparent_age=30),
+        )
+        record, _ = self._accept(_instance_bound_payload())
+        for shape in forged_shapes:
+            with self.subTest(shape=shape):
+                forged = (
+                    StageSpawnRequirement(
+                        index=0,
+                        objective_kind=ObjectiveKind.DEFEAT,
+                        location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                        archetype="forest_path",
+                        anchor_near="capital_altoria",
+                        scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                        npc_reqs=(("bandit", "bandit", None),),
+                        characterizations=(shape,),
+                    ),
+                )
+                SCENE_REQUIREMENT_REGISTRY[record.definition_key] = forged
+                rooms_before = InstanceRoom.objects.all().count()
+                with self.assertRaises(SceneBuilderSpawnError):
+                    materialize_stage(
+                        self.player, record.quest_id, origin_room=self.anchor
+                    )
+                self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
+
+
+class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
+    """End-to-end spawn -> on_commit -> gate -> fake worker coverage."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(Path(self.tempdir.name)),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+
+    def tearDown(self):
+        self.art_settings.disable()
+        super().tearDown()
+
+    def _characterized_payload(self, **overrides):
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        payload = QUEST_TEMPLATE_POOL[0].to_payload()
+        entry = {
+            "display_name": "黑鬍",
+            "age": 35,
+            "apparent_age": 35,
+            "portrait": {"stable_key": "forest_bandit_chief"},
+        }
+        entry.update(overrides)
+        payload["stages"][0]["npc_req"][0].update(entry)
+        return payload
+
+    def _materialize_and_drain(self, payload, client=None):
+        record, _ = self._accept(payload)
+        with self.captureOnCommitCallbacks(execute=True):
+            materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        client = client or FakeSDWebUIClient()
+        with patch("world.art.worker.resolve_sd_client", return_value=client):
+            dispatched = drain_synchronous(10)
+        return record, client, dispatched
+
+    @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
+    def test_fake_worker_receives_the_story_driven_adult_description(self):
+        record, client, dispatched = self._materialize_and_drain(
+            self._characterized_payload()
+        )
+        self.assertEqual(dispatched, 1)
+        self.assertEqual(len(client.calls), 1)
+        subject, description = client.calls[0]
+        self.assertEqual(subject.kind, ArtSubjectKind.CHARACTER)
+        self.assertEqual(subject.key, "forest_bandit_chief")
+        self.assertIn("黑鬍", description)
+        self.assertIn("35", description)
+
+        from world.art.store import ArtAssetRecord, ArtAssetStatus
+
+        record = ArtAssetRecord.objects.filter(
+            db_key="art:portrait:character:forest_bandit_chief"
+        ).first()
+        self.assertIsNotNone(record)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertTrue(
+            (Path(self.tempdir.name) / "portrait" / "character" / "forest_bandit_chief.png").is_file()
+        )
+
+    @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
+    def test_shared_stable_key_resolves_to_one_asset_with_first_writer_wins(self):
+        self._materialize_and_drain(
+            self._characterized_payload(),
+            client=FakeSDWebUIClient(),
+        )
+        self._materialize_and_drain(
+            self._characterized_payload(
+                display_name="獨眼",
+                age=40,
+                apparent_age=40,
+            ),
+            client=FakeSDWebUIClient(),
+        )
+
+        from world.art.store import ArtAssetRecord, ArtAssetStatus
+
+        records = ArtAssetRecord.objects.filter(
+            db_key="art:portrait:character:forest_bandit_chief"
+        )
+        self.assertEqual(records.count(), 1)
+        record = records.first()
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertIn("黑鬍", record.db.source_description)
+        self.assertNotIn("獨眼", record.db.source_description)
+        self.assertTrue(
+            (Path(self.tempdir.name) / "portrait" / "character" / "forest_bandit_chief.png").is_file()
+        )
 
 
 class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixin, EvenniaTest):

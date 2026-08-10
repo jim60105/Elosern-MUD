@@ -1,4 +1,13 @@
-## ADDED Requirements
+# spawn-named-portraits Specification
+
+## Purpose
+
+Define the deterministic SceneBuilder side of named occupant portraits: the spawn path applies
+blueprint characterization (display name, canonical adult ages, and the named portrait policy) to
+spawned occupants and schedules their unique portraits through the existing post-commit seam, so
+generated quests materialize named NPCs whose portraits the art pipeline actually produces.
+
+## Requirements
 
 ### Requirement: The SceneBuilder applies blueprint characterization to named occupants
 When `_spawn_npc` materializes an occupant whose compiled `StageSpawnRequirement` carries
@@ -37,6 +46,13 @@ complete data.
 - **WHEN** a compiled requirement declares no optional fields
 - **THEN** the spawned NPC has no display name, no ages, no portrait policy, and no portrait job is
   scheduled — identical to today's behavior
+
+#### Scenario: A forged requirement with invalid ages is rejected before any spawn
+- **WHEN** a forged `StageSpawnRequirement` (bypassing the compile boundary) carries underage,
+  non-integer, or unpaired ages
+- **THEN** the spawn path re-validates the characterization through the shared helper and raises a
+  named `SceneBuilderSpawnError` before any room or occupant is created, so no permanently
+  adult-gated occupant can ever be written
 
 ### Requirement: A spawned named occupant completes the full portrait pipeline
 A spawned named occupant SHALL reach the fake worker with the deterministic adult-safe description
