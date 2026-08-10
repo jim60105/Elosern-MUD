@@ -81,4 +81,6 @@ identically. A room without flavor SHALL render exactly as today.
 
 #### Scenario: Flavor-less rooms render as today
 - **WHEN** a player looks at a room with no `scene_flavor`
-- **THEN** the appearance is byte-identical to the pre-change rendering
+- **THEN** the appearance contains no flavor paragraph and is otherwise identical to the same
+  room rendered without the flavor attribute (the shared zh-tw room frame applies to every room
+  typeclass, including `InstanceRoom`)

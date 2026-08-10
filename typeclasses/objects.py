@@ -30,6 +30,24 @@ class ObjectParent:
     # strings ("Exits:", "Characters:", "You see ...").
     default_description = "你沒有看到什麼特別的。"
 
+    def get_display_desc(self, looker=None, **kwargs) -> str:
+        """Room description plus the optional scene-flavor paragraph.
+
+        Appends ``self.db.scene_flavor`` as a paragraph after the description
+        and before the exit line when the attribute is present (scene-flavor
+        apply design D4); every flavor-less entity renders byte-identical
+        output. This is the shared room appearance hook every room typeclass
+        resolves through ``return_appearance`` (adopted by ``Room``,
+        ``GridRoom``, ``TerrainRoom``, and ``InstanceRoom``), so the text 看
+        command, the ``at_look`` seam, and the webclient ``explore.look`` path
+        render the flavor identically.
+        """
+        desc = super().get_display_desc(looker, **kwargs)
+        flavor = self.db.scene_flavor
+        if flavor:
+            desc = f"{desc}\n{flavor}"
+        return desc
+
     def get_display_exits(self, looker, **kwargs):
         """Zh-tw exits line: 「出口：南門、北門」 (localize-limbo-zhtw)."""
         exits = self.filter_visible(

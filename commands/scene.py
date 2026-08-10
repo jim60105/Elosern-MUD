@@ -11,6 +11,8 @@ side-effect-free message.
 
 from evennia import Command
 
+from django.db import transaction
+
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind
 from world.quests.runtime import QuestDataError, QuestState, read_records
@@ -108,4 +110,23 @@ class CmdEnterScene(Command):
             # The exit's own failed-traverse path already reported why the move
             # could not happen (e.g. a combat lock veto); do not claim success.
             return
+        if result.flavor_context is not None:
+            self._schedule_scene_flavor(result.room, result.flavor_context)
         self.caller.msg(_ENTERED)
+
+    def _schedule_scene_flavor(self, room, flavor_context) -> None:
+        """Register the flavor generation through ``transaction.on_commit``.
+
+        Runs only after the caller has successfully traversed into the scene,
+        so the completion push reaches a player already inside the room even
+        when the callback fires immediately (no outer transaction) or the
+        client resolves synchronously; a nested outer transaction that rolls
+        back still never fires a generation (design D2). Fire-and-forget,
+        never blocking arrival and never raising to the command (the service
+        wraps every synchronous failure into a logged no-op).
+        """
+        from server.scene_flavor_service import schedule_scene_flavor
+
+        transaction.on_commit(
+            lambda: schedule_scene_flavor(room, flavor_context)
+        )

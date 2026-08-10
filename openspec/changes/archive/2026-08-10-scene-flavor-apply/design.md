@@ -77,7 +77,11 @@ the 進入 command. The Deferred's errbacks log and resolve to nothing.
 Rationale: `commands/` may import `server/` modules (the established ai_director_service pattern);
 `world/quests` must not. Scheduling at the command site keeps materialization itself free of any
 generative concern, and on-commit registration honors the "only after the spawn transaction
-commits" contract even under nesting.
+commits" contract even under nesting. The registration is placed after the caller has successfully
+traversed into the scene — not immediately after materialization — so the completion push reaches a
+player already inside the room even when the callback fires immediately (no outer transaction,
+Django runs `on_commit` callbacks synchronously at registration) or the client resolves
+synchronously (rubber-duck review fix).
 
 ### D3: The write is deterministic and idempotent, guarded by an authoritative existence check
 `world/quests/scene_builder.py::apply_scene_flavor(room, text) -> bool` is the sole writer of
@@ -97,12 +101,27 @@ authoritative check makes "vanished room → no write, no error" provable rather
 On a successful write, the completion path messages every `PlayerCharacter` whose location is the
 room (the flavor paragraph as plain text; players who left are not chased). The shared appearance
 layer renders `room.db.scene_flavor` as a paragraph after the room description and before the
-「出口」 line: the insertion point is `typeclasses/rooms.py::Room.get_display_desc` — the room base
-class's description hook, which Evennia's `return_appearance` calls for every room and which the
-text 看 command, the character `at_look` seam (via `super().at_look`), and the webclient
-`explore.look` path all share (the same layer that owns `get_display_exits` and friends). The
-flavor paragraph renders only when the attribute is present; flavor-less rooms render byte-identical
-output.
+「出口」 line: the insertion point is `typeclasses/objects.py::ObjectParent.get_display_desc` — the
+shared object-appearance mixin that owns `get_display_exits`, `get_display_characters`,
+`get_display_things`, and `default_description`, and which Evennia's `return_appearance` funnels
+through for the text 看 command, the character `at_look` seam (via `super().at_look`), and the
+webclient `explore.look` path alike. The flavor paragraph renders only when the attribute is
+present; flavor-less rooms render byte-identical output.
+
+Correction over the original plan: the flavor-bearing room is always an `InstanceRoom`, and
+`InstanceRoom`/`GridRoom`/`TerrainRoom` do **not** inherit `typeclasses.rooms.Room` (the plain room
+class is only one of four room typeclasses, and `Room` is not their base). They also do not inherit
+`ObjectParent` today, so they currently render evennia's stock English `Exits:` frame. This change
+therefore adopts `ObjectParent` into `GridRoom`, `TerrainRoom`, and `InstanceRoom` (an anchor-room
+inherits it through `GridRoom`), which (a) gives every room typeclass the zh-tw frame the
+localized-appearance main spec already requires — "No English frame string SHALL appear in the
+appearance of a room" — and (b) puts the flavor paragraph hook on the same shared layer the flavor
+look scenarios assert (「出口」, no English frame string). `ObjectParent` is placed **before** the
+contrib base in each MRO (`XYZRoom` for grid, `WildernessRoom` for terrain) so its zh-tw display
+hooks win over evennia's stock `DefaultObject` implementations — C3 linearization would otherwise
+shadow them — while its `get_display_desc` chains `super()` into the contrib overrides
+(`XYZRoom.return_appearance` map display, `WildernessRoom.get_display_desc` `ndb.active_desc` path)
+so those behaviors remain effective.
 
 Rationale: the flavor is prose, not state; the shared room frame keeps Telnet and browser identical
 with no panel work. Alternative considered: an OOB art-panel-style update — rejected as overkill

@@ -7,7 +7,142 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
-from typeclasses.rooms import Room
+from typeclasses.rooms import InstanceRoom, Room
+
+
+class SceneFlavorParagraphTests(EvenniaTest):
+    """The scene-flavor paragraph rides the shared room appearance hook."""
+
+    _FLAVOR = "苔石在幽暗中泛著微光，潮濕的氣味與焚香交織，靜得只剩下風的低鳴。"
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "測試房間"
+        self.room1.save()
+        self.room2.key = "測試房間二"
+        self.room2.save()
+        self.room1.db.scene_flavor = self._FLAVOR
+        create_object(
+            "typeclasses.exits.Exit",
+            key="南門",
+            location=self.room1,
+            destination=self.room2,
+        )
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "scene-flavor::completed-flavor-is-pushed-to-present-players-and-rendered-in-look")
+    def test_flavor_paragraph_appears_after_the_description_on_the_text_look_path(self):
+        self.room1.db.desc = None
+        appearance = self.char1.at_look(self.room1)
+        self.assertLess(
+            appearance.index("測試房間"), appearance.index("你沒有看到什麼特別的。")
+        )
+        self.assertLess(
+            appearance.index("你沒有看到什麼特別的。"), appearance.index(self._FLAVOR)
+        )
+        self.assertLess(appearance.index(self._FLAVOR), appearance.index("出口："))
+        self.assertNotIn("Exits", appearance)
+
+    def test_flavor_paragraph_appears_after_a_real_description(self):
+        self.room1.db.desc = "一間樸素的房間。"
+        appearance = self.char1.at_look(self.room1)
+        self.assertLess(appearance.index("一間樸素的房間。"), appearance.index(self._FLAVOR))
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "scene-flavor::completed-flavor-is-pushed-to-present-players-and-rendered-in-look")
+    def test_flavor_paragraph_appears_on_the_webclient_look_path(self):
+        from web.webclient.actions.exploration_actions import _look_adapter
+
+        self.char1.location = self.room1
+        with patch.object(self.char1, "msg") as msg:
+            result = _look_adapter(self.char1, {"room": True})
+        self.assertEqual(result["outcome"], "success")
+        appearance = str(msg.call_args[0][0])
+        self.assertIn(self._FLAVOR, appearance)
+        self.assertLess(appearance.index(self._FLAVOR), appearance.index("出口："))
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "scene-flavor::completed-flavor-is-pushed-to-present-players-and-rendered-in-look")
+    def test_at_look_seam_renders_the_flavor_paragraph(self):
+        from world.maps.bootstrap import sync_grid
+
+        sync_grid()
+        self.char1.location = self.room1
+        appearance = self.char1.at_look(self.room1)
+        self.assertIn(self._FLAVOR, appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_flavor_less_room_renders_no_paragraph(self):
+        self.room1.db.scene_flavor = None
+        appearance = self.char1.at_look(self.room1)
+        self.assertNotIn(self._FLAVOR, appearance)
+        self.assertIn("出口：", appearance)
+        self.assertNotIn("Exits", appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "scene-flavor::completed-flavor-is-pushed-to-present-players-and-rendered-in-look")
+    def test_instance_room_renders_the_zh_tw_frame_and_the_flavor_paragraph(self):
+        instance = create_object(InstanceRoom, key="場景", location=None)
+        instance.db.desc = "深邃的洞穴內滴水聲迴盪。"
+        instance.db.scene_flavor = self._FLAVOR
+        create_object(
+            "typeclasses.exits.Exit",
+            key="返回",
+            location=instance,
+            destination=self.room1,
+        )
+        appearance = self.char1.at_look(instance)
+        self.assertLess(
+            appearance.index("深邃的洞穴內滴水聲迴盪。"), appearance.index(self._FLAVOR)
+        )
+        self.assertLess(appearance.index(self._FLAVOR), appearance.index("出口："))
+        self.assertNotIn("Exits", appearance)
+        self.assertNotIn("Characters", appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_flavor_less_instance_room_adds_no_paragraph(self):
+        instance = create_object(InstanceRoom, key="無氛圍場景", location=None)
+        instance.db.desc = "深邃的洞穴內滴水聲迴盪。"
+        create_object(
+            "typeclasses.exits.Exit",
+            key="返回",
+            location=instance,
+            destination=self.room1,
+        )
+        appearance = self.char1.at_look(instance)
+        self.assertNotIn(self._FLAVOR, appearance)
+        self.assertIn("出口：", appearance)
+        self.assertNotIn("Exits", appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_grid_room_keeps_the_map_display_and_renders_the_flavor_paragraph(self):
+        from typeclasses.rooms import GridRoom
+
+        grid, errors = GridRoom.create(key="街道", xyz=(1, 1, "probe_map"))
+        self.assertEqual(errors, [])
+        grid.db.desc = "鋪著石板的大道。"
+        grid.db.scene_flavor = self._FLAVOR
+        create_object(
+            "typeclasses.exits.Exit",
+            key="北門",
+            location=grid,
+            destination=self.room1,
+        )
+        appearance = self.char1.at_look(grid)
+        self.assertLess(
+            appearance.index("鋪著石板的大道。"), appearance.index(self._FLAVOR)
+        )
+        self.assertLess(appearance.index(self._FLAVOR), appearance.index("出口："))
+        self.assertNotIn("Exits", appearance)
+
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    def test_terrain_room_active_desc_path_survives_the_mixin_adoption(self):
+        from typeclasses.rooms import TerrainRoom
+
+        terrain = create_object(TerrainRoom, key="荒野", location=None)
+        terrain.db.desc = "固定描述。"
+        terrain.db.scene_flavor = self._FLAVOR
+        terrain.ndb.active_desc = "準備好的移動描述。"
+        desc = terrain.get_display_desc(self.char1)
+        self.assertIn("準備好的移動描述。", desc)
+        self.assertIn(self._FLAVOR, desc)
+        self.assertNotIn("固定描述。", desc)
 
 
 class LocalizedAppearanceTests(EvenniaTest):
