@@ -38,13 +38,20 @@ directly to the degrade outcome with no network request.
 - **THEN** it imports no state writer, no typeclass, no live transport, and no socket, and the
   existing contract test passes without modification
 
+#### Scenario: Calling before registration surfaces a named not-registered error
+- **WHEN** `generate_scene_flavor(context, client)` runs before the `scene_builder` layer hooks are
+  registered in the guardrail's actual registry
+- **THEN** the call errbacks with a named `SceneFlavorNotRegisteredError` identifying that the
+  scene-flavor hooks are not installed, and no flavor is silently fabricated
+
 ### Requirement: The flavor output is plain text with deterministic gates
 The layer SHALL validate every returned flavor: it SHALL be non-empty, SHALL be at least 50 and at
 most 200 characters, SHALL contain at least one CJK Unified Ideograph (Traditional Chinese
 surface), and SHALL contain no digit character (any ASCII or Unicode decimal digit).
 A validation failure SHALL be appended to the prompt and retried under the profile's retry budget;
-retry exhaustion SHALL resolve to `None`. The outcome `None` SHALL be the only failure shape — no
-exception escapes except the named client-required error.
+retry exhaustion SHALL resolve to `None`. The outcome `None` SHALL be the only pipeline-failure
+shape — no exception escapes from the guarded pipeline except the named client-required error;
+the named not-registered error is a registration-precondition error, not a pipeline failure.
 
 #### Scenario: Valid flavor passes the gates
 - **WHEN** a replay returns Traditional Chinese prose between 50 and 200 characters with no digits

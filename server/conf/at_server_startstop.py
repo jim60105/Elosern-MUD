@@ -121,6 +121,32 @@ def _register_character_creation_layer():
         logger.log_warn(f"character_creation registration skipped at server start: {exc}")
 
 
+def _register_scene_flavor_layer():
+    """Register the scene-flavor layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover scene-flavor registration
+    (a conflicting fallback or validator under the layer's profile key) must
+    never abort server startup; the flavor gate still fails loudly on a
+    non-scene-flavor registration, so correctness is preserved.
+
+    Note for maintainers: a repository guarded test asserts that the
+    deterministic scene materializer's literal profile key never appears in this
+    file's source (startup must not resync its generated registry). Keep that
+    key out of this module's text — the seam imports only the layer.
+    """
+    from evennia import logger
+    from world.ai.guardrail import GuardrailRegistrationError
+    from world.ai.scene_flavor import register_scene_flavor
+
+    try:
+        register_scene_flavor()
+    except GuardrailRegistrationError as exc:
+        logger.log_warn(f"scene_flavor registration skipped at server start: {exc}")
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -171,6 +197,7 @@ def at_server_start():
     _register_npc_dialogue_layer()
     _register_scenario_director_layer()
     _register_character_creation_layer()
+    _register_scene_flavor_layer()
 
     # Deterministic art-assets startup sync: ensure a record for every scene
     # and generic-monster subject, then recover explicit named portrait

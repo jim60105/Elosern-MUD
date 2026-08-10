@@ -30,6 +30,7 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
@@ -90,6 +91,7 @@ class SceneMaterialization:
 
     room: Any
     record: Any
+    flavor_context: dict[str, str] | None = None
 
 
 def _validate_occupant_parent(prototype: dict) -> None:
@@ -410,6 +412,74 @@ def _resolve_current_requirement(record: Any, definition: Any) -> Any:
     )
 
 
+def build_flavor_context(
+    requirement: Any,
+    definition: Any,
+    room: Any,
+    origin_room: Any = None,
+) -> dict[str, str] | None:
+    """Assemble the bounded four-key flavor context for a freshly spawned scene.
+
+    Returns a plain dict with exactly ``scene_sentence`` / ``quest_context`` /
+    ``room_name`` / ``region`` sourced from deterministic data only: the
+    requirement's scene sentence (falling back to the archetype registry's),
+    the definition's display name plus quest type, the scene room's key, and
+    the anchor registry's display name when the requirement declares
+    ``anchor_near`` (empty otherwise). ``None`` when the scene has neither a
+    requirement sentence nor a resolvable archetype sentence, so a sentence-less
+    scene schedules no flavor. ``origin_room`` is accepted for call-site
+    symmetry with ``materialize_stage`` and is not part of the four-key
+    assembly (scene-flavor-apply D1). The helper references no generative
+    module and no LLM profile, keeping the deterministic-path ban green.
+    """
+    sentence = requirement.scene_sentence
+    if not sentence:
+        archetype = SCENE_ARCHETYPE_REGISTRY.get(requirement.archetype)
+        if archetype is not None:
+            sentence = archetype.scene_sentence
+    if not sentence:
+        return None
+    region = ""
+    if requirement.anchor_near is not None:
+        anchor = ANCHOR_REGISTRY.get(requirement.anchor_near)
+        if anchor is not None:
+            region = anchor.display_name_zh
+    return {
+        "scene_sentence": sentence,
+        "quest_context": f"{definition.display_name}（{definition.quest_type.value}任務）",
+        "room_name": room.key or _scene_name(requirement.archetype),
+        "region": region,
+    }
+
+
+def apply_scene_flavor(room: Any, text: str) -> bool:
+    """Apply one scene-flavor paragraph idempotently as the attribute's sole writer.
+
+    Verifies the room's database row authoritatively before writing — a cached
+    typeclass is not proof of existence after instance reclamation — and no-ops
+    (``False``) when the room is gone or already carries a flavor, so a race
+    between completion and a re-materialized room can never overwrite. Database
+    and object-deletion exceptions are caught and also resolve to ``False``
+    (logged), ``room.db.desc`` is never touched, and flavor application never
+    raises (scene-flavor-apply D3).
+    """
+    if not isinstance(text, str) or not text.strip():
+        return False
+    try:
+        if not ObjectDB.objects.filter(pk=room.pk).exists():
+            return False
+        if room.db.scene_flavor is not None:
+            return False
+        room.db.scene_flavor = text
+        return True
+    except Exception:  # noqa: BLE001 - bounded, never propagates (design D3)
+        from evennia import logger
+
+        logger.log_warn(f"scene flavor apply skipped: room {getattr(room, 'pk', None)}")
+        return False
+
+
+
 def _materialize_instance(actor, record, definition, requirement, origin_room):
     from world.quests.transitions import restore_quest_log, snapshot_quest_log
 
@@ -454,7 +524,8 @@ def _materialize_instance(actor, record, definition, requirement, origin_room):
             objective = definition.stages[record.stage_index].objective
             occupants = _spawn_occupants(room, requirement, objective)
             bound = _bind_stage(actor, record, room, objective, occupants)
-            return SceneMaterialization(room, bound)
+            flavor_context = build_flavor_context(requirement, definition, room, origin_room)
+            return SceneMaterialization(room, bound, flavor_context=flavor_context)
     except Exception:
         # A failure anywhere in the materialization rolls the database back,
         # but Evennia's in-process attribute cache for the actor's quest log may

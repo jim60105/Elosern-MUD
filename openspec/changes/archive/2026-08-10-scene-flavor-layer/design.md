@@ -46,10 +46,12 @@ day and independently verifiable.
 ### D1: The layer mirrors the narrator/npc_dialogue module pattern
 `world/ai/scene_flavor.py` with: module constants for bounds, `_cap_string` capping of context
 fragments, a frozen `SceneFlavorContext` dataclass, `build_scene_flavor_prompt(context)` pure
-function, semantic validators registered under the `scene_flavor` layer key, a `_SCENE_FLAVOR_
-DEGRADED` sentinel fallback, `register_scene_flavor()` (idempotent, atomic, identity-based
-uninstall on partial failure — exactly the narrator pattern), and `generate_scene_flavor(context,
-client)` entry point rejecting an explicit `None` client.
+function, semantic validators registered under the `scene_builder` layer key (the guardrail and
+profile registries key strictly by `LAYER_NAMES`, so the layer key is the profile name, never a
+separate `scene_flavor` key), a `_SCENE_FLAVOR_DEGRADED` sentinel fallback,
+`register_scene_flavor()` (idempotent, atomic, identity-based uninstall on partial failure —
+exactly the narrator pattern), and `generate_scene_flavor(context, client)` entry point rejecting
+an explicit `None` client.
 
 Rationale: every existing layer follows this shape; consistency keeps the transport-boundary
 contract test (no imports of state writers, typeclasses, or sockets from `world/ai`) trivially
@@ -94,11 +96,13 @@ language (narrator precedent). The 50-char minimum forces the flavor to be a rea
 than a one-word echo. Alternatives considered: jsonschema output — unnecessary for plain text;
 semantic number-pattern rejection — weaker than the digit gate.
 
-### D5: Degrade-to-`None` is the layer's only failure outcome
+### D5: Degrade-to-`None` is the layer's only pipeline-failure outcome
 Disabled profile (enabled: false), offline transport, retry exhaustion, prompt unavailability
 (`PromptUnavailableError`), and explicit `None` client all resolve to `None` with no state change.
-The entry point returns a Deferred resolving to `str | None`; no exception escapes to a caller
-except the named client-required error.
+The entry point returns a Deferred resolving to `str | None`; no exception escapes from the guarded
+pipeline except the named client-required error. Calling before the hooks are registered errbacks
+with the named `SceneFlavorNotRegisteredError` (a registration-precondition error, exactly the
+narrator/npc_dialogue/character_creation convention — never a silent degrade).
 
 Rationale: the deterministic game must remain fully playable with the LLM offline; `None` is the
 "no flavor" outcome the apply change consumes.
@@ -107,6 +111,22 @@ Rationale: the deterministic game must remain fully playable with the LLM offlin
 The new key's validation failure behaves like every other prompt key (prompt-library
 requirement): the key is marked unavailable, the layer degrades to `None`, and startup continues.
 No special case for the forward-declared seam is needed because the layer is the consumer now.
+
+### D7: The layer is registered at server startup like every other layer
+`server/conf/at_server_startstop.py` gains a `_register_scene_flavor_layer()` boot-tolerant seam
+(mirroring `_register_character_creation_layer`) invoked from `at_server_start` after the other
+layer registrations, so the guardrail hooks are installed for the future scene-flavor-apply
+consumer exactly as narrator/npc_dialogue/scenario_director/character_creation are. A foreign
+leftover registration must never abort startup; the flavor gate still fails loudly on a
+non-scene-flavor registration.
+
+### D7: The layer is registered at server startup like every other layer
+`server/conf/at_server_startstop.py` gains a `_register_scene_flavor_layer()` boot-tolerant seam
+(mirroring `_register_character_creation_layer`) invoked from `at_server_start` after the other
+layer registrations, so the guardrail hooks are installed for the future scene-flavor-apply
+consumer exactly as narrator/npc_dialogue/scenario_director/character_creation are. A foreign
+leftover registration must never abort startup; the flavor gate still fails loudly on a
+non-scene-flavor registration.
 
 ## Risks / Trade-offs
 

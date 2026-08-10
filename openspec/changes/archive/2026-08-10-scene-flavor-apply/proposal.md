@@ -24,8 +24,11 @@ consumer, and players never see atmosphere prose that echoes the quest.
   and a vanished room or generation failure leaves no flavor (logged).
 - **Player-visible completion.** On success the flavor is pushed to the `PlayerCharacter`s present
   in the room; a later `look` renders the flavor paragraph after the room description through the
-  shared room appearance hook (`typeclasses/rooms.py::Room.get_display_desc` — text 看, `at_look`,
-  and webclient `explore.look` identically).
+  shared room appearance hook (`typeclasses/objects.py::ObjectParent.get_display_desc` — text 看,
+  `at_look`, and webclient `explore.look` identically). Because the flavor-bearing room is an
+  `InstanceRoom` (not a subclass of the plain `Room` typeclass), `ObjectParent` is adopted into
+  `GridRoom`, `TerrainRoom`, and `InstanceRoom` so every room typeclass renders the zh-tw frame and
+  the flavor paragraph (design D4 correction).
 - **No gameplay dependency.** Offline profile, transport failure, retry exhaustion, or missing
   context all resolve to "no flavor"; rooms, descriptions, and the quest flow are untouched.
 
@@ -49,8 +52,10 @@ consumer, and players never see atmosphere prose that echoes the quest.
 
 - Modified: `world/quests/scene_builder.py` (context helper + `apply_scene_flavor` + result field),
   `world/quests/definitions.py` (no change), `commands/scene.py` (schedules on commit via the
-  service), the shared room appearance hook (`typeclasses/rooms.py::Room.get_display_desc`) used by
-  the text 看 command, the `at_look` seam, and the webclient `explore.look` path.
+  service), the shared room appearance hook (`typeclasses/objects.py::ObjectParent.get_display_desc`)
+  used by the text 看 command, the `at_look` seam, and the webclient `explore.look` path, and the
+  room typeclass bases (`GridRoom`, `TerrainRoom`, `InstanceRoom` adopt `ObjectParent` for the
+  shared zh-tw frame and flavor paragraph).
 - New: `server/scene_flavor_service.py` and its tests under `server/conf/tests/`.
 - Unchanged: `world/ai/` (the layer already landed), `world/ai/profiles.py`, room descriptions,
   quest/combat/economy mechanics.

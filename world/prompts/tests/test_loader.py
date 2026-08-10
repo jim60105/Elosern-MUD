@@ -52,11 +52,38 @@ class ValidLoadTests(unittest.TestCase):
                 "narrator.yaml",
                 "npc_dialogue.yaml",
                 "scenario_director.yaml",
+                "scene_builder.yaml",
                 "npc.yaml",
                 "art.yaml",
                 "character_creation.yaml",
             },
         )
+
+    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
+    def test_scene_flavor_key_is_registered_with_four_scene_placeholders(self):
+        library = load_prompt_library(str(REPO_PROMPTS))
+        self.assertIn("scene_builder.system", library.texts)
+        self.assertIn("scene_builder.system", PROMPT_SPECS)
+        spec = PROMPT_SPECS["scene_builder.system"]
+        self.assertEqual(
+            set(spec.allowed_placeholders),
+            {"scene_sentence", "quest_context", "room_name", "region"},
+        )
+        text = render_prompt(
+            "scene_builder.system",
+            scene_sentence="古老森林深處的祭壇",
+            quest_context="採集任務：採集靈藥草",
+            room_name="林間祭壇",
+            region="遺忘森林",
+        )
+        self.assertIn("古老森林深處的祭壇", text)
+        self.assertIn("採集任務：採集靈藥草", text)
+        self.assertIn("林間祭壇", text)
+        self.assertIn("遺忘森林", text)
+        self.assertNotIn("{scene_sentence}", text)
+        self.assertNotIn("{quest_context}", text)
+        self.assertNotIn("{room_name}", text)
+        self.assertNotIn("{region}", text)
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
     def test_character_creation_key_is_registered_with_concept_placeholders(self):
@@ -224,6 +251,18 @@ class ValidationFailureTests(PromptFixture):
         error = library.errors["narrator.system"]
         self.assertIn("unknown placeholder", error.problem)
         self.assertIn("nmme", error.problem)
+
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
+    def test_scene_builder_unknown_placeholder_is_a_load_time_error(self):
+        self.write_file(
+            "scene_builder.yaml",
+            "schema_version: 1\nprompts:\n  scene_builder.system: 場景 {nmme}。\n",
+        )
+        library = self.load()
+        error = library.errors["scene_builder.system"]
+        self.assertIn("unknown placeholder", error.problem)
+        self.assertIn("nmme", error.problem)
+        self.assertNotIn("scene_builder.system", library.texts)
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_a_malformed_file_fails_only_its_own_key(self):

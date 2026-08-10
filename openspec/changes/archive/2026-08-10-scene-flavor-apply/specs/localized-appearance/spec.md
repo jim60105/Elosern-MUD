@@ -8,8 +8,13 @@ label its exits as 「出口」 (never `Exits:`), its contents/characters sectio
 (never `Characters:` or `You see`), and the default description of an un-described object SHALL be
 zh-tw (never `You see nothing special.`). The room frame SHALL additionally render
 `room.db.scene_flavor` as a paragraph after the room description and before the 「出口」 line when
-the attribute is present; a room without a flavor SHALL render exactly as before. No English frame
-string SHALL appear in the appearance of a room or object. The appearance of an NPC SHALL
+the attribute is present. Every room typeclass (`Room`, `GridRoom`, `AnchorRoom`, `TerrainRoom`,
+`InstanceRoom`) SHALL render the shared zh-tw room frame — including the flavor-bearing
+`InstanceRoom`, which is not a subclass of `Room` (design D4 correction); no English frame string
+SHALL appear in the appearance of a room. A room without a flavor SHALL render no flavor paragraph:
+its appearance SHALL be identical to the flavor-bearing rendering of the same room except for the
+absence of that paragraph. No English frame string SHALL appear in the appearance of a room or
+object. The appearance of an NPC SHALL
 additionally include one affinity stage line (for example 「她看著你的眼神裡帶著信賴。」) rendered
 by the shared layer from the NPC's affinity record for the looking player, identical across all
 three entry paths; the numeric affinity value, cap, and threshold SHALL never appear, and entities
@@ -46,6 +51,8 @@ without an affinity record SHALL render no stage line.
 - **THEN** all three outputs show the room description, then the flavor paragraph, then the
   「出口」 line, with no English frame string
 
-#### Scenario: A flavor-less room renders exactly as before
+#### Scenario: A flavor-less room renders no flavor paragraph
 - **WHEN** a player looks at a room with no `room.db.scene_flavor`
-- **THEN** the appearance is byte-identical to the rendering before this change
+- **THEN** the appearance is byte-identical to the same room with the flavor attribute absent —
+  no flavor paragraph appears, the zh-tw room frame is unchanged, and the flavor feature adds
+  nothing to a flavor-less room
