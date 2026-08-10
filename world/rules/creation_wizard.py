@@ -18,6 +18,7 @@ unchanged.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import json
 from typing import Any
 
 from django.db import transaction
@@ -27,8 +28,13 @@ from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     _CREATION_ATTRIBUTE_KEYS,
+    _owned_character,
+    MAX_PERSONA_FIELD_LENGTH,
+    PERSONA_PROSE_KEYS,
     CharacterCreationError,
     CharacterCreationRequest,
+    _validate_allocations,
+    _validate_persona_block,
     activate_player_character,
     preflight_character_creation,
     resolve_starting_profile,
@@ -45,6 +51,17 @@ from world.rules.surfaces import (
 DRAFT_VERSION = 1
 PRESET_STAGE = "preset_selected"
 CUSTOM_STAGE = "custom_filled"
+CONCEPT_STAGE = "concept_filled"
+
+
+class ConceptDraftStaleError(CharacterCreationError):
+    """The draft fingerprint changed while the concept proposal was in flight.
+
+    Raised by :func:`apply_concept_proposal` when the fingerprint captured
+    before the generative call no longer matches the stored draft, so a late
+    generative response can never overwrite a draft changed by another session
+    or entry (creation-persona-persistence D2).
+    """
 
 # Presentation bounds shared with the wire presenter (web.webclient.
 # presentation.creation) and the JS validator; the registries today are far
@@ -300,14 +317,51 @@ def read_creation_view(character: Any) -> CreationView:
     )
 
 
+def _normalize_allocations(allocations: Any) -> dict[str, int] | None:
+    """Return the structurally checked allocation dict or ``None``."""
+    if not isinstance(allocations, Mapping) or set(allocations) != set(ALLOCATABLE_AXES):
+        return None
+    checked_allocations: dict[str, int] = {}
+    for axis in ALLOCATABLE_AXES:
+        value = allocations.get(axis)
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        if not 0 <= value <= ALLOCATION_MAXIMUM:
+            return None
+        checked_allocations[axis] = value
+    return checked_allocations
+
+
+def _normalize_persona(persona: Any) -> dict[str, str] | None:
+    """Return the validated persona block or ``None`` when malformed."""
+    try:
+        return _validate_persona_block(persona)
+    except CharacterCreationError:
+        return None
+
+
+def _normalize_identity_choices(race: Any, subrace: Any) -> bool:
+    """True when the stored race/subrace pair is registered and compatible."""
+    if not isinstance(race, str) or not (subrace is None or isinstance(subrace, str)):
+        return False
+    if race not in RACE_REGISTRY:
+        return False
+    if subrace is not None:
+        entry = SUBRACE_REGISTRY.get(subrace)
+        if entry is None or entry.race_key != race:
+            return False
+    return True
+
+
 def _normalize_draft(storage: Any) -> dict[str, Any] | None:
     """Return a structurally and semantically valid normalized draft or ``None``.
 
     Accepts any Mapping (Evennia returns lazy ``_SaverDict`` wrappers from the
     attribute store, not plain ``dict`` instances). A draft that fails its
     structural shape OR its semantic bounds (unknown preset, underage, unknown
-    or incompatible race/subrace, malformed allocations) is treated as corrupt
-    and degrades only the draft slot so the creation panel stays schema-valid.
+    or incompatible race/subrace, malformed allocations, malformed persona
+    block) is treated as corrupt and degrades only the draft slot so the
+    creation panel stays schema-valid.
     """
     if not isinstance(storage, Mapping) or storage.get("version") != DRAFT_VERSION:
         return None
@@ -325,9 +379,6 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
         display_name = storage.get("display_name")
         age = storage.get("age")
         apparent_age = storage.get("apparent_age")
-        race = storage.get("race")
-        subrace = storage.get("subrace")
-        allocations = storage.get("allocations")
         if (
             stage != CUSTOM_STAGE
             or not isinstance(display_name, str)
@@ -335,41 +386,55 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
             or not isinstance(age, int)
             or isinstance(apparent_age, bool)
             or not isinstance(apparent_age, int)
-            or not isinstance(race, str)
-            or not (subrace is None or isinstance(subrace, str))
-            or not isinstance(allocations, Mapping)
         ):
             return None
         if age < AGE_MINIMUM or age > AGE_MAXIMUM:
             return None
         if apparent_age < APPARENT_AGE_MINIMUM or apparent_age > APPARENT_AGE_MAXIMUM:
             return None
-        if race not in RACE_REGISTRY:
+        if not _normalize_identity_choices(storage.get("race"), storage.get("subrace")):
             return None
-        if subrace is not None:
-            entry = SUBRACE_REGISTRY.get(subrace)
-            if entry is None or entry.race_key != race:
-                return None
-        if set(allocations) != set(ALLOCATABLE_AXES):
+        checked_allocations = _normalize_allocations(storage.get("allocations"))
+        if checked_allocations is None:
             return None
-        checked_allocations: dict[str, int] = {}
-        for axis in ALLOCATABLE_AXES:
-            value = allocations.get(axis)
-            if isinstance(value, bool) or not isinstance(value, int):
-                return None
-            if not 0 <= value <= ALLOCATION_MAXIMUM:
-                return None
-            checked_allocations[axis] = value
-        return {
+        normalized: dict[str, Any] = {
             "mode": "custom",
             "stage": stage,
             "display_name": display_name,
             "age": age,
             "apparent_age": apparent_age,
-            "race": race,
-            "subrace": subrace,
+            "race": storage["race"],
+            "subrace": storage.get("subrace"),
             "allocations": checked_allocations,
         }
+        if "persona" in storage:
+            persona = _normalize_persona(storage["persona"])
+            if persona is None:
+                return None
+            normalized["persona"] = persona
+        return normalized
+    if mode == "concept":
+        stage = storage.get("stage")
+        if stage != CONCEPT_STAGE:
+            return None
+        if not _normalize_identity_choices(storage.get("race"), storage.get("subrace")):
+            return None
+        checked_allocations = _normalize_allocations(storage.get("allocations"))
+        if checked_allocations is None:
+            return None
+        normalized = {
+            "mode": "concept",
+            "stage": stage,
+            "race": storage["race"],
+            "subrace": storage.get("subrace"),
+            "allocations": checked_allocations,
+        }
+        if "persona" in storage:
+            persona = _normalize_persona(storage["persona"])
+            if persona is None:
+                return None
+            normalized["persona"] = persona
+        return normalized
     return None
 
 
@@ -387,9 +452,89 @@ def _write_draft(character: Any, storage: dict[str, Any]) -> None:
     character.db.creation_draft = storage
 
 
+def draft_fingerprint(character: Any) -> str:
+    """Return a deterministic fingerprint of the character's current draft.
+
+    Built from the normalized draft so two drafts with the same accepted
+    values always share one fingerprint and any change (save, clear, or
+    persona-preserving custom save) produces a different one. The fingerprint
+    is captured before a generative call and compared inside
+    :func:`apply_concept_proposal`'s transaction (creation-persona-persistence
+    D2); ``"absent"`` is the stable marker for a missing draft.
+    """
+    draft = read_draft(character)
+    if draft is None:
+        return "absent"
+    return json.dumps(draft, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+
+
+def apply_concept_proposal(
+    account: Any,
+    character: Any,
+    proposal: Mapping[str, Any],
+    *,
+    expected_fingerprint: str,
+) -> dict[str, Any]:
+    """Validate a concept proposal and save the ``concept_filled`` draft.
+
+    The proposal is a plain-data mapping with exactly ``race_key``,
+    ``subrace_key``, ``allocations``, and ``persona`` (the validated persona
+    block; may be omitted for a draft without persona). The proposal is
+    re-validated deterministically -- race/subrace registry membership and
+    compatibility plus in-band allocations through the same preflight checks,
+    and the persona block's exact three-field bounded shape -- before anything
+    is written. The draft is saved inside one ``transaction.atomic()`` block
+    that compares ``draft_fingerprint(character)`` to the fingerprint captured
+    before the generative call; a mismatch raises
+    :class:`ConceptDraftStaleError` and writes nothing, so a late response can
+    never clobber a draft changed by another session or entry while the call
+    was in flight. Returns the normalized saved draft.
+    """
+    if not isinstance(proposal, Mapping) or set(proposal) != {
+        "race_key", "subrace_key", "allocations", "persona",
+    }:
+        raise CharacterCreationError("concept proposal carries unexpected fields")
+    if account is None or not _owned_character(account, character):
+        raise CharacterCreationError("character is not owned by this account")
+    if not bool(getattr(character, "creation_pending", False)):
+        raise CharacterCreationError("character creation is already complete")
+    race_key = proposal["race_key"]
+    subrace_key = proposal["subrace_key"]
+    if not isinstance(race_key, str) or not race_key:
+        raise CharacterCreationError("race must be a registry key")
+    if subrace_key is not None and (not isinstance(subrace_key, str) or not subrace_key):
+        raise CharacterCreationError("subrace must be a registry key or omitted")
+    profile = resolve_starting_profile(race_key, subrace_key)
+    checked_allocations = _validate_allocations(profile, proposal["allocations"])
+    persona_block = None
+    if proposal["persona"] is not None:
+        persona_block = _validate_persona_block(proposal["persona"])
+    storage: dict[str, Any] = {
+        "version": DRAFT_VERSION,
+        "mode": "concept",
+        "stage": CONCEPT_STAGE,
+        "race": race_key,
+        "subrace": subrace_key,
+        "allocations": checked_allocations,
+    }
+    if persona_block is not None:
+        storage["persona"] = persona_block
+    with transaction.atomic():
+        if draft_fingerprint(character) != expected_fingerprint:
+            raise ConceptDraftStaleError("concept draft fingerprint changed")
+        _write_draft(character, storage)
+    return read_draft(character)
+
+
 def _request_from_draft(draft: dict[str, Any]) -> CharacterCreationRequest:
     if draft["mode"] == "preset":
         return CharacterCreationRequest(mode="preset", preset_key=draft["preset_key"])
+    if draft["mode"] != "custom":
+        # A concept stage never carries the display name and both ages the
+        # activation preflight requires; it can only be completed through a
+        # custom save, never activated directly (creation-persona-persistence
+        # D1).
+        raise CharacterCreationError("creation draft is incomplete")
     return CharacterCreationRequest(
         mode="custom",
         display_name=draft["display_name"],
@@ -428,24 +573,34 @@ def save_custom_draft(
     adult gate, registry membership, name rules, allocation bounds, and budget
     before the draft is written. The trimmed server-accepted display name is
     persisted; no canonical identity or trait value changes.
+
+    A custom save preserves the concept draft's server-owned persona block only
+    when the submitted race equals the concept draft's race -- the generated
+    background still fits -- and clears it otherwise
+    (creation-persona-persistence D1).
     """
     if request.mode != "custom":
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
     validated = preflight_character_creation(account, character, request)
-    _write_draft(
-        character,
-        {
-            "version": DRAFT_VERSION,
-            "mode": "custom",
-            "stage": CUSTOM_STAGE,
-            "display_name": validated.display_name,
-            "age": validated.age,
-            "apparent_age": validated.apparent_age,
-            "race": validated.race,
-            "subrace": validated.subrace,
-            "allocations": dict(request.allocations),
-        },
-    )
+    persona_block = None
+    previous = read_draft(character)
+    if previous is not None and previous.get("mode") == "concept":
+        if previous.get("race") == validated.race:
+            persona_block = previous.get("persona")
+    storage: dict[str, Any] = {
+        "version": DRAFT_VERSION,
+        "mode": "custom",
+        "stage": CUSTOM_STAGE,
+        "display_name": validated.display_name,
+        "age": validated.age,
+        "apparent_age": validated.apparent_age,
+        "race": validated.race,
+        "subrace": validated.subrace,
+        "allocations": dict(request.allocations),
+    }
+    if persona_block is not None:
+        storage["persona"] = persona_block
+    _write_draft(character, storage)
     return read_draft(character)
 
 
@@ -498,13 +653,16 @@ def activate_draft(
                 raise CharacterCreationError("no creation draft saved")
             request = _request_from_draft(draft)
             preflight_character_creation(account, character, request)
+            persona = draft.get("persona")
             if sampler is None:
                 result = activate_player_character(
-                    account, character, request, write_observer=write_observer
+                    account, character, request,
+                    persona=persona, write_observer=write_observer,
                 )
             else:
                 result = activate_player_character(
                     account, character, request,
+                    persona=persona,
                     sampler=sampler, write_observer=write_observer,
                 )
     except Exception:
@@ -525,6 +683,8 @@ __all__ = [
     "APPARENT_AGE_MINIMUM",
     "AdultBoundsView",
     "AllocationAxisView",
+    "CONCEPT_STAGE",
+    "ConceptDraftStaleError",
     "CreationView",
     "CustomFormView",
     "CUSTOM_STAGE",
@@ -541,9 +701,11 @@ __all__ = [
     "RaceOptionView",
     "SubraceView",
     "activate_draft",
+    "apply_concept_proposal",
     "build_custom_form",
     "build_preset_cards",
     "clear_draft",
+    "draft_fingerprint",
     "read_creation_view",
     "read_draft",
     "save_custom_draft",

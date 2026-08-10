@@ -191,6 +191,34 @@ test("saved custom draft restores the form at the saved stage", () => {
   assert.equal(CreationMenu.profileFor(panel, state.raceKey, state.subraceKey).budget, 37);
 });
 
+test("concept draft pre-fills finite controls without name or ages", () => {
+  const panel = validPanel({
+    draft: {
+      mode: "concept",
+      stage: "concept_filled",
+      race: "elf",
+      subrace: "fionnen",
+      allocations: {
+        hp: 0,
+        mp: 0,
+        sp: 0,
+        atk_phys: 12,
+        agility: 12,
+        defense: 13,
+      },
+      background_generated: true,
+    },
+  });
+  const state = CreationMenu.stateFromDraft(panel, panel.draft);
+  assert.equal(state.displayName, "");
+  assert.equal(state.age, "");
+  assert.equal(state.apparentAge, "");
+  assert.equal(state.raceKey, "elf");
+  assert.equal(state.subraceKey, "fionnen");
+  assert.equal(state.allocations.atk_phys, "12");
+  assert.equal(CreationMenu.CONCEPT_ACTION, "creation.concept");
+});
+
 test("no draft produces the pristine default custom state", () => {
   const panel = validPanel();
   const state = CreationMenu.stateFromDraft(panel, null);

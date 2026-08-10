@@ -75,13 +75,13 @@ def build_production_action_registry() -> ActionRegistry:
     ``combat.flee``, ``combat.forfeit``), the seven service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
-    the four creation adapters (``creation.preset``, ``creation.custom``,
-    ``creation.activate``, ``creation.reset``), and the eight exploration
-    adapters (``explore.move``, ``explore.look``, ``explore.talk_scripted``,
-    ``explore.talk_freeform``, ``explore.party_invite``, ``explore.party_leave``,
-    ``explore.engage``, ``explore.wait``). Each action binds one exact payload
-    validator and one narrow deterministic adapter; no action routes through
-    the text parser.
+    the five creation adapters (``creation.preset``, ``creation.custom``,
+    ``creation.concept``, ``creation.activate``, ``creation.reset``), and the
+    eight exploration adapters (``explore.move``, ``explore.look``,
+    ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
+    ``explore.party_leave``, ``explore.engage``, ``explore.wait``). Each action
+    binds one exact payload validator and one narrow deterministic adapter; no
+    action routes through the text parser.
     """
     from web.webclient.actions.combat_actions import (
         _cast_adapter,
@@ -93,10 +93,12 @@ def build_production_action_registry() -> ActionRegistry:
     )
     from web.webclient.actions.creation_actions import (
         _creation_activate_adapter,
+        _creation_concept_adapter,
         _creation_custom_adapter,
         _creation_preset_adapter,
         _creation_reset_adapter,
         validate_creation_activate_payload,
+        validate_creation_concept_payload,
         validate_creation_custom_payload,
         validate_creation_preset_payload,
         validate_creation_reset_payload,
@@ -230,6 +232,14 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="creation.custom",
             validate_payload=validate_creation_custom_payload,
             adapter=_creation_custom_adapter,
+            affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.concept",
+            validate_payload=validate_creation_concept_payload,
+            adapter=_creation_concept_adapter,
             affected_panels=("creation",),
         )
     )

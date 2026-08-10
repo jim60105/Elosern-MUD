@@ -7,6 +7,8 @@ from unittest.mock import Mock, patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
+from world.rules.character_creation import CharacterCreationRequest
+
 from commands.character_creation import (
     ALLOCATION_AXIS_EXPLANATIONS,
     MAX_CONCEPT_LENGTH,
@@ -439,6 +441,144 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         from world.ai.character_creation import MAX_CONCEPT_LENGTH as layer_bound
 
         self.assertEqual(MAX_CONCEPT_LENGTH, layer_bound)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_concept_flow_saves_the_draft_and_persists_persona_at_activation(self):
+        from world.rules.creation_wizard import read_draft
+
+        self._propose(_proposal())
+        replies = ["自訂者", "20", "20"]
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=[*reversed(replies), None],
+        )
+        self.assertIn("已建立", output)
+        # The activation cleared the draft and persisted the persona in the
+        # import-card shape through the same all-or-nothing transaction.
+        self.assertIsNone(read_draft(self.char1))
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.db.persona["personality"], "沉穩")
+        self.assertEqual(self.char1.db.persona["life_story"], "來自邊境的小村")
+        self.assertEqual(self.char1.db.persona["habit"], "清晨練劍")
+        for key in ("identity", "appearance", "social_connection"):
+            self.assertEqual(self.char1.db.persona[key], {})
+
+    @covers_requirement("creation-persona-persistence::concept-apply-is-deterministic-and-fingerprint-protected")
+    def test_stale_concept_draft_reports_and_changes_no_state(self):
+        from twisted.internet import defer
+
+        from world.rules.creation_wizard import read_draft, save_custom_draft
+
+        held = defer.Deferred()
+        patch_obj = self._patch.start()
+        patch_obj.return_value = held
+        self.addCleanup(self._patch.stop)
+        command = CmdCharacterConcept()
+        command.caller = self.char1
+        command.account = self.account
+        command.session = self.session
+        command.args = "構想 流浪的精靈劍士"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            with self.assertRaises(StopIteration):
+                next(generator)
+            # Another entry changes the draft while the proposal is in flight.
+            save_custom_draft(
+                self.account, self.char1,
+                CharacterCreationRequest(
+                    mode="custom", display_name="其他角色", age=20,
+                    apparent_age=20, race="human", subrace=None,
+                    allocations={
+                        "hp": 50, "mp": 50, "sp": 50,
+                        "atk_phys": 10, "agility": 10, "defense": 11,
+                    },
+                ),
+            )
+            held.callback(_proposal())
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertTrue(
+                any("構想草稿已被修改" in text for text in messages),
+                messages,
+            )
+            self.assertEqual(read_draft(self.char1)["mode"], "custom")
+            self.assertTrue(self.char1.creation_pending)
+        finally:
+            self.char1.msg = original_msg
+
+    @covers_requirement("creation-persona-persistence::a-server-owned-concept-draft-stores-the-validated-proposal-and-persona-block")
+    @covers_requirement("creation-persona-persistence::concept-apply-is-deterministic-and-fingerprint-protected")
+    def test_draft_replaced_during_prompts_rejects_activation(self):
+        from twisted.internet import defer
+
+        from world.rules.creation_wizard import read_draft, save_custom_draft
+
+        held = defer.Deferred()
+        patch_obj = self._patch.start()
+        patch_obj.return_value = held
+        self.addCleanup(self._patch.stop)
+        command = CmdCharacterConcept()
+        command.caller = self.char1
+        command.account = self.account
+        command.session = self.session
+        command.args = "構想 流浪的精靈劍士"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            with self.assertRaises(StopIteration):
+                next(generator)
+            held.callback(_proposal())
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertTrue(any("角色提案" in text for text in messages))
+            self.assertEqual(read_draft(self.char1)["mode"], "concept")
+            self.char1.execute_cmd("自訂者", session=self.session)
+            # Another entry replaces the draft while the age prompts are open.
+            save_custom_draft(
+                self.account, self.char1,
+                CharacterCreationRequest(
+                    mode="custom", display_name="其他角色", age=20,
+                    apparent_age=20, race="human", subrace=None,
+                    allocations={
+                        "hp": 50, "mp": 50, "sp": 50,
+                        "atk_phys": 10, "agility": 10, "defense": 11,
+                    },
+                ),
+            )
+            self.char1.execute_cmd("20", session=self.session)
+            self.char1.execute_cmd("20", session=self.session)
+            messages = [call.args[0] for call in message_mock.call_args_list]
+            self.assertTrue(
+                any("構想草稿已被修改" in text for text in messages),
+                messages,
+            )
+            self.assertTrue(self.char1.creation_pending)
+            self.assertEqual(read_draft(self.char1)["mode"], "custom")
+            self.assertIsNone(self.char1.age)
+            self.assertNotEqual(self.char1.key, "自訂者")
+        finally:
+            self.char1.msg = original_msg
+
+    def test_cancel_after_apply_keeps_the_concept_draft_for_resume(self):
+        from world.rules.creation_wizard import read_draft
+
+        self._propose(_proposal())
+        output = self.call(
+            CmdCharacterConcept(),
+            "構想 流浪的精靈劍士",
+            inputs=["cancel", None],
+        )
+        self.assertIn("已取消", output)
+        self.assertTrue(self.char1.creation_pending)
+        draft = read_draft(self.char1)
+        self.assertEqual(draft["mode"], "concept")
+        self.assertEqual(draft["persona"]["personality"], "沉穩")
+        self.assertEqual(self.char1.traits.all(), [])
+        self.assertIsNone(self.char1.age)
 
     def test_live_async_proposal_continues_interactively_when_it_fires(self):
         from twisted.internet import defer

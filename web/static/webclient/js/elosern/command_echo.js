@@ -199,6 +199,10 @@
     "creation.custom": function () {
       return "character create";
     },
+    "creation.concept": function (payload) {
+      var concept = payload && payload.concept;
+      return isNonEmpty(concept) ? join(["character concept", concept]) : null;
+    },
     // The wizard's activation step re-runs the chosen draft path; the reset
     // control has no typed equivalent and falls back to its button label.
     "creation.activate": function (payload, display) {

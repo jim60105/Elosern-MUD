@@ -155,9 +155,12 @@
   var CREATION_MAX_SPECIALTY = 256;
   var CREATION_MAX_LABEL = 128;
   var CREATION_MAX_EXPLANATION = 256;
+  // The concept input bound (mirror of the adapter/command/layer caps).
+  var CREATION_MAX_CONCEPT = 500;
   var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense"];
   var CREATION_PRESET_STAGE = "preset_selected";
   var CREATION_CUSTOM_STAGE = "custom_filled";
+  var CREATION_CONCEPT_STAGE = "concept_filled";
 
   var MESSAGE_NAMES = {
     ui_snapshot: true,
@@ -1857,11 +1860,14 @@
       requireExactFields(
         value,
         "custom draft",
-        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations"],
+        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background_generated"],
         []
       );
       if (value.stage !== CREATION_CUSTOM_STAGE) {
         throw new Error("unsupported custom draft stage");
+      }
+      if (typeof value.background_generated !== "boolean") {
+        throw new Error("custom draft background_generated must be a boolean");
       }
       requireString(value.display_name, "display_name", CREATION_MAX_DISPLAY_NAME);
       requireInt(value.age, "age", CREATION_AGE_MINIMUM, CREATION_AGE_MAXIMUM);
@@ -1881,18 +1887,6 @@
           throw new Error("draft subrace exceeds its bound");
         }
       }
-      var allocations = value.allocations;
-      if (!isPlainObject(allocations)) {
-        throw new Error("draft allocations must be an object");
-      }
-      var allocationKeys = Object.keys(allocations).slice().sort();
-      var expectedKeys = CREATION_AXES.slice().sort();
-      if (allocationKeys.join(",") !== expectedKeys.join(",")) {
-        throw new Error("draft allocations must contain exactly the six axes");
-      }
-      CREATION_AXES.forEach(function (axis) {
-        requireInt(allocations[axis], axis, 0, 10000);
-      });
       return {
         mode: "custom",
         stage: CREATION_CUSTOM_STAGE,
@@ -1901,10 +1895,59 @@
         apparent_age: value.apparent_age,
         race: race,
         subrace: value.subrace,
-        allocations: allocations,
+        allocations: validateCreationDraftAllocations(value),
+        background_generated: value.background_generated,
+      };
+    }
+    if (value.mode === "concept") {
+      requireExactFields(
+        value,
+        "concept draft",
+        ["mode", "stage", "race", "subrace", "allocations", "background_generated"],
+        []
+      );
+      if (value.stage !== CREATION_CONCEPT_STAGE) {
+        throw new Error("unsupported concept draft stage");
+      }
+      if (typeof value.background_generated !== "boolean") {
+        throw new Error("concept draft background_generated must be a boolean");
+      }
+      var conceptRace = validateIdentifier(value.race, "draft race");
+      if (codePoints(conceptRace) > CREATION_MAX_RACE_KEY) {
+        throw new Error("draft race exceeds its bound");
+      }
+      if (value.subrace !== null) {
+        var conceptSubrace = validateIdentifier(value.subrace, "draft subrace");
+        if (codePoints(conceptSubrace) > CREATION_MAX_SUBRACE_KEY) {
+          throw new Error("draft subrace exceeds its bound");
+        }
+      }
+      return {
+        mode: "concept",
+        stage: CREATION_CONCEPT_STAGE,
+        race: conceptRace,
+        subrace: value.subrace,
+        allocations: validateCreationDraftAllocations(value),
+        background_generated: value.background_generated,
       };
     }
     throw new Error("draft has an unknown mode");
+  }
+
+  function validateCreationDraftAllocations(value) {
+    var allocations = value.allocations;
+    if (!isPlainObject(allocations)) {
+      throw new Error("draft allocations must be an object");
+    }
+    var allocationKeys = Object.keys(allocations).slice().sort();
+    var expectedKeys = CREATION_AXES.slice().sort();
+    if (allocationKeys.join(",") !== expectedKeys.join(",")) {
+      throw new Error("draft allocations must contain exactly the six axes");
+    }
+    CREATION_AXES.forEach(function (axis) {
+      requireInt(allocations[axis], axis, 0, 10000);
+    });
+    return allocations;
   }
 
   function validateCreationPanel(payload) {

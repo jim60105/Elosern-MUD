@@ -22,10 +22,12 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from web.webclient.actions.creation_actions import (
     _creation_activate_adapter,
+    _creation_concept_adapter,
     _creation_custom_adapter,
     _creation_preset_adapter,
     _creation_reset_adapter,
     validate_creation_activate_payload,
+    validate_creation_concept_payload,
     validate_creation_custom_payload,
     validate_creation_preset_payload,
     validate_creation_reset_payload,
@@ -321,6 +323,35 @@ class CreationAdapterTests(CreationActionBase):
         self.assertEqual(result["code"], "already_complete")
         self.assertIsNone(read_draft(self.character))
 
+    def test_pending_flip_while_in_flight_rejects_at_completion(self):
+        from twisted.internet import defer
+
+        from world.rules.character_creation import (
+            CharacterCreationRequest,
+            activate_player_character,
+        )
+
+        held = defer.Deferred()
+        patch_obj = patch(
+            "server.ai_director_service.request_character_proposal",
+            return_value=held,
+        )
+        patch_obj.start()
+        self.addCleanup(patch_obj.stop)
+        deferred = _creation_concept_adapter(self.character, _concept_payload())
+        # The character is activated (via another entry) while in flight.
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="custom", **custom_payload()),
+            sampler=lambda low, high: low,
+        )
+        held.callback(_proposal())
+        result = await_result(deferred)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_complete")
+        self.assertIsNone(read_draft(self.character))
+        self.assertFalse(self.character.creation_pending)
+
     def test_adapter_never_writes_canonical_state_directly(self):
         _creation_custom_adapter(self.character, custom_payload())
         self.assertEqual(self.character.age, None)
@@ -458,3 +489,173 @@ class CreationDispatchTests(CreationActionBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _concept_payload(**overrides):
+    value = {"concept": "流浪的精靈劍士"}
+    value.update(overrides)
+    return value
+
+
+def _proposal(**overrides):
+    from world.ai.character_creation import CharacterProposal
+
+    payload = {
+        "race_key": "human",
+        "subrace_key": None,
+        "allocations": balanced_allocations("human"),
+        "suggested_skills": ("flight",),
+        "persona": {
+            "personality": "沉穩",
+            "life_story": "來自邊境的小村",
+            "habit": "清晨練劍",
+        },
+    }
+    payload.update(overrides)
+    return CharacterProposal(**payload)
+
+
+def await_result(d):
+    if not hasattr(d, "addErrback"):
+        return d
+    d.addErrback(lambda f: None)
+    return d.result
+
+
+class CreationConceptTests(CreationActionBase):
+    """The fifth creation action (creation-persona-persistence D4)."""
+
+    def _propose(self, proposal):
+        from twisted.internet import defer
+
+        patch_obj = patch(
+            "server.ai_director_service.request_character_proposal",
+            return_value=defer.succeed(proposal),
+        )
+        patch_obj.start()
+        self.addCleanup(patch_obj.stop)
+        return patch_obj
+
+    def _degrade(self):
+        from twisted.internet import defer
+
+        patch_obj = patch(
+            "server.ai_director_service.request_character_proposal",
+            return_value=defer.succeed(None),
+        )
+        patch_obj.start()
+        self.addCleanup(patch_obj.stop)
+        return patch_obj
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_concept_submission_fills_the_draft_form(self):
+        self._propose(_proposal())
+        result = await_result(
+            _creation_concept_adapter(self.character, _concept_payload())
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "concept_saved")
+        self.assertEqual(result["affected_panels"], ("creation",))
+        draft = read_draft(self.character)
+        self.assertEqual(draft["mode"], "concept")
+        self.assertEqual(draft["race"], "human")
+        self.assertEqual(draft["allocations"], balanced_allocations("human"))
+        self.assertEqual(
+            draft["persona"],
+            {"personality": "沉穩", "life_story": "來自邊境的小村", "habit": "清晨練劍"},
+        )
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.age, None)
+        self.assertEqual(self.character.traits.all(), [])
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_offline_concept_degrades_without_state_change(self):
+        self._degrade()
+        result = await_result(
+            _creation_concept_adapter(self.character, _concept_payload())
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "concept_unavailable")
+        self.assertEqual(result["message"], "生成不可用，請手動創角")
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+        # The deterministic adapters remain fully usable afterwards.
+        result = _creation_custom_adapter(self.character, custom_payload())
+        self.assertEqual(result["outcome"], "success")
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_stale_fingerprint_rejects_the_apply(self):
+        from twisted.internet import defer
+
+        held = defer.Deferred()
+        patch_obj = patch(
+            "server.ai_director_service.request_character_proposal",
+            return_value=held,
+        )
+        patch_obj.start()
+        self.addCleanup(patch_obj.stop)
+        deferred = _creation_concept_adapter(self.character, _concept_payload())
+        # Another entry saves a custom draft while the proposal is in flight.
+        _creation_custom_adapter(self.character, custom_payload())
+        held.callback(_proposal())
+        result = await_result(deferred)
+        self.assertEqual(result["outcome"], "stale")
+        self.assertEqual(result["code"], "concept_stale")
+        self.assertEqual(read_draft(self.character)["mode"], "custom")
+
+    def test_concept_payload_is_exact(self):
+        self.assertEqual(
+            validate_creation_concept_payload(_concept_payload()),
+            _concept_payload(),
+        )
+        for bad in (
+            {"concept": ""},
+            {"concept": "  "},
+            {"concept": "構" * 501},
+            {},
+            {"concept": "構想", "actor": 1},
+            {"concept": "構想", "account": 1},
+            {"concept": "構想", "session": 1},
+            {"concept": "構想", "persona": {"personality": "x"}},
+            {"concept": "構想", "skill": "flight"},
+            {"concept": 5},
+        ):
+            with self.subTest(payload=bad):
+                with self.assertRaises(Exception):
+                    validate_creation_concept_payload(bad)
+
+    def test_unknown_fields_are_rejected_before_the_generative_layer(self):
+        envelope = self._envelope(
+            "creation.concept", {**_concept_payload(), "persona": {"personality": "x"}},
+            request_id="concept-tampered-1",
+        )
+        patch_obj = patch(
+            "server.ai_director_service.request_character_proposal"
+        )
+        mock = patch_obj.start()
+        self.addCleanup(patch_obj.stop)
+        self._dispatch(envelope)
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "malformed_payload")
+        mock.assert_not_called()
+        self.assertIsNone(read_draft(self.character))
+
+    def test_abnormal_puppet_cannot_reach_a_write_path(self):
+        self.character.db_account = None
+        result = await_result(
+            _creation_concept_adapter(self.character, _concept_payload())
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "ownership_rejected")
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+
+    def test_adapter_never_writes_canonical_state_directly(self):
+        self._propose(_proposal())
+        await_result(_creation_concept_adapter(self.character, _concept_payload()))
+        self.assertEqual(self.character.age, None)
+        self.assertEqual(self.character.race, None)
+        self.assertFalse(self.character.attributes.has("persona"))
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])

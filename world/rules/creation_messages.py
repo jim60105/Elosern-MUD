@@ -36,6 +36,9 @@ CREATION_REASON_MESSAGES: dict[str, str] = {
     "already_complete": "角色建立已經完成。",
     "ownership_rejected": "無法為這個帳號建立角色。",
     "no_draft": "尚未儲存角色草稿。",
+    "incomplete_draft": "角色草稿尚未完成。",
+    "concept_unavailable": "生成不可用，請手動創角",
+    "concept_stale": "構想草稿已被修改，請重新提交。",
     "malformed_request": "角色建立要求格式有誤。",
 }
 
@@ -46,6 +49,7 @@ _MESSAGE_CODE_MATCHES: tuple[tuple[str, str], ...] = (
     ("character is not owned by this account", "ownership_rejected"),
     ("character creation is already complete", "already_complete"),
     ("no creation draft saved", "no_draft"),
+    ("creation draft is incomplete", "incomplete_draft"),
     ("unknown player preset", "unknown_preset"),
     ("creation mode must be 'preset' or 'custom'", "malformed_request"),
     ("display name contains an Evennia markup delimiter", "markup_delimiter"),

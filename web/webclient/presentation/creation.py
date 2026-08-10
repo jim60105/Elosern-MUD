@@ -30,6 +30,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.creation_wizard import (
+    CONCEPT_STAGE,
     CUSTOM_STAGE,
     PRESET_STAGE,
     AdultBoundsView,
@@ -293,6 +294,18 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     return {"name": name, "adult": adult, "races": races, "subraces": subraces, "profiles": profiles}
 
 
+def _validate_allocations(value: dict[str, Any], name: str) -> dict[str, Any]:
+    allocations = value["allocations"]
+    if not isinstance(allocations, dict) or set(allocations) != set(ALLOCATABLE_AXES):
+        raise ProtocolValidationError(f"{name} allocations must contain exactly the six axes")
+    normalized_allocations: dict[str, int] = {}
+    for axis in ALLOCATABLE_AXES:
+        normalized_allocations[axis] = _require_int(
+            allocations, axis, minimum=0, maximum=10000
+        )
+    return normalized_allocations
+
+
 def _validate_draft(value: Any) -> dict[str, Any] | None:
     if value is None:
         return None
@@ -316,7 +329,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         _require_exact_fields(
             value,
             "custom draft",
-            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations"},
+            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background_generated"},
             {},
         )
         if value["stage"] != CUSTOM_STAGE:
@@ -334,14 +347,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         subrace = value["subrace"]
         if subrace is not None:
             subrace = _validate_key(subrace, "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
-        allocations = value["allocations"]
-        if not isinstance(allocations, dict) or set(allocations) != set(ALLOCATABLE_AXES):
-            raise ProtocolValidationError("draft allocations must contain exactly the six axes")
-        normalized_allocations: dict[str, int] = {}
-        for axis in ALLOCATABLE_AXES:
-            normalized_allocations[axis] = _require_int(
-                allocations, axis, minimum=0, maximum=10000
-            )
+        background_generated = _require_bool(value, "background_generated")
         return {
             "mode": "custom",
             "stage": CUSTOM_STAGE,
@@ -350,7 +356,33 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             "apparent_age": apparent_age,
             "race": race,
             "subrace": subrace,
-            "allocations": normalized_allocations,
+            "allocations": _validate_allocations(value, "custom draft"),
+            "background_generated": background_generated,
+        }
+    if mode == "concept":
+        # The concept draft carries the finite controls plus the non-content
+        # background indicator; the server-owned persona block is never part
+        # of any wire payload (creation-persona-persistence D4).
+        _require_exact_fields(
+            value,
+            "concept draft",
+            {"mode", "stage", "race", "subrace", "allocations", "background_generated"},
+            {},
+        )
+        if value["stage"] != CONCEPT_STAGE:
+            raise ProtocolValidationError("unsupported concept draft stage")
+        race = _validate_key(value["race"], "draft race", MAX_RACE_KEY_CODE_POINTS)
+        subrace = value["subrace"]
+        if subrace is not None:
+            subrace = _validate_key(subrace, "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+        background_generated = _require_bool(value, "background_generated")
+        return {
+            "mode": "concept",
+            "stage": CONCEPT_STAGE,
+            "race": race,
+            "subrace": subrace,
+            "allocations": _validate_allocations(value, "concept draft"),
+            "background_generated": background_generated,
         }
     raise ProtocolValidationError("draft has an unknown mode")
 
@@ -489,6 +521,18 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
             "stage": PRESET_STAGE,
             "preset_key": draft["preset_key"],
         }
+    if draft["mode"] == "concept":
+        # The persona block never leaves the server: the wire draft carries
+        # only the finite controls and the non-content background indicator
+        # (creation-persona-persistence D4).
+        return {
+            "mode": "concept",
+            "stage": CONCEPT_STAGE,
+            "race": draft["race"],
+            "subrace": draft["subrace"],
+            "allocations": dict(draft["allocations"]),
+            "background_generated": bool(draft.get("persona")),
+        }
     return {
         "mode": "custom",
         "stage": CUSTOM_STAGE,
@@ -498,6 +542,7 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         "race": draft["race"],
         "subrace": draft["subrace"],
         "allocations": dict(draft["allocations"]),
+        "background_generated": bool(draft.get("persona")),
     }
 
 

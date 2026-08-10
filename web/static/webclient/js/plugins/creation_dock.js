@@ -101,8 +101,8 @@
       root.setAttribute("data-mode", "creation");
       var keyboard = getKeyboard();
       // A saved server draft resumes at the saved stage: a preset draft opens
-      // the confirmation screen, a custom draft opens the restored form. No
-      // activation is ever auto-submitted.
+      // the confirmation screen, a custom or concept draft opens the restored
+      // form. No activation is ever auto-submitted.
       var draft = panel.draft;
       if (draft && draft.mode === "preset") {
         this._view = "confirm";
@@ -116,7 +116,10 @@
           keyboard.reset({ items: this._confirmItems, focusKey: null });
           this._ownsKeyboard = true;
         }
-      } else if (draft && draft.mode === "custom") {
+      } else if (
+        draft &&
+        (draft.mode === "custom" || draft.mode === "concept")
+      ) {
         this._view = "custom";
         this._customState = window.Elosern.CreationMenu.stateFromDraft(panel, draft);
         this._renderDock(root, panel);
@@ -309,6 +312,28 @@
       form.setAttribute("aria-label", "自訂角色表單");
       body.appendChild(form);
 
+      // A concept draft's background indicator is non-content: it only tells
+      // the player that a generated background is staged, and the persona
+      // text itself never reaches the browser (creation-persona-persistence
+      // D4). The indicator follows the server-owned persona block, so a
+      // same-race custom save that preserves the block keeps showing it.
+      if (panel.draft && panel.draft.background_generated) {
+        var indicator = makeElement("div", "creation-concept-indicator");
+        indicator.id = "creation-concept-indicator";
+        indicator.setAttribute("role", "status");
+        setText(indicator, "已套用構想草稿，背景已生成。");
+        form.appendChild(indicator);
+      }
+
+      this._appendField(form, "構想", "concept", state.concept, "text", 500, "角色構想（1–500 字元），可套用生成提案");
+      var conceptActions = makeElement("div", "creation-concept-actions");
+      var conceptSubmit = makeElement("button", "creation-control creation-concept-submit");
+      conceptSubmit.type = "button";
+      conceptSubmit.id = "creation-concept-submit";
+      setText(conceptSubmit, "套用構想");
+      conceptActions.appendChild(conceptSubmit);
+      form.appendChild(conceptActions);
+
       this._appendField(form, "姓名", "displayName", state.displayName, "text", 80, "角色姓名（1–80 字元）");
       this._appendField(form, "實際年齡", "age", state.age, "number", null, "實際年齡（至少 18）");
       this._appendField(form, "外表年齡", "apparentAge", state.apparentAge, "number", null, "外表年齡（至少 18）");
@@ -446,7 +471,9 @@
       if (!this._customState) {
         return;
       }
-      if (key === "displayName") {
+      if (key === "concept") {
+        this._customState.concept = value;
+      } else if (key === "displayName") {
         this._customState.displayName = value;
       } else if (key === "age") {
         this._customState.age = value;
@@ -524,7 +551,7 @@
         }
         if (event.key === "Enter") {
           var target = event.target;
-          if (target && (target.id === "creation-submit" || target.id === "creation-reset" || target.id === "creation-field-age" || target.id === "creation-field-apparentAge")) {
+          if (target && (target.id === "creation-submit" || target.id === "creation-reset" || target.id === "creation-concept-submit" || target.id === "creation-field-concept" || target.id === "creation-field-age" || target.id === "creation-field-apparentAge")) {
             // The form owns these Enter keys; stop propagation so the same
             // keydown can never confirm a menu pushed by the handler itself.
             event.preventDefault();
@@ -535,6 +562,10 @@
             }
             if (target.id === "creation-reset") {
               self._openResetConfirm();
+              return;
+            }
+            if (target.id === "creation-concept-submit" || target.id === "creation-field-concept") {
+              self._submitConcept();
               return;
             }
             if (target.id === "creation-field-age") {
@@ -587,6 +618,30 @@
       if (root && this._mounted) {
         this._renderDock(root, this._model.panel);
       }
+    },
+
+    _submitConcept: function () {
+      var panel = this._model && this._model.panel;
+      if (!panel) {
+        return;
+      }
+      var concept = (this._customState && this._customState.concept || "").trim();
+      if (concept.length < 1 || concept.length > 500) {
+        var message = "請輸入 1–500 字的角色構想。";
+        var fieldMessage = el("creation-field-message-concept");
+        if (fieldMessage) {
+          setText(fieldMessage, message);
+        }
+        this._announce(message);
+        return;
+      }
+      var actions = getActions();
+      if (!actions) {
+        return;
+      }
+      actions.submit(window.Elosern.CreationMenu.CONCEPT_ACTION, {
+        concept: concept,
+      });
     },
 
     _submitCustom: function () {
@@ -851,12 +906,34 @@
             }
           } else if (signature !== dock._lastSignature) {
             // A newer snapshot refreshes server-declared choices. Typed unsent
-            // custom values are preserved locally and never auto-resubmitted.
+            // custom values are preserved locally and never auto-resubmitted,
+            // EXCEPT when a concept draft lands: the concept apply replaces the
+            // empty form with the draft's finite controls (race/subrace/
+            // allocations pre-filled) and only the concept text is carried over
+            // (creation-persona-persistence D4).
             var wasCustom = dock._view === "custom" && dock._customDirty;
             var priorCustom = dock._customState;
+            var conceptApplied = panel.draft && panel.draft.mode === "concept";
             dock._model = window.Elosern.CreationMenu.buildMenus(panel);
             dock._renderDock(root, panel);
-            if (wasCustom && priorCustom) {
+            if (conceptApplied) {
+              // The concept apply replaces the empty form's finite controls
+              // with the draft's pre-filled values; the player's typed
+              // name/ages and concept text are carried over, never discarded.
+              var prior = dock._customState;
+              var fresh = window.Elosern.CreationMenu.stateFromDraft(
+                panel,
+                panel.draft
+              );
+              if (prior) {
+                fresh.concept = prior.concept || fresh.concept;
+                fresh.displayName = prior.displayName;
+                fresh.age = prior.age;
+                fresh.apparentAge = prior.apparentAge;
+              }
+              dock._customState = fresh;
+              dock._renderDock(root, panel);
+            } else if (wasCustom && priorCustom) {
               dock._customState = priorCustom;
               dock._renderDock(root, panel);
               dock._announce("伺服器資料已更新，請重新確認你的輸入後再提交。");

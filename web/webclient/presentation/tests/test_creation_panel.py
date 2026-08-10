@@ -57,6 +57,7 @@ from world.rules.creation_wizard import (
     CreationView,
     build_custom_form,
     build_preset_cards,
+    read_draft,
 )
 
 
@@ -345,6 +346,40 @@ class CreationPanelValidationTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_creation(bad)
 
+    def test_draft_concept_stage_shape(self):
+        # The server-side concept draft carries the persona block; the wire
+        # serializer replaces it with the non-content background indicator.
+        draft = {
+            "mode": "concept",
+            "stage": "concept_filled",
+            "race": "human",
+            "subrace": None,
+            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": {"personality": "沉穩", "life_story": "故事", "habit": "習慣"},
+        }
+        payload = _valid_payload(draft=draft)
+        validated = validate_creation(payload)
+        self.assertEqual(validated["draft"]["mode"], "concept")
+        self.assertEqual(validated["draft"]["stage"], "concept_filled")
+        self.assertTrue(validated["draft"]["background_generated"])
+        bad = deepcopy(payload)
+        bad["draft"]["stage"] = "custom_filled"
+        with self.assertRaises(Exception):
+            validate_creation(bad)
+        bad = deepcopy(payload)
+        bad["draft"]["allocations"] = {"hp": 0}
+        with self.assertRaises(Exception):
+            validate_creation(bad)
+        bad = deepcopy(payload)
+        bad["draft"]["background_generated"] = "yes"
+        with self.assertRaises(Exception):
+            validate_creation(bad)
+        # A persona field is not part of the wire concept draft contract.
+        bad = deepcopy(payload)
+        bad["draft"]["persona"] = {"personality": "沉穩"}
+        with self.assertRaises(Exception):
+            validate_creation(bad)
+
     def test_worst_case_realistic_payload_fits_comfortably(self):
         payload = validate_creation(_valid_payload())
         size = json_byte_size(payload)
@@ -604,6 +639,99 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(payload["draft"]["mode"], "custom")
         self.assertEqual(payload["draft"]["display_name"], "新角色")
         self.assertEqual(payload["draft"]["age"], 20)
+
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_concept_draft_serializes_finite_controls_without_persona(self):
+        from world.rules.creation_wizard import apply_concept_proposal, draft_fingerprint
+
+        apply_concept_proposal(
+            self.account,
+            self.character,
+            {
+                "race_key": "human",
+                "subrace_key": None,
+                "allocations": {
+                    "hp": 50, "mp": 50, "sp": 50,
+                    "atk_phys": 10, "agility": 10, "defense": 11,
+                },
+                "persona": {
+                    "personality": "沉穩",
+                    "life_story": "來自邊境的小村，靠磨劍維生",
+                    "habit": "清晨練劍",
+                },
+            },
+            expected_fingerprint=draft_fingerprint(self.character),
+        )
+        payload = self._render()
+        draft = payload["draft"]
+        self.assertEqual(draft["mode"], "concept")
+        self.assertEqual(draft["stage"], "concept_filled")
+        self.assertEqual(draft["race"], "human")
+        self.assertEqual(draft["allocations"]["hp"], 50)
+        self.assertTrue(draft["background_generated"])
+        # Persona content never reaches the browser: no text, keys, or length
+        # information (creation-persona-persistence D4).
+        serialized = __import__("json").dumps(payload, ensure_ascii=False)
+        for fragment in (
+            "personality", "life_story", "habit", "persona",
+            "沉穩", "來自邊境的小村", "清晨練劍", "600",
+        ):
+            self.assertNotIn(fragment, serialized, fragment)
+
+    @covers_requirement("creation-persona-persistence::a-server-owned-concept-draft-stores-the-validated-proposal-and-persona-block")
+    def test_custom_draft_with_preserved_persona_never_serializes_it(self):
+        from world.rules.creation_wizard import apply_concept_proposal, draft_fingerprint
+
+        apply_concept_proposal(
+            self.account,
+            self.character,
+            {
+                "race_key": "human",
+                "subrace_key": None,
+                "allocations": {
+                    "hp": 50, "mp": 50, "sp": 50,
+                    "atk_phys": 10, "agility": 10, "defense": 11,
+                },
+                "persona": {
+                    "personality": "沉穩",
+                    "life_story": "來自邊境的小村，靠磨劍維生",
+                    "habit": "清晨練劍",
+                },
+            },
+            expected_fingerprint=draft_fingerprint(self.character),
+        )
+        from world.rules.character_creation import (
+            CharacterCreationRequest,
+        )
+        from world.rules.creation_wizard import save_custom_draft
+
+        save_custom_draft(
+            self.account,
+            self.character,
+            CharacterCreationRequest(
+                mode="custom",
+                display_name="新角色",
+                age=20,
+                apparent_age=20,
+                race="human",
+                subrace=None,
+                allocations={
+                    "hp": 50, "mp": 50, "sp": 50,
+                    "atk_phys": 10, "agility": 10, "defense": 11,
+                },
+            ),
+        )
+        draft = read_draft(self.character)
+        self.assertEqual(draft["mode"], "custom")
+        self.assertIn("persona", draft, "the server-owned block survives the custom save")
+        payload = self._render()
+        serialized = __import__("json").dumps(payload, ensure_ascii=False)
+        self.assertNotIn("personality", serialized)
+        self.assertNotIn("沉穩", serialized)
+        # The non-content indicator follows the preserved persona block, but
+        # the persona itself stays server-side (creation-persona-persistence D4).
+        self.assertTrue(payload["draft"]["background_generated"])
 
 
 if __name__ == "__main__":

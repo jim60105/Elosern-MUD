@@ -22,8 +22,25 @@ ALLOCATABLE_AXES = GAUGE_KEYS + STATIC_KEYS
 _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "magic_xp", "skill_proficiency", "skills", "skill_grants", "equipment",
-    "inventory", "wallet", "quest_log", "guild_rank",
+    "inventory", "wallet", "quest_log", "guild_rank", "persona",
 )
+
+# The persona draft's exact prose field set (creation-persona-persistence D3).
+# Mirrors the generative layer's ``PERSONA_FIELDS``; a parity test keeps the
+# two in lock step.
+PERSONA_PROSE_KEYS = ("personality", "life_story", "habit")
+# The import-card persona record shape (world.imports loader contract): the
+# block fills the three prose fields and the remaining keys are stored as
+# empty containers, so every future PersonaStore consumer sees the documented
+# six-key contract.
+PERSONA_IMPORT_CARD_KEYS = (
+    "identity", "personality", "life_story", "habit", "appearance",
+    "social_connection",
+)
+# Hard cap on one persona prose field (design D2); matches the generative
+# layer's prompt-side cap so a validated draft always fits the read-only
+# persona contract. A parity test keeps the two in lock step.
+MAX_PERSONA_FIELD_LENGTH = 600
 
 
 class CharacterCreationError(ValueError):
@@ -140,6 +157,32 @@ def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[st
     return checked
 
 
+def _validate_persona_block(value: Any) -> dict[str, str]:
+    """Validate one deterministic persona block: exactly the three prose fields.
+
+    The block is the server-owned persona draft carried by the concept draft
+    (creation-persona-persistence D1/D3). Contents are never inspected -- only
+    the exact field set, text type, and length cap are checked -- so the
+    generative layer's whole-proposal validation stays the content authority
+    and the activation write stays deterministic.
+    """
+    if not isinstance(value, Mapping) or set(value) != set(PERSONA_PROSE_KEYS):
+        raise CharacterCreationError(
+            "persona must contain exactly personality, life_story, and habit"
+        )
+    checked: dict[str, str] = {}
+    for field in PERSONA_PROSE_KEYS:
+        text = value[field]
+        if not isinstance(text, str) or not text.strip():
+            raise CharacterCreationError(f"persona.{field} must be a non-empty text field")
+        if len(text) > MAX_PERSONA_FIELD_LENGTH:
+            raise CharacterCreationError(
+                f"persona.{field} exceeds the {MAX_PERSONA_FIELD_LENGTH}-character length cap"
+            )
+        checked[field] = text
+    return checked
+
+
 def _owned_character(account: Any, character: Any) -> bool:
     return character in account.characters
 
@@ -201,8 +244,15 @@ def activate_player_character(
     *,
     sampler: Callable[[int, int], int] = random.randint,
     write_observer: Callable[[str], None] | None = None,
+    persona: Mapping[str, Any] | None = None,
 ) -> CharacterCreationResult:
-    """Atomically initialize one existing account-owned pending shell."""
+    """Atomically initialize one existing account-owned pending shell.
+
+    ``persona`` carries the server-owned persona block from the staging draft
+    (creation-persona-persistence D3): when present it is validated
+    deterministically and persisted as the six-key import-card record inside
+    the same all-or-nothing transaction; when absent nothing is written.
+    """
     validated = preflight_character_creation(account, character, request)
     low, high = starting_magic_interval(validated.race)
     magic_level = sampler(low, high)
@@ -230,6 +280,17 @@ def activate_player_character(
         "guild_rank": None,
         "creation_pending": False,
     }
+    persona_record = None
+    if persona is not None:
+        checked_persona = _validate_persona_block(persona)
+        persona_record = {
+            "identity": {},
+            "personality": checked_persona["personality"],
+            "life_story": checked_persona["life_story"],
+            "habit": checked_persona["habit"],
+            "appearance": {},
+            "social_connection": {},
+        }
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)
     trait_snapshot = snapshot_traits(character)
@@ -246,6 +307,14 @@ def activate_player_character(
                 character.attributes.add(key, value)
                 if write_observer:
                     write_observer(key)
+            # The persona write is part of the same all-or-nothing transaction:
+            # a failure here rolls back the whole activation, so a crash or a
+            # rejected write can never leave a persona-less active character
+            # behind (creation-persona-persistence D3).
+            if persona_record is not None:
+                character.attributes.add("persona", persona_record)
+                if write_observer:
+                    write_observer("persona")
             # Every activation path (Telnet command, WebClient ``activate_draft``)
             # clears the staging creation draft in the SAME atomic transaction, so
             # a completed character never retains a draft (webclient-character-

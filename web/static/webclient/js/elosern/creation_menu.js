@@ -25,6 +25,7 @@
 
   var PRESET_ACTION = "creation.preset";
   var CUSTOM_ACTION = "creation.custom";
+  var CONCEPT_ACTION = "creation.concept";
   var ACTIVATE_ACTION = "creation.activate";
   var RESET_ACTION = "creation.reset";
 
@@ -154,17 +155,18 @@
       raceKey: races.length > 0 ? races[0].key : null,
       subraceKey: null,
       allocations: emptyAllocations(),
+      concept: "",
     };
   }
 
   function stateFromDraft(panel, draft) {
     var state = defaultCustomState(panel);
-    if (!draft || draft.mode !== "custom") {
+    if (!draft || (draft.mode !== "custom" && draft.mode !== "concept")) {
       return state;
     }
-    state.displayName = draft.display_name || "";
-    state.age = String(draft.age == null ? "" : draft.age);
-    state.apparentAge = String(draft.apparent_age == null ? "" : draft.apparent_age);
+    // A concept draft pre-fills the finite controls (race/subrace/allocations)
+    // while the name and both ages stay player-entered; a custom draft
+    // restores every accepted value.
     state.raceKey = draft.race || state.raceKey;
     state.subraceKey = draft.subrace || null;
     var allocations = draft.allocations || {};
@@ -173,6 +175,12 @@
         state.allocations[axis] = String(allocations[axis]);
       }
     });
+    if (draft.mode !== "custom") {
+      return state;
+    }
+    state.displayName = draft.display_name || "";
+    state.age = String(draft.age == null ? "" : draft.age);
+    state.apparentAge = String(draft.apparent_age == null ? "" : draft.apparent_age);
     return state;
   }
 
@@ -377,6 +385,7 @@
   return {
     PRESET_ACTION: PRESET_ACTION,
     CUSTOM_ACTION: CUSTOM_ACTION,
+    CONCEPT_ACTION: CONCEPT_ACTION,
     ACTIVATE_ACTION: ACTIVATE_ACTION,
     RESET_ACTION: RESET_ACTION,
     rootItems: rootItems,
