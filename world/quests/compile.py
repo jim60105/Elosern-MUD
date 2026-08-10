@@ -26,6 +26,11 @@ from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.quests.characterization import (
+    characterize_errors,
+    duplicate_stable_key_errors,
+    race_lifespan_upper_bound,
+)
 from world.quests.definitions import (
     KNOWN_GRID_MAP_KEYS,
     QUEST_DEFINITION_REGISTRY,
@@ -68,13 +73,32 @@ _DESTINATION_KIND_BY_VALUE = {
 
 
 @dataclass(frozen=True)
+class StageNpcCharacterization:
+    """Optional frozen characterization of one spawned occupant.
+
+    Carries the validated per-occupant characterization fields in deterministic
+    order (design D5): ``display_name``, paired ``age``/``apparent_age``, and the
+    named portrait ``stable_key``. ``None`` fields mean the blueprint declared
+    nothing for that surface; a fully-absent occupant keeps today's shape.
+    """
+
+    display_name: str | None = None
+    age: int | None = None
+    apparent_age: int | None = None
+    portrait_stable_key: str | None = None
+
+
+@dataclass(frozen=True)
 class StageSpawnRequirement:
     """One stage's preserved spawn requirements for change 21's SceneBuilder.
 
     Plain validated data carrying the objective kind, the destination locator,
     the scene requirement (archetype, anchor hint, sentence), and the NPC role
     requirements, so the SceneBuilder can consume them without importing the
-    generative package.
+    generative package. ``characterizations`` is aligned by position with
+    ``npc_reqs``: each entry holds the optional validated characterization of
+    that occupant, or ``None`` when the blueprint declared none (existing
+    consumers unpack ``npc_reqs`` unchanged).
     """
 
     index: int
@@ -84,6 +108,18 @@ class StageSpawnRequirement:
     anchor_near: str | None
     scene_sentence: str | None
     npc_reqs: tuple[tuple[str, str, str | None], ...]
+    characterizations: tuple[StageNpcCharacterization | None, ...] = ()
+
+    def __post_init__(self) -> None:
+        # Characterization entries are aligned by position with ``npc_reqs``;
+        # reject any meaningful mismatch so a future consumer can never attach
+        # a characterization to the wrong occupant. The empty ``()`` default
+        # means "every occupant is field-less" and stays backward compatible.
+        if self.characterizations and len(self.characterizations) != len(self.npc_reqs):
+            raise ValueError(
+                "characterizations must be aligned with npc_reqs "
+                f"({len(self.characterizations)} != {len(self.npc_reqs)})"
+            )
 
 
 # Process-local spawn-requirement registry, keyed by definition key (D4). It
@@ -233,11 +269,47 @@ def _compile_location(location_payload: Any) -> RoomLocator:
     _reject(f"unknown destination layer {layer!r}")  # pragma: no cover
 
 
+def _compile_characterization(
+    requirement: dict[str, Any],
+) -> StageNpcCharacterization | None:
+    """Build one occupant's frozen characterization value from a raw entry.
+
+    Returns ``None`` when the entry declares no characterization surface, so a
+    field-less blueprint keeps today's exact requirement shape (design D5).
+    """
+    portrait = requirement.get("portrait")
+    stable_key = None
+    if isinstance(portrait, dict):
+        stable_key = portrait.get("stable_key")
+    if all(
+        value is None
+        for value in (
+            requirement.get("display_name"),
+            requirement.get("age"),
+            requirement.get("apparent_age"),
+            stable_key,
+        )
+    ):
+        return None
+    return StageNpcCharacterization(
+        display_name=requirement.get("display_name"),
+        age=requirement.get("age"),
+        apparent_age=requirement.get("apparent_age"),
+        portrait_stable_key=stable_key,
+    )
+
+
 def _validate_scene_fields(
     stage_index: int,
     location_payload: Any,
     npc_req_payload: Any,
-) -> tuple[str | None, str | None, str | None, tuple[tuple[str, str, str | None], ...]]:
+) -> tuple[
+    str | None,
+    str | None,
+    str | None,
+    tuple[tuple[str, str, str | None], ...],
+    tuple[StageNpcCharacterization | None, ...],
+]:
     """Validate archetype, anchor hint, scene sentence, and NPC requirements."""
     archetype = None
     anchor_near = None
@@ -269,6 +341,7 @@ def _validate_scene_fields(
     if not isinstance(npc_req_payload, list):
         _reject(f"stage {stage_index} npc_req must be an array")
     npc_reqs: list[tuple[str, str, str | None]] = []
+    characterizations: list[StageNpcCharacterization | None] = []
     for position, requirement in enumerate(npc_req_payload):
         requirement = _require_mapping(
             requirement, f"stage {stage_index} npc_req[{position}]"
@@ -285,8 +358,22 @@ def _validate_scene_fields(
                 f"stage {stage_index} npc_req[{position}].disposition "
                 "must be a string or None"
             )
+        for message in characterize_errors(
+            requirement,
+            lifespan_upper_bound=race_lifespan_upper_bound(tier),
+        ):
+            _reject(
+                f"stage {stage_index} npc_req[{position}] {message}"
+            )
         npc_reqs.append((role, tier, disposition))
-    return archetype, anchor_near, scene_sentence, tuple(npc_reqs)
+        characterizations.append(_compile_characterization(requirement))
+    return (
+        archetype,
+        anchor_near,
+        scene_sentence,
+        tuple(npc_reqs),
+        tuple(characterizations),
+    )
 
 
 def _compile_objective(
@@ -384,6 +471,37 @@ def _definition_key(
     return f"ai_{digest[:16]}"
 
 
+def _npc_req_canonical(
+    entry: tuple[str, str, str | None],
+    characterization: StageNpcCharacterization | None,
+) -> dict[str, Any]:
+    """Serialize one ``npc_req`` entry into a canonical JSON-safe dict.
+
+    The base shape (role/tier/disposition) is always present; the optional
+    characterization fields are included only when declared, so a field-less
+    blueprint contributes a byte-identical digest to today's output while two
+    blueprints differing only in characterization stay distinguishable.
+    """
+    role, tier, disposition = entry
+    canonical: dict[str, Any] = {
+        "role": role,
+        "tier": tier,
+        "disposition": disposition,
+    }
+    if characterization is not None:
+        if characterization.display_name is not None:
+            canonical["display_name"] = characterization.display_name
+        if characterization.age is not None:
+            canonical["age"] = characterization.age
+        if characterization.apparent_age is not None:
+            canonical["apparent_age"] = characterization.apparent_age
+        if characterization.portrait_stable_key is not None:
+            canonical["portrait"] = {
+                "stable_key": characterization.portrait_stable_key
+            }
+    return canonical
+
+
 def _stage_requirement_canonical(requirement: StageSpawnRequirement) -> dict[str, Any]:
     """Serialize one ``StageSpawnRequirement`` into a canonical JSON-safe dict.
 
@@ -408,8 +526,13 @@ def _stage_requirement_canonical(requirement: StageSpawnRequirement) -> dict[str
         "anchor_near": requirement.anchor_near,
         "scene_sentence": requirement.scene_sentence,
         "npc_reqs": [
-            {"role": role, "tier": tier, "disposition": disposition}
-            for role, tier, disposition in requirement.npc_reqs
+            _npc_req_canonical(
+                entry,
+                requirement.characterizations[position]
+                if position < len(requirement.characterizations)
+                else None,
+            )
+            for position, entry in enumerate(requirement.npc_reqs)
         ],
     }
 
@@ -517,6 +640,7 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
 
     quest_stages: list[QuestStage] = []
     stage_requirements: list[StageSpawnRequirement] = []
+    all_npc_entries: list[dict[str, Any]] = []
     for position, stage_payload in enumerate(stages_payload):
         stage_payload = _require_mapping(stage_payload, f"stages[{position}]")
         index = _require_int(stage_payload.get("index"), f"stages[{position}].index")
@@ -532,11 +656,15 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
         npc_req_payload = stage_payload.get("npc_req")
         if not isinstance(npc_req_payload, list):
             _reject(f"stage {position} npc_req must be an array")
+        for entry in npc_req_payload:
+            if isinstance(entry, dict):
+                all_npc_entries.append(entry)
         (
             archetype,
             anchor_near,
             scene_sentence,
             npc_reqs,
+            characterizations,
         ) = _validate_scene_fields(
             position,
             location_payload,
@@ -559,8 +687,12 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
                 anchor_near=anchor_near,
                 scene_sentence=scene_sentence,
                 npc_reqs=npc_reqs,
+                characterizations=characterizations,
             )
         )
+
+    for message in duplicate_stable_key_errors(all_npc_entries):
+        _reject(message)
 
     definition_fields = {
         "display_name": name,

@@ -39,6 +39,13 @@ _NPC_TIERS = (
     NPCTier("bandit", "盜匪", "劫掠商旅與行人的盜匪。", "human", "human_adventurer"),
     NPCTier("priest", "祭司", "侍奉神明的祭司。", "human", "human_commoner"),
     NPCTier("knight", "騎士", "身穿鎧甲、效忠領主的騎士。", "human", "human_elite"),
+    NPCTier(
+        "elven_civilian",
+        "精靈平民",
+        "久居森林聚落的精靈平民，擁有數百年壽命。",
+        "elf",
+        "elf_common",
+    ),
 )
 
 # Frozen: consumers may read registry values but never extend or replace them.

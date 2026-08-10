@@ -35,6 +35,7 @@ from world.lore.races import RACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
+from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
 from world.quests.runtime import (
@@ -52,6 +53,15 @@ SCENE_OCCUPANT_PROTOTYPE_WHITELIST: tuple[str, ...] = ("scene_npc", "scene_monst
 
 RETURN_EXIT_KEY = "返回"
 _FALLBACK_SCENE_NAME = "任務場景"
+
+# The deterministic adult baseline for a portrait-bearing occupant whose
+# blueprint declared no ages (design D3). It is race-agnostic and always within
+# the adult-to-lifespan-maximum validation range for every race (18..80 human,
+# 18..1200 elf), so the art adult gate provably passes: the gate requires
+# canonical integer ages, and the portrait description needs them too. A
+# race-aware midpoint was rejected because it would make a default-age elf a
+# thousand-year elder.
+PORTRAIT_ADULT_BASELINE = 25
 
 
 class SceneBuilderError(RuntimeError):
@@ -124,9 +134,51 @@ def _revalidate_keys(requirement: Any) -> None:
         raise SceneBuilderSpawnError(
             f"unknown anchor {requirement.anchor_near!r}"
         )
-    for role, tier_key, _disposition in requirement.npc_reqs:
+    for position, (role, tier_key, _disposition) in enumerate(requirement.npc_reqs):
         if tier_key not in NPC_TIER_REGISTRY:
             raise SceneBuilderSpawnError(f"unknown NPC tier {tier_key!r}")
+        _revalidate_characterization(requirement, role, tier_key, position)
+
+
+def _revalidate_characterization(
+    requirement: Any,
+    role: str,
+    tier_key: str,
+    position: int,
+) -> None:
+    """Re-validate one occupant's characterization through the shared helper.
+
+    The compile boundary already validated the accepted blueprint, but a
+    forged ``StageSpawnRequirement`` could bypass it and write underage or
+    non-integer canonical ages (a permanently adult-gated NPC) or a malformed
+    policy. Re-running the same shared rules here keeps the adult invariant a
+    hard floor on every spawn path: invalid data raises ``SceneBuilderSpawnError``
+    and rolls the whole materialization back before any state change.
+    """
+    characterizations = getattr(requirement, "characterizations", ())
+    if position >= len(characterizations):
+        return
+    characterization = characterizations[position]
+    if characterization is None:
+        return
+    entry: dict[str, Any] = {}
+    if characterization.display_name is not None:
+        entry["display_name"] = characterization.display_name
+    if characterization.age is not None:
+        entry["age"] = characterization.age
+    if characterization.apparent_age is not None:
+        entry["apparent_age"] = characterization.apparent_age
+    if characterization.portrait_stable_key is not None:
+        entry["portrait"] = {"stable_key": characterization.portrait_stable_key}
+    if not entry:
+        return
+    for message in characterize_errors(
+        entry,
+        lifespan_upper_bound=race_lifespan_upper_bound(tier_key),
+    ):
+        raise SceneBuilderSpawnError(
+            f"invalid characterization for occupant {role!r}: {message}"
+        )
 
 
 def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom:
@@ -147,6 +199,45 @@ def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom
         if archetype is not None:
             room.db.desc = archetype.scene_sentence
     return room
+
+
+def _apply_characterization(
+    npc: NPC,
+    requirement: Any,
+    position: int,
+) -> None:
+    """Apply one compiled occupant's characterization per-field (design D1).
+
+    Each carried field applies independently: ``display_name`` sets the display
+    name; the paired ages set the canonical ``age``/``apparent_age``
+    attributes; a portrait ``stable_key`` materializes the full named policy
+    dict (design D2) and, when the ages are absent, the deterministic adult
+    baseline ``PORTRAIT_ADULT_BASELINE`` so the art adult gate always has
+    canonical inputs (design D3). An occupant without a portrait policy never
+    receives the baseline or a policy (design D4). The policy is written only
+    after the ages, so a policy-bearing occupant always carries canonical adult
+    ages.
+    """
+    characterizations = getattr(requirement, "characterizations", ())
+    if position >= len(characterizations):
+        return
+    characterization = characterizations[position]
+    if characterization is None:
+        return
+    if characterization.display_name is not None:
+        npc.db.display_name = characterization.display_name
+    if characterization.age is not None and characterization.apparent_age is not None:
+        npc.db.age = characterization.age
+        npc.db.apparent_age = characterization.apparent_age
+    if characterization.portrait_stable_key is not None:
+        if npc.db.age is None:
+            npc.db.age = PORTRAIT_ADULT_BASELINE
+        if npc.db.apparent_age is None:
+            npc.db.apparent_age = PORTRAIT_ADULT_BASELINE
+        npc.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": characterization.portrait_stable_key,
+        }
 
 
 def _spawn_npc(
@@ -182,6 +273,7 @@ def _spawn_npc(
     npc.race = tier.race_key
     npc._apply_trait_config(config)
     npc.db.disposition = disposition
+    _apply_characterization(npc, requirement, position)
     return npc
 
 
