@@ -7,16 +7,17 @@ Defines the prompt library: the top-level `prompts/` data folder as the sole sou
 ### Requirement: The prompt library is the single source of truth for every LLM prompt
 The project SHALL store all LLM prompt text in YAML files under one top-level `prompts/` directory
 in the repo root, one file per layer or domain: `narrator.yaml`, `npc_dialogue.yaml`,
-`scenario_director.yaml`, `npc.yaml`, `art.yaml`, and `character_creation.yaml`. Each file SHALL
+`scenario_director.yaml`, `scene_builder.yaml`, `npc.yaml`, `art.yaml`, and `character_creation.yaml`.
+Each file SHALL
 declare `schema_version: 1` and a `prompts:` mapping of prompt key to text block. The folder SHALL
 be the only place prompt text is defined; Python modules SHALL NOT contain prompt text constants,
 and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
 
 #### Scenario: Every generative layer has a prompt file
 - **WHEN** the `prompts/` directory is inspected
-- **THEN** it contains `narrator.yaml`, `npc_dialogue.yaml`, `scenario_director.yaml`, `npc.yaml`,
-  `art.yaml`, and `character_creation.yaml`, each declaring `schema_version: 1` and a `prompts:`
-  mapping whose keys match the code-defined registry
+- **THEN** it contains `narrator.yaml`, `npc_dialogue.yaml`, `scenario_director.yaml`,
+  `scene_builder.yaml`, `npc.yaml`, `art.yaml`, and `character_creation.yaml`, each declaring
+  `schema_version: 1` and a `prompts:` mapping whose keys match the code-defined registry
 
 #### Scenario: Prompt text exists only in the folder
 - **WHEN** the codebase is searched for the narrator or scenario-director system-message text
@@ -26,6 +27,12 @@ and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
 - **WHEN** the prompt registry is queried for `character_creation.system`
 - **THEN** the key exists with its default text, its allowlist contains `concept` and
   `race_catalog`, and the `character_creation` generative layer consumes it at runtime
+
+#### Scenario: The scene-flavor key is registered with its four placeholders and consumed
+- **WHEN** the prompt registry is queried for `scene_builder.system`
+- **THEN** the key exists with its default text, its allowlist contains exactly
+  `scene_sentence`, `quest_context`, `room_name`, and `region`, and the scene-flavor layer renders
+  it (a guarded test proves the registration and the consumer)
 
 ### Requirement: The loader validates every prompt key and bounds failures to the affected layer
 `world/prompts/loader.py` SHALL expose `load_prompt_library(root: str | None = None)` that reads

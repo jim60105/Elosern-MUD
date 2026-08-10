@@ -56,6 +56,15 @@ _NPC_DIALOGUE_TEMPLATE = (
 )
 _NPC_THINKING = "（{name} 沉思片刻……）"
 _ART_CHARACTER_TEMPLATE = "A {race} adult named {name} ({age}) in the {style}."
+_SCENE_BUILDER_SYSTEM = (
+    "你是《伊洛瑟恩大陸》的場景氛圍描述者。場景句子：{scene_sentence}。"
+    "任務脈絡：{quest_context}。房間名稱：{room_name}。地區：{region}。"
+    "請以正體中文，為這個任務場景寫一段 50 到 200 字的氛圍散文，"
+    "只描寫環境與感官氛圍（光線、聲音、氣味、溫度、空間感）。"
+    "你只能依據上面提供的四項資訊寫作：不得虛構任何人物、怪物、物品、數字或世界狀態，"
+    "不得描述正在發生的事件，也不得預言後續發展。"
+    "只輸出氛圍散文本身，不要加上任何標題、前言、註解或元資訊。"
+)
 
 
 class VerbatimShipmentTests(unittest.TestCase):
@@ -153,6 +162,25 @@ class VerbatimShipmentTests(unittest.TestCase):
             "你沒有把握能確實執行的行為，不要寫進 intent。",
         )
 
+    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
+    def test_scene_builder_system_is_shipped_verbatim(self):
+        rendered = render_prompt(
+            "scene_builder.system",
+            scene_sentence="古老森林深處的祭壇",
+            quest_context="採集任務",
+            room_name="林間祭壇",
+            region="遺忘森林",
+        )
+        self.assertEqual(
+            rendered,
+            _SCENE_BUILDER_SYSTEM.replace("{scene_sentence}", "古老森林深處的祭壇")
+            .replace("{quest_context}", "採集任務")
+            .replace("{room_name}", "林間祭壇")
+            .replace("{region}", "遺忘森林"),
+        )
+        self.assertIn("正體中文", rendered)
+        self.assertIn("不得虛構", rendered)
+
 
 class LibrarySourceTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -215,6 +243,29 @@ class LibrarySourceTests(unittest.TestCase):
                 desc="乙",
                 location="丙",
                 persona="",
+            ),
+        )
+
+    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
+    def test_scene_flavor_renders_from_the_library_solely(self):
+        from world.ai.scene_flavor import SceneFlavorContext, build_scene_flavor_prompt
+
+        system, _ = build_scene_flavor_prompt(
+            SceneFlavorContext(
+                scene_sentence="古老森林深處的祭壇",
+                quest_context="採集任務：採集靈藥草",
+                room_name="林間祭壇",
+                region="遺忘森林",
+            )
+        )
+        self.assertEqual(
+            system["content"],
+            render_prompt(
+                "scene_builder.system",
+                scene_sentence="古老森林深處的祭壇",
+                quest_context="採集任務：採集靈藥草",
+                room_name="林間祭壇",
+                region="遺忘森林",
             ),
         )
 
