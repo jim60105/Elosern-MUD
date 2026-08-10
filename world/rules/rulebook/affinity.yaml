@@ -22,6 +22,20 @@ quest_completion_gain: 2
 # the sole affinity writer; negative deltas never reset the daily budget.
 friendly_fire_penalty_per_hit: 1
 
+# Milestone cap-break table (affinity-cap-break D2/D3). Each entry carries
+# exactly one matching identity (npc_key matching npc.key, or a role matching
+# the NPC's schedule role-template key), a quest_key that resolves in the quest
+# definition registry, and an integer new_cap strictly above the natural cap 99.
+# At turn-in, every then-in-party companion matching an entry for the completed
+# quest_key gets its cap raised to new_cap in the same atomic transaction as the
+# reward and the quest_completion gains, before those gains so a record at the
+# old cap cannot clamp them. The example below documents the shape; the
+# introductory hunt is the shipped quest that resolves at load.
+cap_breaks:
+  - npc_key: "altoria_guild_master"
+    quest_key: "introductory_hunt"
+    new_cap: 150
+
 # Exactly seven stages. Floors must equal 0/10/30/50/70/90/100, strictly
 # increasing, no duplicates. Values >= 100 resolve to the topmost stage.
 stages:

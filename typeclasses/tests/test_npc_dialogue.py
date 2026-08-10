@@ -157,6 +157,9 @@ class DialogueExchangeHelperTests(EvenniaTest):
 class LLMNPCSeamTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         _reset_all()
         register_npc_dialogue()
         self.player = create_object(PlayerCharacter, key="dialogue player")

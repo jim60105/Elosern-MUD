@@ -24,6 +24,7 @@ from typeclasses.rooms import Room
 from world.rules import affinity as affinity_module
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import load_config
+from world.quests.catalog import register_catalog
 from world.rules.combat_session import (
     _scan_friendly_fire,
     engage,
@@ -124,6 +125,7 @@ def _grant_affinity(npc, player, value):
 class FriendlyFireBase(EvenniaTest):
     def setUp(self):
         super().setUp()
+        register_catalog()
         for skill in _TEST_SKILLS:
             SKILL_REGISTRY[skill.key] = skill
         self.room = create_object(Room, key="friendly fire arena")

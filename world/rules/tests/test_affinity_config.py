@@ -12,16 +12,23 @@ import tempfile
 from pathlib import Path
 from unittest import TestCase
 
+from world.quests.catalog import register_catalog
 from world.rules.affinity_config import (
     AffinityConfigError,
     load_config,
 )
 
 
+def _register_quests() -> None:
+    """Register the shipped quest catalog so cap_breaks quest keys resolve."""
+    register_catalog()
+
+
 class AffinityStageBoundaryTests(TestCase):
     """One test per canonical boundary value (spec scenario)."""
 
     def setUp(self):
+        _register_quests()
         self.config = load_config()
 
     def test_floor_0_resolves_to_acquaintance(self):
@@ -72,6 +79,9 @@ class AffinityStageBoundaryTests(TestCase):
 
 
 class AffinityConfigValidationTests(TestCase):
+    def setUp(self):
+        _register_quests()
+
     def _load_deviant(self, content: str):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "affinity.yaml"
@@ -151,14 +161,120 @@ class AffinityConfigValidationTests(TestCase):
             )
         )
 
+    def _cap_breaks_base(self) -> str:
+        return (
+            Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
+        ).read_text(encoding="utf-8")
+
+    def _replace_cap_breaks(self, content: str) -> str:
+        """Replace the shipped cap_breaks block with a custom one."""
+        marker = "cap_breaks:\n"
+        start = content.index(marker) + len(marker)
+        end = content.index("stages:\n", start)
+        return content[:start] + content[start:end].replace(
+            content[start:end], "  - { npc_key: 'altoria_guild_master', "
+            "quest_key: 'introductory_hunt', new_cap: 150 }\n"
+        )
+
+    @covers_requirement("affinity-cap-break::the-cap-breaks-rulebook-table-drives-milestone-cap-raises-at-quest-turn-in")
+    def test_cap_break_unknown_quest_key_is_rejected(self):
+        base = self._cap_breaks_base()
+        deviant = base.replace(
+            'quest_key: "introductory_hunt"', 'quest_key: "no_such_quest"'
+        )
+        self._load_deviant(deviant)
+
+    def test_cap_break_missing_quest_key_is_rejected(self):
+        base = self._cap_breaks_base()
+        self._load_deviant(
+            base.replace('    quest_key: "introductory_hunt"\n', "")
+        )
+
+    def test_cap_break_neither_selector_is_rejected(self):
+        base = self._cap_breaks_base()
+        deviant = base.replace(
+            'npc_key: "altoria_guild_master"\n', 'role: ""\n'
+        )
+        self._load_deviant(deviant)
+
+    def test_cap_break_both_selectors_are_rejected(self):
+        base = self._cap_breaks_base()
+        deviant = base.replace(
+            'npc_key: "altoria_guild_master"\n',
+            'npc_key: "altoria_guild_master"\n    role: "guard"\n',
+        )
+        self._load_deviant(deviant)
+
+    def test_cap_break_malformed_second_selector_is_still_rejected(self):
+        base = self._cap_breaks_base()
+        deviant = base.replace(
+            'npc_key: "altoria_guild_master"\n',
+            'npc_key: 123\n    role: "guard"\n',
+        )
+        self._load_deviant(deviant)
+
+    def test_cap_break_npc_key_and_role_selectors_are_distinct(self):
+        base = self._cap_breaks_base()
+        entries = (
+            "  - npc_key: 'altoria_guild_master'\n"
+            "    quest_key: 'introductory_hunt'\n"
+            "    new_cap: 150\n"
+            "  - role: 'guard'\n"
+            "    quest_key: 'introductory_hunt'\n"
+            "    new_cap: 200\n"
+        )
+        start = base.index("cap_breaks:\n") + len("cap_breaks:\n")
+        end = base.index("stages:\n", start)
+        deviant = base[:start] + entries + base[end:]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "affinity.yaml"
+            path.write_text(deviant, encoding="utf-8")
+            config = load_config(path=path)
+        self.assertEqual(
+            [(e.selector_kind, e.selector, e.new_cap) for e in config.cap_breaks],
+            [
+                ("npc_key", "altoria_guild_master", 150),
+                ("role", "guard", 200),
+            ],
+        )
+
+    def test_cap_break_new_cap_at_or_below_natural_cap_is_rejected(self):
+        base = self._cap_breaks_base()
+        for value in ("99", "50"):
+            with self.subTest(value=value):
+                self._load_deviant(
+                    base.replace("new_cap: 150", f"new_cap: {value}")
+                )
+
+    def test_cap_break_duplicate_quest_and_selector_is_rejected(self):
+        base = self._cap_breaks_base()
+        extra = (
+            "  - npc_key: 'altoria_guild_master'\n"
+            "    quest_key: 'introductory_hunt'\n"
+            "    new_cap: 200\n"
+        )
+        start = base.index("cap_breaks:\n") + len("cap_breaks:\n")
+        deviant = base[:start] + extra + base[start:]
+        self._load_deviant(deviant)
+
+    def test_cap_break_non_integer_new_cap_is_rejected(self):
+        base = self._cap_breaks_base()
+        self._load_deviant(base.replace("new_cap: 150", "new_cap: many"))
+
 
 class AffinityConfigConstantsTests(TestCase):
+    def setUp(self):
+        _register_quests()
+
     def test_constants_come_from_yaml(self):
         config = load_config()
         self.assertEqual(config.invite_threshold, 70)
         self.assertEqual(config.daily_interaction_cap, 5)
         self.assertEqual(config.quest_completion_gain, 2)
         self.assertEqual(config.friendly_fire_penalty_per_hit, 1)
+        self.assertEqual(
+            config.cap_break_for("introductory_hunt")[0].new_cap, 150
+        )
 
     def test_every_stage_id_has_exactly_one_named_test(self):
         names = [

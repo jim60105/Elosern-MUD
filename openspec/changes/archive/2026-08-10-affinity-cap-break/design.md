@@ -56,9 +56,13 @@ the old cap cannot clamp the +2 (a record at value 99 / cap 99 ends at value 101
 150). Entries matching nothing are no-ops; re-completing the quest is idempotent because the cap
 only grows.
 
-- Selector semantics: two entries may not share the same `quest_key` and selector (rejected at
-  load); a companion matching several entries of one quest resolves to the highest `new_cap`, so
-  results never depend on YAML order.
+- Selector semantics: two entries may not share the same `quest_key`, selector kind, and selector
+  value (rejected at load); an `npc_key` and a `role` selector are distinct, so one quest may carry
+  both shapes. A companion matching several entries of one quest resolves to the highest
+  `new_cap`, so results never depend on YAML order. An NPC matches a `role` selector when its
+  stored schedule is a template reference whose template key equals the selector (the schedule
+  rulebook's "role templates", e.g. `guard`, `storekeeper`, `resident`); an NPC without a
+  template-reference schedule never matches a role selector.
 - Referential validation: `quest_key` must resolve in the quest definition registry.
 - Alternatives considered: triggering on an affinity threshold reached. Rejected by owner decision
   (dedicated milestone, not a numeric trigger).
@@ -66,8 +70,9 @@ only grows.
 ### D3: The table is validated like every rulebook value
 
 `world/rules/affinity_config.py` validates `cap_breaks`: each entry has a non-empty `quest_key`
-that resolves in the quest definition registry, exactly one of `npc_key`/`role`, an integer
-`new_cap` strictly above the natural cap 99, and no duplicate (`quest_key`, selector) pairs;
+that resolves in the quest definition registry, exactly one of `npc_key`/`role` (decided by key
+presence, so a mistyped selector never silently falls back to the other one), an integer `new_cap`
+strictly above the natural cap 99, and no duplicate (`quest_key`, selector kind, selector) triples;
 loading fails closed on deviation.
 
 ## Risks / Trade-offs

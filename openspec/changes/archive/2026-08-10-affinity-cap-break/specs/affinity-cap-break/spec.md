@@ -36,8 +36,11 @@ rendering.
 that resolves in the quest definition registry, exactly one matching identity (`npc_key` or
 `role`), and an integer `new_cap` strictly above the natural cap 99. Loading SHALL fail closed on
 a missing, non-string, or empty `quest_key`, an unresolvable `quest_key`, an entry with neither
-`npc_key` nor `role`, a non-integer `new_cap`, a `new_cap` at or below 99, or two entries with the
-same `quest_key` and the same selector. When a guild quest is turned in, the deterministic reward
+`npc_key` nor `role`, an entry carrying both `npc_key` and `role` (decided by key presence, so a
+mistyped selector never silently falls back to the other one), a non-integer `new_cap`, a
+`new_cap` at or below 99, or two entries with the same `quest_key` and the same selector
+(`npc_key` and `role` are distinct selectors). When a
+guild quest is turned in, the deterministic reward
 settlement SHALL look up `cap_breaks` by the completed `quest_key` and, for every then-in-party
 companion matching the entry's `npc_key` or role, call `raise_affinity_cap` with the entry's
 `new_cap` inside the same atomic transaction as the reward and the `quest_completion` affinity
@@ -76,5 +79,6 @@ SHALL be no-ops.
 
 #### Scenario: A malformed cap_breaks table is rejected at load
 - **WHEN** an entry omits `quest_key`, references an unknown quest, omits both `npc_key` and
-  `role`, duplicates another entry's `quest_key` and selector, or declares `new_cap` at or below 99
+  `role`, declares both `npc_key` and `role`, duplicates another entry's `quest_key` and selector,
+  or declares `new_cap` at or below 99
 - **THEN** loading the rulebook fails closed with a named validation error

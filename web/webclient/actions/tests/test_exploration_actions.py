@@ -252,6 +252,9 @@ class ExplorationValidatorTests(unittest.TestCase):
 
 class ExplorationActionAdapterTests(EvenniaTestCase):
     def setUp(self):
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         _reset_guardrail()
         register_npc_dialogue()
         from world.rules import skip_safety

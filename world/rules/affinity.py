@@ -295,6 +295,31 @@ def apply_affinity_change(
     )
 
 
+def raise_affinity_cap(npc: Any, player: Any, new_cap: int) -> bool:
+    """Raise a record's ``cap`` monotonically; the sole cap writer (affinity-cap-break D1).
+
+    Only this function mutates a record's ``cap``. For a player without a
+    record it first creates a fresh record (value 0, cap 99) so a milestone can
+    never silently fail on a recordless bound companion, then raises it. It
+    raises only when ``new_cap`` is strictly greater than the current cap,
+    leaves the value and the daily-gain fields untouched, runs no daily-budget
+    logic and no auto-leave hook, and returns whether the cap changed.
+    """
+    from typeclasses.npcs import NPC
+
+    if isinstance(new_cap, bool) or not isinstance(new_cap, int):
+        return False
+    if not isinstance(npc, NPC):
+        return False
+
+    handler = npc.relations
+    record = handler._load(player) or AffinityRecord()
+    if new_cap <= record.cap:
+        return False
+    handler._save(player, replace(record, cap=new_cap))
+    return True
+
+
 def restore_relations_surfaces(snapshots: dict[int, Any]) -> None:
     """Restore in-process ``relations_data`` surfaces after a rolled-back round.
 

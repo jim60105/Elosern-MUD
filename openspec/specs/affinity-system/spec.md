@@ -12,14 +12,15 @@ auto-leave recheck seam consumed by later party changes.
 ### Requirement: Every NPC holds a hidden numeric affinity toward each player
 Each NPC SHALL hold one affinity record per player it has interacted with, stored as serialized
 data on the NPC's `relations_data` attribute through the `RelationHandler` mounted on
-`LivingEntity.relations`. A record SHALL contain `value` (initial 0), `cap` (initial 99), the
-daily-gain counter, and the world-day tick at which that counter started. Deserialization SHALL
-tolerate missing fields with defaults and SHALL reject type-violating values by resetting the
-record to a fresh default (logging the event) rather than raising, so a corrupted record can never
-crash a look or a conversation. Reading affinity SHALL NOT create or persist a record: read APIs
-(`affinity_for`, `stage_for`) return defaults for players without a record, and a `has_record`
-check SHALL distinguish a stored record from a default. The numeric value SHALL be hidden from the
-player; only stage names are rendered (see the stage-ladder requirement).
+`LivingEntity.relations`. A record SHALL contain `value` (initial 0), `cap` (initial 99, mutable
+only through `raise_affinity_cap`), the daily-gain counter, and the world-day tick at which that
+counter started. Deserialization SHALL tolerate missing fields with defaults and SHALL reject
+type-violating values by resetting the record to a fresh default (logging the event) rather than
+raising, so a corrupted record can never crash a look or a conversation. Reading affinity SHALL NOT
+create or persist a record: read APIs (`affinity_for`, `stage_for`) return defaults for players
+without a record, and a `has_record` check SHALL distinguish a stored record from a default. The
+numeric value SHALL be hidden from the player; only stage names are rendered (see the stage-ladder
+requirement).
 
 #### Scenario: A fresh NPC starts at zero affinity
 - **WHEN** a player reads the affinity record of an NPC with no prior interaction
@@ -37,6 +38,11 @@ player; only stage names are rendered (see the stage-ladder requirement).
 #### Scenario: Records are keyed per player
 - **WHEN** two different players interact with the same NPC
 - **THEN** each player's record reads and writes independently
+
+#### Scenario: The cap is mutable only through the sole cap writer
+- **WHEN** the code paths that mutate a record's `cap` are inspected
+- **THEN** every mutation goes through `raise_affinity_cap`, and a raised cap (e.g. 150) persists
+  across serialization round trips without changing the value or the daily-gain fields
 
 ### Requirement: The stage ladder maps hidden values to seven Traditional Chinese stage names
 `rulebook/affinity.yaml` SHALL define exactly seven stages with floors 0 (初識), 10 (熟識),
