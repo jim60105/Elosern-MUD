@@ -63,6 +63,12 @@ penalty count never depends on the iteration order of damage events.
 - **THEN** the later hit still applies its penalty, because the round's qualifying membership was
   snapshotted before the penalties began
 
+#### Scenario: A compression is scanned once after it resolves
+- **WHEN** a player action resolves through overwhelm compression (multiple raw rounds compressed
+  into one resolved player action round)
+- **THEN** the scan runs once over the compression's player-action damage events after the
+  compression resolves, and the same per-hit penalty, snapshot, and auto-leave contracts hold
+
 #### Scenario: A failure rolls back every penalty
 - **WHEN** the leave write fails after an earlier hit of the same action already applied a penalty
 - **THEN** every penalty of that round rolls back with the round's transaction and no notification

@@ -69,6 +69,9 @@ def _reply_text(speech="我會考慮看看。", intent=None):
 class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         _reset_all()
         register_npc_dialogue()
         self.hall = create_object(Room, key="party hall")

@@ -24,6 +24,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from world.quests.catalog import register_catalog
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
 from world.rules.party import (
@@ -85,6 +86,7 @@ class MembershipOwnershipContractTests(unittest.TestCase):
 class PartyMembershipTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.room = create_object(Room, key="party room")
         self.player = create_object(PlayerCharacter, key="party player")
         self.player.race = "human"
@@ -266,6 +268,7 @@ class AutoLeaveIntegrationTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.room = create_object(Room, key="auto room")
         self.player = create_object(PlayerCharacter, key="auto player")
         self.player.race = "human"

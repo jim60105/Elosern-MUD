@@ -57,10 +57,16 @@ behavior, and buff-tick damage never qualify because they are not player actions
   action → NPC damage", not intent).
 - **Atomicity**: the scan, every penalty write, and any resulting auto-leave run inside the
   player action round's transaction boundary; a failure rolls the whole round's affinity effects
-  back, and the auto-leave notification is delivered after commit (never mid-transaction).
+  back, and the auto-leave notification is delivered after commit (never mid-transaction). The
+  scan failure propagates out of the facade, so no round result with partial penalties is ever
+  returned (the round result cannot commit with partial penalties).
 - **Membership snapshot**: qualifying membership is snapshotted when the scan starts, so a
   companion that leaves because of an earlier hit in the same round still qualifies for every hit
   that round; each round re-snapshots.
+- **Overwhelm compression**: the resolver-backed compression is one resolved player action round
+  (one submit = one player action round). The scan runs once over the compression's logs after it
+  resolves; the player's own follow-up actions within a compression are enemy-targeting basic
+  attacks, so the single scan finds all player-action companion damage events.
 - Alternatives considered: per-battle once-only penalty (rejected by owner decision, -1 per hit)
   and live membership checks per event (rejected — makes the penalty count depend on iteration
   order).

@@ -224,6 +224,39 @@ def register_adventurer(
     return parsed
 
 
+def _cap_break_new_cap(npc: Any, quest_key: str) -> int | None:
+    """The highest ``new_cap`` among the cap-break entries ``npc`` matches.
+
+    Reads the affinity rulebook's ``cap_breaks`` entries for ``quest_key`` and
+    matches each selector against the companion: an ``npc_key`` selector
+    matches ``npc.key``; a ``role`` selector matches the companion's schedule
+    role-template key (the ``template`` of its stored template-reference
+    schedule, e.g. ``guard``). An NPC matching several entries resolves to the
+    highest ``new_cap``, independent of entry order; no match returns ``None``.
+    Read-only; never writes.
+    """
+    from world.rules.affinity_config import get_config
+
+    candidates = [
+        entry
+        for entry in get_config().cap_break_for(quest_key)
+        if _cap_break_matches(npc, entry)
+    ]
+    return max((entry.new_cap for entry in candidates), default=None)
+
+
+def _cap_break_matches(npc: Any, entry: Any) -> bool:
+    if entry.selector_kind == "npc_key":
+        return npc.key == entry.selector
+    from collections.abc import Mapping
+
+    schedule = npc.db.schedule
+    if not isinstance(schedule, Mapping):
+        return False
+    template = schedule.get("template")
+    return isinstance(template, str) and template == entry.selector
+
+
 class RewardClaimError(ValueError):
     """A reward claim violates the atomic settlement contract."""
 
@@ -325,12 +358,20 @@ def turn_in_quest(
     # The then-in-party companion list is precomputed once, so a membership
     # change mid-transaction cannot alter who earns the quest-completion
     # bonus (party-quest D-3). The gain constant comes from the affinity
-    # rulebook, never duplicated here.
+    # rulebook, never duplicated here. The cap-break raises for the completed
+    # quest are also precomputed up front, so a mid-transaction re-read of the
+    # rulebook or the party cannot change which caps break (affinity-cap-break
+    # D2).
     from world.rules.affinity_config import get_config
     from world.rules.party import live_companions
 
     companions = live_companions(actor)
     companion_gain = get_config().quest_completion_gain
+    cap_raises = [
+        (npc, _cap_break_new_cap(npc, record.definition_key))
+        for npc in companions
+    ]
+    cap_raises = [(npc, new_cap) for npc, new_cap in cap_raises if new_cap is not None]
 
     snapshots = snapshot_attributes(
         actor,
@@ -374,8 +415,12 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         actor.db.guild_reward_claims = [*claims, quest_id]
-        from world.rules.affinity import apply_affinity_change
+        from world.rules.affinity import apply_affinity_change, raise_affinity_cap
 
+        # Cap breaks apply before the quest-completion gains so a record
+        # sitting at the old cap cannot clamp the +2 (affinity-cap-break D2).
+        for npc, new_cap in cap_raises:
+            raise_affinity_cap(npc, actor, new_cap)
         for npc in companions:
             apply_affinity_change(npc, actor, "quest_completion", companion_gain)
         nonlocal onboarding_completed

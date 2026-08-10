@@ -83,6 +83,9 @@ class AffinityStageLineTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         self.room1.key = "測試房間"
         self.room1.save()
         self.char1.location = self.room1

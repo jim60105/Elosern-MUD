@@ -34,6 +34,7 @@ class AffinitySource(StrEnum):
     GUILD = "guild"
     AI_DIALOGUE = "ai_dialogue"
     QUEST_COMPLETION = "quest_completion"
+    FRIENDLY_FIRE = "friendly_fire"
 
 
 @dataclass(frozen=True)
@@ -292,6 +293,49 @@ def apply_affinity_change(
         budget_capped=budget_capped,
         source_rejected=False,
     )
+
+
+def raise_affinity_cap(npc: Any, player: Any, new_cap: int) -> bool:
+    """Raise a record's ``cap`` monotonically; the sole cap writer (affinity-cap-break D1).
+
+    Only this function mutates a record's ``cap``. For a player without a
+    record it first creates a fresh record (value 0, cap 99) so a milestone can
+    never silently fail on a recordless bound companion, then raises it. It
+    raises only when ``new_cap`` is strictly greater than the current cap,
+    leaves the value and the daily-gain fields untouched, runs no daily-budget
+    logic and no auto-leave hook, and returns whether the cap changed.
+    """
+    from typeclasses.npcs import NPC
+
+    if isinstance(new_cap, bool) or not isinstance(new_cap, int):
+        return False
+    if not isinstance(npc, NPC):
+        return False
+
+    handler = npc.relations
+    record = handler._load(player) or AffinityRecord()
+    if new_cap <= record.cap:
+        return False
+    handler._save(player, replace(record, cap=new_cap))
+    return True
+
+
+def restore_relations_surfaces(snapshots: dict[int, Any]) -> None:
+    """Restore in-process ``relations_data`` surfaces after a rolled-back round.
+
+    The idmapper attribute cache is not transaction-aware: a rolled-back
+    ``relations_data`` write still leaves the post-write value readable
+    in-process. Callers that snapshot the records before an atomic block
+    invoke this helper in the failure path so readers never observe the
+    rolled-back state. The writer's own failure branch already restores the
+    failing record; this covers every earlier hit of the same round.
+    """
+    from evennia.objects.models import ObjectDB
+
+    for npc_pk, data in snapshots.items():
+        entity = ObjectDB.objects.filter(id=npc_pk).first()
+        if entity is not None:
+            entity.db.relations_data = data
 
 
 def affinity_stage_line(npc: Any, looker: Any) -> str:

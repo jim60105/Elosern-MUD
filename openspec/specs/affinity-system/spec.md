@@ -12,14 +12,15 @@ auto-leave recheck seam consumed by later party changes.
 ### Requirement: Every NPC holds a hidden numeric affinity toward each player
 Each NPC SHALL hold one affinity record per player it has interacted with, stored as serialized
 data on the NPC's `relations_data` attribute through the `RelationHandler` mounted on
-`LivingEntity.relations`. A record SHALL contain `value` (initial 0), `cap` (initial 99), the
-daily-gain counter, and the world-day tick at which that counter started. Deserialization SHALL
-tolerate missing fields with defaults and SHALL reject type-violating values by resetting the
-record to a fresh default (logging the event) rather than raising, so a corrupted record can never
-crash a look or a conversation. Reading affinity SHALL NOT create or persist a record: read APIs
-(`affinity_for`, `stage_for`) return defaults for players without a record, and a `has_record`
-check SHALL distinguish a stored record from a default. The numeric value SHALL be hidden from the
-player; only stage names are rendered (see the stage-ladder requirement).
+`LivingEntity.relations`. A record SHALL contain `value` (initial 0), `cap` (initial 99, mutable
+only through `raise_affinity_cap`), the daily-gain counter, and the world-day tick at which that
+counter started. Deserialization SHALL tolerate missing fields with defaults and SHALL reject
+type-violating values by resetting the record to a fresh default (logging the event) rather than
+raising, so a corrupted record can never crash a look or a conversation. Reading affinity SHALL NOT
+create or persist a record: read APIs (`affinity_for`, `stage_for`) return defaults for players
+without a record, and a `has_record` check SHALL distinguish a stored record from a default. The
+numeric value SHALL be hidden from the player; only stage names are rendered (see the stage-ladder
+requirement).
 
 #### Scenario: A fresh NPC starts at zero affinity
 - **WHEN** a player reads the affinity record of an NPC with no prior interaction
@@ -37,6 +38,11 @@ player; only stage names are rendered (see the stage-ladder requirement).
 #### Scenario: Records are keyed per player
 - **WHEN** two different players interact with the same NPC
 - **THEN** each player's record reads and writes independently
+
+#### Scenario: The cap is mutable only through the sole cap writer
+- **WHEN** the code paths that mutate a record's `cap` are inspected
+- **THEN** every mutation goes through `raise_affinity_cap`, and a raised cap (e.g. 150) persists
+  across serialization round trips without changing the value or the daily-gain fields
 
 ### Requirement: The stage ladder maps hidden values to seven Traditional Chinese stage names
 `rulebook/affinity.yaml` SHALL define exactly seven stages with floors 0 (初識), 10 (熟識),
@@ -65,17 +71,18 @@ be Traditional Chinese forms (信賴, 絕對).
 ### Requirement: apply_affinity_change is the sole affinity writer with a source-capped daily budget
 `world/rules/affinity.py` SHALL expose `apply_affinity_change(npc, player, source, delta)` as the
 only function that writes affinity values. The source SHALL be a member of the closed set
-(`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`); an unknown source SHALL be rejected
-without writing. The writer SHALL reject a non-NPC owner without writing. Before budgeting a
-capped positive delta it SHALL lazily reset the daily-gain counter when the record's stored tick
-differs from the current world day; negative deltas SHALL never reset the counter and never restore
-spent budget. Positive deltas from the capped sources SHALL draw from the remaining daily budget
-(`cap` 5 shared across `talk`, `trade`, `guild`, `ai_dialogue`); `quest_completion` deltas SHALL
-bypass the cap. The applied delta SHALL be `min(requested, remaining_budget, cap - value)`, the
-daily counter SHALL accrue only the actually applied increase, and a delta that applies zero SHALL
-consume no budget. Positive deltas SHALL clamp to the record's `cap`; negative deltas SHALL apply
-unclamped downward (floor 0) and always run the party auto-leave recheck hook. The function SHALL
-return a structured outcome (applied, delta used, budget capped) so callers can render feedback.
+(`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`, `friendly_fire`); an unknown source
+SHALL be rejected without writing. The writer SHALL reject a non-NPC owner without writing. Before
+budgeting a capped positive delta it SHALL lazily reset the daily-gain counter when the record's
+stored tick differs from the current world day; negative deltas (including `friendly_fire`) SHALL
+never reset the counter and never restore spent budget. Positive deltas from the capped sources
+SHALL draw from the remaining daily budget (`cap` 5 shared across `talk`, `trade`, `guild`,
+`ai_dialogue`); `quest_completion` deltas SHALL bypass the cap. The applied delta SHALL be
+`min(requested, remaining_budget, cap - value)`, the daily counter SHALL accrue only the actually
+applied increase, and a delta that applies zero SHALL consume no budget. Positive deltas SHALL
+clamp to the record's `cap`; negative deltas SHALL apply unclamped downward (floor 0) and always
+run the party auto-leave recheck hook. The function SHALL return a structured outcome (applied,
+delta used, budget capped) so callers can render feedback.
 
 #### Scenario: Capped sources exhaust the daily budget
 - **WHEN** capped-source gains total 5 in one world day and a sixth capped gain is attempted
@@ -100,8 +107,14 @@ return a structured outcome (applied, delta used, budget capped) so callers can 
 - **THEN** the gain applies and the value increases
 
 #### Scenario: Negative deltas never reset or restore the budget
-- **WHEN** a negative delta applies after the budget was exhausted
+- **WHEN** a negative delta (including a `friendly_fire` penalty) applies after the budget was
+  exhausted
 - **THEN** the value decreases, the daily counter stays exhausted, and the auto-leave hook runs
+
+#### Scenario: A friendly_fire source is accepted without budget interaction
+- **WHEN** a call supplies the `friendly_fire` source with a negative delta
+- **THEN** the penalty applies downward without consuming or resetting the daily budget, and the
+  outcome reports the applied amount
 
 #### Scenario: An unknown source is rejected without writing
 - **WHEN** a call supplies a source outside the closed set
