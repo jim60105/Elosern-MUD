@@ -141,17 +141,24 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         # 3. Cross a closed/open/restock boundary via the world clock.
         self.player.location = self.guild_hall
         real_clock = get_world_clock()
-        # Move from day 0 00:00 to day 1 08:00 (32h): caravan restock at 06:00
-        # then shop open at 08:00. Both sources registered by sync_guild_economy.
+        # Move from day 0 00:00 to day 1 08:00 in bounded chunks: caravan
+        # restock at 06:00 then shop open at 08:00, both on day 1. A single
+        # advance may cover at most one full day, so 32h is split 24h + 8h.
+        # Both sources registered by sync_guild_economy.
         from world.rules.economy import shop_is_open
 
         with patch("world.rules.clock.get_world_clock", return_value=real_clock):
-            events = real_clock.advance(
-                32 * 3600,
+            first_events = real_clock.advance(
+                24 * 3600,
                 AdvanceSource.COMMAND,
                 [self.player],
             )
-        kinds = [event.kind for event in events]
+            second_events = real_clock.advance(
+                8 * 3600,
+                AdvanceSource.COMMAND,
+                [self.player],
+            )
+        kinds = [event.kind for event in first_events + second_events]
         self.assertIn("caravan_arrivals", kinds)
         self.assertIn("shop_hours", kinds)
         self.assertTrue(shop_is_open("altoria_general_store"))

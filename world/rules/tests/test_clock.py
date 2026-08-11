@@ -9,7 +9,9 @@ from unittest.mock import patch
 
 from world.rules.clock import (
     AdvanceSource,
+    ClockAdvanceBoundError,
     DaypartError,
+    MAX_ADVANCE_SECONDS,
     ScheduledEvent,
     WorldClock,
     WorldDateTime,
@@ -180,9 +182,35 @@ class ClockTests(unittest.TestCase):
     def test_daily_resets_use_crossed_boundary_count(self):
         entity = Entity()
         entity.sexual = object()
-        with patch("world.rules.clock.reset_daily_counters") as reset:
+        with (
+            patch("world.rules.clock.reset_daily_counters") as reset,
+            patch("world.rules.clock.MAX_ADVANCE_SECONDS", 86400 * 3),
+        ):
             WorldClock(1).advance(86400 * 3, AdvanceSource.COMBAT, [entity])
         self.assertEqual(reset.call_count, 3)
+
+    @covers_requirement("world-clock::advance-has-a-bounded-settlement-budget-per-call")
+    def test_advance_exactly_at_the_one_day_bound_is_accepted(self):
+        # `wait until` can legally request a full-day wait; the bound is
+        # exclusive so the worst case stays a valid advance.
+        entity = Entity()
+        clock = WorldClock()
+        events = clock.advance(MAX_ADVANCE_SECONDS, AdvanceSource.COMBAT, [entity])
+        self.assertEqual(clock.tick, MAX_ADVANCE_SECONDS)
+        self.assertIsInstance(events, list)
+
+    @covers_requirement("world-clock::advance-has-a-bounded-settlement-budget-per-call")
+    def test_oversized_advance_raises_before_any_stage(self):
+        entity = Entity()
+        clock = WorldClock(10)
+        with (
+            patch("world.rules.clock._run_stages") as stages,
+            self.assertRaises(ClockAdvanceBoundError),
+        ):
+            clock.advance(MAX_ADVANCE_SECONDS + 1, AdvanceSource.SKIP, [entity])
+        stages.assert_not_called()
+        self.assertEqual(clock.tick, 10)
+        self.assertEqual(entity.traits.hp.current, 10)
 
     def test_identical_inputs_are_reproducible_and_scoped(self):
         first, second, untouched = Entity(), Entity(), Entity()
@@ -270,3 +298,101 @@ class WorldClockPersistenceTests(EvenniaTest):
         self.assertIsInstance(stored_after["current"], int)
         self.assertEqual(stored_after["current"], 47)
         self.assertEqual(stored_after["regen_remainder"], 0.5)
+
+
+class WorldClockAtomicityTests(EvenniaTest):
+    """The advance is all-or-nothing for entity state and the persisted tick."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.traits.hp.current = 10
+        self.player.traits.hp.base = 100
+        self.player.traits.hp.rate = 1
+        self.player.traits.sp.current = 3
+        self.player.traits.sp.base = 100
+        self.player.traits.sp.rate = 2
+
+    def _stored_hp(self):
+        return self.player.attributes.get("traits", category="traits")["hp"]["current"]
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_failed_advance_restores_entity_state_and_leaves_tick_unchanged(self):
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        before_tick = clock.tick
+        with (
+            patch(
+                "world.rules.clock._settle_buffs_and_decay",
+                side_effect=RuntimeError("simulated mid-advance failure"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            clock.advance(3600, AdvanceSource.SKIP, [self.player])
+        # No partial save: the tick and both entity surfaces are unchanged.
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(self.player.traits.hp.current, 10)
+        self.assertEqual(self._stored_hp(), 10)
+        self.assertEqual(self.player.traits.sp.current, 3)
+
+    def test_persist_failure_restores_tick_in_memory_and_on_the_script(self):
+        from evennia.utils.search import search_script
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        script = search_script("world_clock")[0]
+        clock.advance(60, AdvanceSource.SKIP, [self.player])
+        before_tick = clock.tick
+
+        def failing_persist(tick):
+            script.db.tick = tick
+            raise RuntimeError("simulated persist failure")
+
+        clock._persist = failing_persist
+        with self.assertRaises(RuntimeError):
+            clock.advance(60, AdvanceSource.SKIP, [self.player])
+        # The in-memory clock, a fresh read of the singleton, the persisted
+        # script attribute, and the entity surface all keep their old values.
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        self.assertEqual(self.player.traits.hp.current, 70)
+        self.assertEqual(self._stored_hp(), 70)
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_successful_advance_persists_entity_state_and_tick_together(self):
+        from evennia.utils.search import search_object, search_script
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        before_tick = clock.tick
+        clock.advance(3600, AdvanceSource.SKIP, [self.player])
+        # Simulate a restart: drop both idmapper instances and re-fetch.
+        self.player.flush_cached_instance(self.player)
+        script = search_script("world_clock")[0]
+        script.flush_cached_instance(script)
+        fresh_player = search_object(self.player.key)[0]
+        self.assertEqual(fresh_player.traits.hp.current, 100)
+        self.assertEqual(fresh_player.traits.sp.current, 100)
+        self.assertEqual(get_world_clock().tick, before_tick + 3600)
+
+    @covers_requirement("world-clock::advance-has-a-bounded-settlement-budget-per-call")
+    def test_oversized_advance_raises_before_any_write(self):
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        before_tick = clock.tick
+        with (
+            patch("world.rules.clock._run_stages") as stages,
+            self.assertRaises(ClockAdvanceBoundError),
+        ):
+            clock.advance(MAX_ADVANCE_SECONDS + 1, AdvanceSource.SKIP, [self.player])
+        stages.assert_not_called()
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(self.player.traits.hp.current, 10)
+        self.assertEqual(self._stored_hp(), 10)
