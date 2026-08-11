@@ -43,12 +43,16 @@ SHALL set at creation time. Before attempting to move, it SHALL call the travers
 `at_pre_move(None)` hook and abort with no state change if it returns falsy, matching the veto
 convention every other exit in the game (including the stock `WildernessExit`) honors. On a successful
 traversal, it SHALL send departure/arrival room announcements, call `at_post_move(None)` on the
-traversing object, call `world.rules.movement.charge_movement(traversing_object,
-"wilderness_move")` (the `movement-cost-charging` capability), and call
-`world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge` capability) —
-rather than calling `world.rules.clock.get_world_clock().advance()` directly. The observable cost,
-success-only condition, and `AdvanceSource.COMMAND` source are unchanged; only the call sites are now
-the shared functions every exit lineage uses. The arrival recording SHALL NOT alter the charge.
+traversing object, and complete through the shared movement-completion helper
+`typeclasses.exits.after_successful_movement(traversing_object, source_location,
+cost_key="wilderness_move", wilderness_coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].
+wilderness_xy, wilderness_name=WILDERNESS_NAME)` — the `onboarding-skip-coverage` change's shared
+boundary — which SHALL call `world.rules.movement.charge_movement(traversing_object, cost_key)` (the
+`movement-cost-charging` capability), `world.rules.map_knowledge.record_arrival(traversing_object)`
+(the `map-knowledge` capability), and the onboarding room-entry observer, rather than calling
+`world.rules.clock.get_world_clock().advance()` directly. The observable cost, success-only condition,
+and `AdvanceSource.COMMAND` source are unchanged; only the call sites are now the shared functions
+every exit lineage uses. The arrival recording SHALL NOT alter the charge.
 
 #### Scenario: Traversing the gate exit places the object in the wilderness at the registered coordinate
 - **WHEN** a character traverses a `WildernessGateExit` configured for `"capital_altoria"`
@@ -73,11 +77,13 @@ the shared functions every exit lineage uses. The arrival recording SHALL NOT al
   traversing object's location is unchanged, `get_world_clock().tick` is unchanged, and no
   map-knowledge observation is recorded
 
-#### Scenario: The clock charge and arrival recording go through the shared functions
+#### Scenario: The clock charge and arrival recording go through the shared completion helper
 - **WHEN** `typeclasses/exits.py::WildernessGateExit.at_traverse` is inspected
-- **THEN** its successful branch calls `world.rules.movement.charge_movement(traversing_object,
-  "wilderness_move")` and `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither
-  branch calls `world.rules.clock.get_world_clock().advance()` directly
+- **THEN** its successful branch calls `after_successful_movement(...)` with
+  `cost_key="wilderness_move"`, the shared helper (not the exit) calls
+  `world.rules.movement.charge_movement(traversing_object, cost_key)` and
+  `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the exit nor the helper
+  calls `world.rules.clock.get_world_clock().advance()` directly
 
 ### Requirement: WildernessReturnExit routes exactly one registered coordinate-and-direction pair back to the grid
 `typeclasses/exits.py::WildernessReturnExit`, subclassing
@@ -108,23 +114,25 @@ regardless of which routing branch was taken.
 ### Requirement: Every successful WildernessReturnExit traversal advances the clock, not only the registered return branch
 Every successful traversal through `WildernessReturnExit` — both the special-cased branch that routes
 back to a grid room, and the ordinary `super().at_traverse()` fallback that governs every other
-coordinate and direction — SHALL call `world.rules.movement.charge_movement(traversing_object,
-"wilderness_move")` and `world.rules.map_knowledge.record_arrival(traversing_object)` (the
-`movement-cost-charging` and `map-knowledge` capabilities), rather than calling
-`world.rules.clock.get_world_clock().advance()` directly, before returning. No successful step through
-this exit SHALL be free, and every successful step SHALL record its destination node. An unsuccessful
-traversal (the underlying `at_traverse_coordinates`/`at_pre_move` check fails, per the stock
-`WildernessExit`'s own logic) SHALL NOT advance the clock and SHALL NOT record an observation.
+coordinate and direction — SHALL complete through the shared movement-completion helper
+`typeclasses.exits.after_successful_movement(...)` with `cost_key="wilderness_move"`, which SHALL call
+`world.rules.movement.charge_movement(traversing_object, cost_key)` (the `movement-cost-charging`
+capability) and `world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge`
+capability) on both branches, plus the onboarding room-entry observer — rather than calling
+`world.rules.clock.get_world_clock().advance()` directly. No successful step through this exit SHALL
+be free, and every successful step SHALL record its destination node. An unsuccessful traversal (the
+underlying `at_traverse_coordinates`/`at_pre_move` check fails, per the stock `WildernessExit`'s own
+logic) SHALL NOT advance the clock and SHALL NOT record an observation.
 
 This is the concrete fix for a defect a rubber-duck review found in an earlier draft of this
 capability: `ElosernWildernessMapProvider.exit_typeclass = WildernessReturnExit` installs this class on
 all eight directional exits at every wilderness coordinate (the `wilderness-map-provider` capability),
 so if only the registered return branch advanced the clock, every intermediate step of a continent
 crossing would cost nothing — contradicting the whole point of wiring wilderness movement to
-`WorldClock` at all. Folding both call sites onto `charge_movement()` (rather than each duplicating
-`get_world_clock().advance()` independently) is this change's own contribution: the same fix, now
-expressed once instead of twice, and consistent with how every other movement lineage in the project
-charges (`movement-cost-charging` capability).
+`WorldClock` at all. Folding both call sites onto the one shared completion helper (rather than each
+duplicating `get_world_clock().advance()` independently) is this change's own contribution: the same
+fix, now expressed once instead of twice, and consistent with how every other movement lineage in the
+project charges (`movement-cost-charging` capability).
 
 #### Scenario: Traversing south from the registered entry coordinate advances the clock and records the grid node
 - **WHEN** a character successfully traverses the `"south"` exit at a registered entry coordinate
@@ -163,12 +171,13 @@ charges (`movement-cost-charging` capability).
   `get_world_clock().tick` is unchanged, and no map-knowledge observation is recorded — a failed
   return is never reported as a successful, clock-charged step
 
-#### Scenario: Both branches charge and record through the shared functions
+#### Scenario: Both branches complete through the shared completion helper
 - **WHEN** `typeclasses/exits.py::WildernessReturnExit.at_traverse` is inspected
 - **THEN** both its special-cased return branch and its `super().at_traverse()` fallback branch call
-  `world.rules.movement.charge_movement(traversing_object, "wilderness_move")` and
-  `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither calls
-  `world.rules.clock.get_world_clock().advance()` directly
+  `after_successful_movement(...)` with `cost_key="wilderness_move"`, the shared helper (not the
+  exit) calls `world.rules.movement.charge_movement(traversing_object, cost_key)` and
+  `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the exit nor the helper
+  calls `world.rules.clock.get_world_clock().advance()` directly
 
 ### Requirement: Leaving the wilderness through WildernessReturnExit triggers ordinary cleanup
 When a traversing object leaves a `TerrainRoom` through `WildernessReturnExit`'s grid-routing branch,

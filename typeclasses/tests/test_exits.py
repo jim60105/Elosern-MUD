@@ -8,7 +8,11 @@ from evennia.contrib.grid.wilderness.wilderness import WildernessExit
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
-from typeclasses.exits import WildernessGateExit, WildernessReturnExit
+from typeclasses.exits import (
+    WildernessGateExit,
+    WildernessReturnExit,
+    after_successful_movement,
+)
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.bootstrap import sync_grid, sync_wilderness
@@ -189,20 +193,52 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, wilderness_location)
         self.assertEqual(self._tick(), before)
 
+    @covers_requirement("onboarding-guide::deviation-detection-applies-to-every-room-type")
+    def test_guided_player_entering_wilderness_is_marked_skipped(self):
+        from world.rules.onboarding import snapshot_for
+
+        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
+        self.gate.at_traverse(self.char1, self.north_gate)
+        self.assertEqual(snapshot_for(self.char1).guide_progress.state, "skipped")
+        self.assertFalse(self.char1.onboarded)
+
+    def test_wilderness_step_and_return_are_noops_for_ended_guide(self):
+        from world.rules.onboarding import snapshot_for
+
+        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
+        self.gate.at_traverse(self.char1, self.north_gate)
+        before = snapshot_for(self.char1).guide_progress
+        self._exit("east").at_traverse(self.char1, self.char1.location)
+        self.assertEqual(snapshot_for(self.char1).guide_progress, before)
+        self._exit("west").at_traverse(self.char1, self.char1.location)
+        self._exit("south").at_traverse(self.char1, self.char1.location)
+        self.assertEqual(snapshot_for(self.char1).guide_progress, before)
+        self.assertIs(self.char1.location, self.north_gate)
+
 
 class WildernessClockChargeSourceTests(EvenniaTest):
-    """Source-inspection: the wilderness wiring goes through charge_movement
-    (map-movement-clock task 5.4), never an inline get_world_clock().advance."""
+    """Source-inspection: the wilderness wiring routes through the shared
+    ``after_successful_movement`` completion helper (onboarding-skip coverage
+    design D1), never an inline get_world_clock().advance."""
 
-    def test_gate_exit_uses_charge_movement_not_inline_advance(self):
+    @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
+    def test_gate_exit_routes_success_through_shared_completion_helper(self):
         source = inspect.getsource(WildernessGateExit.at_traverse)
-        self.assertIn("charge_movement(traversing_object, \"wilderness_move\")", source)
+        self.assertIn("after_successful_movement(", source)
+        self.assertIn('cost_key="wilderness_move"', source)
+        self.assertNotIn("get_world_clock().advance", source)
+        self.assertNotIn('charge_movement(traversing_object, "wilderness_move")', source)
+
+    @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
+    def test_return_exit_both_branches_route_through_shared_completion_helper(self):
+        source = inspect.getsource(WildernessReturnExit.at_traverse)
+        self.assertEqual(source.count("after_successful_movement("), 2)
         self.assertNotIn("get_world_clock().advance", source)
 
-    def test_return_exit_both_branches_use_charge_movement(self):
-        source = inspect.getsource(WildernessReturnExit.at_traverse)
-        self.assertEqual(
-            source.count("charge_movement(traversing_object, \"wilderness_move\")"),
-            2,
-        )
+    @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
+    def test_shared_helper_charges_records_and_observes_through_shared_functions(self):
+        source = inspect.getsource(after_successful_movement)
+        self.assertIn("charge_movement(traversing_object, cost_key)", source)
+        self.assertIn("record_arrival(traversing_object)", source)
+        self.assertIn("observe_room_entry(traversing_object)", source)
         self.assertNotIn("get_world_clock().advance", source)

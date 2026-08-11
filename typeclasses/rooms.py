@@ -43,10 +43,14 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZR
 
     Adopts ``QuestObservableRoomMixin`` so a ``PlayerCharacter`` entering a grid
     room advances matching REACH/ESCORT stages (quest-runtime D-5). Every
-    ``AnchorRoom`` inherits the hook through this class. After the quest
-    observer, the onboarding observer runs so 南門/公會外/corridor entries reach
-    ``world.rules.onboarding.observe_room_entry`` (onboarding-guide D10) — the
-    same player-entry path, no per-room monkey-patching.
+    ``AnchorRoom`` inherits the hook through this class. The onboarding
+    room-entry observer does NOT live here: it runs from the shared
+    movement-completion boundary ``after_successful_movement``
+    (``typeclasses/exits.py``), so arrivals into plain ``Room``, ``GridRoom``,
+    ``TerrainRoom``, and ``InstanceRoom`` all reach
+    ``world.rules.onboarding.observe_room_entry`` the same way (onboarding-skip
+    coverage design D1) — no per-room monkey-patching and no double
+    observation.
 
     ``ObjectParent`` sits before ``XYZRoom`` in the MRO so the shared zh-tw
     frame and the scene-flavor paragraph hook apply to every grid room while
@@ -61,9 +65,6 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZR
         from typeclasses.characters import PlayerCharacter
 
         if isinstance(obj, PlayerCharacter):
-            from world.rules.onboarding import observe_room_entry
-
-            observe_room_entry(obj)
             from world.art.service import ensure_scene_asset
 
             ensure_scene_asset(self.scene_archetype)

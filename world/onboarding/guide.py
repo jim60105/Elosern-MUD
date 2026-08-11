@@ -131,9 +131,15 @@ def room_entry_decision(snapshot: OnboardingSnapshot, room_key: str) -> str | No
 
     Returns ``None`` (no change), ``"completed"`` when the player reaches the
     guild exterior, or ``"skipped"`` when the player deviates outside the guided
-    corridor without finishing the guide.
+    corridor without finishing the guide. The one-transition rule makes the
+    decision ``None`` once the guide has ended: an onboarded player or a player
+    whose guide already reached ``completed`` or ``skipped`` never transitions
+    again, so repeated arrivals are observation no-ops.
     """
     if snapshot.onboarded:
+        return None
+    progress = snapshot.guide_progress
+    if progress is not None and progress.state != "active":
         return None
     if room_key == GUILD_EXTERIOR_ROOM_KEY:
         return "completed"

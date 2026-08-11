@@ -77,15 +77,16 @@ and SHALL be eligible for pruning.
 
 ### Requirement: Arrival recording happens only at existing successful-arrival seams
 `world/rules/map_knowledge.py`'s `record_arrival` SHALL be invoked only from the project's existing
-successful-arrival seams: `typeclasses/exits.py::MovementCostMixin.at_post_traverse` (after
-`charge_movement`), the success branches of `WildernessGateExit.at_traverse` and both success
-branches of `WildernessReturnExit.at_traverse` (after `charge_movement`), and
-`world/rules/onboarding.py::relocate_to_starting_location` (after a successful relocation, with no
-movement-time charge). Failed traversal, locked exits, vetoed `at_pre_move`, rolled-back movement,
-teleport-style `move_to` calls, quiet reclamation relocations, search, map rendering, and remote
-inspection SHALL NOT record discovery. The derived node SHALL be computed from the character's current
-location at recording time, so grid, wilderness, instance, and interior each yield their canonical
-identity without per-seam node computation.
+successful-arrival seams: the shared movement-completion helper
+`typeclasses.exits.after_successful_movement` — which the `MovementCostMixin.at_post_traverse`, the
+success branch of `WildernessGateExit.at_traverse`, and both success branches of
+`WildernessReturnExit.at_traverse` all call after `charge_movement` (the onboarding-skip-coverage
+change's shared boundary) — and `world/rules/onboarding.py::relocate_to_starting_location` (after a
+successful relocation, with no movement-time charge). Failed traversal, locked exits, vetoed
+`at_pre_move`, rolled-back movement, teleport-style `move_to` calls, quiet reclamation relocations,
+search, map rendering, and remote inspection SHALL NOT record discovery. The derived node SHALL be
+computed from the character's current location at recording time, so grid, wilderness, instance, and
+interior each yield their canonical identity without per-seam node computation.
 
 #### Scenario: Grid traversal records the destination after success
 - **WHEN** a `PlayerCharacter` successfully traverses a `CostedXYZExit` or an ordinary `Exit`

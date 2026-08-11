@@ -209,6 +209,98 @@ class OnboardingStateServiceTests(OnboardingGridMixin, EvenniaTest):
         self.assertTrue(guard.relations.has_record(self.player))
 
 
+class SharedMovementBoundarySkipTests(OnboardingGridMixin, EvenniaTest):
+    """Task 3.1: the shared movement-completion boundary (onboarding-skip
+    coverage design D1) marks the guide skipped for every room type — plain
+    ``Room`` and ``InstanceRoom`` here, wilderness covered by the typeclass
+    exit tests — while corridor arrivals and onboarded moves stay no-ops."""
+
+    def setUp(self):
+        super().setUp()
+        self.player.guide_progress = GuideProgress.active().to_storage()
+        self.player.location = _south_gate()
+
+    def _traverse(self, exit_obj, destination):
+        exit_obj.at_traverse(self.player, destination)
+
+    @covers_requirement("onboarding-guide::deviation-detection-applies-to-every-room-type")
+    def test_guided_player_entering_plain_room_is_marked_skipped(self):
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        destination = create_object(Room, key="plain-room")
+        exit_obj = create_object(Exit, key="door", location=_south_gate(), destination=destination)
+        self._traverse(exit_obj, destination)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "skipped")
+        self.assertFalse(self.player.onboarded)
+
+    @covers_requirement("onboarding-guide::deviation-detection-applies-to-every-room-type")
+    def test_guided_player_entering_instance_room_is_marked_skipped(self):
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import InstanceRoom
+
+        destination = create_object(InstanceRoom, key="instance-room")
+        destination.origin_room = _south_gate()
+        exit_obj = create_object(Exit, key="door", location=_south_gate(), destination=destination)
+        self._traverse(exit_obj, destination)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "skipped")
+
+    @covers_requirement("onboarding-guide::deviation-detection-applies-to-every-room-type")
+    def test_corridor_arrival_keeps_guide_active(self):
+        from typeclasses.exits import Exit
+
+        corridor = self._corridor_room()  # 南大道
+        exit_obj = create_object(Exit, key="north", location=_south_gate(), destination=corridor)
+        self._traverse(exit_obj, corridor)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "active")
+
+    def test_onboarded_player_move_is_a_noop(self):
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        self.player.onboarded = True
+        destination = create_object(Room, key="plain-room-2")
+        exit_obj = create_object(Exit, key="door", location=_south_gate(), destination=destination)
+        self._traverse(exit_obj, destination)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "active")
+
+    def test_entering_south_gate_through_exit_plays_arrival_scene(self):
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        self.player.guide_progress = None
+        self.player.onboarding_beat = None
+        outside = create_object(Room, key="outside-gate")
+        self.player.location = outside
+        exit_obj = create_object(Exit, key="gate", location=outside, destination=_south_gate())
+        messages = []
+        self.player.msg = lambda text, **kwargs: messages.append(str(text))
+        exit_obj.at_traverse(self.player, _south_gate())
+        self.assertTrue(any("南門" in message for message in messages))
+        self.assertEqual(self.player.onboarding_beat, "look")
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "active")
+
+    def test_repeated_arrival_does_not_rewrite_ended_guide(self):
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        destination = create_object(Room, key="plain-room-3")
+        exit_obj = create_object(Exit, key="door", location=_south_gate(), destination=destination)
+        self._traverse(exit_obj, destination)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "skipped")
+        self._traverse(exit_obj, destination)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "skipped")
+
+    def test_skipped_guide_never_flips_back_to_completed_at_guild_exterior(self):
+        from typeclasses.exits import Exit
+
+        self.player.guide_progress = GuideProgress(state="skipped").to_storage()
+        exterior = _guild_exterior()
+        exit_obj = create_object(Exit, key="east", location=_south_gate(), destination=exterior)
+        self._traverse(exit_obj, exterior)
+        self.assertEqual(snapshot_for(self.player).guide_progress.state, "skipped")
+
+
 class GuardSyncTests(OnboardingGridMixin, EvenniaTest):
     @covers_requirement("onboarding-guide::the-south-gate-guard-offers-scripted-guidance")
     def test_sync_creates_exactly_one_adult_guard(self):

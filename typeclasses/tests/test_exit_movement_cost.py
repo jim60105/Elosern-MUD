@@ -89,3 +89,24 @@ class MovementCostExitTests(EvenniaTest):
         self.char1.move_to(self.room2, quiet=True)
         self.assertIs(self.char1.location, self.room2)
         self.assertEqual(get_world_clock().tick, before)
+
+
+class MovementCostMixinSourceTests(EvenniaTest):
+    """Source-inspection: at_post_traverse delegates to the shared
+    after_successful_movement completion helper (onboarding-skip coverage
+    design D1), never an inline get_world_clock().advance."""
+
+    @covers_requirement("movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value")
+    def test_mixin_delegates_to_shared_completion_helper(self):
+        import inspect
+
+        from typeclasses.exits import MovementCostMixin, after_successful_movement
+
+        source = inspect.getsource(MovementCostMixin.at_post_traverse)
+        self.assertIn("after_successful_movement(", source)
+        self.assertIn("cost_key=self.movement_cost_key", source)
+        self.assertNotIn("get_world_clock().advance", source)
+        helper = inspect.getsource(after_successful_movement)
+        self.assertIn("charge_movement(traversing_object, cost_key)", helper)
+        self.assertIn("record_arrival(traversing_object)", helper)
+        self.assertNotIn("get_world_clock().advance", helper)
