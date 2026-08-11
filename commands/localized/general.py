@@ -8,6 +8,10 @@ upstream semantics. No stock English command remains reachable: the merged
 player cmdsets remove the originals (commands/default_cmdsets.py).
 """
 
+from typing import Any
+
+from django.db import transaction
+
 from evennia.commands.default.general import (
     CmdDrop as _CmdDrop,
     CmdGet as _CmdGet,
@@ -24,6 +28,15 @@ from evennia.commands.default.general import NumberedTargetCommand as _NumberedT
 from evennia.typeclasses.attributes import NickTemplateInvalid
 from evennia.utils import utils
 
+from world.lore.items import ITEM_REGISTRY
+from world.rules.equipment import (
+    InventoryError,
+    apply_inventory_plan,
+    materialize_registry_object,
+    plan_inventory_delta,
+    registry_key_for_object,
+)
+
 
 class NumberedTargetCommand(_NumberedTargetCommand):
     """Numbered-target parse that also accepts the zh-tw classifier 「個」.
@@ -37,6 +50,110 @@ class NumberedTargetCommand(_NumberedTargetCommand):
         super().parse()
         if self.number and self.args.startswith("個"):
             self.args = self.args[1:].lstrip()
+
+
+def _search_held(
+    caller: Any, args: str, number: int, fallback_key: str | None
+) -> list[Any] | None:
+    """Resolve a held item for drop/give.
+
+    Searches the character's containment; when ``fallback_key`` names a
+    registry key the canonical list holds, a containment miss resolves to the
+    key-only removal path (returned as an empty list). Returns ``None`` when
+    the standard zh-tw not-found / multi-match message was already echoed.
+    """
+    nofound_string = f"你沒有帶著 {args}。"
+    multimatch_string = f"你帶著不只一個 {args}："
+    if fallback_key is None:
+        objs = caller.search(
+            args,
+            location=caller,
+            nofound_string=nofound_string,
+            multimatch_string=multimatch_string,
+            stacked=number,
+        )
+        if not objs:
+            return None
+        return utils.make_iter(objs)
+    objs = caller.search(args, location=caller, quiet=True, stacked=number) or []
+    if len(objs) > 1 and not number:
+        caller.search(
+            args,
+            location=caller,
+            multimatch_string=multimatch_string,
+            stacked=number,
+        )
+        return None
+    return objs
+
+
+class _TransferRefused(Exception):
+    """A move was refused; the enclosing transaction rolls back untouched."""
+
+
+def _reconcile_rollback(objs: list[Any], origin: Any, destination: Any) -> None:
+    """Re-point Evennia's in-memory state after a database rollback.
+
+    Django undoes the moves at the database level, but the moved instances
+    keep their stale ``db_location`` field and the involved containers keep
+    stale contents caches. Re-point the fields (no save: the database is
+    already correct) and re-init the container caches from the database.
+    """
+    for obj in objs:
+        obj.db_location = origin
+    for container in {origin, destination} - {None}:
+        container.contents_cache.init()
+
+
+def _receiver_plan(target: Any, keys: tuple[str, ...]) -> Any:
+    """Plan the canonical-list addition for a character-like receiver.
+
+    Only player characters and NPCs hold canonical inventories; other
+    targets (rooms, plain objects) receive containment-only items.
+    """
+    if not keys:
+        return None
+    from typeclasses.characters import PlayerCharacter
+    from typeclasses.npcs import NPC
+
+    if not isinstance(target, (PlayerCharacter, NPC)):
+        return None
+    return plan_inventory_delta(target, additions=keys)
+
+
+def _transfer_with_plan(
+    objs: list[Any],
+    destination: Any,
+    move_type: str,
+    plan: Any,
+    extra_plans: tuple[Any, ...] = (),
+    origin: Any = None,
+) -> list[Any]:
+    """Atomically move objects and apply the canonical key-list deltas.
+
+    All-or-nothing: a refused move (``move_to`` returning ``False``) raises
+    inside the transaction, so the database rolls back every completed move
+    and no key list changes; the moved instances and container caches are
+    then reconciled with the rolled-back database. Refusals return ``[]``;
+    other exceptions re-raise after the same reconciliation.
+    """
+    try:
+        with transaction.atomic():
+            for obj in objs:
+                if not obj.move_to(destination, quiet=True, move_type=move_type):
+                    raise _TransferRefused
+            if plan is not None:
+                apply_inventory_plan(plan)
+            for extra_plan in extra_plans:
+                if extra_plan is not None:
+                    apply_inventory_plan(extra_plan)
+    except _TransferRefused:
+        _reconcile_rollback(objs, origin, destination)
+        return []
+    except Exception:
+        _reconcile_rollback(objs, origin, destination)
+        raise
+    return list(objs)
 
 
 class CmdLook(_CmdLook):
@@ -137,7 +254,7 @@ class CmdGet(_CmdGet, NumberedTargetCommand):
     用法：
       拿 <物品>
 
-    從你所在的位置撿起一個物品，放進背包。
+    從你所在的位置撿起一個物品，放進背包。登錄物品會同步計入背包清單。
     """
 
     key = "拿"
@@ -168,20 +285,29 @@ class CmdGet(_CmdGet, NumberedTargetCommand):
             if not obj.at_pre_get(caller):
                 return
 
-        moved = []
-        for obj in objs:
-            if obj.move_to(caller, quiet=True, move_type="get"):
-                moved.append(obj)
-                obj.at_get(caller)
-
+        additions = tuple(
+            item_key
+            for item_key in (registry_key_for_object(obj) for obj in objs)
+            if item_key is not None
+        )
+        plan = plan_inventory_delta(caller, additions=additions) if additions else None
+        moved = _transfer_with_plan(
+            objs,
+            destination=caller,
+            move_type="get",
+            plan=plan,
+            origin=caller.location,
+        )
         if not moved:
             self.msg("那個撿不起來。")
-        else:
-            obj_name = moved[0].get_numbered_name(len(moved), caller, return_string=True)
-            caller.msg(f"你撿起了{obj_name}。")
-            caller.location.msg_contents(
-                f"{caller.key} 撿起了{obj_name}。", exclude=[caller]
-            )
+            return
+        for obj in moved:
+            obj.at_get(caller)
+        obj_name = moved[0].get_numbered_name(len(moved), caller, return_string=True)
+        caller.msg(f"你撿起了{obj_name}。")
+        caller.location.msg_contents(
+            f"{caller.key} 撿起了{obj_name}。", exclude=[caller]
+        )
 
 
 class CmdDrop(_CmdDrop, NumberedTargetCommand):
@@ -190,7 +316,7 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
     用法：
       丟 <物品>
 
-    把背包中的一個物品丟到你目前所在的位置。
+    把背包中的一個物品丟到你目前所在的位置。登錄物品的背包清單記錄會同步移除。
     """
 
     key = "丟"
@@ -202,36 +328,71 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
         if not self.args:
             caller.msg("要丟什麼？")
             return
-
-        objs = caller.search(
-            self.args,
-            location=caller,
-            nofound_string=f"你沒有帶著 {self.args}。",
-            multimatch_string=f"你帶著不只一個 {self.args}：",
-            stacked=self.number,
+        key = self.args
+        fallback_key = (
+            key if key in ITEM_REGISTRY and key in (caller.db.inventory or []) else None
         )
-        if not objs:
+        objs = _search_held(caller, key, self.number, fallback_key)
+        if objs is None:
             return
-        objs = utils.make_iter(objs)
+        if not objs:
+            # The canonical list holds the key but no contained object (e.g. a
+            # quest reward): materialize the missing mirror in the room, then
+            # remove the key, so the drop is a real all-or-nothing transfer.
+            quantity = self.number or 1
+            try:
+                plan = plan_inventory_delta(
+                    caller, removals=tuple(key for _ in range(quantity))
+                )
+            except InventoryError:
+                caller.msg(f"你沒有帶著 {key}。")
+                return
+            try:
+                with transaction.atomic():
+                    for _ in range(quantity):
+                        materialize_registry_object(caller.location, key)
+                    apply_inventory_plan(plan)
+            except Exception:
+                caller.location.contents_cache.init()
+                raise
+            name = f"{quantity} 個 {key}" if quantity > 1 else key
+            caller.msg(f"你丟下了{name}。")
+            caller.location.msg_contents(
+                f"{caller.key} 丟下了{name}。", exclude=[caller]
+            )
+            return
 
         for obj in objs:
             if not obj.at_pre_drop(caller):
                 return
 
-        moved = []
-        for obj in objs:
-            if obj.move_to(caller.location, quiet=True, move_type="drop"):
-                moved.append(obj)
-                obj.at_drop(caller)
-
+        removals = tuple(
+            item_key
+            for item_key in (registry_key_for_object(obj) for obj in objs)
+            if item_key is not None
+        )
+        try:
+            plan = plan_inventory_delta(caller, removals=removals) if removals else None
+        except InventoryError:
+            caller.msg(f"你沒有帶著 {key}。")
+            return
+        moved = _transfer_with_plan(
+            objs,
+            destination=caller.location,
+            move_type="drop",
+            plan=plan,
+            origin=caller,
+        )
         if not moved:
             self.msg("那個丟不掉。")
-        else:
-            obj_name = moved[0].get_numbered_name(len(moved), caller, return_string=True)
-            caller.msg(f"你丟下了{obj_name}。")
-            caller.location.msg_contents(
-                f"{caller.key} 丟下了{obj_name}。", exclude=[caller]
-            )
+            return
+        for obj in moved:
+            obj.at_drop(caller)
+        obj_name = moved[0].get_numbered_name(len(moved), caller, return_string=True)
+        caller.msg(f"你丟下了{obj_name}。")
+        caller.location.msg_contents(
+            f"{caller.key} 丟下了{obj_name}。", exclude=[caller]
+        )
 
 
 class CmdGive(_CmdGive, NumberedTargetCommand):
@@ -240,7 +401,7 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
     用法：
       給 <背包中的物品> = <目標>
 
-    把你背包中的物品交給另一個人，放進對方的背包。
+    把你背包中的物品交給另一個人，放進對方的背包。登錄物品的背包清單記錄會同步轉移。
     """
 
     key = "給"
@@ -253,20 +414,46 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         if not self.args or not self.rhs:
             caller.msg("用法：給 <背包中的物品> = <目標>")
             return
-        to_give = caller.search(
-            self.lhs,
-            location=caller,
-            nofound_string=f"你沒有帶著 {self.lhs}。",
-            multimatch_string=f"你帶著不只一個 {self.lhs}：",
-            stacked=self.number,
+        key = self.lhs
+        fallback_key = (
+            key if key in ITEM_REGISTRY and key in (caller.db.inventory or []) else None
         )
-        if not to_give:
+        to_give = _search_held(caller, key, self.number, fallback_key)
+        if to_give is None:
             return
         target = caller.search(self.rhs)
         if not target:
             return
-
-        to_give = utils.make_iter(to_give)
+        if not to_give:
+            # The canonical list holds the key but no contained object (e.g. a
+            # quest reward): materialize the missing mirror at the target, then
+            # transfer the key, so the give is a real all-or-nothing transfer.
+            quantity = self.number or 1
+            name = f"{quantity} 個 {key}" if quantity > 1 else key
+            if target == caller:
+                caller.msg(f"你把{name}留給了自己。")
+                return
+            try:
+                plan = plan_inventory_delta(
+                    caller, removals=tuple(key for _ in range(quantity))
+                )
+                receiver_plan = _receiver_plan(target, tuple(key for _ in range(quantity)))
+            except InventoryError:
+                caller.msg(f"你沒有帶著 {key}。")
+                return
+            try:
+                with transaction.atomic():
+                    for _ in range(quantity):
+                        materialize_registry_object(target, key)
+                    apply_inventory_plan(plan)
+                    if receiver_plan is not None:
+                        apply_inventory_plan(receiver_plan)
+            except Exception:
+                target.contents_cache.init()
+                raise
+            caller.msg(f"你把{name}交給了 {target.get_display_name(caller)}。")
+            target.msg(f"{caller.get_display_name(target)} 把{name}交給了你。")
+            return
 
         singular, plural = to_give[0].get_numbered_name(len(to_give), caller)
         if target == caller:
@@ -277,20 +464,35 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
             if not obj.at_pre_give(caller, target):
                 return
 
-        moved = []
-        for obj in to_give:
-            if obj.move_to(target, quiet=True, move_type="give"):
-                moved.append(obj)
-                obj.at_give(caller, target)
-
+        removals = tuple(
+            item_key
+            for item_key in (registry_key_for_object(obj) for obj in to_give)
+            if item_key is not None
+        )
+        try:
+            plan = plan_inventory_delta(caller, removals=removals) if removals else None
+            receiver_plan = _receiver_plan(target, removals)
+        except InventoryError:
+            caller.msg(f"你沒有帶著 {key}。")
+            return
+        moved = _transfer_with_plan(
+            to_give,
+            destination=target,
+            move_type="give",
+            plan=plan,
+            extra_plans=(receiver_plan,),
+            origin=caller,
+        )
         if not moved:
             caller.msg(
                 f"你無法把物品交給 {target.get_display_name(caller)}。"
             )
-        else:
-            obj_name = to_give[0].get_numbered_name(len(moved), caller, return_string=True)
-            caller.msg(f"你把{obj_name}交給了 {target.get_display_name(caller)}。")
-            target.msg(f"{caller.get_display_name(target)} 把{obj_name}交給了你。")
+            return
+        for obj in moved:
+            obj.at_give(caller, target)
+        obj_name = to_give[0].get_numbered_name(len(moved), caller, return_string=True)
+        caller.msg(f"你把{obj_name}交給了 {target.get_display_name(caller)}。")
+        target.msg(f"{caller.get_display_name(target)} 把{obj_name}交給了你。")
 
 
 class CmdHome(_CmdHome):

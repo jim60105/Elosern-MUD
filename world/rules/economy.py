@@ -23,7 +23,11 @@ from world.rules.surfaces import (
     restore_traits,
     snapshot_traits,
 )
-from world.rules.equipment import plan_inventory_delta
+from world.rules.equipment import (
+    materialize_registry_object,
+    plan_inventory_delta,
+    registry_key_for_object,
+)
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 
@@ -206,6 +210,10 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
         from world.rules.affinity import AffinitySource, apply_affinity_change
 
         apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
+        # Mirror the key-list entries with one contained object each, so
+        # drop/give always resolve a real object for the bought items.
+        for _ in range(quantity):
+            materialize_registry_object(actor, item_key)
 
     def restore():
         _restore_trade(actor, merchant, snapshot)
@@ -278,6 +286,13 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
         from world.rules.affinity import AffinitySource, apply_affinity_change
 
         apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
+        # Drop the mirrored contained objects for the sold key; the key list
+        # stays authoritative when containment holds fewer than sold.
+        contained = [
+            obj for obj in actor.contents if registry_key_for_object(obj) == item_key
+        ]
+        for obj in contained[:quantity]:
+            obj.delete()
 
     def restore():
         _restore_trade(actor, merchant, snapshot)

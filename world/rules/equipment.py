@@ -14,6 +14,7 @@ from typing import Any
 
 from django.db import transaction
 
+from world.lore.items import ITEM_REGISTRY
 from world.rules.surfaces import (
     attribute_snapshot,
     restore_traits,
@@ -23,6 +24,38 @@ from world.rules.surfaces import (
 
 class InventoryError(ValueError):
     """An inventory operation violates the deterministic planning contract."""
+
+
+def registry_key_for_object(obj: Any) -> str | None:
+    """Map a contained Evennia Object to its ``ITEM_REGISTRY`` key.
+
+    An explicit ``registry_key`` attribute wins over the object key, so a
+    scene object authored with a name that happens to match a registry key
+    never enters the canonical inventory by accident. Objects outside the
+    registry map to ``None``.
+    """
+    attr_key = getattr(obj.db, "registry_key", None)
+    if attr_key in ITEM_REGISTRY:
+        return attr_key
+    if obj.key in ITEM_REGISTRY:
+        return obj.key
+    return None
+
+
+def materialize_registry_object(container: Any, item_key: str) -> Any:
+    """Create the contained mirror Object for one canonical key entry.
+
+    The object carries an explicit ``registry_key`` attribute so
+    ``registry_key_for_object`` resolves it without relying on its key.
+    """
+    from evennia.utils.create import create_object
+
+    return create_object(
+        "typeclasses.objects.Object",
+        key=item_key,
+        attributes=[("registry_key", item_key)],
+        location=container,
+    )
 
 
 @dataclass(frozen=True)

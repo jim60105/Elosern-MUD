@@ -7,7 +7,7 @@ Buy and sell SHALL keep operating on `db.inventory` as today, and their prefligh
 #### Scenario: Sell sees every canonical item including picked-up ones
 
 - **WHEN** a player picked up a registry item via `拿` and then opens the shop sell flow
-- **THEN** the item appears in sellable holdings and selling removes its key from `db.inventory`
+- **THEN** the item appears in sellable holdings, selling removes its key from `db.inventory`, and the mirrored contained objects of the sold units are removed
 
 #### Scenario: Buy materializes the contained object
 

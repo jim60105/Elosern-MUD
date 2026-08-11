@@ -5,8 +5,9 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
+from commands.localized import CmdDrop, CmdGet, CmdGive
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
@@ -42,7 +43,7 @@ class ShopRegistryIsolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
+class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         load_catalog_into_cache()
@@ -205,6 +206,81 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaTest):
             buy(self.player, self.merchant_npc, "meal", 1)
         self.assertNotIsInstance(self.player.db.wallet, float)
         self.assertEqual(self.player.db.wallet, 90)
+
+    def _contained(self, item_key):
+        return [obj for obj in self.player.contents if obj.key == item_key]
+
+    @covers_requirement("shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory")
+    @covers_requirement("equipment-inventory::the-key-list-is-the-single-canonical-inventory-record-for-registry-items")
+    def test_buy_materializes_a_contained_object_per_item(self):
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            buy(self.player, self.merchant_npc, "meal", 2)
+        self.assertEqual(len(self._contained("meal")), 2)
+        self.assertTrue(all(obj.db.registry_key == "meal" for obj in self._contained("meal")))
+        self.assertEqual(list_items(self.player), ["meal", "meal"])
+
+    @covers_requirement("shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory")
+    def test_sell_removes_the_contained_objects(self):
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            buy(self.player, self.merchant_npc, "meal", 2)
+            sell(self.player, self.merchant_npc, "meal", 1)
+        self.assertEqual(len(self._contained("meal")), 1)
+        self.assertEqual(list_items(self.player), ["meal"])
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            sell(self.player, self.merchant_npc, "meal", 1)
+        self.assertEqual(self._contained("meal"), [])
+        self.assertEqual(list_items(self.player), [])
+
+    def test_sell_deletes_what_exists_when_containment_holds_fewer(self):
+        self.player.db.inventory = ["meal", "meal"]
+        self.merchant.merchant_stock = {"meal": 5}
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.player,
+        )
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(self.player, self.merchant_npc, "meal", 2)
+        self.assertEqual(result["quantity"], 2)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(self._contained("meal"), [])
+
+    def test_bought_item_can_be_dropped(self):
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            buy(self.player, self.merchant_npc, "meal", 1)
+        output = self.call(CmdDrop(), "meal", caller=self.player)
+        self.assertIn("你丟下了meal。", output)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(self._contained("meal"), [])
+        self.assertEqual(len([o for o in self.store.contents if o.key == "meal"]), 1)
+
+    def test_bought_item_can_be_given(self):
+        recipient = create_object(PlayerCharacter, key="recipient", location=self.store)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            buy(self.player, self.merchant_npc, "meal", 1)
+        output = self.call(CmdGive(), "meal = recipient", caller=self.player)
+        self.assertIn("你把meal交給了", output)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(self._contained("meal"), [])
+        self.assertEqual(len([o for o in recipient.contents if o.key == "meal"]), 1)
+
+    @covers_requirement("shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory")
+    def test_picked_up_item_is_sellable(self):
+        create_object(
+            "typeclasses.objects.Object",
+            key="healing_potion",
+            attributes=[("registry_key", "healing_potion")],
+            location=self.store,
+        )
+        self.call(CmdGet(), "healing_potion", caller=self.player)
+        self.assertEqual(list_items(self.player), ["healing_potion"])
+        self.assertEqual(len(self._contained("healing_potion")), 1)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(self.player, self.merchant_npc, "healing_potion", 1)
+        self.assertEqual(result["quantity"], 1)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(self._contained("healing_potion"), [])
 
 
 class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTest):
