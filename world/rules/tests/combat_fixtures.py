@@ -8,13 +8,14 @@ from world.rules.skip_safety import _BATTLEFIELDS
 class BattlefieldIsolation:
     """Snapshot and restore the transient skip-safety battlefield registry.
 
-    ``world.rules.skip_safety._BATTLEFIELDS`` is keyed by entity keys, which
-    Evennia's test fixtures reuse across tests (every ``char1`` is ``"Char"``);
-    a combat test that engages without settling leaves a stale registration
-    that makes a later skip-safety evaluation in the same process report a
-    false "in combat". Every test that registers battlefields restores the
-    registry in teardown, and the restoration is registered via ``addCleanup``
-    so a failing ``setUp`` cannot leak either.
+    ``world.rules.skip_safety._BATTLEFIELDS`` is keyed by participant dbrefs,
+    which Evennia's test fixtures keep distinct across tests (every ``char1``
+    is ``"Char"`` but has its own pk); a combat test that engages without
+    settling leaves a stale registration that makes a later skip-safety
+    evaluation in the same process report a false "in combat". Every test that
+    registers battlefields restores the registry in teardown, and the
+    restoration is registered via ``addCleanup`` so a failing ``setUp`` cannot
+    leak either.
     """
 
     def setUp(self):

@@ -17,23 +17,27 @@ _BATTLEFIELDS: dict[str, Battlefield] = {}
 
 
 def register_active_battlefield(battlefield: Battlefield) -> None:
-    """Register a transient battlefield lookup for its current roster."""
-    _BATTLEFIELDS.update({key: battlefield for key in battlefield.roster})
+    """Register a transient battlefield lookup for its current roster.
+
+    Indexed by each participant's immutable dbref so same-key entities can
+    never cross-evict each other's registrations.
+    """
+    _BATTLEFIELDS.update({str(entity.pk): battlefield for entity in battlefield.roster.values()})
 
 
 def unregister_active_battlefield(entity: Any) -> None:
     """Remove one combatant's transient battlefield lookup on settlement."""
-    _BATTLEFIELDS.pop(str(entity.key), None)
+    _BATTLEFIELDS.pop(str(entity.pk), None)
 
 
 def unregister_participants(dbrefs: Iterable[int]) -> None:
     """Remove every registration whose roster contains any participant dbref.
 
     Settlement cleanup for a session whose participant objects cannot all be
-    resolved (party-combat D-5): a deleted participant's key can no longer be
-    looked up through its object, but its battlefield registration still holds
-    every roster key -- so this scan purges the whole session's keys at once,
-    and a stale key can never survive to block a later object that reuses it.
+    resolved (party-combat D-5): a deleted participant's dbref still maps to a
+    live battlefield in the registry, so this scan purges the whole session's
+    registrations at once, and a stale registration can never survive to block
+    a later object that reuses the same display key.
     """
     wanted = {int(dbref) for dbref in dbrefs}
     stale = [
@@ -50,7 +54,7 @@ def unregister_participants(dbrefs: Iterable[int]) -> None:
 
 
 def _active_battlefield_for(actor: Any) -> Battlefield | None:
-    return _BATTLEFIELDS.get(str(actor.key))
+    return _BATTLEFIELDS.get(str(actor.pk))
 
 
 def _living(entity: Any) -> bool:

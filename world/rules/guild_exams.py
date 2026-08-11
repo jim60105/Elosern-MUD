@@ -211,6 +211,11 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
         ensure_npc_adult_identity(opponent)
         opponent.location = actor.location
+        # Suffix the pk so a participant whose display name equals the bare
+        # ``guild-examiner-<rank>`` pattern can never collide in a battlefield
+        # roster keyed by display key.
+        opponent.key = f"guild-examiner-{target_rank}-{opponent.pk}"
+        opponent.save()
     except Exception:
         try:
             opponent.delete()
@@ -279,19 +284,20 @@ def start_guild_exam(
     attempt = _attempt_number(records, target_rank)
     exam_id = f"{actor.pk}:{target_rank}:{attempt}"
 
-    # Precompute the opponent spawn before any mutation so no orphan exists.
-    opponent = _spawn_opponent(actor, target_rank)
-
     from world.rules.combat_session import CombatSessionRecord, to_storage
 
     record_snapshot = attribute_snapshot(actor, "guild_exams")
     session_snapshot = attribute_snapshot(actor, "active_combat")
     rank_snapshot = attribute_snapshot(actor, "guild_rank")
     examiner_relations = attribute_snapshot(examiner, "relations_data")
+    opponent = None
     try:
         from django.db import transaction
 
         with transaction.atomic():
+            # Spawn inside the transaction so every failure path rolls the
+            # opponent back; no orphan can survive a rejected start.
+            opponent = _spawn_opponent(actor, target_rank)
             session = CombatSessionRecord(
                 session_id=f"guild_exam:{actor.pk}:{exam_id}",
                 mode="guild_exam",
@@ -324,16 +330,21 @@ def start_guild_exam(
 
             apply_affinity_change(examiner, actor, AffinitySource.GUILD, 1)
     except Exception:
+        from world.rules.skip_safety import unregister_participants
+
+        if opponent is not None:
+            unregister_participants((int(actor.pk), int(opponent.pk)))
         from world.rules.surfaces import restore_attribute_best_effort
 
         restore_attribute_best_effort(actor, "guild_exams", record_snapshot)
         restore_attribute_best_effort(actor, "active_combat", session_snapshot)
         restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
         restore_attribute_best_effort(examiner, "relations_data", examiner_relations)
-        try:
-            opponent.delete()
-        except Exception:
-            pass
+        if opponent is not None:
+            try:
+                opponent.delete()
+            except Exception:
+                pass
         raise
     return exam_record
 
