@@ -23,6 +23,7 @@ _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "magic_xp", "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
+    "portrait_policy",
 )
 
 # The persona draft's exact prose field set (creation-persona-persistence D3).
@@ -237,6 +238,25 @@ def starting_magic_interval(race_key: str) -> tuple[int, int]:
     return low, high
 
 
+def finalize_player_portrait(character: Any) -> None:
+    """Establish the named portrait policy and schedule the post-commit ensure.
+
+    The explicit named policy (``{"mode": "named", "stable_key": str(pk)}``)
+    is the art lifecycle's eligibility marker; ``schedule_portrait_ensure``
+    registers the exception-safe post-commit ensure. Must be called INSIDE the
+    activation transaction (fix-creation-finalization-safety D3): a rollback
+    removes the policy attribute and the registered on-commit job never fires,
+    so no rolled-back creation can leave portrait state behind.
+    """
+    character.db.portrait_policy = {
+        "mode": "named",
+        "stable_key": str(character.pk),
+    }
+    from world.art.service import schedule_portrait_ensure
+
+    schedule_portrait_ensure(character)
+
+
 def activate_player_character(
     account: Any,
     character: Any,
@@ -324,6 +344,14 @@ def activate_player_character(
                 if write_observer:
                     write_observer("creation_draft")
                 character.attributes.remove("creation_draft")
+            # Every player-activation path (Telnet command, WebClient
+            # ``activate_draft``) establishes the named portrait policy and
+            # schedules the post-commit portrait ensure INSIDE this activation
+            # transaction (fix-creation-finalization-safety D3): a rollback
+            # removes the policy attribute and the on-commit job never fires.
+            finalize_player_portrait(character)
+            if write_observer:
+                write_observer("portrait_policy")
     except Exception:
         character.key = old_key
         restore_traits(character, trait_snapshot)

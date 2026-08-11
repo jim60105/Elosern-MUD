@@ -15,9 +15,9 @@
 
 ## Decisions
 
-**D1 — Move the confirm-view switch into the save success path (client).** `_submitCustom` transitions to the confirmation view only inside the `creation.custom` success callback; on rejection/error it stays on the form and surfaces the rejection code.
+**D1 — Move the confirm-view switch into the save success path (client).** `_submitCustom` and the preset-card handler transition to the confirmation view only inside the `creation.custom`/`creation.preset` success callback; on rejection/error they stay on the current view (custom form or preset list) and surface the rejection code.
 
-**D2 — Server-side draft fingerprint binding (defense in depth).** `save_custom_draft` returns the fingerprint of the stored draft; the adapter records it as `session.ndb`-local state (or in the returned payload) and `creation.activate` requires the activation payload's fingerprint to match the draft it is about to activate. A mismatch is rejected with a stable code, so even a crafted/stale confirmation cannot activate an older draft.
+**D2 — Server-side draft fingerprint binding (defense in depth).** The save adapters record the fingerprint of the stored draft as character-local state and return it in the success result; `creation.activate` requires the recorded fingerprint to match the draft it is about to activate. A mismatch is rejected with a stable code, so even a crafted/stale confirmation cannot activate an older draft. Any rejected save attempt invalidates the recorded fingerprint, so a leftover confirmation cannot activate an older draft after a failed save.
 
 **D3 — Shared post-activation finalization helper inside the activation transaction.** Extract `finalize_player_portrait(character)` (named policy `{"mode": "named", "stable_key": str(pk)}` + `transaction.on_commit(schedule_portrait_ensure)`) into `world/rules/character_creation.py`; call it from both `commands/character_creation.py` and `_creation_activate_adapter` INSIDE `activate_player_character`'s outer transaction, so a rollback removes both the policy attribute and any queued job (fault-injection test pins this).
 
@@ -25,4 +25,4 @@
 
 - **Fingerprint format drift**: draft fingerprint must be stable between save and activate; reuse the existing serialization/fingerprint function already used for draft staleness (`creation_wizard.py:455-468`).
 - **Failed portrait enqueue after activation**: art failures must not roll back the character; finalization stays post-commit, mirroring Telnet today.
-- **Web preset/concept paths**: activation gating applies to custom saves; preset/concept paths already finalize the same stored draft and go through the same activate adapter, so fingerprint binding covers them uniformly.
+- **Web preset/concept paths**: activation gating applies to preset and custom saves (the same result-gated confirmation covers both, and both invalidate on rejection); concept saves record the fingerprint on success and invalidate on rejection. All paths finalize the same stored draft and go through the same activate adapter, so fingerprint binding covers them uniformly.

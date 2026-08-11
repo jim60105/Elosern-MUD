@@ -100,17 +100,10 @@ def _activate_creation(
         relocate_to_starting_location,
     )
 
-    # Establish the explicit named portrait policy and schedule the
-    # post-commit portrait ensure. A failed activation returns above, so a
-    # rolled-back creation never writes a policy or emits a job (design D2/D7).
-    caller.db.portrait_policy = {
-        "mode": "named",
-        "stable_key": str(caller.pk),
-    }
-    from world.art.service import schedule_portrait_ensure
-
-    schedule_portrait_ensure(caller)
-
+    # Portrait finalization (named ``portrait_policy`` + post-commit ensure)
+    # runs INSIDE the activation transaction through the shared
+    # ``finalize_player_portrait``, so a rolled-back creation never writes a
+    # policy or emits a job (fix-creation-finalization-safety D3).
     relocate_to_starting_location(caller)
     caller.msg(
         f"角色 {result.display_name} 已建立，初始魔法等級為 {result.magic_level}。"

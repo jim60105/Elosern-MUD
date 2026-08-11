@@ -59,6 +59,14 @@ ALLOCATION_MAXIMUM = 10000
 AFFECTED_CREATION = ("creation",)
 AFFECTED_ACTIVATE = ()
 
+# The character ndb key carrying the fingerprint of the draft confirmed by the
+# last successful save (fix-creation-finalization-safety D2). Recorded on the
+# character rather than the session so the binding survives a transport
+# replacement: the webclient reconnect flow retires session state
+# (``retire_sequence``), and a reconnect-resumed confirmation must still verify
+# against the saved draft.
+FINGERPRINT_NDB_KEY = "elosern_confirmed_draft_fingerprint"
+
 
 class CreationActionError(ValueError):
     """A creation action payload violates its exact bounded schema."""
@@ -186,6 +194,43 @@ def _success(code: str, message: str, affected: tuple[str, ...]) -> dict[str, An
     }
 
 
+def _confirmed_success(
+    code: str,
+    message: str,
+    affected: tuple[str, ...],
+    actor: Any,
+) -> dict[str, Any]:
+    """Build a success result bound to the draft that was just saved.
+
+    ``draft_fingerprint`` is captured AFTER the deterministic save so the
+    record always names the stored draft; the fingerprint is returned in the
+    result and recorded as character-local state so ``creation.activate`` can
+    reject a confirmation whose draft changed in between
+    (fix-creation-finalization-safety D2).
+    """
+    fingerprint = draft_fingerprint(actor)
+    setattr(actor.ndb, FINGERPRINT_NDB_KEY, fingerprint)
+    return {
+        **_success(code, message, affected),
+        "fingerprint": fingerprint,
+    }
+
+
+def _invalidate_confirmation(actor: Any) -> None:
+    """Drop the recorded save confirmation so a later activation is refused.
+
+    Any failed save attempt invalidates the confirmation: the draft the player
+    was trying to save was not stored, so a confirmation left over from an
+    earlier successful save must not be able to activate that older draft
+    (fix-creation-finalization-safety D2, webclient-character-creation-ui
+    "Save rejection followed by activation is refused").
+    """
+    try:
+        delattr(actor.ndb, FINGERPRINT_NDB_KEY)
+    except AttributeError:
+        pass
+
+
 def _pending_owner(actor: Any):
     """Return the owning account when ``actor`` is an owned pending shell.
 
@@ -217,27 +262,31 @@ def _creation_preset_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, A
     """Validate the preset key and persist the ``preset_selected`` draft."""
     account = _pending_owner(actor)
     if account is None:
+        _invalidate_confirmation(actor)
         return _rejected("ownership_rejected")
     try:
         save_preset_draft(account, actor, payload["preset_key"])
     except CharacterCreationError as error:
+        _invalidate_confirmation(actor)
         return _rejected(error)
     message = "已儲存預設角色選擇。"
-    return _success("preset_saved", message, AFFECTED_CREATION)
+    return _confirmed_success("preset_saved", message, AFFECTED_CREATION, actor)
 
 
 def _creation_custom_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Validate the complete custom form and persist the ``custom_filled`` draft."""
     account = _pending_owner(actor)
     if account is None:
+        _invalidate_confirmation(actor)
         return _rejected("ownership_rejected")
     request = CharacterCreationRequest(mode="custom", **payload)
     try:
         save_custom_draft(account, actor, request)
     except CharacterCreationError as error:
+        _invalidate_confirmation(actor)
         return _rejected(error)
     message = "已儲存自訂角色資料。"
-    return _success("custom_saved", message, AFFECTED_CREATION)
+    return _confirmed_success("custom_saved", message, AFFECTED_CREATION, actor)
 
 
 def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
@@ -253,8 +302,10 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     """
     account = _pending_owner(actor)
     if account is None:
+        _invalidate_confirmation(actor)
         return _rejected("ownership_rejected")
     if not bool(getattr(actor, "creation_pending", False)):
+        _invalidate_confirmation(actor)
         return _rejected("already_complete")
     from server.ai_director_service import request_character_proposal
 
@@ -264,14 +315,17 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     def _on_success(proposal):
         if proposal is None:
             # The single public degraded marker of the guarded layer.
+            _invalidate_confirmation(actor)
             return _rejected("concept_unavailable")
         # Re-authorize current domain state at completion: the character could
         # have been activated or the ownership changed while the proposal was
         # in flight (webclient-action-dispatch ownership contract).
         current_account = _pending_owner(actor)
         if current_account is None:
+            _invalidate_confirmation(actor)
             return _rejected("ownership_rejected")
         if not bool(getattr(actor, "creation_pending", False)):
+            _invalidate_confirmation(actor)
             return _rejected("already_complete")
         try:
             apply_concept_proposal(
@@ -286,18 +340,21 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
                 expected_fingerprint=fingerprint,
             )
         except ConceptDraftStaleError:
+            _invalidate_confirmation(actor)
             return {
                 "outcome": "stale",
                 "code": "concept_stale",
                 "message": rejection_message("concept_stale"),
             }
         except CharacterCreationError as error:
+            _invalidate_confirmation(actor)
             return _rejected(error)
         message = "構想已套用，請填寫姓名與年齡完成建立。"
-        return _success("concept_saved", message, AFFECTED_CREATION)
+        return _confirmed_success("concept_saved", message, AFFECTED_CREATION, actor)
 
     def _on_failure(failure):
         failure.trap(Exception)
+        _invalidate_confirmation(actor)
         return _rejected("concept_unavailable")
 
     deferred.addCallbacks(_on_success, _on_failure)
@@ -305,11 +362,30 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
 
 
 def _creation_activate_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
-    """Atomically activate the stored draft and hand off to exploration."""
+    """Atomically activate the stored draft and hand off to exploration.
+
+    Activation is bound to the draft confirmed by the last successful save
+    (fix-creation-finalization-safety D2): the recorded fingerprint must match
+    the stored draft, otherwise the confirmation is stale (or no successful
+    save ever happened) and the activation is refused with a stable code
+    before any deterministic write.
+    """
     del payload
     account = _pending_owner(actor)
     if account is None:
         return _rejected("ownership_rejected")
+    if not bool(getattr(actor, "creation_pending", False)):
+        return _rejected("already_complete")
+    current_fingerprint = draft_fingerprint(actor)
+    if current_fingerprint != "absent":
+        # A draft is stored; it must be the exact one the confirmation was
+        # shown for. A missing record means no successful save happened on
+        # this connection's creation flow.
+        recorded = getattr(actor.ndb, FINGERPRINT_NDB_KEY, None)
+        if recorded is None:
+            return _rejected("no_confirmed_save")
+        if recorded != current_fingerprint:
+            return _rejected("confirmation_stale")
     try:
         result = activate_draft(account, actor)
     except CharacterCreationError as error:
