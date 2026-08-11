@@ -226,6 +226,22 @@ apply an intent.
 - **WHEN** the player talks to an `LLMNPC` whose schedule state blocks `talk`
 - **THEN** the stable rejection line is presented, and no prompt is built, no pipeline runs, no memory is appended, and no intent is applied
 
+### Requirement: Async dialogue intents revalidate context at completion
+
+When an async NPC exchange completes, the system SHALL revalidate that the player and the NPC are still co-located and that the NPC is still interactable before applying the reply's intent; a stale completion SHALL display the speech but discard the intent with a clear message.
+
+#### Scenario: Intent is dropped after separation
+- **WHEN** an async reply completes after the player or NPC left the room
+- **THEN** the speech is shown and no intent (give/take item, adjust relation, reveal lore) is applied
+
+#### Scenario: Intent is dropped when the NPC becomes busy
+- **WHEN** an async reply completes after the NPC entered a `busy`/`resting` schedule state
+- **THEN** the speech is shown and no intent is applied
+
+#### Scenario: Co-located interactive completion applies the intent
+- **WHEN** an async reply completes while both parties remain co-located and the NPC is interactable
+- **THEN** the intent applies through its existing per-kind validation
+
 ### Requirement: The generative dialogue layer preserves the transport and single-writer boundaries
 
 `world/ai/npc_dialogue.py` SHALL import no state writer, no typeclass, no live transport, and no socket; it SHALL consume the client through the injected protocol and consume the prompt and degrade seams without importing entity or rules packages. No module under `world/ai/` SHALL apply a state change under any circumstance, and the sole transport composition site SHALL remain `world/ai/client.py` plus presentation composition roots that inject the client into the seams. The repository-wide transport-boundary contract test SHALL remain green without modification.

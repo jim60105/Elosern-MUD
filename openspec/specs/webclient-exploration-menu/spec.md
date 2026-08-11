@@ -137,6 +137,14 @@ The production action registry SHALL register `explore.talk_freeform`. Its paylo
 - **WHEN** an actor submits `explore.talk_freeform` with an `npc_id` that is not a present eligible `LLMNPC`
 - **THEN** the adapter rejects with a stable reason and the injected client is never invoked
 
+### Requirement: Freeform-talk completion rechecks presence before applying intents
+
+The freeform-talk adapter SHALL re-run the co-location and interactability checks when the deferred reply settles, before any intent application, and SHALL return a clear stale-completion result when the checks fail.
+
+#### Scenario: Deferred reply after the player moved is discarded
+- **WHEN** the player sends freeform talk and moves away before the reply arrives
+- **THEN** the adapter shows the speech, discards the intent, and reports the stale context to the player
+
 ### Requirement: explore.party_invite proposes a party through the guarded dialogue seam
 The production action registry SHALL register `explore.party_invite`. Its payload SHALL accept exactly `npc_id` (a positive integer) and `message` (a string of at most 512 code points, possibly empty). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents — never a stored, remote, or ambiguous reference — re-verify presence, free-form eligibility (an `LLMNPC`), no existing binding, and a party below the 4-companion bound, obtain the `npc_dialogue` profile client from the exploration composition root (a live `OpenAICompatClient` when the profile is enabled, or a non-`None` offline stub when disabled — the stub is never called because the guardrail degrades before any transport work), and run `npc.run_npc_exchange(message, actor, client)`. On the degraded terminal the adapter SHALL apply the fixed threshold decision (`affinity >= 70`) with deterministic accept/reject lines; otherwise it SHALL present the reply's speech and route the reply's intent through `apply_npc_intent`, rendering the join, refusal, full-party, duplicate, and remote notifications with the same fixed Traditional Chinese messages the `invite` command uses, and SHALL never override an AI decision with the threshold. The adapter SHALL return a Deferred that resolves to a safe success result after the seam settles, SHALL publish a full snapshot at one newer revision so the applied membership binding refreshes atomically, and SHALL NOT assign memory, intent, party, or affinity state directly. A missing, no-longer-present, non-eligible, already-bound NPC or a full party SHALL reject synchronously with a stable code before any client or transport work.
 

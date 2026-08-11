@@ -329,9 +329,19 @@ class LLMNPC(NPC):
         Returns:
             A Deferred resolving after the reply is presented (or the degraded
             greeting/silence is rendered) and a verified intent is applied.
+            The resolution value is the applied :class:`IntentOutcome` when a
+            reply was presented -- including the completion gate's stale
+            marker when the exchange settled after the pair separated or the
+            NPC stopped allowing talk -- and ``None`` on a blocked or degraded
+            seam.
         """
         from world.ai.npc_dialogue import NPCDialogueClientRequiredError
-        from world.rules.npc_intents import apply_npc_intent
+        from world.rules.npc_intents import (
+            STALE_CONTEXT_NOTE,
+            apply_npc_intent,
+            intent_context_ok,
+            is_stale_context,
+        )
         from world.rules.npc_schedules import interaction_reason
 
         reason = interaction_reason(self, "talk")
@@ -356,4 +366,12 @@ class LLMNPC(NPC):
             return
 
         character.msg(f"{self.key}說：{result.reply.speech}")
-        apply_npc_intent(self, character, result.reply.intent)
+        outcome = apply_npc_intent(
+            self, character, result.reply.intent, context_ok=intent_context_ok
+        )
+        if is_stale_context(outcome):
+            # The exchange settled after the pair separated or the NPC left
+            # the talkable state (completion gate, audit F22): keep the
+            # speech, skip the intent, and tell the player why.
+            character.msg(STALE_CONTEXT_NOTE)
+        return outcome

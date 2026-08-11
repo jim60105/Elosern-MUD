@@ -41,9 +41,12 @@ from world.rules.guild_offers import (
     register_guild_offer,
 )
 from world.rules.npc_intents import (
+    STALE_CONTEXT_REASON,
     IntentOutcome,
     _apply_plan,
     apply_npc_intent,
+    intent_context_ok,
+    is_stale_context,
 )
 from world.rules.surfaces import write_counter_trait
 
@@ -119,7 +122,12 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTest):
             GuildExaminer.create(far, service_id="far", branch_key="guild_branch_altoria")
         )
         self._give_merit(50)
-        outcome = apply_npc_intent(far, self.player, _exam_intent("E"))
+        # The completion gate is bypassed so this test exercises the exam
+        # gate's own remote-examiner check: the gate is the first line of
+        # defense and per-kind domain checks stay in force below it (F22).
+        outcome = apply_npc_intent(
+            far, self.player, _exam_intent("E"), context_ok=lambda npc, player: True
+        )
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "remote_examiner")
         self.assertEqual(_read_exams(self.player), [])
@@ -472,7 +480,12 @@ class PartyInviteIntentTests(EvenniaTest):
     def test_remote_join_gate_failure_discards_only_the_intent(self):
         other = create_object(Room, key="remote room")
         far = create_object(NPC, key="far npc", location=other)
-        outcome = apply_npc_intent(far, self.player, self._invite_intent(True))
+        # Bypass the completion gate so ``join_party``'s own co-location
+        # recheck stays in force and is exercised directly (task 3.2: the
+        # party flow still rechecks below the shared gate).
+        outcome = apply_npc_intent(
+            far, self.player, self._invite_intent(True), context_ok=lambda npc, player: True
+        )
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "not_co_located")
         self.assertIsNone(far.db.party_member)
@@ -805,6 +818,113 @@ class RevealLoreIntentTests(EvenniaTest):
         self.assertFalse(outcome.applied)
         self.assertIn("failed and was discarded", outcome.reason)
         self.assertIsNone(self.player.db.lore_discovered)
+
+
+class CompletionGateTests(EvenniaTest):
+    """The completion gate drops intents after separation or busy transitions.
+
+    The gate is the canonical ``intent_context_ok`` predicate -- co-location
+    of the pair and a talk-interactable NPC -- evaluated inside
+    ``apply_npc_intent`` at application time, so an async exchange that
+    settled after the player or the NPC left the room, or after a
+    schedule-driven state transition, reads canonical state and skips the
+    intent (audit F22).
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.room = create_object(Room, key="gate room")
+        self.other = create_object(Room, key="gate other room")
+        self.player = create_object(PlayerCharacter, key="gate player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.npc = create_object(NPC, key="gate npc", location=self.room)
+
+    def _give_intent(self):
+        return {"kind": "give_item", "item_key": "healing_potion", "qty": 1}
+
+    def _take_intent(self):
+        return {"kind": "take_item", "item_key": "healing_potion", "qty": 1}
+
+    def _relation_intent(self, delta=3):
+        return {"kind": "adjust_relation", "delta": delta}
+
+    def _lore_intent(self):
+        return {"kind": "reveal_lore", "category": "race", "key": "elf"}
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_give_intent_is_dropped_after_separation(self):
+        self.npc.db.inventory = ["healing_potion"]
+        self.npc.location = self.other
+        outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertTrue(is_stale_context(outcome))
+        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.player.db.inventory or []), [])
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_take_intent_is_dropped_when_the_player_left(self):
+        self.player.db.inventory = ["healing_potion"]
+        self.player.location = self.other
+        outcome = apply_npc_intent(self.npc, self.player, self._take_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertEqual(list(self.player.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.npc.db.inventory or []), [])
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_relation_intent_is_dropped_after_a_busy_transition(self):
+        self.npc.db.schedule_state = "busy"
+        outcome = apply_npc_intent(self.npc, self.player, self._relation_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertIsNone(self.npc.relations._load(self.player))
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_lore_intent_is_dropped_after_a_resting_transition(self):
+        self.npc.db.schedule_state = "resting"
+        outcome = apply_npc_intent(self.npc, self.player, self._lore_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertIsNone(self.player.db.lore_discovered)
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_co_located_interactive_completion_applies_the_intent(self):
+        self.npc.db.inventory = ["healing_potion"]
+        outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
+        self.assertTrue(outcome.applied)
+        self.assertFalse(is_stale_context(outcome))
+        self.assertEqual(list(self.npc.db.inventory), [])
+        self.assertEqual(list(self.player.db.inventory), ["healing_potion"])
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_the_gate_reads_canonical_state_at_application_time(self):
+        # The predicate is evaluated inside ``apply_npc_intent``, so a
+        # schedule-driven move landing mid-exchange (between the pre-call
+        # fast path and the intent application) still fails the gate.
+        self.npc.db.inventory = ["healing_potion"]
+        self.assertTrue(intent_context_ok(self.npc, self.player))
+        self.npc.location = self.other
+        outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_stale_context_party_invite_returns_the_marker_before_join_gates(self):
+        # The shared gate applies to ``party_invite`` too: a separated pair
+        # gets the stale marker without running ``join_party``'s domain
+        # gates, which stay in force once the gate passes (task 3.2).
+        self.npc.location = self.other
+        outcome = apply_npc_intent(
+            self.npc, self.player, {"kind": "party_invite", "accept": True}
+        )
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
+        self.assertIsNone(self.npc.db.party_member)
 
 
 class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):

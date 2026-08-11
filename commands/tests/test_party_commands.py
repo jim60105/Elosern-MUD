@@ -29,6 +29,7 @@ from world.ai.npc_dialogue import register_npc_dialogue
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.rules.affinity import AffinitySource, apply_affinity_change
+from world.rules.npc_intents import STALE_CONTEXT_NOTE
 from world.rules.party import (
     ALREADY_COMPANION_MESSAGE,
     DEGRADED_ACCEPT_MESSAGE,
@@ -177,6 +178,19 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             with self._patch_client(client):
                 output = self.call(CmdInvite(), "艾洛希雅")
         self.assertIn(DEGRADED_REJECT_MESSAGE, output)
+        self.assertNotIn(JOINED_MESSAGE, output)
+        self.assertFalse(is_companion(self.npc, self.char1))
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("party-system::the-invite-command-proposes-a-party-through-the-ai-judged-dialogue-seam")
+    def test_offline_threshold_is_gated_when_the_npc_becomes_busy(self):
+        self._bind(70)
+        self.npc.db.schedule_state = "busy"
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with self._patch_client(client):
+                output = self.call(CmdInvite(), "艾洛希雅")
+        self.assertIn(STALE_CONTEXT_NOTE, output)
         self.assertNotIn(JOINED_MESSAGE, output)
         self.assertFalse(is_companion(self.npc, self.char1))
         self.assertEqual(len(client.calls), 0)

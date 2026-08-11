@@ -35,6 +35,7 @@ from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.affinity import apply_affinity_change
+from world.rules.npc_intents import is_stale_context
 
 from tools.spec_traceability import covers_requirement
 
@@ -247,6 +248,72 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(len(client.calls), 0)
         self.assertEqual(self.npc._chat_lines(self.player), [])
         self.assertEqual(_inventory(self.player), [])
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_player_leaving_mid_exchange_shows_the_note_and_drops_the_intent(self):
+        self.npc.db.inventory = ["healing_potion"]
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client)
+            self.player.location = self.room2
+            client.deferred.callback(
+                _reply_text(
+                    speech="我給你一瓶藥水。",
+                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                )
+            )
+            outcome = await_result(d)
+        self.assertFalse(outcome.applied)
+        self.assertTrue(is_stale_context(outcome))
+        texts = _msg_texts(msg)
+        self.assertIn("我給你一瓶藥水。", " ".join(texts))
+        self.assertTrue(any("離開" in text for text in texts))
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_npc_leaving_mid_exchange_shows_the_note_and_drops_the_intent(self):
+        self.npc.db.inventory = ["healing_potion"]
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client)
+            self.npc.location = self.room2
+            client.deferred.callback(
+                _reply_text(
+                    speech="我給你一瓶藥水。",
+                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                )
+            )
+            outcome = await_result(d)
+        self.assertTrue(is_stale_context(outcome))
+        texts = _msg_texts(msg)
+        self.assertIn("我給你一瓶藥水。", " ".join(texts))
+        self.assertTrue(any("離開" in text for text in texts))
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(_inventory(self.npc), ["healing_potion"])
+        self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
+
+    @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
+    def test_busy_transition_mid_exchange_shows_the_note_and_drops_the_intent(self):
+        self.npc.db.inventory = ["healing_potion"]
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client)
+            self.npc.db.schedule_state = "busy"
+            client.deferred.callback(
+                _reply_text(
+                    speech="我給你一瓶藥水。",
+                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                )
+            )
+            outcome = await_result(d)
+        self.assertTrue(is_stale_context(outcome))
+        texts = _msg_texts(msg)
+        self.assertIn("我給你一瓶藥水。", " ".join(texts))
+        self.assertTrue(any("無法交談" in text for text in texts))
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(_inventory(self.npc), ["healing_potion"])
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
     def test_thinking_feedback_sends_one_message_after_timeout_and_cancels(self):

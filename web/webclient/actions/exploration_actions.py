@@ -30,7 +30,12 @@ from world.rules.map_knowledge import (
     encode_room,
     encode_wild,
 )
-from world.rules.npc_intents import apply_npc_intent
+from world.rules.npc_intents import (
+    STALE_CONTEXT_NOTE,
+    apply_npc_intent,
+    intent_context_ok,
+    is_stale_context,
+)
 from world.rules.npc_schedules import interaction_reason
 from world.rules.onboarding import run_scripted_talk
 from world.rules.party import (
@@ -423,7 +428,12 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     client = build_dialogue_client()
     deferred = npc.at_talked_to(payload["speech"], actor, client)
 
-    def _on_success(_result: Any) -> dict[str, Any]:
+    def _on_success(result: Any) -> dict[str, Any]:
+        if is_stale_context(result):
+            # The seam showed the speech and the stale note; the panel result
+            # carries the same outcome so the client reports the dropped
+            # intent (F22 completion gate).
+            return _success("talked", STALE_CONTEXT_NOTE, AFFECTED_FULL)
         return _success("talked", "對方回應了你的話。", AFFECTED_FULL)
 
     def _on_failure(failure: Any) -> dict[str, Any]:
@@ -490,6 +500,12 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
     if result.degraded:
         from world.rules.affinity_config import get_config
 
+        if not intent_context_ok(npc, actor):
+            # The exchange settled after the pair separated or the NPC stopped
+            # allowing talk (F22 completion gate): the degraded threshold
+            # decides nothing on a stale context.
+            actor.msg(STALE_CONTEXT_NOTE)
+            return STALE_CONTEXT_NOTE
         affinity = npc.relations.affinity_for(actor)
         if affinity < get_config().invite_threshold:
             actor.msg(f"{npc.key}說：{DEGRADED_REJECT_MESSAGE}")
@@ -507,6 +523,12 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
     actor.msg(f"{npc.key}說：{result.reply.speech}")
     intent = result.reply.intent
     outcome = apply_npc_intent(npc, actor, intent)
+    if is_stale_context(outcome):
+        # The exchange settled after the pair separated or the NPC stopped
+        # allowing talk: keep the speech, skip the intent, and report the
+        # stale context (F22 completion gate).
+        actor.msg(STALE_CONTEXT_NOTE)
+        return STALE_CONTEXT_NOTE
     if not (isinstance(intent, dict) and intent.get("kind") == "party_invite"):
         return result.reply.speech
     if intent.get("accept") is True:

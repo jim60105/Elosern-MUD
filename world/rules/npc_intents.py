@@ -13,6 +13,7 @@ sole writer of any state this change causes; the generative reply layer never
 imports this module or applies a state change itself.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,6 +22,7 @@ from django.db import transaction
 from world.rules.affinity import apply_affinity_change
 from world.rules.equipment import InventoryError, plan_inventory_delta
 from world.rules.guild_exams import GuildExamError, start_guild_exam
+from world.rules.npc_schedules import interaction_reason
 from world.rules.surfaces import (
     attribute_snapshot,
     restore_attribute_best_effort,
@@ -38,6 +40,16 @@ _MAX_RELATION_DELTA = 10
 
 _MAX_INTENT_KEY_LENGTH = 64
 
+# Stable completion-gate marker (audit F22): an async exchange settled after
+# the pair separated or the NPC stopped allowing ``talk``. The intent is
+# skipped and callers surface ``STALE_CONTEXT_NOTE`` instead of applying
+# anything; ``is_stale_context`` recognizes the outcome.
+STALE_CONTEXT_REASON = "stale_context"
+
+# Player-facing note appended by the dialogue seams when the completion gate
+# fails; Traditional Chinese is the canonical game prose.
+STALE_CONTEXT_NOTE = "對方已經離開／現在無法交談。"
+
 
 @dataclass(frozen=True)
 class IntentOutcome:
@@ -54,15 +66,64 @@ class IntentOutcome:
     delta_used: int | None = None
 
 
-def apply_npc_intent(npc: Any, player: Any, intent: Any) -> IntentOutcome:
+def intent_context_ok(npc: Any, player: Any) -> bool:
+    """The canonical completion gate: co-location and talk-interactability.
+
+    Returns ``True`` only while the pair is still in the same room and
+    ``interaction_reason(npc, "talk")`` is ``None``. Evaluated at intent
+    application time, so an async exchange that settled after the player or
+    the NPC left the room, or after a schedule-driven move put the NPC into a
+    ``busy``/``resting`` state, reads canonical state and fails the gate
+    (audit F22).
+    """
+    if interaction_reason(npc, "talk") is not None:
+        return False
+    npc_location = getattr(npc, "location", None)
+    player_location = getattr(player, "location", None)
+    return npc_location is not None and npc_location is player_location
+
+
+def is_stale_context(outcome: Any) -> bool:
+    """True when an outcome is the completion gate's stale marker.
+
+    The gate returns a plain :class:`IntentOutcome` (``applied=False`` with
+    ``STALE_CONTEXT_REASON``); the helper also tolerates a ``None`` result
+    (a blocked or degraded seam) so callers can classify a settled exchange
+    without a kind check.
+    """
+    return (
+        isinstance(outcome, IntentOutcome)
+        and outcome.applied is False
+        and outcome.reason == STALE_CONTEXT_REASON
+    )
+
+
+def apply_npc_intent(
+    npc: Any,
+    player: Any,
+    intent: Any,
+    *,
+    context_ok: Callable[[Any, Any], bool] = intent_context_ok,
+) -> IntentOutcome:
     """Verify then apply one extracted NPC intent through deterministic APIs.
 
     ``npc`` is the speaking NPC and ``player`` is the speaking player. The
-    intent's kind is whitelisted upstream; here every kind is re-verified
-    against the deterministic world. ``none`` is an applied no-op. Illegal,
-    unverifiable, or forward-declared intents return ``applied=False`` with a
-    documented reason and change no state; the caller keeps the speech.
+    completion gate runs first: ``context_ok`` is evaluated against the
+    **current** canonical state (co-location plus ``interaction_reason(npc,
+    "talk")`` by default); a ``False`` result means the exchange's context
+    went stale while the reply was in flight, so the intent is skipped with
+    the stable ``STALE_CONTEXT_REASON`` outcome (recognizable via
+    :func:`is_stale_context`) and the caller surfaces ``STALE_CONTEXT_NOTE``
+    instead of applying anything. Per-kind domain checks stay untouched below
+    the gate, so e.g. ``party_invite`` still runs ``join_party``'s own
+    rechecks when the gate passes. The intent's kind is whitelisted upstream;
+    here every kind is re-verified against the deterministic world. ``none``
+    is an applied no-op. Illegal, unverifiable, or forward-declared intents
+    return ``applied=False`` with a documented reason and change no state; the
+    caller keeps the speech.
     """
+    if not context_ok(npc, player):
+        return IntentOutcome(False, STALE_CONTEXT_REASON)
     if not isinstance(intent, dict):
         return IntentOutcome(False, "intent is not a mapping")
     kind = intent.get("kind")
