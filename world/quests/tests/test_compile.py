@@ -526,6 +526,16 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
 
 
 class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        # Pure-unit class: the durable store is a database Script, so the
+        # store boundary is patched to keep every test here DB-free.
+        patcher = patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _compiled(self):
         return compile_quest_blueprint(_defeat_payload())
 
@@ -711,6 +721,13 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
     def setUp(self):
         super().setUp()
         self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
+        # Pure-unit class: the durable store is a database Script, so the
+        # store boundary is patched to keep every test here DB-free.
+        patcher = patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         SCENE_REQUIREMENT_REGISTRY.clear()

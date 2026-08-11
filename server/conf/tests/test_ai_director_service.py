@@ -94,6 +94,13 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         super().setUp()
         _install_scenario_director()
         from world.ai import scenario_director as _sd
+        # Pure-unit class: the durable store is a database Script, so the
+        # store boundary is patched to keep every test here DB-free.
+        patcher = patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @covers_requirement("scene-builder::the-composition-root-posts-one-generated-quest-to-the-guild-board-and-degrades-offline")
     def test_valid_fixture_resolves_to_a_registered_quest_with_no_generative_mutation(self):

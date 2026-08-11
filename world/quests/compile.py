@@ -6,7 +6,10 @@ runtime type. ``compile_quest_blueprint`` re-validates every constraint the
 ``scenario_director`` guardrail checked against the same immutable
 ``world.lore`` registries and maps the payload onto ``QuestDefinition`` plus a
 ``QuestReward`` and issuer branch. ``register_generated_quest`` publishes the
-compiled definition and its offer as one all-or-nothing operation.
+compiled definition, its offer, and the stage spawn requirements as one
+all-or-nothing, durable-first operation: the serialized payload is appended to
+the ``generated_quest_store`` Script before any process-local registry is
+touched, and startup restore reconciles store to registries (design D2/D3).
 
 This module is deterministic: it contains no generative or transport
 dependency, accepts only plain validated data (never a proposal object from the
@@ -14,7 +17,8 @@ generative package), and reads the same lore registries the guardrail validators
 read, so the two sides cannot drift.
 """
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from enum import Enum
 import hashlib
 import json
 import re
@@ -44,6 +48,10 @@ from world.quests.definitions import (
     RoomLocator,
     register_quest_definition,
     validate_definition,
+)
+from .generated_quest_store import (
+    append_payload as append_generated_quest_payload,
+    remove_payload as remove_generated_quest_payload,
 )
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
@@ -754,18 +762,225 @@ def scene_requirements_for(definition_key: str) -> tuple[StageSpawnRequirement, 
     return SCENE_REQUIREMENT_REGISTRY.get(definition_key, ())
 
 
+def _db_safe(value: Any) -> Any:
+    """Convert enums and tuples in dataclass output to JSON-safe primitives.
+
+    Mirrors ``world.lore.sync._db_safe`` (without importing that private
+    helper): enums become their ``.value`` and tuples become lists, so the
+    payload can be stored as plain JSON-safe data.
+    """
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {key: _db_safe(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_db_safe(item) for item in value]
+    if isinstance(value, list):
+        return [_db_safe(item) for item in value]
+    return value
+
+
+def _compiled_to_payload(
+    compiled: CompiledQuest,
+    offer: GuildQuestOffer,
+) -> dict[str, Any]:
+    """Serialize one compiled quest plus its offer into a JSON-safe payload.
+
+    The payload is the durable mirror of one ``register_generated_quest``
+    publication: the definition, the offer, and the stage spawn requirements,
+    all converted to plain JSON-safe values (enums to their ``.value``,
+    tuples to lists).
+    """
+    return {
+        "definition": _db_safe(asdict(compiled.definition)),
+        "offer": _db_safe(asdict(offer)),
+        "requirements": [
+            _db_safe(asdict(requirement))
+            for requirement in compiled.stage_requirements
+        ],
+    }
+
+
+def _locator_from_payload(data: dict[str, Any] | None) -> RoomLocator | None:
+    if data is None:
+        return None
+    xyz = data["xyz"]
+    return RoomLocator(
+        kind=DestinationKind(data["kind"]),
+        anchor_key=data["anchor_key"],
+        xyz=None if xyz is None else tuple(xyz),
+    )
+
+
+def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
+    return QuestObjective(
+        kind=ObjectiveKind(data["kind"]),
+        quantity=data["quantity"],
+        monster_tier=data["monster_tier"],
+        destination=_locator_from_payload(data["destination"]),
+        requires_bound_targets=data["requires_bound_targets"],
+        item_key=data["item_key"],
+    )
+
+
+def _stage_from_payload(data: dict[str, Any]) -> QuestStage:
+    return QuestStage(
+        index=data["index"],
+        objective=_objective_from_payload(data["objective"]),
+    )
+
+
+def _characterization_from_payload(
+    data: dict[str, Any] | None,
+) -> StageNpcCharacterization | None:
+    if data is None:
+        return None
+    return StageNpcCharacterization(
+        display_name=data["display_name"],
+        age=data["age"],
+        apparent_age=data["apparent_age"],
+        portrait_stable_key=data["portrait_stable_key"],
+    )
+
+
+def _requirement_from_payload(data: dict[str, Any]) -> StageSpawnRequirement:
+    return StageSpawnRequirement(
+        index=data["index"],
+        objective_kind=ObjectiveKind(data["objective_kind"]),
+        location=_locator_from_payload(data["location"]),
+        archetype=data["archetype"],
+        anchor_near=data["anchor_near"],
+        scene_sentence=data["scene_sentence"],
+        npc_reqs=tuple(tuple(entry) for entry in data["npc_reqs"]),
+        characterizations=tuple(
+            _characterization_from_payload(entry)
+            for entry in data["characterizations"]
+        ),
+    )
+
+
+def payload_to_registrations(
+    payload: Any,
+) -> tuple[QuestDefinition, GuildQuestOffer, tuple[StageSpawnRequirement, ...]]:
+    """Reconstruct one stored payload into its closed runtime values.
+
+    The single reconstruction path for the durable mirror: every value is
+    converted back (enums via their ``.value``, lists back to tuples) and
+    every dataclass is rebuilt with the constructor
+    ``register_generated_quest`` uses, so a restored registration is equal to
+    the original. A malformed payload raises instead of being silently
+    dropped (design D3).
+    """
+    definition_data = payload["definition"]
+    definition = QuestDefinition(
+        key=definition_data["key"],
+        display_name=definition_data["display_name"],
+        quest_type=QuestType(definition_data["quest_type"]),
+        rank=definition_data["rank"],
+        stages=tuple(_stage_from_payload(stage) for stage in definition_data["stages"]),
+        deadline_hours=definition_data["deadline_hours"],
+    )
+    offer_data = payload["offer"]
+    reward_data = offer_data["reward"]
+    offer = GuildQuestOffer(
+        definition_key=offer_data["definition_key"],
+        issuer_branch_key=offer_data["issuer_branch_key"],
+        reward=QuestReward(
+            copper=reward_data["copper"],
+            items=tuple(
+                ItemQuantity(item["item_key"], item["quantity"])
+                for item in reward_data["items"]
+            ),
+            merit=reward_data["merit"],
+        ),
+    )
+    requirements = tuple(
+        _requirement_from_payload(requirement)
+        for requirement in payload["requirements"]
+    )
+    _validate_restored_payload(definition, offer, requirements)
+    return definition, offer, requirements
+
+
+def _validate_restored_payload(
+    definition: QuestDefinition,
+    offer: GuildQuestOffer,
+    requirements: tuple[StageSpawnRequirement, ...],
+) -> None:
+    """Reject a stored payload whose reconstructed values cannot be consistent.
+
+    A payload is trusted only when it reconstructs to a closed, self-consistent
+    registration: the offer must bind the exact definition, and every spawn
+    requirement must sit at its own position with the objective kind of the
+    definition stage it describes. Corrupt or schema-drifted payloads fail
+    loudly here (design D3) instead of silently registering an offer against
+    the wrong quest or leaving the SceneBuilder to fail mid-game.
+    """
+    if offer.definition_key != definition.key:
+        _reject(
+            f"stored payload offer binds {offer.definition_key!r} to "
+            f"definition {definition.key!r}"
+        )
+    for position, requirement in enumerate(requirements):
+        if requirement.index != position:
+            _reject(
+                f"stored payload requirement {position} declares index "
+                f"{requirement.index}; indices must match their position"
+            )
+        if not (0 <= requirement.index < len(definition.stages)):
+            _reject(
+                f"stored payload requirement {requirement.index} has no "
+                f"matching stage in definition {definition.key!r}"
+            )
+        if requirement.objective_kind is not definition.stages[requirement.index].objective.kind:
+            _reject(
+                f"stored payload requirement {requirement.index} declares "
+                f"objective kind {requirement.objective_kind.value!r}, but "
+                f"definition {definition.key!r} stage {requirement.index} is "
+                f"{definition.stages[requirement.index].objective.kind.value!r}"
+            )
+
+
+def register_restored_quest(
+    definition: QuestDefinition,
+    offer: GuildQuestOffer,
+    requirements: tuple[StageSpawnRequirement, ...],
+) -> None:
+    """Register one durable-mirror payload's values (design D3).
+
+    The compile-boundary write used by startup restore: the definition and
+    offer register idempotently (equal content is a no-op, conflicting content
+    raises) and the spawn-requirement entry follows the same equal-or-reject
+    contract, so repeated restarts keep exactly one entry while a malformed or
+    conflicting payload fails loudly instead of being silently dropped.
+    Keeping every ``SCENE_REQUIREMENT_REGISTRY`` write inside this module
+    preserves the single-writer boundary the repository contract tests assert.
+    """
+    register_quest_definition(definition)
+    register_guild_offer(offer)
+    requirement_current = SCENE_REQUIREMENT_REGISTRY.get(definition.key)
+    if requirement_current is not None and requirement_current != requirements:
+        _reject(
+            f"conflicting spawn requirements already registered under "
+            f"{definition.key!r}"
+        )
+    SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
+
+
 def register_generated_quest(compiled: CompiledQuest) -> None:
     """Register one compiled definition, its offer, and its spawn requirements
-    all-or-nothing.
+    all-or-nothing and durable-first.
 
     Preflights all three registries' equal/conflict states before writing any,
     so a conflicting definition, offer, or spawn-requirement entry raises
-    ``QuestCompileError`` before any mutation. Otherwise the definition is
-    written first, then the offer and the requirement entry; if a later write
-    fails despite preflight (defensive), every entry this call added -- the
-    definition, the offer, and the requirements -- is rolled back together, so
-    a generated definition is never left registered without its offer or its
-    scene requirements.
+    ``QuestCompileError`` before any mutation. The compiled payload is then
+    appended to the durable generated-quest store FIRST (D2): a store failure
+    aborts registration with no in-memory entries. Only after the append
+    succeeds are the definition, the offer, and the requirement entry written;
+    if a later write still fails despite preflight (defensive), every entry
+    this call added -- the definition, the offer, the requirements, and the
+    store payload -- is rolled back together, so a generated definition is
+    never left registered without its durable mirror.
     """
     definition = compiled.definition
     requirements = compiled.stage_requirements
@@ -793,11 +1008,15 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
             f"{definition.key!r}"
         )
 
+    payload_added = append_generated_quest_payload(
+        _compiled_to_payload(compiled, offer)
+    )
+
     definition_added = definition_current is None
     offer_added = offer_current is None
     requirement_added = requirement_current is None
-    register_quest_definition(definition)
     try:
+        register_quest_definition(definition)
         register_guild_offer(offer)
         SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
     except Exception:
@@ -807,4 +1026,6 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
             GUILD_OFFER_REGISTRY.pop((definition.key, compiled.issuer_branch_key), None)
         if requirement_added:
             SCENE_REQUIREMENT_REGISTRY.pop(definition.key, None)
+        if payload_added:
+            remove_generated_quest_payload(definition.key)
         raise

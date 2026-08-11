@@ -744,7 +744,10 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
 
         compiled = compile_quest_blueprint(payload)
         validate_definition(compiled.definition)
-        register_generated_quest(compiled)
+        with patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        ):
+            register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
 
 
@@ -1179,7 +1182,11 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
             with self.subTest(entry=entry.name):
                 compiled = compile_quest_blueprint(entry.to_payload())
                 validate_definition(compiled.definition)
-                register_generated_quest(compiled)
+                with patch(
+                    "world.quests.compile.append_generated_quest_payload",
+                    return_value=True,
+                ):
+                    register_generated_quest(compiled)
                 self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
                 self.assertIn(
                     (compiled.definition.key, compiled.issuer_branch_key),
@@ -1221,7 +1228,10 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
             self.assertEqual(validator_fn(payload), [])
         compiled = compile_quest_blueprint(payload)
         validate_definition(compiled.definition)
-        register_generated_quest(compiled)
+        with patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        ):
+            register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertIn(
             (compiled.definition.key, compiled.issuer_branch_key),
@@ -1359,7 +1369,11 @@ class RegistryRestoreRegressionTests(unittest.TestCase):
         probe.setUp()
         try:
             compiled = compile_quest_blueprint(_instance_payload())
-            register_generated_quest(compiled)
+            with patch(
+                "world.quests.compile.append_generated_quest_payload",
+                return_value=True,
+            ):
+                register_generated_quest(compiled)
             self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
             self.assertIn(
                 (compiled.definition.key, compiled.issuer_branch_key),
