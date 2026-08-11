@@ -143,3 +143,12 @@ Every admitted action whose transport-and-puppet sequence remains active through
 #### Scenario: Disconnect after submit does not duplicate mutation
 - **WHEN** the WebSocket closes after sending an action but before receiving its result
 - **THEN** the reconnected browser requests a full snapshot, does not resend the prior request automatically, and displays that its outcome could not be confirmed
+
+### Requirement: Dispatch rejects no-puppet actions with a bounded response
+
+The action dispatcher SHALL return a bounded rejection (stable code, no character data) for actions submitted without a puppeted actor, instead of silently dropping them.
+
+#### Scenario: No-puppet action returns a stable rejection
+
+- **WHEN** `ui_action` is dispatched while `session.puppet` is None
+- **THEN** the client receives a rejection with a stable code and no character state

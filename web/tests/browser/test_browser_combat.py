@@ -299,6 +299,49 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
+    @covers_requirement(
+        "webclient-combat-menu::terminal-combat-outcomes-refresh-all-mode-relevant-panels"
+    )
+    def test_terminal_outcome_publishes_fresh_exploration_panels(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        # During combat the exploration-mode panels render unavailable; only a
+        # full post-settlement snapshot can restore them.
+        state = store_state(page)
+        for name in ("exploration", "character", "services"):
+            self.assertIn(name, state["panels"])
+            self.assertFalse(state["panels"][name]["available"], f"{name} must be combat-unavailable")
+        self.assertEqual(state["mode"], "combat")
+
+        session_id = self._combat_panel(page)["session"]["session_id"]
+        page.evaluate(
+            "(sessionId) => Elosern.actions.submit('combat.forfeit', "
+            "{ session_id: sessionId })",
+            session_id,
+        )
+        deadline = time.monotonic() + 15000 / 1000
+        while time.monotonic() < deadline:
+            state = store_state(page)
+            if (
+                state["mode"] == "exploration"
+                and state["panels"].get("context_actions", {}).get("available") is False
+            ):
+                break
+            page.wait_for_timeout(250)
+        # Every mode-relevant panel is fresh post-settlement canonical state:
+        # the combat-era unavailable forms were replaced by the full snapshot.
+        # local_map availability depends on map knowledge, so only the
+        # guaranteed exploration-mode panels are asserted as available.
+        for name in ("exploration", "character", "services", "status"):
+            self.assertIn(name, state["panels"])
+            self.assertTrue(
+                state["panels"][name]["available"], f"{name} panel must be fresh"
+            )
+        self.assertEqual(state["mode"], "exploration")
+        # The exploration dock mounts from the fresh state.
+        self.assertEqual(self._dock_mode(page), "exploration")
+
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
     def test_area_explicit_multi_selection(self):
         page = self.logged_in_page()

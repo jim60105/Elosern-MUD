@@ -76,7 +76,11 @@
       if (!state || !state.connected || state.mutationsLocked) {
         return true;
       }
-      if (state.awaitingInitialSnapshot || state.phase === "awaiting_initial_snapshot") {
+      if (
+        state.awaitingInitialSnapshot ||
+        state.phase === "awaiting_initial_snapshot" ||
+        state.phase === "detached"
+      ) {
         return true;
       }
       return false;
@@ -149,6 +153,13 @@
         releaseIfReady();
         return;
       }
+      if (result.outcome === "rejected" && result.code === "no_puppet") {
+        // The puppet is gone; no presentation will ever gate this rejection,
+        // so the in-flight mutation lock is released unconditionally.
+        onNotice("result", result.message);
+        inFlight = null;
+        return;
+      }
       if (result.outcome === "error") {
         onNotice("error", result.message);
         releaseIfReady();
@@ -198,6 +209,18 @@
       sync();
     }
 
+    // The puppet detached (OOC): the server retired the dispatch sequence, so
+    // an in-flight mutation can never confirm. Release the lock and warn;
+    // nothing is retried.
+    function onDetached() {
+      var hadInFlight = !!inFlight;
+      inFlight = null;
+      uncertain = hadInFlight;
+      if (hadInFlight) {
+        onNotice("uncertain", "你已離開角色，前一個操作的結果無法確認。");
+      }
+    }
+
     // A new transport generation clears all in-flight state.
     function onTransportReset() {
       inFlight = null;
@@ -211,6 +234,7 @@
       onActionResult: onActionResult,
       onPresentationAccepted: onPresentationAccepted,
       onReconnect: onReconnect,
+      onDetached: onDetached,
       onTransportReset: onTransportReset,
       isLocked: locked,
       isInFlight: function () {
@@ -300,6 +324,7 @@
       },
     });
 
+    var lastPhase = null;
     return {
       client: client,
       sync: function () {
@@ -322,7 +347,13 @@
         setRouterLock();
       },
       handlePresentation: function () {
-        client.onPresentationAccepted(controller ? controller.getState() : {});
+        var state = controller ? controller.getState() : {};
+        if (lastPhase !== "detached" && state.phase === "detached") {
+          // The puppet detached: an in-flight mutation can never confirm.
+          client.onDetached();
+        }
+        lastPhase = state.phase;
+        client.onPresentationAccepted(state);
         setRouterLock();
       },
       handleReconnect: function () {

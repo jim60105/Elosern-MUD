@@ -505,20 +505,28 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
                 build_production_action_registry(),
                 build_production_registry(),
             )
+        # A terminal outcome (flee) publishes a full snapshot: the mode flips
+        # back to exploration, so every mode-relevant panel is replaced,
+        # including the art catalog without the fled monster.
+        snapshots = [
+            call.kwargs["ui_snapshot"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_snapshot" in call.kwargs
+        ]
+        self.assertTrue(snapshots, "a terminal combat action must publish a full snapshot")
+        panels = snapshots[-1]["panels"]
+        for name in ("status", "context_actions", "art", "exploration", "character", "services", "local_map"):
+            self.assertIn(name, panels)
+        # The fled participant leaves the art catalog in the same publication.
+        catalog = panels["art"]["portrait_catalog"]
+        self.assertNotIn(str(monster.pk), catalog)
+        self.assertNotIn(str(self.char1.pk), catalog)
         updates = [
             call.kwargs["ui_update"][0][0]
             for call in self.sessionhandler.data_out.call_args_list
             if "ui_update" in call.kwargs
         ]
-        self.assertTrue(updates, "a combat action must publish a panel update")
-        panels = updates[-1]["panels"]
-        self.assertIn("status", panels)
-        self.assertIn("context_actions", panels)
-        self.assertIn("art", panels)
-        # The fled participant leaves the art catalog in the same update.
-        catalog = panels["art"]["portrait_catalog"]
-        self.assertNotIn(str(monster.pk), catalog)
-        self.assertNotIn(str(self.char1.pk), catalog)
+        self.assertFalse(updates, "a terminal outcome must not publish a partial update")
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_text_command_refresh_snapshot_includes_the_art_panel(self):

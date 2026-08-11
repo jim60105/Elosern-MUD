@@ -10,7 +10,7 @@ refresh canonical presentation without changing Evennia's command semantics.
 from evennia.commands.cmdhandler import cmdhandler
 from evennia.server.inputfuncs import _IDLE_COMMAND, _maybe_strip_incoming_mxp
 
-from web.webclient.actions.dispatcher import handle_ui_action
+from web.webclient.actions.dispatcher import handle_ui_action, reject_no_puppet
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.ingress import (
     is_webclient,
@@ -22,6 +22,7 @@ from web.webclient.presentation.protocol import (
     UI_SYNC,
     ProtocolValidationError,
     check_envelope,
+    validate_ui_action,
     validate_ui_sync,
 )
 from web.webclient.presentation.registry import build_production_registry
@@ -68,14 +69,30 @@ def ui_action(session, *args, **kwargs):
 
     The actor is resolved only from ``session.puppet``. Anonymous, unpuppeted,
     Telnet, and AJAX sessions are rejected before adapter invocation, and no
-    character state is returned.
+    character state is returned. An unpuppeted action is never silently
+    dropped: it receives a bounded ``no_puppet`` rejection so the browser can
+    release its in-flight mutation lock.
     """
     if not is_webclient(session):
         return
+    payload = args[0] if args else None
     actor = getattr(session, "puppet", None)
     if actor is None:
+        # Validate only the global envelope: the echoed epoch/revision must be
+        # schema-safe, and malformed input still gets the safe error.
+        try:
+            check_envelope(payload)
+            action = validate_ui_action(payload)
+        except Exception:
+            send_protocol_error(
+                session,
+                code="malformed_envelope",
+                message="操作訊息格式錯誤",
+                reload_required=False,
+            )
+            return
+        reject_no_puppet(session, action)
         return
-    payload = args[0] if args else None
     handle_ui_action(
         session,
         actor,

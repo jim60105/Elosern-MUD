@@ -211,6 +211,183 @@ class UiActionIntegrationTests(EvenniaTest):
         self.assertNotIn("adapter", status_source)
 
 
+class OocLifecycleIntegrationTests(EvenniaTest):
+    """Real CmdOOC/CmdIC puppet-lifecycle hooks (fix-webclient-session-lifecycle 1.x).
+
+    OOC sends the no-puppet transition, retires the dispatch sequence, and
+    resets the client sequence; repuppeting the same character produces a
+    fresh epoch and never reuses the retired request cache.
+    """
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        import evennia
+
+        self.sessionhandler = evennia.SESSION_HANDLER
+        self.ws_session = _make_websocket_session(self.sessionhandler, self.account)
+        self.ws_session.puppet = self.char1
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        from world.rules.clock import get_world_clock
+
+        get_world_clock()
+        self.sessionhandler.data_out.reset_mock()
+
+    def tearDown(self):
+        self.sessionhandler.data_out.reset_mock()
+        super().tearDown()
+
+    def _sync(self):
+        self.sessionhandler.data_out.reset_mock()
+        inputfuncs.ui_sync(self.ws_session, {"protocol_version": 1})
+        calls = [
+            call
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_snapshot" in call.kwargs
+        ]
+        envelope = calls[-1].kwargs["ui_snapshot"][0][0]
+        return envelope
+
+    def _run_ooc(self):
+        from commands.localized.account import CmdOOC
+
+        cmd = CmdOOC()
+        cmd.caller = self.account
+        cmd.account = self.account
+        cmd.session = self.ws_session
+        cmd.playable = self.char1
+        cmd.func()
+
+    def _run_ic(self):
+        from commands.localized.account import CmdIC
+
+        cmd = CmdIC()
+        cmd.caller = self.account
+        cmd.account = self.account
+        cmd.session = self.ws_session
+        cmd.args = ""
+        cmd.playable = self.char1
+        cmd.func()
+
+    def _send_action(self, envelope, request_id):
+        handle_ui_action(
+            self.ws_session,
+            self.ws_session.puppet,
+            {
+                "protocol_version": 1,
+                "presentation_epoch": envelope["presentation_epoch"],
+                "request_id": request_id,
+                "base_revision": envelope["revision"],
+                "action_id": "proof.noop",
+                "payload": {},
+            },
+            self._registry_with(
+                lambda actor, payload: {
+                    "outcome": "success",
+                    "code": "ok",
+                    "message": "完成",
+                    "affected_panels": ("status",),
+                }
+            ),
+            build_production_registry(),
+        )
+
+    def _registry_with(self, adapter):
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.noop",
+                validate_payload=lambda payload: payload,
+                adapter=adapter,
+            )
+        )
+        return registry
+
+    @covers_requirement(
+        "webclient-oob-protocol::unpuppet-retires-the-active-presentation-and-dispatch-sequence"
+    )
+    def test_ooc_transitions_then_retires_and_resets_sequence(self):
+        envelope = self._sync()
+        coordinator = attach_coordinator(self.ws_session, build_production_registry())
+        epoch_before = coordinator.epoch
+
+        self.sessionhandler.data_out.reset_mock()
+        self._run_ooc()
+
+        # The client transition is delivered before the sequence retires.
+        transitions = [
+            call
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_protocol_error" in call.kwargs
+        ]
+        self.assertTrue(transitions, "OOC must send the no-puppet transition")
+        self.assertEqual(
+            transitions[-1].kwargs["ui_protocol_error"][0][0]["code"], "no_puppet"
+        )
+
+        # The dispatch sequence is retired and the coordinator epoch bumped.
+        self.assertIsNone(getattr(self.ws_session.ndb, "elosern_dispatch", None))
+        self.assertIsNone(getattr(self.ws_session.ndb, "elosern_actor_id", None))
+        self.assertNotEqual(
+            coordinator.epoch, epoch_before, "OOC must start a fresh epoch"
+        )
+
+    @covers_requirement(
+        "webclient-oob-protocol::unpuppet-retires-the-active-presentation-and-dispatch-sequence"
+    )
+    def test_same_character_repuppet_starts_fresh_sequence(self):
+        envelope = self._sync()
+        coordinator = attach_coordinator(self.ws_session, build_production_registry())
+        epoch_before = coordinator.epoch
+        self._send_action(envelope, "r:1")
+
+        self._run_ooc()
+        self.assertIsNone(self.ws_session.puppet)
+        self.assertIsNone(getattr(self.ws_session.ndb, "elosern_dispatch", None))
+
+        self._run_ic()
+        self.assertIs(self.ws_session.puppet, self.char1)
+        envelope2 = self._sync()
+        coordinator2 = attach_coordinator(self.ws_session, build_production_registry())
+        self.assertNotEqual(
+            envelope2["presentation_epoch"],
+            epoch_before,
+            "repuppet of the same character must not reuse the old epoch",
+        )
+        self.assertNotEqual(
+            coordinator2.epoch, epoch_before, "coordinator must hold the fresh epoch"
+        )
+
+        # The old completed-request cache is gone: replaying the same request
+        # id after repuppet executes the adapter again.
+        received = []
+        adapter = lambda actor, payload: received.append(actor) or {
+            "outcome": "success",
+            "code": "ok",
+            "message": "完成",
+            "affected_panels": ("status",),
+        }
+        registry = self._registry_with(adapter)
+        self.sessionhandler.data_out.reset_mock()
+        handle_ui_action(
+            self.ws_session,
+            self.ws_session.puppet,
+            {
+                "protocol_version": 1,
+                "presentation_epoch": envelope2["presentation_epoch"],
+                "request_id": "r:1",
+                "base_revision": envelope2["revision"],
+                "action_id": "proof.noop",
+                "payload": {},
+            },
+            registry,
+            build_production_registry(),
+        )
+        self.assertEqual(len(received), 1, "repuppet must not replay the old cache")
+
+
 if __name__ == "__main__":
     import unittest
 

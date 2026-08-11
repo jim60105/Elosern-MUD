@@ -326,6 +326,67 @@ class DispatcherTests(unittest.TestCase):
         self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
 
     @covers_requirement(
+        "webclient-combat-menu::terminal-combat-outcomes-refresh-all-mode-relevant-panels"
+    )
+    def test_empty_affected_panels_publishes_full_snapshot(self):
+        # A terminal settlement (empty affected panels) must publish a full
+        # snapshot at a fresh revision, never a partial ui_update, so the mode
+        # flip to exploration carries every panel.
+        session = self._session_with_coordinator()
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload: {
+                    "outcome": "success",
+                    "code": "fled",
+                    "message": "你脫離了戰鬥。",
+                    "affected_panels": (),
+                }
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        snapshots = [call for call in session.sent if "ui_snapshot" in call]
+        updates = [call for call in session.sent if "ui_update" in call]
+        self.assertTrue(snapshots, "terminal completion must publish a full snapshot")
+        self.assertFalse(updates, "terminal completion must not publish a partial update")
+        result = [
+            call for call in session.sent if "ui_action_result" in call
+        ][-1]["ui_action_result"][0][0]
+        self.assertEqual(result["presentation_revision"], snapshots[-1]["ui_snapshot"][0][0]["revision"])
+        self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
+
+    @covers_requirement(
+        "webclient-action-dispatch::dispatch-rejects-no-puppet-actions-with-a-bounded-response"
+    )
+    def test_reject_no_puppet_echoes_request_binding(self):
+        from web.webclient.actions.dispatcher import NO_PUPPET_CODE, reject_no_puppet
+
+        session = self._session_with_coordinator()
+        epoch = session.ndb.elosern_coordinator.epoch
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": epoch,
+            "request_id": "stale-9",
+            "base_revision": 4,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        reject_no_puppet(session, action)
+        results = [call for call in session.sent if "ui_action_result" in call]
+        self.assertEqual(len(results), 1)
+        envelope = results[0]["ui_action_result"][0][0]
+        self.assertEqual(envelope["outcome"], "rejected")
+        self.assertEqual(envelope["code"], NO_PUPPET_CODE)
+        self.assertEqual(envelope["presentation_epoch"], epoch)
+        self.assertEqual(envelope["request_id"], "stale-9")
+        self.assertEqual(envelope["presentation_revision"], 4)
+        self.assertNotIn("panels", envelope)
+        self.assertNotIn("correlation_id", envelope)
+
+    @covers_requirement(
         "webclient-action-dispatch::admitted-action-completion-publishes-canonical-state-before-unlocking"
     )
     def test_internal_error_publishes_snapshot_and_unlocks(self):

@@ -146,6 +146,84 @@ class UiSyncIntegrationTests(EvenniaTest):
         self.assertEqual(envelope["code"], "malformed_envelope")
 
 
+class UiActionNoPuppetInputFunctionTests(EvenniaTest):
+    """No-puppet ``ui_action`` responses (fix-webclient-session-lifecycle 2.1).
+
+    An unpuppeted WebSocket action is never silently dropped: it receives a
+    bounded ``no_puppet`` rejection echoing the request's own epoch and base
+    revision, so the browser can release its in-flight mutation lock.
+    """
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        self.ws_session = _make_session(evennia_session_handler(), "webclient/websocket")
+        self.sessionhandler.data_out.reset_mock()
+
+    def tearDown(self):
+        self.sessionhandler.data_out.reset_mock()
+        super().tearDown()
+
+    @property
+    def sessionhandler(self):
+        import evennia
+
+        return evennia.SESSION_HANDLER
+
+    @covers_requirement(
+        "webclient-action-dispatch::dispatch-rejects-no-puppet-actions-with-a-bounded-response",
+        "webclient-oob-protocol::no-puppet-actions-receive-a-bounded-rejection",
+    )
+    def test_unpuppeted_action_gets_bounded_rejection(self):
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": "a" * 22,
+            "request_id": "stale:1",
+            "base_revision": 7,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        inputfuncs.ui_action(self.ws_session, action)
+        results = [
+            call
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_action_result" in call.kwargs
+        ]
+        self.assertEqual(len(results), 1, "no-puppet action must not be dropped")
+        envelope = results[-1].kwargs["ui_action_result"][0][0]
+        self.assertEqual(envelope["outcome"], "rejected")
+        self.assertEqual(envelope["code"], "no_puppet")
+        self.assertEqual(envelope["presentation_epoch"], "a" * 22)
+        self.assertEqual(envelope["request_id"], "stale:1")
+        self.assertEqual(envelope["presentation_revision"], 7)
+        self.assertNotIn("panels", envelope)
+
+    def test_unpuppeted_malformed_action_gets_safe_error(self):
+        inputfuncs.ui_action(self.ws_session, {"bad": 1})
+        errors = [
+            call
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_protocol_error" in call.kwargs
+        ]
+        self.assertEqual(len(errors), 1)
+        envelope = errors[-1].kwargs["ui_protocol_error"][0][0]
+        self.assertEqual(envelope["code"], "malformed_envelope")
+
+    def test_telnet_session_never_gets_no_puppet_response(self):
+        telnet = _make_session(self.sessionhandler, "telnet", account=self.account)
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": "a" * 22,
+            "request_id": "stale:2",
+            "base_revision": 1,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        inputfuncs.ui_action(telnet, action)
+        self.sessionhandler.data_out.assert_not_called()
+
+
 def evennia_session_handler():
     import evennia
 

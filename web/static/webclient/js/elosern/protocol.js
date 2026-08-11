@@ -53,6 +53,7 @@
     "presentation_unavailable",
     "internal_error",
     "malformed_envelope",
+    "no_puppet",
   ];
   var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical"];
 
@@ -3041,7 +3042,7 @@
     // -----------------------------------------------------------------------
     createStore: function () {
       var generation = 0;
-      var phase = "idle"; // idle | awaiting_initial_snapshot | active
+      var phase = "idle"; // idle | awaiting_initial_snapshot | active | detached
       var activeEpoch = null;
       var revision = null;
       var mode = null;
@@ -3188,14 +3189,25 @@
               return { accepted: false, reason: "invalid", detail: error.message };
             }
 
-            if (phase === "idle" || phase === "awaiting_initial_snapshot") {
-              // Only the first valid full snapshot of the current generation
-              // with a non-retired epoch may establish active state.
+            if (
+              phase === "idle" ||
+              phase === "awaiting_initial_snapshot" ||
+              phase === "detached"
+            ) {
+              // Only a valid full snapshot with a non-retired epoch may
+              // establish (or re-establish after an OOC detachment) active
+              // state; updates never do.
               if (messageName !== "ui_snapshot") {
                 return { accepted: false, reason: "update_cannot_establish_epoch" };
               }
               if (retired.has(meta.epoch)) {
                 return { accepted: false, reason: "retired_epoch" };
+              }
+              // A detached store re-adopts only a genuinely fresh epoch; a
+              // same-epoch snapshot would be a stale survivor of the retired
+              // sequence.
+              if (phase === "detached" && meta.epoch === activeEpoch) {
+                return { accepted: false, reason: "different_epoch" };
               }
               commitPresentation(meta, true);
               return { accepted: true, established: true, revision: meta.revision };
@@ -3220,7 +3232,13 @@
             } catch (error) {
               return { accepted: false, reason: "invalid", detail: error.message };
             }
-            if (phase !== "active" || result.epoch !== activeEpoch) {
+            // While detached the pre-detachment epoch stays live so a bounded
+            // no-puppet rejection for an in-flight request is still accepted
+            // and can release the client's mutation lock.
+            if (
+              (phase !== "active" && phase !== "detached") ||
+              result.epoch !== activeEpoch
+            ) {
               return { accepted: false, reason: "different_epoch" };
             }
             lastActionResult = JSON.parse(canonicalJson(result));
@@ -3237,6 +3255,15 @@
             return { accepted: false, reason: "invalid", detail: error.message };
           }
           protocolError = JSON.parse(canonicalJson(protocolErrorPayload));
+          if (protocolErrorPayload.code === "no_puppet") {
+            // The puppet detached (OOC): clear character panels, lock
+            // mutations, and enter the detached phase. The active epoch is
+            // retained so a late no-puppet rejection can still be accepted;
+            // only a fresh-epoch snapshot re-establishes active state.
+            phase = "detached";
+            panels = {};
+            mutationsLocked = true;
+          }
           if (
             protocolErrorPayload.code === "unsupported_version" ||
             protocolErrorPayload.reloadRequired

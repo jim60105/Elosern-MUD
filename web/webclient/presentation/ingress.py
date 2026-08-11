@@ -83,6 +83,36 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
     return coordinator
 
 
+def send_unpuppet_transition(session: Any) -> None:
+    """Notify a WebClient that its puppet detached, before the sequence retires.
+
+    The browser clears character panels and locks mutations on this signal, so
+    it must be delivered while the session is still a live WebClient. Telnet
+    and AJAX sessions receive no graphical OOB state.
+    """
+    if not is_webclient(session):
+        return
+    send_protocol_error(
+        session,
+        code="no_puppet",
+        message="你已離開角色（OOC）。",
+        reload_required=False,
+    )
+
+
+def reset_client_sequence(session: Any) -> None:
+    """Start a fresh client-visible sequence for the next puppet.
+
+    Bumps the attached coordinator's epoch and clears the recorded actor
+    binding, so repuppeting the same character later still produces a fresh
+    epoch and never reuses the retired dispatch cache or in-flight marker.
+    """
+    coordinator = attach_coordinator(session, build_production_registry())
+    coordinator.reset()
+    if getattr(session, "ndb", None) is not None:
+        session.ndb.elosern_actor_id = None
+
+
 def synchronize_session(session: Any, actor: Any) -> bool:
     """Emit a full snapshot for a puppeted session; return success.
 

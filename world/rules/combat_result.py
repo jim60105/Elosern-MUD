@@ -58,6 +58,13 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
     rejected settlement maps its exact stable rejection reason. Success
     declares the affected panels so the dispatcher publishes canonical ``status``
     and ``context_actions`` replacements before unlocking the browser.
+
+    A terminal settlement declares an empty affected-panel set, which the
+    dispatcher interprets as a full-snapshot publication: the mode flips back
+    to exploration, so every mode-relevant panel (exploration, character,
+    services, local_map, status, context_actions, art) must be replaced with
+    post-settlement canonical state. Non-terminal rounds keep the small
+    three-panel update.
     """
     if result["outcome"] == "rejected":
         reason = result.get("reason")
@@ -80,7 +87,7 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
         "outcome": "success",
         "code": outcome,
         "message": terminal_outcome_message(outcome),
-        "affected_panels": AFFECTED_PANELS,
+        "affected_panels": (),
     }
 
 

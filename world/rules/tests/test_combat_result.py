@@ -61,11 +61,14 @@ class CombatResultRenderingTests(unittest.TestCase):
         )
         self.assertNotIn("logs", result)
 
-    def test_oob_terminal_result_uses_stable_code(self):
+    def test_oob_terminal_result_declares_no_affected_panels(self):
         result = settle_to_oob_result({"outcome": "fled"})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "fled")
         self.assertEqual(result["message"], "你脫離了戰鬥。")
+        # A terminal outcome must publish a full snapshot, not a partial
+        # update: the mode flips back to exploration.
+        self.assertEqual(result["affected_panels"], ())
 
     def test_oob_rejected_result_maps_reason(self):
         result = settle_to_oob_result(
