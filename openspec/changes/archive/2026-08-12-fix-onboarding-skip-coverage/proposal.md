@@ -17,3 +17,4 @@ The onboarding corridor-skip observer is invoked only from `GridRoom.at_object_r
 ## Impact
 
 - `typeclasses/rooms.py` (remove GridRoom-only hook), `typeclasses/exits.py` / shared movement-completion path (call observer), `world/rules/onboarding.py` (idempotent observer), tests.
+- Delta specs: `onboarding-guide` gains the ADDED deviation-detection requirement; `movement-cost-charging`, `wilderness-gateway`, and `map-knowledge` get MODIFIED structural wording because the four movement paths now complete through the shared helper instead of calling `charge_movement`/`record_arrival` inline.

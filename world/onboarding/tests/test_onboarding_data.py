@@ -173,6 +173,22 @@ class RoomEntryTests(unittest.TestCase):
             room_entry_decision(_snapshot(onboarded=True), "神殿街")
         )
 
+    def test_ended_guide_never_transitions_again(self):
+        for state in ("completed", "skipped"):
+            with self.subTest(state=state):
+                self.assertIsNone(
+                    room_entry_decision(
+                        _snapshot(guide_progress=GuideProgress(state=state)),
+                        "神殿街",
+                    )
+                )
+                self.assertIsNone(
+                    room_entry_decision(
+                        _snapshot(guide_progress=GuideProgress(state=state)),
+                        GUILD_EXTERIOR_ROOM_KEY,
+                    )
+                )
+
 
 class DialogueTableTests(unittest.TestCase):
     def test_known_keywords_return_authored_responses(self):

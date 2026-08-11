@@ -35,7 +35,10 @@ movement SHALL call `charge_movement()`.
 `typeclasses/exits.py` SHALL define `MovementCostMixin`, a plain mixin carrying a class attribute
 `movement_cost_key: str` (default `"move"`) and overriding `at_post_traverse(traversing_object,
 source_location, **kwargs)` to call `super().at_post_traverse(...)` followed by
-`charge_movement(traversing_object, self.movement_cost_key)` and then
+`after_successful_movement(traversing_object, source_location, cost_key=self.movement_cost_key,
+destination=traversing_object.location)` — the shared movement-completion helper (the
+onboarding-skip-coverage change's shared boundary) — which SHALL call
+`world.rules.movement.charge_movement(traversing_object, cost_key)` and then
 `world.rules.map_knowledge.record_arrival(traversing_object)`. Recording map knowledge happens only
 after the movement transaction has already succeeded, because this hook fires exclusively from the
 stock `DefaultExit.at_traverse` success branch — the same structural guarantee that already makes the
@@ -74,6 +77,13 @@ knowledge SHALL NOT change the movement-charge behavior in any way.
   change 14's `_relocate_to_default_home()` uses)
 - **THEN** `get_world_clock().tick` is unchanged and no map-knowledge observation is recorded, even
   though `at_post_move` still fires on the moved object
+
+#### Scenario: The MovementCostMixin delegates to the shared completion helper
+- **WHEN** `typeclasses/exits.py::MovementCostMixin.at_post_traverse` is inspected
+- **THEN** it calls `after_successful_movement(...)` with `cost_key=self.movement_cost_key`, the
+  shared helper (not the mixin) calls `world.rules.movement.charge_movement(traversing_object,
+  cost_key)` and `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the mixin
+  nor the helper calls `world.rules.clock.get_world_clock().advance()` directly
 
 ### Requirement: typeclasses.exits.Exit and CostedXYZExit both carry MovementCostMixin with
 movement_cost_key "move"

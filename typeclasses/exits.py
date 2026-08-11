@@ -7,6 +7,8 @@ for allowing Characters to traverse the exit to its destination.
 
 """
 
+from typing import Any
+
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit, enter_wilderness
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.objects.objects import DefaultExit
@@ -16,33 +18,71 @@ from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
 
+def after_successful_movement(
+    traversing_object: Any,
+    source_location: Any,
+    *,
+    cost_key: str,
+    destination: Any | None = None,
+    wilderness_coordinates: tuple[int, int] | None = None,
+    wilderness_source_coordinates: tuple[int, int] | None = None,
+    wilderness_name: str = WILDERNESS_NAME,
+) -> None:
+    """Complete a successful traversal through the shared movement boundary.
+
+    Runs the success-path sequence every exit lineage shares (onboarding-skip
+    coverage design D1): charge the ``cost_key`` clock cost, record the
+    destination map-knowledge node, move co-located companions, and finally run
+    the onboarding room-entry observer so any arrival outside the guided
+    corridor — plain ``Room``, ``GridRoom``, ``TerrainRoom``, or
+    ``InstanceRoom`` — marks the guide skipped. ``charge_movement``,
+    ``record_arrival``, and ``follow_companions`` are internally no-ops for
+    anything that is not a ``PlayerCharacter`` and never raise from a traversal
+    hook; the onboarding observer is player-gated and idempotent, so the helper
+    is safe to call on any successful traversal from any path.
+    """
+    from world.rules.map_knowledge import record_arrival
+    from world.rules.movement import charge_movement
+    from world.rules.onboarding import observe_room_entry
+    from world.rules.party import follow_companions
+
+    charge_movement(traversing_object, cost_key)
+    record_arrival(traversing_object)
+    follow_companions(
+        traversing_object,
+        source_location,
+        destination=destination,
+        wilderness_coordinates=wilderness_coordinates,
+        wilderness_source_coordinates=wilderness_source_coordinates,
+        wilderness_name=wilderness_name,
+    )
+    observe_room_entry(traversing_object)
+
+
 class MovementCostMixin:
-    """Charges WorldClock and records map knowledge for a successful player traversal.
+    """Completes a successful player traversal through the shared boundary.
 
     Hooks ``at_post_traverse`` — which Evennia's stock ``DefaultExit.at_traverse``
     calls only from its successful-``move_to()`` branch — rather than inspecting
     ``at_traverse``'s own return value, which is ``None`` in both branches
     (map-movement-clock design.md D-2). A locked exit never reaches this hook
     (the access check runs first), and a vetoed ``at_pre_move`` aborts before it
-    (design.md D-6); neither needs a guard here. After charging, the destination
-    node is recorded through ``world.rules.map_knowledge.record_arrival``
-    (map-knowledge-minimap design D3) — a no-op for anything that is not a
-    ``PlayerCharacter`` and never raises from the traversal hook.
+    (design.md D-6); neither needs a guard here. On success the traversal runs
+    ``after_successful_movement`` — charging the ``movement_cost_key`` cost,
+    recording the destination node through ``world.rules.map_knowledge.
+    record_arrival`` (map-knowledge-minimap design D3), moving companions, and
+    running the onboarding room-entry observer (onboarding-skip coverage design
+    D1) — all no-ops for anything that is not a ``PlayerCharacter``.
     """
 
     movement_cost_key: str = "move"
 
     def at_post_traverse(self, traversing_object, source_location, **kwargs):
         super().at_post_traverse(traversing_object, source_location, **kwargs)
-        from world.rules.map_knowledge import record_arrival
-        from world.rules.movement import charge_movement
-        from world.rules.party import follow_companions
-
-        charge_movement(traversing_object, self.movement_cost_key)
-        record_arrival(traversing_object)
-        follow_companions(
+        after_successful_movement(
             traversing_object,
             source_location,
+            cost_key=self.movement_cost_key,
             destination=traversing_object.location,
         )
 
@@ -91,8 +131,9 @@ class WildernessGateExit(Exit):
     ignoring target_location entirely. db.anchor_key is set by sync_wilderness()
     at creation time -- it is NOT optional, and a gate exit created without it
     will KeyError on first use (map-wilderness design.md D-7). A successful
-    entry charges wilderness_move and records the destination ``wild:`` node
-    (map-knowledge-minimap design D3).
+    entry charges wilderness_move, records the destination ``wild:`` node
+    (map-knowledge-minimap design D3), and completes through the shared
+    ``after_successful_movement`` boundary (onboarding-skip coverage design D1).
     """
 
     def at_traverse(self, traversing_object, target_location, **kwargs):
@@ -120,15 +161,10 @@ class WildernessGateExit(Exit):
             exclude=[traversing_object],
         )
         traversing_object.at_post_move(None)
-        from world.rules.map_knowledge import record_arrival
-        from world.rules.movement import charge_movement
-        from world.rules.party import follow_companions
-
-        charge_movement(traversing_object, "wilderness_move")
-        record_arrival(traversing_object)
-        follow_companions(
+        after_successful_movement(
             traversing_object,
             source_location,
+            cost_key="wilderness_move",
             wilderness_coordinates=entry.wilderness_xy,
             wilderness_name=WILDERNESS_NAME,
         )
@@ -143,7 +179,9 @@ class WildernessReturnExit(WildernessExit):
     special-cased return branch and ordinary fallback alike -- so no wilderness
     step is free (map-wilderness design.md D-6's correction note). Every
     successful step also records its destination node through
-    ``record_arrival`` (map-knowledge-minimap design D3).
+    ``record_arrival`` (map-knowledge-minimap design D3); both branches
+    complete through the shared ``after_successful_movement`` boundary
+    (onboarding-skip coverage design D1).
     """
 
     def at_traverse(self, traversing_object, target_location):
@@ -160,15 +198,10 @@ class WildernessReturnExit(WildernessExit):
                     return False
                 if not traversing_object.move_to(grid_room, quiet=False):
                     return False
-                from world.rules.map_knowledge import record_arrival
-                from world.rules.movement import charge_movement
-                from world.rules.party import follow_companions
-
-                charge_movement(traversing_object, "wilderness_move")
-                record_arrival(traversing_object)
-                follow_companions(
+                after_successful_movement(
                     traversing_object,
                     self.location,
+                    cost_key="wilderness_move",
                     destination=grid_room,
                     wilderness_source_coordinates=current,
                 )
@@ -178,15 +211,10 @@ class WildernessReturnExit(WildernessExit):
         # wilderness_move; only the routing decision is gated.
         result = super().at_traverse(traversing_object, target_location)
         if result:
-            from world.rules.map_knowledge import record_arrival
-            from world.rules.movement import charge_movement
-            from world.rules.party import follow_companions
-
-            charge_movement(traversing_object, "wilderness_move")
-            record_arrival(traversing_object)
-            follow_companions(
+            after_successful_movement(
                 traversing_object,
                 self.location,
+                cost_key="wilderness_move",
                 wilderness_coordinates=traversing_object.location.coordinates,
                 wilderness_source_coordinates=current,
             )

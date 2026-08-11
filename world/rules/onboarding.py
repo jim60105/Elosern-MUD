@@ -186,7 +186,19 @@ def observe_room_entry(character: Any) -> None:
     arrival at 冒險者公會外 completes guidance. Reaching the South Gate triggers
     the arrival scene through ``maybe_play_arrival``. All room-key checks live
     here.
+
+    Idempotent and safe for every arrival: a no-op for non-player arrivals
+    (NPCs, monsters, companions moved by ``follow_companions``), for onboarded
+    players, and for players whose guide already ended — ``room_entry_decision``
+    honors the one-transition rule, so repeated arrivals and moves back into
+    the corridor never re-mark or overwrite an ended guide. Called from the
+    shared movement-completion boundary (``after_successful_movement``) for
+    every room type.
     """
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(character, PlayerCharacter):
+        return
     if getattr(character, "onboarded", False):
         return
     room_key = _room_key(character)
