@@ -26,6 +26,7 @@ from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
 from server.ai_director_service import (
+    EscortUnavailableError,
     NoSuitableTemplateError,
     request_generated_quest,
 )
@@ -152,6 +153,29 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
             )
             failure = await_result(d)
         self.assertTrue(failure.check(NoSuitableTemplateError))
+
+    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
+    def test_escort_request_is_refused_and_nothing_is_registered(self):
+        definitions_before = dict(QUEST_DEFINITION_REGISTRY)
+        offers_before = dict(GUILD_OFFER_REGISTRY)
+        disabled = _raw(scenario_director={"enabled": False})
+        with override_settings(LLM_PROFILES=disabled):
+            d = request_generated_quest(
+                context=_context(requested_type="護衛", issuer_branch="guild_branch_altoria")
+            )
+            failure = await_result(d)
+        self.assertTrue(failure.check(EscortUnavailableError))
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), definitions_before)
+        self.assertEqual(dict(GUILD_OFFER_REGISTRY), offers_before)
+
+    def test_escort_request_refuses_before_any_transport_work(self):
+        client = FakeLLMClient()
+        d = request_generated_quest(
+            client, context=_context(requested_type="護衛", issuer_branch="guild_branch_altoria")
+        )
+        failure = await_result(d)
+        self.assertTrue(failure.check(EscortUnavailableError))
+        self.assertEqual(client.calls, [])
 
     @covers_requirement("scene-builder::the-composition-root-posts-one-generated-quest-to-the-guild-board-and-degrades-offline")
     def test_module_imports_before_server_initialization_without_binding_a_logger(self):

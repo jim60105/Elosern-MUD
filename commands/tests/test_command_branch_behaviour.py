@@ -14,6 +14,7 @@ from commands.guild import (
     CmdGuildLog,
     CmdGuildMerit,
     CmdGuildRegister,
+    CmdGuildRequest,
     CmdGuildTurnIn,
 )
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
@@ -26,6 +27,9 @@ from world.rules.guild import GuildDataError, RewardClaimError
 from world.rules.guild_exams import ExamReason, GuildExamError
 from world.rules.guild_offers import BoardAccessError, GuildOfferError
 from world.rules.skip_safety import SkipRejectReason
+
+
+from tools.spec_traceability import covers_requirement
 
 
 def _command(command_type, args=""):
@@ -142,6 +146,43 @@ class GuildCommandBranchTests(TestCase):
         self.assertEqual(_parse_requested_type(""), "討伐")
         self.assertEqual(_parse_requested_type("採集"), "採集")
         self.assertIsNone(_parse_requested_type("烤肉"))
+
+    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
+    def test_request_refuses_escort_with_a_clear_message(self):
+        from server.ai_director_service import EscortUnavailableError
+
+        command = _command(CmdGuildRequest, "護衛")
+        staff = Mock()
+        staff.components.get.return_value.branch_key = "guild_branch_altoria"
+        command.resolve_staff = Mock(return_value=staff)
+        command.caller.ndb = SimpleNamespace(guild_request_pending=None)
+        command.caller.guild_rank = "F"
+        with patch(
+            "commands.guild.parse_guild_registration",
+            return_value={"branch_key": "guild_branch_altoria"},
+        ), patch(
+            "commands.guild.request_generated_quest",
+            side_effect=EscortUnavailableError("no binding flow"),
+        ):
+            command.func()
+        command.caller.msg.assert_called_with(
+            "護衛委託目前尚未開放，請選擇其他類型的委託。"
+        )
+
+    def test_resolve_deferred_reports_escort_refusal_on_the_pending_path(self):
+        from twisted.internet.defer import Deferred
+
+        from commands.guild import _GuildRequestPendingError, _resolve_deferred
+        from server.ai_director_service import EscortUnavailableError
+
+        caller = Mock()
+        caller.ndb.guild_request_pending = None
+        pending = Deferred()
+        with self.assertRaises(_GuildRequestPendingError):
+            _resolve_deferred(pending, caller)
+        pending.addErrback(lambda failure: None)
+        pending.errback(EscortUnavailableError("no binding flow"))
+        caller.msg.assert_called_with("護衛委託目前尚未開放，請選擇其他類型的委託。")
 
     def test_resolve_deferred_sync_and_pending_paths(self):
         from twisted.internet.defer import Deferred, fail, succeed

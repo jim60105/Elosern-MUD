@@ -272,6 +272,9 @@ def follow_companions(
             continue
     if not companions:
         return
+    destination_had_companion = destination is not None and any(
+        npc.location is destination for npc in live_companions(player)
+    )
     left_behind: list[Any] = []
     for npc in companions:
         try:
@@ -291,7 +294,9 @@ def follow_companions(
             moved = False
         if not moved:
             left_behind.append(npc)
-    _reobserve_quest_arrival(player)
+    _reobserve_quest_arrival(
+        player, destination_had_companion=destination_had_companion
+    )
     if not left_behind:
         return
     try:
@@ -306,15 +311,22 @@ def follow_companions(
         )
 
 
-def _reobserve_quest_arrival(player: Any) -> None:
+def _reobserve_quest_arrival(player: Any, *, destination_had_companion: bool) -> None:
     """Re-run the quest arrival observation after the companions' moves complete.
 
     The player's own ``at_object_receive`` observation runs before the follow
     moves, so a companion arriving *with* the player would be invisible to the
     first observation; the re-run happens after the moves (party-quest D-2) and
     the quest observer's one-transition rule makes the repeated observation
-    idempotent. Never raises from a traversal hook.
+    idempotent for the shipped quantity-1 objectives. When a companion was
+    already present in the destination before the follow, the first observation
+    has already advanced every matching stage for this arrival event, so the
+    re-run is skipped: it would otherwise count the same event a second time
+    (for example a defensive non-1 quantity could jump two progress points on
+    one arrival). Never raises from a traversal hook.
     """
+    if destination_had_companion:
+        return
     from world.quests.room_observation import observe_room_entry
 
     try:

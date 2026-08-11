@@ -436,6 +436,11 @@ def _compile_objective(
     if kind in (ObjectiveKind.REACH, ObjectiveKind.ESCORT):
         if location is None:
             _reject(f"stage {stage_index} {kind.value} objective requires a destination")
+        if quantity != 1:
+            _reject(
+                f"stage {stage_index} {kind.value} objective quantity must be "
+                "exactly 1; arrival observation cannot accumulate repeated visits"
+            )
         return QuestObjective(
             kind=kind,
             quantity=quantity,
@@ -555,13 +560,19 @@ def _validate_scene_bound_rules(
 
     Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
     entities always live in a reclaimable instance room, never a permanent map
-    room. An ESCORT stage must be a permanent destination (never instance): the
-    SceneBuilder locates permanent rooms only, so an ESCORT scene never spawns
-    its protected entities into the destination room (which would auto-complete
-    the escort on entry) and never pollutes a permanent map. A bound-target
-    DEFEAT must declare a quantity no greater than its ``npc_req`` count so the
-    objective is always satisfiable by defeating the bound targets.
+    room. An ESCORT stage is refused entirely until a protected-entity binding
+    flow exists: permanent-location stages are never bound to protected
+    entities today (the SceneBuilder locates permanent rooms only, so a bound
+    entity could never be spawned into an ESCORT destination), which would
+    leave the quest structurally uncompletable. A bound-target DEFEAT must
+    declare a quantity no greater than its ``npc_req`` count so the objective
+    is always satisfiable by defeating the bound targets.
     """
+    if objective.kind is ObjectiveKind.ESCORT:
+        _reject(
+            f"stage {stage_index} declares an ESCORT objective, which cannot be "
+            "published until a protected-entity binding flow exists"
+        )
     has_occupants = bool(npc_reqs)
     if has_occupants and not (
         location is not None and location.kind is DestinationKind.BOUND_INSTANCE
@@ -569,16 +580,6 @@ def _validate_scene_bound_rules(
         _reject(
             f"stage {stage_index} declares NPC requirements outside an "
             "instance-layer destination; occupant-bearing scenes must be instances"
-        )
-    if (
-        objective.kind is ObjectiveKind.ESCORT
-        and location is not None
-        and location.kind is DestinationKind.BOUND_INSTANCE
-    ):
-        _reject(
-            f"stage {stage_index} declares an ESCORT objective at an instance "
-            "destination; ESCORT scenes must be permanent rooms (located only, "
-            "never instance-materialized)"
         )
     if (
         objective.kind is ObjectiveKind.DEFEAT
@@ -984,6 +985,12 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
     """
     definition = compiled.definition
     requirements = compiled.stage_requirements
+    for stage in definition.stages:
+        if stage.objective.kind is ObjectiveKind.ESCORT:
+            _reject(
+                "ESCORT stages cannot be published until a protected-entity "
+                "binding flow exists; the whole quest is refused"
+            )
     offer = GuildQuestOffer(
         definition_key=definition.key,
         issuer_branch_key=compiled.issuer_branch_key,

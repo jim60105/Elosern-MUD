@@ -730,6 +730,42 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
+    def test_escort_stage_at_anchor_is_rejected_and_retried(self):
+        bad = _payload()
+        bad["quest_type"] = "護衛"
+        bad["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
+        bad["stages"][0]["npc_req"] = []
+        for validator_fn in scenario_director._VALIDATORS.values():
+            if validator_fn(bad):
+                break
+        else:
+            self.fail("no validator rejected the unbindable escort proposal")
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    @covers_requirement("quest-blueprint::reach-and-escort-objectives-accept-only-quantity-one")
+    def test_reach_quantity_two_is_rejected_and_retried(self):
+        bad = _payload()
+        bad["quest_type"] = "探索"
+        bad["stages"][0]["objective"] = {"kind": "reach_location", "quantity": 2}
+        client = FakeLLMClient()
+        client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
+        client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     def test_valid_instance_bound_payload_passes_guardrail_and_compiles(self):
         payload = self._instance_bound_payload()
         for validator_fn in scenario_director._VALIDATORS.values():

@@ -7,14 +7,16 @@ directly on its ordinary entry/step path and never routes through
 ``at_object_receive``.
 """
 
+from dataclasses import replace
 from typing import Any
 
 from evennia.objects.models import ObjectDB
 
 from typeclasses.entities import LivingEntity
 
-from .definitions import DestinationKind, ObjectiveKind, RoomLocator
+from .definitions import DestinationKind, ObjectiveKind, QuestDefinition, RoomLocator
 from .runtime import (
+    QuestRecord,
     QuestState,
     definition_for,
     fulfill_record,
@@ -65,6 +67,23 @@ def _companion_present(room: Any, player: Any) -> bool:
     return False
 
 
+def _advance_arrival(record: QuestRecord, definition: QuestDefinition) -> QuestRecord:
+    """Advance one REACH / ESCORT stage by exactly one arrival event.
+
+    Progress is incremented by one and capped at the objective quantity: a
+    single matching arrival can never jump to full completion, so even a
+    non-1 quantity (should one slip through) accumulates instead of
+    over-filling. Reaching the quantity fulfills the stage exactly as before
+    (advancing to the next stage or completing the quest), so the shipped
+    quantity-1 behavior is unchanged.
+    """
+    objective = definition.stages[record.stage_index].objective
+    next_progress = record.stage_progress + 1
+    if next_progress < objective.quantity:
+        return replace(record, stage_progress=next_progress)
+    return fulfill_record(record, definition)
+
+
 def observe_room_entry(room: Any, obj: Any) -> None:
     """Advance a player's active REACH / ESCORT stages satisfied by this room.
 
@@ -104,7 +123,13 @@ def observe_room_entry(room: Any, obj: Any) -> None:
             continue
         if not satisfied:
             continue
-        replacements[record.quest_id] = fulfill_record(record, definition)
+        advanced = _advance_arrival(record, definition)
+        replacements[record.quest_id] = advanced
+        if (
+            advanced.state is QuestState.IN_PROGRESS
+            and advanced.stage_index == record.stage_index
+        ):
+            continue
         pin_operations.extend(release_stage_binding(obj, record))
     if not replacements:
         return

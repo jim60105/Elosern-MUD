@@ -38,6 +38,7 @@ from world.maps.bootstrap import sync_grid
 from world.quests.catalog import register_catalog
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
+    QuestCompileError,
     StageNpcCharacterization,
     StageSpawnRequirement,
     compile_quest_blueprint,
@@ -319,16 +320,13 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         self.assertEqual(defeat_fresh.protected_entity_ids, ())
 
     @covers_requirement("scene-builder::materializing-a-stage-spawns-the-destination-sets-scene-metadata-and-binds-one-stage-atomically-and-idempotently")
-    def test_escort_permanent_stage_is_located_without_spawning_or_binding(self):
-        record, _ = self._accept(_escort_anchor_payload())
-        rooms_before = InstanceRoom.objects.all().count()
-        result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.assertIs(result.room, self.anchor)
-        self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
-        fresh = self._fresh(record.quest_id)
-        self.assertIsNone(fresh.stage_room_id)
-        self.assertEqual(fresh.objective_target_ids, ())
-        self.assertEqual(fresh.protected_entity_ids, ())
+    def test_escort_stage_is_refused_before_publication(self):
+        with self.assertRaisesRegex(
+            QuestCompileError,
+            "ESCORT objective, which cannot be published until a "
+            "protected-entity binding flow exists",
+        ):
+            compile_quest_blueprint(_escort_anchor_payload())
 
     @covers_requirement("scene-builder::materializing-a-stage-spawns-the-destination-sets-scene-metadata-and-binds-one-stage-atomically-and-idempotently")
     def test_monster_tier_defeat_spawns_quantity_monsters(self):
