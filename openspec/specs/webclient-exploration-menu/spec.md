@@ -280,3 +280,10 @@ The managed localhost Playwright suite SHALL exercise, using keyboard controls o
 #### Scenario: No take or drop control is rendered
 - **WHEN** the exploration dock is open in any room
 - **THEN** no `explore.take`/`explore.drop` affordance or generic object-mutation control exists anywhere in the rendered surface
+
+### Requirement: Exploration move rows advertise canonical destinations
+The exploration menu's wilderness move rows SHALL use the canonical destination resolver so the advertised destination equals the node the player actually arrives at.
+
+#### Scenario: Move row destination matches actual arrival
+- **WHEN** the exploration menu lists wilderness move rows
+- **THEN** each row's destination is the canonical arrival node, including the gateway south row that returns to the grid

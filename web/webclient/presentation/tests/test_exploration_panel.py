@@ -16,9 +16,10 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
+from typeclasses.exits import WildernessGateExit
 from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
-from typeclasses.rooms import Room
+from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.exploration import (
     ACTION_IDS,
@@ -44,7 +45,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid
+from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.map_knowledge import record_arrival
@@ -1130,6 +1131,58 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(module._look_objects(self.player), [])
         self.assertEqual(module._interact_targets(self.player), [])
         self.assertIsNone(module._destination_node(object()))
+
+
+class WildernessExplorationPresenterTests(EvenniaTestCase):
+    """Wilderness move rows advertise canonical arrival nodes (fix-wilderness-web-navigation)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_wilderness()
+        cls._north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+
+    def setUp(self):
+        self.room1 = create_object(Room, key="Room1")
+        self.char1 = create_object(PlayerCharacter, key="Char", location=self.room1)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.north_gate = GridRoom.objects.get(id=self._north_gate.id)
+        self.gate = [
+            exit_obj
+            for exit_obj in self.north_gate.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        ][0]
+
+    def _render(self):
+        return build_production_registry().render("exploration", _context(self.char1))
+
+    @covers_requirement("webclient-exploration-menu::exploration-move-rows-advertise-canonical-destinations")
+    def test_wilderness_move_rows_advertise_canonical_destinations(self):
+        from typeclasses.rooms import TerrainRoom
+        from world.maps.wilderness_destination import resolve_wilderness_destination
+
+        self.gate.at_traverse(self.char1, self.north_gate)
+        self.assertIsInstance(self.char1.location, TerrainRoom)
+        room = self.char1.location
+        payload = self._render()
+        self.assertTrue(payload["available"])
+        rows = {row["label"]: row for row in payload["move"]}
+        # The eight cardinal exits all route through the resolver.
+        self.assertEqual(
+            set(rows),
+            {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"},
+        )
+        for direction, row in rows.items():
+            expected = resolve_wilderness_destination(room, direction)
+            self.assertIsNotNone(expected)
+            self.assertEqual(row["destination"], expected, direction)
+            self.assertTrue(row["enabled"])
+            self.assertIsNone(row["disabled_reason"])
+        # The gateway south row advertises the grid arrival node, not a wild cell.
+        self.assertEqual(rows["south"]["destination"], "grid:capital_altoria:2:4")
 
 
 if __name__ == "__main__":

@@ -1014,6 +1014,87 @@ class LocalMapWildernessTests(EvenniaTestCase):
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         self.assertIn(far, [node["id"] for node in remembered])
 
+    @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
+    def test_wilderness_adjacent_nodes_carry_move_actions_with_canonical_destinations(self):
+        from world.maps.wilderness_destination import resolve_wilderness_destination
+
+        self.gate.at_traverse(self.char1, self.north_gate)
+        room = self.char1.location
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["layer"], "wilderness")
+        current = payload["current_node"]
+        moves = [node for node in payload["nodes"] if node["action"] is not None]
+        self.assertEqual(len(moves), 8)
+        for move in moves:
+            self.assertEqual(move["action"]["kind"], "move")
+            self.assertTrue(move["action"]["exit_ref"].isascii())
+        directions = {
+            edge["label"]: edge["destination"]
+            for edge in payload["edges"]
+            if edge["source"] == current
+        }
+        self.assertEqual(len(directions), 8)
+        for direction, node_id in directions.items():
+            node = next(node for node in payload["nodes"] if node["id"] == node_id)
+            expected = resolve_wilderness_destination(room, direction)
+            self.assertIsNotNone(expected, direction)
+            self.assertEqual(node["action"]["destination"], expected, direction)
+            edge = next(
+                edge for edge in payload["edges"]
+                if edge["source"] == current and edge["label"] == direction
+            )
+            self.assertTrue(edge["traversable"], direction)
+        # The gateway south node advertises the grid arrival node, not a wild cell.
+        south_node_id = directions["s"]
+        south_node = next(node for node in payload["nodes"] if node["id"] == south_node_id)
+        self.assertEqual(south_node["action"]["destination"], "grid:capital_altoria:2:4")
+
+    @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
+    def test_locked_wilderness_node_stays_inert(self):
+        self.gate.at_traverse(self.char1, self.north_gate)
+        room = self.char1.location
+        south_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "south"][0]
+        south_exit.locks.add("traverse:false()")
+        payload = self._registry().render("local_map", _context(self.char1))
+        current = payload["current_node"]
+        edge = next(
+            edge for edge in payload["edges"]
+            if edge["source"] == current and edge["label"] == "s"
+        )
+        node = next(node for node in payload["nodes"] if node["id"] == edge["destination"])
+        self.assertIsNone(node["action"])
+        self.assertFalse(edge["traversable"])
+        # The other seven directions still carry move actions.
+        self.assertEqual(
+            len([node for node in payload["nodes"] if node["action"] is not None]),
+            7,
+        )
+
+    def test_aliased_unrelated_exit_does_not_hijack_the_south_action(self):
+        from typeclasses.exits import WildernessReturnExit
+
+        self.gate.at_traverse(self.char1, self.north_gate)
+        room = self.char1.location
+        south_exit = [exit_obj for exit_obj in room.exits if exit_obj.key == "south"][0]
+        # An unrelated exit aliased "s" must never replace the real south
+        # exit in the move descriptor (direction mapping is key-based only).
+        extra = create_object(
+            WildernessReturnExit,
+            key="密道",
+            aliases=["s"],
+            location=room,
+            destination=room,
+        )
+        payload = self._registry().render("local_map", _context(self.char1))
+        current = payload["current_node"]
+        edge = next(
+            edge for edge in payload["edges"]
+            if edge["source"] == current and edge["label"] == "s"
+        )
+        node = next(node for node in payload["nodes"] if node["id"] == edge["destination"])
+        self.assertEqual(node["action"]["exit_ref"], str(int(south_exit.id)))
+        self.assertNotEqual(node["action"]["exit_ref"], str(int(extra.id)))
+
 
 if __name__ == "__main__":
     unittest.main()

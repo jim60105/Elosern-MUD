@@ -556,15 +556,28 @@ def _grid_exit_action(actor: Any, room, coord: tuple[int, int], z: str) -> dict[
 
 
 def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> str:
-    """Build the wilderness layer from provider bounds and terrain labels (D7)."""
+    """Build the wilderness layer from provider bounds and terrain labels (D7).
+
+    Every traversable adjacent node carries the exact ``move`` descriptor with
+    the canonical destination resolved through
+    ``resolve_wilderness_destination`` (fix-wilderness-web-navigation) -- the
+    contrib's self-loop exits never name the real arrival node, and the
+    registered gateway south exit actually returns to the grid. The edge is
+    only ``traversable`` when the node carries a move action, matching the
+    grid layer.
+    """
     from typeclasses.rooms import TerrainRoom
+    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    from world.maps.wilderness_destination import (
+        normalize_wilderness_direction,
+        resolve_wilderness_destination,
+    )
     from world.maps.wilderness_provider import (
         WILDERNESS_MAX_X,
         WILDERNESS_MAX_Y,
         WILDERNESS_NAME,
         region_for_coordinates,
     )
-    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 
     location = actor.location
     if not isinstance(location, TerrainRoom):
@@ -590,6 +603,16 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         action=None,
     )
 
+    # Direction -> real exit object (the contrib keys the eight exits
+    # "north".."northwest"). Only exits whose own key is a canonical
+    # wilderness direction map; an unrelated exit (e.g. one aliased "s")
+    # must never hijack a direction's move descriptor.
+    exits_by_direction: dict[str, Any] = {}
+    for exit_obj in location.exits:
+        direction = normalize_wilderness_direction(exit_obj.key)
+        if direction is not None:
+            exits_by_direction.setdefault(direction, exit_obj)
+
     # Eight legal adjacent cells are visible (visited or unvisited).
     for direction in WILD_DIRECTIONS:
         neighbor = _wild_neighbor(x, y, direction)
@@ -602,6 +625,19 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             if _known_node_id(node_id, visited)
             else "visible_unvisited"
         )
+        destination = resolve_wilderness_destination(location, direction)
+        exit_obj = exits_by_direction.get(direction)
+        action = None
+        if (
+            destination is not None
+            and exit_obj is not None
+            and _traversable(exit_obj, actor)
+        ):
+            action = {
+                "kind": "move",
+                "exit_ref": _exit_ref(exit_obj),
+                "destination": destination,
+            }
         builder.add_node(
             node_id,
             WILDERNESS_REGION_REGISTRY[region_for_coordinates(nx, ny)].display_name_zh,
@@ -610,9 +646,9 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             visibility=visibility,
             anchor=False,
             landmark=False,
-            action=None,
+            action=action,
         )
-        builder.add_edge(current_id, node_id, direction, True)
+        builder.add_edge(current_id, node_id, direction, action is not None)
 
     # Remembered wild cells outside adjacency, bounded by most-recent last_seen.
     for visit in builder.remembered(MAX_NODES - len(builder.nodes)):

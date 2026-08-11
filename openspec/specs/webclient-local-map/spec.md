@@ -172,3 +172,14 @@ The WebClient `local-map` component SHALL make a currently traversable adjacent 
 #### Scenario: A map node never invents a destination
 - **WHEN** a node's `action` is missing, malformed, or not the exact `move` object, or the payload is rejected by its validator
 - **THEN** no travel action is submitted, only the minimap renderer disables itself with the single-sync recovery path, and narrative and text input remain usable
+
+### Requirement: Wilderness minimap nodes are actionable
+Every traversable adjacent wilderness node in the local map SHALL carry an `explore.move` action descriptor with the canonical destination node, matching the grid/interior layers' behavior.
+
+#### Scenario: Adjacent wilderness node can be moved to
+- **WHEN** the player opens the local map while in wilderness terrain
+- **THEN** each traversable adjacent node has a move action whose destination is the canonical node, and activating it moves the player there
+
+#### Scenario: Non-traversable or unreachable nodes stay inert
+- **WHEN** a wilderness node is outside the traversable set (e.g. out of bounds)
+- **THEN** the node carries no move action
