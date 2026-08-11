@@ -143,12 +143,43 @@ def _matches_expected(monster: Monster, expected: MonsterPopulation) -> bool:
     )
 
 
+def _session_participant_ids() -> frozenset[int]:
+    """Return the dbrefs referenced by any persisted active combat session.
+
+    Defense in depth for ``ensure_population`` (fix-startup-session-restore-
+    order D2): scans every ``PlayerCharacter``'s persisted ``active_combat``
+    record and collects its participant dbrefs, so reconciliation can leave
+    session-referenced monsters untouched. Records that cannot be parsed are
+    skipped -- their dbrefs are unknown, so they protect nothing and the
+    startup restore step handles them separately.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.combat_session import from_storage
+
+    participants: set[int] = set()
+    for player in PlayerCharacter.objects.all_family():
+        raw = player.db.active_combat
+        if raw is None:
+            continue
+        try:
+            record = from_storage(dict(raw))
+        except Exception:
+            continue
+        participants.update(record.player_ids)
+        participants.update(record.enemy_ids)
+    return frozenset(participants)
+
+
 def ensure_population(wilderness, coordinates: tuple[int, int]) -> None:
     """Reconcile one wilderness coordinate against its deterministic population.
 
     Only ``Monster`` objects bearing the matching ``population_key`` marker are
-    ever reconciled. When the model returns ``None``, every marker-matching
-    monster is deleted (stale-cleanup); foreign monsters are untouched. When it
+    ever reconciled. When a persisted active combat session references any
+    marker-matching monster, the whole pass is skipped so the participant is
+    neither deleted nor respawned before session restoration settles it
+    (fix-startup-session-restore-order D2). When the model returns ``None``,
+    every marker-matching monster is deleted (stale-cleanup); foreign monsters
+    are untouched. When it
     returns a population, the coordinate is reconciled to exactly one living,
     model-conformant marker-matching monster: if exactly one such monster
     already exists (living, correct tier, correct key) nothing is written;
@@ -165,6 +196,14 @@ def ensure_population(wilderness, coordinates: tuple[int, int]) -> None:
         for obj in wilderness.get_objs_at_coordinates(coordinates)
         if isinstance(obj, Monster) and obj.db.population_key == key
     ]
+    if matching:
+        participants = _session_participant_ids()
+        if any(monster.pk in participants for monster in matching):
+            # A persisted active combat session still references one of these
+            # monsters; skip the whole reconciliation pass so the participant
+            # is neither deleted nor respawned before session restoration
+            # settles it.
+            return
     if expected is None:
         for monster in matching:
             _remove_monster(wilderness, monster)
