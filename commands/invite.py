@@ -88,8 +88,15 @@ class CmdInvite(Command):
     def _render_degraded(self, npc: LLMNPC) -> None:
         """Apply the fixed threshold decision on the degraded terminal only."""
         from world.rules.affinity_config import get_config
+        from world.rules.npc_intents import STALE_CONTEXT_NOTE, intent_context_ok
 
         caller = self.caller
+        if not intent_context_ok(npc, caller):
+            # The exchange settled after the pair separated or the NPC stopped
+            # allowing talk (F22 completion gate): the degraded threshold
+            # decides nothing on a stale context.
+            caller.msg(STALE_CONTEXT_NOTE)
+            return
         affinity = npc.relations.affinity_for(caller)
         if affinity < get_config().invite_threshold:
             caller.msg(f"{npc.key}說：{DEGRADED_REJECT_MESSAGE}")
@@ -104,10 +111,20 @@ class CmdInvite(Command):
 
     def _render_intent(self, npc: LLMNPC, intent) -> None:
         """Apply the verified intent and render the join/refusal feedback."""
-        from world.rules.npc_intents import apply_npc_intent
+        from world.rules.npc_intents import (
+            STALE_CONTEXT_NOTE,
+            apply_npc_intent,
+            is_stale_context,
+        )
 
         caller = self.caller
         outcome = apply_npc_intent(npc, caller, intent)
+        if is_stale_context(outcome):
+            # The exchange settled after the pair separated or the NPC
+            # stopped allowing talk (F22 completion gate): keep the speech,
+            # skip the intent, and report the stale context.
+            caller.msg(STALE_CONTEXT_NOTE)
+            return
         if not (isinstance(intent, dict) and intent.get("kind") == "party_invite"):
             return
         if intent.get("accept") is True:

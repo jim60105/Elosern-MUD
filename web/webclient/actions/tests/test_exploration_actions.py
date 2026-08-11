@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from django.test import override_settings
+from twisted.internet import defer
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -94,6 +95,18 @@ def await_result(d):
     result = d.result
     d.addErrback(lambda f: None)
     return result
+
+
+class _HeldClient:
+    """Test double whose response is a Deferred the test resolves manually."""
+
+    def __init__(self):
+        self.deferred = defer.Deferred()
+        self.calls = []
+
+    def get_response(self, descriptor):
+        self.calls.append(descriptor)
+        return self.deferred
 
 
 class ExplorationValidatorTests(unittest.TestCase):
@@ -771,6 +784,37 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "dialogue_failed")
 
+    @covers_requirement("webclient-exploration-menu::freeform-talk-completion-rechecks-presence-before-applying-intents")
+    def test_freeform_deferred_reply_after_the_player_moved_is_discarded(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        npc.db.inventory = ["healing_potion"]
+        client = _HeldClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(self.player, "msg") as msg:
+            deferred = _talk_freeform_adapter(
+                self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+            )
+            self.player.location = self.destination
+            client.deferred.callback(
+                _reply_text(
+                    speech="我給你一瓶藥水。",
+                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                )
+            )
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn("離開", result["message"])
+        # The speech is shown (memory) and the stale note is surfaced, while
+        # the intent changes no state (F22 completion gate).
+        self.assertEqual(npc._chat_lines(self.player)[1], "對話精靈: 我給你一瓶藥水。")
+        self.assertEqual(list(self.player.db.inventory or []), [])
+        self.assertEqual(list(npc.db.inventory or []), ["healing_potion"])
+        texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
+        self.assertIn("我給你一瓶藥水。", " ".join(texts))
+        self.assertTrue(any("離開" in text for text in texts))
+
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_host_rejects_scripted_talk_without_a_transaction(self):
         host = create_object(NPC, key="公會職員", location=self.room1)
@@ -876,6 +920,31 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
                     )
                 )
         self.assertEqual(result["outcome"], "success")
+        from world.rules.party import is_companion
+
+        self.assertFalse(is_companion(npc, self.player))
+        self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")
+    def test_party_invite_offline_threshold_is_gated_when_the_npc_becomes_busy(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(npc, self.player, AffinitySource.QUEST_COMPLETION, 70)
+        npc.db.schedule_state = "busy"
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch(
+                "web.webclient.actions.dialogue_composition.build_dialogue_client",
+                return_value=client,
+            ):
+                result = await_result(
+                    _party_invite_adapter(
+                        self.player, {"npc_id": int(npc.pk), "message": ""}
+                    )
+                )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn("無法交談", result["message"])
         from world.rules.party import is_companion
 
         self.assertFalse(is_companion(npc, self.player))

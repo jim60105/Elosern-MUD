@@ -14,11 +14,13 @@ The freeform adapter (`web/webclient/actions/exploration_actions.py:407-424`) ch
 
 ## Decisions
 
-**D1 — Shared completion gate in `apply_npc_intent`.** Add a required `context_ok` predicate (co-location + `interaction_reason(npc, "talk") is None`) evaluated at the top of the intent application seam; a failure returns a stable stale-completion result and skips the intent. Per-kind domain checks stay untouched below the gate.
+**D1 — Shared completion gate in `apply_npc_intent`.** Add a `context_ok` predicate (co-location + `interaction_reason(npc, "talk") is None`) evaluated at the top of the intent application seam; a failure returns a stable stale-completion result and skips the intent. The parameter defaults to the canonical `intent_context_ok` so the gate can never be forgotten; per-kind domain checks stay untouched below the gate.
 
 **D2 — Surface stale completions to the player.** `at_talked_to` renders the speech and, when the gate fails, appends a short "對方已經離開／現在無法交談" note instead of applying the intent; the Web adapter returns the same outcome.
 
 **D3 — No change to synchronous flows.** The gate is a no-op when the checks pass, preserving current co-located behavior; pre-call checks remain as an early fast-path.
+
+**D4 — The degraded invite terminals share the gate.** The fixed-threshold decision in `CmdInvite._render_degraded` and `_render_invite_outcome`'s degraded branch also runs `intent_context_ok` first: a stale context (separation or a busy/resting transition while the exchange was in flight) shows the stale note instead of applying the threshold. The freeform degraded terminal applies no intent (authored greeting or silence) and needs no gate.
 
 ## Risks / Trade-offs
 
