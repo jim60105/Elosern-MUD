@@ -85,6 +85,24 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTest):
             search_object_by_tag(GENERAL_STORE_TAG)[0],
         )
 
+    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-adult-identity")
+    def test_service_hosts_carry_adult_identity(self):
+        sync_service_content()
+        for host in (self._guild_host(), self._merchant_host()):
+            self.assertEqual(int(host.attributes.get("age")), 18)
+            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+
+    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-adult-identity")
+    def test_resync_repairs_hosts_missing_adult_identity(self):
+        sync_service_content()
+        for host in (self._guild_host(), self._merchant_host()):
+            host.attributes.remove("age")
+            host.attributes.remove("apparent_age")
+        sync_service_content()
+        for host in (self._guild_host(), self._merchant_host()):
+            self.assertEqual(int(host.attributes.get("age")), 18)
+            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+
     def test_merchant_stock_initializes_only_when_absent(self):
         sync_service_content()
         merchant = self._merchant_host().components.get(Merchant.get_component_slot())

@@ -129,3 +129,12 @@ merchant stock that has already been initialized.
 #### Scenario: Live merchant stock survives content resync
 - **WHEN** a player buys an item and startup sync runs again
 - **THEN** the decremented stock remains rather than returning to initial stock
+
+### Requirement: Guild service hosts carry adult identity
+
+The system SHALL persist adult `age`/`apparent_age` on the guild service host NPCs
+(guild master and merchant) created during `sync_guild_economy`.
+
+#### Scenario: Service host has adult age after sync
+- **WHEN** `sync_guild_economy` creates `altoria_guild_master` or `altoria_merchant`
+- **THEN** both NPCs have integer `age` and `apparent_age` of at least 18
