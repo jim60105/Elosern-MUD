@@ -602,6 +602,34 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
         self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
 
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
+    def test_register_generated_quest_refuses_escort_stages(self):
+        from ._fixtures import anchor_locator, escort, quest
+        from world.quests.definitions import QuestType
+
+        definition = quest(
+            "escort_publication_guard",
+            quest_type=QuestType.ESCORT,
+            stages=(QuestStage(0, escort(anchor_locator())),),
+        )
+        compiled = CompiledQuest(
+            definition=definition,
+            reward=QuestReward(copper=50, items=(), merit=25),
+            issuer_branch_key="guild_branch_altoria",
+            stage_requirements=(),
+        )
+        with self.assertRaisesRegex(
+            QuestCompileError,
+            "ESCORT stages cannot be published until a protected-entity "
+            "binding flow exists",
+        ):
+            register_generated_quest(compiled)
+        self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
+        self.assertNotIn(
+            (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
+        )
+
 
 class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
@@ -657,15 +685,28 @@ class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
             compile_quest_blueprint(payload)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
-    def test_escort_stage_at_anchor_is_allowed_by_the_compiler(self):
+    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
+    def test_escort_stage_at_anchor_is_rejected_by_the_compiler(self):
         payload = _defeat_payload()
         payload["quest_type"] = "護衛"
         payload["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
         payload["stages"][0]["npc_req"] = []
-        compiled = compile_quest_blueprint(payload)
-        self.assertEqual(
-            compiled.definition.stages[0].objective.kind, ObjectiveKind.ESCORT
-        )
+        with self.assertRaisesRegex(
+            QuestCompileError,
+            "ESCORT objective, which cannot be published until a "
+            "protected-entity binding flow exists",
+        ):
+            compile_quest_blueprint(payload)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    @covers_requirement("quest-blueprint::reach-and-escort-objectives-accept-only-quantity-one")
+    def test_escort_stage_with_quantity_two_is_rejected_by_the_compiler(self):
+        payload = _defeat_payload()
+        payload["stages"][0]["objective"] = {"kind": "reach_location", "quantity": 2}
+        with self.assertRaisesRegex(
+            QuestCompileError, "reach objective quantity must be exactly 1"
+        ):
+            compile_quest_blueprint(payload)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     def test_bound_defeat_quantity_exceeding_npc_reqs_is_rejected(self):

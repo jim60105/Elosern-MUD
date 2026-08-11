@@ -177,10 +177,22 @@ def _validate_objective(
     elif objective.kind is ObjectiveKind.REACH:
         if objective.monster_tier is not None or objective.requires_bound_targets:
             _reject(definition, "REACH objective cannot declare defeat selectors")
+        if objective.quantity != 1:
+            _reject(
+                definition,
+                "REACH objective quantity must be exactly 1; arrival observation "
+                "cannot accumulate repeated visits",
+            )
         _validate_destination(definition, objective.destination, ObjectiveKind.REACH)
     elif objective.kind is ObjectiveKind.ESCORT:
         if objective.monster_tier is not None or objective.requires_bound_targets:
             _reject(definition, "ESCORT objective cannot declare defeat selectors")
+        if objective.quantity != 1:
+            _reject(
+                definition,
+                "ESCORT objective quantity must be exactly 1; arrival observation "
+                "cannot accumulate repeated visits",
+            )
         _validate_destination(definition, objective.destination, ObjectiveKind.ESCORT)
     elif objective.kind is ObjectiveKind.ACQUIRE:
         if (

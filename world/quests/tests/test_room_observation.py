@@ -21,7 +21,11 @@ from typeclasses.rooms import (
     TerrainRoom,
 )
 from world.quests.binding import bind_stage_runtime
-from world.quests.definitions import QuestStage, QuestType
+from world.quests.definitions import (
+    QUEST_DEFINITION_REGISTRY,
+    QuestStage,
+    QuestType,
+)
 from world.quests.room_observation import QuestObservableRoomMixin
 from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
 from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
@@ -257,6 +261,55 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         self._enter(self._anchor())
         self.assertEqual(self._records()[0]["state"], "completed")
 
+    def test_one_arrival_event_advances_exactly_one_stage(self):
+        definition = register(
+            quest(
+                "reach_two_stages",
+                quest_type=QuestType.EXPLORE,
+                stages=(
+                    reach_stage(anchor_locator(), 0),
+                    reach_stage(anchor_locator(), 1),
+                ),
+            )
+        )
+        accept_quest(self.player, definition.key)
+        self._companion("同伴", self._anchor())
+        self._enter(self._anchor())
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "in_progress")
+        self.assertEqual(stored["stage_index"], 1)
+        self.assertEqual(stored["stage_progress"], 0)
+        self.player.move_to(self.room1, quiet=True)
+        self._enter(self._anchor())
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_index"], 1)
+
+    @covers_requirement("quest-progress-tracking::arrival-observation-advances-at-most-one-per-event-and-never-exceeds-quantity")
+    def test_arrival_advances_at_most_one_per_event_and_never_over_fills(self):
+        definition = quest(
+            "reach_quantity_two_slipped",
+            quest_type=QuestType.EXPLORE,
+            stages=(QuestStage(0, reach(anchor_locator(), quantity=2)),),
+        )
+        QUEST_DEFINITION_REGISTRY[definition.key] = definition
+        accept_quest(self.player, definition.key)
+        self._companion("同伴", self._anchor())
+        self._enter(self._anchor())
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "in_progress")
+        self.assertEqual(stored["stage_progress"], 1)
+        self.player.move_to(self.room1, quiet=True)
+        self._enter(self._anchor())
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 2)
+        self.player.move_to(self.room1, quiet=True)
+        self._enter(self._anchor())
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 2)
+
 
 class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
     """Real exit traversal with companion follow (party-quest task 2.4).
@@ -398,6 +451,32 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         self._companion("跟隨者")
         self.door.at_traverse(self.player, self.anchor)
         self.assertEqual(self._records()[0]["state"], "in_progress")
+
+    @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
+    @covers_requirement("quest-progress-tracking::arrival-observation-advances-at-most-one-per-event-and-never-exceeds-quantity")
+    def test_follow_rerun_never_double_advances_the_same_arrival(self):
+        definition = quest(
+            "reach_quantity_two_follow",
+            quest_type=QuestType.EXPLORE,
+            stages=(QuestStage(0, reach(anchor_locator(), quantity=2)),),
+        )
+        QUEST_DEFINITION_REGISTRY[definition.key] = definition
+        accept_quest(self.player, definition.key)
+        waiting = self._companion("等候者")
+        waiting.move_to(self.anchor, quiet=True)
+        self._companion("跟隨者")
+        self.door.at_traverse(self.player, self.anchor)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "in_progress")
+        self.assertEqual(stored["stage_progress"], 1)
+        back = create_object(
+            Exit, key="back", location=self.anchor, destination=self.room1
+        )
+        back.at_traverse(self.player, self.room1)
+        self.door.at_traverse(self.player, self.anchor)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 2)
 
 
 class WildernessObservationExclusionTests(QuestRegistryIsolation, EvenniaTest):

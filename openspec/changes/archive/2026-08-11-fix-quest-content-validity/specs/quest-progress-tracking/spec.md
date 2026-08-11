@@ -2,7 +2,7 @@
 
 ### Requirement: Arrival observation advances at most one per event and never exceeds quantity
 
-REACH/ESCORT arrival observation SHALL increment stage progress by at most one per matching arrival event and SHALL cap progress at the objective quantity, so even a non-1 quantity (should one slip through) can never jump to full completion in a single arrival.
+REACH/ESCORT arrival observation SHALL increment stage progress by at most one per matching arrival event and SHALL cap progress at the objective quantity, so even a non-1 quantity (should one slip through) can never jump to full completion in a single arrival. The post-follow re-observation (party-follow D-2) SHALL NOT re-count the same arrival event: when a companion was already present in the destination, the re-run is skipped because the first observation has already advanced every matching stage for that event.
 
 #### Scenario: First arrival with quantity one completes the stage
 

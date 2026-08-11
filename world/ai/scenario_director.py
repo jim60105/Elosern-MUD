@@ -859,8 +859,8 @@ def _validate_scene_bound_rules(parsed: Any) -> list[str]:
     """Enforce the shared scene-bound rules the compiler also enforces (D5).
 
     Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
-    entities always live in a reclaimable instance room; an ESCORT stage must be
-    a permanent destination (never instance, never instance-materialized); a
+    entities always live in a reclaimable instance room; an ESCORT stage is
+    refused entirely until a protected-entity binding flow exists; a
     bound-target DEFEAT quantity must not exceed its ``npc_req`` count; and
     ``anchor_near`` must name a placed anchor.
     """
@@ -874,17 +874,16 @@ def _validate_scene_bound_rules(parsed: Any) -> list[str]:
         layer = location.get("layer") if isinstance(location, dict) else None
         has_npc = isinstance(npc_req, list) and bool(npc_req)
         is_escort = isinstance(objective, dict) and objective.get("kind") == "escort"
+        if is_escort:
+            errors.append(
+                f"stage {index} declares an ESCORT objective, which cannot be "
+                "published until a protected-entity binding flow exists"
+            )
         if has_npc and layer != "instance":
             errors.append(
                 f"stage {index} declares NPC requirements outside an "
                 "instance-layer destination; occupant-bearing scenes must be "
                 "instances"
-            )
-        if is_escort and layer == "instance":
-            errors.append(
-                f"stage {index} declares an ESCORT objective at an instance "
-                "destination; ESCORT scenes must be permanent rooms (located "
-                "only, never instance-materialized)"
             )
         if (
             isinstance(objective, dict)
@@ -937,6 +936,16 @@ def _validate_objective_selectors(parsed: Any) -> list[str]:
             if objective.get("monster_tier") is not None:
                 errors.append(
                     f"stage {index} {kind} cannot declare a monster_tier"
+                )
+            quantity = objective.get("quantity", 1)
+            if (
+                not isinstance(quantity, bool)
+                and isinstance(quantity, int)
+                and quantity != 1
+            ):
+                errors.append(
+                    f"stage {index} {kind} quantity must be exactly 1; "
+                    "arrival observation cannot accumulate repeated visits"
                 )
     return errors
 

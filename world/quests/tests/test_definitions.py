@@ -152,6 +152,46 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
                 with self.assertRaises(QuestDefinitionError):
                     register(quest(key, stages=(QuestStage(0, objective),)))
 
+    @covers_requirement("quest-blueprint::reach-and-escort-objectives-accept-only-quantity-one")
+    def test_reach_and_escort_quantity_must_be_exactly_one(self):
+        invalid = (
+            (
+                "reach-quantity-2",
+                QuestType.EXPLORE,
+                QuestObjective(
+                    kind=ObjectiveKind.REACH,
+                    quantity=2,
+                    destination=anchor_locator(),
+                ),
+            ),
+            (
+                "escort-quantity-2",
+                QuestType.ESCORT,
+                QuestObjective(
+                    kind=ObjectiveKind.ESCORT,
+                    quantity=2,
+                    destination=anchor_locator(),
+                ),
+            ),
+        )
+        for key, quest_type, objective in invalid:
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(
+                    QuestDefinitionError, "quantity must be exactly 1"
+                ):
+                    register(
+                        quest(key, quest_type=quest_type, stages=(QuestStage(0, objective),))
+                    )
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+        register(
+            quest(
+                "reach-quantity-1",
+                quest_type=QuestType.EXPLORE,
+                stages=(QuestStage(0, reach(anchor_locator())),),
+            )
+        )
+        self.assertIn("reach-quantity-1", QUEST_DEFINITION_REGISTRY)
+
     def test_placed_anchor_is_structurally_valid_without_a_room_dbref(self):
         self.assertIn("capital_altoria", ANCHOR_PLACEMENT_REGISTRY)
         register(quest("anchor-valid", stages=(QuestStage(0, reach(anchor_locator())),)))

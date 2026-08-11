@@ -28,6 +28,19 @@ class NoSuitableTemplateError(RuntimeError):
     """
 
 
+class EscortUnavailableError(RuntimeError):
+    """An escort (護衛) quest request is refused.
+
+    Raised before any director transport or template work: no protected-entity
+    binding flow exists yet, so an escort quest could never complete. The named
+    error lets ``commands/`` surface a clear player-facing refusal on both the
+    offline-template and live paths.
+    """
+
+
+_ESCORT_REQUESTED_TYPE = "護衛"
+
+
 class _OfflineStubClient:
     """A non-``None`` client injected when the ``scenario_director`` profile is
     disabled.
@@ -65,6 +78,12 @@ def request_generated_quest(client=None, *, context):
         any other proposal; when no compatible template exists it errbacks with
         ``ScenarioDirectorTemplateError``.
     """
+    if context.get("requested_type") == _ESCORT_REQUESTED_TYPE:
+        raise EscortUnavailableError(
+            "escort quests are not available until a protected-entity "
+            "binding flow exists"
+        )
+
     if client is None:
         from world.ai.client import OpenAICompatClient
         from world.ai.profiles import get_profile

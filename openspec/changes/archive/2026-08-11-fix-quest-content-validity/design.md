@@ -18,7 +18,7 @@
 
 **D2 — Refuse ESCORT publishing until a binding path exists.** The proposal validator and `register_generated_quest` reject ESCORT stages (and the director refuses 護衛 requests with a clear message) until a protected-entity binding flow is implemented. This converts a silent uncompletable quest into an explicit rejection.
 
-**D3 — Defensive increment in arrival observation.** `observe_room_entry` increments progress by one (capped at quantity) instead of calling `fulfill_record` unconditionally, so the one-transition rule and the quantity-1 cap make behavior identical today while removing the jump-completion path.
+**D3 — Defensive increment in arrival observation.** `observe_room_entry` increments progress by one (capped at quantity) instead of calling `fulfill_record` unconditionally, so the one-transition rule and the quantity-1 cap make behavior identical today while removing the jump-completion path. The party-follow re-observation skips the re-run when a companion was already present in the destination, so one arrival event is never counted twice (the first observation has already advanced every matching stage for that event).
 
 ## Risks / Trade-offs
 
