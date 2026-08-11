@@ -254,6 +254,73 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         # No exam started => rank stays F.
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
+    def test_same_named_player_can_take_the_exam(self):
+        self.player.key = "guild-examiner-E"
+        self.player.save()
+        self._give_merit(50)
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        self.assertIsNotNone(opponent)
+        self.assertEqual(opponent.key, f"guild-examiner-E-{opponent.pk}")
+        self.assertNotEqual(opponent.key, self.player.key)
+        self.assertIsNotNone(read_session(self.player))
+
+    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
+    def test_opponent_keys_stay_distinct_across_spawns(self):
+        self._give_merit(50)
+        first = start_guild_exam(self.player, self.examiner, "E")
+        first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
+        from world.rules.combat_session import forfeit
+
+        forfeit(self.player)
+        second = start_guild_exam(self.player, self.examiner, "E")
+        second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
+        self.assertIsNotNone(first_opponent)
+        self.assertIsNotNone(second_opponent)
+        self.assertNotEqual(first_opponent.key, second_opponent.key)
+
+    @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
+    def test_affinity_failure_leaves_no_orphan_session_or_registration(self):
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        self._give_merit(50)
+        with patch(
+            "world.rules.affinity.apply_affinity_change",
+            side_effect=RuntimeError("affinity boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                start_guild_exam(self.player, self.examiner, "E")
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(_BATTLEFIELDS, {})
+        orphans = ObjectDB.objects.filter(
+            db_key__startswith="guild-examiner-E-",
+            db_location=self.hall,
+        )
+        self.assertEqual(orphans.count(), 0)
+
+    @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
+    def test_reconstruction_failure_leaves_no_orphan_session_or_registration(self):
+        from world.rules.combat_session import CombatSessionError, SessionReason
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        self._give_merit(50)
+        with patch(
+            "world.rules.combat_session.reconstruct_battlefield",
+            side_effect=CombatSessionError(SessionReason.MISSING_PARTICIPANT),
+        ):
+            with self.assertRaises(CombatSessionError):
+                start_guild_exam(self.player, self.examiner, "E")
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(_BATTLEFIELDS, {})
+        orphans = ObjectDB.objects.filter(
+            db_key__startswith="guild-examiner-E-",
+            db_location=self.hall,
+        )
+        self.assertEqual(orphans.count(), 0)
+
 
 class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
     def setUp(self):
@@ -344,6 +411,22 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         settle_exam_outcome(self.player, session, None, "exam_failed")
         self.assertEqual(self.player.guild_rank, "F")
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+
+    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
+    def test_same_named_player_can_complete_the_exam(self):
+        self.player.key = "guild-examiner-E"
+        self.player.save()
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(result["outcome"], "exam_passed")
+        self.assertEqual(self.player.guild_rank, "E")
+        self.assertIsNone(read_session(self.player))
 
     @covers_requirement("guild-rank-exams::examination-combat-is-nonlethal-and-grants-no-ordinary-defeat-rewards")
     def test_candidate_knockout_is_nonfatal_but_fails(self):

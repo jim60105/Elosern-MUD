@@ -473,8 +473,8 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTest):
         self.assertGreater(companion.traits.hp.current, 0)
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(any(
-            str(key) in _BATTLEFIELDS
-            for key in (self.player.key, companion.key, self.monster.key)
+            str(entity.pk) in _BATTLEFIELDS
+            for entity in (self.player, companion, self.monster)
         ))
 
     @covers_requirement("party-system::combat-terminal-rules-are-player-centric")
@@ -513,13 +513,13 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTest):
     def test_missing_participant_cleanup_unregisters_every_survivor(self):
         companion = _companion(self.player, "留下來", hp=100)
         engage(self.player, self.monster)
-        for key in (self.player.key, companion.key, self.monster.key):
-            self.assertIn(str(key), _BATTLEFIELDS)
+        for entity in (self.player, companion, self.monster):
+            self.assertIn(str(entity.pk), _BATTLEFIELDS)
         self.monster.delete()
         result = forfeit(self.player)
         self.assertEqual(result["outcome"], "defeat")
-        for key in (self.player.key, companion.key, self.monster.key):
-            self.assertNotIn(str(key), _BATTLEFIELDS)
+        for entity in (self.player, companion, self.monster):
+            self.assertNotIn(str(entity.pk), _BATTLEFIELDS)
         self.assertIsNone(self.player.db.active_combat)
 
     def test_a_deleted_participant_s_key_never_blocks_a_replacement(self):
