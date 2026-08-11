@@ -215,6 +215,13 @@
       showOverlay(hasBeenActive);
       return;
     }
+    if (state.phase === "detached") {
+      // The puppet detached (OOC): panels are cleared and mutations locked,
+      // but the connection is fine and the drawer stays usable, so the
+      // disconnect overlay must not appear.
+      showOverlay(false);
+      return;
+    }
     var ready =
       state.connected &&
       state.phase === "active" &&

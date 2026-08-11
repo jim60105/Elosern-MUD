@@ -31,7 +31,8 @@
         "web.tests.browser.test_browser_shell",
         "web.tests.browser.test_browser_actions",
         "web.tests.browser.test_browser_local_map",
-        "web.tests.browser.test_browser_input_narrative"
+        "web.tests.browser.test_browser_input_narrative",
+        "web.tests.browser.test_browser_session_lifecycle"
       ]
     },
     {

@@ -160,6 +160,20 @@ class CmdOOC(_CmdOOC):
 
         try:
             account.unpuppet_object(session)
+            # WebClient: tell the browser to clear character panels and lock
+            # mutations, then retire the presentation/dispatch sequence so any
+            # puppet (even the same character) starts a fresh epoch and
+            # request cache.
+            from web.webclient.presentation.ingress import (
+                reset_client_sequence,
+                send_unpuppet_transition,
+            )
+
+            send_unpuppet_transition(session)
+            from web.webclient.actions.dispatcher import retire_sequence
+
+            retire_sequence(session)
+            reset_client_sequence(session)
             self.msg("\n|G你已離開角色（OOC）。|n\n")
 
             if _AUTO_PUPPET_ON_LOGIN and _MAX_NR_CHARACTERS == 1 and self.playable:

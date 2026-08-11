@@ -56,6 +56,7 @@ PROTOCOL_ERROR_CODES = (
     "presentation_unavailable",
     "internal_error",
     "malformed_envelope",
+    "no_puppet",
 )
 # Codes whose protocol error envelope must carry a correlation ID.
 PROTOCOL_ERROR_CORRELATED_CODES = ("internal_error",)

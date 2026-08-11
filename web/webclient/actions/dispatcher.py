@@ -101,6 +101,26 @@ def retire_sequence(session: Any) -> None:
         ndb.elosern_dispatch = None
 
 
+NO_PUPPET_CODE = "no_puppet"
+NO_PUPPET_MESSAGE = "目前沒有附身角色，無法執行操作"
+
+
+def reject_no_puppet(session: Any, action: dict[str, Any]) -> None:
+    """Send the bounded no-puppet rejection for one validated ``ui_action``.
+
+    The envelope echoes the request's own epoch and base revision so the
+    browser can accept it against the view it acted on and release its
+    in-flight mutation lock; no character state is ever included.
+    """
+    _send_action_result(
+        session,
+        action["presentation_epoch"],
+        action["request_id"],
+        {"outcome": "rejected", "code": NO_PUPPET_CODE, "message": NO_PUPPET_MESSAGE},
+        action["base_revision"],
+    )
+
+
 def _cache_result(state: SequenceState, request_id: str, result: dict[str, Any]) -> None:
     state.cache[request_id] = result
     state.cache.move_to_end(request_id)

@@ -181,3 +181,49 @@ test("lock releases using the reducer-normalized result shape", () => {
   h.client.onPresentationAccepted({ revision: 9 });
   assert.strictEqual(h.client.isInFlight(), false);
 });
+
+test("no_puppet rejection releases the lock unconditionally", () => {
+  const h = makeHarness();
+  h.client.submit("combat.cast", {});
+  const requestId = h.sent[0].args[0].request_id;
+  h.client.onActionResult({
+    requestId,
+    epoch: "a".repeat(22),
+    outcome: "rejected",
+    code: "no_puppet",
+    message: "目前沒有附身角色，無法執行操作",
+    presentation_revision: 5,
+  });
+  // No presentation will ever gate this rejection; the lock is released
+  // immediately, even though the store revision never advanced.
+  assert.strictEqual(h.client.isInFlight(), false);
+  assert.strictEqual(h.notices.some((n) => n.kind === "result"), true);
+});
+
+test("submit while detached (OOC) is refused", () => {
+  const h = makeHarness();
+  h.setState({ phase: "detached", mutationsLocked: true });
+  assert.strictEqual(h.client.submit("combat.cast", {}), null);
+  assert.strictEqual(h.sent.length, 0);
+  assert.strictEqual(h.client.isLocked(), true);
+});
+
+test("detachment with an in-flight mutation releases the lock and warns", () => {
+  const h = makeHarness();
+  h.client.submit("combat.cast", {});
+  assert.strictEqual(h.client.isInFlight(), true);
+  h.client.onDetached();
+  assert.strictEqual(h.client.isInFlight(), false);
+  assert.strictEqual(h.client.uncertain(), true);
+  assert.strictEqual(h.notices.some((n) => n.kind === "uncertain"), true);
+  // No ui_sync is issued: the server retired the sequence and there is no
+  // puppet to synchronize against.
+  assert.strictEqual(h.sent.some((m) => m.name === "ui_sync"), false);
+});
+
+test("detachment with no in-flight mutation stays silent", () => {
+  const h = makeHarness();
+  h.client.onDetached();
+  assert.strictEqual(h.client.uncertain(), false);
+  assert.strictEqual(h.notices.length, 0);
+});
