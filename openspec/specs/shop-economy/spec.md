@@ -107,3 +107,19 @@ interaction.
 #### Scenario: Altoria merchant is usable through commands
 - **WHEN** the player enters the general store during opening hours
 - **THEN** list, buy, and sell invoke the same deterministic APIs used by integration tests
+
+### Requirement: Shop economy stays consistent with the canonical inventory
+Buy and sell SHALL keep operating on `db.inventory` as the canonical record, and their preflight checks
+SHALL remain authoritative for stock, funds, and holdings regardless of object containment. Buy SHALL
+materialize one contained mirror object per bought unit inside the same transaction that writes the
+key list; sell SHALL remove the mirrored contained objects of the sold units in the same transaction.
+
+#### Scenario: Sell sees every canonical item including picked-up ones
+- **WHEN** a player picked up a registry item via `拿` and then opens the shop sell flow
+- **THEN** the item appears in sellable holdings, selling removes its key from `db.inventory`, and the
+  mirrored contained objects of the sold units are removed
+
+#### Scenario: Buy materializes the contained object
+- **WHEN** a player buys a registry item
+- **THEN** the item's Evennia Object exists in the character's containment in the same transaction as
+  the key-list write, so it can be dropped or given

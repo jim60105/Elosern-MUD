@@ -5,6 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia import default_cmds
+from evennia.objects.objects import DefaultObject
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
@@ -38,6 +39,7 @@ from commands.localized import (
     LOCALIZED_DEFAULT_KEYS,
 )
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 
 
@@ -276,6 +278,208 @@ class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char2.location = self.room1
         output = self.call(CmdGive(), "銅幣 = 路人", msg="你把銅幣交給了")
         self.assertIn("你把銅幣交給了", output)
+
+    @covers_requirement("equipment-inventory::the-key-list-is-the-single-canonical-inventory-record-for-registry-items")
+    @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
+    def test_get_registry_object_records_the_canonical_key(self):
+        create_object(
+            "typeclasses.objects.Object",
+            key="healing_potion",
+            attributes=[("registry_key", "healing_potion")],
+            location=self.room1,
+        )
+        output = self.call(CmdGet(), "healing_potion")
+        self.assertIn("你撿起了healing_potion。", output)
+        self.assertEqual(self.char1.db.inventory, ["healing_potion"])
+        self.assertEqual(
+            len([o for o in self.char1.contents if o.key == "healing_potion"]), 1
+        )
+
+    def test_get_registry_object_by_key_attribute_only(self):
+        create_object(
+            "typeclasses.objects.Object",
+            key="藥水",
+            attributes=[("registry_key", "healing_potion")],
+            location=self.room1,
+        )
+        output = self.call(CmdGet(), "藥水")
+        self.assertIn("你撿起了藥水。", output)
+        self.assertEqual(self.char1.db.inventory, ["healing_potion"])
+
+    def test_get_stacked_registry_objects_add_one_key_per_object(self):
+        create_object(
+            "typeclasses.objects.Object",
+            key="healing_potion",
+            attributes=[("registry_key", "healing_potion")],
+            location=self.room1,
+        )
+        create_object(
+            "typeclasses.objects.Object",
+            key="healing_potion",
+            attributes=[("registry_key", "healing_potion")],
+            location=self.room1,
+        )
+        output = self.call(CmdGet(), "2 個 healing_potion")
+        self.assertIn("你撿起了2 個 healing_potion。", output)
+        self.assertEqual(
+            self.char1.db.inventory, ["healing_potion", "healing_potion"]
+        )
+
+    def test_drop_stacked_registry_objects_remove_one_key_per_object(self):
+        self.char1.db.inventory = ["meal", "meal"]
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        output = self.call(CmdDrop(), "2 個 meal")
+        self.assertIn("你丟下了2 個 meal。", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        self.assertEqual(len([o for o in self.room1.contents if o.key == "meal"]), 2)
+
+    def test_drop_registry_object_without_canonical_key_is_refused(self):
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        output = self.call(CmdDrop(), "meal")
+        self.assertIn("你沒有帶著 meal。", output)
+        self.assertIsNone(self.char1.db.inventory)
+        self.assertEqual(len([o for o in self.char1.contents if o.key == "meal"]), 1)
+
+    @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
+    def test_get_non_registry_object_keeps_inventory_unchanged(self):
+        create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+        output = self.call(CmdGet(), "銅幣")
+        self.assertIn("你撿起了銅幣。", output)
+        self.assertIsNone(self.char1.db.inventory)
+
+    def test_drop_non_registry_object_keeps_inventory_unchanged(self):
+        create_object("typeclasses.objects.Object", key="銅幣", location=self.char1)
+        output = self.call(CmdDrop(), "銅幣")
+        self.assertIn("你丟下了銅幣。", output)
+        self.assertIsNone(self.char1.db.inventory)
+
+    @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
+    def test_drop_registry_object_removes_the_canonical_key(self):
+        self.char1.db.inventory = ["meal"]
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        output = self.call(CmdDrop(), "meal")
+        self.assertIn("你丟下了meal。", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        self.assertEqual(len([o for o in self.room1.contents if o.key == "meal"]), 1)
+
+    @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
+    def test_give_registry_object_transfers_the_canonical_key(self):
+        self.char1.db.inventory = ["meal"]
+        self.char2.location = self.room1
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        output = self.call(CmdGive(), "meal = 路人")
+        self.assertIn("你把meal交給了", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        self.assertEqual(self.char2.db.inventory, ["meal"])
+        self.assertEqual(len([o for o in self.char2.contents if o.key == "meal"]), 1)
+
+    def test_give_registry_object_to_npc_adds_the_canonical_key(self):
+        self.char1.db.inventory = ["meal"]
+        npc = create_object(NPC, key="阿諾", location=self.room1)
+        create_object(
+            "typeclasses.objects.Object",
+            key="meal",
+            attributes=[("registry_key", "meal")],
+            location=self.char1,
+        )
+        output = self.call(CmdGive(), "meal = 阿諾")
+        self.assertIn("你把meal交給了", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        self.assertEqual(npc.db.inventory, ["meal"])
+        self.assertEqual(len([o for o in npc.contents if o.key == "meal"]), 1)
+
+    def test_drop_canonical_key_without_object_materializes_the_mirror(self):
+        self.char1.db.inventory = ["meal"]
+        output = self.call(CmdDrop(), "meal")
+        self.assertIn("你丟下了meal。", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        mirrored = [o for o in self.room1.contents if o.key == "meal"]
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(mirrored[0].db.registry_key, "meal")
+
+    def test_give_canonical_key_without_object_materializes_at_target(self):
+        self.char1.db.inventory = ["meal"]
+        self.char2.location = self.room1
+        output = self.call(CmdGive(), "meal = 路人")
+        self.assertIn("你把meal交給了", output)
+        self.assertEqual(self.char1.db.inventory, [])
+        self.assertEqual(self.char2.db.inventory, ["meal"])
+        mirrored = [o for o in self.char2.contents if o.key == "meal"]
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(mirrored[0].db.registry_key, "meal")
+
+    def test_give_to_self_with_canonical_key_keeps_it(self):
+        self.char1.db.inventory = ["meal"]
+        output = self.call(CmdGive(), "meal = 測試者")
+        self.assertIn("留給了", output)
+        self.assertEqual(self.char1.db.inventory, ["meal"])
+
+    @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
+    def test_get_failed_move_aborts_the_batch_and_changes_nothing(self):
+        first = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+        second = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+        real_move_to = DefaultObject.move_to
+        calls = {"count": 0}
+
+        def fake_move(self, destination, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                return False
+            return real_move_to(self, destination, **kwargs)
+
+        with patch.object(DefaultObject, "move_to", fake_move):
+            output = self.call(CmdGet(), "2 個 銅幣")
+        self.assertIn("那個撿不起來。", output)
+        self.assertEqual([first.location, second.location], [self.room1, self.room1])
+        self.assertEqual(len([o for o in self.room1.contents if o.key == "銅幣"]), 2)
+        self.assertEqual(len([o for o in self.char1.contents if o.key == "銅幣"]), 0)
+        self.assertEqual(self.char1.db.inventory or [], [])
+
+    def test_get_exception_mid_transfer_changes_nothing(self):
+        first = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+        second = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+        real_move_to = DefaultObject.move_to
+        calls = {"count": 0}
+
+        def fake_move(self, destination, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise RuntimeError("move failed")
+            return real_move_to(self, destination, **kwargs)
+
+        with patch.object(DefaultObject, "move_to", fake_move):
+            with self.assertRaises(RuntimeError):
+                self.call(CmdGet(), "2 個 銅幣")
+        self.assertEqual([first.location, second.location], [self.room1, self.room1])
+        self.assertEqual(len([o for o in self.room1.contents if o.key == "銅幣"]), 2)
+        self.assertEqual(len([o for o in self.char1.contents if o.key == "銅幣"]), 0)
+        self.assertEqual(self.char1.db.inventory or [], [])
 
     def test_home_command_zh_tw(self):
         self.char1.home = self.room1
