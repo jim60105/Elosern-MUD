@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from django.db import transaction
 from evennia import DefaultScript
 from evennia.utils.create import create_script
 from evennia.utils.search import search_script
 
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
 from world.rules.sexual_state import DECAY_CONFIG, decay_tick, reset_daily_counters
+from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import GAUGE_KEYS
 
 
@@ -21,6 +23,11 @@ CLOCK_YAML = yaml.safe_load(
     (Path(__file__).parent / "rulebook" / "clock.yaml").read_text(encoding="utf-8")
 )
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
+
+# A single advance may cover at most one full game day: this keeps ``wait
+# until``'s worst case (a day-long wait) legal while bounding the per-day
+# boundary loop at one crossing per call.
+MAX_ADVANCE_SECONDS = _DAY_SECONDS
 
 
 def _validate_settlement_intervals(buff_definitions, decay_config) -> int:
@@ -53,6 +60,10 @@ _EVENT_SOURCES: dict[str, Callable[[int, int], list["ScheduledEvent"]]] = {}
 
 class DaypartError(ValueError):
     """Raised when a named clock daypart is unknown."""
+
+
+class ClockAdvanceBoundError(ValueError):
+    """Raised when an advance would exceed ``MAX_ADVANCE_SECONDS``."""
 
 
 class AdvanceSource(StrEnum):
@@ -211,6 +222,87 @@ def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entiti
     return _settle_boundary_stages(clock.tick, clock.tick + seconds, entities)
 
 
+# Durable attribute surfaces an advance can write on a caller-supplied entity:
+# the shared entity-snapshot set (world/rules/action.py) plus the
+# sexual-decay accumulators, so a rolled-back advance restores every cache.
+_ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
+    ("traits", "traits"),
+    ("disguised_stats", None),
+    ("sexual_traits", "traits"),
+    ("virgin", "sexual_state"),
+    ("experience_types", "sexual_state"),
+    ("buffs", None),
+    ("skill_grants", None),
+    ("magic_xp", None),
+    ("skill_proficiency", None),
+) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
+
+
+def _snapshot_advance_entities(entities: tuple[Any, ...]) -> dict[int, dict[str, tuple[bool, Any]]]:
+    """Snapshot the durable surfaces ``advance`` may write on each entity."""
+    snapshots: dict[int, dict[str, tuple[bool, Any]]] = {}
+    for entity in entities:
+        if not hasattr(entity, "attributes"):
+            continue
+        snapshots[id(entity)] = {
+            key: attribute_snapshot(entity, key, category)
+            for key, category in _ADVANCE_ENTITY_SURFACES
+        }
+    return snapshots
+
+
+def _snapshot_clock_tick(clock: "WorldClock") -> tuple[int, tuple[bool, Any] | None]:
+    """Snapshot the in-memory tick and the persisted tick attribute."""
+    script = getattr(clock, "_script", None)
+    tick_snapshot = (
+        attribute_snapshot(script, "tick") if script is not None else None
+    )
+    return clock.tick, tick_snapshot
+
+
+def _restore_clock_tick(
+    clock: "WorldClock",
+    snapshot: tuple[int, tuple[bool, Any] | None],
+) -> None:
+    """Restore the in-memory and persisted tick after a rolled-back advance."""
+    in_memory_tick, tick_snapshot = snapshot
+    clock.tick = in_memory_tick
+    script = getattr(clock, "_script", None)
+    if script is not None and tick_snapshot is not None:
+        restore_attribute_best_effort(script, "tick", tick_snapshot)
+
+
+def _restore_advance_entities(
+    entities: tuple[Any, ...],
+    snapshots: dict[int, dict[str, tuple[bool, Any]]],
+) -> None:
+    """Restore snapshotted surfaces and refresh caches after a rolled-back advance."""
+    for entity in entities:
+        snapshot = snapshots.get(id(entity))
+        if snapshot is None:
+            continue
+        for key, category in _ADVANCE_ENTITY_SURFACES:
+            restore_attribute_best_effort(entity, key, snapshot[key], category)
+        _refresh_advance_entity_caches(entity)
+
+
+def _refresh_advance_entity_caches(entity: Any) -> None:
+    """Drop stale in-memory trait/sexual caches so the next read matches the DB."""
+    from evennia.utils.logger import log_warn
+
+    try:
+        entity.traits.trait_data = entity.attributes.get(
+            "traits", default={}, category="traits"
+        )
+        entity.traits._cache.clear()
+    except Exception as error:
+        log_warn(f"clock advance could not refresh trait caches on {entity}: {error}")
+    try:
+        entity.__dict__.pop("sexual", None)
+    except Exception as error:
+        log_warn(f"clock advance could not drop cached sexual state on {entity}: {error}")
+
+
 @dataclass
 class WorldClock:
     """The sole mutable driver of elapsed game time."""
@@ -224,12 +316,24 @@ class WorldClock:
     def advance(self, seconds: int, source: AdvanceSource, entities: Iterable[Any]) -> list[ScheduledEvent]:
         if seconds < 0:
             raise ValueError("seconds must be non-negative")
+        if seconds > MAX_ADVANCE_SECONDS:
+            raise ClockAdvanceBoundError(
+                f"advance of {seconds}s exceeds the {MAX_ADVANCE_SECONDS}s bound"
+            )
         scope = tuple(entities)
-        events = _run_stages(self, seconds, source, scope)
-        self.tick += seconds
-        persist = getattr(self, "_persist", None)
-        if persist is not None:
-            persist(self.tick)
+        snapshots = _snapshot_advance_entities(scope)
+        tick_snapshot = _snapshot_clock_tick(self)
+        try:
+            with transaction.atomic():
+                events = _run_stages(self, seconds, source, scope)
+                self.tick += seconds
+                persist = getattr(self, "_persist", None)
+                if persist is not None:
+                    persist(self.tick)
+        except Exception:
+            _restore_clock_tick(self, tick_snapshot)
+            _restore_advance_entities(scope, snapshots)
+            raise
         return events
 
 
@@ -247,6 +351,7 @@ def get_world_clock() -> WorldClock:
         WorldClockScript, key="world_clock", persistent=True, interval=0, repeats=0
     )
     clock = WorldClock(int(script.db.tick or 0))
+    clock._script = script
     clock._persist = lambda tick: setattr(script.db, "tick", tick)
     return clock
 
@@ -263,6 +368,7 @@ def read_world_clock() -> WorldClock | None:
         return None
     script = matches[0]
     clock = WorldClock(int(script.db.tick or 0))
+    clock._script = script
     clock._persist = lambda tick: setattr(script.db, "tick", tick)
     return clock
 

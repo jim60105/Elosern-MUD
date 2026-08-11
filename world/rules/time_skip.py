@@ -6,10 +6,12 @@ computation, the safety gate, and clock advancement can never diverge. This
 module owns the ``clock.yaml`` bounds, the ``evaluate_skip_safety`` gate, and
 the ``AdvanceSource.SKIP`` execution; callers never advance time themselves.
 
-The WebClient ``explore.wait`` ``seconds`` payload is bounded by the documented
-protocol-level ``MAX_WEB_SKIP_SECONDS``, which never changes command behavior:
-``rest`` still accepts any parseable duration with no cap, and ``sleep`` still
-caps at ``CLOCK_YAML["max_sleep_seconds"]``.
+``rest`` caps its parsed duration at ``MAX_SKIP_SECONDS``
+(``CLOCK_YAML["max_sleep_seconds"]``), the same bound ``sleep`` uses for its
+computed full-regen duration. The WebClient ``explore.wait`` ``seconds``
+payload is bounded by the documented protocol-level ``MAX_WEB_SKIP_SECONDS``,
+which equals ``MAX_SKIP_SECONDS``; none of the bounds change command behavior
+beyond the configured maximum.
 """
 
 import math
@@ -33,8 +35,11 @@ class DurationParseError(ValueError):
 # The four named dayparts accepted by ``wait`` and ``explore.wait``.
 DAYPARTS = ("midnight", "dawn", "noon", "dusk")
 
+# Cap for explicit ``rest`` durations and the full-regen ``sleep`` duration.
+MAX_SKIP_SECONDS = CLOCK_YAML["max_sleep_seconds"]
+
 # Protocol-level bound for the WebClient ``explore.wait`` ``seconds`` value.
-MAX_WEB_SKIP_SECONDS = CLOCK_YAML["max_sleep_seconds"]
+MAX_WEB_SKIP_SECONDS = MAX_SKIP_SECONDS
 
 _DURATION_RE = re.compile(r"^(?P<amount>\d+)\s*(?P<unit>[smhd])$")
 _UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
@@ -45,11 +50,21 @@ _REJECTION_MESSAGES = {
 
 
 def parse_duration(text: str) -> int:
-    """Parse an explicit ``<number><s|m|h|d>`` rest duration into seconds."""
+    """Parse an explicit ``<number><s|m|h|d>`` rest duration into seconds.
+
+    The result is clamped to ``MAX_SKIP_SECONDS`` so ``rest`` can never drive
+    an unbounded clock advance; durations at or under the cap parse exactly.
+    """
     match = _DURATION_RE.fullmatch(text.strip())
     if match is None:
         raise DurationParseError("duration must use <number><s|m|h|d>")
-    return int(match["amount"]) * _UNIT_SECONDS[match["unit"]]
+    try:
+        seconds = int(match["amount"]) * _UNIT_SECONDS[match["unit"]]
+    except ValueError:
+        # Absurdly long digit strings exceed Python's int-string limit; any
+        # such duration is astronomically over the cap, so clamp directly.
+        return MAX_SKIP_SECONDS
+    return min(seconds, MAX_SKIP_SECONDS)
 
 
 def seconds_to_full_regen(entity: Any) -> int:
@@ -101,6 +116,7 @@ def advance_skip(actor: Any, seconds: int) -> list[ScheduledEvent]:
 __all__ = [
     "DAYPARTS",
     "DurationParseError",
+    "MAX_SKIP_SECONDS",
     "MAX_WEB_SKIP_SECONDS",
     "advance_skip",
     "parse_duration",

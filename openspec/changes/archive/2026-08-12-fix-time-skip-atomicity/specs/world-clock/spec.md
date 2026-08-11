@@ -16,7 +16,7 @@
 
 ### Requirement: advance() has a bounded settlement budget per call
 
-`WorldClock.advance()` SHALL reject or reject-and-degrade any call whose elapsed seconds would exceed a configured maximum advance duration (`MAX_ADVANCE_SECONDS`, defaulting to `rulebook/clock.yaml`'s `max_sleep_seconds`), so the per-day boundary loop and event accumulation are bounded per call.
+`WorldClock.advance()` SHALL reject or reject-and-degrade any call whose elapsed seconds would exceed a configured maximum advance duration (`MAX_ADVANCE_SECONDS`, equal to one full game day — `seconds_per_hour * hours_per_day` from `rulebook/clock.yaml`), so the per-day boundary loop and event accumulation are bounded per call. One full day keeps `wait until`'s worst case (a day-long wait) legal while still bounding the loop at one day crossing per call.
 
 #### Scenario: Oversized advance is refused without writes
 

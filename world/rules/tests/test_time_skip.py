@@ -16,6 +16,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.monsters import Monster
 from world.rules.clock import AdvanceSource, CLOCK_YAML, get_world_clock
 from world.rules.time_skip import (
+    MAX_SKIP_SECONDS,
     MAX_WEB_SKIP_SECONDS,
     DurationParseError,
     advance_skip,
@@ -31,10 +32,22 @@ class SkipHelperPureTests(unittest.TestCase):
         self.assertEqual(parse_duration("90s"), 90)
         self.assertEqual(parse_duration("2m"), 120)
         self.assertEqual(parse_duration("1h"), 3600)
-        self.assertEqual(parse_duration("1d"), 86400)
+        self.assertEqual(parse_duration("11h"), 11 * 3600)
         for bad in ("", "soon", "1", "1x", "-5m"):
             with self.assertRaises(DurationParseError):
                 parse_duration(bad)
+
+    def test_parse_duration_clamps_at_max_skip_seconds(self):
+        self.assertEqual(parse_duration("12h"), MAX_SKIP_SECONDS)
+        self.assertEqual(parse_duration("1d"), MAX_SKIP_SECONDS)
+        self.assertEqual(parse_duration("1000000000d"), MAX_SKIP_SECONDS)
+        self.assertEqual(parse_duration("11h"), 11 * 3600)
+        # A five-digit amount below the cap still parses exactly.
+        self.assertEqual(parse_duration("10000s"), 10000)
+
+    def test_parse_duration_clamps_absurd_digit_strings(self):
+        self.assertEqual(parse_duration("9" * 5000 + "d"), MAX_SKIP_SECONDS)
+        self.assertEqual(parse_duration("9" * 5000 + "s"), MAX_SKIP_SECONDS)
 
     def test_full_regen_is_bounded_by_max_sleep_seconds(self):
         class Gauge:

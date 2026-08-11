@@ -13,10 +13,11 @@ from commands.skip import (
 )
 from tools.spec_traceability import covers_requirement
 from world.rules.clock import AdvanceSource, ScheduledEvent
+from world.rules.time_skip import MAX_SKIP_SECONDS
 
 
 class SkipCommandHelperTests(unittest.TestCase):
-    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-exactly-that")
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_rest_advances_by_the_exact_explicit_duration(self):
         caller = SimpleNamespace(msg=Mock())
         clock = Mock()
@@ -34,6 +35,27 @@ class SkipCommandHelperTests(unittest.TestCase):
         safety.assert_called_once_with(caller)
         clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, [caller])
         caller.msg.assert_called_once_with("時間經過了 3600 秒。")
+
+    def test_rest_longer_than_the_maximum_is_capped(self):
+        caller = SimpleNamespace(msg=Mock())
+        clock = Mock()
+        clock.advance.return_value = []
+        command = CmdRest()
+        command.caller = caller
+        command.args = "1000000000d"
+
+        with (
+            patch("commands.skip.evaluate_skip_safety", return_value=None),
+            patch("commands.skip.get_world_clock", return_value=clock),
+        ):
+            command.func()
+
+        clock.advance.assert_called_once_with(
+            MAX_SKIP_SECONDS, AdvanceSource.SKIP, [caller]
+        )
+        caller.msg.assert_called_once_with(
+            f"時間經過了 {MAX_SKIP_SECONDS} 秒。"
+        )
 
     def test_duration_parser_accepts_explicit_units_only(self):
         self.assertEqual(_parse_duration("1h"), 3600)
