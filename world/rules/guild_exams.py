@@ -13,7 +13,6 @@ from enum import StrEnum
 from typing import Any
 
 from evennia.utils.create import create_object
-from evennia.utils.logger import log_warn
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
@@ -359,8 +358,10 @@ def settle_exam_outcome(
 
     Opponent knockout promotes exactly one rank; candidate knockout, flee,
     forfeit, invalid recovery, or round cap records FAIL with rank and
-    cumulative merit unchanged. The temporary opponent is deleted and the exam
-    closes in all cases.
+    cumulative merit unchanged. The temporary opponent is deleted by the
+    caller after the settlement transaction commits (so a rolled-back
+    settlement keeps it alive for exactly one retry); this function only
+    writes the exam terminal state.
     """
     if session_record is None or session_record.mode != "guild_exam":
         raise GuildExamError(ExamReason.NOT_SETTLABLE)
@@ -371,17 +372,6 @@ def settle_exam_outcome(
         raise GuildExamError(ExamReason.UNKNOWN_EXAM)
     if record.state is not ExamState.ACTIVE:
         return {"exam_id": exam_id, "state": record.state.value}
-
-    opponent = None
-    if battlefield is not None:
-        for entity in battlefield.roster.values():
-            if int(entity.pk) == record.opponent_id:
-                opponent = entity
-                break
-    else:
-        from evennia.objects.models import ObjectDB
-
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
 
     passed = outcome == "exam_passed"
     new_state = ExamState.PASSED if passed else ExamState.FAILED
@@ -408,12 +398,6 @@ def settle_exam_outcome(
         restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
         restore_attribute_best_effort(actor, "guild_exams", exams_snapshot)
         raise
-    finally:
-        if opponent is not None:
-            try:
-                opponent.delete()
-            except Exception as error:
-                log_warn(f"guild_exam: could not delete opponent {opponent}: {error}")
     return {"exam_id": exam_id, "state": new_state.value, "passed": passed}
 
 

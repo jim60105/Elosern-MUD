@@ -10,8 +10,10 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from commands.action import CmdCast
+from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.action import (
     ActionRequest,
@@ -34,8 +36,15 @@ from world.rules.combat_session import (
     submit_player_action,
     to_storage,
 )
+from world.rules.party import join_party
 from world.skills.handler import INNATE_SKILL_KEYS
-from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
+from world.skills.registry import (
+    FactionConstraint,
+    SKILL_REGISTRY,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
 from .combat_fixtures import BattlefieldIsolation
 
 
@@ -120,6 +129,24 @@ class CombatSessionRecordTests(unittest.TestCase):
         self.assertEqual(record.session_id, "hostile:1:0")
         self.assertEqual(to_storage(record)["room_id"], 5)
 
+    def test_settled_tick_is_optional_and_round_trips(self):
+        base = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 5,
+            "player_ids": [1],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+        }
+        # Older durable records without the marker stay valid (default None).
+        self.assertIsNone(from_storage(base).settled_tick)
+        marked = from_storage({**base, "settled_tick": 42})
+        self.assertEqual(marked.settled_tick, 42)
+        self.assertEqual(to_storage(marked)["settled_tick"], 42)
+
     def test_malformed_records_fail_closed(self):
         base = {
             "session_id": "hostile:1:0",
@@ -141,6 +168,8 @@ class CombatSessionRecordTests(unittest.TestCase):
             {"rounds_elapsed": -1},
             {"fled_ids": [99]},
             {"exam_id": None, "mode": "guild_exam"},
+            {"settled_tick": "six"},
+            {"settled_tick": -1},
         ]
         for mutation in bad_cases:
             data = {**base, **mutation}
@@ -443,6 +472,171 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTest):
         self.assertFalse(is_in_active_session(self.player))
 
 
+class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
+    """fix-combat-settlement-recovery: settled marker and atomic round chain."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="recovery arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        self.monster = _monster("recovery goblin", hp=100)
+        self.monster.location = self.room
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    def test_restored_marked_session_is_not_settled_twice(self):
+        # A terminal hostile session whose settlement committed (marker and
+        # clock) but whose clear never ran is settled exactly once by
+        # restoration -- never a second time (task 4.1, simulated restart
+        # after the clock-commit-before-clear window).
+        self.monster.traits.hp.base = 1
+        self.monster.traits.hp.current = 1
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "fire_ball", [self.monster])
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+        # Fabricate the durable mid-window state a restart would read: the
+        # settlement (marker + clock) committed, the session clear did not.
+        from world.rules.combat_session import _persist
+
+        _persist(
+            self.player,
+            from_storage({**to_storage(record), "settled_tick": clock.tick}),
+        )
+        restore_active_session(self.player)
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertFalse(is_in_active_session(self.player))
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_settlement_failure_rolls_back_the_whole_round(self):
+        self.monster.traits.hp.base = 1
+        self.monster.traits.hp.current = 1
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.combat_session.settle_combat_result",
+                side_effect=RuntimeError("clock write failed"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "fire_ball", [self.monster])
+        # Round effects, session metadata, clock tick, and clearing all
+        # rolled back together; the session survives for exactly one retry.
+        self.assertEqual(self.monster.traits.hp.current, 1)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(clock.tick, 0)
+        self.assertIsNotNone(self.player.db.active_combat)
+        # The retry runs the round again and settles exactly once.
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "fire_ball", [self.monster])
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+
+    def test_termination_between_effects_and_persist_leaves_no_half_round(self):
+        # A process termination between the round effects and the session
+        # metadata write leaves either the full round durable or none of it:
+        # here the metadata write fails, so the effects roll back with it.
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.combat_session._persist",
+                side_effect=RuntimeError("terminated"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "fire_ball", [self.monster])
+        self.assertEqual(self.monster.traits.hp.current, 100)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(clock.tick, 0)
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    def test_three_round_victory_advances_eighteen_seconds_once(self):
+        # A hostile session that ends after three completed rounds settles
+        # exactly 18 seconds with the combat source and never an extra cast
+        # cost per command: rounds 1-2 advance nothing, round 3 settles 3x6s.
+        for key, value in {
+            "atk_phys": 2,
+            "agility": 30,
+            "defense": 50,
+            "magic_level": 90,
+        }.items():
+            getattr(self.player.traits, key).base = value
+        self.player.traits.hp.base = 500
+        self.player.traits.hp.current = 500
+        self.monster.traits.hp.base = 405
+        self.monster.traits.hp.current = 405
+        for key, value in {"atk_phys": 1, "agility": 30, "defense": 0}.items():
+            getattr(self.monster.traits, key).base = value
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch("world.rules.monster_behaviour._should_flee", return_value=False),
+        ):
+            for expected_rounds in (1, 2):
+                result = submit_player_action(
+                    self.player, "fire_ball", [self.monster]
+                )
+                self.assertEqual(result["outcome"], "round")
+                self.assertEqual(clock.tick, 0)
+                self.assertEqual(
+                    read_session(self.player).rounds_elapsed, expected_rounds
+                )
+            result = submit_player_action(self.player, "fire_ball", [self.monster])
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(clock.tick, 18)
+        self.assertIsNone(self.player.db.active_combat)
+
+    def test_flee_settlement_failure_rolls_back_and_retry_flees(self):
+        # The flee terminal source shares the same atomic seam: a failed
+        # settlement rolls the flee, the round effects, and the metadata back
+        # together, and the retry can flee again and settle exactly once.
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.combat_session.settle_combat_result",
+                side_effect=RuntimeError("clock write failed"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "flee", [])
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(clock.tick, 0)
+        self.assertNotIn(str(self.player.key), read_session(self.player).fled_ids)
+        self.assertEqual(self.monster.traits.hp.current, 100)
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "flee", [])
+        self.assertEqual(result["outcome"], "fled")
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+
+
 class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -496,6 +690,179 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
 
 # Sentinel used to prove no EventLog was created; kept local to avoid import.
 _EVENT_LOGS_SENTINEL = ()
+
+
+# Test-only ANY-faction area damage skill so the player's own action can hit an
+# ally-side companion in the seam flow (production skills are ENEMY-only).
+SEAM_AREA = SkillDef(
+    key="test_seam_area",
+    label="測試範圍",
+    description="測試用：對範圍內任何目標造成魔法傷害。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.AREA,
+    cost={},
+    usable_out_of_combat=False,
+    element="fire",
+    effects=["damage:fire:magic"],
+    faction_constraint=FactionConstraint.ANY,
+)
+
+
+class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
+    """Cross-cutting regression tests for the shared round seam (task 3.2).
+
+    One session flow exercises every seam phase in order -- a preflight
+    rejection (no round), a reverse-overwhelm ordinary round, a friendly-fire
+    penalty rollback on a failed terminal settlement, and the terminal
+    settlement itself -- so later changes to ``submit_player_action``/
+    ``settle_session`` cannot silently break the shared outer transaction.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        SKILL_REGISTRY[SEAM_AREA.key] = SEAM_AREA
+        self.room = create_object(Room, key="seam arena")
+        self.player = _player("seam player")
+        self.player.location = self.room
+        self.player.db.skills = {"active": [SEAM_AREA.key], "passive": []}
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 2
+        self.player.traits.hp.base = 390
+        self.player.traits.hp.current = 390
+        self.companion = create_object(NPC, key="誤傷夥伴", location=self.room)
+        self.companion.race = "human"
+        self.companion.apply_race_baseline()
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.companion.traits, key).base = 2
+        self.companion.traits.hp.base = 100
+        self.companion.traits.hp.current = 100
+        join_party(self.companion, self.player)
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(
+            self.companion, self.player, AffinitySource.QUEST_COMPLETION, 10
+        )
+        # Foe team overwhelming by the power-ratio rule alone (>= 100x):
+        # power = stat sum x hp = (200+30+100) x 1300 = 429000 vs player team
+        # 3920, with a <= 5-round estimate (198 base damage at a 0.78 hit
+        # rate). Monster magic_level is a counter trait capped at 0, so the
+        # attack/agility/defense carry the power. The monster's d100 margin
+        # (77) stays below the critical threshold: its solid hit lands for
+        # 298 damage, flooring the companion but leaving the player standing.
+        self.monster = create_object(Monster, key="seam goblin")
+        self.monster.threat_tier = "low"
+        self.monster.apply_monster_tier("floor")
+        for key, value in {
+            "atk_phys": 200,
+            "agility": 30,
+            "defense": 100,
+        }.items():
+            getattr(self.monster.traits, key).base = value
+        self.monster.traits.hp.base = 1300
+        self.monster.traits.hp.current = 1300
+        self.monster.location = self.room
+
+    def tearDown(self):
+        SKILL_REGISTRY.pop(SEAM_AREA.key, None)
+        super().tearDown()
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_one_session_flow_covers_all_seam_phases(self):
+        engage(self.player, self.monster)
+        from world.rules.overwhelm import classify_overwhelm
+
+        # Reverse overwhelm: the FOE team is the overwhelming one, so the
+        # player's action runs one ordinary round, never the compression.
+        self.assertEqual(
+            classify_overwhelm(
+                reconstruct_battlefield(self.player, read_session(self.player))
+            ),
+            "foes",
+        )
+        clock = WorldClock()
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            # 1. A preflight rejection consumes no round and no world time.
+            result = submit_player_action(
+                self.player, "no_such_skill", [self.monster]
+            )
+            self.assertEqual(result["outcome"], "rejected")
+            self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+            self.assertEqual(clock.tick, 0)
+            self.assertEqual(self.monster.traits.hp.current, 1300)
+
+            # 2. The reverse-overwhelm action drives one ordinary round: the
+            #    monster's solid hit floors the companion nonlethally, and
+            #    the player's area attack hits both the monster and the
+            #    companion, so the friendly-fire penalty applies (-1 per hit)
+            #    inside the seam.
+            with patch("world.rules.combat.roll_d100", return_value=100):
+                result = submit_player_action(
+                    self.player,
+                    SEAM_AREA.key,
+                    [self.monster, self.companion],
+                )
+            self.assertEqual(result["outcome"], "round")
+            self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+            self.assertEqual(clock.tick, 0)
+            self.assertEqual(
+                self.companion.relations.affinity_for(self.player), 9
+            )
+            self.assertEqual(self.player.traits.hp.current, 390)
+            self.assertEqual(self.companion.traits.hp.current, 1)
+
+            # 3. A terminal settlement failure rolls the round back,
+            #    including the fresh friendly-fire penalty (party/relations
+            #    surfaces are restored with the round). The player's attack
+            #    kills the pinned monster, so the settlement step runs and
+            #    fails; the monster is held from fleeing so the round stays
+            #    on the kill path.
+            self.monster.traits.hp.current = 1
+            with (
+                patch("world.rules.combat.roll_d100", return_value=100),
+                patch(
+                    "world.rules.combat_session.settle_combat_result",
+                    side_effect=RuntimeError("clock write failed"),
+                ),
+                patch(
+                    "world.rules.monster_behaviour._should_flee",
+                    return_value=False,
+                ),
+            ):
+                with self.assertRaises(RuntimeError):
+                    submit_player_action(
+                        self.player,
+                        SEAM_AREA.key,
+                        [self.monster, self.companion],
+                    )
+            self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+            self.assertEqual(clock.tick, 0)
+            self.assertEqual(self.monster.traits.hp.current, 1)
+            self.assertEqual(
+                self.companion.relations.affinity_for(self.player), 9
+            )
+            self.assertEqual(self.player.traits.hp.current, 390)
+
+            # 4. A player-defeat round settles exactly once and clears the
+            #    session: the monster's solid hit floors the weakened player
+            #    on its initiative turn. Both elapsed rounds settle (12 s).
+            self.player.traits.hp.current = 40
+            with (
+                patch("world.rules.combat.roll_d100", return_value=100),
+                patch(
+                    "world.rules.monster_behaviour._should_flee",
+                    return_value=False,
+                ),
+            ):
+                result = submit_player_action(
+                    self.player,
+                    SEAM_AREA.key,
+                    [self.monster, self.companion],
+                )
+            self.assertEqual(result["outcome"], "defeat")
+            self.assertEqual(clock.tick, 12)
+            self.assertIsNone(self.player.db.active_combat)
+            self.assertFalse(is_in_active_session(self.player))
 
 
 class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):

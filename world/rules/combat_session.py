@@ -18,7 +18,14 @@ from evennia.objects.models import ObjectDB
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
-from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
+from world.rules.action import (
+    ActionRequest,
+    ActionResolver,
+    SNAPSHOTTED_SURFACES,
+    _restore_touched_best_effort,
+    _snapshot_touched,
+    _stored_trait_value,
+)
 from world.rules.action_preview import revalidate_submission
 from world.rules.combat import (
     COMBAT_YAML,
@@ -27,7 +34,7 @@ from world.rules.combat import (
     is_battle_over,
     run_round,
 )
-from world.rules.clock import settle_combat_result
+from world.rules.clock import get_world_clock, settle_combat_result
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
 from world.rules.skip_safety import (
@@ -38,6 +45,12 @@ from world.skills.registry import SKILL_REGISTRY
 
 BASIC_ATTACK_KEY = "basic_attack"
 _ROUND_SECONDS = int(COMBAT_YAML["round"]["seconds"])
+
+# Surfaces the outer round-and-settlement transaction snapshots on every
+# participant. ``instance_pin`` is excluded because it lives on rooms, not
+# combatants; the session room is snapshotted with it separately.
+_ROUND_ENTITY_SURFACES = frozenset(SNAPSHOTTED_SURFACES - {"instance_pin"})
+_ROOM_SURFACES = frozenset({"instance_pin"})
 
 
 class CombatSessionError(ValueError):
@@ -73,6 +86,9 @@ _RECORD_FIELDS = frozenset(
         "exam_id",
     }
 )
+# Optional field: written only when the terminal settlement committed. Older
+# durable records without it stay valid, so it is never a required field.
+_OPTIONAL_RECORD_FIELDS = frozenset({"settled_tick"})
 
 
 @dataclass(frozen=True)
@@ -88,6 +104,7 @@ class CombatSessionRecord:
     knocked_out_ids: tuple[int, ...]
     rounds_elapsed: int
     exam_id: str | None
+    settled_tick: int | None = None
 
 
 def _parse_id_list(values: Any, field: str) -> tuple[int, ...]:
@@ -117,7 +134,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION, "active_combat must be a dict"
         )
-    unknown = set(data) - _RECORD_FIELDS
+    unknown = set(data) - _RECORD_FIELDS - _OPTIONAL_RECORD_FIELDS
     if unknown:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION,
@@ -154,6 +171,13 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION, "rounds_elapsed must be non-negative"
         )
+    settled_tick = data.get("settled_tick")
+    if settled_tick is not None:
+        settled_tick = _require_int(settled_tick, "settled_tick")
+        if settled_tick < 0:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION, "settled_tick must be non-negative"
+            )
     record = CombatSessionRecord(
         session_id=session_id,
         mode=mode,
@@ -164,6 +188,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         knocked_out_ids=_parse_id_list(data["knocked_out_ids"], "knocked_out_ids"),
         rounds_elapsed=rounds_elapsed,
         exam_id=exam_id,
+        settled_tick=settled_tick,
     )
     _validate_participant_shape(record)
     return record
@@ -210,6 +235,7 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         "knocked_out_ids": list(record.knocked_out_ids),
         "rounds_elapsed": record.rounds_elapsed,
         "exam_id": record.exam_id,
+        "settled_tick": record.settled_tick,
     }
 
 
@@ -601,6 +627,126 @@ def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
     return tuple(sorted(knocked))
 
 
+def _snapshot_round_touched(
+    actor: Any,
+    battlefield: Battlefield,
+    record: CombatSessionRecord,
+) -> tuple[
+    tuple[tuple[Any, frozenset[str], dict[str, Any]], ...],
+    dict[str, tuple[bool, Any]],
+]:
+    """Snapshot every entity the round-and-settlement chain may touch.
+
+    Covers all participants (entity surfaces plus ``quest_log`` so quest
+    transitions credited or failed from combat defeats roll back), the
+    battlefield's own in-process ``fled``/``knocked_out`` state, the session
+    room's ``pin_reasons``, and the actor's session/exam attributes that the
+    settlement chain writes (``active_combat``, and ``guild_rank``/
+    ``guild_exams`` for examinations). The entity surfaces come from the
+    shared snapshot handler registration, so a new effect surface raises at
+    registration time instead of silently escaping the outer rollback
+    (fix-combat-settlement-recovery D1). Returns ``(obj, surfaces, snapshot)``
+    tuples plus the actor's extra attribute snapshots for restoration; the
+    caller additionally snapshots the party and relations surfaces the
+    friendly-fire scan writes.
+    """
+    from world.rules.action import _attribute_snapshot
+
+    touched = [
+        (
+            entity,
+            _ROUND_ENTITY_SURFACES,
+            _snapshot_touched(entity, _ROUND_ENTITY_SURFACES),
+        )
+        for entity in battlefield.roster.values()
+    ]
+    touched.append(
+        (
+            battlefield,
+            _ROUND_ENTITY_SURFACES,
+            _snapshot_touched(battlefield, _ROUND_ENTITY_SURFACES),
+        )
+    )
+    room = actor.location
+    if room is not None:
+        touched.append(
+            (
+                room,
+                _ROOM_SURFACES,
+                _snapshot_touched(room, _ROOM_SURFACES),
+            )
+        )
+    room_pk = getattr(room, "pk", None)
+    # Quest DEFEAT transitions release the stage pin of every active quest
+    # stage, which may live in a room outside the session; snapshot those
+    # rooms too so an outer rollback restores their in-process pins.
+    raw_quests = actor.db.quest_log
+    if raw_quests:
+        for quest in raw_quests:
+            room_id = quest.get("stage_room_id") if isinstance(quest, dict) else None
+            if not isinstance(room_id, int) or room_id == room_pk:
+                continue
+            stage_room = ObjectDB.objects.filter(id=room_id).first()
+            if stage_room is not None:
+                touched.append(
+                    (
+                        stage_room,
+                        _ROOM_SURFACES,
+                        _snapshot_touched(stage_room, _ROOM_SURFACES),
+                    )
+                )
+    extra: dict[str, tuple[bool, Any]] = {
+        "active_combat": _attribute_snapshot(actor, "active_combat"),
+    }
+    if record.mode == "guild_exam":
+        extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
+        extra["guild_exams"] = _attribute_snapshot(actor, "guild_exams")
+    return tuple(touched), extra
+
+
+def _snapshot_party_surfaces(
+    actor: Any,
+    battlefield: Battlefield,
+) -> tuple[list[Any], dict[int, Any], dict[int, Any]]:
+    """Snapshot the party/relations surfaces the friendly-fire scan writes."""
+    from world.rules.party import party_ids
+
+    party_before = list(actor.db.party or ())
+    members_before: dict[int, Any] = {}
+    relations_before: dict[int, Any] = {}
+    companion_pks = set(party_ids(actor))
+    if companion_pks:
+        for entity in battlefield.roster.values():
+            pk = getattr(entity, "pk", None)
+            if isinstance(pk, int) and pk in companion_pks:
+                members_before[pk] = entity.db.party_member
+                relations_before[pk] = entity.db.relations_data
+    return party_before, members_before, relations_before
+
+
+def _restore_round_touched(
+    actor: Any,
+    touched: tuple[tuple[Any, frozenset[str], dict[str, Any]], ...],
+    extra: dict[str, tuple[bool, Any]],
+    party_before: list[Any],
+    members_before: dict[int, Any],
+    relations_before: dict[int, Any],
+) -> None:
+    """Restore every snapshotted surface after a rolled-back round."""
+    from world.rules.action import _restore_attribute
+
+    for obj, surfaces, snapshot in touched:
+        _restore_touched_best_effort(obj, snapshot, surfaces)
+    for key, snapshot in extra.items():
+        _restore_attribute(actor, key, snapshot)
+    if party_before or members_before:
+        from world.rules.affinity import restore_relations_surfaces
+        from world.rules.party import restore_membership_surfaces
+
+        restore_membership_surfaces(actor, party_before, members_before)
+        restore_relations_surfaces(relations_before)
+
+
 def _scan_friendly_fire(
     actor: Any,
     battlefield: Battlefield,
@@ -733,34 +879,68 @@ def submit_player_action(
 
     overwhelming = classify_overwhelm(battlefield)
     player_team = battlefield.team_of(str(actor.key))
-    if overwhelming == player_team:
-        provider = _overwhelm_provider(actor, request, battlefield, record)
-        result = resolve_overwhelm(battlefield, provider, max_rounds=12)
-        logs = result.event_logs
-        gained = result.rounds_elapsed
-    else:
-        provider = _round_provider(actor, request, battlefield, record)
-        logs = run_round(battlefield, provider)
-        gained = 1
-
-    for line in _scan_friendly_fire(actor, battlefield, logs):
-        actor.msg(line)
-
-    knocked = _knocked_out_ids(logs, battlefield)
-    new_record = replace(
-        record,
-        fled_ids=tuple(
-            sorted(
-                int(battlefield.roster[key].pk)
-                for key in battlefield.fled
-                if key in battlefield.roster
-            )
-        ),
-        knocked_out_ids=tuple(sorted(set(record.knocked_out_ids) | set(knocked))),
-        rounds_elapsed=record.rounds_elapsed + gained,
+    touched, extra = _snapshot_round_touched(actor, battlefield, record)
+    party_before, members_before, relations_before = _snapshot_party_surfaces(
+        actor, battlefield
     )
-    _persist(actor, new_record)
-    return _continue_or_settle(actor, new_record, battlefield, logs)
+    from django.db import transaction
+
+    notifications: tuple[str, ...] = ()
+    try:
+        with transaction.atomic():
+            # Shared outer transaction (fix-combat-settlement-recovery D1):
+            # round effects, friendly-fire penalties, session metadata, and
+            # the terminal settlement commit (or roll back) as one unit, so a
+            # process termination can never leave half-round durable state.
+            # Later combat changes that edit this seam (roster-and-overwhelm,
+            # friendly-fire reachability) must keep edits inside this block.
+            if overwhelming == player_team:
+                provider = _overwhelm_provider(actor, request, battlefield, record)
+                result = resolve_overwhelm(battlefield, provider, max_rounds=12)
+                logs = result.event_logs
+                gained = result.rounds_elapsed
+            else:
+                provider = _round_provider(actor, request, battlefield, record)
+                logs = run_round(battlefield, provider)
+                gained = 1
+
+            notifications = _scan_friendly_fire(actor, battlefield, logs)
+
+            knocked = _knocked_out_ids(logs, battlefield)
+            new_record = replace(
+                record,
+                fled_ids=tuple(
+                    sorted(
+                        int(battlefield.roster[key].pk)
+                        for key in battlefield.fled
+                        if key in battlefield.roster
+                    )
+                ),
+                knocked_out_ids=tuple(sorted(set(record.knocked_out_ids) | set(knocked))),
+                rounds_elapsed=record.rounds_elapsed + gained,
+            )
+            _persist(actor, new_record)
+            result = _continue_or_settle(actor, new_record, battlefield, logs)
+    except Exception:
+        # The outer transaction rolled the database back; restore the
+        # in-process attribute surfaces so readers never observe the
+        # rolled-back values (the idmapper cache is not transaction-aware),
+        # and re-register skip safety because clear_session ran in-process.
+        _restore_round_touched(
+            actor,
+            touched,
+            extra,
+            party_before,
+            members_before,
+            relations_before,
+        )
+        register_active_battlefield(battlefield)
+        raise
+    # Deliver auto-leave notices only after the whole round committed, so a
+    # rolled-back round never shows a fake disengagement notification.
+    for line in notifications:
+        actor.msg(line)
+    return result
 
 
 def _team_living(
@@ -850,26 +1030,41 @@ def settle_session(
 ) -> dict[str, Any]:
     """Settle accumulated round time once and clear session state (D-6).
 
-    Exam sessions persist their PASS/FAIL terminal state and close the active
-    session FIRST; only after that does combat time settle exactly once. A
-    failure before the exam write leaves the session intact so a retry cannot
-    advance the clock twice for the same rounds. Hostile sessions settle time
-    then clear.
+    The whole terminal settlement is one durable transaction (fix-combat-
+    settlement-recovery D2): the exam outcome (guild-exam mode), the combat
+    clock advance, the durable ``settled_tick`` marker, and the session clear
+    commit or roll back together. A crash mid-settlement therefore never
+    loses exam time, never double-counts hostile time, and never leaves a
+    half-settled session; the marker additionally lets a restart skip
+    re-settlement for any durable record already marked settled. The session
+    clear is the last step inside the transaction, so a failure of any
+    earlier step leaves the durable session intact for exactly one retry.
+    Exam opponents are deleted only after the transaction commits: a rolled-
+    back settlement must leave the temporary opponent alive for the retry,
+    and deleting inside the transaction could strand a stale deleted
+    instance in the idmapper cache.
     """
-    exam_result = None
-    if record.mode == "guild_exam":
-        from world.rules.guild_exams import settle_exam_outcome
+    from django.db import transaction
 
-        exam_result = settle_exam_outcome(actor, record, battlefield, outcome)
-        # The exam terminal state is persisted and idempotent by exam ID; clear
-        # the session before advancing time so a clock failure cannot cause a
-        # second advance for the same rounds on a retry.
+    exam_result = None
+    with transaction.atomic():
+        if record.mode == "guild_exam":
+            from world.rules.guild_exams import settle_exam_outcome
+
+            exam_result = settle_exam_outcome(actor, record, battlefield, outcome)
+        events = settle_combat_result(
+            SimpleNamespace(total_seconds=record.rounds_elapsed * _ROUND_SECONDS),
+            [actor],
+        )
+        # Record the world tick at which the settlement committed; a non-None
+        # value marks the session as settled for any later reader.
+        _persist(
+            actor,
+            replace(record, settled_tick=get_world_clock().tick),
+        )
         clear_session(actor, battlefield, record)
-    events = settle_combat_result(
-        SimpleNamespace(total_seconds=record.rounds_elapsed * _ROUND_SECONDS),
-        [actor],
-    )
-    clear_session(actor, battlefield, record)
+    if record.mode == "guild_exam":
+        _delete_exam_opponent(actor, record)
     return {
         "outcome": outcome,
         "rounds_elapsed": record.rounds_elapsed,
@@ -877,6 +1072,64 @@ def settle_session(
         "events": tuple(events),
         "exam": exam_result,
     }
+
+
+def _delete_exam_opponent(actor: Any, record: CombatSessionRecord) -> None:
+    """Delete the settled exam's temporary opponent, best effort.
+
+    Runs after the settlement transaction committed, so a failed settlement
+    keeps the opponent alive for exactly one retry. An already-missing
+    opponent (or a delete error) is logged and never raises.
+    """
+    from evennia.utils.logger import log_warn
+
+    from world.rules.guild_exams import _read_exams
+
+    exam_record = next(
+        (r for r in _read_exams(actor) if r.exam_id == record.exam_id),
+        None,
+    )
+    if exam_record is None:
+        return
+    opponent = ObjectDB.objects.filter(id=exam_record.opponent_id).first()
+    if opponent is None:
+        return
+    try:
+        opponent.delete()
+    except Exception as error:
+        log_warn(f"guild_exam: could not delete opponent {opponent}: {error}")
+
+
+def _settle_with_restore(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+    outcome: str,
+    logs=(),
+) -> dict[str, Any]:
+    """Settle a session outside a round, restoring actor surfaces on failure.
+
+    ``settle_session`` runs its own durable transaction; when it fails (for
+    example a clock write error during forfeit or startup restoration), the
+    database keeps the session but the in-process ``active_combat``/exam
+    attributes were already reassigned by the settlement steps. Restoring
+    them keeps the retry path consistent without waiting for a reload
+    (the idmapper attribute cache is not transaction-aware).
+    """
+    from world.rules.action import _attribute_snapshot, _restore_attribute
+
+    extra: dict[str, tuple[bool, Any]] = {
+        "active_combat": _attribute_snapshot(actor, "active_combat"),
+    }
+    if record.mode == "guild_exam":
+        extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
+        extra["guild_exams"] = _attribute_snapshot(actor, "guild_exams")
+    try:
+        return settle_session(actor, record, battlefield, outcome, logs)
+    except Exception:
+        for key, snapshot in extra.items():
+            _restore_attribute(actor, key, snapshot)
+        raise
 
 
 def forfeit(actor: Any) -> dict[str, Any]:
@@ -890,7 +1143,7 @@ def forfeit(actor: Any) -> dict[str, Any]:
     except CombatSessionError:
         battlefield = None
     outcome = "defeat" if record.mode == "hostile" else "exam_failed"
-    return settle_session(actor, record, battlefield, outcome)
+    return _settle_with_restore(actor, record, battlefield, outcome)
 
 
 def restore_active_session(actor: Any) -> None:
@@ -898,16 +1151,28 @@ def restore_active_session(actor: Any) -> None:
 
     Missing, deleted, moved, duplicated, or malformed participants close the
     session deterministically: hostile sessions settle as defeat, examinations
-    as FAIL, leaving no orphan opponent and no blocked player.
+    as FAIL, leaving no orphan opponent and no blocked player. A record that
+    already carries a durable ``settled_tick`` marker is never settled again:
+    its time already committed, so restoration only clears the leftover
+    session state (fix-combat-settlement-recovery D2).
     """
     record = read_session(actor)
     if record is None:
+        return
+    if record.settled_tick is not None:
+        from evennia.utils.logger import log_warn
+
+        log_warn(
+            f"combat_session: skipping settlement of already-settled session "
+            f"{record.session_id} (settled at tick {record.settled_tick})"
+        )
+        clear_session(actor, None, record)
         return
     try:
         battlefield = reconstruct_battlefield(actor, record)
         outcome = _terminal_outcome(actor, battlefield, record)
         if outcome is not None:
-            settle_session(actor, record, battlefield, outcome)
+            _settle_with_restore(actor, record, battlefield, outcome)
             return
         register_active_battlefield(battlefield)
     except Exception as error:
@@ -916,7 +1181,7 @@ def restore_active_session(actor: Any) -> None:
         log_warn(
             f"combat_session: terminating invalid session for {actor.key}: {error}"
         )
-        settle_session(
+        _settle_with_restore(
             actor,
             record,
             None,

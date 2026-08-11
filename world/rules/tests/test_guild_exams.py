@@ -450,6 +450,160 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         self.assertGreaterEqual(self.player.traits.hp.current, 1)
 
 
+class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTest):
+    """fix-combat-settlement-recovery: exam time settles exactly once.
+
+    The old ordering (exam write and clear before the clock advance) lost the
+    exam's time when the process died between the two commits; the new
+    settlement is one durable transaction with a settled marker, so a restart
+    never re-settles and never loses the time.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.hall = create_object(Room, key="exam hall")
+        self.player = create_object(PlayerCharacter, key="exam recovery")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.hall
+        self.staff = create_object(NPC, key="guild staff", location=self.hall)
+        self.staff.components.add(
+            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        self.examiner = create_object(NPC, key="examiner", location=self.hall)
+        self.examiner.components.add(
+            GuildExaminer.create(
+                self.examiner,
+                service_id="examiner",
+                branch_key="guild_branch_altoria",
+            )
+        )
+        register_adventurer(self.player, self.staff)
+        from world.rules.surfaces import write_counter_trait
+
+        write_counter_trait(self.player, "guild_merit", 50)
+
+    def test_restored_exam_session_settles_time_exactly_once(self):
+        # Simulate a restart from the durable state BEFORE the settlement
+        # committed: the exam is still ACTIVE, its terminal session still
+        # present with two rounds elapsed, the clock unadvanced (a crash
+        # mid-transaction). Restoration must settle the exam's rounds exactly
+        # once -- the time is never lost and never doubled.
+        from world.rules.clock import WorldClock
+        from world.rules.combat_session import (
+            _persist,
+            from_storage as session_from_storage,
+            to_storage as session_to_storage,
+        )
+
+        record = start_guild_exam(self.player, self.examiner, "E")
+        session = read_session(self.player)
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        _persist(
+            self.player,
+            session_from_storage(
+                {
+                    **session_to_storage(session),
+                    "rounds_elapsed": 2,
+                    "knocked_out_ids": [int(opponent.pk)],
+                }
+            ),
+        )
+        opponent.traits.hp.current = 1
+        clock = WorldClock()
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            restore_active_session(self.player)
+        self.assertEqual(clock.tick, 12)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
+        self.assertEqual(self.player.guild_rank, "E")
+        self.assertIsNone(read_session(self.player))
+
+    def test_restored_marked_exam_session_is_not_resettled(self):
+        # Simulate the clock-commit-before-clear window for an exam: the exam
+        # outcome and the marker committed, the clear never ran. Restoration
+        # skips settlement (no second clock advance) and clears the leftover
+        # session state.
+        from dataclasses import replace
+
+        from world.rules.clock import WorldClock
+        from world.rules.combat_session import (
+            _persist,
+            from_storage as session_from_storage,
+            to_storage as session_to_storage,
+        )
+        from world.rules.guild_exams import _write_exams
+
+        record = start_guild_exam(self.player, self.examiner, "E")
+        session = read_session(self.player)
+        _write_exams(
+            self.player,
+            [
+                replace(
+                    exam,
+                    state=ExamState.FAILED,
+                    terminal_reason="exam_failed",
+                )
+                for exam in _read_exams(self.player)
+            ],
+        )
+        _persist(
+            self.player,
+            session_from_storage(
+                {**session_to_storage(session), "settled_tick": 6}
+            ),
+        )
+        clock = WorldClock(6)
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            restore_active_session(self.player)
+        self.assertEqual(clock.tick, 6)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self.assertIsNone(read_session(self.player))
+
+    def test_failed_exam_settlement_keeps_opponent_alive_for_retry(self):
+        # The opponent is deleted only after the settlement commits: a failed
+        # settlement (clock write error) rolls the exam outcome back and the
+        # temporary opponent survives for exactly one retry, which then
+        # settles, deletes it, and advances the clock exactly once.
+        from world.rules.clock import WorldClock
+
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        opponent.traits.hp.base = 1
+        opponent.traits.hp.current = 1
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.combat_session.settle_combat_result",
+                side_effect=RuntimeError("clock write failed"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
+        self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
+        self.assertIsNotNone(read_session(self.player))
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(result["outcome"], "exam_passed")
+        # The overwhelming candidate compresses the examination to the 12-round
+        # cap (exam knockouts are not battlefield-tracked), settling 72 s once.
+        self.assertEqual(clock.tick, 72)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
+        self.assertEqual(self.player.guild_rank, "E")
+        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
+        self.assertIsNone(read_session(self.player))
+
+
 class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
