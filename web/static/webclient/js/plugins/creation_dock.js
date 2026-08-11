@@ -65,6 +65,8 @@
     _customDirty: false,
     _pendingActivate: null,
     _pendingActivateKey: null,
+    _pendingActivateRequestId: null,
+    _pendingPresetKey: null,
     _confirmItems: [],
     _keydownBound: null,
     _formKeyBound: null,
@@ -82,6 +84,8 @@
       this._customDirty = false;
       this._pendingActivate = null;
       this._pendingActivateKey = null;
+      this._pendingActivateRequestId = null;
+      this._pendingPresetKey = null;
       this._confirmItems = [];
       this._focusKey = null;
       this._unbindFormKeys();
@@ -261,6 +265,13 @@
         idPrefix: "creation-row",
         menu: this._model.menus.presets,
       });
+      // A rejected preset save renders its stable rejection here
+      // (fix-creation-finalization-safety D1); the live region carries the
+      // transient announcement.
+      var listMessage = makeElement("div", "creation-form-message");
+      listMessage.id = "creation-form-message";
+      listMessage.setAttribute("role", "status");
+      body.appendChild(listMessage);
     },
 
     _renderConfirm: function (body, panel) {
@@ -432,6 +443,14 @@
       setText(cancel, "返回");
       actions.appendChild(cancel);
       form.appendChild(actions);
+
+      // A rejected save stays on the form and renders its stable rejection
+      // here (fix-creation-finalization-safety D1); the live region carries
+      // the transient announcement.
+      var formMessage = makeElement("div", "creation-form-message");
+      formMessage.id = "creation-form-message";
+      formMessage.setAttribute("role", "status");
+      form.appendChild(formMessage);
     },
 
     _appendField: function (form, label, key, value, type, max, hint) {
@@ -670,10 +689,25 @@
         return;
       }
       var payload = window.Elosern.CreationMenu.customPayload(state);
-      actions.submit(window.Elosern.CreationMenu.CUSTOM_ACTION, payload);
-      this._pendingActivate = "custom";
-      this._pendingActivateKey = null;
-      this._confirmItems = window.Elosern.CreationMenu.activateConfirm(null).items;
+      // The confirmation view opens only after the server confirms the save
+      // (fix-creation-finalization-safety D1): a rejected save must leave the
+      // form live instead of a stale confirmation. The request id lets the
+      // result handler below correlate the exact save being confirmed.
+      var requestId = actions.submit(window.Elosern.CreationMenu.CUSTOM_ACTION, payload);
+      if (requestId !== null) {
+        this._pendingActivateRequestId = requestId;
+      }
+    },
+
+    // Opens the confirmation for the save whose result just arrived. The
+    // pending save kind (preset or custom) was recorded when the save was
+    // submitted, so the confirmation always names the just-saved draft.
+    _openPendingConfirm: function () {
+      var presetKey = this._pendingPresetKey;
+      this._pendingActivate = presetKey ? "preset" : "custom";
+      this._pendingActivateKey = presetKey || null;
+      this._pendingPresetKey = null;
+      this._confirmItems = window.Elosern.CreationMenu.activateConfirm(presetKey).items;
       this._view = "confirm";
       var keyboard = getKeyboard();
       if (keyboard) {
@@ -681,7 +715,37 @@
       }
       var root = el("action-dock");
       if (root) {
-        this._renderDock(root, panel);
+        this._renderDock(root, this._model.panel);
+      }
+    },
+
+    // Handles the result of the custom or preset save whose confirmation is
+    // pending. Success opens the confirmation for the just-saved draft;
+    // rejection or error stays on the current view and surfaces the rejection
+    // (fix-creation-finalization-safety D1).
+    _handleActionResult: function (result) {
+      if (
+        this._pendingActivateRequestId === null ||
+        !result ||
+        result.requestId !== this._pendingActivateRequestId
+      ) {
+        return;
+      }
+      this._pendingActivateRequestId = null;
+      if (result.outcome === "success") {
+        this._openPendingConfirm();
+        return;
+      }
+      this._pendingPresetKey = null;
+      if (result.outcome === "rejected" || result.outcome === "error") {
+        this._renderRejection(result);
+      }
+    },
+
+    _renderRejection: function (result) {
+      var messageEl = el("creation-form-message");
+      if (messageEl) {
+        setText(messageEl, (result.code || "") + " " + (result.message || ""));
       }
     },
 
@@ -799,18 +863,18 @@
       if (item.presetKey) {
         var actions = getActions();
         if (actions) {
-          actions.submit(window.Elosern.CreationMenu.PRESET_ACTION, {
+          // The confirmation opens only after the server confirms the preset
+          // save (fix-creation-finalization-safety D1): a rejected preset save
+          // leaves the list live instead of a stale confirmation. The request
+          // id correlates the exact save being confirmed.
+          var requestId = actions.submit(window.Elosern.CreationMenu.PRESET_ACTION, {
             preset_key: item.presetKey,
           });
+          if (requestId !== null) {
+            this._pendingActivateRequestId = requestId;
+            this._pendingPresetKey = item.presetKey;
+          }
         }
-        this._pendingActivate = "preset";
-        this._pendingActivateKey = item.presetKey;
-        this._confirmItems = window.Elosern.CreationMenu.activateConfirm(
-          item.presetKey
-        ).items;
-        this._view = "confirm";
-        keyboard.pushMenu({ items: this._confirmItems, focusKey: null });
-        this._refreshDock();
         return;
       }
       if (
@@ -832,6 +896,7 @@
         this._view = this._pendingActivate === "preset" ? "presets" : "custom";
         this._pendingActivate = null;
         this._pendingActivateKey = null;
+        this._pendingPresetKey = null;
         this._refreshDock();
         return;
       }
@@ -877,6 +942,7 @@
         return;
       }
       var lastEpoch = null;
+      var lastResult = null;
       controller.subscribe(function (state) {
         var root = el("action-dock");
         if (!root) {
@@ -888,6 +954,13 @@
         }
         if (epochChanged && dock._mounted) {
           dock._discardLocalState();
+        }
+        // A custom-save result resolves the pending confirmation: success
+        // opens the confirmation view for the just-saved draft, rejection or
+        // error stays on the form (fix-creation-finalization-safety D1).
+        if (state.lastActionResult && state.lastActionResult !== lastResult) {
+          lastResult = state.lastActionResult;
+          dock._handleActionResult(state.lastActionResult);
         }
         if (panelAvailable(state)) {
           var panel = state.panels["creation"];

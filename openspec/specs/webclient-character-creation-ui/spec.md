@@ -146,6 +146,17 @@ Successful `creation.activate` SHALL remain all-or-nothing for character state: 
 - **WHEN** a write failure is injected into the activation transaction
 - **THEN** the whole activation rolls back, the character remains pending with its prior draft, and no partial trait, identity, or progression state is persisted
 
+### Requirement: Web activation confirms the exact draft shown
+The system SHALL ensure the `creation.activate` flow activates the draft whose save was confirmed, and SHALL surface a stable error when the stored draft changed between confirmation and activation.
+
+#### Scenario: Activation after successful save activates the saved draft
+- **WHEN** the player confirms after a successful custom save
+- **THEN** the character is activated from that saved draft and `creation_pending` becomes false
+
+#### Scenario: Save rejection followed by activation is refused
+- **WHEN** the player confirms while the last save was rejected and an older draft remains stored
+- **THEN** the activation is refused with a stable code and no character is activated
+
 ### Requirement: The creation dock is keyboard-first, form-capable, and confirmation-protected
 In `creation` mode the action dock SHALL present preset cards and the custom form rather than exploration or service menus. Arrow keys SHALL navigate finite lists and buttons, Tab and Shift+Tab SHALL move focus through text/numeric fields, Enter SHALL activate the focused control or submit a complete server-declared form, and Escape SHALL pop exactly one menu level without discarding the saved server wizard draft. The final activation and the destructive custom reset SHALL each require an explicit confirmation panel. Disabled entries SHALL remain focusable with their explanation and SHALL submit nothing. Validation messages SHALL be associated with the field they concern and announced through the accessible live region. A stale revision SHALL preserve typed unsent values locally where safe, refresh server-declared choices, and ask the player to review rather than automatically resubmitting. No canonical service or creation state SHALL be stored in localStorage.
 

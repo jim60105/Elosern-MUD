@@ -179,7 +179,7 @@ class CharacterActivationTests(EvenniaTest):
             "identity", "traits", "age", "apparent_age", "race", "subrace",
             "magic_xp", "skill_proficiency", "skills", "skill_grants",
             "equipment", "inventory", "wallet", "quest_log", "guild_rank",
-            "creation_pending",
+            "creation_pending", "portrait_policy",
         )
         for stage in stages:
             with self.subTest(stage=stage):
@@ -196,6 +196,7 @@ class CharacterActivationTests(EvenniaTest):
                         "creation_pending", "magic_xp", "skill_proficiency",
                         "skills", "skill_grants", "equipment", "inventory",
                         "wallet", "quest_log", "guild_rank",
+                        "portrait_policy",
                     )
                 }
                 before_traits = deepcopy(dict(character.traits.trait_data))
@@ -275,6 +276,115 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIsNotNone(self.character.traits.magic_level)
         self.assertIs(self.character.location, old_location)
         self.assertTrue(any("南門" in message for message in messages))
+
+
+class PortraitFinalizationTests(EvenniaTest):
+    """Shared portrait finalization on every activation path
+    (fix-creation-finalization-safety D3 / art-asset-lifecycle)."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+
+    def request(self, **overrides):
+        values = {
+            "mode": "custom",
+            "display_name": "  新角色  ",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": None,
+            "allocations": balanced_allocations("human"),
+        }
+        values.update(overrides)
+        return CharacterCreationRequest(**values)
+
+    def _portrait_key(self):
+        return f"art:portrait:character:{self.character.pk}"
+
+    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
+    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
+    def test_activation_sets_the_named_policy_and_schedules_exactly_one_ensure(self):
+        from world.art.store import ArtAssetRecord
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            activate_player_character(
+                self.account, self.character, self.request(),
+                sampler=lambda low, high: low,
+            )
+        self.assertEqual(
+            self.character.db.portrait_policy,
+            {"mode": "named", "stable_key": str(self.character.pk)},
+        )
+        self.assertEqual(len(callbacks), 1)
+        records = ArtAssetRecord.objects.filter(db_key=self._portrait_key())
+        self.assertEqual(records.count(), 1)
+
+    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
+    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
+    def test_web_activation_produces_identical_portrait_state(self):
+        from web.webclient.actions.creation_actions import (
+            _creation_activate_adapter,
+            _creation_custom_adapter,
+        )
+        from world.art.store import ArtAssetRecord
+
+        web = create_object(PlayerCharacter, key="web-shell")
+        self.account.at_post_create_character(web)
+        web.db_account = self.account
+        _creation_custom_adapter(
+            web,
+            {
+                "display_name": "網頁角色",
+                "age": 20,
+                "apparent_age": 20,
+                "race": "human",
+                "subrace": None,
+                "allocations": balanced_allocations("human"),
+            },
+        )
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            _creation_activate_adapter(web, {})
+        self.assertFalse(web.creation_pending)
+        self.assertEqual(
+            web.db.portrait_policy,
+            {"mode": "named", "stable_key": str(web.pk)},
+        )
+        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(
+                db_key=f"art:portrait:character:{web.pk}"
+            ).count(),
+            1,
+        )
+
+    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
+    def test_failed_activation_leaves_no_policy_and_no_job(self):
+        from world.art.store import ArtAssetRecord
+        from world.rules.creation_wizard import activate_draft, save_custom_draft
+
+        save_custom_draft(self.account, self.character, self.request())
+
+        def fail(stage):
+            if stage == "portrait_policy":
+                raise RuntimeError("injected portrait failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected portrait failure"):
+            activate_draft(
+                self.account, self.character,
+                sampler=lambda low, high: low, write_observer=fail,
+            )
+        self.assertTrue(self.character.creation_pending)
+        self.assertFalse(self.character.attributes.has("portrait_policy"))
+        self.assertIsNone(self.character.db.portrait_policy)
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(db_key=self._portrait_key()).count(),
+            0,
+        )
 
 
 PERSONA_BLOCK = {

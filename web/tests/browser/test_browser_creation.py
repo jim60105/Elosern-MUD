@@ -181,6 +181,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
 
 class PresetCreationJourneys(CreationBrowserTest):
     @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
     def test_preset_selection_confirm_activate_reaches_exploration(self):
         page = self._login_creation()
         install_outbound_recorder(page)
@@ -195,9 +196,10 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.preset"), 1)
         payloads = self._sent_payloads(page, "creation.preset")
         self.assertEqual(payloads, [{"preset_key": "human_wanderer"}])
-        self.assertEqual(page.locator(".creation-confirm").count(), 1)
 
+        # The confirmation appears only after the preset save result arrives.
         self._wait_confirm_ready(page)
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Enter")  # 確認啟用
         self._wait_exploration(page)
         self.assertEqual(sent_action_count(page, "creation.activate"), 1)
@@ -213,6 +215,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "Enter")  # 預設角色
         _press(page, "Enter")  # human_wanderer card -> confirmation screen
+        self._wait_confirm_ready(page)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Escape")  # pop exactly one level back to the preset list
         self.assertEqual(page.locator(".creation-confirm").count(), 0)
@@ -221,9 +224,39 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
 
+    @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
+    def test_rejected_preset_save_stays_on_the_list_without_confirmation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "Enter")  # 預設角色
+        # Drive the dock's own preset-submit path with a key the deterministic
+        # server gate rejects: the confirmation must stay off and the rejection
+        # must be rendered on the preset list.
+        page.evaluate(
+            "window.Elosern.creationDock.handleItem({presetKey: 'nonexistent_preset'})"
+        )
+        self.assertEqual(sent_action_count(page, "creation.preset"), 1)
+        result = self._wait_result(
+            page, lambda r: r["outcome"] == "rejected"
+        )
+        self.assertEqual(result["code"], "unknown_preset")
+        # The dock never entered the confirmation view and still shows the list
+        # with the rejection rendered.
+        self.assertEqual(page.locator(".creation-confirm").count(), 0)
+        self.assertGreaterEqual(page.locator("#creation-body .dock-row").count(), 1)
+        self.assertIn(
+            result["code"],
+            page.evaluate("document.getElementById('creation-form-message').textContent"),
+        )
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertEqual(self._dock_mode(page), "creation")
+
 
 class CustomCreationJourneys(CreationBrowserTest):
     @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
     def test_custom_form_keyboard_journey_to_activation(self):
         page = self._login_creation()
         install_outbound_recorder(page)
@@ -306,13 +339,60 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertEqual(payloads[0]["subrace"], "foxkin")
         self.assertEqual(payloads[0]["allocations"]["hp"], 25)
 
-        # The confirmation screen appears; Enter confirms activation.
-        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        # The confirmation screen appears only after the save result arrives;
+        # Enter confirms activation.
         self._wait_confirm_ready(page)
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Enter")
         self._wait_exploration(page)
         self.assertEqual(sent_action_count(page, "creation.activate"), 1)
         self.assertNotEqual(self._dock_mode(page), "creation")
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
+    def test_rejected_custom_save_stays_on_the_form_without_confirmation(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+
+        # A name containing the Evennia markup delimiter passes the advisory
+        # client validation but is rejected by the deterministic server gate.
+        page.evaluate("document.getElementById('creation-field-displayName').focus()")
+        page.keyboard.type("壞|名字")
+        _press(page, "Tab")
+        page.keyboard.type("24")
+        _press(page, "Tab")
+        page.keyboard.type("24")
+        for axis, value in (
+            ("hp", "50"), ("mp", "50"), ("sp", "50"),
+            ("atk_phys", "10"), ("agility", "10"), ("defense", "11"),
+        ):
+            page.evaluate(
+                "document.getElementById('creation-field-%s').focus()" % axis
+            )
+            page.keyboard.type(value)
+        page.evaluate("document.getElementById('creation-submit').focus()")
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "creation.custom"), 1)
+
+        result = self._wait_result(
+            page, lambda r: r["outcome"] == "rejected" and r["code"] == "markup_delimiter"
+        )
+        self.assertEqual(result["code"], "markup_delimiter")
+        # The dock never entered the confirmation view and still shows the form
+        # with the rejection rendered.
+        self.assertEqual(page.locator(".creation-confirm").count(), 0)
+        self.assertIsNotNone(page.locator("#creation-submit"))
+        self.assertIn(
+            "markup_delimiter",
+            page.evaluate("document.getElementById('creation-form-message').textContent"),
+        )
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
+        self.assertEqual(self._dock_mode(page), "creation")
+        self.assertIsNone(self._creation_panel(page)["draft"])
 
     @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
     def test_underage_actual_age_rejected_despite_disabled_client_validation(self):
@@ -492,7 +572,9 @@ class ConceptCreationJourneys(CreationBrowserTest):
         self.assertEqual(payloads[0]["race"], "human")
         self.assertNotIn("persona", payloads[0])
 
-        # Confirmation screen, then activation hands off to exploration.
+        # Confirmation screen, then activation hands off to exploration. The
+        # confirmation appears only after the custom save result arrives.
+        self._wait_confirm_ready(page)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Enter")
         self._wait_exploration(page)

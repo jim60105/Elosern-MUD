@@ -44,7 +44,7 @@ from world.rules.character_creation import (
     resolve_starting_profile,
 )
 from world.rules.clock import get_world_clock
-from world.rules.creation_wizard import read_draft
+from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
 
 
 def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -358,6 +358,126 @@ class CreationAdapterTests(CreationActionBase):
         self.assertEqual(self.character.race, None)
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
+
+
+class CreationFingerprintBindingTests(CreationActionBase):
+    """Server-side draft-fingerprint binding (fix-creation-finalization-safety D2)."""
+
+    def test_custom_save_returns_and_records_the_stored_fingerprint(self):
+        result = _creation_custom_adapter(self.character, custom_payload())
+        self.assertEqual(result["outcome"], "success")
+        fingerprint = draft_fingerprint(self.character)
+        self.assertEqual(result["fingerprint"], fingerprint)
+        self.assertEqual(
+            getattr(self.character.ndb, "elosern_confirmed_draft_fingerprint", None),
+            fingerprint,
+        )
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
+    @covers_requirement("creation-activation-gating::activation-is-bound-to-the-last-successfully-saved-draft")
+    def test_stale_confirmation_is_refused_without_activating(self):
+        _creation_custom_adapter(self.character, custom_payload())
+        # Another entry replaces the stored draft without going through the
+        # adapter, so the recorded confirmation now names an older draft.
+        save_custom_draft(
+            self.account,
+            self.character,
+            CharacterCreationRequest(
+                mode="custom",
+                display_name="較新草稿",
+                age=21,
+                apparent_age=21,
+                race="human",
+                subrace=None,
+                allocations=balanced_allocations("human"),
+            ),
+        )
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "confirmation_stale")
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertEqual(self.character.key, "pending-shell")
+
+    def test_activate_after_a_draft_saved_outside_the_adapter_is_refused(self):
+        # A draft stored by the deterministic save API directly (e.g. the
+        # Telnet path) never passed through a confirmed adapter save; activation
+        # must refuse rather than activate an unconfirmed draft.
+        save_custom_draft(
+            self.account,
+            self.character,
+            CharacterCreationRequest(mode="custom", **custom_payload()),
+        )
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_confirmed_save")
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+
+    def test_activate_without_any_draft_still_rejects_with_no_draft(self):
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_draft")
+        self.assertTrue(self.character.creation_pending)
+
+    def test_preset_save_also_binds_the_confirmation_fingerprint(self):
+        result = _creation_preset_adapter(self.character, {"preset_key": "human_wanderer"})
+        self.assertEqual(result["outcome"], "success")
+        fingerprint = draft_fingerprint(self.character)
+        self.assertEqual(result["fingerprint"], fingerprint)
+        self.assertEqual(
+            getattr(self.character.ndb, "elosern_confirmed_draft_fingerprint", None),
+            fingerprint,
+        )
+
+    @covers_requirement("creation-activation-gating::activation-is-bound-to-the-last-successfully-saved-draft")
+    @covers_requirement("webclient-character-creation-ui::web-activation-confirms-the-exact-draft-shown")
+    def test_activate_after_a_rejected_save_is_refused_without_activating(self):
+        # A rejected save invalidates the confirmation: the draft the player
+        # was trying to save was not stored, so a leftover confirmation must
+        # not be able to activate the older draft (webclient-character-
+        # creation-ui "Save rejection followed by activation is refused").
+        _creation_custom_adapter(self.character, custom_payload())
+        rejected = _creation_custom_adapter(
+            self.character, custom_payload(age=17)
+        )
+        self.assertEqual(rejected["outcome"], "rejected")
+        self.assertEqual(rejected["code"], "underage_age")
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_confirmed_save")
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertEqual(self.character.key, "pending-shell")
+
+    def test_rejected_preset_save_also_invalidates_the_confirmation(self):
+        _creation_preset_adapter(self.character, {"preset_key": "human_wanderer"})
+        rejected = _creation_preset_adapter(
+            self.character, {"preset_key": "nonexistent_preset"}
+        )
+        self.assertEqual(rejected["outcome"], "rejected")
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_confirmed_save")
+        self.assertTrue(self.character.creation_pending)
+
+    def test_rejected_concept_save_also_invalidates_the_confirmation(self):
+        from twisted.internet import defer
+
+        _creation_custom_adapter(self.character, custom_payload())
+        held = defer.Deferred()
+        with patch(
+            "server.ai_director_service.request_character_proposal",
+            return_value=held,
+        ):
+            deferred = _creation_concept_adapter(self.character, _concept_payload())
+            held.callback(None)
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "concept_unavailable")
+        activate = _creation_activate_adapter(self.character, {})
+        self.assertEqual(activate["outcome"], "rejected")
+        self.assertEqual(activate["code"], "no_confirmed_save")
 
 
 class CreationActivateIntegrationTests(CreationActionBase):
