@@ -161,7 +161,7 @@ def at_server_start():
     )
     from world.quests.bootstrap import sync_quest_runtime
     from world.rules.clock import get_world_clock
-    from world.rules.guild_economy import sync_guild_economy
+    from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
     from world.rules.npc_schedules import sync_npc_schedules
     from world.rules.onboarding import sync_guard_npc
 
@@ -171,6 +171,11 @@ def at_server_start():
     sync_all()
     sync_limbo()
     sync_grid()
+    # Restore persisted combat sessions BEFORE wilderness population
+    # reconciliation: a defeated population monster still referenced by a
+    # committed session must not be deleted or respawned first
+    # (fix-startup-session-restore-order D1).
+    restore_persisted_sessions()
     sync_wilderness()
     sync_service_interiors()
     sync_quest_runtime()

@@ -42,6 +42,7 @@ from world.quests.bootstrap import sync_quest_runtime
 from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.rules.combat_session import engage
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
@@ -405,3 +406,148 @@ class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixi
             if r.definition_key == "introductory_hunt" and r.state is QuestState.COMPLETED
         ]
         self.assertEqual(len(completed), 1)
+
+
+class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
+    """A committed wilderness kill survives a restart (audit finding F10).
+
+    Persisted combat sessions are restored before wilderness population
+    reconciliation runs, and reconciliation never deletes or respawns a monster
+    that a persisted session still references (fix-startup-session-restore-
+    order).
+    """
+
+    def setUp(self):
+        super().setUp()
+        from evennia.contrib.grid.wilderness.wilderness import (
+            WildernessScript,
+            create_wilderness,
+            enter_wilderness,
+        )
+
+        create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
+        self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=(60, 100), name=WILDERNESS_NAME)
+        self.room = self.char1.location
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.monster = next(
+            obj
+            for obj in self.script.get_objs_at_coordinates((60, 100))
+            if isinstance(obj, Monster)
+        )
+
+    def _crash_after_committed_terminal_round(self):
+        """Persist a killing blow without settling, as after a crash.
+
+        Mirrors the process state between round resolution and
+        ``settle_session``: the defeated monster's stored HP is 0 and the
+        record's ``rounds_elapsed`` already advanced, but ``active_combat`` is
+        still set and skip-safety is empty (fresh process).
+        """
+        from dataclasses import replace
+
+        from world.rules.combat_session import _persist, engage, read_session
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        engage(self.player, self.monster)
+        self.monster.traits.hp.current = 0
+        record = read_session(self.player)
+        _persist(self.player, replace(record, rounds_elapsed=record.rounds_elapsed + 1))
+        _BATTLEFIELDS.clear()
+
+    @covers_requirement("player-combat-session::startup-restores-combat-sessions-before-wilderness-population-reconciliation")
+    @covers_requirement("wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant")
+    def test_restart_settles_committed_victory_before_reconciliation(self):
+        from world.rules.combat_session import settle_session
+        from world.rules.guild_economy import restore_persisted_sessions
+
+        self._crash_after_committed_terminal_round()
+
+        # Even in the worst case (reconciliation running first, as a startup
+        # ordering regression), the defeated participant survives because the
+        # persisted session still references it.
+        sync_wilderness()
+        surviving = [
+            obj
+            for obj in self.script.get_objs_at_coordinates((60, 100))
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual([obj.pk for obj in surviving], [self.monster.pk])
+        self.assertEqual(self.monster.traits.hp.current, 0)
+
+        # Session restoration settles the committed victory, not a defeat.
+        settled: dict[str, str] = {}
+
+        def spy(actor, record, battlefield, outcome, logs=()):
+            settled["outcome"] = outcome
+            return settle_session(actor, record, battlefield, outcome, logs)
+
+        with patch("world.rules.combat_session.settle_session", side_effect=spy):
+            restore_persisted_sessions()
+        self.assertEqual(settled["outcome"], "victory")
+        self.assertIsNone(self.player.db.active_combat)
+
+        # Only afterwards does reconciliation respawn the defeated monster.
+        sync_wilderness()
+        respawned = [
+            obj
+            for obj in self.script.get_objs_at_coordinates((60, 100))
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(respawned), 1)
+        self.assertNotEqual(respawned[0].pk, self.monster.pk)
+        self.assertGreater(respawned[0].traits.hp.current, 0)
+
+    def test_restore_registers_live_session_skip_safety_state(self):
+        from world.rules.guild_economy import restore_persisted_sessions
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        # A mid-combat session (no terminal round) survives the restore step
+        # with its skip-safety registration intact (task 1.2).
+        engage(self.player, self.monster)
+        _BATTLEFIELDS.clear()
+        restore_persisted_sessions()
+        self.assertIsNotNone(self.player.db.active_combat)
+        self.assertIn(str(self.player.key), _BATTLEFIELDS)
+        self.assertIn(str(self.monster.key), _BATTLEFIELDS)
+
+    @covers_requirement("wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant")
+    def test_reconciliation_without_sessions_is_unchanged(self):
+        # No session references the entry monster: a dead population monster
+        # is still replaced by a fresh living one, exactly as before the guard.
+        dead_pk = self.monster.pk
+        self.monster.traits.hp.current = 0
+        ensure_population(self.script, (60, 100))
+        respawned = [
+            obj
+            for obj in self.script.get_objs_at_coordinates((60, 100))
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(respawned), 1)
+        self.assertNotEqual(respawned[0].pk, dead_pk)
+        self.assertGreater(respawned[0].traits.hp.current, 0)
+
+    @covers_requirement("wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant")
+    def test_session_on_another_coordinate_does_not_block_reconciliation(self):
+        # The guard is participant-scoped: an active session referencing the
+        # entry monster must not freeze reconciliation at a different
+        # coordinate.
+        engage(self.player, self.monster)
+        ensure_population(self.script, (61, 100))
+        other = next(
+            obj
+            for obj in self.script.get_objs_at_coordinates((61, 100))
+            if isinstance(obj, Monster)
+        )
+        other.traits.hp.current = 0
+        ensure_population(self.script, (61, 100))
+        respawned = [
+            obj
+            for obj in self.script.get_objs_at_coordinates((61, 100))
+            if isinstance(obj, Monster)
+        ]
+        self.assertEqual(len(respawned), 1)
+        self.assertNotEqual(respawned[0].pk, other.pk)
+        self.assertGreater(respawned[0].traits.hp.current, 0)

@@ -1,5 +1,7 @@
 """Source guards and command registration tests for the guild-economy layer (tasks 11.4, 11.6)."""
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 import unittest
 from pathlib import Path
@@ -53,6 +55,73 @@ class NoGenerativeImportTests(unittest.TestCase):
         source = inspect.getsource(at_server_start)
         self.assertLess(source.index("sync_quest_runtime()"), source.index("sync_guild_economy()"))
         self.assertLess(source.index("sync_grid()"), source.index("sync_guild_economy()"))
+
+    def test_startup_restores_sessions_before_wilderness_sync(self):
+        # Persisted combat sessions must be restored before wilderness
+        # population reconciliation so a defeated population monster is never
+        # deleted or respawned before its committed outcome settles (F10).
+        from server.conf.at_server_startstop import at_server_start
+
+        source = inspect.getsource(at_server_start)
+        self.assertLess(
+            source.index("restore_persisted_sessions()"),
+            source.index("sync_wilderness()"),
+        )
+
+    @covers_requirement("player-combat-session::startup-restores-combat-sessions-before-wilderness-population-reconciliation")
+    def test_startup_invokes_restore_before_wilderness_sync(self):
+        # Behavioral twin of the source-order guard above: every startup step
+        # is stubbed, so the assertion covers the actual invocation sequence of
+        # the composition root, not its source text.
+        from contextlib import ExitStack
+        from unittest.mock import patch
+
+        from server.conf.at_server_startstop import at_server_start
+
+        order: list[str] = []
+        targets = {
+            "world.lore.sync.sync_all": "sync_all",
+            "world.maps.bootstrap.sync_limbo": "sync_limbo",
+            "world.maps.bootstrap.sync_grid": "sync_grid",
+            "world.rules.guild_economy.restore_persisted_sessions": "restore_persisted_sessions",
+            "world.maps.bootstrap.sync_wilderness": "sync_wilderness",
+            "world.maps.bootstrap.sync_service_interiors": "sync_service_interiors",
+            "world.quests.bootstrap.sync_quest_runtime": "sync_quest_runtime",
+            "world.rules.guild_economy.sync_guild_economy": "sync_guild_economy",
+            "world.rules.onboarding.sync_guard_npc": "sync_guard_npc",
+            "world.rules.npc_schedules.sync_npc_schedules": "sync_npc_schedules",
+        }
+        patchers = [
+            patch("world.rules.clock.get_world_clock"),
+            patch("world.prompts.loader.load_prompt_library"),
+            patch("world.art.service.art_sync_all"),
+            patch("web.webclient.presentation.art_push.connect_art_push"),
+            *[
+                patch("server.conf.at_server_startstop." + name)
+                for name in (
+                    "_register_narrator_layer",
+                    "_register_npc_dialogue_layer",
+                    "_register_scenario_director_layer",
+                    "_register_character_creation_layer",
+                    "_register_scene_flavor_layer",
+                )
+            ],
+        ]
+        for target, name in targets.items():
+            patchers.append(
+                patch(
+                    target,
+                    side_effect=lambda *args, name=name, **kwargs: order.append(name),
+                )
+            )
+        with ExitStack() as stack:
+            for patcher in patchers:
+                stack.enter_context(patcher)
+            at_server_start()
+        self.assertLess(
+            order.index("restore_persisted_sessions"),
+            order.index("sync_wilderness"),
+        )
 
     def test_schedule_sync_runs_after_guard_npc_sync(self):
         from server.conf.at_server_startstop import at_server_start

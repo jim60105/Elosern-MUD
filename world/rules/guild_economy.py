@@ -3,8 +3,14 @@
 ``sync_guild_economy()`` is the single idempotent entry point called after
 quest synchronization. It reloads the validated catalog against the current
 quest definition registry, installs service content (interiors, NPC hosts,
-components, and initial merchant stock), registers the clock event sources,
-and restores or terminates persisted combat/examination sessions.
+components, and initial merchant stock), and registers the clock event
+sources.
+
+``restore_persisted_sessions()`` restores or terminates persisted
+combat/examination sessions. It is owned by this module but called from
+``at_server_start`` BEFORE wilderness population reconciliation, so a defeated
+population monster is never deleted or respawned before its committed session
+outcome is settled (fix-startup-session-restore-order D1).
 """
 
 from evennia.utils.create import create_object
@@ -137,7 +143,6 @@ def sync_guild_economy() -> None:
     register_catalog_offers(catalog)
     sync_service_content()
     _register_clock_sources()
-    _restore_persisted_sessions()
 
 
 def _register_clock_sources() -> None:
@@ -149,7 +154,7 @@ def _register_clock_sources() -> None:
     register_shop_hours()
 
 
-def _restore_persisted_sessions() -> None:
+def restore_persisted_sessions() -> None:
     """Restore or diagnostically terminate persisted combat/exam sessions (tasks 7.11/8.x)."""
     from typeclasses.characters import PlayerCharacter
 

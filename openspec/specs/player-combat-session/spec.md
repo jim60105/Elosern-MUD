@@ -112,9 +112,10 @@ quest planners. Undecided encounters SHALL pause for player input between ordina
 - **THEN** the session persists and no additional round runs before the player's next action
 
 ### Requirement: Startup restores valid sessions and terminates invalid references safely
-`sync_guild_economy()` SHALL reconstruct valid persisted sessions and skip-safety registration. Missing,
-deleted, moved, duplicated, or malformed participants SHALL produce a diagnostic and deterministic
-session termination without leaving the player blocked.
+The deterministic startup sequence SHALL reconstruct valid persisted sessions and skip-safety
+registration through `restore_persisted_sessions()`. Missing, deleted, moved, duplicated, or malformed
+participants SHALL produce a diagnostic and deterministic session termination without leaving the
+player blocked.
 
 #### Scenario: Reload preserves an active battle
 - **WHEN** the server reloads with a valid session whose participants remain in its room
@@ -123,6 +124,18 @@ session termination without leaving the player blocked.
 #### Scenario: Deleted enemy does not strand the player
 - **WHEN** startup finds that every recorded enemy dbref is missing
 - **THEN** it closes the session with a diagnostic and clears skip-safety state
+
+### Requirement: Startup restores combat sessions before wilderness population reconciliation
+The deterministic startup sequence SHALL restore persisted combat sessions (or otherwise protect
+their recorded participants) before any wilderness population reconciliation can delete or replace a
+monster referenced by an active session, so a committed terminal outcome is never converted into a
+defeat by the reconciliation.
+
+#### Scenario: Defeated population monster survives until session restore
+- **WHEN** a restart follows a terminal round against a wilderness population monster whose session
+  was not yet settled
+- **THEN** session restoration runs before population reconciliation and settles the committed
+  outcome, and the reconciliation does not delete or respawn the recorded participant first
 
 ### Requirement: Active sessions block movement and define pause, forfeit, and recovery outcomes
 A PlayerCharacter with an active combat session SHALL be unable to traverse or otherwise leave the
