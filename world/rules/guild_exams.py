@@ -17,7 +17,7 @@ from evennia.utils.logger import log_warn
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
-from typeclasses.npcs import NPC
+from typeclasses.npcs import NPC, ensure_npc_adult_identity
 from world.lore.races import RACE_REGISTRY
 from world.rules.guild import parse_guild_registration
 from world.rules.guild_config import get_catalog
@@ -209,6 +209,7 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
             )
         )
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
+        ensure_npc_adult_identity(opponent)
         opponent.location = actor.location
     except Exception:
         try:

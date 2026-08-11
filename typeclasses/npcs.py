@@ -14,6 +14,24 @@ from .entities import LivingEntity
 # current gauge value, never the maximum.
 _DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_level", "hp")
 
+# Canonical adult age baseline for procedurally spawned or synced NPCs
+# (fix-npc-adult-identity D1); every character must be an adult.
+NPC_ADULT_BASELINE = 18
+
+
+def ensure_npc_adult_identity(npc: Any) -> None:
+    """Ensure an NPC persists canonical adult age attributes (set-if-absent).
+
+    Sets ``age`` to 18 when missing and ``apparent_age`` to 18 when missing,
+    independently: an existing value is never overwritten, and a missing field
+    is never filled merely because the other field is absent. No-op for NPCs
+    whose identity already carries both values (import/characterization
+    paths), so it can run unconditionally on every spawn/sync site.
+    """
+    for key in ("age", "apparent_age"):
+        if npc.attributes.get(key) is None:
+            npc.attributes.add(key, NPC_ADULT_BASELINE)
+
 
 @dataclass(frozen=True)
 class DialogueExchangeResult:

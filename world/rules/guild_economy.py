@@ -16,7 +16,7 @@ from typeclasses.components import (
     Merchant,
     ScriptedDialogue,
 )
-from typeclasses.npcs import NPC
+from typeclasses.npcs import NPC, ensure_npc_adult_identity
 from world.maps.bootstrap import (
     GENERAL_STORE_TAG,
     GUILD_HALL_TAG,
@@ -50,6 +50,7 @@ def _sync_service_host(key, room, component_specs) -> NPC:
     if host.race is None:
         host.race = "human"
         host.apply_race_baseline()
+    ensure_npc_adult_identity(host)
     for component_class, kwargs in component_specs:
         if not host.components.has(component_class.name):
             host.components.add(component_class.create(host, **kwargs))
