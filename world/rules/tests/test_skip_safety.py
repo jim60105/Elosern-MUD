@@ -12,7 +12,7 @@ from world.rules.skip_safety import (
     evaluate_skip_safety,
     register_active_battlefield,
 )
-from .combat_fixtures import FakeGauge
+from .combat_fixtures import BattlefieldIsolation, FakeGauge
 
 
 def actor(key, hp=10, contents=()):
@@ -23,7 +23,7 @@ def actor(key, hp=10, contents=()):
     )
 
 
-class SkipSafetyTests(unittest.TestCase):
+class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     @covers_requirement("skip-safety-gate::a-safe-actor-s-skip-is-unconditionally-allowed", "skip-safety-gate::evaluate-skip-safety-rejects-a-skip-when-the-actor-is-actively-in-combat")
     @covers_requirement("skip-safety-gate::fled-battlefield-membership-is-not-by-itself-a-reject-condition")
     @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")

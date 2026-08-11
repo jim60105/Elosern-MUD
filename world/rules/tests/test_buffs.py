@@ -2,6 +2,11 @@
 
 from tools.spec_traceability import covers_requirement
 
+import tempfile
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+
 from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -11,12 +16,86 @@ from world.rules.buffs import (
     BUFF_DEFINITIONS,
     RulebookBuff,
     _add_buff,
+    _apply_rate_modifier,
+    active_buff_keys_from_storage,
     blocks_action,
     entity_active_buffs,
     grant_conferred_growth_rate,
     growth_rate_multiplier,
+    load_buff_definitions,
     tick_buffs,
 )
+
+
+def _write_yaml(content: str) -> Path:
+    handle = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+    handle.write(content)
+    handle.close()
+    return Path(handle.name)
+
+
+class BuffDefinitionValidationTests(unittest.TestCase):
+    def test_non_list_root_is_rejected(self):
+        path = _write_yaml("key: value\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
+    def test_entry_without_key_is_rejected(self):
+        path = _write_yaml("- duration: 10\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
+    def test_duplicate_key_is_rejected(self):
+        path = _write_yaml("- key: a\n- key: a\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
+    def test_invalid_modifier_shape_is_rejected(self):
+        path = _write_yaml("- key: a\n  modifiers: {bogus: 1}\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
+    def test_unsupported_stacking_is_rejected(self):
+        path = _write_yaml("- key: a\n  stacking: wrong\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
+    def test_noop_rate_target_tick_does_nothing(self):
+        entity = SimpleNamespace(traits=SimpleNamespace())
+        _apply_rate_modifier(entity, {"target": "magic_level_growth", "delta": 1})
+
+    def test_unknown_rate_target_is_rejected(self):
+        entity = SimpleNamespace(traits=SimpleNamespace())
+        with self.assertRaises(NotImplementedError):
+            _apply_rate_modifier(entity, {"target": "bogus", "delta": 1})
+
+    def test_unique_per_source_requires_source_key(self):
+        entity = SimpleNamespace(buffs=SimpleNamespace(add=lambda *a, **k: None))
+        with self.assertRaises(ValueError):
+            _add_buff(entity, "conferred_growth_rate")
+
+    def test_storage_accessor_tolerates_missing_and_malformed_cache(self):
+        empty = SimpleNamespace(attributes=SimpleNamespace(get=lambda *a, **k: None))
+        self.assertEqual(active_buff_keys_from_storage(empty), set())
+        bad_root = SimpleNamespace(attributes=SimpleNamespace(get=lambda *a, **k: "nope"))
+        with self.assertRaises(TypeError):
+            active_buff_keys_from_storage(bad_root)
+        bad_entry = SimpleNamespace(
+            attributes=SimpleNamespace(get=lambda *a, **k: {"b": "nope"})
+        )
+        with self.assertRaises(TypeError):
+            active_buff_keys_from_storage(bad_entry)
+
+    def test_storage_accessor_skips_paused_and_zero_stack_buffs(self):
+        entity = SimpleNamespace(
+            attributes=SimpleNamespace(
+                get=lambda *a, **k: {
+                    "poisoned": {"definition_key": "poisoned", "paused": True},
+                    "fear": {"definition_key": "fear", "stacks": 0},
+                }
+            )
+        )
+        self.assertEqual(active_buff_keys_from_storage(entity), set())
 
 
 class BuffIntegrationTests(EvenniaTest):

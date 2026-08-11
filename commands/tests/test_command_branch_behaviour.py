@@ -136,6 +136,68 @@ class GuildCommandBranchTests(TestCase):
             command.func()
         self.assertIn("4 / 10 (升階 E)", command.caller.msg.call_args.args[0])
 
+    def test_parse_requested_type_defaults_and_rejects_unknown(self):
+        from commands.guild import _parse_requested_type
+
+        self.assertEqual(_parse_requested_type(""), "討伐")
+        self.assertEqual(_parse_requested_type("採集"), "採集")
+        self.assertIsNone(_parse_requested_type("烤肉"))
+
+    def test_resolve_deferred_sync_and_pending_paths(self):
+        from twisted.internet.defer import Deferred, fail, succeed
+        from twisted.python.failure import Failure
+
+        from commands.guild import _GuildRequestPendingError, _resolve_deferred
+        from server.ai_director_service import NoSuitableTemplateError
+
+        posted = SimpleNamespace(
+            definition=SimpleNamespace(display_name="討伐魔物", key="hunt")
+        )
+        caller = Mock()
+        caller.ndb.guild_request_pending = None
+
+        result = _resolve_deferred(succeed(posted), caller)
+        self.assertIs(result, posted)
+
+        with self.assertRaises(NoSuitableTemplateError):
+            _resolve_deferred(
+                fail(NoSuitableTemplateError("none")), caller
+            )
+
+        pending = Deferred()
+        caller.reset_mock()
+        with self.assertRaises(_GuildRequestPendingError):
+            _resolve_deferred(pending, caller)
+        self.assertIs(caller.ndb.guild_request_pending, pending)
+
+        pending.callback(posted)
+        caller.msg.assert_called_with(
+            "你張貼了一份委託：討伐魔物 （hunt）。用 guild list 查看。"
+        )
+
+    def test_resolve_pending_deferred_reports_named_and_generic_failures(self):
+        from twisted.internet.defer import Deferred
+
+        from commands.guild import _GuildRequestPendingError, _resolve_deferred
+        from server.ai_director_service import NoSuitableTemplateError
+
+        caller = Mock()
+        caller.ndb.guild_request_pending = None
+        pending = Deferred()
+        with self.assertRaises(_GuildRequestPendingError):
+            _resolve_deferred(pending, caller)
+        pending.addErrback(lambda failure: None)
+        pending.errback(NoSuitableTemplateError("none"))
+        caller.msg.assert_called_with("公會目前沒有適合你的委託。")
+
+        caller.reset_mock()
+        pending = Deferred()
+        with self.assertRaises(_GuildRequestPendingError):
+            _resolve_deferred(pending, caller)
+        pending.addErrback(lambda failure: None)
+        pending.errback(RuntimeError("boom"))
+        caller.msg.assert_called_with("委託未能完成，請稍後再試。")
+
 
 class CombatCommandBranchTests(TestCase):
     def test_engage_validates_state_target_and_maps_every_rule_reason(self):

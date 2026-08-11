@@ -323,6 +323,10 @@ class AdjustRelationIntentTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: the affinity
+        # writer reaches the rulebook load, which resolves
+        # ``introductory_hunt`` from the definition registry.
+        register_catalog()
         self.room = create_object(Room, key="affinity room")
         self.player = create_object(PlayerCharacter, key="affinity player")
         self.player.race = "human"

@@ -112,20 +112,22 @@ profiling and parallel-evaluation commands.
 ### Test runtime budget (measured, do not waste wall-clock)
 
 The full Evennia suite (`evennia test ... commands server typeclasses web
-world`) takes roughly **17 minutes serial** (2,525 tests) and **~2 minutes with
-`--parallel 4`** (~125 s, measured twice consecutively green). Serial remains
-canonical for final handoff evidence, but `--parallel 4 --noinput` is the
-default full-suite command during development. The managed browser suite is
-the slowest thing in the repo and dominates total runtime:
+world`) is now **3,104 tests**: ~152 s with `--parallel 4` including coverage
+instrumentation (the CI profile), and ~45 s with `--parallel 16` on the
+24-core development machine. Serial remains canonical for final handoff
+evidence, but `--parallel 4 --noinput` is the default full-suite command
+during development. The managed browser suite is the slowest thing in the repo
+and dominates total runtime (measured 3,465 s locally for the full 148-test
+run):
 
 - Each Playwright test boots a real Evennia server. Foundation browser tests
   share one server per process (~30–40s each); **combat browser tests boot one
   server per test** because a live combat session (or an abnormal transport
   close during combat) leaves the shared Evennia server in a state that corrupts
   later fresh logins. A combat test therefore takes ~35–70s each.
-- `web/tests/browser/test_browser_combat.py` (12 tests) ≈ 6–8 minutes;
-  `test_browser_combat_rejection.py` (4 tests) ≈ 4 minutes; the full browser
-  suite (`unittest discover -s web/tests/browser -t .`) is 20+ minutes.
+- The CI quality gate shards the browser suite across six parallel jobs by
+  `.github/browser-shards.json`; each test file has exactly one serial
+  execution owner (enforced by a top-level contract test).
 - Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are ~1s.
 - `tools/spec_traceability check` is seconds; the `verify --evidence` gate needs
   the full evidence run only at final handoff.

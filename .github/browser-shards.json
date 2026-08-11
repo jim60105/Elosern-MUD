@@ -1,0 +1,54 @@
+{
+  "shards": [
+    {
+      "index": 1,
+      "name": "combat",
+      "files": [
+        "web.tests.browser.test_browser_combat",
+        "web.tests.browser.test_browser_combat_rejection"
+      ]
+    },
+    {
+      "index": 2,
+      "name": "creation-layout",
+      "files": [
+        "web.tests.browser.test_browser_creation",
+        "web.tests.browser.test_browser_layout"
+      ]
+    },
+    {
+      "index": 3,
+      "name": "exploration-reconnect",
+      "files": [
+        "web.tests.browser.test_browser_exploration",
+        "web.tests.browser.test_browser_reconnect"
+      ]
+    },
+    {
+      "index": 4,
+      "name": "shell-actions-local-map-input-narrative",
+      "files": [
+        "web.tests.browser.test_browser_shell",
+        "web.tests.browser.test_browser_actions",
+        "web.tests.browser.test_browser_local_map",
+        "web.tests.browser.test_browser_input_narrative"
+      ]
+    },
+    {
+      "index": 5,
+      "name": "services-pointer",
+      "files": [
+        "web.tests.browser.test_browser_services",
+        "web.tests.browser.test_browser_pointer"
+      ]
+    },
+    {
+      "index": 6,
+      "name": "art-harness",
+      "files": [
+        "web.tests.browser.test_browser_art",
+        "web.tests.browser.test_harness"
+      ]
+    }
+  ]
+}

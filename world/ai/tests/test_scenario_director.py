@@ -45,6 +45,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.quests.tests._fixtures import RegistryIsolationMixin
 
 from tools.spec_traceability import covers_requirement
 
@@ -200,6 +201,28 @@ class ScenarioDirectorProposalTypeTests(unittest.TestCase):
         rebuilt = QuestBlueprint.from_payload(round_tripped)
         self.assertEqual(rebuilt, blueprint)
         self.assertNotIn("object at", json.dumps(payload))
+
+    def test_unknown_location_layer_fails_construction(self):
+        with self.assertRaises(ValueError):
+            BlueprintLocation(layer="nowhere")
+
+    def test_unknown_objective_kind_fails_construction(self):
+        with self.assertRaises(ValueError):
+            BlueprintObjective(kind="explode")
+
+    def test_objective_quantity_must_be_a_positive_integer(self):
+        with self.assertRaises(ValueError):
+            BlueprintObjective(kind="defeat", quantity=0)
+        with self.assertRaises(ValueError):
+            BlueprintObjective(kind="defeat", quantity=True)
+
+    def test_failure_conditions_must_stay_empty(self):
+        with self.assertRaises(ValueError):
+            BlueprintFailure(conditions=("something",))
+
+    def test_blueprint_requires_at_least_one_stage(self):
+        with self.assertRaises(ValueError):
+            _blueprint(stages=())
 
 
 class BlueprintCharacterizationTypeTests(unittest.TestCase):
@@ -368,6 +391,58 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         _reset_all()
 
     @covers_requirement("guardrail::semantic-validators-are-pluggable-and-layer-scoped")
+    @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
+    def test_malformed_rank_reward_and_item_shapes_are_rejected(self):
+        validators = scenario_director._VALIDATORS
+        self.assertTrue(validators["rank_known"]({"rank": 7}))
+        reward_errors = validators["reward_in_band"](
+            {"rank": "F", "reward": {"copper": True, "merit": -1}}
+        )
+        self.assertIn("reward copper must be an integer", reward_errors)
+        self.assertIn("reward merit must be a non-negative integer", reward_errors)
+        self.assertEqual(validators["reward_in_band"]({"reward": "nope"}), [])
+        self.assertEqual(validators["reward_items_known"]({"reward": {}}), [])
+        item_errors = validators["reward_items_known"](
+            {
+                "reward": {
+                    "items": [
+                        {"item_key": "healing_potion", "quantity": 0},
+                        {"item_key": "healing_potion", "quantity": 1},
+                        {"item_key": "no_such_item", "quantity": 1},
+                        "bogus",
+                    ]
+                }
+            }
+        )
+        self.assertIn(
+            "reward item 'healing_potion' quantity must be a positive integer",
+            item_errors,
+        )
+        self.assertIn("duplicate reward item key 'healing_potion'", item_errors)
+        self.assertIn("unknown reward item 'no_such_item'", item_errors)
+        self.assertIn("reward items must be objects", item_errors)
+
+    @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
+    def test_validators_tolerate_malformed_root_and_stage_shapes(self):
+        validators = scenario_director._VALIDATORS
+        self.assertEqual(
+            validators["rank_known"]("not-a-dict"),
+            ["quest rank None is not in GUILD_RANK_REGISTRY"],
+        )
+        self.assertEqual(validators["reward_in_band"]("not-a-dict"), [])
+        self.assertEqual(validators["reward_items_known"]("not-a-dict"), [])
+        for name in (
+            "archetype_known",
+            "npc_tier_known",
+            "monster_tier_known",
+            "anchor_known",
+            "defeat_selector",
+            "objective_selectors",
+            "stage_indices_contiguous",
+            "deadline_valid",
+        ):
+            self.assertEqual(validators[name]("not-a-dict"), [], name)
+
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_unknown_rank_is_rejected_and_retried_with_error_appended(self):
         client = FakeLLMClient()
@@ -570,8 +645,9 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
 
-class SceneBoundValidatorTests(unittest.TestCase):
+class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         _reset_all()
         register_scenario_director()
 
@@ -670,9 +746,6 @@ class SceneBoundValidatorTests(unittest.TestCase):
         validate_definition(compiled.definition)
         register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
-        QUEST_DEFINITION_REGISTRY.clear()
-        GUILD_OFFER_REGISTRY.clear()
-        SCENE_REQUIREMENT_REGISTRY.clear()
 
 
 class CharacterizationValidatorTests(unittest.TestCase):
@@ -1003,8 +1076,9 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
         self.assertTrue(failure.check(ScenarioDirectorNotRegisteredError))
 
 
-class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
+class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         _reset_all()
         register_scenario_director()
 
@@ -1046,15 +1120,50 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
         import importlib
         import sys
 
+        import world.ai
+
+        # Keep the pre-test module objects: re-importing replaces them in
+        # sys.modules and as attributes on the ``world.ai`` package, and
+        # invalidates the identities every other test in the process bound at
+        # import time (order-independent execution requires the original
+        # modules to be restored afterwards).
+        original = {
+            name: module
+            for name, module in sys.modules.items()
+            if name.startswith("world.ai.director_templates")
+            or name.startswith("world.ai.scenario_director")
+        }
         for module in list(sys.modules):
             if module.startswith("world.ai.director_templates") or module.startswith(
                 "world.ai.scenario_director"
             ):
                 del sys.modules[module]
-        pool = importlib.import_module("world.ai.director_templates")
-        self.assertTrue(pool.QUEST_TEMPLATE_POOL)
-        director = importlib.import_module("world.ai.scenario_director")
-        self.assertTrue(director.get_template_pool())
+        try:
+            pool = importlib.import_module("world.ai.director_templates")
+            self.assertTrue(pool.QUEST_TEMPLATE_POOL)
+            director = importlib.import_module("world.ai.scenario_director")
+            self.assertTrue(director.get_template_pool())
+        finally:
+            # Restore the pre-test modules and package attributes, and purge
+            # every probe-created module that did not exist before the test
+            # (a re-imported module that stays behind would bind a fresh
+            # scenario_director identity and break later tests in this
+            # process).
+            sys.modules.update(original)
+            for name, module in list(sys.modules.items()):
+                if name.startswith("world.ai.director_templates") or name.startswith(
+                    "world.ai.scenario_director"
+                ):
+                    if name not in original:
+                        del sys.modules[name]
+            for attribute in ("director_templates", "scenario_director"):
+                if not hasattr(world.ai, attribute):
+                    continue
+                original_module = original.get(f"world.ai.{attribute}")
+                if original_module is None:
+                    delattr(world.ai, attribute)
+                else:
+                    setattr(world.ai, attribute, original_module)
 
     @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
     def test_every_entry_compiles_to_a_registrable_definition(self):
@@ -1076,8 +1185,6 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
                     (compiled.definition.key, compiled.issuer_branch_key),
                     GUILD_OFFER_REGISTRY,
                 )
-        QUEST_DEFINITION_REGISTRY.clear()
-        GUILD_OFFER_REGISTRY.clear()
 
     @covers_requirement("scene-builder::the-hand-written-template-pool-gains-an-instance-layer-scene-so-offline-play-exercises-the-materializer")
     def test_instance_layer_template_validates_compiles_and_registers_with_requirements(self):
@@ -1127,9 +1234,6 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
             and requirements[0].location.kind is DestinationKind.BOUND_INSTANCE
         )
         self.assertTrue(requirements[0].npc_reqs)
-        QUEST_DEFINITION_REGISTRY.clear()
-        GUILD_OFFER_REGISTRY.clear()
-        SCENE_REQUIREMENT_REGISTRY.clear()
 
     @covers_requirement("scene-builder::the-hand-written-template-pool-gains-an-instance-layer-scene-so-offline-play-exercises-the-materializer")
     def test_offline_request_can_produce_a_materializable_instance_quest(self):
@@ -1198,6 +1302,78 @@ class ScenarioDirectorTemplatePoolTests(unittest.TestCase):
             for message in validator_fn(payload)
         ]
         self.assertTrue(errors, "an underage template must be rejected at registration")
+
+
+def _instance_payload():
+    """A valid instance-bound payload (registers scene requirements)."""
+    payload = _payload()
+    payload["stages"][0]["objective"] = {
+        "kind": "defeat",
+        "quantity": 1,
+        "monster_tier": None,
+    }
+    payload["stages"][0]["location_req"] = {
+        "layer": "instance",
+        "archetype": "forest_path",
+        "anchor_key": None,
+        "anchor_near": "capital_altoria",
+        "xyz": None,
+        "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+    }
+    payload["stages"][0]["npc_req"] = [
+        {"role": "bandit", "tier": "bandit", "disposition": None}
+    ]
+    return payload
+
+
+class RegistryRestoreRegressionTests(unittest.TestCase):
+    """Regression: registered generated content must not outlive its test.
+
+    The pre-fix scenario-director tests cleared the three process-global
+    registries destructively, so a later test in the same process (for example
+    the affinity-rulebook load in ``DisplayedStatsBlockTests``) saw empty
+    registries and failed. The single test below proves the restoration
+    contract directly, so it holds under any test ordering (serial, parallel,
+    shuffled, reversed).
+    """
+
+    @covers_requirement("evennia-test-optimization::tests-restore-process-global-registry-state")
+    def test_registries_hold_exactly_the_pre_test_contents_after_a_mutating_test(self):
+        from world.quests.compile import (
+            SCENE_REQUIREMENT_REGISTRY,
+            compile_quest_blueprint,
+            register_generated_quest,
+        )
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        class _GeneratedProbe(RegistryIsolationMixin, unittest.TestCase):
+            def runTest(self):
+                pass
+
+        quests_before = dict(QUEST_DEFINITION_REGISTRY)
+        offers_before = dict(GUILD_OFFER_REGISTRY)
+        requirements_before = dict(SCENE_REQUIREMENT_REGISTRY)
+
+        probe = _GeneratedProbe("runTest")
+        probe.setUp()
+        try:
+            compiled = compile_quest_blueprint(_instance_payload())
+            register_generated_quest(compiled)
+            self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
+            self.assertIn(
+                (compiled.definition.key, compiled.issuer_branch_key),
+                GUILD_OFFER_REGISTRY,
+            )
+        finally:
+            # The destructive pre-fix tests cleared the registries here; the
+            # addCleanup-registered restoration must bring back every entry
+            # even when an assertion above fails.
+            probe.doCleanups()
+
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), quests_before)
+        self.assertEqual(dict(GUILD_OFFER_REGISTRY), offers_before)
+        self.assertEqual(dict(SCENE_REQUIREMENT_REGISTRY), requirements_before)
 
 
 class ScenarioDirectorStartupRegistrationTests(unittest.TestCase):

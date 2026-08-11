@@ -55,6 +55,7 @@ from world.rules.party import (
     is_companion,
 )
 from world.rules.surfaces import read_counter_trait
+from .combat_fixtures import BattlefieldIsolation
 
 ALTORIA_BRANCH = "guild_branch_altoria"
 MOVE = CLOCK_YAML["command_defaults"]["move"]
@@ -73,11 +74,12 @@ def _reset_all():
     _OUTPUT_SCHEMAS.clear()
 
 
-class OfflinePartyQuestLoopTests(EvenniaCommandTestMixin, EvenniaTest):
+class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest):
     """The design §7 offline full loop: invite → follow → combat → turn-in → dismiss."""
 
     def setUp(self):
         super().setUp()
+        from world.quests.catalog import register_catalog
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
@@ -85,6 +87,7 @@ class OfflinePartyQuestLoopTests(EvenniaCommandTestMixin, EvenniaTest):
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         _reset_all()
         register_npc_dialogue()
+        register_catalog()
         sync_quest_runtime()
         self.hall = create_object(Room, key="公會大廳")
         self.hunt_ground = create_object(Room, key="南郊狩獵場")

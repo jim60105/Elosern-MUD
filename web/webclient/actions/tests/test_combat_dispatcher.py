@@ -17,6 +17,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_session import engage, read_session
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="dispatch player"):
@@ -46,7 +47,7 @@ class _FakeSession:
         self.sent.append(kwargs)
 
 
-class CombatDispatchIntegrationTests(EvenniaTest):
+class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="dispatch arena")

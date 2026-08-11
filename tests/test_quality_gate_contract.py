@@ -22,47 +22,79 @@ class QualityGateContractTests(unittest.TestCase):
         )
         triggers = workflow.get("on", workflow.get(True))
         self.assertEqual(set(triggers), {"push", "pull_request"})
-
-        job = workflow["jobs"]["quality-gate"]
-        self.assertEqual(job["runs-on"], "ubuntu-latest")
         self.assertEqual(workflow["permissions"], {"contents": "read"})
-        steps = {step["name"]: step for step in job["steps"]}
+
+        jobs = workflow["jobs"]
+        preflight = jobs["preflight"]
+        self.assertEqual(preflight["runs-on"], "ubuntu-latest")
+        self.assertIn("Validate OpenSpec", [s["name"] for s in preflight["steps"]])
+        self.assertIn(
+            "Validate static requirement traceability", [s["name"] for s in preflight["steps"]]
+        )
+        self.assertIn(
+            "Run Node DOM-independent test suite", [s["name"] for s in preflight["steps"]]
+        )
+        self.assertEqual(preflight["outputs"]["browser-shards"], "${{ steps.shards.outputs.matrix }}")
+
+        evennia_job = jobs["evennia"]
+        self.assertEqual(evennia_job["needs"], "preflight")
+        evennia_steps = {step["name"]: step for step in evennia_job["steps"]}
         self.assertEqual(
-            steps["Prepare Evennia runtime directories"]["run"],
+            evennia_steps["Prepare Evennia runtime directories"]["run"],
             "mkdir -p server/db server/logs",
         )
-        self.assertEqual(
-            steps["Configure traceability evidence path"]["run"],
-            'echo "OPENSPEC_TEST_EVIDENCE=$RUNNER_TEMP/spec-test-evidence.jsonl" >> "$GITHUB_ENV"',
+        self.assertIn(
+            "openspec validate --all --strict",
+            preflight["steps"][
+                [s["name"] for s in preflight["steps"]].index("Validate OpenSpec")
+            ]["run"],
         )
-        step_names = [step["name"] for step in job["steps"]]
-        self.assertLess(
-            step_names.index("Prepare Evennia runtime directories"),
-            step_names.index("Run full non-browser Evennia suite with coverage"),
+        self.assertIn(
+            "tools.spec_traceability check",
+            preflight["steps"][
+                [s["name"] for s in preflight["steps"]].index(
+                    "Validate static requirement traceability"
+                )
+            ]["run"],
         )
-        self.assertIn("openspec validate --all --strict", steps["Validate OpenSpec"]["run"])
-        self.assertIn("tools.spec_traceability check", steps["Validate static requirement traceability"]["run"])
-        self.assertIn("tools.spec_traceability verify", steps["Verify successful requirement execution"]["run"])
-        evennia_step = steps["Run full non-browser Evennia suite with coverage"]
+        self.assertIn(
+            "tools.spec_traceability verify",
+            jobs["gate"]["steps"][
+                [s["name"] for s in jobs["gate"]["steps"]].index(
+                    "Verify successful requirement execution"
+                )
+            ]["run"],
+        )
+        evennia_step = evennia_steps["Run full non-browser Evennia suite with coverage"]
         evennia_command = evennia_step["run"]
-        self.assertEqual(
+        self.assertIn(
+            "coverage run",
             evennia_command,
-            "uv run --locked coverage run -m evennia test --settings test_settings.py --noinput commands server typeclasses world web.webclient",
         )
+        self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_command)
+        self.assertIn("--parallel 4", evennia_command)
+        self.assertIn("commands server typeclasses world web.webclient", evennia_command)
         self.assertEqual(evennia_step["env"]["MUD_TEST_SETTINGS"], "1")
         self.assertNotIn("evennia test --settings test_settings.py .", evennia_command)
-        self.assertEqual(
-            steps["Run top-level regression suite with coverage"]["run"],
-            "uv run --locked coverage run -m unittest discover -s tests -t .",
+
+        top_level_job = jobs["top-level"]
+        top_level_step = next(
+            step for step in top_level_job["steps"]
+            if step["name"] == "Run top-level regression suite with coverage"
         )
-        self.assertIn("coverage report --fail-under=90", steps["Enforce aggregate coverage threshold"]["run"])
+        self.assertIn("unittest discover -s tests -t .", top_level_step["run"])
+
+        gate = jobs["gate"]
+        gate_step_names = [step["name"] for step in gate["steps"]]
+        gate_steps = {step["name"]: step for step in gate["steps"]}
+        self.assertIn("coverage report --fail-under=90", gate_steps["Enforce aggregate coverage threshold"]["run"])
         self.assertLess(
-            step_names.index("Enforce aggregate coverage threshold"),
-            step_names.index("Generate aggregate coverage XML"),
+            gate_step_names.index("Enforce aggregate coverage threshold"),
+            gate_step_names.index("Generate aggregate coverage XML"),
         )
         self.assertLess(
-            step_names.index("Generate aggregate coverage XML"),
-            step_names.index("Upload coverage reports to Codecov"),
+            gate_step_names.index("Generate aggregate coverage XML"),
+            gate_step_names.index("Upload coverage reports to Codecov"),
         )
 
     @covers_requirement(
@@ -82,26 +114,29 @@ class QualityGateContractTests(unittest.TestCase):
         workflow = yaml.safe_load(
             (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
         )
-        steps = {step["name"]: step for step in workflow["jobs"]["quality-gate"]["steps"]}
-        self.assertEqual(
-            steps["Run full non-browser Evennia suite with coverage"]["env"]["COVERAGE_FILE"],
-            ".coverage.evennia",
+        jobs = workflow["jobs"]
+        evennia_step = next(
+            step for step in jobs["evennia"]["steps"]
+            if step["name"] == "Run full non-browser Evennia suite with coverage"
         )
-        self.assertEqual(
-            steps["Run browser acceptance suite"]["env"]["COVERAGE_FILE"],
-            ".coverage.browser",
+        self.assertEqual(evennia_step["env"]["COVERAGE_FILE"], "coverage-evennia")
+        browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
+        browser_step = next(
+            step for step in browser_jobs[0]["steps"]
+            if step["name"].startswith("Run browser shard")
         )
-        self.assertEqual(
-            steps["Run top-level regression suite with coverage"]["env"]["COVERAGE_FILE"],
-            ".coverage.top-level",
+        self.assertIn("COVERAGE_FILE", browser_step["env"])
+        top_level_step = next(
+            step for step in jobs["top-level"]["steps"]
+            if step["name"] == "Run top-level regression suite with coverage"
         )
+        self.assertEqual(top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level")
+        gate_steps = {step["name"]: step for step in jobs["gate"]["steps"]}
+        self.assertIn("coverage combine", gate_steps["Combine coverage data"]["run"])
+        self.assertIn("coverage-evennia*", gate_steps["Combine coverage data"]["run"])
+        self.assertIn("tools.verify_coverage_roots", gate_steps["Verify coverage source roots"]["run"])
         self.assertEqual(
-            steps["Combine coverage data"]["run"],
-            "uv run --locked coverage combine .coverage.evennia .coverage.browser .coverage.top-level",
-        )
-        self.assertIn("tools.verify_coverage_roots", steps["Verify coverage source roots"]["run"])
-        self.assertEqual(
-            steps["Generate aggregate coverage XML"]["run"],
+            gate_steps["Generate aggregate coverage XML"]["run"],
             "uv run --locked coverage xml -o coverage.xml",
         )
 
@@ -111,7 +146,7 @@ class QualityGateContractTests(unittest.TestCase):
             (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
         )
         upload = next(
-            step for step in workflow["jobs"]["quality-gate"]["steps"]
+            step for step in workflow["jobs"]["gate"]["steps"]
             if step["name"] == "Upload coverage reports to Codecov"
         )
         self.assertEqual(

@@ -2,6 +2,29 @@
 
 from types import SimpleNamespace
 
+from world.rules.skip_safety import _BATTLEFIELDS
+
+
+class BattlefieldIsolation:
+    """Snapshot and restore the transient skip-safety battlefield registry.
+
+    ``world.rules.skip_safety._BATTLEFIELDS`` is keyed by entity keys, which
+    Evennia's test fixtures reuse across tests (every ``char1`` is ``"Char"``);
+    a combat test that engages without settling leaves a stale registration
+    that makes a later skip-safety evaluation in the same process report a
+    false "in combat". Every test that registers battlefields restores the
+    registry in teardown, and the restoration is registered via ``addCleanup``
+    so a failing ``setUp`` cannot leak either.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(self._restore_battlefields, dict(_BATTLEFIELDS))
+
+    def _restore_battlefields(self, snapshot):
+        _BATTLEFIELDS.clear()
+        _BATTLEFIELDS.update(snapshot)
+
 
 class FakeSkills:
     def __init__(self, values: dict[str, int], owned: list[str] | None = None):

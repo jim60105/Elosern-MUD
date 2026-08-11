@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
@@ -36,10 +37,11 @@ from world.rules.guild_exams import (
 )
 from world.rules.guild_offers import register_guild_offer
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 
 
-class ExamRegistryIsolation(QuestRegistryIsolation):
+class ExamRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
         register_catalog()
@@ -96,6 +98,50 @@ class ExamRecordTests(unittest.TestCase):
             with self.subTest(data=mutation):
                 with self.assertRaises(GuildExamError):
                     from_storage({**base, **mutation})
+
+    def test_malformed_record_shape_fails_closed(self):
+        base = {
+            "exam_id": "1:E:1",
+            "character_id": 1,
+            "target_rank": "E",
+            "requested_by": "command",
+            "opponent_id": 2,
+            "session_id": "guild_exam:1:1:E:1",
+            "state": "active",
+            "terminal_reason": None,
+        }
+        for mutation in (
+            "not-a-dict",
+            {"extra_field": 1},
+            {"target_rank": None},
+            {"opponent_id": True},
+            {"terminal_reason": 5},
+        ):
+            with self.subTest(data=mutation):
+                with self.assertRaises(GuildExamError):
+                    from_storage(mutation if isinstance(mutation, str) else {**base, **mutation})
+
+    def test_read_exams_tolerates_missing_and_rejects_duplicate_ids(self):
+        empty = SimpleNamespace(db=SimpleNamespace(guild_exams=None))
+        self.assertEqual(_read_exams(empty), [])
+
+        base = {
+            "exam_id": "1:E:1",
+            "character_id": 1,
+            "target_rank": "E",
+            "requested_by": "command",
+            "opponent_id": 2,
+            "session_id": "guild_exam:1:1:E:1",
+            "state": "active",
+            "terminal_reason": None,
+        }
+        duplicate = SimpleNamespace(db=SimpleNamespace(guild_exams=[base, base]))
+        with self.assertRaises(GuildExamError):
+            _read_exams(duplicate)
+
+        bad_root = SimpleNamespace(db=SimpleNamespace(guild_exams=5))
+        with self.assertRaises(GuildExamError):
+            _read_exams(bad_root)
 
 
 class ExamStartTests(ExamRegistryIsolation, EvenniaTest):

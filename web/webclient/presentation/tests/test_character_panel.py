@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.character import (
@@ -256,9 +257,16 @@ class CharacterSchemaTests(unittest.TestCase):
             validate_character(payload)
 
 
-class CharacterPresenterTests(EvenniaTest):
+class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: the affinity
+        # rulebook load (reached through guild registration) resolves
+        # ``introductory_hunt`` from the definition registry, so this class
+        # must not depend on an earlier test to have registered it.
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         get_world_clock()
         self.player = create_object(PlayerCharacter, key="角色狀態測試")
         self.player.race = "human"

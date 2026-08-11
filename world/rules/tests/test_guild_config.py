@@ -146,6 +146,22 @@ class MeritThresholdTests(unittest.TestCase):
         with self.assertRaises(GuildConfigError):
             validate_merit_thresholds(bad)
 
+    def test_missing_threshold_rank_is_rejected(self):
+        raw = raw_rulebook()["merit_thresholds"]
+        bad = {k: v for k, v in raw.items() if k != "E"}
+        with self.assertRaises(GuildConfigError):
+            validate_merit_thresholds(bad)
+
+    def test_unknown_threshold_rank_is_rejected(self):
+        bad = {**raw_rulebook()["merit_thresholds"], "X": 1}
+        with self.assertRaises(GuildConfigError):
+            validate_merit_thresholds(bad)
+
+    def test_non_integer_threshold_is_rejected(self):
+        bad = {**raw_rulebook()["merit_thresholds"], "E": True}
+        with self.assertRaises(GuildConfigError):
+            validate_merit_thresholds(bad)
+
 
 class ExamProfileTests(unittest.TestCase):
     def test_every_profile_stays_inside_its_lore_band(self):
@@ -187,6 +203,30 @@ class ExamProfileTests(unittest.TestCase):
         }
         with self.assertRaises(GuildConfigError):
             validate_exam_profiles(mutated)
+
+    def test_missing_profile_rank_is_rejected(self):
+        raw = raw_rulebook()["exam_profiles"]
+        bad = {k: v for k, v in raw.items() if k != "E"}
+        with self.assertRaises(GuildConfigError):
+            validate_exam_profiles(bad)
+
+    def test_unknown_profile_rank_is_rejected(self):
+        raw = raw_rulebook()["exam_profiles"]
+        bad = {**raw, "X": raw["E"]}
+        with self.assertRaises(GuildConfigError):
+            validate_exam_profiles(bad)
+
+    def test_non_mapping_profile_entry_is_rejected(self):
+        raw = raw_rulebook()["exam_profiles"]
+        bad = {**raw, "E": "nope"}
+        with self.assertRaises(GuildConfigError):
+            validate_exam_profiles(bad)
+
+    def test_empty_profile_skills_are_rejected(self):
+        raw = raw_rulebook()["exam_profiles"]
+        bad = {"E": {**raw["E"], "skills": []}, **{k: v for k, v in raw.items() if k != "E"}}
+        with self.assertRaises(GuildConfigError):
+            validate_exam_profiles(bad)
 
 
 class ShopRuleTests(unittest.TestCase):
@@ -245,6 +285,24 @@ class ShopRuleTests(unittest.TestCase):
         raw = raw_rulebook()["shops"]
         with self.assertRaises(GuildConfigError):
             validate_shop_configs([{**raw[0], "shop_key": "not_a_shop"}])
+
+    def test_shops_root_must_be_a_list(self):
+        with self.assertRaises(GuildConfigError):
+            validate_shop_configs({"altoria_general_store": {}})
+
+    def test_non_mapping_shop_entry_is_rejected(self):
+        with self.assertRaises(GuildConfigError):
+            validate_shop_configs(["nope"])
+
+    def test_duplicate_shop_key_is_rejected(self):
+        raw = raw_rulebook()["shops"]
+        with self.assertRaises(GuildConfigError):
+            validate_shop_configs(raw + [raw[0]])
+
+    def test_hour_at_or_above_day_length_is_rejected(self):
+        raw = raw_rulebook()["shops"]
+        with self.assertRaises(GuildConfigError):
+            validate_shop_configs([{**raw[0], "open_hour": 25}])
 
     def test_offer_not_in_shop_identity_is_rejected(self):
         raw = raw_rulebook()["shops"]

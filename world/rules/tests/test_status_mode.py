@@ -11,9 +11,10 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.context import PresentationContext
+from .combat_fixtures import BattlefieldIsolation
 
 
-class ModeDerivationTests(EvenniaTest):
+class ModeDerivationTests(BattlefieldIsolation, EvenniaTest):
     def _actor(self):
         actor = create_object(PlayerCharacter, key="mode actor")
         actor.race = "human"

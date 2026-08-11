@@ -67,6 +67,7 @@ from world.rules.combat_session import (
 )
 from world.rules.map_knowledge import encode_grid, encode_wild, parse_knowledge
 from world.rules.time_skip import MAX_WEB_SKIP_SECONDS
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _raw(**overrides):
@@ -250,7 +251,7 @@ class ExplorationValidatorTests(unittest.TestCase):
                     validator({field: "x"})
 
 
-class ExplorationActionAdapterTests(EvenniaTestCase):
+class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         from world.quests.catalog import register_catalog
 

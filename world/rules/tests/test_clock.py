@@ -229,8 +229,6 @@ class ClockTests(unittest.TestCase):
             _try_accrue_magic_study((), 60, AdvanceSource.SKIP)
 
     def test_invalid_settlement_interval_fails_module_validation(self):
-        import importlib
-
         import world.rules.clock as clock_module
         import world.rules.sexual_state as sexual_state
 
@@ -238,11 +236,12 @@ class ClockTests(unittest.TestCase):
         sexual_state.DECAY_CONFIG["fake_bad"] = {"interval_seconds": 0}
         try:
             with self.assertRaises(ValueError):
-                importlib.reload(clock_module)
+                clock_module._validate_settlement_intervals(
+                    clock_module.BUFF_DEFINITIONS, sexual_state.DECAY_CONFIG
+                )
         finally:
             sexual_state.DECAY_CONFIG.clear()
             sexual_state.DECAY_CONFIG.update(original)
-            importlib.reload(clock_module)
 
 
 class WorldClockPersistenceTests(EvenniaTest):

@@ -278,6 +278,13 @@ class DisplayedStatsBlockTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: the affinity
+        # rulebook load resolves ``introductory_hunt`` from the definition
+        # registry, so this class must not depend on an earlier test to have
+        # registered it (mirrors ``AffinityStageLineTests``).
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         self.room1.key = "測試房間"
         self.room1.save()
         self.char1.location = self.room1

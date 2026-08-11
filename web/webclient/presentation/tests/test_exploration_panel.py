@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
@@ -701,7 +702,7 @@ class ExplorationSchemaTests(unittest.TestCase):
             validate_exploration(payload)
 
 
-class ExplorationPresenterTests(EvenniaTestCase):
+class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

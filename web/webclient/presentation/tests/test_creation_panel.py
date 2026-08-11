@@ -167,6 +167,24 @@ class CreationPanelValidationTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_creation(payload)
 
+    def test_preset_card_empty_prose_and_subrace_bound_are_rejected(self):
+        base = _valid_payload()
+        base["presets"] = base["presets"][:1]
+        card = base["presets"][0]
+        for field in ("display_name", "race_description", "emphasis", "background"):
+            with self.subTest(field=field):
+                card[field] = "   "
+                with self.assertRaises(Exception):
+                    validate_creation(deepcopy(base))
+        card["display_name"] = "艾琳"
+        card["race_description"] = "描述"
+        card["emphasis"] = "配點"
+        card["background"] = "背景"
+        with self.subTest("subrace bound"):
+            card["subrace"] = "x" * (MAX_SUBRACE_KEY_CODE_POINTS + 1)
+            with self.assertRaises(Exception):
+                validate_creation(deepcopy(base))
+
     def test_name_and_adult_bounds_are_exact(self):
         for mutate, label in (
             (lambda c: c["name"].update(min_length=0), "min_length"),

@@ -8,6 +8,8 @@ service.
 
 from __future__ import annotations
 
+import time
+
 from playwright.sync_api import Page
 
 # Deterministic seeded account (see seed.py).
@@ -138,6 +140,32 @@ def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
 def store_state(page: Page) -> dict:
     """Return the current client store state."""
     return page.evaluate("Elosern.StateController.getState()")
+
+
+def wait_for_narrative_settled(page: Page, before: int, timeout: int = 30000) -> None:
+    """Wait until the narrative exceeds ``before`` characters and stops growing.
+
+    A plain length-exceeds wait races with the tail of a previous server
+    response on a loaded runner: a later assertion can observe a partially
+    settled narrative and misattribute the growth. This helper polls until two
+    consecutive reads agree (a quiet gap after the last append), then falls
+    back to the length-exceeds wait so a genuinely missing response still
+    fails loudly with a timeout.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    previous = None
+    while time.monotonic() < deadline:
+        current = len(page.locator(".elosern-narrative").inner_text())
+        if current > before and current == previous:
+            return
+        previous = current
+        page.wait_for_timeout(200)
+    page.wait_for_function(
+        "(before) => document.querySelector('.elosern-narrative')"
+        ".innerText.length > before",
+        arg=before,
+        timeout=timeout,
+    )
 
 
 def valid_status_panel(name: str, identity: str) -> dict:

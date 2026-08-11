@@ -118,6 +118,88 @@ the failure traceback from its worker. This is a correctness, isolation, and
 diagnostic failure, so parallel execution is rejected without spending more
 time on bare `--parallel`, clean-clone, evidence, or subprocess-coverage runs.
 
+### 2026-08-11: Quality-gate stabilization and parallel CI adoption
+
+The quality gate previously ran the entire non-browser Evennia suite serially
+with coverage in one job: at 3,004 tests this took **2,385 s (~40 min)** in CI
+and failed on two consecutive merges with order-dependent registry leaks. This
+change fixed the isolation defects, proved parallel equivalence, adopted the
+parallel profile in CI, and raised the aggregate coverage above the gate.
+
+**Isolation defects fixed (root causes of the CI failures):**
+
+- `OnboardingHuntIntegrationTests` ran `sync_guild_economy()` and restored only
+  `QUEST_DEFINITION_REGISTRY`, leaking the canonical `introductory_hunt` offer
+  into the process-global `GUILD_OFFER_REGISTRY`; a later test's conflicting
+  `×1` registration then raised `GuildOfferError`. All three registries
+  (`QUEST_DEFINITION_REGISTRY`, `GUILD_OFFER_REGISTRY`,
+  `SCENE_REQUIREMENT_REGISTRY`) are now snapshotted and restored through one
+  reusable `RegistryIsolationMixin` (`world/quests/tests/_fixtures.py`) whose
+  restoration is registered via `addCleanup` before any mutation, so a failing
+  `setUp` cannot leak either.
+- `test_scenario_director` cleared the three registries destructively without
+  restoring prior contents; those sites now use the mixin. The cold-start
+  module re-import test restored `sys.modules` but not the `world.ai` package
+  attributes, invalidating module identity for later tests; both are restored
+  now.
+- `test_clock` reloaded `world.rules.clock` in place, invalidating every class
+  identity other modules bound at import time; the module-level interval
+  validation was extracted into `_validate_settlement_intervals()` and the test
+  calls it directly instead of reloading.
+- Combat tests left stale entries in the process-global skip-safety
+  `_BATTLEFIELDS` registry (keyed by entity keys that Evennia's fixtures reuse,
+  e.g. every `char1` is `"Char"`), and tests calling `at_server_start()` or
+  `sync_guild_economy()` re-registered abandoned combat sessions. A
+  `BattlefieldIsolation` mixin now snapshots/restores `_BATTLEFIELDS` in every
+  combat-touching class and in every sync/startup caller.
+- Several classes reached the affinity-rulebook load (which resolves
+  `introductory_hunt`) without registering the quest catalog in their own
+  setup, failing on whatever worker ran them first; each now calls
+  `register_catalog()` in its own `setUp`.
+
+**Equivalence evidence (3,007 tests at the time, 3,104 after the coverage
+tests):** plain `--parallel 4` twice consecutively, `--shuffle 42`, `-r`
+(reversed), and additional `--parallel 16` runs all passed green. Requirement
+evidence collected under parallel workers combines into a parseable JSONL with
+no interleaved lines. Subprocess coverage (`coverage run
+--concurrency=multiprocessing --parallel-mode`) produces one sidecar per
+worker; `coverage combine` merges them and the combined report keeps the exact
+`commands server typeclasses web world` roots.
+
+**Wall time (CI-relevant profile):** the full non-browser Evennia suite runs in
+~152 s with `--parallel 4` including coverage instrumentation, versus the
+2,385 s serial CI step — an ~15x speedup. On the 24-core development machine
+`--parallel 16` runs the suite in ~45 s. The managed browser suite (148 tests,
+one real Evennia server per shard process, combat tests booting a dedicated
+server per test) was measured at 3,465 s (~58 min) locally and is sharded
+across six CI jobs by a committed manifest (`.github/browser-shards.json`);
+each shard remains the sole serial owner of its files, and a top-level
+regression test asserts every discovered browser test file belongs to exactly
+one shard.
+
+**Coverage:** the full three-entry-point aggregate (complete non-browser
+Evennia suite with subprocess coverage, complete managed browser suite, and
+the top-level regression suite) measured 88% at the start of this change and
+**91.06%** after adding focused tests for the largest uncovered branches in
+`commands/localized/` (account, general, help, xyzgrid commands), the
+scenario-director dataclass/validator shapes, the quest compile boundary,
+guild config/exam validation, buff definition validation, and the character
+creation panel. The browser suite's parent process contributes no measurable
+coverage to the five roots (the game code executes in the managed server
+subprocess), so the aggregate is dominated by the non-browser Evennia suite —
+exactly as the gate computed it before.
+
+**CI adoption:** the single quality-gate job became five: a fast `preflight`
+job (OpenSpec validation, static traceability checks, Node suite, shard-matrix
+computation), the `evennia` job (parallel profile with subprocess coverage),
+the six `browser` matrix shards, the `top-level` job, and a `gate` job that
+downloads every artifact, validates that each expected coverage and evidence
+artifact arrived non-empty, concatenates the evidence files in entry-point
+order, runs `spec_traceability verify`, combines every uploaded sidecar with
+`coverage combine`, verifies the coverage roots, enforces the aggregate 90%
+branch gate, and publishes Codecov XML from the combined data only. Serial
+execution remains the canonical final-handoff evidence profile.
+
 ### 2026-08: Parallel adopted after isolation fixes
 
 At 2,525 tests the serial suite had grown to ~1,033 s. Parallel was

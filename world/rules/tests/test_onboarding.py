@@ -53,6 +53,12 @@ def _guild_exterior():
 class OnboardingGridMixin:
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: scripted talk
+        # reaches the affinity rulebook load, which resolves
+        # ``introductory_hunt`` from the definition registry.
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         create_object(__import__("typeclasses.rooms", fromlist=["Room"]).Room, key="虛境", location=None)
         sync_grid()
         sync_service_interiors()

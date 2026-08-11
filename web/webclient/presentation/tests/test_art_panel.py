@@ -39,6 +39,7 @@ from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.combat_session import engage
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _valid_scene(**overrides):
@@ -188,7 +189,7 @@ def _monster(key="art goblin", hp=100):
     return monster
 
 
-class ArtPresenterTests(EvenniaTest):
+class ArtPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
@@ -403,7 +404,7 @@ class ArtPresenterTests(EvenniaTest):
         self.assertEqual(payload["reason"]["code"], "art_unavailable")
 
 
-class ArtSnapshotIntegrationTests(EvenniaTest):
+class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
     """Full-snapshot and combat-result atomicity integration (task 7.1)."""
 
     character_typeclass = PlayerCharacter

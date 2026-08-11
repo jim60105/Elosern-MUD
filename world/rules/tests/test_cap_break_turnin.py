@@ -12,6 +12,7 @@ role-selector matching, and fault-injection restore of caps and values.
 from tools.spec_traceability import covers_requirement
 
 from dataclasses import replace
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -24,6 +25,7 @@ from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestState, accept_quest, fulfill_record, read_records
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.affinity import (
     AffinitySource,
     apply_affinity_change,
@@ -31,6 +33,7 @@ from world.rules.affinity import (
 )
 from world.rules.affinity_config import load_config
 from world.rules.guild import register_adventurer, turn_in_quest
+from world.rules.guild_config import load_catalog_into_cache, register_catalog_offers
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
     GuildQuestOffer,
@@ -216,6 +219,62 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         self.assertEqual(record.cap, cap_snapshot)
         self.assertEqual(record.value, 30)
         self.assertEqual(self.player.db.wallet, 0)
+
+
+class OfferSyncIsolationRegressionTests(RegistryIsolationMixin, unittest.TestCase):
+    """Regression: catalog-offer registration must not leak from a failing setup.
+
+    The pre-fix CI failure: ``OnboardingHuntIntegrationTests`` registered the
+    canonical ×2 healing-potion offer and left it behind, so the conflicting
+    ×1 registration in ``CapBreakTurnInTests.setUp`` raised
+    ``GuildOfferError``. The single test below proves the restoration contract
+    directly, so it holds under any test ordering (serial, parallel, shuffled,
+    reversed). The class itself mutates the offer registry (the successful
+    conflicting registration at the end), so it restores the three registries
+    around every test.
+    """
+
+    @covers_requirement("evennia-test-optimization::tests-restore-process-global-registry-state")
+    def test_failing_setup_does_not_leak_the_canonical_offer(self):
+        from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
+
+        class _FailingSetupProbe(RegistryIsolationMixin, unittest.TestCase):
+            """A case whose setUp registers the catalog offers and then fails."""
+
+            def setUp(self):
+                super().setUp()
+                register_catalog()
+                register_catalog_offers(load_catalog_into_cache())
+                raise RuntimeError("injected failure after offer registration")
+
+            def runTest(self):
+                pass
+
+        quests_before = dict(QUEST_DEFINITION_REGISTRY)
+        offers_before = dict(GUILD_OFFER_REGISTRY)
+        requirements_before = dict(SCENE_REQUIREMENT_REGISTRY)
+
+        probe = _FailingSetupProbe("runTest")
+        result = unittest.TestResult()
+        probe.run(result)
+        self.assertEqual(len(result.errors), 1)
+
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), quests_before)
+        self.assertEqual(dict(GUILD_OFFER_REGISTRY), offers_before)
+        self.assertEqual(dict(SCENE_REQUIREMENT_REGISTRY), requirements_before)
+
+        # With the canonical offer gone, the conflicting ×1 registration that
+        # broke CI succeeds (the catalog definitions are re-registered exactly
+        # as ``CapBreakTurnInBase.setUp`` does).
+        register_catalog()
+        offer = GuildQuestOffer(
+            definition_key="introductory_hunt",
+            issuer_branch_key=ALTORIA_BRANCH,
+            reward=QuestReward(
+                copper=50, items=(ItemQuantity("healing_potion", 1),), merit=25
+            ),
+        )
+        register_guild_offer(offer)
 
 
 if __name__ == "__main__":

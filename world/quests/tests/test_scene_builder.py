@@ -35,6 +35,7 @@ from world.art.worker import drain_synchronous
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.maps.bootstrap import sync_grid
+from world.quests.catalog import register_catalog
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
     StageNpcCharacterization,
@@ -816,6 +817,10 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
 class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: guild
+        # registration reaches the affinity rulebook load, which resolves
+        # ``introductory_hunt`` from the definition registry.
+        register_catalog()
         create_object(Room, key="虛境", location=None)
         sync_grid()
         self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()

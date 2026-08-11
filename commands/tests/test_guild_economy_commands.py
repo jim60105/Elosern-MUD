@@ -30,11 +30,11 @@ from world.quests.transitions import apply_quest_log_replacement
 from world.rules.guild_config import CATALOG, load_catalog_into_cache
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY, register_guild_offer
 from world.rules.surfaces import write_counter_trait
-from world.rules.combat_session import engage
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.skills.equipment import list_items
 
 
-class CommandIsolation(QuestRegistryIsolation):
+class CommandIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
         register_catalog()

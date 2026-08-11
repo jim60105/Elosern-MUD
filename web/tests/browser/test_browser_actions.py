@@ -153,11 +153,18 @@ class ActionLockingTest(BrowserAcceptanceTest):
         self.assertEqual(state["revision"], revision_before)
 
         # The one-sync renderer recovery guard fires exactly once per episode.
-        first = page.evaluate(
-            "() => Elosern.StateController.requestResync('status')"
-        )
-        second = page.evaluate(
-            "() => Elosern.StateController.requestResync('status')"
+        # Both requests run in one page task: a server snapshot answering the
+        # first resync would legitimately end the failure episode (a rendered
+        # panel resets the guard), so the two calls must be atomic to observe
+        # the blocked second request.
+        first, second = page.evaluate(
+            """() => {
+                const controller = Elosern.StateController;
+                return [
+                    controller.requestResync('status'),
+                    controller.requestResync('status'),
+                ];
+            }"""
         )
         self.assertTrue(first, "first resync of an episode must be allowed")
         self.assertFalse(second, "a second resync in one episode must be blocked")

@@ -19,6 +19,7 @@ from world.rules.buffs import _add_buff
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.sexual_state import AROUSAL_LEVELS
+from .combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="preview player"):
@@ -37,7 +38,7 @@ def _monster(key="preview goblin", hp=100):
     return monster
 
 
-class ActionPreviewTests(EvenniaTest):
+class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="preview arena")

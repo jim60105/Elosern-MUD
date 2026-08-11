@@ -58,7 +58,9 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 self.server = None
 
     def _exploration_panel(self, page):
-        return store_state(page)["panels"]["exploration"]
+        # The panels mapping can be observed mid-snapshot-adoption without the
+        # exploration key; callers poll, so a missing panel reads as None.
+        return store_state(page)["panels"].get("exploration")
 
     def _wait_exploration_available(self, page, timeout=30000):
         deadline = time.monotonic() + timeout / 1000

@@ -21,14 +21,21 @@ CLOCK_YAML = yaml.safe_load(
     (Path(__file__).parent / "rulebook" / "clock.yaml").read_text(encoding="utf-8")
 )
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
-_INTERVALS = [
-    definition.tick_interval
-    for definition in BUFF_DEFINITIONS.values()
-    if definition.tick_interval is not None
-] + [config["interval_seconds"] for config in DECAY_CONFIG.values()]
-if any(not isinstance(interval, int) or interval <= 0 for interval in _INTERVALS):
-    raise ValueError(f"invalid settlement interval: {_INTERVALS!r}")
-SETTLEMENT_QUANTUM_SECONDS = gcd(*_INTERVALS)
+
+
+def _validate_settlement_intervals(buff_definitions, decay_config) -> int:
+    """Validate every settlement interval, returning their greatest common divisor."""
+    intervals = [
+        definition.tick_interval
+        for definition in buff_definitions.values()
+        if definition.tick_interval is not None
+    ] + [config["interval_seconds"] for config in decay_config.values()]
+    if any(not isinstance(interval, int) or interval <= 0 for interval in intervals):
+        raise ValueError(f"invalid settlement interval: {intervals!r}")
+    return gcd(*intervals)
+
+
+SETTLEMENT_QUANTUM_SECONDS = _validate_settlement_intervals(BUFF_DEFINITIONS, DECAY_CONFIG)
 _STAGE_ORDER = (
     "gauge_regen",
     "buff_ticks",

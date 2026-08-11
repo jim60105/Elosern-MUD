@@ -25,14 +25,12 @@ from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
-    SCENE_REQUIREMENT_REGISTRY,
     compile_quest_blueprint,
     register_generated_quest,
 )
 from world.quests.runtime import accept_quest
 from world.quests.scene_builder import apply_scene_flavor
-from world.quests.tests._fixtures import QuestRegistryIsolation
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.quests.tests._fixtures import RegistryIsolationMixin
 
 from commands.scene import CmdEnterScene
 from tools.spec_traceability import covers_requirement
@@ -298,14 +296,12 @@ def _instance_bound_payload(**overrides):
     return payload
 
 
-class SceneFlavorCommandCompositionTests(QuestRegistryIsolation, EvenniaTest):
+class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTest):
     """CmdEnterScene schedules exactly one generation on commit (design D2)."""
 
     def setUp(self):
         super().setUp()
         _install_scene_flavor()
-        self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
-        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         create_object("typeclasses.rooms.Room", key="虛境", location=None)
         sync_grid()
         self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
@@ -319,10 +315,6 @@ class SceneFlavorCommandCompositionTests(QuestRegistryIsolation, EvenniaTest):
         accept_quest(self.player, compiled.definition.key)
 
     def tearDown(self):
-        SCENE_REQUIREMENT_REGISTRY.clear()
-        SCENE_REQUIREMENT_REGISTRY.update(self._requirements_items)
-        GUILD_OFFER_REGISTRY.clear()
-        GUILD_OFFER_REGISTRY.update(self._offer_items)
         from world.ai import guardrail
 
         guardrail._semantic_validators.pop("scene_builder", None)

@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import TestCase
 
 from world.quests.catalog import register_catalog
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.affinity_config import (
     AffinityConfigError,
     load_config,
@@ -260,6 +261,31 @@ class AffinityConfigValidationTests(TestCase):
     def test_cap_break_non_integer_new_cap_is_rejected(self):
         base = self._cap_breaks_base()
         self._load_deviant(base.replace("new_cap: 150", "new_cap: many"))
+
+
+class AffinityRulebookSelfContainedLoadTests(RegistryIsolationMixin, TestCase):
+    """Regression: a rulebook load must not depend on an earlier test's state.
+
+    ``DisplayedStatsBlockTests``-style setup registers the quest catalog in
+    its own setup; that load succeeds even on a process whose registry was
+    never pre-registered. Before the isolation fix a destructive registry
+    ``clear()`` left the registry empty and the affinity-rulebook load raised
+    ``AffinityConfigError`` for ``introductory_hunt``.
+    """
+
+    @covers_requirement("evennia-test-optimization::tests-restore-process-global-registry-state")
+    def test_load_succeeds_after_self_registration_on_an_empty_registry(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+        # Simulate a process whose registry was never pre-registered: the
+        # pre-fix failure loaded the rulebook against an empty registry. The
+        # isolation mixin restores the pre-test contents afterwards.
+        QUEST_DEFINITION_REGISTRY.clear()
+        register_catalog()
+        config = load_config()
+        self.assertEqual(
+            config.cap_break_for("introductory_hunt")[0].new_cap, 150
+        )
 
 
 class AffinityConfigConstantsTests(TestCase):

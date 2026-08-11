@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from world.quests.catalog import INTRODUCTORY_HUNT, register_catalog
+from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -14,6 +15,7 @@ from world.quests.definitions import (
     RoomLocator,
     register_quest_definition,
 )
+from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
 
 class QuestRegistryIsolation:
@@ -32,6 +34,36 @@ class QuestRegistryIsolation:
         QUEST_DEFINITION_REGISTRY.clear()
         QUEST_DEFINITION_REGISTRY.update(self._registry_items)
         super().tearDown()
+
+
+#: The process-global registries shared across the whole test process.
+_PROCESS_GLOBAL_REGISTRIES = (
+    QUEST_DEFINITION_REGISTRY,
+    GUILD_OFFER_REGISTRY,
+    SCENE_REQUIREMENT_REGISTRY,
+)
+
+
+class RegistryIsolationMixin:
+    """Snapshot and restore the three process-global registries.
+
+    ``QUEST_DEFINITION_REGISTRY``, ``GUILD_OFFER_REGISTRY``, and
+    ``SCENE_REQUIREMENT_REGISTRY`` are module-global and shared across the
+    whole test process. The snapshot is taken in ``setUp`` and the restoration
+    is registered via ``addCleanup`` immediately, so even a ``setUp`` that
+    raises after mutating cannot leak registry state into later tests
+    (``tearDown`` is skipped when ``setUp`` fails; cleanups are not).
+    """
+
+    def setUp(self):
+        super().setUp()
+        snapshots = tuple(dict(registry) for registry in _PROCESS_GLOBAL_REGISTRIES)
+        self.addCleanup(self._restore_process_global_registries, snapshots)
+
+    def _restore_process_global_registries(self, snapshots):
+        for registry, snapshot in zip(_PROCESS_GLOBAL_REGISTRIES, snapshots):
+            registry.clear()
+            registry.update(snapshot)
 
 
 def defeat(tier="low", *, bound=False, quantity=1) -> QuestObjective:

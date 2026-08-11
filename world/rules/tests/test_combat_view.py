@@ -15,6 +15,7 @@ from world.rules.combat_view import (
     SECONDARY_ACTIONS,
     build_combat_view,
 )
+from .combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="view player"):
@@ -33,7 +34,7 @@ def _monster(key="view goblin", hp=100):
     return monster
 
 
-class CombatViewTests(EvenniaTest):
+class CombatViewTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="view arena")

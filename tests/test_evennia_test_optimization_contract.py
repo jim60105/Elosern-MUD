@@ -97,39 +97,118 @@ class TestOwnershipContractTests(unittest.TestCase):
         workflow = yaml.safe_load(
             (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
         )
-        steps = {step["name"]: step for step in workflow["jobs"]["quality-gate"]["steps"]}
-        browser = steps["Run browser acceptance suite"]
-        evennia = steps["Run full non-browser Evennia suite with coverage"]
-        top_level = steps["Run top-level regression suite with coverage"]
-
-        self.assertEqual(browser["env"]["COVERAGE_FILE"], ".coverage.browser")
-        self.assertIn("unittest discover -s web/tests/browser -t .", browser["run"])
-        self.assertNotIn("--parallel", browser["run"])
-        self.assertEqual(evennia["env"]["COVERAGE_FILE"], ".coverage.evennia")
-        self.assertIn("commands server typeclasses world web.webclient", evennia["run"])
-        self.assertIn("--noinput", evennia["run"])
-        self.assertNotIn(" commands server typeclasses web world", evennia["run"])
-        self.assertEqual(top_level["env"]["COVERAGE_FILE"], ".coverage.top-level")
+        jobs = workflow["jobs"]
+        self.assertEqual(jobs["evennia"]["needs"], "preflight")
+        self.assertEqual(jobs["top-level"]["needs"], "preflight")
         self.assertEqual(
-            steps["Combine coverage data"]["run"],
-            "uv run --locked coverage combine .coverage.evennia .coverage.browser .coverage.top-level",
+            jobs["gate"]["needs"], ["evennia", "browser", "top-level"]
         )
-        for step in (browser, evennia, top_level):
-            self.assertEqual(
-                step["env"]["OPENSPEC_TEST_EVIDENCE"],
-                "${{ env.OPENSPEC_TEST_EVIDENCE }}",
-            )
 
-        all_commands = [step.get("run", "") for step in workflow["jobs"]["quality-gate"]["steps"]]
-        browser_discovery = "unittest discover -s web/tests/browser -t ."
-        self.assertEqual(sum(command.count(browser_discovery) for command in all_commands), 1)
-        self.assertFalse(
-            any(
-                "evennia test" in command
-                and (" typeclasses web world" in command or command.rstrip().endswith(" web"))
-                for command in all_commands
-            )
+        browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
+        self.assertTrue(browser_jobs)
+        browser_strategy = browser_jobs[0]["strategy"]
+        self.assertFalse(browser_strategy.get("fail-fast", False))
+        self.assertIn(
+            "needs.preflight.outputs.browser-shards",
+            browser_strategy["matrix"]["include"],
         )
+        shards_step = next(
+            step for step in workflow["jobs"]["preflight"]["steps"]
+            if step["name"] == "Compute browser shard matrix"
+        )
+        self.assertIn("['shards']", shards_step["run"])
+
+        evennia_step = next(
+            step
+            for step in jobs["evennia"]["steps"]
+            if step["name"] == "Run full non-browser Evennia suite with coverage"
+        )
+        self.assertEqual(evennia_step["env"]["COVERAGE_FILE"], "coverage-evennia")
+        self.assertIn("commands server typeclasses world web.webclient", evennia_step["run"])
+        self.assertIn("--noinput", evennia_step["run"])
+        self.assertIn("--parallel 4", evennia_step["run"])
+        self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_step["run"])
+        self.assertNotIn(" commands server typeclasses web world", evennia_step["run"])
+        self.assertNotIn("web.tests.browser", evennia_step["run"])
+
+        top_level_step = next(
+            step
+            for step in jobs["top-level"]["steps"]
+            if step["name"] == "Run top-level regression suite with coverage"
+        )
+        self.assertEqual(top_level_step["env"]["COVERAGE_FILE"], "coverage-top-level")
+        self.assertIn("unittest discover -s tests -t .", top_level_step["run"])
+
+        browser_run = next(
+            step
+            for step in browser_jobs[0]["steps"]
+            if step["name"].startswith("Run browser shard")
+        )["run"]
+        self.assertIn("matrix.files", browser_run)
+        self.assertNotIn("--parallel", browser_run)
+        self.assertNotIn("discover -s web/tests/browser", browser_run)
+
+        gate = jobs["gate"]
+        gate_steps = {step["name"]: step for step in gate["steps"]}
+        self.assertIn("coverage combine", gate_steps["Combine coverage data"]["run"])
+        self.assertIn("coverage-evennia*", gate_steps["Combine coverage data"]["run"])
+        self.assertIn(
+            "spec_traceability verify",
+            gate_steps["Verify successful requirement execution"]["run"],
+        )
+        self.assertIn(
+            "fail-under=90",
+            gate_steps["Enforce aggregate coverage threshold"]["run"],
+        )
+
+        all_commands = []
+        for job in jobs.values():
+            for step in job.get("steps", []):
+                all_commands.append(step.get("run", ""))
+        browser_discovery = "unittest discover -s web/tests/browser -t ."
+        self.assertEqual(sum(command.count(browser_discovery) for command in all_commands), 0)
+
+    @covers_requirement(
+        "evennia-test-optimization::existing-quality-gates-remain-authoritative"
+    )
+    def test_browser_shard_manifest_owns_every_browser_test_file_exactly_once(self):
+        import json
+
+        manifest = json.loads(
+            (REPO_ROOT / ".github/browser-shards.json").read_text(encoding="utf-8")
+        )
+        shards = manifest["shards"]
+        self.assertGreaterEqual(len(shards), 2)
+        indices = [shard["index"] for shard in shards]
+        self.assertEqual(indices, sorted(indices))
+        self.assertEqual(len(indices), len(set(indices)), "shard indices must be unique")
+
+        browser_dir = REPO_ROOT / "web/tests/browser"
+        discovered = {path.stem for path in browser_dir.glob("test_*.py")}
+        self.assertTrue(discovered)
+        owned: set[str] = set()
+        for shard in shards:
+            for dotted in shard["files"]:
+                module = dotted.rsplit(".", 1)[-1]
+                self.assertIn(module, discovered, f"{dotted} is not a discovered file")
+                self.assertNotIn(
+                    module, owned, f"{module} is assigned to more than one shard"
+                )
+                owned.add(module)
+        self.assertEqual(
+            owned, discovered, "every discovered browser test file must be in a shard"
+        )
+
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
+        )
+        evennia = workflow["jobs"]["evennia"]
+        evennia_step = next(
+            step for step in evennia["steps"]
+            if step["name"] == "Run full non-browser Evennia suite with coverage"
+        )
+        self.assertIn("web.webclient", evennia_step["run"])
+        self.assertNotIn("web.tests.browser", evennia_step["run"])
 
 
 class TestOptimizationEvidenceTests(unittest.TestCase):

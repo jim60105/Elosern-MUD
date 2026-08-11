@@ -15,8 +15,10 @@ from world.maps.instance import (
     register_instance_reclamation,
     unpin_instance_room,
 )
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules import clock as clock_module
 from world.rules.clock import AdvanceSource, ScheduledEvent, get_world_clock
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 EXPECTED_STAGE_ORDER = (
     "gauge_regen",
@@ -33,7 +35,7 @@ EXPECTED_STAGE_ORDER = (
 BLOCKING_PIN = "quest:1:stage:0"
 
 
-class InstanceStageWiringTests(EvenniaTest):
+class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         clock_module._EVENT_SOURCES.pop("instance_reclamation", None)

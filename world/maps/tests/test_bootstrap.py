@@ -12,16 +12,25 @@ from server.conf.at_server_startstop import at_server_start
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.maps.altoria_capital import XYMAP_DATA
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
 NORTH_GATE_XYZ = (2, 4, "capital_altoria")
 
 
-class GridBootstrapTests(EvenniaTest):
+class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+    """Grid bootstrap tests.
+
+    ``at_server_start()`` runs the full startup synchronization (including
+    ``sync_guild_economy()``), so the process-global registries are snapshotted
+    and restored around every test.
+    """
+
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -191,7 +200,10 @@ class GridBootstrapTests(EvenniaTest):
         self.assertEqual(len(self._bridging_exits()), 2)
 
 
-class WildernessBootstrapTests(EvenniaTest):
+class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+    """Wilderness bootstrap tests (``at_server_start()`` mutates the shared
+    registries, so they are snapshotted and restored around every test)."""
+
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"

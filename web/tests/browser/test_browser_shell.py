@@ -9,6 +9,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_narrative_settled,
 )
 
 REQUIRED_SURFACES = (
@@ -108,10 +109,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_before.__len__(),
-        )
+        wait_for_narrative_settled(page, narrative_before.__len__())
         # Focus retained in the field, drawer still open, field cleared.
         self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
         self.assertTrue(
@@ -130,10 +128,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # A second command can be sent with no pointer interaction.
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_after.__len__(),
-        )
+        wait_for_narrative_settled(page, narrative_after.__len__())
         self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
         self.assertTrue(
             page.evaluate(

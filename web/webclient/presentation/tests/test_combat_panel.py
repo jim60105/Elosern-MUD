@@ -21,6 +21,7 @@ from web.webclient.presentation.registry import (
     build_production_registry,
 )
 from world.rules.combat_session import engage
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _valid_skill(**overrides):
@@ -357,7 +358,7 @@ def _monster(key="panel goblin", hp=100):
     return monster
 
 
-class ContextActionsPresenterTests(EvenniaTest):
+class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="panel arena")

@@ -20,6 +20,7 @@ from world.rules.combat_session import (
     resolve_target_token,
 )
 from world.rules.combat_view import build_combat_view
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="token player"):
@@ -38,7 +39,7 @@ def _monster(key="token goblin", hp=100):
     return monster
 
 
-class TokenParsingTests(EvenniaTest):
+class TokenParsingTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="token arena")
@@ -111,7 +112,7 @@ class TokenParsingTests(EvenniaTest):
         self.assertEqual(result, [self.monster])
 
 
-class CombatActionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="combat actions room")

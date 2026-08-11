@@ -39,6 +39,7 @@ from world.rules.guild_economy import sync_guild_economy
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.surfaces import read_counter_trait
 from world.rules.traits import get_display_value
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 class Phase4Isolation(QuestRegistryIsolation):
@@ -62,7 +63,7 @@ class Phase4Isolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class OfflinePhase4MilestoneTests(Phase4Isolation, EvenniaCommandTestMixin, EvenniaTest):
+class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         sync_guild_economy()

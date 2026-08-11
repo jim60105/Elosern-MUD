@@ -29,55 +29,58 @@ class BrowserVerificationContractTests(unittest.TestCase):
     )
     def test_workflow_installs_chromium_runs_node_and_browser_before_evidence(self):
         workflow = yaml.safe_load(_read(".github/workflows/quality-gate.yml"))
-        job = workflow["jobs"]["quality-gate"]
-        step_names = [step["name"] for step in job["steps"]]
-        steps = {step["name"]: step for step in job["steps"]}
+        jobs = workflow["jobs"]
+        preflight = jobs["preflight"]
+        preflight_names = [step["name"] for step in preflight["steps"]]
+        preflight_steps = {step["name"]: step for step in preflight["steps"]}
 
         self.assertLess(
-            step_names.index("Install Chromium for browser acceptance"),
-            step_names.index("Run browser acceptance suite"),
-            "Chromium must be installed before any Python runner that can "
-            "discover browser tests",
-        )
-        self.assertLess(
-            step_names.index("Install Chromium for browser acceptance"),
-            step_names.index("Run browser acceptance suite"),
-        )
-        self.assertLess(
-            step_names.index("Run Node DOM-independent test suite"),
-            step_names.index("Verify successful requirement execution"),
-        )
-        self.assertLess(
-            step_names.index("Run browser acceptance suite"),
-            step_names.index("Verify successful requirement execution"),
+            preflight_names.index("Run Node DOM-independent test suite"),
+            preflight_names.index("Compute browser shard matrix"),
+            "the Node suite runs in preflight before any execution job starts",
         )
         self.assertIn(
             "playwright install --with-deps chromium",
-            steps["Install Chromium for browser acceptance"]["run"],
+            jobs["browser"]["steps"][
+                [step["name"] for step in jobs["browser"]["steps"]].index(
+                    "Install Chromium for browser acceptance"
+                )
+            ]["run"],
         )
         self.assertEqual(
-            steps["Run Node DOM-independent test suite"]["run"],
+            preflight_steps["Run Node DOM-independent test suite"]["run"],
             "node --test web/static/webclient/js/tests/*.test.js",
         )
-        self.assertEqual(
-            steps["Run browser acceptance suite"]["run"],
-            "uv run --locked coverage run -m unittest discover -s web/tests/browser -t .",
+
+        browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
+        browser_run = next(
+            step for step in browser_jobs[0]["steps"]
+            if step["name"].startswith("Run browser shard")
+        )["run"]
+        self.assertIn("coverage run", browser_run)
+        self.assertIn("matrix.files", browser_run)
+
+        gate_names = [step["name"] for step in jobs["gate"]["steps"]]
+        self.assertLess(
+            gate_names.index("Verify successful requirement execution"),
+            gate_names.index("Enforce aggregate coverage threshold"),
         )
 
     @covers_requirement(
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"
     )
-    def test_browser_evidence_uses_the_shared_evidence_path(self):
+    def test_browser_evidence_uses_a_per_shard_evidence_path(self):
         workflow = yaml.safe_load(_read(".github/workflows/quality-gate.yml"))
-        steps = {
-            step["name"]: step for step in workflow["jobs"]["quality-gate"]["steps"]
-        }
-        browser_step = steps["Run browser acceptance suite"]
-        self.assertEqual(
-            browser_step["env"].get("OPENSPEC_TEST_EVIDENCE"),
-            "${{ env.OPENSPEC_TEST_EVIDENCE }}",
+        browser_jobs = [job for name, job in workflow["jobs"].items() if name.startswith("browser")]
+        browser_step = next(
+            step for step in browser_jobs[0]["steps"]
+            if step["name"].startswith("Run browser shard")
         )
-        self.assertEqual(browser_step["env"].get("COVERAGE_FILE"), ".coverage.browser")
+        self.assertIn(
+            "evidence.browser-shard-",
+            browser_step["env"].get("OPENSPEC_TEST_EVIDENCE", ""),
+        )
+        self.assertIn("COVERAGE_FILE", browser_step["env"])
         self.assertNotIn("--parallel", browser_step["run"])
 
     @covers_requirement(
@@ -85,21 +88,28 @@ class BrowserVerificationContractTests(unittest.TestCase):
     )
     def test_existing_gates_remain_required_without_failure_suppression(self):
         workflow = yaml.safe_load(_read(".github/workflows/quality-gate.yml"))
-        job = workflow["jobs"]["quality-gate"]
-        step_names = [step["name"] for step in job["steps"]]
-        for required in (
-            "Validate OpenSpec",
-            "Validate static requirement traceability",
-            "Run full non-browser Evennia suite with coverage",
-            "Run top-level regression suite with coverage",
-            "Verify successful requirement execution",
-            "Verify coverage source roots",
-            "Enforce aggregate coverage threshold",
-            "Upload coverage reports to Codecov",
-        ):
-            self.assertIn(required, step_names, f"gate {required!r} is missing")
+        jobs = workflow["jobs"]
+        required = {
+            "preflight": (
+                "Validate OpenSpec",
+                "Validate static requirement traceability",
+            ),
+            "evennia": ("Run full non-browser Evennia suite with coverage",),
+            "top-level": ("Run top-level regression suite with coverage",),
+            "gate": (
+                "Verify successful requirement execution",
+                "Verify coverage source roots",
+                "Enforce aggregate coverage threshold",
+                "Upload coverage reports to Codecov",
+            ),
+        }
+        for job_name, names in required.items():
+            step_names = [step["name"] for step in jobs[job_name]["steps"]]
+            for required_name in names:
+                self.assertIn(required_name, step_names, f"gate {required_name!r} is missing")
         combined = " ".join(
             step.get("run", "") + str(step.get("uses", ""))
+            for job in jobs.values()
             for step in job["steps"]
         )
         self.assertNotIn("continue-on-error", combined)
@@ -182,7 +192,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
     def test_workflow_pins_a_supported_node_version(self):
         workflow = yaml.safe_load(_read(".github/workflows/quality-gate.yml"))
         steps = {
-            step["name"]: step for step in workflow["jobs"]["quality-gate"]["steps"]
+            step["name"]: step for step in workflow["jobs"]["preflight"]["steps"]
         }
         self.assertEqual(
             steps["Install Node.js"]["with"]["node-version"], "24"

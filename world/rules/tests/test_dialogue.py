@@ -33,6 +33,14 @@ from world.rules.onboarding import run_scripted_talk, snapshot_for
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: scripted talk
+        # reaches the affinity rulebook load (through ``run_scripted_talk``),
+        # which resolves ``introductory_hunt`` from the definition registry,
+        # so this class must not depend on an earlier test to have registered
+        # it.
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         self.player = create_object(NPC, key="talker")
 
     def _scripted_host(self, dialogue_key: str = GUILD_STAFF_DIALOGUE_KEY) -> NPC:

@@ -41,8 +41,9 @@ from world.maps.wilderness_provider import (
 from world.quests.bootstrap import sync_quest_runtime
 from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestState, read_records
-from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.guild_economy import sync_guild_economy
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 ENTRY_XY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"].wilderness_xy
 
@@ -327,9 +328,15 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         self.assertIs(monsters[0].location, original.location)
 
 
-class OnboardingHuntIntegrationTests(QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
+class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaCommandTestMixin, EvenniaTest):
     """End-to-end onboarding hunt: register, accept, walk out the North Gate,
-    defeat the populated monster, and observe the quest complete."""
+    defeat the populated monster, and observe the quest complete.
+
+    ``setUp`` runs ``sync_guild_economy()``, which registers the canonical
+    catalog offer into the process-global ``GUILD_OFFER_REGISTRY``;
+    ``RegistryIsolationMixin`` restores all three registries (definitions,
+    offers, requirements) even when a later ``setUp`` step raises.
+    """
 
     def setUp(self):
         super().setUp()

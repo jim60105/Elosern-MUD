@@ -37,6 +37,12 @@ def _attach_staff(npc: NPC, branch_key: str = "guild_branch_altoria") -> NPC:
 class GuildRegistrationTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        # Register the quest catalog in this class's own setup: registration
+        # reaches the affinity rulebook load, which resolves
+        # ``introductory_hunt`` from the definition registry.
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         self.room = create_object(Room, key="guild lobby")
         self.player = create_object(PlayerCharacter, key="guild player")
         self.player.race = "human"

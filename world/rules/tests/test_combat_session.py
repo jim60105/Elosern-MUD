@@ -36,6 +36,7 @@ from world.rules.combat_session import (
 )
 from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
+from .combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="combat player"):
@@ -155,7 +156,7 @@ class CombatSessionIdTests(EvenniaTest):
             self.assertEqual(session_id_for(player, "hostile"), f"hostile:{player.pk}:42")
 
 
-class EngageTests(EvenniaTest):
+class EngageTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="forest")
@@ -203,7 +204,7 @@ class EngageTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, 0)
 
 
-class PlayerRoundTests(EvenniaTest):
+class PlayerRoundTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="arena")
@@ -287,7 +288,7 @@ class PlayerRoundTests(EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class ExplicitTargetContractTests(EvenniaTest):
+class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):
     """Regression tests for the explicit-list facade contract (tasks 2.2-2.3)."""
 
     def setUp(self):
@@ -397,7 +398,7 @@ class ExplicitTargetContractTests(EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class SessionPersistenceTests(EvenniaTest):
+class SessionPersistenceTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="battlefield room")
@@ -442,7 +443,7 @@ class SessionPersistenceTests(EvenniaTest):
         self.assertFalse(is_in_active_session(self.player))
 
 
-class PreflightSideEffectTests(EvenniaTest):
+class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="preflight room")
@@ -497,7 +498,7 @@ class PreflightSideEffectTests(EvenniaTest):
 _EVENT_LOGS_SENTINEL = ()
 
 
-class CommandSessionTests(QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
+class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1 = create_object(Room, key="cmd arena")

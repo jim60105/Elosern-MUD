@@ -44,7 +44,8 @@ env/
 # ==========================================
 # Tests, Coverage & Translations
 # ==========================================
-.coverage
+.coverage*
+coverage-*
 coverage.json
 coverage.xml
 .tox

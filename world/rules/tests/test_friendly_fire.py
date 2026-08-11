@@ -34,6 +34,7 @@ from world.rules.combat_session import (
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.party import AUTO_LEAVE_MESSAGE, PartyWriteError, join_party, party_ids
+from .combat_fixtures import BattlefieldIsolation
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
@@ -122,7 +123,7 @@ def _grant_affinity(npc, player, value):
     )
 
 
-class FriendlyFireBase(EvenniaTest):
+class FriendlyFireBase(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         register_catalog()

@@ -19,11 +19,13 @@ from world.maps.limbo import (
     LIMBO_KEY,
     LIMBO_LEGACY_KEY,
 )
+from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
 
 
-class LimboRoomTests(EvenniaTest):
+class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"

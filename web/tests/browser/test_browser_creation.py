@@ -132,6 +132,33 @@ class CreationBrowserTest(BrowserAcceptanceTest):
             % (page.evaluate("window.__elosernSent || []"), store_state(page))
         )
 
+    def _wait_confirm_ready(self, page, timeout=30000):
+        """Wait until the confirmation frame is mounted and the router unlocked.
+
+        The confirm screen renders synchronously with the submit, but the
+        router rejects Enter while the just-sent mutation is still in flight
+        (``confirm()`` emits ``locked``); on a loaded runner the server
+        response can arrive after the test's fixed delay and swallow the
+        confirmation. Polling for an unlocked router with the confirm frame
+        mounted makes the confirmation deterministic.
+        """
+        page.wait_for_function(
+            """() => {
+                const router = window.Elosern && window.Elosern.keyboard;
+                if (!router || !router.isMutationInFlight
+                    || !router.isAwaitingRevision) {
+                    return false;
+                }
+                if (router.isMutationInFlight() || router.isAwaitingRevision()) {
+                    return false;
+                }
+                const menu = router.currentMenu && router.currentMenu();
+                const confirm = document.querySelector('.creation-confirm');
+                return !!confirm && !!menu && !!menu.items && menu.items.length > 0;
+            }""",
+            timeout=timeout,
+        )
+
     def _wait_result(self, page, predicate, timeout=30000):
         deadline = time.monotonic() + timeout / 1000
         while time.monotonic() < deadline:
@@ -170,6 +197,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertEqual(payloads, [{"preset_key": "human_wanderer"}])
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
 
+        self._wait_confirm_ready(page)
         _press(page, "Enter")  # 確認啟用
         self._wait_exploration(page)
         self.assertEqual(sent_action_count(page, "creation.activate"), 1)
@@ -280,6 +308,7 @@ class CustomCreationJourneys(CreationBrowserTest):
 
         # The confirmation screen appears; Enter confirms activation.
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        self._wait_confirm_ready(page)
         _press(page, "Enter")
         self._wait_exploration(page)
         self.assertEqual(sent_action_count(page, "creation.activate"), 1)

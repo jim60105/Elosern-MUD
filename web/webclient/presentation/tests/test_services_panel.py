@@ -12,6 +12,7 @@ import unittest
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
@@ -580,7 +581,7 @@ class ServicesSchemaTests(unittest.TestCase):
             validate_services(payload)
 
 
-class ServicesPresenterTests(EvenniaTestCase):
+class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG

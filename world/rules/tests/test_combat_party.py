@@ -51,6 +51,7 @@ from world.rules.skip_safety import SkipRejectReason, _BATTLEFIELDS
 from world.rules.targeting import expand_target_shorthand
 
 from .combat_fixtures import FakeEntity
+from .combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="combat party player"):
@@ -96,7 +97,7 @@ def _damage_entries(logs):
     ]
 
 
-class EngagePartyTests(EvenniaTest):
+class EngagePartyTests(BattlefieldIsolation, EvenniaTest):
     """Task 1.4: allied-team collection on engage."""
 
     def setUp(self):
@@ -265,7 +266,7 @@ class EngagePartyTests(EvenniaTest):
         self.assertNotIn(str(companion.key), battlefield.fled)
 
 
-class KnockoutStateTests(EvenniaTest):
+class KnockoutStateTests(BattlefieldIsolation, EvenniaTest):
     """Tasks 2.7 and 3.3: per-entity nonlethal knockout as battlefield state."""
 
     def setUp(self):
@@ -437,7 +438,7 @@ class KnockoutStateTests(EvenniaTest):
         )
 
 
-class TerminalAndCleanupTests(EvenniaTest):
+class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTest):
     """Task 4.3: player-centric terminal rules and participant cleanup."""
 
     def setUp(self):

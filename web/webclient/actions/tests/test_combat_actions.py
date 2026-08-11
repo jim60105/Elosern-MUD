@@ -20,6 +20,7 @@ from web.webclient.actions.combat_actions import (
 )
 from world.rules.action import RejectReason
 from world.rules.combat_session import engage, read_session
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _player(key="adapter player"):
@@ -99,7 +100,7 @@ class CastPayloadValidationTests(unittest.TestCase):
             validate_forfeit_payload({"session_id": "hostile:1:0", "extra": 1})
 
 
-class CombatAdapterTests(EvenniaTest):
+class CombatAdapterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="adapter arena")

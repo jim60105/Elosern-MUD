@@ -18,9 +18,10 @@ from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.shop_hours import _boundary_ticks, settle_shop_hours
 from world.rules.caravan_arrivals import settle_caravan_arrivals
 from world.rules.guild_economy import sync_guild_economy
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
-class ClockRegistryIsolation(QuestRegistryIsolation):
+class ClockRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
         register_catalog()

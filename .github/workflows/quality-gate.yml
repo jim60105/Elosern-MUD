@@ -8,15 +8,14 @@ permissions:
   contents: read
 
 jobs:
-  quality-gate:
+  preflight:
     runs-on: ubuntu-latest
+    outputs:
+      browser-shards: ${{ steps.shards.outputs.matrix }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
-      - name: Configure traceability evidence path
-        run: echo "OPENSPEC_TEST_EVIDENCE=$RUNNER_TEMP/spec-test-evidence.jsonl" >> "$GITHUB_ENV"
 
       - name: Install Node.js
         uses: actions/setup-node@v7
@@ -40,12 +39,6 @@ jobs:
       - name: Sync locked environment
         run: uv sync --locked
 
-      - name: Install Chromium for browser acceptance
-        run: uv run --locked playwright install --with-deps chromium
-
-      - name: Prepare Evennia runtime directories
-        run: mkdir -p server/db server/logs
-
       - name: Validate OpenSpec
         run: openspec validate --all --strict
 
@@ -55,32 +48,202 @@ jobs:
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 
-      - name: Run browser acceptance suite
-        env:
-          COVERAGE_FILE: .coverage.browser
-          OPENSPEC_TEST_EVIDENCE: ${{ env.OPENSPEC_TEST_EVIDENCE }}
-        run: uv run --locked coverage run -m unittest discover -s web/tests/browser -t .
+      - name: Compute browser shard matrix
+        id: shards
+        run: >-
+          echo "matrix=$(uv run --locked python -c
+          "import json; print(json.dumps(json.load(open('.github/browser-shards.json'))['shards']))")"
+          >> "$GITHUB_OUTPUT"
+
+  evennia:
+    needs: preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.0"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install pinned Python
+        run: uv python install "$(<.python-version)"
+
+      - name: Sync locked environment
+        run: uv sync --locked
+
+      - name: Prepare Evennia runtime directories
+        run: mkdir -p server/db server/logs
 
       - name: Run full non-browser Evennia suite with coverage
         env:
-          COVERAGE_FILE: .coverage.evennia
+          COVERAGE_FILE: coverage-evennia
           MUD_TEST_SETTINGS: "1"
-          OPENSPEC_TEST_EVIDENCE: ${{ env.OPENSPEC_TEST_EVIDENCE }}
-        run: uv run --locked coverage run -m evennia test --settings test_settings.py --noinput commands server typeclasses world web.webclient
+          OPENSPEC_TEST_EVIDENCE: evidence.evennia.jsonl
+        run: >-
+          uv run --locked coverage run
+          --concurrency=multiprocessing --parallel-mode
+          -m evennia test --settings test_settings.py --noinput
+          --parallel 4 commands server typeclasses world web.webclient
+
+      - name: Upload coverage and evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: evennia-artifacts
+          if-no-files-found: error
+          path: |
+            coverage-evennia*
+            evidence.evennia.jsonl
+
+  browser:
+    needs: preflight
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.browser-shards) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.0"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install pinned Python
+        run: uv python install "$(<.python-version)"
+
+      - name: Sync locked environment
+        run: uv sync --locked
+
+      - name: Install Chromium for browser acceptance
+        run: uv run --locked playwright install --with-deps chromium
+
+      - name: Prepare Evennia runtime directories
+        run: mkdir -p server/db server/logs
+
+      - name: Run browser shard ${{ matrix.index }}
+        env:
+          COVERAGE_FILE: coverage-browser-shard-${{ matrix.index }}
+          OPENSPEC_TEST_EVIDENCE: evidence.browser-shard-${{ matrix.index }}.jsonl
+        run: uv run --locked coverage run -m unittest ${{ join(matrix.files, ' ') }}
+
+      - name: Upload coverage and evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-shard-${{ matrix.index }}-artifacts
+          if-no-files-found: error
+          path: |
+            coverage-browser-shard-${{ matrix.index }}*
+            evidence.browser-shard-${{ matrix.index }}.jsonl
+
+  top-level:
+    needs: preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.0"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install pinned Python
+        run: uv python install "$(<.python-version)"
+
+      - name: Sync locked environment
+        run: uv sync --locked
 
       - name: Run top-level regression suite with coverage
         env:
-          COVERAGE_FILE: .coverage.top-level
-          OPENSPEC_TEST_EVIDENCE: ${{ env.OPENSPEC_TEST_EVIDENCE }}
+          COVERAGE_FILE: coverage-top-level
+          OPENSPEC_TEST_EVIDENCE: evidence.top-level.jsonl
         run: uv run --locked coverage run -m unittest discover -s tests -t .
+
+      - name: Upload coverage and evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: top-level-artifacts
+          if-no-files-found: error
+          path: |
+            coverage-top-level*
+            evidence.top-level.jsonl
+
+  gate:
+    needs: [evennia, browser, top-level]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.0"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install pinned Python
+        run: uv python install "$(<.python-version)"
+
+      - name: Sync locked environment
+        run: uv sync --locked
+
+      - name: Download all execution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-artifacts"
+          merge-multiple: true
+
+      - name: Validate artifact completeness
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          check_glob() {
+            local label="$1" pattern="$2"
+            local files=(${pattern})
+            [ ${#files[@]} -gt 0 ] || { echo "missing ${pattern} for ${label}"; exit 1; }
+            for file in "${files[@]}"; do
+              test -s "$file" || { echo "${label} coverage artifact ${file} is empty"; exit 1; }
+            done
+          }
+          check_glob "evennia" 'coverage-evennia*'
+          check_glob "top-level" 'coverage-top-level*'
+          test -s evidence.evennia.jsonl || { echo "evidence.evennia.jsonl is missing or empty"; exit 1; }
+          test -s evidence.top-level.jsonl || { echo "evidence.top-level.jsonl is missing or empty"; exit 1; }
+          while read -r index; do
+            check_glob "browser-shard-${index}" "coverage-browser-shard-${index}*"
+            test -s "evidence.browser-shard-${index}.jsonl" || { echo "evidence.browser-shard-${index}.jsonl is missing or empty"; exit 1; }
+          done < <(uv run --locked python -c \
+            "import json; print('\n'.join(str(s['index']) for s in json.load(open('.github/browser-shards.json'))['shards']))")
+
+      - name: Concatenate requirement evidence in entry-point order
+        run: >-
+          cat evidence.evennia.jsonl evidence.browser-shard-*.jsonl evidence.top-level.jsonl
+          > evidence.combined.jsonl
 
       - name: Verify successful requirement execution
         run: >-
           uv run --locked python -m tools.spec_traceability verify
-          --evidence "$OPENSPEC_TEST_EVIDENCE"
+          --evidence evidence.combined.jsonl
 
       - name: Combine coverage data
-        run: uv run --locked coverage combine .coverage.evennia .coverage.browser .coverage.top-level
+        run: >-
+          uv run --locked coverage combine
+          coverage-evennia* coverage-browser-shard-* coverage-top-level*
 
       - name: Verify coverage source roots
         run: |

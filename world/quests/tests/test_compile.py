@@ -394,6 +394,130 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(bad)
 
+    def test_compiler_rejects_malformed_reward_shapes(self):
+        bad = _defeat_payload()
+        bad["reward"] = "lots"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["copper"] = True
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["merit"] = -1
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = "healing_potion"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = ["healing_potion"]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = [{"item_key": "", "quantity": 1}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = [{"item_key": "no_such_item", "quantity": 1}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = [{"item_key": "healing_potion", "quantity": 0}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["reward"]["items"] = [
+            {"item_key": "healing_potion", "quantity": 1},
+            {"item_key": "healing_potion", "quantity": 1},
+        ]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+    def test_compiler_rejects_malformed_location_shapes(self):
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"]["layer"] = "wilderness"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"] = {"layer": "grid"}
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"] = {
+            "layer": "grid",
+            "xyz": ["a", 1, "capital_altoria"],
+        }
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"] = {"layer": "grid", "xyz": [1, 2, "no_such_map"]}
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"] = {
+            "layer": "instance",
+            "anchor_key": "capital_altoria",
+            "xyz": None,
+        }
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["location_req"] = {"layer": "anchor", "anchor_key": None}
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+    def test_compiler_rejects_malformed_objective_and_npc_shapes(self):
+        bad = _defeat_payload()
+        bad["stages"][0]["objective"] = {"kind": "explode", "quantity": 1}
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["objective"]["monster_tier"] = "bogus"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["npc_req"] = "victim"
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["npc_req"] = [{"role": "", "tier": "civilian"}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["npc_req"] = [{"role": "victim", "tier": "bogus"}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["stages"][0]["npc_req"] = [{"role": "victim", "tier": "civilian", "disposition": 5}]
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
+        bad = _defeat_payload()
+        bad["quest_type"] = "採集"
+        bad["stages"][0]["objective"] = {"kind": "acquire", "quantity": 1, "item_key": "bogus"}
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(bad)
+
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     def test_raw_ai_shaped_dict_is_still_rejected_by_the_runtime_registry(self):
         with self.assertRaises(QuestDefinitionError):
