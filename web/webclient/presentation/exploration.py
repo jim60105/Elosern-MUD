@@ -488,17 +488,39 @@ def _bounded_display_name(obj: Any) -> str:
 
 
 def _move_rows(actor: Any) -> list[dict[str, Any]]:
-    """Serialize the bounded move exit list from the actor's current location."""
+    """Serialize the bounded move exit list from the actor's current location.
+
+    Wilderness rooms route every direction through the canonical destination
+    resolver (fix-wilderness-web-navigation): the contrib's self-loop exits
+    name the current room, and the registered gateway south exit actually
+    returns to the grid, so ``exit_obj.destination`` can never be trusted
+    there. A direction the resolver cannot route (out of bounds, gateway
+    without a grid room) is omitted, exactly like a missing destination room.
+    """
+    from typeclasses.rooms import TerrainRoom
+    from world.maps.wilderness_destination import (
+        normalize_wilderness_direction,
+        resolve_wilderness_destination,
+    )
+
     location = getattr(actor, "location", None)
     if location is None:
         return []
+    wilderness = isinstance(location, TerrainRoom)
     exits = sorted(location.exits, key=lambda exit_obj: (exit_obj.key or "", int(exit_obj.id)))
     rows: list[dict[str, Any]] = []
     for exit_obj in exits[:MAX_MOVE_EXITS]:
-        destination = exit_obj.destination
-        if destination is None:
+        if exit_obj.destination is None:
             continue
-        destination_node = _destination_node(destination)
+        if wilderness:
+            direction = normalize_wilderness_direction(exit_obj.key)
+            destination_node = (
+                resolve_wilderness_destination(location, direction)
+                if direction is not None
+                else None
+            )
+        else:
+            destination_node = _destination_node(exit_obj.destination)
         if destination_node is None:
             continue
         enabled = _traversable(exit_obj, actor)
