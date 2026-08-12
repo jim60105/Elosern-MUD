@@ -200,20 +200,28 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
+        # SELF shape is validated with the disguise context supplied, exactly
+        # as the out-of-combat cast path does (commands/action.py).
         self.player.db.skills = {"active": ["status_disguise"], "passive": []}
-        result = revalidate_submission(self.player, "status_disguise", context, [])
+        disguise_context = BattlefieldActionContext(
+            context.battlefield,
+            event_context={"disguise": {"atk_phys": 60}},
+        )
+        result = revalidate_submission(
+            self.player, "status_disguise", disguise_context, []
+        )
         self.assertTrue(result.enabled)
 
         # Player-facing SELF requires an empty list: an explicit actor target
         # (even the actor itself) is a shape mismatch, matching the facade.
         result = revalidate_submission(
-            self.player, "status_disguise", context, [self.player]
+            self.player, "status_disguise", disguise_context, [self.player]
         )
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
         result = revalidate_submission(
-            self.player, "status_disguise", context, [self.monster]
+            self.player, "status_disguise", disguise_context, [self.monster]
         )
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
@@ -251,6 +259,78 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
+
+    def test_context_requiring_skills_are_disabled_in_combat(self):
+        self.player.db.skills = {
+            "active": ["status_disguise", "dominion_art"],
+            "passive": [],
+        }
+        context = self._context()
+        # SELF submits an empty list; SINGLE submits one live candidate, the
+        # exact shapes the combat menu sends.
+        submitted = {
+            "status_disguise": [],
+            "dominion_art": [self.monster],
+        }
+        for skill_key, targets in submitted.items():
+            with self.subTest(skill_key=skill_key):
+                preview = preview_skill(
+                    self.player, skill_key, context, [self.monster]
+                )
+                self.assertFalse(preview.enabled)
+                self.assertIs(
+                    preview.reason, RejectReason.MISSING_EFFECT_CONTEXT
+                )
+                result = revalidate_submission(
+                    self.player, skill_key, context, targets
+                )
+                self.assertFalse(result.enabled)
+                self.assertIs(
+                    result.reason, RejectReason.MISSING_EFFECT_CONTEXT
+                )
+                preflight = ActionResolver.preflight(
+                    ActionRequest(
+                        self.player, skill_key, targets, context
+                    )
+                )
+                self.assertEqual(preflight.outcome, "rejected")
+                self.assertIs(
+                    preflight.reason, RejectReason.MISSING_EFFECT_CONTEXT
+                )
+
+    def test_context_requiring_skills_resolve_with_supplied_context(self):
+        self.player.db.skills = {
+            "active": ["status_disguise", "dominion_art"],
+            "passive": [],
+        }
+        context = self._context()
+        disguise_context = BattlefieldActionContext(
+            context.battlefield,
+            event_context={"disguise": {"atk_phys": 60}},
+        )
+        preview = preview_skill(
+            self.player, "status_disguise", disguise_context, [self.player]
+        )
+        self.assertTrue(preview.enabled)
+        preflight = ActionResolver.preflight(
+            ActionRequest(self.player, "status_disguise", [], disguise_context)
+        )
+        self.assertEqual(preflight.outcome, "success")
+
+        dominion_context = BattlefieldActionContext(
+            context.battlefield,
+            event_context={
+                "confer_skill_key": "body_enhancement",
+                "confer_scale": 0.1,
+                "confer_trait_keys": ("atk_phys",),
+            },
+        )
+        preflight = ActionResolver.preflight(
+            ActionRequest(
+                self.player, "dominion_art", [self.monster], dominion_context
+            )
+        )
+        self.assertEqual(preflight.outcome, "success")
 
 
 if __name__ == "__main__":

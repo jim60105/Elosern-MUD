@@ -35,6 +35,7 @@ class EffectRegistryTests(unittest.TestCase):
             "test_supported",
             lambda actor, targets, effect_id, context: [],
             frozenset({"traits"}),
+            requires_event_context=frozenset(),
         )
 
     def test_unsupported_surface_fails_at_registration(self):
@@ -43,6 +44,25 @@ class EffectRegistryTests(unittest.TestCase):
                 "test_inventory",
                 lambda actor, targets, effect_id, context: [],
                 frozenset({"inventory"}),
+                requires_event_context=frozenset(),
+            )
+
+    @covers_requirement("effect-context-validation::effect-handlers-declare-their-required-event-context")
+    def test_every_registered_handler_declares_its_context_requirements(self):
+        from world.rules.action import (
+            _EFFECT_HANDLERS,
+            _EFFECT_HANDLER_REQUIRED_CONTEXT,
+        )
+
+        self.assertEqual(
+            set(_EFFECT_HANDLER_REQUIRED_CONTEXT),
+            set(_EFFECT_HANDLERS),
+        )
+        for prefix, required in _EFFECT_HANDLER_REQUIRED_CONTEXT.items():
+            self.assertIsInstance(required, frozenset, prefix)
+            self.assertTrue(
+                all(isinstance(key, str) for key in required),
+                f"{prefix} declares non-string context keys",
             )
 
     @covers_requirement("action-resolution-pipeline::resolution-is-atomic-a-failure-at-any-step-leaves-zero-state-mutated", "targeting-validation::single-and-area-target-specs-filter-candidates-differently")
@@ -159,6 +179,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             "test_malformed",
             lambda actor, targets, effect_id, context: [object()],
             frozenset({"traits"}),
+            requires_event_context=frozenset(),
         )
         with self.assertRaises(Exception) as caught:
             _step5_effect_resolution(request, skill, [])

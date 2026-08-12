@@ -843,6 +843,33 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
         roll.assert_not_called()
         self.assertIsNone(result.event_log)
 
+    @covers_requirement("action-resolution-pipeline::preflight-rejects-missing-handler-context-before-any-round-cost")
+    def test_missing_effect_context_rejects_without_a_round_or_enemy_action(self):
+        self.player.db.skills = {
+            "active": ["status_disguise", "dominion_art"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        from world.rules.clock import WorldClock
+        from world.rules.combat_session import read_session
+
+        clock = WorldClock()
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            for skill_key in ("status_disguise", "dominion_art"):
+                with self.subTest(skill_key=skill_key):
+                    result = submit_player_action(
+                        self.player, skill_key, [self.monster]
+                    )
+                    self.assertEqual(result["outcome"], "rejected")
+                    self.assertIs(
+                        result["reason"], RejectReason.MISSING_EFFECT_CONTEXT
+                    )
+                    self.assertEqual(
+                        read_session(self.player).rounds_elapsed, 0
+                    )
+                    self.assertEqual(clock.tick, 0)
+                    self.assertEqual(self.monster.traits.hp.current, 100)
+
 
 # Sentinel used to prove no EventLog was created; kept local to avoid import.
 _EVENT_LOGS_SENTINEL = ()

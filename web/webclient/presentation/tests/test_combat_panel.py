@@ -447,6 +447,28 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(fire["disabled_reason"]["code"], "insufficient_resource")
         self.assertTrue(fire["disabled_reason"]["message"].strip())
 
+    @covers_requirement("webclient-combat-menu::combat-menu-availability-reflects-handler-context")
+    def test_context_requiring_skills_are_disabled_in_the_menu(self):
+        self.player.db.skills = {
+            "active": ["status_disguise", "dominion_art"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        by_key = {skill["key"]: skill for skill in payload["skills"]}
+        for skill_key in ("status_disguise", "dominion_art"):
+            with self.subTest(skill_key=skill_key):
+                skill = by_key[skill_key]
+                self.assertFalse(skill["enabled"])
+                self.assertEqual(
+                    skill["disabled_reason"]["code"],
+                    "missing_effect_context",
+                )
+                self.assertTrue(skill["disabled_reason"]["message"].strip())
+
     def test_presenter_isolation_on_missing_session(self):
         payload = self.registry.render(
             "context_actions",

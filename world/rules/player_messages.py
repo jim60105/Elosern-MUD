@@ -23,6 +23,7 @@ _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.ACTION_FORBIDDEN: "你目前無法行動。",
     RejectReason.UNKNOWN_EFFECT_ID: "這項技能的效果無法發動。",
     RejectReason.EFFECT_RESOLUTION_FAILED: "這項技能的效果無法發動。",
+    RejectReason.MISSING_EFFECT_CONTEXT: "目前的場合無法提供這項技能所需的情境。",
     RejectReason.RESOURCE_DEDUCTION_FAILED: "你的資源不足。",
     RejectReason.EVENT_LOG_CONSTRUCTION_FAILED: "這項行動無法完成。",
     RejectReason.TIME_COST_LOOKUP_FAILED: "這項行動無法完成。",

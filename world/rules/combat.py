@@ -332,6 +332,7 @@ register_effect_handler(
     "damage",
     _handle_damage,
     surfaces=frozenset({"traits"}),
+    requires_event_context=frozenset(),
 )
 
 

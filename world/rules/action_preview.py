@@ -24,6 +24,7 @@ from world.rules.action import (
     RejectReason,
     RejectedAction,
     _EFFECT_HANDLERS,
+    _EFFECT_HANDLER_REQUIRED_CONTEXT,
     _effect_prefix,
     _stored_trait_value,
 )
@@ -98,6 +99,15 @@ def _skill_wide_failure(
     for effect_id in skill.effects:
         if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:
             return RejectReason.UNKNOWN_EFFECT_ID, effect_id
+    event_keys = set(getattr(context, "event_context", None) or {})
+    for effect_id in skill.effects:
+        prefix = _effect_prefix(effect_id)
+        missing = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] - event_keys
+        if missing:
+            return (
+                RejectReason.MISSING_EFFECT_CONTEXT,
+                f"missing event_context key {sorted(missing)[0]!r}",
+            )
     seconds = SKILL_TIME_OVERRIDES.get(skill.key, DEFAULT_CAST_SECONDS)
     if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 0:
         return RejectReason.TIME_COST_LOOKUP_FAILED, f"{skill.key}: {seconds!r}"
