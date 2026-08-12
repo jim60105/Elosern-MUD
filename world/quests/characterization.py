@@ -16,12 +16,21 @@ import unicodedata
 from typing import Any
 
 from world.art.adult import ADULT_MINIMUM
+from world.art.subjects import (
+    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+    MAX_SUBJECT_KEY_BYTES,
+    MAX_SUBJECT_KEY_LENGTH,
+)
 
 # Bounded text/key caps for the characterization fields. ``stable_key`` obeys
-# the art-side subject-key rules (non-empty, no colon, no control characters)
-# plus an explicit length cap; ``display_name`` is bounded text.
+# the single shared art-side subject-key contract (fix-art-pipeline-contracts
+# D1): non-empty, no reserved separators, no control characters, at most 64
+# code points and at most 200 UTF-8 bytes -- exactly what
+# ``world/art/subjects.py`` enforces for every producer, so a compiled quest
+# key can never be rejected later at the queue or exceed the worker output
+# filename bound.
 MAX_DISPLAY_NAME_LENGTH = 64
-MAX_STABLE_KEY_LENGTH = 64
+MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 
 _AGE_FIELDS = ("age", "apparent_age")
 
@@ -57,8 +66,8 @@ def characterize_errors(
       ``ADULT_MINIMUM <= value <= lifespan_upper_bound``. A key present with a
       ``None`` value is not an absence and rejects.
     - ``portrait``, when declared, is a mapping with exactly one ``stable_key``
-      field whose value is bounded non-empty text without colons or control
-      characters.
+      field whose value obeys the shared subject-key contract (bounded
+      non-empty text, no reserved separators, no control characters).
     """
     errors: list[str] = []
 
@@ -103,8 +112,13 @@ def characterize_errors(
                 stable_key = portrait["stable_key"]
                 if stable_key is None or not isinstance(stable_key, str) or not stable_key:
                     errors.append("portrait.stable_key must be non-empty text")
-                elif ":" in stable_key:
-                    errors.append("portrait.stable_key must not contain ':'")
+                elif any(
+                    char in FORBIDDEN_SUBJECT_KEY_CHARACTERS for char in stable_key
+                ):
+                    errors.append(
+                        "portrait.stable_key must not contain '|', '/', ':', "
+                        "'{', or '}'"
+                    )
                 elif any(
                     not char.isprintable()
                     or unicodedata.category(char).startswith("C")
@@ -112,6 +126,11 @@ def characterize_errors(
                 ):
                     errors.append(
                         "portrait.stable_key must not contain control characters"
+                    )
+                elif len(stable_key.encode("utf-8")) > MAX_SUBJECT_KEY_BYTES:
+                    errors.append(
+                        f"portrait.stable_key exceeds the "
+                        f"{MAX_SUBJECT_KEY_BYTES}-byte UTF-8 bound"
                     )
                 elif len(stable_key) > MAX_STABLE_KEY_LENGTH:
                     errors.append(

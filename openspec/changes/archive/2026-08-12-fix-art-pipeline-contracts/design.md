@@ -14,7 +14,7 @@
 
 ## Decisions
 
-**D1 — Tighten `_validate_subject_key`** to reject `|`, `/`, `:`, `{`, `}`, and control characters, and keys longer than 64 characters; enforce the same rule at import validation (`world/imports/validate.py`) and quest characterization so invalid keys never reach the queue. This is the single shared key contract; the import/creation changes (`fix-import-key-validity`) mirror it.
+**D1 — Tighten `_validate_subject_key`** to reject `|`, `/`, `:`, `{`, `}`, and control characters, and keys longer than 64 characters; enforce the same rule at import validation (`world/imports/validate.py`) and quest characterization so invalid keys never reach the queue. This is the single shared key contract; the import/creation changes (`fix-import-key-validity`) mirror it. The contract adds a second, independent length bound: at most 200 UTF-8 bytes, so even a key of 4-byte characters keeps the worker output identity (`portrait/character/<key>.png` = 23 bytes plus the key) and the queue record key (`art:<full key>`) within the 255-byte filesystem `NAME_MAX` and Evennia varchar bounds (rubber-duck review). `world/art/subjects.py` hosts both constants; the import schema derives its pattern from them and `validate.py` mirrors the byte check a regex cannot express.
 
 **D2 — Wire length covers the full subject key.** The wire `subject_key` carries the full form (`<kind>:<key>`), so `MAX_SUBJECT_KEY` stays 128 and a producer key ≤ 64 plus the longest prefix (`portrait:character:` = 19 chars) always fits. Add a boundary round-trip test for every `ArtSubjectKind`. The media route needs no change because valid keys are single-segment.
 

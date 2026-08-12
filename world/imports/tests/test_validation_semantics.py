@@ -56,6 +56,28 @@ class SemanticValidationTests(TestCase):
                 self.assertFalse(report.is_valid)
                 self.assertIn("key", {issue.field for issue in report.rejections})
 
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_every_reserved_separator_and_overlong_key_rejects_without_an_entity(self):
+        from world.art.subjects import (
+            FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+            MAX_SUBJECT_KEY_BYTES,
+            MAX_SUBJECT_KEY_LENGTH,
+        )
+
+        for bad in (
+            *(f"a{char}b" for char in sorted(FORBIDDEN_SUBJECT_KEY_CHARACTERS)),
+            "x" * (MAX_SUBJECT_KEY_LENGTH + 1),
+            # 64 four-byte characters pass the code-point bound but exceed the
+            # UTF-8 byte bound that keeps worker filenames within NAME_MAX.
+            "😀" * (MAX_SUBJECT_KEY_BYTES // 4 + 1),
+        ):
+            with self.subTest(key=bad[:8]):
+                record = example_record()
+                record["key"] = bad
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+                self.assertIn("key", {issue.field for issue in report.rejections})
+
     @covers_requirement("import-validation::key-charset-is-checked-at-import-validation")
     def test_format_and_private_use_characters_in_keys_reject_like_creation(self):
         for bad in ("a\u200b", "a\ue000", "a\ud800"):
