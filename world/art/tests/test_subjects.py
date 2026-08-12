@@ -6,6 +6,9 @@ import unittest
 from evennia.utils.test_resources import EvenniaTest
 
 from world.art.subjects import (
+    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+    MAX_SUBJECT_KEY_BYTES,
+    MAX_SUBJECT_KEY_LENGTH,
     ArtSubject,
     ArtSubjectError,
     ArtSubjectKind,
@@ -41,7 +44,12 @@ class SubjectParsingTests(unittest.TestCase):
         for bad in (
             "scene:",
             "scene:a:b",
+            "scene:a/b",
+            "scene:a|b",
+            "scene:a{b",
+            "scene:a}b",
             "scene:bad\x00key",
+            "scene:" + "x" * (MAX_SUBJECT_KEY_LENGTH + 1),
             "portrait:character:",
             "portrait:character:a:b",
             "unknown:key",
@@ -60,6 +68,79 @@ class SubjectParsingTests(unittest.TestCase):
         self.assertNotEqual(scene.full(), character.full())
         self.assertNotEqual(scene.full(), monster.full())
         self.assertNotEqual(character.full(), monster.full())
+
+
+class StableKeyContractTests(unittest.TestCase):
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_boundary_length_key_round_trips_for_every_kind(self):
+        key = "x" * MAX_SUBJECT_KEY_LENGTH
+        for kind in ArtSubjectKind:
+            with self.subTest(kind=kind):
+                subject = ArtSubject(kind, key)
+                self.assertEqual(subject.full(), f"{kind.value}:{key}")
+                self.assertEqual(parse_subject(subject.full()), subject)
+
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_utf8_byte_bound_keeps_worker_identities_within_name_max(self):
+        # 64 four-byte characters are legal code points but 256 UTF-8 bytes;
+        # the byte bound must reject them and keep the worst accepted key
+        # inside the 255-byte filesystem name limit for every kind.
+        key = "😀" * MAX_SUBJECT_KEY_LENGTH
+        with self.assertRaises(ArtSubjectError):
+            parse_subject(f"scene:{key}")
+        boundary = "😀" * (MAX_SUBJECT_KEY_BYTES // 4)
+        self.assertEqual(len(boundary.encode("utf-8")), MAX_SUBJECT_KEY_BYTES)
+        from world.art.worker import expected_output_identity
+
+        for kind in ArtSubjectKind:
+            with self.subTest(kind=kind):
+                subject = ArtSubject(kind, boundary)
+                identity = expected_output_identity(subject)
+                self.assertLessEqual(
+                    len(identity.encode("utf-8")), 255, identity
+                )
+                self.assertEqual(parse_subject(subject.full()), subject)
+
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_full_wire_subject_key_always_fits_the_wire_bound(self):
+        from web.webclient.presentation.art import MAX_SUBJECT_KEY
+
+        key = "x" * MAX_SUBJECT_KEY_LENGTH
+        for kind in ArtSubjectKind:
+            with self.subTest(kind=kind):
+                full = f"{kind.value}:{key}"
+                self.assertLessEqual(len(full), MAX_SUBJECT_KEY)
+        # The wire bound stays at 128; a 64-character producer key plus the
+        # longest kind prefix (portrait:character:) still fits with headroom.
+        self.assertEqual(MAX_SUBJECT_KEY, 128)
+
+    @covers_requirement("art-subject-model::subject-producer-validation-rejects-unrepresentable-keys")
+    def test_unrepresentable_keys_reject_with_a_named_error(self):
+        for bad in (
+            "a/b",
+            "a|b",
+            "a{b",
+            "a}b",
+            "x" * (MAX_SUBJECT_KEY_LENGTH + 1),
+            "😀" * (MAX_SUBJECT_KEY_BYTES // 4 + 1),
+        ):
+            with self.subTest(key=bad[:8]):
+                with self.assertRaises(ArtSubjectError):
+                    character_subject_for(
+                        self._character({"mode": "named", "stable_key": bad})
+                    )
+
+    @covers_requirement("art-subject-model::art-subject-keys-are-typed-namespaced-and-validated-before-queue-access")
+    def test_unvalidated_construction_is_rejected_at_the_dataclass(self):
+        with self.assertRaises(ArtSubjectError):
+            ArtSubject(ArtSubjectKind.SCENE, "a/b")
+        with self.assertRaises(ArtSubjectError):
+            ArtSubject(ArtSubjectKind.CHARACTER, "x" * (MAX_SUBJECT_KEY_LENGTH + 1))
+
+    def _character(self, policy):
+        character = Mock()
+        character.db.portrait_policy = policy
+        return character
 
 
 class RegistryResolutionTests(unittest.TestCase):

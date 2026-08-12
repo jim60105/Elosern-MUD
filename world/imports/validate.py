@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 from jsonschema import Draft202012Validator
 
+from world.art.subjects import MAX_SUBJECT_KEY_BYTES
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 
@@ -97,14 +98,16 @@ def _structural_issues(
     ]
 
 
-def _check_entity_key_printable(record: dict[str, Any]) -> list[Issue]:
-    """Reject keys with non-printable or Unicode control characters.
+def _check_entity_key_contract(record: dict[str, Any]) -> list[Issue]:
+    """Mirror the shared art subject-key contract for imported entity keys.
 
-    The schema pattern excludes C0/DEL/C1 controls structurally; this check
-    mirrors ``world.rules.character_creation._validate_name`` so the import
-    validator and player-created names reject the same character set
-    (fix-import-key-validity D1/D3): anything not ``isprintable()`` or in a
-    Unicode ``C*`` category (format, surrogate, private-use etc.) is rejected.
+    The schema pattern excludes the reserved separators, the 64-code-point
+    bound, and C0/DEL/C1 controls structurally; this check mirrors
+    ``world.art.subjects._validate_subject_key`` (fix-art-pipeline-contracts
+    D1) for everything a regex cannot express: anything not ``isprintable()``
+    or in a Unicode ``C*`` category (format, surrogate, private-use etc.), and
+    keys exceeding the UTF-8 byte bound so the worker output filename always
+    stays within the filesystem name-length limit.
     """
     key = record.get("key")
     if not isinstance(key, str):
@@ -117,6 +120,13 @@ def _check_entity_key_printable(record: dict[str, Any]) -> list[Issue]:
                     f"key {key!r} contains a non-printable or control character",
                 )
             ]
+    if len(key.encode("utf-8")) > MAX_SUBJECT_KEY_BYTES:
+        return [
+            Issue(
+                "key",
+                f"key {key!r} exceeds the {MAX_SUBJECT_KEY_BYTES}-byte UTF-8 bound",
+            )
+        ]
     return []
 
 
@@ -269,7 +279,7 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_structural_issues(record, CHARACTER_SCHEMA_V1))
     if report.rejections:
         return report
-    report.rejections.extend(_check_entity_key_printable(record))
+    report.rejections.extend(_check_entity_key_contract(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
     report.rejections.extend(_check_magic_cap(record))
@@ -283,7 +293,7 @@ def validate_world_entry(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_structural_issues(record, WORLD_SCHEMA_V1))
     if report.rejections:
         return report
-    report.rejections.extend(_check_entity_key_printable(record))
+    report.rejections.extend(_check_entity_key_contract(record))
     return report
 
 

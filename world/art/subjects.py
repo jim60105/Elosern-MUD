@@ -20,6 +20,23 @@ from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 
+# The single shared stable-key contract (fix-art-pipeline-contracts D1): every
+# producer of a portrait/scene stable key validates against these same rules.
+# ``world/imports/schema.py`` (imported entity keys) and
+# ``world/quests/characterization.py`` (quest portrait keys) consume this
+# constant set so no producer set can drift. A valid key survives the queue
+# record key, the worker output path, the media route, and the wire bound.
+#
+# Two independent length bounds: at most ``MAX_SUBJECT_KEY_LENGTH`` code
+# points (the wire bound counts code points) and at most
+# ``MAX_SUBJECT_KEY_BYTES`` UTF-8 bytes, so even 4-byte characters keep the
+# worker output identity (``portrait/character/<key>.png`` = 23 bytes plus
+# the key) and the queue record key (``art:<full key>``) within the 255-byte
+# filesystem ``NAME_MAX`` and Evennia varchar bounds, with margin.
+MAX_SUBJECT_KEY_LENGTH = 64
+MAX_SUBJECT_KEY_BYTES = 200
+FORBIDDEN_SUBJECT_KEY_CHARACTERS = frozenset("|/:{}")
+
 
 class ArtSubjectError(ValueError):
     """Raised when an art subject is malformed or unresolvable."""
@@ -40,16 +57,42 @@ class ArtSubject:
     kind: ArtSubjectKind
     key: str
 
+    def __post_init__(self) -> None:
+        # Construction-time validation so the queue and store APIs can never
+        # carry an unrepresentable key, even when a caller bypasses the typed
+        # producer helpers (parse_subject / *_subject_for).
+        _validate_subject_key(self.key)
+
     def full(self) -> str:
         """The serialized full subject key, e.g. ``scene:forest_path``."""
         return f"{self.kind.value}:{self.key}"
 
 
 def _validate_subject_key(key: str) -> None:
+    """Reject keys that cannot survive the queue, store path, or wire.
+
+    The rule set is the shared producer contract: non-empty text, at most
+    ``MAX_SUBJECT_KEY_LENGTH`` code points, at most ``MAX_SUBJECT_KEY_BYTES``
+    UTF-8 bytes, no reserved separators (``|``, ``/``, ``:``, ``{``, ``}``),
+    and no control characters. A key that passes here is always a single
+    media-route segment, always fits the wire subject-key bound when combined
+    with any kind prefix, and always keeps the worker output filename within
+    the filesystem name-length limit.
+    """
     if not isinstance(key, str) or not key:
         raise ArtSubjectError("an art subject key must be non-empty text")
-    if ":" in key:
-        raise ArtSubjectError("an art subject key must not contain ':'")
+    if len(key) > MAX_SUBJECT_KEY_LENGTH:
+        raise ArtSubjectError(
+            f"an art subject key must be at most {MAX_SUBJECT_KEY_LENGTH} characters"
+        )
+    if len(key.encode("utf-8")) > MAX_SUBJECT_KEY_BYTES:
+        raise ArtSubjectError(
+            f"an art subject key must be at most {MAX_SUBJECT_KEY_BYTES} UTF-8 bytes"
+        )
+    if any(char in FORBIDDEN_SUBJECT_KEY_CHARACTERS for char in key):
+        raise ArtSubjectError(
+            "an art subject key must not contain '|', '/', ':', '{', or '}'"
+        )
     if any(
         not char.isprintable() or unicodedata.category(char).startswith("C")
         for char in key

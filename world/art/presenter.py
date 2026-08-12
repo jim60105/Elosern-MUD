@@ -64,15 +64,22 @@ def resolve_subject(subject: ArtSubject) -> dict:
 
     Returns status, same-origin URL, aspect ratio, and alternative text for a
     ``done`` record; a truthful placeholder kind/label otherwise. Never leaks
-    ``out_path`` or the store root.
+    ``out_path`` or the store root. A claimed ``in_progress`` record is
+    normalized to the wire-stable ``pending`` status so a snapshot taken while
+    a worker holds the claim renders a placeholder instead of failing the wire
+    schema (fix-art-pipeline-contracts D3); the persistent record status is
+    never touched.
     """
     record = _record_for(subject)
     if record is None or record.db.status != ArtAssetStatus.DONE:
         kind = PLACEHOLDER_MISSING
+        status = record.db.status if record else ArtAssetStatus.MISSING
+        if status == ArtAssetStatus.IN_PROGRESS:
+            status = ArtAssetStatus.PENDING
         return {
             "kind": kind,
             "label": PLACEHOLDER_LABELS[kind],
-            "status": record.db.status if record else ArtAssetStatus.MISSING,
+            "status": status,
             "url": None,
             "aspect_ratio": record.db.aspect_ratio if record else None,
             "alt": PLACEHOLDER_LABELS[kind],

@@ -4,7 +4,15 @@ from unittest import TestCase
 
 from jsonschema import Draft202012Validator
 
-from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
+from world.art.subjects import (
+    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+    MAX_SUBJECT_KEY_LENGTH,
+)
+from world.imports.schema import (
+    CHARACTER_SCHEMA_V1,
+    MAX_ENTITY_KEY_LENGTH,
+    WORLD_SCHEMA_V1,
+)
 from world.imports.tests.helpers import example_record
 
 
@@ -101,6 +109,17 @@ class SchemaTests(TestCase):
         self.assertFalse(
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
+
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_schema_pattern_derives_from_the_shared_art_contract(self):
+        # The schema mirrors the art-side subject-key contract literally: same
+        # length bound, and every reserved separator rejected by the pattern.
+        self.assertEqual(MAX_ENTITY_KEY_LENGTH, MAX_SUBJECT_KEY_LENGTH)
+        for char in sorted(FORBIDDEN_SUBJECT_KEY_CHARACTERS):
+            with self.subTest(char=char):
+                self.assert_character_invalid(
+                    lambda r, char=char: r.update(key=f"a{char}b")
+                )
 
     def test_world_entry_keys_share_the_entity_key_rules(self):
         validator = Draft202012Validator(WORLD_SCHEMA_V1)

@@ -106,6 +106,33 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
                     characterize_errors(_entry(portrait=portrait), lifespan_upper_bound=80)
                 )
 
+    @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
+    def test_reserved_separator_stable_keys_reject_like_the_shared_contract(self):
+        from world.art.subjects import (
+            FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+            MAX_SUBJECT_KEY_BYTES,
+        )
+
+        for char in sorted(FORBIDDEN_SUBJECT_KEY_CHARACTERS):
+            with self.subTest(char=char):
+                self.assertTrue(
+                    characterize_errors(
+                        _entry(portrait={"stable_key": f"a{char}b"}),
+                        lifespan_upper_bound=80,
+                    )
+                )
+        with self.subTest(key="over-byte-bound"):
+            self.assertTrue(
+                characterize_errors(
+                    _entry(
+                        portrait={
+                            "stable_key": "😀" * (MAX_SUBJECT_KEY_BYTES // 4 + 1)
+                        }
+                    ),
+                    lifespan_upper_bound=80,
+                )
+            )
+
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_portrait_with_extra_keys_rejects(self):
         self.assertTrue(

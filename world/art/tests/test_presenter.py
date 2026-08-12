@@ -20,8 +20,8 @@ from world.art.presenter import (
     resolve_scene,
     resolve_subject,
 )
-from world.art.queue import claim, ensure, settle
-from world.art.store import ArtAssetStatus
+from world.art.queue import claim, ensure, record_key, settle
+from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
@@ -146,6 +146,44 @@ class ArtPresenterTests(EvenniaTest):
         self.assertEqual(resolve_scene("not_a_scene")["kind"], PLACEHOLDER_UNAVAILABLE)
         payload = resolve_scene("forest_path")
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+
+    @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
+    def test_claimed_record_is_presented_as_pending_while_the_worker_holds_it(self):
+        subject = _scene()
+        ensure(subject, "desc")
+        claim(10)
+        payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertEqual(payload["status"], ArtAssetStatus.PENDING)
+        self.assertIsNone(payload["url"])
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
+
+    @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
+    def test_settled_statuses_pass_through_unchanged(self):
+        for subject, expected in (
+            (_scene("not_ensured"), ArtAssetStatus.MISSING),
+            (_scene("dungeon_interior"), ArtAssetStatus.FAILED),
+        ):
+            if expected == ArtAssetStatus.FAILED:
+                ensure(subject, "desc")
+                claim(10)
+                settle(subject, status=ArtAssetStatus.FAILED,
+                       output_identity=None, error="boom")
+            payload = resolve_subject(subject)
+            self.assertEqual(payload["status"], expected)
+
+    @covers_requirement("art-subject-model::subject-producer-validation-rejects-unrepresentable-keys")
+    def test_slash_portrait_key_resolves_to_unavailable_without_a_queue_record(self):
+        self.player.db.portrait_policy = {"mode": "named", "stable_key": "a/b"}
+        payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["url"])
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key="art:portrait:character:a/b"
+            ).exists()
+        )
 
     def test_media_url_never_leaks_the_store_root(self):
         url = media_url_for("scene/forest_path.png")

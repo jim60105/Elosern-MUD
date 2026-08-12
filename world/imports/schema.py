@@ -1,5 +1,11 @@
 """Frozen version-one JSON Schemas for imported records."""
 
+import re
+
+from world.art.subjects import (
+    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
+    MAX_SUBJECT_KEY_LENGTH,
+)
 from world.lore.sexual_vocab import (
     AROUSAL_LEVELS,
     CLIMAX_PHASE_LEVELS,
@@ -12,15 +18,21 @@ from world.lore.sexual_vocab import (
 _DRAFT = "https://json-schema.org/draft/2020-12/schema"
 _NONNEGATIVE = {"type": "integer", "minimum": 0}
 
-# The shared entity-key contract (fix-import-key-validity D1): printable
-# characters excluding the structural separators ``|``, ``/``, ``:``, ``{``,
-# ``}`` and control characters (C0, DEL, C1), bounded at 64 characters. The
-# pattern uses absolute ``\\A``/``\\Z`` anchors so a trailing newline or any
-# other excluded character fails the whole-string match. This rule set is
-# mirrored by the art stable-key change (``fix-art-pipeline-contracts``) so no
-# producer set drifts; both changes use identical constants.
-MAX_ENTITY_KEY_LENGTH = 64
-ENTITY_KEY_PATTERN_V1 = r"\A[^|/:{}\x00-\x1f\x7f\x80-\x9f]{1,64}\Z"
+# The shared entity-key contract (fix-art-pipeline-contracts D1):
+# ``world/art/subjects.py`` hosts the single constant set (reserved
+# separators and the 64-character bound); the schema derives its structural
+# pattern from it, so the import pipeline and every art producer enforce
+# exactly the same rule set. The pattern uses absolute ``\\A``/``\\Z``
+# anchors so a trailing newline or any other excluded character fails the
+# whole-string match (the naive ``^...$`` form would let ``$`` match before
+# a final newline).
+MAX_ENTITY_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
+_FORBIDDEN_CLASS = "".join(
+    re.escape(char) for char in sorted(FORBIDDEN_SUBJECT_KEY_CHARACTERS)
+)
+ENTITY_KEY_PATTERN_V1 = (
+    rf"\A[^{_FORBIDDEN_CLASS}\x00-\x1f\x7f\x80-\x9f]{{1,{MAX_ENTITY_KEY_LENGTH}}}\Z"
+)
 _ENTITY_KEY_RULES = {
     "type": "string",
     "minLength": 1,

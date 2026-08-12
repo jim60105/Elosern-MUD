@@ -34,8 +34,8 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
-from world.art.queue import ensure, settle
-from world.art.store import ArtAssetStatus
+from world.art.queue import claim, ensure, record_key, settle
+from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.combat_session import engage
@@ -285,6 +285,23 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTest):
         payload = self._render()
         self.assertEqual(payload["scene"]["status"], ArtAssetStatus.FAILED)
         self.assertIsNone(payload["scene"]["url"])
+
+    @covers_requirement("webclient-art-panel::the-art-panel-accepts-the-normalized-in-flight-state")
+    @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
+    def test_claimed_record_renders_available_with_a_pending_placeholder(self):
+        subject = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        ensure(subject, "desc")
+        claim(10)
+        payload = self._render()
+        self.assertTrue(payload["available"])
+        scene = payload["scene"]
+        self.assertEqual(scene["subject_key"], "scene:tavern_interior")
+        self.assertEqual(scene["status"], "pending")
+        self.assertIsNone(scene["url"])
+        self.assertEqual(scene["placeholder"]["kind"], "missing")
+        self.assertEqual(scene["aspect_ratio"], "16:9")
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
     def test_unresolvable_scene_archetype_renders_unavailable(self):
         self.room.scene_archetype = None
