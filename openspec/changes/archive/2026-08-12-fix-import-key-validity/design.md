@@ -14,7 +14,7 @@
 
 ## Decisions
 
-**D1 — Schema-level key pattern.** `key` gets `pattern: ^[^|/:{}\x00-\x1f]{1,64}$` in the character schema (and matching world-entry checks), making the restriction structural and enforced before semantic validation. This rule set mirrors the shared key contract hosted by the art stable-key change (`fix-art-pipeline-contracts`); the two changes land with identical constants so no producer set drifts.
+**D1 — Schema-level key pattern.** `key` gets `pattern: \A[^|/:{}\x00-\x1f\x7f\x80-\x9f]{1,64}\Z` in the character schema (and matching world-entry checks), making the restriction structural and enforced before semantic validation. Absolute `\A`/`\Z` anchors ensure a trailing newline or any other excluded character fails the whole-string match (the naive `^...$` form would let `$` match before a final newline). `validate.py` additionally mirrors `_validate_name`'s printable/control check (`isprintable()` + Unicode `C*` category) so format characters, surrogates, and private-use characters that a regex cannot express are rejected identically at import and creation. This rule set mirrors the shared key contract hosted by the art stable-key change (`fix-art-pipeline-contracts`); the two changes land with identical constants so no producer set drifts.
 
 **D2 — Batch character-key uniqueness.** Extend the existing duplicate-key scan to `character` records; duplicates become a structural issue that fails the whole batch (all-or-nothing, consistent with `loader.py:74-87`).
 

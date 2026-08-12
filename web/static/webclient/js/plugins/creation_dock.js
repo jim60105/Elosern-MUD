@@ -345,7 +345,7 @@
       conceptActions.appendChild(conceptSubmit);
       form.appendChild(conceptActions);
 
-      this._appendField(form, "姓名", "displayName", state.displayName, "text", 80, "角色姓名（1–80 字元）");
+      this._appendField(form, "姓名", "displayName", state.displayName, "text", 64, "角色姓名（1–64 字元）");
       this._appendField(form, "實際年齡", "age", state.age, "number", null, "實際年齡（至少 18）");
       this._appendField(form, "外表年齡", "apparentAge", state.apparentAge, "number", null, "外表年齡（至少 18）");
 
@@ -471,7 +471,7 @@
           input.setAttribute("max", String(max));
         }
       } else {
-        input.setAttribute("maxlength", String(max || 80));
+        input.setAttribute("maxlength", String(max || 64));
       }
       input.value = value || "";
       var self = this;

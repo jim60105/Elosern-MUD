@@ -281,8 +281,8 @@
   function validateCustom(panel, state) {
     var errors = {};
     var name = (state.displayName || "").trim();
-    if (name.length < 1 || name.length > 80) {
-      errors.displayName = "角色姓名需為 1–80 個字元。";
+    if (name.length < 1 || name.length > 64) {
+      errors.displayName = "角色姓名需為 1–64 個字元。";
     }
     var age = parseInt(state.age, 10);
     if (isNaN(age) || age < 18 || age > 10000) {

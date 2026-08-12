@@ -144,6 +144,26 @@ class CharacterActivationTests(EvenniaTest):
                     sampler=lambda low, high, value=sample: value,
                 )
 
+    def test_display_name_rejects_separators_and_the_shared_length_bound(self):
+        for name in ("角色/名", "角色:名", "角色}名", "x" * 65):
+            with self.subTest(name=name[:6]), self.assertRaises(CharacterCreationError):
+                activate_player_character(
+                    self.account, self.character,
+                    self.request(display_name=name),
+                )
+            self.assertTrue(self.character.creation_pending)
+            self.assertEqual(self.character.traits.all(), [])
+
+    def test_64_character_display_name_is_accepted(self):
+        name = "新" * 64
+        result = activate_player_character(
+            self.account, self.character,
+            self.request(display_name=name),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(result.display_name, name)
+        self.assertEqual(self.character.key, name)
+
     @covers_requirement("player-stat-allocation::starting-magic-level-is-sampled-from-a-race-owned-average-band")
     def test_preset_activation_uses_the_same_magic_sampler(self):
         result = activate_player_character(

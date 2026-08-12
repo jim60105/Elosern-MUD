@@ -76,6 +76,51 @@ class SchemaTests(TestCase):
         )
         self.assert_character_invalid(lambda r: r.update(record_type="world_entry"))
 
+    @covers_requirement("import-schema::imported-entity-keys-use-a-safe-character-set")
+    def test_entity_keys_reject_separators_and_control_characters(self):
+        for bad in (
+            "orc|alpha",
+            "orc/alpha",
+            "orc:alpha",
+            "orc{alpha",
+            "orc}alpha",
+            "orc\x00alpha",
+            "orc\x1falpha",
+            "orc\x7falpha",
+            "orc\x85alpha",
+            "trailing newline\n",
+        ):
+            with self.subTest(key=bad):
+                self.assert_character_invalid(lambda r, bad=bad: r.update(key=bad))
+
+    @covers_requirement("import-schema::imported-entity-keys-use-a-safe-character-set")
+    def test_entity_key_length_bound_is_64_characters(self):
+        self.assert_character_invalid(lambda r: r.update(key="x" * 65))
+        record = example_record()
+        record["key"] = "x" * 64
+        self.assertFalse(
+            list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        )
+
+    def test_world_entry_keys_share_the_entity_key_rules(self):
+        validator = Draft202012Validator(WORLD_SCHEMA_V1)
+        for bad in ("a|b", "a/b", "a:b", "a{b", "a}b", "a\x01b", "a\x7fb", "a\n"):
+            record = {
+                "record_type": "world_entry",
+                "schema_version": 1,
+                "key": bad,
+                "content": "...",
+            }
+            with self.subTest(key=bad):
+                self.assertTrue(list(validator.iter_errors(record)))
+        record = {
+            "record_type": "world_entry",
+            "schema_version": 1,
+            "key": "x" * 64,
+            "content": "...",
+        }
+        self.assertFalse(list(validator.iter_errors(record)))
+
     @covers_requirement("import-schema::world-schema-v1-validates-a-minimal-opaque-world-info-entry")
     def test_minimal_world_entry_and_required_content(self):
         record = {

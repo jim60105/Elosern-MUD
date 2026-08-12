@@ -52,7 +52,7 @@ function validPanel(overrides) {
       },
     ],
     custom: {
-      name: { min_length: 1, max_length: 80 },
+      name: { min_length: 1, max_length: 64 },
       adult: {
         age_minimum: 18,
         age_maximum: 10000,

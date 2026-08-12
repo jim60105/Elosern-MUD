@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import unicodedata
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -94,6 +95,29 @@ def _structural_issues(
         Issue(_field_path(error), error.message)
         for error in sorted(validator.iter_errors(record), key=lambda item: list(item.path))
     ]
+
+
+def _check_entity_key_printable(record: dict[str, Any]) -> list[Issue]:
+    """Reject keys with non-printable or Unicode control characters.
+
+    The schema pattern excludes C0/DEL/C1 controls structurally; this check
+    mirrors ``world.rules.character_creation._validate_name`` so the import
+    validator and player-created names reject the same character set
+    (fix-import-key-validity D1/D3): anything not ``isprintable()`` or in a
+    Unicode ``C*`` category (format, surrogate, private-use etc.) is rejected.
+    """
+    key = record.get("key")
+    if not isinstance(key, str):
+        return []
+    for char in key:
+        if not char.isprintable() or unicodedata.category(char).startswith("C"):
+            return [
+                Issue(
+                    "key",
+                    f"key {key!r} contains a non-printable or control character",
+                )
+            ]
+    return []
 
 
 def _check_disguised_stats_subset(record: dict[str, Any]) -> list[Issue]:
@@ -207,15 +231,37 @@ def collect_degraded_checks() -> list[DegradedCheck]:
     return checks
 
 
-def _check_world_entry_key_uniqueness(
+def _flag_duplicate_keys(
+    reports: list[RecordReport],
     records: Sequence[dict[str, Any]],
-) -> list[Issue]:
-    counts = Counter(record["key"] for record in records)
-    return [
-        Issue("key", f"duplicate world-entry key {key!r} in batch")
-        for key, count in counts.items()
-        if key is not None and count > 1
-    ]
+    record_type: str,
+    label: str,
+) -> None:
+    """Append a structural key-uniqueness issue to every valid matching report.
+
+    Mirrors the world-entry scan for each record family so a duplicated
+    character or world-entry key fails the whole batch (fix-import-key-validity
+    D2). Only valid reports are flagged -- a record that already failed earlier
+    checks stays rejected on its own grounds.
+    """
+    duplicate_keys = {
+        key
+        for key, count in Counter(record["key"] for record in records).items()
+        if count > 1
+    }
+    for report in reports:
+        if (
+            report.is_valid
+            and report.record
+            and report.record.get("record_type") == record_type
+            and report.record.get("key") in duplicate_keys
+        ):
+            report.rejections.append(
+                Issue(
+                    "key",
+                    f"duplicate {label} key {report.record['key']!r} in batch",
+                )
+            )
 
 
 def validate_character(record: dict[str, Any]) -> RecordReport:
@@ -223,6 +269,7 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_structural_issues(record, CHARACTER_SCHEMA_V1))
     if report.rejections:
         return report
+    report.rejections.extend(_check_entity_key_printable(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
     report.rejections.extend(_check_magic_cap(record))
@@ -234,11 +281,15 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
 def validate_world_entry(record: dict[str, Any]) -> RecordReport:
     report = RecordReport(str(record.get("key", "<unknown>")), record=record)
     report.rejections.extend(_structural_issues(record, WORLD_SCHEMA_V1))
+    if report.rejections:
+        return report
+    report.rejections.extend(_check_entity_key_printable(record))
     return report
 
 
 def validate_batch(paths: list[Path]) -> BatchReport:
     reports: list[RecordReport] = []
+    character_records: list[dict[str, Any]] = []
     world_records: list[dict[str, Any]] = []
     for path in paths:
         try:
@@ -276,24 +327,11 @@ def validate_batch(paths: list[Path]) -> BatchReport:
         )
         report.path = path
         reports.append(report)
-        if kind == "world_entry" and report.is_valid:
-            world_records.append(raw)
+        if report.is_valid:
+            (character_records if kind == "character" else world_records).append(raw)
 
-    duplicate_keys = {
-        key
-        for key, count in Counter(record["key"] for record in world_records).items()
-        if count > 1
-    }
-    for report in reports:
-        if (
-            report.is_valid
-            and report.record
-            and report.record.get("record_type") == "world_entry"
-            and report.record.get("key") in duplicate_keys
-        ):
-            report.rejections.append(
-                Issue("key", f"duplicate world-entry key {report.record['key']!r} in batch")
-            )
+    _flag_duplicate_keys(reports, character_records, "character", "character")
+    _flag_duplicate_keys(reports, world_records, "world_entry", "world-entry")
     return BatchReport(reports, collect_degraded_checks())
 
 

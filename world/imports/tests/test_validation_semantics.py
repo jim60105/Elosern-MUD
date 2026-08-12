@@ -46,6 +46,29 @@ class SemanticValidationTests(TestCase):
         self.assertTrue(report.rejections)
         self.assertFalse(report.warnings)
 
+    @covers_requirement("import-validation::key-charset-is-checked-at-import-validation")
+    def test_separator_and_overlong_keys_are_structural_rejections(self):
+        for bad in ("orc|alpha", "x" * 65):
+            with self.subTest(key=bad[:8]):
+                record = example_record()
+                record["key"] = bad
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+                self.assertIn("key", {issue.field for issue in report.rejections})
+
+    @covers_requirement("import-validation::key-charset-is-checked-at-import-validation")
+    def test_format_and_private_use_characters_in_keys_reject_like_creation(self):
+        for bad in ("a\u200b", "a\ue000", "a\ud800"):
+            with self.subTest(key=bad[:2]):
+                record = example_record()
+                record["key"] = bad
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+                self.assertIn(
+                    "non-printable or control",
+                    " ".join(issue.message for issue in report.rejections),
+                )
+
     @covers_requirement("import-validation::the-cli-prints-a-prominent-banner-whenever-any-check-is-running-in-degraded-mode")
     def test_skill_check_degrades_once_at_batch_level(self):
         with patch("world.imports.validate._resolve_skill_registry", return_value=None):

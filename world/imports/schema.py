@@ -12,6 +12,22 @@ from world.lore.sexual_vocab import (
 _DRAFT = "https://json-schema.org/draft/2020-12/schema"
 _NONNEGATIVE = {"type": "integer", "minimum": 0}
 
+# The shared entity-key contract (fix-import-key-validity D1): printable
+# characters excluding the structural separators ``|``, ``/``, ``:``, ``{``,
+# ``}`` and control characters (C0, DEL, C1), bounded at 64 characters. The
+# pattern uses absolute ``\\A``/``\\Z`` anchors so a trailing newline or any
+# other excluded character fails the whole-string match. This rule set is
+# mirrored by the art stable-key change (``fix-art-pipeline-contracts``) so no
+# producer set drifts; both changes use identical constants.
+MAX_ENTITY_KEY_LENGTH = 64
+ENTITY_KEY_PATTERN_V1 = r"\A[^|/:{}\x00-\x1f\x7f\x80-\x9f]{1,64}\Z"
+_ENTITY_KEY_RULES = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": MAX_ENTITY_KEY_LENGTH,
+    "pattern": ENTITY_KEY_PATTERN_V1,
+}
+
 CHARACTER_SCHEMA_V1 = {
     "$schema": _DRAFT,
     "title": "CHARACTER_SCHEMA_V1",
@@ -42,7 +58,7 @@ CHARACTER_SCHEMA_V1 = {
             ),
         },
         "schema_version": {"const": 1},
-        "key": {"type": "string", "minLength": 1},
+        "key": dict(_ENTITY_KEY_RULES),
         "display_name": {"type": "string", "minLength": 1},
         "age": {
             "type": "integer",
@@ -128,7 +144,7 @@ WORLD_SCHEMA_V1 = {
             "description": "Required discriminator selecting WORLD_SCHEMA_V1.",
         },
         "schema_version": {"const": 1},
-        "key": {"type": "string", "minLength": 1},
+        "key": dict(_ENTITY_KEY_RULES),
         "display_name": {"type": "string"},
         "tags": {"type": "array", "items": {"type": "string"}},
         "content": {

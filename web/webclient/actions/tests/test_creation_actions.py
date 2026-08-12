@@ -166,7 +166,7 @@ class CreationPayloadValidationTests(unittest.TestCase):
             {**custom_payload(), "session": 1},
             {**custom_payload(), "magic_level": 1},
             {**custom_payload(), "skills": []},
-            {**custom_payload(), "display_name": "x" * 81},
+            {**custom_payload(), "display_name": "x" * 65},
             {**custom_payload(), "age": -1},
             {**custom_payload(), "apparent_age": 10001},
             {**custom_payload(), "age": True},

@@ -23,8 +23,9 @@ FALLBACK_MESSAGE = "角色建立目前無法完成。"
 # command output and the browser creation dock share these exact strings.
 CREATION_REASON_MESSAGES: dict[str, str] = {
     "unknown_preset": "找不到這個預設角色。",
-    "invalid_name": "角色姓名必須是 1–80 個可列印字元，且不含控制字元。",
+    "invalid_name": "角色姓名必須是 1–64 個可列印字元，且不含控制字元。",
     "markup_delimiter": "角色姓名不能包含特殊格式標記。",
+    "reserved_separator": "角色姓名不能包含保留分隔字元。",
     "underage_age": "實際年齡必須是至少 18 的整數。",
     "underage_apparent_age": "外表年齡必須是至少 18 的整數。",
     "unknown_race": "找不到這個種族。",
@@ -55,9 +56,10 @@ _MESSAGE_CODE_MATCHES: tuple[tuple[str, str], ...] = (
     ("unknown player preset", "unknown_preset"),
     ("creation mode must be 'preset' or 'custom'", "malformed_request"),
     ("display name contains an Evennia markup delimiter", "markup_delimiter"),
+    ("display name contains a reserved separator", "reserved_separator"),
     ("display name contains a control character", "invalid_name"),
     ("display name must be text", "invalid_name"),
-    ("display name must contain 1 to 80 characters", "invalid_name"),
+    ("display name must contain 1 to 64 characters", "invalid_name"),
     ("apparent_age must be an integer of at least 18", "underage_apparent_age"),
     ("age must be an integer of at least 18", "underage_age"),
     ("does not belong to race", "incompatible_subrace"),

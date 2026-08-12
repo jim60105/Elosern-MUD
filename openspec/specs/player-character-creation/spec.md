@@ -24,7 +24,7 @@ When Evennia creates the default `PlayerCharacter` for a newly registered accoun
 - **THEN** its pending shell remains in `account.characters`, is the account's last puppet, and retains the parent hook's ownership locks
 
 ### Requirement: Character creation offers preset and custom modes
-The pending character's creation command SHALL offer exactly two activation modes. A preset mode SHALL select a key from the immutable player-preset catalog. A custom mode SHALL collect a non-empty player-supplied display name, actual age, apparent age, a race key, an optional compatible subrace key, and six stat allocations. The custom mode SHALL not accept player-supplied raw magic level, guild merit, skills, equipment, or trait caps. The requested display name SHALL be trimmed, contain 1–80 printable non-control characters, contain no Evennia markup delimiter, and become the activated object's visible key.
+The pending character's creation command SHALL offer exactly two activation modes. A preset mode SHALL select a key from the immutable player-preset catalog. A custom mode SHALL collect a non-empty player-supplied display name, actual age, apparent age, a race key, an optional compatible subrace key, and six stat allocations. The custom mode SHALL not accept player-supplied raw magic level, guild merit, skills, equipment, or trait caps. The requested display name SHALL be trimmed, contain 1–64 printable non-control characters, contain no `|`, `/`, `:`, `{`, or `}` (the shared entity-key contract: no structural separator and no markup delimiter), and become the activated object's visible key.
 
 The deterministic core MAY additionally persist a bounded, versioned `creation_draft` staging attribute on the pending character, written only through a `world.rules` creation-wizard service, to satisfy the WebClient's reconnect-at-saved-stage requirement. The staging attribute is not canonical identity: writing it SHALL NOT set `age`, `apparent_age`, `race`, `subrace`, the object key, traits, or `creation_pending` on the character, and it SHALL be cleared by the same atomic transaction that activates the character. A rejected or cancelled draft save SHALL leave the canonical identity attributes, the trait set, and any previously validated staging draft unchanged.
 
@@ -37,7 +37,7 @@ The deterministic core MAY additionally persist a bounded, versioned `creation_d
 - **THEN** the system initializes that account-owned character with the chosen identity and calculated trait values, then marks it active
 
 #### Scenario: An invalid display name is rejected before activation
-- **WHEN** custom creation supplies a blank, overlong, control-character, or markup-delimiter-bearing display name
+- **WHEN** custom creation supplies a blank, overlong, control-character, structural-separator-bearing, or markup-delimiter-bearing display name
 - **THEN** activation is rejected and the account-owned shell retains its existing key and pending state
 
 #### Scenario: Invalid draft input changes no character state

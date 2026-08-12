@@ -72,9 +72,11 @@ MAX_SUBRACES = 16
 MAX_PROFILES = 16
 
 # Custom-form bounds (design D2): identical to the command wizard's name rules
-# and the deterministic adult gate.
+# and the deterministic adult gate. The display-name bound mirrors the shared
+# entity-key contract (fix-import-key-validity D3) so the panel's advertised
+# maximum never exceeds what `_validate_name` accepts.
 NAME_MIN_LENGTH = 1
-NAME_MAX_LENGTH = 80
+NAME_MAX_LENGTH = 64
 AGE_MINIMUM = 18
 AGE_MAXIMUM = 10000
 APPARENT_AGE_MINIMUM = 18

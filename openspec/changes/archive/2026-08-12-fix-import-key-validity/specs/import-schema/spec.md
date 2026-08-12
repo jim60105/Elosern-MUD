@@ -2,7 +2,7 @@
 
 ### Requirement: Imported entity keys use a safe character set
 
-The import schema SHALL constrain every entity `key` to printable characters excluding the structural separators `|`, `/`, and `:`, with a maximum length of 64 characters.
+The import schema SHALL constrain every entity `key` to printable characters excluding the structural separators `|`, `/`, `:`, `{`, `}`, and control characters, with a maximum length of 64 characters.
 
 #### Scenario: Pipe key is rejected
 

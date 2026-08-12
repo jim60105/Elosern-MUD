@@ -8,6 +8,7 @@ from typing import Any
 
 from django.db import transaction
 
+from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.rules.surfaces import (
@@ -127,12 +128,16 @@ def _validate_name(value: Any) -> str:
     if not isinstance(value, str):
         raise CharacterCreationError("display name must be text")
     name = value.strip()
-    if not 1 <= len(name) <= 80:
-        raise CharacterCreationError("display name must contain 1 to 80 characters")
+    if not 1 <= len(name) <= MAX_ENTITY_KEY_LENGTH:
+        raise CharacterCreationError(
+            f"display name must contain 1 to {MAX_ENTITY_KEY_LENGTH} characters"
+        )
     if any(not char.isprintable() or unicodedata.category(char).startswith("C") for char in name):
         raise CharacterCreationError("display name contains a control character")
-    if "|" in name or "{" in name:
+    if any(char in name for char in "|{}"):
         raise CharacterCreationError("display name contains an Evennia markup delimiter")
+    if any(char in name for char in "/:"):
+        raise CharacterCreationError("display name contains a reserved separator")
     return name
 
 

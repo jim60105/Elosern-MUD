@@ -75,7 +75,7 @@ class CreationWizardTests(EvenniaTest):
         keys = {card.key for card in view.presets}
         self.assertIn("human_wanderer", keys)
         self.assertIn("elf_guardian", keys)
-        self.assertEqual(view.custom.name.max_length, 80)
+        self.assertEqual(view.custom.name.max_length, 64)
         self.assertEqual(view.custom.adult.age_minimum, 18)
         self.assertEqual(view.custom.adult.apparent_age_minimum, 18)
         race_keys = {race.key for race in view.custom.races}
