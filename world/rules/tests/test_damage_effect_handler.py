@@ -172,3 +172,38 @@ class DamageResolverIntegrationTests(EvenniaTest):
         before = deepcopy(hp_data)
         self.assertEqual(_stored_hp(self.target), before["current"])
         self.assertEqual(hp_data, before)
+
+    def test_imported_npc_with_a_valid_key_takes_damage_normally(self):
+        from world.imports.loader import instantiate_character
+        from world.imports.tests.helpers import example_record
+
+        record = example_record()
+        record["key"] = "orc alpha"
+        npc = instantiate_character(record)
+        self.assertEqual(npc.key, "orc alpha")
+        npc.db.skills = {"active": [], "passive": []}
+        npc.traits.agility.base = 5
+        npc.traits.agility.current = 5
+        battlefield = Battlefield(
+            {
+                "party": frozenset({"actor"}),
+                "foes": frozenset({"orc alpha"}),
+            },
+            {"actor": self.actor, "orc alpha": npc},
+        )
+        request = ActionRequest(
+            self.actor,
+            "fire_ball",
+            [npc],
+            BattlefieldActionContext(battlefield),
+        )
+        before = npc.traits.hp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertNotEqual(result.reason, RejectReason.EVENT_LOG_CONSTRUCTION_FAILED)
+        self.assertEqual(
+            [entry.kind for entry in result.event_log.entries[:2]],
+            ["roll", "damage"],
+        )
+        self.assertLess(npc.traits.hp.value, before)

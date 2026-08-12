@@ -35,9 +35,12 @@ from world.rules.creation_wizard import (
     save_preset_draft,
 )
 
-# Wire limits (equal to the deterministic bounds and the panel contract).
+# Wire limits (equal to the deterministic bounds and the panel contract). The
+# display-name limit mirrors the shared entity-key contract
+# (fix-import-key-validity D3), so the adapter never accepts a name the
+# deterministic creation service would reject on length alone.
 MAX_KEY_CODE_POINTS = 64
-MAX_NAME_CODE_POINTS = 80
+MAX_NAME_CODE_POINTS = 64
 # The concept bound mirrors the deterministic command bound
 # (``commands.character_creation.MAX_CONCEPT_LENGTH``) and the generative
 # layer's prompt cap; a parity test keeps all of them in lock step.

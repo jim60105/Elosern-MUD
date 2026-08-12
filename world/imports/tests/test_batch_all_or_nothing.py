@@ -123,3 +123,32 @@ class BatchTests(EvenniaTest):
         path = self.write("unhashable.json", world)
         report = validate_batch([path])
         self.assertFalse(report.all_valid)
+
+    @covers_requirement("import-validation::batch-import-rejects-duplicate-character-keys")
+    def test_duplicate_character_keys_fail_the_whole_batch(self):
+        first = example_record()
+        first_path = self.write("first.json", first)
+        second = example_record()
+        second["key"] = first["key"]
+        second_path = self.write("second.json", second)
+        report = validate_batch([first_path, second_path])
+        self.assertFalse(report.all_valid)
+        self.assertTrue(all(item.rejections for item in report.records))
+        with patch("world.imports.loader._instantiate_validated_character") as instantiate:
+            with self.assertRaises(ImportRejected):
+                load_batch([first_path, second_path])
+        instantiate.assert_not_called()
+
+    @covers_requirement("import-validation::batch-import-rejects-duplicate-character-keys")
+    def test_unique_character_keys_pass_the_uniqueness_check(self):
+        first = example_record()
+        first_path = self.write("first.json", first)
+        second = example_record()
+        second["key"] = "second_reference"
+        second_path = self.write("second.json", second)
+        report = validate_batch([first_path, second_path])
+        self.assertTrue(report.all_valid)
+        self.assertEqual(
+            [record["key"] for record in report.character_records],
+            ["ciaran_reference", "second_reference"],
+        )

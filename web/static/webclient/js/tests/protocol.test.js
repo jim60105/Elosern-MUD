@@ -1984,7 +1984,7 @@ function validCreationPanel(overrides) {
         },
       ],
       custom: {
-        name: { min_length: 1, max_length: 80 },
+        name: { min_length: 1, max_length: 64 },
         adult: {
           age_minimum: 18,
           age_maximum: 10000,
@@ -2208,7 +2208,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     draft: null,
     presets: Array(Protocol.CREATION_MAX_PRESETS).fill(Object.assign({}, card)),
     custom: {
-      name: { min_length: 1, max_length: 80 },
+      name: { min_length: 1, max_length: 64 },
       adult: {
         age_minimum: 18,
         age_maximum: 10000,

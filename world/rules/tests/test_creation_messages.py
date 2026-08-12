@@ -62,9 +62,10 @@ class CreationRejectionMappingTests(unittest.TestCase):
         cases = {
             "unknown player preset": "unknown_preset",
             "display name must be text": "invalid_name",
-            "display name must contain 1 to 80 characters": "invalid_name",
+            "display name must contain 1 to 64 characters": "invalid_name",
             "display name contains a control character": "invalid_name",
             "display name contains an Evennia markup delimiter": "markup_delimiter",
+            "display name contains a reserved separator": "reserved_separator",
             "age must be an integer of at least 18": "underage_age",
             "apparent_age must be an integer of at least 18": "underage_apparent_age",
             "unknown race 'x'": "unknown_race",
@@ -103,6 +104,7 @@ class CreationRejectionMappingTests(unittest.TestCase):
             ("underage age", request(age=17), "underage_age"),
             ("underage apparent age", request(apparent_age=17), "underage_apparent_age"),
             ("markup name", request(display_name="|rbad|n"), "markup_delimiter"),
+            ("separator name", request(display_name="角色/名"), "reserved_separator"),
             ("incompatible subrace", request(race="human", subrace="foxkin"), "incompatible_subrace"),
         ]
         for label, req, expected in cases:
