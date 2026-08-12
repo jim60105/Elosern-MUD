@@ -24,10 +24,17 @@ from .transitions import pending_effects_for_transition, release_stage_binding
 
 
 def _defeated_targets(event_log: Any) -> tuple[tuple[int, str | None], ...]:
-    """Return ``(target_id, monster_tier)`` from ``target_defeated`` entries."""
+    """Return ``(target_id, monster_tier)`` from ``target_defeated`` entries.
+
+    Simulated defeats (guild examinations) are excluded: the battle is a
+    simulation, so a lethal crossing there grants no DEFEAT progress and
+    cannot fail a protected entity (exam-simulated-battle-redesign D4).
+    """
     defeated = []
     for entry in event_log.entries:
         if entry.kind != "target_defeated":
+            continue
+        if entry.data.get("simulated"):
             continue
         target_id = entry.data.get("target_id")
         tier = entry.data.get("monster_tier")

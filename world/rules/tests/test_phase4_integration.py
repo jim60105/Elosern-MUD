@@ -174,12 +174,16 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         from commands.combat import CmdGuildExam
 
         self.player.location = self.guild_hall
-        # Give the player decisive power so the nonlethal exam resolves.
+        # Give the player decisive power so the simulated exam resolves.
         for key in ("atk_phys", "agility", "defense", "magic_level"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
-        self.call(CmdGuildExam(), "E", "你開始了 E 階的考核")
+        self.call(
+            CmdGuildExam(),
+            "E",
+            "你開始了 E 階的考核。這是一場模擬戰：雙方在開戰前與結束後都會恢復全部的體力、法力與精力。請選擇你的行動（cast <技能>[=<目標>]）。",
+        )
         self.assertIsNotNone(self.player.db.active_combat)
         session = read_session(self.player)
         self.assertEqual(session.mode, "guild_exam")

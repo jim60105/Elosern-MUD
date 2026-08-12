@@ -315,7 +315,10 @@ def _exam_start_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
         record = start_guild_exam(actor, examiner, target_rank, requested_by="webclient")
     except GuildExamError as error:
         return _rejected(error)
-    message = f"升階考核（{record.target_rank}）開始。"
+    message = (
+        f"升階考核（{record.target_rank}）開始。這是模擬戰，"
+        "雙方在開戰前與結束後都會恢復全部的體力、法力與精力。"
+    )
     actor.msg(message)
     return _success("exam_started", message, AFFECTED_EXAM)
 

@@ -19,7 +19,7 @@
 
 **D2 — Pre-restore at exam start.** `start_guild_exam` restores the candidate's and the opponent's HP, MP, and SP to full after the opponent is spawned and before the first round (part of the existing all-or-nothing start transaction, so a failed start restores nothing).
 
-**D3 — Post-restore at settlement.** `settle_session`'s exam branch restores both sides' HP, MP, and SP to full after the exam outcome is recorded and before the opponent is deleted.
+**D3 — Post-restore at settlement, inside the settlement transaction.** `settle_session`'s exam branch restores both sides' HP, MP, and SP to full as the last step inside the terminal settlement transaction, after the exam outcome is recorded and the session clears, and before the opponent is deleted post-commit — so the restoration commits or rolls back with the exam outcome and can never strand a defeated candidate. The degraded settlement paths (`_settle_with_restore` for forfeit/restoration) additionally snapshot/restore the candidate's and opponent's trait surfaces so a rolled-back settlement leaves no stale in-process gauge values (the idmapper cache is not transaction-aware).
 
 **D4 — Kill-reward suppression stays, via simulation semantics.** The exam battle remains excluded from kill XP/loot, DEFEAT quest progress, and protected-entity failure — now because the fight is a simulation, matching the existing suppression behavior without the HP floor.
 
@@ -29,4 +29,4 @@
 
 - **Candidate can die in an exam**: the post-restore makes it consequence-free (simulation), and the settlement already records FAIL without rank change.
 - **EventLog/planner consumers**: lethal `target_defeated` entries for the examiner must still be excluded from kill/quest consumers (D4) — the existing suppression hooks are kept; tests pin this.
-- **Restore vs. pending effects**: restore runs only after the session clears and outside the round transaction, so no in-round effect can be overwritten mid-fight.
+- **Restore vs. pending effects**: restore runs only after the session clears, inside the terminal settlement transaction and never during round resolution, so no in-round effect can be overwritten mid-fight.

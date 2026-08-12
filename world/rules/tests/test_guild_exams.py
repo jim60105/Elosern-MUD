@@ -347,10 +347,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
 
         write_counter_trait(self.player, "guild_merit", 50)
 
-    def test_nonlethal_opponent_knockout_is_not_a_kill(self):
-        from world.rules.action import _ENTRY_TEMPLATES
-        from world.rules.event_log import EventEntry
-
+    def test_lethal_examiner_defeat_passes_and_restores_both_sides(self):
         # Make the candidate overwhelmingly strong for one decisive hit.
         for key in ("atk_phys", "agility", "defense", "magic_level"):
             getattr(self.player.traits, key).base = 200
@@ -362,14 +359,19 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
             result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
+        # Ordinary lethal semantics: the examiner's HP really crossed zero.
         kinds = [entry.kind for log in result["logs"] for entry in log.entries]
-        self.assertIn("target_knocked_out", kinds)
-        self.assertNotIn("target_defeated", kinds)
-        # The knockout floored HP nonlethally at 1; the terminal settlement
-        # then regenerates the floored opponent with the roster scope
-        # (fix-combat-session-roster-and-overwhelm D1) before the temporary
-        # opponent is deleted.
-        self.assertGreater(opponent.traits.hp.current, 1)
+        self.assertIn("target_defeated", kinds)
+        self.assertNotIn("target_knocked_out", kinds)
+        # Simulated battle: both sides are restored to full HP/MP/SP after
+        # the outcome, then the temporary opponent is deleted.
+        for entity in (self.player, opponent):
+            for key in ("hp", "mp", "sp"):
+                self.assertEqual(
+                    getattr(entity.traits, key).current,
+                    getattr(entity.traits, key).max,
+                    key,
+                )
         self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
 
     def test_promotion_preserves_merit(self):
@@ -435,26 +437,116 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(read_session(self.player))
 
-    @covers_requirement("guild-rank-exams::examination-combat-is-nonlethal-and-grants-no-ordinary-defeat-rewards")
-    def test_candidate_knockout_is_nonfatal_but_fails(self):
-        # Make the examiner overwhelmingly strong so its basic_attack floors
-        # the candidate's HP at 1 and knocks it out; the exam fails without a
-        # kill, and the candidate survives at 1 HP.
+    @covers_requirement("guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it")
+    def test_candidate_lethal_defeat_fails_but_restores(self):
+        # Make the examiner overwhelmingly strong so its basic_attack drives
+        # the candidate's HP to 0; the exam fails without a rank change, and
+        # the simulated battle restores the candidate to full HP/MP/SP.
         record = start_guild_exam(self.player, self.examiner, "E")
-        from evennia.objects.models import ObjectDB
-        from world.rules.combat_session import read_session, submit_player_action
-
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         for key in ("atk_phys", "agility", "defense", "magic_level"):
             getattr(opponent.traits, key).base = 500
         opponent.traits.hp.base = 2000
         opponent.traits.hp.current = 2000
-        session = read_session(self.player)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_failed")
         self.assertEqual(self.player.guild_rank, "F")
-        self.assertGreaterEqual(self.player.traits.hp.current, 1)
+        # The lethal crossing really reached zero (simulated, not floored).
+        kinds = [entry.kind for log in result["logs"] for entry in log.entries]
+        self.assertIn("target_defeated", kinds)
+        for key in ("hp", "mp", "sp"):
+            self.assertEqual(
+                getattr(self.player.traits, key).current,
+                getattr(self.player.traits, key).max,
+                key,
+            )
+
+    def test_wounded_candidate_and_examiner_start_at_full(self):
+        # A wounded or spent participant enters the simulated battle at full
+        # HP/MP/SP: the start restores both sides after the spawn.
+        for key in ("hp", "mp", "sp"):
+            getattr(self.player.traits, key).current = 1
+        original_spawn = __import__(
+            "world.rules.guild_exams", fromlist=["_spawn_opponent"]
+        )._spawn_opponent
+
+        def wounded_spawn(actor, target_rank):
+            opponent = original_spawn(actor, target_rank)
+            for key in ("hp", "mp", "sp"):
+                getattr(opponent.traits, key).current = 1
+            return opponent
+
+        with patch(
+            "world.rules.guild_exams._spawn_opponent",
+            side_effect=wounded_spawn,
+        ):
+            record = start_guild_exam(self.player, self.examiner, "E")
+        for key in ("hp", "mp", "sp"):
+            self.assertEqual(
+                getattr(self.player.traits, key).current,
+                getattr(self.player.traits, key).max,
+                key,
+            )
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        self.assertIsNotNone(opponent)
+        for key in ("hp", "mp", "sp"):
+            self.assertEqual(
+                getattr(opponent.traits, key).current,
+                getattr(opponent.traits, key).max,
+                key,
+            )
+
+    def test_lethal_exam_defeat_grants_no_kill_rewards(self):
+        # A lethal simulated defeat is tagged on the event entry, so
+        # kill-credit consumers (XP is monster-tier-gated; DEFEAT progress and
+        # protected-entity failure come from the quest planner) never observe
+        # an ordinary kill from the examination.
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        self.assertEqual(self.player.db.quest_log, [])
+        magic_before = self.player.db.magic_xp
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(result["outcome"], "exam_passed")
+        defeated = [
+            entry
+            for log in result["logs"]
+            for entry in log.entries
+            if entry.kind == "target_defeated"
+        ]
+        self.assertTrue(defeated)
+        self.assertTrue(all(entry.data.get("simulated") is True for entry in defeated))
+        # No kill XP (the examiner is an NPC with no monster tier) and no
+        # quest mutations were planned from the simulated defeat.
+        self.assertEqual(self.player.db.magic_xp, magic_before)
+        self.assertEqual(self.player.db.quest_log, [])
+
+    def test_failed_exam_start_restores_nothing(self):
+        # A rejected start rolls the pre-restore back: the candidate keeps the
+        # wounded/spent state it brought in, and no opponent survives.
+        for key in ("hp", "mp", "sp"):
+            getattr(self.player.traits, key).current = 1
+        with patch(
+            "world.rules.affinity.apply_affinity_change",
+            side_effect=RuntimeError("affinity boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                start_guild_exam(self.player, self.examiner, "E")
+        for key in ("hp", "mp", "sp"):
+            self.assertEqual(getattr(self.player.traits, key).current, 1, key)
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertEqual(
+            ObjectDB.objects.filter(
+                db_key__startswith="guild-examiner-E-",
+                db_location=self.hall,
+            ).count(),
+            0,
+        )
 
 
 class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTest):
@@ -602,13 +694,63 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTest):
         ):
             result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
-        # The overwhelming candidate compresses the examination to the 12-round
-        # cap (exam knockouts are not battlefield-tracked), settling 72 s once.
-        self.assertEqual(clock.tick, 72)
+        # The overwhelming candidate defeats the examiner in one lethal
+        # round (exam defeats are not battlefield-tracked), settling 6 s once.
+        self.assertEqual(clock.tick, 6)
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
         self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
         self.assertIsNone(read_session(self.player))
+
+    def test_forfeit_restore_failure_rolls_back_settlement_and_gauges(self):
+        # The full restoration is part of the settlement transaction: a
+        # restore failure rolls the exam outcome, session clear, and gauge
+        # writes back, and the degraded forfeit path restores the in-process
+        # trait surfaces (the idmapper cache is not transaction-aware). A
+        # retry then settles and restores normally.
+        from world.rules.combat_session import forfeit
+
+        record = start_guild_exam(self.player, self.examiner, "E")
+        self.player.traits.hp.current = 1
+        with patch(
+            "world.rules.traits.restore_gauges_to_full",
+            side_effect=RuntimeError("restore failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                forfeit(self.player)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
+        self.assertIsNotNone(read_session(self.player))
+        self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
+        self.assertEqual(self.player.traits.hp.current, 1)
+        result = forfeit(self.player)
+        self.assertEqual(result["outcome"], "exam_failed")
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
+        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
+        self.assertIsNone(read_session(self.player))
+
+    def test_submit_path_restore_failure_rolls_back_the_round(self):
+        # In the submit path the restore runs inside the shared outer
+        # round-and-settlement transaction: a restore failure rolls the round
+        # effects and the settlement back, leaving the exam ACTIVE and both
+        # sides' in-process gauges at their pre-round values.
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        with patch(
+            "world.rules.traits.restore_gauges_to_full",
+            side_effect=RuntimeError("restore failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
+        self.assertIsNotNone(read_session(self.player))
+        self.assertEqual(self.player.guild_rank, "F")
+        self.assertEqual(opponent.traits.hp.current, opponent.traits.hp.max)
+        self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
 
 
 class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTest):
