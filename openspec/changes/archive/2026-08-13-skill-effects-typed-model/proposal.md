@@ -13,9 +13,11 @@ D3).
 ## What Changes
 
 - Add `world/skills/effects.py` defining one frozen dataclass per effect prefix (`StatMultiplyEffect`,
-  `ElementMasteryEffect`, `SexualMasteryEffect`, `RuleTableEffect`, `FlavorEffect`, `MovementEffect`,
-  `WeaponStyleEffect`, `ConferralEffect`, `DivineMysteryEffect`, plus thin wrappers for the
-  already-working `confer_skill_partial`/`set_disguise` (named `DisguiseEffect` explicitly, since
+  `GrowthRateEffect` (the read-time `growth_rate` prefix `reincarnation_boon_elosia` already declares
+  and `world/rules/progression.py` consumes), `ElementMasteryEffect`, `SexualMasteryEffect`,
+  `RuleTableEffect`, `FlavorEffect`, `MovementEffect`, `WeaponStyleEffect`, `ConferralEffect`,
+  `DivineMysteryEffect`, plus thin wrappers for the already-working
+  `confer_skill_partial`/`set_disguise` (named `DisguiseEffect` explicitly, since
   `conferral-generalization` references it by that name)/`buff_apply`/`self_buff_apply`/
   `confer_growth_rate`/`sexual_event`/`damage`/`disengage` prefixes) and a single dispatch function
   `parse_effect(effect_id: str)`.

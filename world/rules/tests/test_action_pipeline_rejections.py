@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
+    _EFFECT_HANDLERS,
     ActionRequest,
     ActionResolver,
     CommitFailed,
@@ -51,14 +52,23 @@ class ActionPipelineRejectionTests(EvenniaTest):
         finally:
             SKILL_REGISTRY["status_disguise"] = original
 
+    @covers_requirement("skill-registry::body-enhancement-family-is-passive-not-active")
+    def test_cast_of_reclassified_body_enhancement_is_rejected_as_passive(self):
+        self.actor.db.skills = {"active": [], "passive": ["body_enhancement"]}
+        self.assertIs(
+            self.resolve("body_enhancement").reason,
+            RejectReason.SKILL_NOT_ACTIVE,
+        )
+
     def test_unknown_effect(self):
         original = SKILL_REGISTRY["status_disguise"]
         SKILL_REGISTRY["status_disguise"] = replace(
             original,
-            effects=["unknown:test"],
+            effects=["damage:fire:magic"],
         )
         try:
-            self.assertIs(self.resolve().reason, RejectReason.UNKNOWN_EFFECT_ID)
+            with patch.dict(_EFFECT_HANDLERS, {"damage": None}):
+                self.assertIs(self.resolve().reason, RejectReason.UNKNOWN_EFFECT_ID)
             self.assertIsNone(self.actor.db.disguised_stats)
         finally:
             SKILL_REGISTRY["status_disguise"] = original

@@ -1,9 +1,9 @@
 """Skill handling from design section 5.2 and ``skills-equipment``."""
 
-import math
 from dataclasses import dataclass
 from typing import Any
 
+from .effects import StatMultiplyEffect
 from .registry import SKILL_REGISTRY
 
 
@@ -24,20 +24,6 @@ class ConferredSkillGrant:
     skill_key: str
     trait_keys: tuple[str, ...]
     scale: float
-
-
-def _parse_stat_multiply(effect_id: str) -> tuple[str, float] | None:
-    """Parse this package's one effect convention; leave other IDs opaque."""
-    parts = effect_id.split(":")
-    if len(parts) != 3 or parts[0] != "stat_multiply" or not parts[1]:
-        return None
-    try:
-        multiplier = float(parts[2])
-    except ValueError:
-        return None
-    if not math.isfinite(multiplier):
-        return None
-    return parts[1], multiplier
 
 
 class SkillHandler:
@@ -63,11 +49,15 @@ class SkillHandler:
         """Return a derived multiplied value without mutating stored traits."""
         base = getattr(self.entity.traits, trait_key).value
         multiplier = 1.0
-        for skill_key in dict.fromkeys(self._raw.get("active", [])):
+        owned = [
+            *self._raw.get("active", []),
+            *self._raw.get("passive", []),
+        ]
+        for skill_key in dict.fromkeys(owned):
             skill = SKILL_REGISTRY.get(skill_key)
             if skill is None:
                 continue
-            owned_multiplier = _matching_multiplier(skill.effects, trait_key)
+            owned_multiplier = _matching_multiplier(skill.parsed_effects, trait_key)
             if owned_multiplier is not None:
                 multiplier *= owned_multiplier
 
@@ -77,7 +67,9 @@ class SkillHandler:
             source_skill = SKILL_REGISTRY.get(grant.skill_key)
             if source_skill is None:
                 continue
-            source_multiplier = _matching_multiplier(source_skill.effects, trait_key)
+            source_multiplier = _matching_multiplier(
+                source_skill.parsed_effects, trait_key
+            )
             if source_multiplier is not None:
                 multiplier *= source_multiplier * grant.scale
         return round(base * multiplier)
@@ -87,13 +79,15 @@ class SkillHandler:
         return list(self.entity.db.skill_grants or [])
 
 
-def _matching_multiplier(effects: list[str], trait_key: str) -> float | None:
+def _matching_multiplier(
+    parsed_effects: tuple, trait_key: str
+) -> float | None:
     """Combine stat multipliers in one skill that match a trait."""
-    multipliers: list[float] = []
-    for effect_id in effects:
-        parsed = _parse_stat_multiply(effect_id)
-        if parsed is not None and parsed[0] == trait_key:
-            multipliers.append(parsed[1])
+    multipliers = [
+        effect.multiplier
+        for effect in parsed_effects
+        if isinstance(effect, StatMultiplyEffect) and effect.trait == trait_key
+    ]
     if not multipliers:
         return None
     if len(multipliers) > 1:

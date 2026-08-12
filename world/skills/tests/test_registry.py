@@ -6,6 +6,7 @@ from dataclasses import fields
 import unittest
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
+from world.skills.effects import ElementMasteryEffect, SexualMasteryEffect
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
@@ -31,6 +32,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "element",
                 "effects",
                 "faction_constraint",
+                "parsed_effects",
             ],
         )
         for key, skill in SKILL_REGISTRY.items():
@@ -212,7 +214,7 @@ class SkillRegistryTests(unittest.TestCase):
             cost={"mp": 5},
             usable_out_of_combat=False,
             element=None,
-            effects=["direct:effect"],
+            effects=["set_disguise"],
         )
         with self.assertRaises(TypeError):
             skill.cost["mp"] = 0
@@ -249,3 +251,51 @@ class SkillRegistryTests(unittest.TestCase):
                 registered.effects.append("unbounded")
             with self.assertRaises(TypeError):
                 registered.cost["mp"] = 0
+
+    @covers_requirement("skill-effect-model::skilldef---post-init---rejects-unparseable-effects-at-construction")
+    def test_construction_rejects_unrecognized_effect_prefix(self):
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="unknown_effect",
+                label="未知效果",
+                description="帶有無法辨識效果前綴的定義必須在建構時失敗。",
+                kind=SkillKind.PASSIVE,
+                target_spec=TargetSpec.NONE,
+                cost={},
+                usable_out_of_combat=False,
+                element=None,
+                effects=["not_a_real_prefix:x"],
+            )
+
+    @covers_requirement("skill-effect-model::skilldef---post-init---rejects-unparseable-effects-at-construction")
+    def test_every_registry_entry_parses_at_construction(self):
+        for key, skill in SKILL_REGISTRY.items():
+            if skill.effects:
+                self.assertTrue(
+                    skill.parsed_effects,
+                    f"skill {key!r} declares effects but parsed none",
+                )
+            else:
+                self.assertEqual(skill.parsed_effects, ())
+
+    @covers_requirement("skill-registry::body-enhancement-family-is-passive-not-active")
+    def test_body_enhancement_family_is_passive_not_active(self):
+        for key in (
+            "body_enhancement",
+            "body_enhancement_extreme",
+            "body_enhancement_basic",
+        ):
+            self.assertIs(
+                SKILL_REGISTRY[key].kind,
+                SkillKind.PASSIVE,
+                key,
+            )
+
+    @covers_requirement("skill-registry::reincarnation-boon-yuna-s-effect-string-is-well-formed")
+    def test_reincarnation_boon_yuna_parses_as_sexual_mastery_effect(self):
+        parsed = SKILL_REGISTRY["reincarnation_boon_yuna"].parsed_effects
+        self.assertEqual(len(parsed), 1)
+        self.assertIsInstance(parsed[0], SexualMasteryEffect)
+        self.assertFalse(
+            any(isinstance(effect, ElementMasteryEffect) for effect in parsed)
+        )
