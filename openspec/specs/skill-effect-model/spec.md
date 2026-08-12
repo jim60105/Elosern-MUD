@@ -1,16 +1,30 @@
-## ADDED Requirements
+## Purpose
+
+Defines the typed effect-ID parsing module `world/skills/effects.py`: one frozen
+dataclass per recognized effect prefix, a single `parse_effect` dispatch, and
+the registry-load-time validation guarantee that an unrecognized prefix fails
+at import, not silently at use.
+
+## Requirements
 
 ### Requirement: parse_effect classifies every declared prefix into a typed dataclass
 `world/skills/effects.py` SHALL define `parse_effect(effect_id: str)` returning one of a fixed set of
-frozen dataclasses, one per recognized prefix (`stat_multiply`, `element_mastery_rank`,
+frozen dataclasses, one per recognized prefix (`stat_multiply`, `growth_rate`, `element_mastery_rank`,
 `sexual_magic_mastery`, `passive_buff`, `combat_prediction`, `passive_trait`, `movement`,
 `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`, `self_buff_apply`,
 `confer_growth_rate`, `sexual_event`, `damage`, `disengage`, `divine_mystery`). `parse_effect` SHALL
-raise `ValueError` for any prefix not in this set.
+raise `ValueError` for any prefix not in this set. `growth_rate` SHALL be recognized because
+`reincarnation_boon_elosia` already declares `growth_rate:magic:100`, which
+`world/rules/progression.py` consumes; omitting it would make the registry's own import fail the
+"every existing entry parses" scenario below.
 
 #### Scenario: A known prefix parses into its dataclass
 - **WHEN** `parse_effect("stat_multiply:atk_phys:100")` is called
 - **THEN** it returns a `StatMultiplyEffect(trait="atk_phys", multiplier=100.0)` instance
+
+#### Scenario: The read-time growth_rate prefix parses into its dataclass
+- **WHEN** `parse_effect("growth_rate:magic:100")` is called
+- **THEN** it returns a `GrowthRateEffect(stat="magic", multiplier=100.0)` instance
 
 #### Scenario: An unknown prefix raises
 - **WHEN** `parse_effect("definitely_not_a_real_prefix:x")` is called

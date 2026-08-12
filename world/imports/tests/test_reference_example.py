@@ -21,7 +21,6 @@ class ReferenceExampleTests(TestCase):
         self.assertEqual(len(record["stats"]), 8)
         self.assertTrue(record["disguised_stats"])
         self.assertLess(set(record["disguised_stats"]), set(record["stats"]))
-        self.assertTrue(record["skills"])
-        self.assertTrue(record["passives"])
+        self.assertTrue(record["skills"] or record["passives"])
         self.assertGreater(len(record["sexual_baseline"]), 3)
         self.assertGreater(len(record["persona"]), 1)

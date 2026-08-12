@@ -21,8 +21,8 @@
     "atk_phys": 12,
     "agility": 10
   },
-  "skills": ["body_enhancement"],
-  "passives": ["elf_longevity"],
+  "skills": [],
+  "passives": ["body_enhancement", "elf_longevity"],
   "equipment": {},
   "inventory": [],
   "sexual_baseline": {

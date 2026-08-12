@@ -13,7 +13,9 @@ from typeclasses.monsters import Monster
 from world.lore.races import RACE_REGISTRY
 from world.rules.traits import STATIC_KEYS
 from world.skills import handler
-from world.skills.handler import _matching_multiplier, _parse_stat_multiply
+from world.skills.effects import StatMultiplyEffect
+from world.skills.handler import _matching_multiplier
+from world.skills.registry import SKILL_REGISTRY
 
 
 class SkillHandlerTests(EvenniaTest):
@@ -69,6 +71,16 @@ class SkillHandlerTests(EvenniaTest):
         entity.db.skills = {"active": ["fire_ball"], "passive": []}
         self.assertEqual(entity.skills.effective_value("atk_phys"), before)
 
+    @covers_requirement("skill-registry::body-enhancement-family-is-passive-not-active")
+    def test_passive_ownership_still_applies_the_multiplier(self):
+        entity = self._entity()
+        entity.db.skills = {
+            "active": [],
+            "passive": ["body_enhancement_extreme"],
+        }
+        before = entity.traits.atk_phys.value
+        self.assertEqual(entity.skills.effective_value("atk_phys"), before * 1000)
+
     def test_duplicate_owned_key_is_resolution_idempotent(self):
         entity = self._entity()
         entity.db.skills = {
@@ -97,27 +109,20 @@ class SkillHandlerTests(EvenniaTest):
             self.assertLessEqual(lower, getattr(entity.traits, key).base)
             self.assertLessEqual(getattr(entity.traits, key).base, upper)
 
-    def test_parser_ignores_opaque_and_malformed_effects(self):
+    def test_matching_multiplier_reads_typed_effects(self):
+        skill = SKILL_REGISTRY["body_enhancement"]
         self.assertEqual(
-            _parse_stat_multiply("stat_multiply:atk_phys:1.2"),
-            ("atk_phys", 1.2),
+            _matching_multiplier(skill.parsed_effects, "atk_phys"),
+            100.0,
         )
-        for effect in (
-            "damage:fire:magic",
-            "stat_multiply:atk_phys",
-            "stat_multiply::10",
-            "stat_multiply:atk_phys:not-a-number",
-            "stat_multiply:atk_phys:nan",
-        ):
-            self.assertIsNone(_parse_stat_multiply(effect))
+        self.assertIsNone(_matching_multiplier(skill.parsed_effects, "magic_level"))
+        self.assertIsNone(_matching_multiplier((), "atk_phys"))
+        duplicate = (
+            StatMultiplyEffect(trait="atk_phys", multiplier=2.0),
+            StatMultiplyEffect(trait="atk_phys", multiplier=3.0),
+        )
         with self.assertRaises(ValueError):
-            _matching_multiplier(
-                [
-                    "stat_multiply:atk_phys:2",
-                    "stat_multiply:atk_phys:3",
-                ],
-                "atk_phys",
-            )
+            _matching_multiplier(duplicate, "atk_phys")
 
     def test_handler_source_never_assigns_to_traits(self):
         tree = ast.parse(inspect.getsource(handler))

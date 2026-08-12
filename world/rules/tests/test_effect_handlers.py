@@ -17,6 +17,7 @@ from world.rules.action import (
     RejectReason,
     SNAPSHOTTED_SURFACES,
     UnsnapshottedSurfaceError,
+    _EFFECT_HANDLERS,
     _commit,
     _handle_sexual_event,
     _handle_buff_apply,
@@ -167,22 +168,17 @@ class LandedEffectHandlerTests(EvenniaTest):
 
         request = ActionRequest(
             Actor(),
-            "status_disguise",
+            "fire_ball",
             [],
             RoomActionContext(None),
         )
-        skill = replace(
-            SKILL_REGISTRY["status_disguise"],
-            effects=["test_malformed:value"],
-        )
-        register_effect_handler(
-            "test_malformed",
-            lambda actor, targets, effect_id, context: [object()],
-            frozenset({"traits"}),
-            requires_event_context=frozenset(),
-        )
-        with self.assertRaises(Exception) as caught:
-            _step5_effect_resolution(request, skill, [])
+        skill = SKILL_REGISTRY["fire_ball"]
+        with patch.dict(
+            _EFFECT_HANDLERS,
+            {"damage": lambda actor, targets, effect_id, context: [object()]},
+        ):
+            with self.assertRaises(Exception) as caught:
+                _step5_effect_resolution(request, skill, [])
         self.assertEqual(
             caught.exception.reason,
             RejectReason.EFFECT_RESOLUTION_FAILED,

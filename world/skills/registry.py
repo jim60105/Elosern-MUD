@@ -1,15 +1,16 @@
 """Skill definitions from design section 5.2 and ``skills-equipment``.
 
 ``SkillKind`` and ``TargetSpec`` are forward declarations for change 8's
-action resolver to import rather than redefine. ``stat_multiply`` is the only
-effect-ID convention interpreted by this package; all other effects remain
-opaque for the future rulebook engine.
+action resolver to import rather than redefine. Every ``effects`` string is
+parsed into a typed dataclass by ``world.skills.effects.parse_effect`` at
+construction; see that module for the recognized effect-ID conventions.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
+from world.skills.effects import parse_effect
 
 
 class _FrozenDict(dict):
@@ -99,6 +100,7 @@ class SkillDef:
     element: Element | None
     effects: list[str]
     faction_constraint: FactionConstraint = FactionConstraint.ANY
+    parsed_effects: tuple = ()
 
     def __post_init__(self) -> None:
         """Enforce the registry invariants for every constructor path.
@@ -107,10 +109,17 @@ class SkillDef:
         ``flee`` definition) must observe the same bounded presentation
         metadata and the same immutable collection contract as the seed
         builder, so no runtime code can mutate a registered definition.
+        Every effect string must parse under the typed dispatch table; an
+        unrecognized prefix raises here (registry-load time), not at use.
         """
         _validate_metadata(self.label, self.description)
         object.__setattr__(self, "cost", _FrozenDict(self.cost))
         object.__setattr__(self, "effects", _FrozenList(self.effects))
+        object.__setattr__(
+            self,
+            "parsed_effects",
+            tuple(parse_effect(effect_id) for effect_id in self.effects),
+        )
 
 
 def _validate_metadata(label: str, description: str) -> None:
@@ -158,12 +167,12 @@ _BODY_TRAITS = ("atk_phys", "agility", "defense")
 
 
 def _body_multiplier(key: str, label: str, multiplier: float) -> SkillDef:
-    """Build one active physical-stat multiplier tier."""
+    """Build one passive physical-stat multiplier tier."""
     return _skill(
         key,
         label,
         "以體內能量強化自身的物理能力，提升攻擊、敏捷與防禦。",
-        SkillKind.ACTIVE,
+        SkillKind.PASSIVE,
         TargetSpec.SELF,
         usable_out_of_combat=True,
         effects=[
@@ -411,7 +420,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             "轉生帶來的祝福，被動精通性魔法的掌握。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
-            effects=["element_mastery_rank:性魔法:主宰"],
+            effects=["sexual_magic_mastery"],
         ),
     )
 }

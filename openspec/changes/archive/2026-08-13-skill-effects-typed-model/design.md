@@ -42,6 +42,20 @@ skills — is accepted by the registry with no validation and does nothing anywh
 - **`passive_trait` (e.g. `elf_longevity`) becomes `FlavorEffect`, explicitly declared inert.** This is
   a deliberate category (D1's "flavor with no mechanical effect is a legitimate declared category"),
   distinct from an *unrecognized* prefix. `parse_effect` accepts it; nothing ever consumes it.
+- **`growth_rate` is a recognized read-time prefix, not an unknown one.** The registry already
+  declares `reincarnation_boon_elosia` with `effects=["growth_rate:magic:100"]`, consumed by
+  `world/rules/progression.py`'s `_self_magic_growth_multiplier`. It therefore gets
+  `GrowthRateEffect(stat, multiplier)` (a `StatMultiplyEffect`-shaped pair) in this change — the
+  "unknown prefix raises" guarantee and the "every existing registry entry still parses" scenario
+  would otherwise contradict each other on this one existing entry. `progression.py` itself is not
+  migrated here (it reads raw strings); only the typed representation is introduced.
+- **`ElementMasteryEffect` stores the rank segment, not an element key.** The shipped mastery
+  entries declare `effects=["element_mastery_rank:主宰"]` and the sibling
+  `element-mastery-cast-gate` change keeps that exact string; the skill's element already lives in
+  `SkillDef.element`. The parent design doc's `ElementMasteryEffect(element)` signature is
+  explicitly amended here: the parsed field is `rank` (`ElementMasteryEffect(rank="主宰")`). This
+  does not conflict with any sibling change — none of them read the field (the cast gate keys off
+  owned skill keys, per D4).
 - **`body_enhancement*` reclassification lands in this change, not a separate one**, because it is a
   three-line diff (the `kind=` argument) directly adjacent to the typed-effect work on the same skills,
   and separating it would create a dependency edge for no isolation benefit.
@@ -58,6 +72,16 @@ skills — is accepted by the registry with no validation and does nothing anywh
   startup instead of degrading gracefully. → Mitigation: this is the explicit intent (D1) — a loud
   startup failure is strictly better than an 18-skills-silently-dead regression, and this is a
   single-player local server where startup failures are immediately visible to the one operator.
+- [Risk] `growth_rate` is parsed twice: once here into `GrowthRateEffect`, and once by
+  `world/rules/progression.py`'s `_self_magic_growth_multiplier` (raw-string `startswith`/`float`
+  reads). The two parsers could drift if a later change rebalances the growth-rate grammar. →
+  Mitigation: deferred deliberately — the parent design §3.1 names only `handler.py` and (under
+  later changes) `combat_modifiers.py` for consumer migration, and `progression.py` is outside this
+  change's Impact list. Any future grammar change owns updating `progression.py` (its sole
+  consumer); a dedicated consumer-migration follow-up can fold it in.
+- [Note] At main-spec sync time, the `skill-handler` spec's `effective_value` wording ("every
+  currently-owned active skill's matching `stat_multiply` effect") should be widened to "owned
+  active or passive skill", since this change extends the read to both ownership buckets.
 
 ## Migration Plan
 
