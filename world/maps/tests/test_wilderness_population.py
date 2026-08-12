@@ -500,18 +500,20 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotEqual(respawned[0].pk, self.monster.pk)
         self.assertGreater(respawned[0].traits.hp.current, 0)
 
+    @covers_requirement("evennia-test-optimization::registry-content-assertions-use-the-registry-s-key-domain")
     def test_restore_registers_live_session_skip_safety_state(self):
         from world.rules.guild_economy import restore_persisted_sessions
         from world.rules.skip_safety import _BATTLEFIELDS
 
         # A mid-combat session (no terminal round) survives the restore step
-        # with its skip-safety registration intact (task 1.2).
+        # with its skip-safety registration intact (task 1.2). The registry is
+        # keyed by each participant's immutable dbref, never its display key.
         engage(self.player, self.monster)
         _BATTLEFIELDS.clear()
         restore_persisted_sessions()
         self.assertIsNotNone(self.player.db.active_combat)
-        self.assertIn(str(self.player.key), _BATTLEFIELDS)
-        self.assertIn(str(self.monster.key), _BATTLEFIELDS)
+        self.assertIn(str(self.player.pk), _BATTLEFIELDS)
+        self.assertIn(str(self.monster.pk), _BATTLEFIELDS)
 
     @covers_requirement("wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant")
     def test_reconciliation_without_sessions_is_unchanged(self):

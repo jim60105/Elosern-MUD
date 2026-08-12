@@ -286,6 +286,57 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             page.wait_for_timeout(250)
         raise AssertionError("combat mode never became available")
 
+    def _focus_combat_dock(self, page) -> None:
+        """Focus the action dock and wait for the mounted, unlocked router.
+
+        The combat dock renders its first row synchronously inside the router
+        reset's focus emission, so a mounted ``#combat-row-0`` proves the
+        KeyboardRouter frame exists; waiting for ``isMutationInFlight()`` to be
+        false closes the router's submission gate. Together they guarantee a
+        subsequent Enter press reaches the KeyboardRouter and is never
+        swallowed by the command-drawer field or an unfocused editable target.
+        """
+        page.evaluate("document.getElementById('action-dock').focus()")
+        page.wait_for_function(
+            "() => !!document.querySelector('#combat-row-0')", timeout=15000
+        )
+        page.wait_for_function(
+            "() => !window.Elosern.keyboard.isMutationInFlight()", timeout=15000
+        )
+
+    def _wait_combat_row_key(
+        self, page, key: str, timeout: int = 15000, row_zero: bool = False
+    ) -> None:
+        """Wait until a mounted combat row in the action dock carries a key.
+
+        With ``row_zero`` the predicate is scoped to the first combat row
+        (``#combat-row-0``, the menu frame's first cell); otherwise any
+        ``#combat-row-*`` row matching the exact key qualifies (the focused
+        cell after navigation).
+        """
+        if row_zero:
+            page.wait_for_function(
+                "(key) => (() => {"
+                "  const row = document.querySelector('#combat-row-0');"
+                "  return row && row.dataset.itemKey && "
+                "    row.dataset.itemKey.indexOf(key) === 0;"
+                "})()",
+                arg=key,
+                timeout=timeout,
+            )
+            return
+        page.wait_for_function(
+            "(key) => (() => {"
+            "  var rows = document.querySelectorAll('#action-dock [data-item-key]');"
+            "  for (var i = 0; i < rows.length; i++) {"
+            "    if (rows[i].dataset.itemKey === key) { return true; }"
+            "  }"
+            "  return false;"
+            "})()",
+            arg=key,
+            timeout=timeout,
+        )
+
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
     def test_combat_portrait_overlay_shows_name_and_role(self):
         page = self.logged_in_page()
@@ -330,6 +381,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self.assertTrue(page.locator(".art-scene").is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
+    @covers_requirement("webclient-browser-verification::art-panel-portrait-keyboard-journeys-establish-dock-focus-before-key-presses")
     def test_keyboard_focus_switches_the_portrait_without_a_packet(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -339,17 +391,29 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             "() => !!document.querySelector('.art-portrait')", timeout=15000
         )
         first_name = page.locator(".art-portrait-name").inner_text()
-        # Focus the root "攻擊" action and open its target menu: the focused
-        # target descriptor resolves to that participant's portrait.
-        page.keyboard.press("Enter")
-        page.wait_for_timeout(300)
-        page.wait_for_function(
-            "() => !!document.querySelector('.art-portrait')", timeout=15000
-        )
         combat = store_state(page)["panels"]["context_actions"]
+        monster_id = next(
+            p["identity"]
+            for p in combat["participants"]
+            if p["team"] == "foes"
+        )
         monster_name = next(
             p["display_name"] for p in combat["participants"] if p["team"] == "foes"
         )
+        # Focus the root "攻擊" action and open its target menu: the focused
+        # target descriptor resolves to that participant's portrait. The dock
+        # is focused and its router frame mounted (and unlocked) first, so the
+        # Enter press is never swallowed by the command drawer or an editable
+        # field. The single-target menu lists the actor first (presenter
+        # order), so move past it to the enemy target like the combat-menu
+        # journeys do.
+        self._focus_combat_dock(page)
+        page.keyboard.press("Enter")
+        # The basic-attack target menu mounts (its first cell is a target row)
+        # before navigating it.
+        self._wait_combat_row_key(page, "target-", row_zero=True)
+        page.keyboard.press("ArrowRight")  # past the actor to the enemy target
+        self._wait_combat_row_key(page, "target-" + str(monster_id))
         page.wait_for_function(
             "(n) => document.querySelector('.art-portrait-name') && "
             "document.querySelector('.art-portrait-name').innerText === n",
@@ -363,6 +427,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self.assertEqual(sent_action_count(page, None), 0)
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
+    @covers_requirement("webclient-browser-verification::art-panel-portrait-keyboard-journeys-establish-dock-focus-before-key-presses")
     def test_defeated_participant_leaves_the_catalog_in_the_same_update(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -377,10 +442,13 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # settlement clears the session and the catalog entry disappears in the
         # same combat update.
         # Root order: attack, skills, items, defend, flee, forfeit.
+        self._focus_combat_dock(page)
         for _ in range(5):
             page.keyboard.press("ArrowDown")
             page.wait_for_timeout(60)
         page.keyboard.press("Enter")  # open the secondary Forfeit menu
+        # The confirmation frame mounts before the confirming Enter.
+        self._wait_combat_row_key(page, "confirm-forfeit")
         page.keyboard.press("Enter")  # confirm-forfeit
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
