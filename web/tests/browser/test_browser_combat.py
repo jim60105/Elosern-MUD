@@ -178,19 +178,22 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # status_disguise is the third owned skill (first column, second row
-        # of the 2-column skills grid).
+        # status_disguise (SELF) is now disabled in combat: the session context
+        # cannot supply its disguise key, so the menu exposes the disabled
+        # explanation instead of a cast. flee is the enabled SELF skill (third
+        # grid row, first column of the 2-column skills grid).
         self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
         self._press(page, "ArrowDown")  # status_disguise (second grid row)
-        self._press(page, "Enter")  # open status_disguise
+        self._press(page, "ArrowDown")  # flee (third grid row)
+        self._press(page, "Enter")  # open flee
         self._press(page, "Enter")  # confirm self-cast
 
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "status_disguise")
+        self.assertEqual(envelope["payload"]["skill_key"], "flee")
         self.assertNotIn("target_ids", envelope["payload"])
         self.assertNotIn("target_shorthand", envelope["payload"])
         self.assertNotIn("actor", envelope["payload"])

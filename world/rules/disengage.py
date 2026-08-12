@@ -147,4 +147,5 @@ register_effect_handler(
     "disengage",
     _handle_disengage,
     surfaces=frozenset({"battlefield"}),
+    requires_event_context=frozenset({"battlefield"}),
 )

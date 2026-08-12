@@ -45,6 +45,7 @@ class RejectReason(StrEnum):
     ACTION_FORBIDDEN = "action_forbidden"
     UNKNOWN_EFFECT_ID = "unknown_effect_id"
     EFFECT_RESOLUTION_FAILED = "effect_resolution_failed"
+    MISSING_EFFECT_CONTEXT = "missing_effect_context"
     RESOURCE_DEDUCTION_FAILED = "resource_deduction_failed"
     EVENT_LOG_CONSTRUCTION_FAILED = "event_log_construction_failed"
     TIME_COST_LOOKUP_FAILED = "time_cost_lookup_failed"
@@ -135,6 +136,7 @@ SNAPSHOTTED_SURFACES = frozenset(
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
 _EFFECT_HANDLER_SURFACES: dict[str, frozenset[str]] = {}
+_EFFECT_HANDLER_REQUIRED_CONTEXT: dict[str, frozenset[str]] = {}
 _EVENT_EFFECT_PLANNERS: dict[str, Callable[[ActionRequest, "EventLog"], list[PendingEffect]]] = {}
 DEFAULT_CAST_SECONDS = 6
 SKILL_TIME_OVERRIDES: dict[str, int] = {}
@@ -158,8 +160,16 @@ def register_effect_handler(
     prefix: str,
     handler: EffectHandler,
     surfaces: frozenset[str],
+    requires_event_context: frozenset[str],
 ) -> None:
-    """Register an effect prefix only when all mutations are restorable."""
+    """Register an effect prefix only when all mutations are restorable.
+
+    ``requires_event_context`` SHALL name every ``event_context`` key the
+    handler needs to resolve; an explicit (possibly empty) frozenset is
+    required so no handler can silently skip the contract. Preflight and
+    preview reject an action whose session context cannot supply every
+    declared key, before any round cost.
+    """
     unsupported = surfaces - SNAPSHOTTED_SURFACES
     if unsupported:
         raise UnsnapshottedSurfaceError(
@@ -167,6 +177,7 @@ def register_effect_handler(
         )
     _EFFECT_HANDLERS[prefix] = handler
     _EFFECT_HANDLER_SURFACES[prefix] = surfaces
+    _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] = frozenset(requires_event_context)
 
 
 def _entity_key(entity: Any) -> str:
@@ -230,14 +241,20 @@ def _step4_capability(actor: Any) -> None:
         raise RejectedAction(RejectReason.ACTION_FORBIDDEN, _entity_key(actor))
 
 
-def _require_context(context: dict[str, Any], *keys: str) -> tuple[Any, ...]:
-    try:
-        return tuple(context[key] for key in keys)
-    except KeyError as error:
+def _require_context(context: dict[str, Any], prefix: str) -> dict[str, Any]:
+    """Return the declared event-context values for one effect-handler prefix.
+
+    Reads the handler's registration declaration so resolution-time
+    requirements can never drift from preflight (design D1).
+    """
+    declared = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix]
+    missing = declared - set(context)
+    if missing:
         raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            f"missing event_context key {error.args[0]!r}",
-        ) from error
+            RejectReason.MISSING_EFFECT_CONTEXT,
+            f"missing event_context key {sorted(missing)[0]!r}",
+        )
+    return {key: context[key] for key in declared}
 
 
 def _handle_confer_skill_partial(
@@ -246,12 +263,10 @@ def _handle_confer_skill_partial(
     effect_id: str,
     context: dict[str, Any],
 ) -> list[PendingEffect]:
-    skill_key, scale, trait_keys = _require_context(
-        context,
-        "confer_skill_key",
-        "confer_scale",
-        "confer_trait_keys",
-    )
+    values = _require_context(context, "confer_skill_partial")
+    skill_key = values["confer_skill_key"]
+    scale = values["confer_scale"]
+    trait_keys = values["confer_trait_keys"]
     target = targets[0]
     source_key = _entity_key(actor)
     return [
@@ -276,7 +291,8 @@ def _handle_set_disguise(
     effect_id: str,
     context: dict[str, Any],
 ) -> list[PendingEffect]:
-    overrides = context.get("disguise", context.get("overrides"))
+    values = _require_context(context, "set_disguise")
+    overrides = values["disguise"]
     if not isinstance(overrides, dict):
         raise RejectedAction(
             RejectReason.EFFECT_RESOLUTION_FAILED,
@@ -355,7 +371,8 @@ def _handle_confer_growth_rate(
     effect_id: str,
     context: dict[str, Any],
 ) -> list[PendingEffect]:
-    (scale,) = _require_context(context, "confer_scale")
+    values = _require_context(context, "confer_growth_rate")
+    scale = values["confer_scale"]
     target = targets[0]
     source_key = _entity_key(actor)
     return [
@@ -411,31 +428,39 @@ register_effect_handler(
     "confer_skill_partial",
     _handle_confer_skill_partial,
     frozenset({"skill_grants"}),
+    requires_event_context=frozenset(
+        {"confer_skill_key", "confer_scale", "confer_trait_keys"}
+    ),
 )
 register_effect_handler(
     "set_disguise",
     _handle_set_disguise,
     frozenset({"traits"}),
+    requires_event_context=frozenset({"disguise"}),
 )
 register_effect_handler(
     "buff_apply",
     _handle_buff_apply,
     frozenset({"buffs"}),
+    requires_event_context=frozenset(),
 )
 register_effect_handler(
     "self_buff_apply",
     _handle_self_buff_apply,
     frozenset({"buffs"}),
+    requires_event_context=frozenset(),
 )
 register_effect_handler(
     "confer_growth_rate",
     _handle_confer_growth_rate,
     frozenset({"buffs"}),
+    requires_event_context=frozenset({"confer_scale"}),
 )
 register_effect_handler(
     "sexual_event",
     _handle_sexual_event,
     frozenset({"sexual", "traits"}),
+    requires_event_context=frozenset(),
 )
 
 
@@ -999,11 +1024,19 @@ class ActionResolver:
             _step2_resource_check(request.actor, skill)
             _step3_targeting(request, skill)
             _step4_capability(request.actor)
+            context = _event_context(request)
             for effect_id in skill.effects:
-                if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:
+                prefix = _effect_prefix(effect_id)
+                if prefix not in _EFFECT_HANDLERS:
                     raise RejectedAction(
                         RejectReason.UNKNOWN_EFFECT_ID,
                         effect_id,
+                    )
+                missing = _EFFECT_HANDLER_REQUIRED_CONTEXT[prefix] - context.keys()
+                if missing:
+                    raise RejectedAction(
+                        RejectReason.MISSING_EFFECT_CONTEXT,
+                        f"missing event_context key {sorted(missing)[0]!r}",
                     )
             _step8_time_cost(request, skill)
         except RejectedAction as rejection:

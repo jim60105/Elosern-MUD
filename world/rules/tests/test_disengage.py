@@ -137,6 +137,7 @@ class DisengageStagingTests(unittest.TestCase):
                 "test_inventory_disengage",
                 lambda actor, targets, effect_id, context: [],
                 frozenset({"inventory"}),
+                requires_event_context=frozenset(),
             )
 
     @covers_requirement("disengage-action::a-missing-battlefield-reference-in-event-context-is-a-named-rejection-not-a-crash")
