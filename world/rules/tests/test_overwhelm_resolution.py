@@ -212,7 +212,7 @@ class ResolutionTests(unittest.TestCase):
                 side_effect=[[expected[0]], [expected[1]]],
             ),
         ):
-            _, _, raw, rounds = _resolve_overwhelm_raw(
+            _, _, raw, rounds, _ = _resolve_overwhelm_raw(
                 field,
                 lambda entity, current: None,
                 max_rounds=12,
@@ -313,7 +313,7 @@ class RealCombatEquivalenceTests(EvenniaTest):
     def _assert_direction_is_exact(self, *, strong_first: bool) -> None:
         resolved = self._field("resolved", strong_first=strong_first)
         random.seed(1017)
-        initial, verdict, raw, rounds = _resolve_overwhelm_raw(
+        initial, verdict, raw, rounds, _ = _resolve_overwhelm_raw(
             resolved,
             default_attack_policy,
             12,
@@ -342,6 +342,50 @@ class RealCombatEquivalenceTests(EvenniaTest):
         # but the session facade never dispatches it for a foe-overwhelming
         # verdict, so this is not a production dispatch contract.
         self._assert_direction_is_exact(strong_first=False)
+
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-resolves-an-overwhelm-classified-encounter-by-reusing-run-round")
+    def test_commanded_identity_never_changes_resolution(self):
+        plain = self._field("plain", strong_first=True)
+        random.seed(1017)
+        baseline = resolve_overwhelm(plain, default_attack_policy)
+        marked = self._field("marked", strong_first=True)
+        random.seed(1017)
+        result = resolve_overwhelm(
+            marked,
+            default_attack_policy,
+            commanded_actor="first-marked",
+            commanded_skill="shadow_slash",
+        )
+        self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
+        self.assertEqual(result.total_seconds, baseline.total_seconds)
+        self.assertEqual(result.verdict_after, baseline.verdict_after)
+        self.assertEqual(result.battle_over, baseline.battle_over)
+        self.assertEqual(self._state(marked), self._state(plain))
+
+        def without_markers(logs):
+            return [
+                (actor, tuple(row for row in entries if row[0] != "commanded_action"))
+                for actor, entries in self._logs(logs)
+            ]
+
+        self.assertEqual(
+            without_markers(result.event_logs),
+            without_markers(baseline.event_logs),
+        )
+        markers = [
+            (actor, entries)
+            for actor, entries in self._logs(result.event_logs)
+            if any(row[0] == "commanded_action" for row in entries)
+        ]
+        self.assertEqual(len(markers), 1)
+        self.assertEqual(
+            [
+                (actor, entries)
+                for actor, entries in self._logs(baseline.event_logs)
+                if any(row[0] == "commanded_action" for row in entries)
+            ],
+            [],
+        )
 
     def test_real_bounded_multi_round_encounter_completes_and_renders(self):
         elf = self._entity("elf-multi", strong=True)

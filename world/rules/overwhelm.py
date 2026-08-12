@@ -12,6 +12,7 @@ from world.rules import combat
 from world.rules.combat import Battlefield
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
+from world.skills.registry import SKILL_REGISTRY
 
 
 OVERWHELM_YAML = yaml.safe_load(
@@ -250,21 +251,58 @@ def compress_event_logs(
     overwhelming_team: str,
     overwhelmed_team: str,
     rounds: int,
+    commanded_actor: str | None = None,
+    commanded_skill: str | None = None,
+    commanded_window: Iterable[EventLog] | None = None,
 ) -> tuple[EventLog, ...]:
-    """Remove redundant successful-hit rolls and prepend an encounter summary."""
+    """Preserve every per-attack record and prepend an encounter summary.
+
+    Every entry of every non-empty input ``EventLog`` is kept in original
+    order via ``dataclasses.replace()``; only an input ``EventLog`` with zero
+    entries is dropped. When ``commanded_actor``, ``commanded_skill``, and
+    ``commanded_window`` are all provided, exactly one ``commanded_action``
+    entry is prepended to the first log within ``commanded_window``, in
+    window order, whose actor and skill key both match; omitting any
+    argument, or finding no match in the window, adds no marker.
+    """
     raw = tuple(raw_logs)
-    filtered = tuple(
-        replace(
-            log,
-            entries=tuple(
-                entry
-                for entry in log.entries
-                if entry.kind != "roll" or not entry.data.get("hit", False)
+    window = None if commanded_window is None else tuple(commanded_window)
+    marker_target = None
+    if (
+        commanded_actor is not None
+        and commanded_skill is not None
+        and window is not None
+    ):
+        raw_by_id = {id(log): log for log in raw}
+        marker_target = next(
+            (
+                log
+                for log in window
+                if id(log) in raw_by_id
+                and log.entries
+                and log.actor == commanded_actor
+                and log.skill_key == commanded_skill
             ),
+            None,
         )
-        for log in raw
-    )
-    filtered = tuple(log for log in filtered if log.entries)
+    preserved: list[EventLog] = []
+    for log in raw:
+        if not log.entries:
+            continue
+        entries = log.entries
+        if log is marker_target:
+            skill = SKILL_REGISTRY.get(commanded_skill)
+            label = skill.label if skill is not None else commanded_skill
+            marker = EventEntry(
+                kind="commanded_action",
+                actor=commanded_actor,
+                target=None,
+                data={"skill": label},
+                text_template="你施展了「{data[skill]}」。",
+            )
+            entries = (marker,) + entries
+        preserved.append(replace(log, entries=entries))
+    filtered = tuple(preserved)
     damage_entries = tuple(_damage_entries(filtered))
     hits = len(damage_entries)
     total_damage = sum(
@@ -300,35 +338,50 @@ def _resolve_overwhelm_raw(
     battlefield: Battlefield,
     action_provider: combat.ActionProvider,
     max_rounds: int,
-) -> tuple[str | None, str | None, list[EventLog], int]:
-    """Resolve and expose raw logs for exact-equivalence tests."""
+) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
+    """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
         raise ValueError("max_rounds must be non-negative")
     initial = classify_overwhelm(battlefield)
     if initial is None or combat.is_battle_over(battlefield):
-        return initial, initial, [], 0
+        return initial, initial, [], 0, ()
     raw_logs: list[EventLog] = []
     rounds = 0
     verdict_after = initial
+    round1_window: tuple[EventLog, ...] = ()
     while rounds < max_rounds and not combat.is_battle_over(battlefield):
-        raw_logs.extend(combat.run_round(battlefield, action_provider))
+        round_logs = combat.run_round(battlefield, action_provider)
+        if rounds == 0:
+            round1_window = tuple(round_logs)
+        raw_logs.extend(round_logs)
         rounds += 1
         verdict_after = classify_overwhelm(battlefield)
         if verdict_after != initial:
             break
-    return initial, verdict_after, raw_logs, rounds
+    return initial, verdict_after, raw_logs, rounds, round1_window
 
 
 def resolve_overwhelm(
     battlefield: Battlefield,
     action_provider: combat.ActionProvider,
     max_rounds: int = 12,
+    commanded_actor: str | None = None,
+    commanded_skill: str | None = None,
 ) -> OverwhelmResult:
-    """Resolve a currently overwhelming encounter through the normal loop."""
-    initial, verdict_after, raw_logs, rounds = _resolve_overwhelm_raw(
-        battlefield,
-        action_provider,
-        max_rounds,
+    """Resolve a currently overwhelming encounter through the normal loop.
+
+    The optional ``commanded_actor``/``commanded_skill`` identity is
+    forwarded to compression (with the round-1 log slice) so the player's
+    commanded action can be marked in the compressed record; it never
+    affects combat math, and callers that omit it receive identical
+    resolution without the marker.
+    """
+    initial, verdict_after, raw_logs, rounds, round1_window = (
+        _resolve_overwhelm_raw(
+            battlefield,
+            action_provider,
+            max_rounds,
+        )
     )
     event_logs = (
         ()
@@ -338,6 +391,9 @@ def resolve_overwhelm(
             initial,
             next(team for team in battlefield.teams if team != initial),
             rounds,
+            commanded_actor=commanded_actor,
+            commanded_skill=commanded_skill,
+            commanded_window=round1_window,
         )
     )
     return OverwhelmResult(

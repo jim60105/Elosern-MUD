@@ -22,6 +22,7 @@ from world.rules.action import (
 )
 from world.rules.clock import WorldClock
 from world.rules.combat import BattlefieldActionContext, run_round
+from world.rules.event_log import render_plain_text
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.combat_session import (
     CombatSessionError,
@@ -314,6 +315,74 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTest):
             result = submit_player_action(self.player, "fire_ball", [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertIsNone(self.player.db.active_combat)
+
+
+class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTest):
+    """overwhelm-log-attribution: the compressed log of a player-overwhelming
+    session marks the player's commanded action and keeps every attack's own
+    roll line, so a self-commanded basic attack can never be misread as the
+    attack that damaged the enemy. Self-targeting damage stays legal: the
+    commanded action resolves against the actor."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="attribution arena")
+        self.player = _player("attribution player")
+        self.player.location = self.room
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        self.monster = _monster("attribution goblin", hp=100)
+        self.monster.location = self.room
+
+    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    def test_commanded_self_attack_is_marked_and_rolls_stay_attributable(self):
+        engage(self.player, self.monster)
+        with patch("world.rules.combat.roll_d100", return_value=44):
+            result = submit_player_action(
+                self.player, "basic_attack", [self.player]
+            )
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(result["rounds_elapsed"], 2)
+        # The self-commanded basic attack resolved against the actor (a miss
+        # against the player's own agility), leaving the player unharmed.
+        self.assertEqual(self.player.traits.hp.current, 2000)
+        marker = "你施展了「基本攻擊」。"
+        self_miss = (
+            f"{self.player.key} 對 {self.player.key} 的攻擊擲出了 44。"
+        )
+        self.assertIn(marker, "\n".join(render_plain_text(log) for log in result["logs"]))
+        commanded_logs = [
+            render_plain_text(log)
+            for log in result["logs"]
+            if log.actor == str(self.player.key)
+            and log.skill_key == "basic_attack"
+            and str(log.targets[0]) == str(self.player.key)
+        ]
+        self.assertEqual(len(commanded_logs), 1)
+        self.assertTrue(commanded_logs[0].startswith(marker))
+        self.assertIn(self_miss, commanded_logs[0])
+        # The compression's auto basic attack against the enemy keeps its own
+        # roll line immediately before its damage line.
+        auto_logs = [
+            render_plain_text(log)
+            for log in result["logs"]
+            if log.actor == str(self.player.key)
+            and log.skill_key == "basic_attack"
+            and str(log.targets[0]) == str(self.monster.key)
+        ]
+        self.assertEqual(len(auto_logs), 1)
+        auto_lines = auto_logs[0].splitlines()
+        self.assertEqual(
+            auto_lines[0],
+            f"{self.player.key} 對 {self.monster.key} 的攻擊擲出了 44。",
+        )
+        self.assertTrue(
+            auto_lines[1].startswith(
+                f"{self.player.key} 對 {self.monster.key} 造成了 "
+            )
+        )
 
 
 class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):

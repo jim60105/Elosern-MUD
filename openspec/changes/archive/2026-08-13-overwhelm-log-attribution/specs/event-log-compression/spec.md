@@ -1,8 +1,38 @@
-# event-log-compression Specification
+# event-log-compression Delta Specification
 
-## Purpose
-TBD - created by archiving change overwhelm-resolution. Update Purpose after archive.
-## Requirements
+## REMOVED Requirements
+
+### Requirement: compress_event_logs drops redundant hit rolls and preserves miss and damage records
+**Reason**: Dropping successful `"roll"` entries removed the visible attack line for every hit in a
+compressed overwhelm log, so a damage entry could appear to belong to a different attack than the one
+that produced it — e.g. a commanded self-attack's miss roll followed by an auto-attack's damage on an
+enemy read as a wrong target. The noise reduction was not worth breaking per-attack attribution.
+**Migration**: Compressed logs now preserve every entry; consumers must not rely on successful hit
+rolls being absent. The project has no released users, so no data migration is needed.
+
+## MODIFIED Requirements
+
+### Requirement: A full record of who hit whom, for how much, is preserved alongside the summary
+The tuple `compress_event_logs()` returns SHALL contain, in addition to the summary entry, every
+non-empty per-action `EventLog` from the input with every entry preserved — compression SHALL NOT
+reduce the individually attributable hit/miss/damage record to only the aggregate summary, and SHALL
+NOT remove any `"roll"` entry, including successful hits.
+
+#### Scenario: Every individual hit remains attributable to its actor and target after compression
+- **WHEN** `compress_event_logs()`'s output is inspected for an encounter where entity `elosia` hit
+  entity `violet` twice
+- **THEN** two `"damage"`-kind `EventEntry` instances with `actor="elosia"` and `target="violet"` are
+  present in the output, in addition to the aggregate summary entry, and each damage entry is
+  preceded in its parent `EventLog` by the matching successful `"roll"` entry, in original order
+
+#### Scenario: The output size is the input size plus the summary and optional marker
+- **WHEN** the total `EventEntry` count across `compress_event_logs()`'s returned tuple is compared
+  against the total `EventEntry` count across its `raw_logs` input
+- **THEN** the compressed count equals the input count plus exactly one (the summary entry), plus
+  exactly one more when a commanded-action marker is applied
+
+## ADDED Requirements
+
 ### Requirement: compress_event_logs preserves every attack record without kind-based filtering
 `compress_event_logs(raw_logs, overwhelming_team, overwhelmed_team, rounds, commanded_actor=None,
 commanded_skill=None, commanded_window=None) -> tuple[EventLog, ...]` SHALL preserve every
@@ -68,67 +98,3 @@ omitted, no marker SHALL be added. The marker SHALL NOT alter any other entry, t
 - **WHEN** `render_plain_text()` is called on the marked `EventLog` of a `basic_attack` command
 - **THEN** the rendered text opens with `你施展了「基本攻擊」。` followed by the commanded action's own
   roll and damage lines
-
-### Requirement: compress_event_logs prepends one overwhelm_resolution summary entry aggregating the
-compressed encounter
-`compress_event_logs()` SHALL prepend exactly one new `EventLog` whose single `EventEntry` has
-`kind="overwhelm_resolution"`, `actor` equal to `overwhelming_team`, `target` equal to
-`overwhelmed_team`, and `data` containing at least `rounds`, `hits` (count of `"damage"`-kind entries
-across the filtered input), and `total_damage` (sum of those entries' `amount` fields).
-
-#### Scenario: The summary entry's data reflects the actual filtered hits and damage
-- **WHEN** `compress_event_logs()` processes input logs containing three `"damage"`-kind entries with
-  amounts 10, 15, and 5, plus one retained miss-roll entry
-- **THEN** the summary entry's `data["hits"] == 3` and `data["total_damage"] == 30`
-
-#### Scenario: The summary entry carries no additional time cost
-- **WHEN** the summary `EventLog`'s `time_cost_seconds` is inspected
-- **THEN** it is `0` — the real elapsed time is already accounted for by the constituent per-action
-  `EventLog`s this change did not alter
-
-#### Scenario: The summary entry's actor and target are team keys, not entity keys
-- **WHEN** the summary `EventLog`'s `entries[0].actor` and `.target` are inspected
-- **THEN** they equal the `overwhelming_team` and `overwhelmed_team` arguments exactly, which are
-  `Battlefield.teams` keys, not individual entity keys — distinguishing this entry from every other
-  `EventEntry` this project's `EventLog` consumers have seen so far
-
-### Requirement: A full record of who hit whom, for how much, is preserved alongside the summary
-The tuple `compress_event_logs()` returns SHALL contain, in addition to the summary entry, every
-non-empty per-action `EventLog` from the input with every entry preserved — compression SHALL NOT
-reduce the individually attributable hit/miss/damage record to only the aggregate summary, and SHALL
-NOT remove any `"roll"` entry, including successful hits.
-
-#### Scenario: Every individual hit remains attributable to its actor and target after compression
-- **WHEN** `compress_event_logs()`'s output is inspected for an encounter where entity `elosia` hit
-  entity `violet` twice
-- **THEN** two `"damage"`-kind `EventEntry` instances with `actor="elosia"` and `target="violet"` are
-  present in the output, in addition to the aggregate summary entry, and each damage entry is
-  preceded in its parent `EventLog` by the matching successful `"roll"` entry, in original order
-
-#### Scenario: The output size is the input size plus the summary and optional marker
-- **WHEN** the total `EventEntry` count across `compress_event_logs()`'s returned tuple is compared
-  against the total `EventEntry` count across its `raw_logs` input
-- **THEN** the compressed count equals the input count plus exactly one (the summary entry), plus
-  exactly one more when a commanded-action marker is applied
-
-### Requirement: A compressed EventLog renders through render_plain_text with no LLM involvement
-Every `EventLog` `compress_event_logs()` returns, including the summary entry, SHALL render correctly
-through change 8's existing `event_log.render_plain_text()` with zero network calls and zero imports
-from any `world/ai/` module.
-
-#### Scenario: The summary entry's text_template renders with dict-key data access
-- **WHEN** `render_plain_text()` is called on the summary `EventLog`
-- **THEN** it returns a string with every `{data[...]}` placeholder in the entry's `text_template`
-  resolved to the corresponding `data` value, with no unresolved `{...}` remaining and no import of any
-  `world/ai/` module
-
-#### Scenario: Joining every returned EventLog reproduces the whole compressed encounter as prose
-- **WHEN** `render_plain_text()` is called on each `EventLog` in `compress_event_logs()`'s returned
-  tuple and the results are joined with newlines, in tuple order
-- **THEN** the joined string opens with the aggregate summary sentence followed by the individual
-  per-hit sentences, with no model call anywhere in the process
-
-#### Scenario: Rendering is a pure, repeatable function of the compressed log
-- **WHEN** `render_plain_text()` is called twice on the same compressed `EventLog`
-- **THEN** both calls return byte-identical output
-

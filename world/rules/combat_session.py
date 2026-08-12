@@ -907,7 +907,13 @@ def submit_player_action(
             # unchanged.
             if overwhelming == player_team:
                 provider = _overwhelm_provider(actor, request, battlefield, record)
-                result = resolve_overwhelm(battlefield, provider, max_rounds=12)
+                result = resolve_overwhelm(
+                    battlefield,
+                    provider,
+                    max_rounds=12,
+                    commanded_actor=str(actor.key),
+                    commanded_skill=skill_key,
+                )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:

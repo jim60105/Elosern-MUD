@@ -5,10 +5,15 @@ TBD - created by archiving change overwhelm-resolution. Update Purpose after arc
 ## Requirements
 ### Requirement: resolve_overwhelm resolves an overwhelm-classified encounter by reusing run_round,
 never a separate combat algorithm
-`world/rules/overwhelm.py` SHALL provide `resolve_overwhelm(battlefield, action_provider, max_rounds)
--> OverwhelmResult`. Every state mutation this function causes SHALL occur exclusively through calls to
+`world/rules/overwhelm.py` SHALL provide `resolve_overwhelm(battlefield, action_provider, max_rounds,
+commanded_actor=None, commanded_skill=None) -> OverwhelmResult`. Every state mutation this function
+causes SHALL occur exclusively through calls to
 change 9's `combat.run_round(battlefield, action_provider)`, unmodified. This function SHALL NOT call
-`roll_d100()`, construct a `PendingEffect`, or perform any damage/to-hit computation of its own.
+`roll_d100()`, construct a `PendingEffect`, or perform any damage/to-hit computation of its own. The
+optional `commanded_actor` and `commanded_skill` keyword arguments SHALL be forwarded to
+`compress_event_logs()` together with the encounter's round-1 log slice, and SHALL influence only
+the compressed log record (the commanded-action marker), never combat math, round count, verdicts,
+or any entity state; callers that omit them receive identical resolution with no marker.
 
 #### Scenario: resolve_overwhelm performs no combat math outside of run_round
 - **WHEN** `world/rules/overwhelm.py`'s source is inspected
@@ -27,6 +32,13 @@ change 9's `combat.run_round(battlefield, action_provider)`, unmodified. This fu
   already returns `True`
 - **THEN** it returns an `OverwhelmResult` with zero rounds elapsed and `battle_over=True`, without
   calling `combat.run_round()`
+
+#### Scenario: The optional commanded identity never changes resolution
+- **WHEN** the same `Battlefield` and seed are resolved once with `commanded_actor`/`commanded_skill`
+  and once without them
+- **THEN** `rounds_elapsed`, `total_seconds`, `verdict_after`, `battle_over`, and every entity's
+  final hp are identical between the two calls; the only difference in `event_logs` is the
+  commanded-action marker entry
 
 ### Requirement: Single-shot resolution is exactly consistent with per-round resolution under the same
 seed and starting state
