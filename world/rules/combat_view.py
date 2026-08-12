@@ -286,9 +286,7 @@ def _build_skills(
 ) -> tuple[SkillDescriptorView, ...]:
     context = BattlefieldActionContext(
         battlefield,
-        event_context={"battlefield": battlefield}
-        if record.mode == "hostile"
-        else {"battlefield": battlefield, "nonlethal": True},
+        event_context={"battlefield": battlefield},
     )
     from evennia.objects.models import ObjectDB
 

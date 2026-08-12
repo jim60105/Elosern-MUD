@@ -190,6 +190,14 @@ def initial_trait_config_for_monster_tier(
     return trait_config_for_values(values, 0)
 
 
+def restore_gauges_to_full(entity: Any) -> None:
+    """Restore every gauge trait (HP/MP/SP) of one entity to its full maximum."""
+    for key in GAUGE_KEYS:
+        gauge = getattr(entity.traits, key, None)
+        if gauge is not None:
+            gauge.current = gauge.max
+
+
 def get_display_value(entity: Any, trait_key: str) -> int:
     """Read a possibly disguised base stat for exactly three display consumers.
 

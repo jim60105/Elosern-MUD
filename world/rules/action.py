@@ -693,6 +693,7 @@ def _defeated_entry(
     projected: dict[int, float],
     defeated_ids: set[int],
     nonlethal: bool = False,
+    simulated: bool = False,
 ) -> EventEntry | None:
     """Emit one ``target_defeated`` or ``target_knocked_out`` crossing entry.
 
@@ -700,7 +701,11 @@ def _defeated_entry(
     effects against one target neither use stale HP nor duplicate the defeat.
     Under a nonlethal policy a positive-to-non-positive crossing emits a
     ``target_knocked_out`` identity instead of ``target_defeated``, giving
-    kill-credit/quest/loot consumers no defeat entry to observe.
+    kill-credit/quest/loot consumers no defeat entry to observe. A simulated
+    battle (guild examination) keeps the ordinary lethal ``target_defeated``
+    entry but tags it ``simulated``, so kill-credit consumers can skip the
+    defeat without hiding that the HP really crossed zero
+    (exam-simulated-battle-redesign D4).
     """
     if amount <= 0:
         return None
@@ -723,6 +728,8 @@ def _defeated_entry(
     data: dict[str, Any] = {"target_id": int(dbref)}
     if not nonlethal:
         data["monster_tier"] = getattr(entity, "threat_tier", None)
+    if simulated:
+        data["simulated"] = True
     return EventEntry(
         kind=kind,
         actor=actor_key,
@@ -748,6 +755,7 @@ def _step7_build_event_log(
         event_context = _event_context(request)
         nonlethal = bool(event_context.get("nonlethal", False))
         nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
+        simulated = bool(event_context.get("simulated", False))
         for effect in pending:
             entries.extend(
                 _entries_from_effect(
@@ -765,6 +773,7 @@ def _step7_build_event_log(
                 projected,
                 defeated_ids,
                 nonlethal=nonlethal or str(effect.entity.key) in nonlethal_keys,
+                simulated=simulated,
             )
             if defeated is not None:
                 entries.append(defeated)

@@ -421,16 +421,18 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
 
 
 def _context_for(battlefield: Battlefield, record: CombatSessionRecord) -> BattlefieldActionContext:
-    """Build the session's action context with its nonlethal policy.
+    """Build the session's action context with its damage and reward policy.
 
-    Examinations keep the session-wide ``nonlethal`` flag unchanged. Hostile
-    sessions carry ``nonlethal_keys`` naming the allied companions, so damage
-    floors companions at 1 HP and marks them knocked out per target while
-    monsters stay lethal (party-combat D-3).
+    Hostile sessions carry ``nonlethal_keys`` naming the allied companions, so
+    damage floors companions at 1 HP and marks them knocked out per target
+    while monsters stay lethal (party-combat D-3). Guild examinations run as
+    ordinary lethal combat with a ``simulated`` marker instead of a nonlethal
+    policy: defeats are real HP crossings, but kill-credit consumers treat
+    them as simulation outcomes (exam-simulated-battle-redesign D1/D4).
     """
     event_context: dict[str, Any] = {"battlefield": battlefield}
     if record.mode == "guild_exam":
-        event_context["nonlethal"] = True
+        event_context["simulated"] = True
     elif len(record.player_ids) > 1:
         companion_pks = set(record.player_ids[1:])
         event_context["nonlethal_keys"] = frozenset(
@@ -483,8 +485,8 @@ def _enemy_policy(
     ``monster_behaviour_policy`` falls back to ``default_attack_policy`` for
     non-Monster combatants, so a guild-examination NPC opponent (which has no
     ``threat_tier``) still acts through its profile skills. The request context
-    is rebuilt with the session's nonlethal policy so examination opponents can
-    knock out but never kill the candidate.
+    is rebuilt from the session record, so examination opponents fight with
+    ordinary lethal semantics inside the simulated battle.
     """
     request = monster_behaviour_policy(entity, battlefield)
     if request is None:
@@ -1042,17 +1044,19 @@ def settle_session(
 
     The whole terminal settlement is one durable transaction (fix-combat-
     settlement-recovery D2): the exam outcome (guild-exam mode), the combat
-    clock advance, the durable ``settled_tick`` marker, and the session clear
-    commit or roll back together. A crash mid-settlement therefore never
-    loses exam time, never double-counts hostile time, and never leaves a
-    half-settled session; the marker additionally lets a restart skip
-    re-settlement for any durable record already marked settled. The session
-    clear is the last step inside the transaction, so a failure of any
-    earlier step leaves the durable session intact for exactly one retry.
-    Exam opponents are deleted only after the transaction commits: a rolled-
-    back settlement must leave the temporary opponent alive for the retry,
-    and deleting inside the transaction could strand a stale deleted
-    instance in the idmapper cache.
+    clock advance, the durable ``settled_tick`` marker, the session clear,
+    and the simulated-battle gauge restoration commit or roll back together.
+    A crash mid-settlement therefore never loses exam time, never double-
+    counts hostile time, never leaves a half-settled session, and never
+    strands a defeated exam candidate; the marker additionally lets a
+    restart skip re-settlement for any durable record already marked
+    settled. The session clear is the last step inside the transaction
+    (followed by the exam gauge restoration), so a failure of any earlier
+    step leaves the durable session intact for exactly one retry. Exam
+    opponents are deleted only after the transaction commits: a rolled-back
+    settlement must leave the temporary opponent alive for the retry, and
+    deleting inside the transaction could strand a stale deleted instance
+    in the idmapper cache.
     """
     from django.db import transaction
 
@@ -1094,6 +1098,13 @@ def settle_session(
             replace(record, settled_tick=get_world_clock().tick),
         )
         clear_session(actor, battlefield, record)
+        if record.mode == "guild_exam":
+            # Simulated battle: restore both sides inside the settlement
+            # transaction, so the full-restoration guarantee commits or rolls
+            # back with the exam outcome and can never strand a defeated
+            # candidate (exam-simulated-battle-redesign D3). Opponent deletion
+            # stays post-commit so a rolled-back settlement keeps it alive.
+            _restore_exam_participants(actor, record, battlefield)
     if record.mode == "guild_exam":
         _delete_exam_opponent(actor, record)
     return {
@@ -1105,6 +1116,53 @@ def settle_session(
     }
 
 
+def _find_exam_opponent(actor: Any, record: CombatSessionRecord) -> Any | None:
+    """Return the settled exam's temporary opponent, if it still exists."""
+    from world.rules.guild_exams import _read_exams
+
+    exam_record = next(
+        (r for r in _read_exams(actor) if r.exam_id == record.exam_id),
+        None,
+    )
+    if exam_record is None:
+        return None
+    return ObjectDB.objects.filter(id=exam_record.opponent_id).first()
+
+
+def _restore_exam_participants(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> None:
+    """Restore both exam sides' gauges to full inside the settlement.
+
+    Runs as the last step of the settlement transaction, after the session
+    clears and before the temporary opponent is deleted post-commit
+    (exam-simulated-battle-redesign D3): the candidate and examiner walk away
+    from the simulated battle fully healed regardless of outcome, and the
+    restoration commits or rolls back with the exam outcome. The battlefield
+    roster is preferred when available; a degraded path (or a roster that
+    lacks the opponent) falls back to the durable exam record lookup.
+    """
+    from world.rules.traits import restore_gauges_to_full
+
+    restore_gauges_to_full(actor)
+    opponent = None
+    if battlefield is not None:
+        opponent = next(
+            (
+                entity
+                for key, entity in battlefield.roster.items()
+                if int(entity.pk) in record.enemy_ids
+            ),
+            None,
+        )
+    if opponent is None:
+        opponent = _find_exam_opponent(actor, record)
+    if opponent is not None:
+        restore_gauges_to_full(opponent)
+
+
 def _delete_exam_opponent(actor: Any, record: CombatSessionRecord) -> None:
     """Delete the settled exam's temporary opponent, best effort.
 
@@ -1114,15 +1172,7 @@ def _delete_exam_opponent(actor: Any, record: CombatSessionRecord) -> None:
     """
     from evennia.utils.logger import log_warn
 
-    from world.rules.guild_exams import _read_exams
-
-    exam_record = next(
-        (r for r in _read_exams(actor) if r.exam_id == record.exam_id),
-        None,
-    )
-    if exam_record is None:
-        return
-    opponent = ObjectDB.objects.filter(id=exam_record.opponent_id).first()
+    opponent = _find_exam_opponent(actor, record)
     if opponent is None:
         return
     try:
@@ -1152,14 +1202,28 @@ def _settle_with_restore(
     extra: dict[str, tuple[bool, Any]] = {
         "active_combat": _attribute_snapshot(actor, "active_combat"),
     }
+    trait_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
     if record.mode == "guild_exam":
         extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
         extra["guild_exams"] = _attribute_snapshot(actor, "guild_exams")
+        # The settlement transaction restores the exam sides' gauges; when it
+        # rolls back, restore the in-process trait surfaces too (the idmapper
+        # cache is not transaction-aware), for the actor and the opponent.
+        from world.rules.surfaces import snapshot_traits
+
+        trait_snapshots.append((actor, snapshot_traits(actor)))
+        opponent = _find_exam_opponent(actor, record)
+        if opponent is not None:
+            trait_snapshots.append((opponent, snapshot_traits(opponent)))
     try:
         return settle_session(actor, record, battlefield, outcome, logs)
     except Exception:
         for key, snapshot in extra.items():
             _restore_attribute(actor, key, snapshot)
+        for entity, snapshot in trait_snapshots:
+            from world.rules.surfaces import restore_traits
+
+            restore_traits(entity, snapshot)
         raise
 
 

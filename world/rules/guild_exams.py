@@ -1,11 +1,14 @@
-"""Triggerable nonlethal guild examinations (guild-economy D-7).
+"""Triggerable simulated-battle guild examinations (guild-economy D-7).
 
 ``start_guild_exam`` is the sole examination trigger; ``requested_by`` is audit
 metadata, never authority. It validates registration, exact next rank, the true
 cumulative merit threshold, and absence of active combat/exam, then spawns a
-temporary adult NPC opponent and opens a ``guild_exam`` combat session as one
-all-or-nothing operation. Settlement is idempotent by exam ID and promotes
-exactly one rank on PASS.
+temporary adult NPC opponent, restores both sides to full HP/MP/SP, and opens a
+``guild_exam`` combat session as one all-or-nothing operation. The exam is a
+simulated lethal battle: combat follows ordinary lethal semantics, and both
+sides are restored to full HP/MP/SP again after settlement, win or lose
+(exam-simulated-battle-redesign D1-D3). Settlement is idempotent by exam ID
+and promotes exactly one rank on PASS.
 """
 
 from dataclasses import dataclass, replace
@@ -23,6 +26,8 @@ from world.rules.guild_config import get_catalog
 from world.rules.surfaces import (
     attribute_snapshot,
     read_counter_trait,
+    restore_traits,
+    snapshot_traits,
 )
 
 
@@ -231,11 +236,13 @@ def start_guild_exam(
     *,
     requested_by: str = "command",
 ) -> GuildExamRecord:
-    """Start one nonlethal guild examination as the sole trigger (D-7).
+    """Start one simulated-battle guild examination as the sole trigger (D-7).
 
     ``requested_by`` is audit metadata only; every gate (co-location,
     component/branch, registration, exact next rank, true merit threshold,
-    no active combat/exam) is revalidated here regardless of its value.
+    no active combat/exam) is revalidated here regardless of its value. The
+    candidate and the spawned opponent are restored to full HP/MP/SP inside
+    the all-or-nothing start, so a failed start restores nothing.
     """
     if not isinstance(actor, PlayerCharacter):
         raise GuildExamError(ExamReason.NOT_A_PLAYER)
@@ -289,6 +296,10 @@ def start_guild_exam(
     session_snapshot = attribute_snapshot(actor, "active_combat")
     rank_snapshot = attribute_snapshot(actor, "guild_rank")
     examiner_relations = attribute_snapshot(examiner, "relations_data")
+    # The pre-restore writes trait surfaces; restore them on rollback so the
+    # in-process gauge values never serve the restored values a rejected
+    # start rolled back in the database (idmapper is not transaction-aware).
+    traits_snapshot = snapshot_traits(actor)
     opponent = None
     try:
         from django.db import transaction
@@ -297,6 +308,14 @@ def start_guild_exam(
             # Spawn inside the transaction so every failure path rolls the
             # opponent back; no orphan can survive a rejected start.
             opponent = _spawn_opponent(actor, target_rank)
+            # Simulated battle: both sides enter at full HP/MP/SP regardless
+            # of their state before the exam (exam-simulated-battle-redesign
+            # D2); a failed start rolls this restoration back with everything
+            # else.
+            from world.rules.traits import restore_gauges_to_full
+
+            restore_gauges_to_full(actor)
+            restore_gauges_to_full(opponent)
             session = CombatSessionRecord(
                 session_id=f"guild_exam:{actor.pk}:{exam_id}",
                 mode="guild_exam",
@@ -339,6 +358,7 @@ def start_guild_exam(
         restore_attribute_best_effort(actor, "active_combat", session_snapshot)
         restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
         restore_attribute_best_effort(examiner, "relations_data", examiner_relations)
+        restore_traits(actor, traits_snapshot)
         if opponent is not None:
             try:
                 opponent.delete()

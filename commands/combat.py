@@ -174,5 +174,6 @@ class CmdGuildExam(Command):
             self.caller.msg(message)
             return
         self.caller.msg(
-            f"你開始了 {record.target_rank} 階的考核。請選擇你的行動（cast <技能>[=<目標>]）。"
+            f"你開始了 {record.target_rank} 階的考核。這是一場模擬戰：雙方在開戰前"
+            "與結束後都會恢復全部的體力、法力與精力。請選擇你的行動（cast <技能>[=<目標>]）。"
         )

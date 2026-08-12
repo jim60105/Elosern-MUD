@@ -161,10 +161,10 @@ SCENARIO_TO_TEST = {
         "exams", "ExamProfileValidationTests", "test_spawned_opponent_uses_true_profile_stats"
     ),
     "Examiner knockout is not a quest kill": ref(
-        "exams", "ExamCombatTests", "test_nonlethal_opponent_knockout_is_not_a_kill"
+        "exams", "ExamCombatTests", "test_lethal_exam_defeat_grants_no_kill_rewards"
     ),
     "Candidate knockout is nonfatal but loses": ref(
-        "exams", "ExamCombatTests", "test_flee_records_fail"
+        "exams", "ExamCombatTests", "test_candidate_lethal_defeat_fails_but_restores"
     ),
     "Passing promotes exactly one rank": ref(
         "exams", "ExamCombatTests", "test_promotion_preserves_merit"

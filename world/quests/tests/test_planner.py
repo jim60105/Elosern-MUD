@@ -300,6 +300,60 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(room.db.pin_reasons, room_pins_before)
 
 
+    def test_simulated_defeat_grants_no_defeat_progress(self):
+        # A guild examination is a simulated battle: even a tier-matching
+        # lethal defeat must not advance a DEFEAT objective.
+        accept_quest(self.player, self.tier_hunt.key)
+        target = self._monster("simulated-victim")
+        field = self._field(self.player, [target])
+        request = ActionRequest(
+            self.player,
+            "fire_ball",
+            [target],
+            BattlefieldActionContext(
+                field,
+                event_context={"battlefield": field, "simulated": True},
+            ),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(target.traits.hp.current, 0)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    def test_simulated_defeat_never_fails_protected_entity(self):
+        # A simulated lethal crossing on a bound protected entity must not
+        # fail its active quest: the battle is a simulation.
+        record = accept_quest(self.player, self.escort_quest.key)
+        guard = self._npc("simulated-guard")
+        room = create_object(InstanceRoom, key="simulated-room")
+        bind_stage_runtime(
+            self.player,
+            record.quest_id,
+            room=room,
+            protected_entities=(guard,),
+        )
+        killer = self._monster("simulated-killer", hp=200, tier="mid")
+        killer.db.skills = {"active": ["claw"], "passive": []}
+        field = self._field(killer, [guard])
+        request = ActionRequest(
+            killer,
+            "claw",
+            [guard],
+            BattlefieldActionContext(
+                field,
+                event_context={"battlefield": field, "simulated": True},
+            ),
+        )
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(guard.traits.hp.current, 0)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "in_progress")
+        self.assertEqual(stored["protected_entity_ids"], [int(guard.pk)])
+
+
 class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTest):
     """Companion DEFEAT credit for the quest owner (party-quest task 1.3)."""
 
