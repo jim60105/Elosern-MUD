@@ -262,8 +262,9 @@ retained `--keepdb` database stays clean after full runs: the
 `world.maps.tests.test_bootstrap` fresh-grid precondition now passes on
 repeated consecutive runs.
 
-Serial execution remains the handoff standard, but `--parallel 4 --noinput`
-is the documented default full-suite command during development. Removing
+Serial execution remains the handoff standard, but `--parallel 16 --noinput`
+is the documented default full-suite command during development (CI keeps
+`--parallel 4` as its worker profile). Removing
 duplicate managed-browser discovery is accepted
 separately only after the final serial evidence and aggregate coverage run
 passes.

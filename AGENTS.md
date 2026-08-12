@@ -93,7 +93,7 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 ```sh
 uv sync --locked
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands server typeclasses world web.webclient
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 4 commands server typeclasses world web.webclient
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 commands server typeclasses world web.webclient
 uv run --locked python -m unittest discover -s web/tests/browser -t .
 uv run --locked -m unittest discover -s tests -t .
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
@@ -112,10 +112,10 @@ profiling and parallel-evaluation commands.
 ### Test runtime budget (measured, do not waste wall-clock)
 
 The full Evennia suite (`evennia test ... commands server typeclasses web
-world`) is now **3,104 tests**: ~152 s with `--parallel 4` including coverage
-instrumentation (the CI profile), and ~45 s with `--parallel 16` on the
-24-core development machine. Serial remains canonical for final handoff
-evidence, but `--parallel 4 --noinput` is the default full-suite command
+world`) is now **3,104 tests**: ~45 s with `--parallel 16` on the 24-core
+development machine, and ~152 s with `--parallel 4` including coverage
+instrumentation (the CI profile). Serial remains canonical for final handoff
+evidence, but `--parallel 16 --noinput` is the default full-suite command
 during development. The managed browser suite is the slowest thing in the repo
 and dominates total runtime (measured 3,465 s locally for the full 148-test
 run):
