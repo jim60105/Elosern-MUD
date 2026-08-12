@@ -54,12 +54,20 @@ class _Entity:
 
 
 class TargetingTests(unittest.TestCase):
+    @covers_requirement("targeting-validation::target-resolution-runs-four-ordered-validations")
     def test_faction_truth_table(self):
+        # ANY (the only shipped constraint) accepts every relation; SELF_ONLY
+        # accepts only the actor; legacy ALLY/ENEMY values restrict nothing.
+        self.assertTrue(validate_faction(Relation.SELF, FactionConstraint.ANY))
+        self.assertTrue(validate_faction(Relation.ALLY, FactionConstraint.ANY))
         self.assertTrue(validate_faction(Relation.ENEMY, FactionConstraint.ANY))
-        self.assertTrue(validate_faction(Relation.SELF, FactionConstraint.ALLY))
+        self.assertTrue(validate_faction(Relation.SELF, FactionConstraint.SELF_ONLY))
+        self.assertFalse(validate_faction(Relation.ALLY, FactionConstraint.SELF_ONLY))
+        self.assertFalse(validate_faction(Relation.ENEMY, FactionConstraint.SELF_ONLY))
         self.assertTrue(validate_faction(Relation.ALLY, FactionConstraint.ALLY))
+        self.assertTrue(validate_faction(Relation.ENEMY, FactionConstraint.ALLY))
+        self.assertTrue(validate_faction(Relation.ALLY, FactionConstraint.ENEMY))
         self.assertTrue(validate_faction(Relation.ENEMY, FactionConstraint.ENEMY))
-        self.assertFalse(validate_faction(Relation.ALLY, FactionConstraint.ENEMY))
 
     def test_room_context_never_invents_hostility(self):
         room = object()
@@ -116,7 +124,10 @@ class TargetingTests(unittest.TestCase):
         room = object()
         actor = _Entity("actor", room)
         target = _Entity("target", room)
-        skill = SKILL_REGISTRY["fire_ball"]
+        skill = replace(
+            SKILL_REGISTRY["fire_ball"],
+            faction_constraint=FactionConstraint.SELF_ONLY,
+        )
         room_request = ActionRequest(
             actor,
             skill.key,
@@ -130,22 +141,65 @@ class TargetingTests(unittest.TestCase):
             RejectReason.TARGET_FACTION_FORBIDDEN,
         )
 
-        class EnemyContext(RoomActionContext):
+        class SelfContext(RoomActionContext):
             battlefield = object()
 
             def relation_to(self, actor, target):
-                return Relation.ENEMY
+                return Relation.SELF
 
-        enemy_request = ActionRequest(
+        self_request = ActionRequest(
             actor,
             skill.key,
             [target],
-            EnemyContext(room),
+            SelfContext(room),
         )
         self.assertEqual(
-            resolve_targets(enemy_request, skill, [target]),
+            resolve_targets(self_request, skill, [target]),
             [target],
         )
+
+    @covers_requirement("targeting-validation::target-resolution-runs-four-ordered-validations")
+    def test_any_skill_accepts_every_relation(self):
+        room = object()
+        actor = _Entity("actor", room)
+        self_entity = _Entity("self", room)
+        ally = _Entity("ally", room)
+        enemy = _Entity("enemy", room)
+        skill = SKILL_REGISTRY["fire_ball"]
+
+        class _Context(RoomActionContext):
+            battlefield = object()
+
+            def __init__(self, relation):
+                super().__init__(room)
+                self._relation = relation
+
+            def relation_to(self, actor, target):
+                return self._relation
+
+        for relation in (Relation.SELF, Relation.ALLY, Relation.ENEMY):
+            request = ActionRequest(
+                actor, skill.key, [enemy], _Context(relation)
+            )
+            self.assertEqual(
+                resolve_targets(request, skill, [enemy]),
+                [enemy],
+                relation,
+            )
+
+    @covers_requirement("targeting-validation::target-resolution-runs-four-ordered-validations")
+    def test_self_only_rejects_non_actor_targets(self):
+        room = object()
+        actor = _Entity("actor", room)
+        ally = _Entity("ally", room)
+        skill = replace(
+            SKILL_REGISTRY["fire_ball"],
+            faction_constraint=FactionConstraint.SELF_ONLY,
+        )
+        request = ActionRequest(actor, skill.key, [ally], RoomActionContext(room))
+        with self.assertRaises(RejectedAction) as caught:
+            resolve_targets(request, skill, [ally])
+        self.assertIs(caught.exception.reason, RejectReason.TARGET_FACTION_FORBIDDEN)
 
 
 class _BattlefieldContext(RoomActionContext):
@@ -262,6 +316,21 @@ class TightenedShapeTests(unittest.TestCase):
         with self.assertRaises(RejectedAction) as caught:
             resolve_targets(request, skill, [dead])
         self.assertIs(caught.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+
+    @covers_requirement("targeting-validation::combat-shortcuts-are-convenience-ui-not-permission-boundaries")
+    def test_any_area_skill_accepts_explicit_ally_despite_enemy_shorthand(self):
+        room = object()
+        actor = _Entity("actor", room)
+        ally = _Entity("ally", room)
+        skill = replace(
+            SKILL_REGISTRY["wind_blade"],
+            faction_constraint=FactionConstraint.ANY,
+        )
+        # RoomActionContext reports Relation.ALLY for co-located non-self
+        # entities; an ANY skill validates the explicit ally target just like
+        # an explicit enemy list, with no shorthand-based permission change.
+        request = ActionRequest(actor, skill.key, [ally], RoomActionContext(room))
+        self.assertEqual(resolve_targets(request, skill, [ally]), [ally])
 
     def test_expand_shorthand_out_of_combat_rejects(self):
         actor = self._actor()

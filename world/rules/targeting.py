@@ -67,13 +67,17 @@ def validate_faction(
     relation: Relation,
     constraint: FactionConstraint,
 ) -> bool:
-    """Return whether a relation satisfies a skill-owned constraint."""
-    return {
-        FactionConstraint.ANY: True,
-        FactionConstraint.SELF_ONLY: relation is Relation.SELF,
-        FactionConstraint.ALLY: relation in {Relation.SELF, Relation.ALLY},
-        FactionConstraint.ENEMY: relation is Relation.ENEMY,
-    }[constraint]
+    """Return whether a relation satisfies a skill-owned constraint.
+
+    Only the self-only rule is enforced: ``ANY`` (the only constraint shipped
+    attack and recovery skills may declare) accepts every relation, while
+    ``SELF_ONLY`` accepts only the actor. The legacy ``ALLY``/``ENEMY``
+    constraint values are accepted by this function for completeness but no
+    shipped skill declares them (fix-friendly-fire-reachability D1).
+    """
+    if constraint is FactionConstraint.SELF_ONLY:
+        return relation is Relation.SELF
+    return True
 
 
 def _rejection(reason: str, detail: str):

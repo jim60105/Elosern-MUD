@@ -46,7 +46,7 @@ class SkillRegistryTests(unittest.TestCase):
             self.assertIsInstance(skill.faction_constraint, FactionConstraint)
 
     @covers_requirement(
-        "skill-registry::skilldef-carries-the-action-resolver-s-skill-owned-faction-constraint"
+        "skill-registry::skills-declare-only-self-only-or-free-target-scope"
     )
     def test_every_definition_has_bounded_player_facing_metadata(self):
         for skill in SKILL_REGISTRY.values():
@@ -63,6 +63,32 @@ class SkillRegistryTests(unittest.TestCase):
                 f"skill {skill.key!r} description exceeds 512 code points",
             )
             self.assertFalse("\n" in skill.label or "\n" in skill.description)
+
+    @covers_requirement("skill-registry::skills-declare-only-self-only-or-free-target-scope")
+    def test_no_skill_is_enemy_or_ally_restricted(self):
+        for key, skill in SKILL_REGISTRY.items():
+            self.assertIn(
+                skill.faction_constraint,
+                (FactionConstraint.ANY, FactionConstraint.SELF_ONLY),
+                f"skill {key!r} must not declare an ENEMY/ALLY-only constraint",
+            )
+        for key in ("basic_attack", "fire_ball", "wind_blade", "shadow_slash"):
+            self.assertIs(
+                SKILL_REGISTRY[key].faction_constraint,
+                FactionConstraint.ANY,
+                key,
+            )
+
+    def test_self_only_constraint_is_available_for_self_effects(self):
+        # The enum keeps SELF_ONLY for self-only effects; the shipped flee
+        # innate skill is the only self-only consumer today.
+        self.assertIn(FactionConstraint.SELF_ONLY, FactionConstraint)
+        from world.rules.disengage import FLEE_SKILL_KEY
+
+        self.assertIs(
+            SKILL_REGISTRY[FLEE_SKILL_KEY].faction_constraint,
+            FactionConstraint.SELF_ONLY,
+        )
 
     def test_constructing_without_metadata_fails_closed(self):
         with self.assertRaises(TypeError):
@@ -168,7 +194,7 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertGreaterEqual(len(boons), 3)
         self.assertEqual(len({tuple(skill.effects) for skill in boons}), len(boons))
 
-    @covers_requirement("skill-registry::skilldef-carries-the-action-resolver-s-skill-owned-faction-constraint")
+    @covers_requirement("skill-registry::skills-declare-only-self-only-or-free-target-scope")
     def test_definition_collections_are_deeply_immutable(self):
         fire_ball = SKILL_REGISTRY["fire_ball"]
         with self.assertRaises(TypeError):

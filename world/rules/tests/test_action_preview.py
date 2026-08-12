@@ -173,7 +173,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         context = self._context()
         preview = preview_skill(self.player, "wind_blade", context, [self.monster])
         self.assertTrue(preview.enabled)
-        self.assertEqual(preview.shorthands, ("all-enemies", "all"))
+        self.assertEqual(preview.shorthands, ("all-enemies", "all-allies", "all"))
 
     def test_revalidate_rejects_stale_or_wrong_shape(self):
         context = self._context()
@@ -182,11 +182,13 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertTrue(result.enabled)
 
+        # ANY skills accept every relation, so the actor itself is now a
+        # valid explicit target for a damage skill (friendly-fire free
+        # targeting); the wrong-shape rejection is the empty list instead.
         result = revalidate_submission(
             self.player, "fire_ball", context, [self.player]
         )
-        self.assertFalse(result.enabled)
-        self.assertIs(result.reason, RejectReason.TARGET_FACTION_FORBIDDEN)
+        self.assertTrue(result.enabled)
 
         result = revalidate_submission(self.player, "fire_ball", context, [])
         self.assertFalse(result.enabled)

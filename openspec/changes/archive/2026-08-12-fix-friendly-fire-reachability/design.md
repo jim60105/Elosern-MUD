@@ -29,3 +29,4 @@
 - **Intentional companion hits**: the affinity penalty is the design's balancing mechanism (per-hit −1, auto-leave below 70); free targeting plus penalty is the stated design intent.
 - **Healing enemies**: permitted by design (free choice); no mechanical consequence is specified.
 - **Dependency on the outer transaction**: the scan relocation lands after `fix-combat-settlement-recovery` (declared in tasks).
+- **Main-spec amendments**: the party-system "ENEMY-targeting skills SHALL NOT select companions" contract and the action-resolution-pipeline different-context scenario are amended by this change's delta set, because no shipped skill is enemy-restricted anymore and companions become selectable.

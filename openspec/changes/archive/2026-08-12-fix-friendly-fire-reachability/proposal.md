@@ -17,6 +17,8 @@ The targeting model is more restrictive than the design intends (audit finding F
 - `targeting-validation`: the faction check enforces only the self-only rule; shorthands are convenience UI.
 - `affinity-friendly-fire`: reachable through shipped content; healing allies/foes carries no penalty.
 - `webclient-combat-menu`: shorthand options are convenience UI, not permission boundaries.
+- `party-system`: companions are selectable as explicit targets; companion hits apply the friendly-fire penalty instead of a faction rejection.
+- `action-resolution-pipeline`: the different-context faction scenario is restated with the self-only rule.
 
 ## Impact
 

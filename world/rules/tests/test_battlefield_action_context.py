@@ -48,7 +48,7 @@ class BattlefieldActionContextTests(unittest.TestCase):
                 event_context={"battlefield": other},
             )
 
-    @covers_requirement("battlefield-action-context::combat-shortcuts-read-the-two-team-roster-with-no-separate-expansion-path", "targeting-validation::combat-shortcuts-expand-to-an-explicit-list-and-pass-the-same-four-validations")
+    @covers_requirement("battlefield-action-context::combat-shortcuts-read-the-two-team-roster-with-no-separate-expansion-path", "targeting-validation::combat-shortcuts-are-convenience-ui-not-permission-boundaries")
     def test_shorthand_expands_mapping_values(self):
         self.assertEqual(
             expand_target_shorthand(self.actor, self.context, "all-enemies"),

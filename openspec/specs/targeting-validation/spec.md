@@ -7,7 +7,8 @@ TBD - created by archiving change action-resolver. Update Purpose after archive.
 `world/rules/targeting.py` SHALL validate every candidate target, in order: (1) presence, (2) alive,
 (3) range, (4) faction constraint. Each validation SHALL reject with its own named `RejectReason` when
 it fails, and no later validation SHALL run for a candidate that already failed an earlier one for
-`TargetSpec.SINGLE`.
+`TargetSpec.SINGLE`. The faction check enforces only the skill's self-only rule: for `ANY` skills every
+relation passes; for `SELF_ONLY` skills only the actor passes.
 
 #### Scenario: A target not present in the room or battlefield rejects at presence
 - **WHEN** target resolution runs against a candidate `context.is_present()` reports `False` for
@@ -22,9 +23,12 @@ it fails, and no later validation SHALL run for a candidate that already failed 
   `is_in_range()` is stubbed to return `False`
 - **THEN** it rejects with `RejectReason.TARGET_OUT_OF_RANGE`
 
-#### Scenario: A faction-forbidden target rejects at the faction check
-- **WHEN** target resolution runs against a candidate whose `context.relation_to(actor, target)` does
-  not satisfy the skill's own `SkillDef.faction_constraint`
+#### Scenario: An ANY skill accepts every relation
+- **WHEN** target resolution runs against candidates whose `context.relation_to(actor, target)` returns `Relation.SELF`, `Relation.ALLY`, and `Relation.ENEMY` respectively for an `ANY` skill
+- **THEN** all three candidates pass the faction check
+
+#### Scenario: A SELF_ONLY skill rejects non-actor targets at the faction check
+- **WHEN** target resolution runs against a candidate whose relation is not `Relation.SELF` for a `SELF_ONLY` skill
 - **THEN** it rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`
 
 #### Scenario: A target failing multiple validations reports the earliest one
@@ -71,11 +75,13 @@ silently dropped; a valid AREA input whose final target list is empty after filt
 - **THEN** it rejects with `RejectReason.TARGET_SPEC_MISMATCH` before filtering, effect staging, or resource deduction
 
 ### Requirement: FactionConstraint is read from SkillDef, not declared by the caller
-`world/rules/targeting.py` SHALL validate targets against `SkillDef.faction_constraint` — change 5's
-`FactionConstraint` enum (`ANY`/`ALLY`/`ENEMY`/`SELF_ONLY`), a property of the skill definition itself
-— never against a value the calling `ActionRequest` supplies independently. Faction validation SHALL
+`world/rules/targeting.py` SHALL validate targets against `SkillDef.faction_constraint` — the
+`FactionConstraint` enum (`ANY`/`SELF_ONLY`; legacy `ALLY`/`ENEMY` values are retained for legacy
+test data and restrict nothing), a property of the skill definition itself — never against a value
+the calling `ActionRequest` supplies independently. Faction validation SHALL
 compare `skill.faction_constraint` against `context.relation_to(actor, target)`, which SHALL return
-`Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean in-combat flag.
+`Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean in-combat flag. The `ANY`
+value is the default and accepts every `Relation` value; `SELF_ONLY` accepts only `Relation.SELF`.
 
 #### Scenario: The skill's own constraint governs, regardless of who casts it or how
 - **WHEN** two different callers both invoke the same `skill_key` against the same target, once from
@@ -88,12 +94,6 @@ compare `skill.faction_constraint` against `context.relation_to(actor, target)`,
   target where `relation_to()` returns `Relation.ALLY`
 - **THEN** faction validation rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`
 
-#### Scenario: ALLY accepts both SELF and ALLY relations
-- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ALLY` is validated against a target
-  where `relation_to()` returns `Relation.SELF`, and separately against a target where it returns
-  `Relation.ALLY`
-- **THEN** both checks pass
-
 #### Scenario: ANY accepts every relation
 - **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ANY` (the default) is validated
   against targets returning `Relation.SELF`, `Relation.ALLY`, and `Relation.ENEMY` respectively
@@ -102,22 +102,22 @@ compare `skill.faction_constraint` against `context.relation_to(actor, target)`,
 ### Requirement: Out-of-combat targeting has no hostility model
 `RoomActionContext.relation_to()` SHALL return `Relation.SELF` for the actor itself and
 `Relation.ALLY` for every other present entity — never `Relation.ENEMY` — so that a skill whose
-`faction_constraint` is `ANY` or `ALLY` (`SINGLE`-targeted) may target any present entity out of
-combat.
+`faction_constraint` is `ANY` may target any present entity out of combat. The faction check
+enforces only the self-only rule, so the legacy `ENEMY`/`ALLY` constraint values (retained for
+legacy test data, never declared by shipped skills) restrict nothing.
 
 #### Scenario: Support magic, self-buffing, and sexual magic on a companion all validate identically
-- **WHEN** a `TargetSpec.SINGLE` skill whose `faction_constraint` is `FactionConstraint.ALLY` is
+- **WHEN** a `TargetSpec.SINGLE` skill whose `faction_constraint` is `FactionConstraint.ANY` is
   resolved out of combat against (a) the actor itself, (b) a present companion entity, using
   `RoomActionContext`
 - **THEN** both (a) and (b) pass faction validation with no special-cased branch distinguishing the two
 
-#### Scenario: An ENEMY-constrained skill has no valid target out of combat
-- **WHEN** a skill whose `faction_constraint` is `FactionConstraint.ENEMY` is resolved out of combat
+#### Scenario: A legacy enemy constraint restricts nothing out of combat
+- **WHEN** a skill whose `faction_constraint` is the legacy `FactionConstraint.ENEMY` value is resolved out of combat
   against any present entity via `RoomActionContext`
-- **THEN** it rejects with `RejectReason.TARGET_FACTION_FORBIDDEN`, because `RoomActionContext` never
-  reports `Relation.ENEMY`
+- **THEN** it passes faction validation, because only the self-only rule is enforced
 
-### Requirement: Combat shortcuts expand to an explicit list and pass the same four validations
+### Requirement: Combat shortcuts are convenience UI, not permission boundaries
 `expand_target_shorthand(actor, context, shorthand)` SHALL resolve `all-enemies`,
 `all-allies`, and `all` into an explicit deterministic candidate list of live entity values drawn from
 `context.battlefield.roster`. Shorthand SHALL be accepted only for a `TargetSpec.AREA` skill. When the
@@ -126,11 +126,22 @@ its values rather than its keys. The resulting candidates SHALL be validated by 
 four-step AREA-filtering logic used for an explicitly supplied target list; no validation SHALL be
 skipped.
 `all-allies` SHALL include both `Relation.ALLY` entities and the actor's `Relation.SELF` entity.
+Shorthand selection is a convenience for the player and neither widens nor narrows the skill's
+targeting scope: the same candidates would be valid if listed explicitly, and an `ANY` skill may
+still be given explicit ally or enemy targets.
 
 #### Scenario: A dead ally on the roster is filtered out of all-allies, not included
 - **WHEN** `all-allies` expands to a roster mapping that includes one dead ally
 - **THEN** the final target list, after the four validations run against every expanded entity,
   excludes the dead ally exactly as it would if that entity had been listed explicitly
+
+#### Scenario: all-enemies expands and validates like an explicit list
+- **WHEN** `all-enemies` is expanded for an `ANY` AREA skill
+- **THEN** the expansion produces the enemy candidates, they pass the same validations as an explicit list, and the skill resolves normally
+
+#### Scenario: An ANY skill may target allies explicitly despite all-enemies UI
+- **WHEN** a player selects an ally target explicitly for an `ANY` AREA skill while the menu also offers `all-enemies`
+- **THEN** the explicit ally target is valid and the skill resolves against it
 
 #### Scenario: A mapping roster expands to entities rather than keys
 - **WHEN** a battlefield roster is a `dict[str, LivingEntity]`
