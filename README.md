@@ -1,6 +1,6 @@
 # Elosern MUD
 
-[![codecov](https://codecov.io/gh/jim60105/MUD/graph/badge.svg?token=ysbLT6R5c7)](https://codecov.io/gh/jim60105/MUD)
+[![codecov](https://codecov.io/gh/jim60105/Elosern-MUD/graph/badge.svg?token=ysbLT6R5c7)](https://codecov.io/gh/jim60105/Elosern-MUD)
 
 This project uses Evennia `6.1.0`, SciPy `1.16.0` for Evennia's XYZ grid contrib, and the container
 image pins Python `3.13`.
