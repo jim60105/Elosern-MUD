@@ -162,9 +162,9 @@ class QualityGateContractTests(unittest.TestCase):
     @covers_requirement("spec-test-traceability::aggregate-coverage-is-published-to-codecov")
     def test_readme_contains_the_private_codecov_badge_without_upload_secret(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        badge = "[![codecov](https://codecov.io/gh/jim60105/MUD/graph/badge.svg?token=ysbLT6R5c7)](https://codecov.io/gh/jim60105/MUD)"
+        badge = "[![codecov](https://codecov.io/gh/jim60105/Elosern-MUD/graph/badge.svg?token=ysbLT6R5c7)](https://codecov.io/gh/jim60105/Elosern-MUD)"
         self.assertIn(badge, readme)
-        self.assertIn("/gh/jim60105/MUD/graph/badge.svg?token=ysbLT6R5c7", readme)
+        self.assertIn("/gh/jim60105/Elosern-MUD/graph/badge.svg?token=ysbLT6R5c7", readme)
         self.assertNotIn("CODECOV_TOKEN", readme)
         self.assertNotIn("secrets.", readme)
 

@@ -1,6 +1,6 @@
 ## 1. Confirm Codecov prerequisites
 
-- [x] 1.1 Confirm the `CODECOV_TOKEN` repository secret, configure `master` as the default branch, and confirm the Codecov project for `jim60105/MUD`.
+- [x] 1.1 Confirm the `CODECOV_TOKEN` repository secret, configure `master` as the default branch, and confirm the Codecov project for `jim60105/Elosern-MUD`.
 - [ ] 1.2 Confirm that the configured secret is available to same-repository push and pull-request quality-gate runs before relying on Codecov publication as a hard dependency.
 - [x] 1.3 Resolve the `codecov/codecov-action` v5.5.5 release tag to the reviewed immutable commit SHA `0fb7174895f61a3b6b78fc075e0cd60383518dac`.
 
@@ -8,7 +8,7 @@
 
 - [x] 2.1 Update `tests/test_quality_gate_contract.py` to require the exact disjoint Evennia labels, retain the dedicated top-level command, and reject repository-root discovery.
 - [x] 2.2 Add contract assertions for aggregate XML generation after the local 90% gate, the immutable Codecov v5 action pin, the repository secret reference, explicit report settings, and fail-on-upload-error behavior.
-- [x] 2.3 Add a repository contract assertion that `README.md` contains Codecov's generated private-repository badge and link for `jim60105/MUD` on `master`, without containing an upload credential.
+- [x] 2.3 Add a repository contract assertion that `README.md` contains Codecov's generated private-repository badge and link for `jim60105/Elosern-MUD` on `master`, without containing an upload credential.
 
 ## 3. Optimize and publish the quality gate
 

@@ -7,7 +7,7 @@ The quality-gate workflow spends about fifteen minutes running 990 tests because
 - Replace repository-root Evennia test discovery with explicit production-package test labels so package-local game tests still run once while top-level repository contract tests remain owned by their separate command.
 - Keep both test entry points, successful-execution evidence collection, coverage-file combination, source-root verification, and the 90% aggregate threshold intact.
 - Generate a standard coverage XML report from the verified combined data and upload that exact aggregate report to Codecov from GitHub Actions using the configured repository secret.
-- Add a Codecov coverage badge for `jim60105/MUD` to `README.md`.
+- Add a Codecov coverage badge for `jim60105/Elosern-MUD` to `README.md`.
 - Update local quality-gate documentation and workflow contract tests to describe and enforce the non-overlapping test ownership and Codecov publication steps.
 
 ## Capabilities

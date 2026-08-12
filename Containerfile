@@ -108,7 +108,7 @@ ARG RELEASE
 RUN test -n "$VERSION" && test -n "$RELEASE"
 LABEL org.opencontainers.image.title="Elosern MUD" \
       org.opencontainers.image.description="Containerized Evennia foundation for the Elosern MUD." \
-      org.opencontainers.image.source="https://github.com/jim60105/MUD" \
+      org.opencontainers.image.source="https://github.com/jim60105/Elosern-MUD" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${RELEASE}" \
       org.opencontainers.image.licenses="UNLICENSED"

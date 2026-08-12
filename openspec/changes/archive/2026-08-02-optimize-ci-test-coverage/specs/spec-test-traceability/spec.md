@@ -61,7 +61,7 @@ threshold, source-root verification, and externally published XML report.
 ### Requirement: Aggregate coverage is published to Codecov
 After all local test, traceability, source-root, and coverage-threshold gates
 succeed, GitHub Actions SHALL upload the explicit combined XML report to the
-`jim60105/MUD` Codecov project using an immutable v5 release of the official
+`jim60105/Elosern-MUD` Codecov project using an immutable v5 release of the official
 Codecov action and the configured `CODECOV_TOKEN` repository secret.
 The action MUST disable automatic report discovery and MUST fail the CI job when
 the requested upload fails. `README.md` SHALL display a Codecov badge linked to
@@ -79,5 +79,5 @@ that repository's Codecov page and scoped to the configured default branch.
 
 #### Scenario: README exposes current coverage
 - **WHEN** a reader views `README.md`
-- **THEN** Codecov's generated private-repository badge for `jim60105/MUD` displays the configured default branch's coverage without exposing an upload credential
+- **THEN** Codecov's generated private-repository badge for `jim60105/Elosern-MUD` displays the configured default branch's coverage without exposing an upload credential
 - **AND** selecting the badge opens that repository's Codecov page
