@@ -33,8 +33,9 @@ seed and starting state
 Given a fixed random seed and an identical starting `Battlefield`, the sequence of entity-state
 mutations (hp, buffs, sexual state) produced by `resolve_overwhelm()` SHALL be identical to the
 sequence produced by calling `combat.run_round()` the same number of times, in a loop external to this
-change, under the same seed and starting state. This SHALL be demonstrated for both overwhelm
-directions.
+change, under the same seed and starting state. This SHALL be demonstrated for the player-overwhelming
+direction. The foe-overwhelming (reverse) direction is not a dispatchable outcome: the session facade
+never invokes `resolve_overwhelm()` for it, so no reverse-equivalence contract exists.
 
 #### Scenario: Final hp values are identical between the two resolution paths
 - **WHEN** an overwhelm-classified `Battlefield` is resolved once via `resolve_overwhelm()` under a
@@ -52,12 +53,6 @@ directions.
 - **WHEN** the same two resolution paths are compared to completion (encounter ends in both)
 - **THEN** `rounds_elapsed` is identical between the two paths, and the same team is left with living,
   non-fled members in both
-
-#### Scenario: Reverse overwhelm is proven with the same rigor as forward overwhelm
-- **WHEN** a `Battlefield` where the player-aligned team is the overwhelmed side (design doc §6.3's
-  "player is one-shot") is resolved via both paths under a fixed seed
-- **THEN** the same hp, winner, rounds-elapsed, and entry-for-entry EventLog equivalence checks as the
-  forward-overwhelm scenarios all hold
 
 ### Requirement: resolve_overwhelm stops the moment classify_overwhelm's verdict changes
 `resolve_overwhelm()` SHALL call `classify_overwhelm(battlefield)` before running each round via
@@ -125,3 +120,11 @@ one round" language holds for this project's real calibrated stat bands.
   worked reference stats) is resolved via `resolve_overwhelm()` under its fixed seed
 - **THEN** `rounds_elapsed == 1` and the human-elite defender's final hp is `<= 0`
 
+
+### Requirement: The session never dispatches compression for the foe-overwhelming direction
+The player-combat session SHALL invoke `resolve_overwhelm()` only for player-overwhelming verdicts; a
+foe-overwhelming verdict SHALL NOT be passed to the resolver by any production call site.
+
+#### Scenario: Foe-overwhelming encounters never reach the resolver in production
+- **WHEN** every production call site of `resolve_overwhelm()` is inspected
+- **THEN** each is gated on the player's team being the overwhelming side, and no call site passes a foe-team verdict

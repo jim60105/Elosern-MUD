@@ -337,6 +337,10 @@ class RealCombatEquivalenceTests(EvenniaTest):
         self._assert_direction_is_exact(strong_first=True)
 
     def test_real_combat_exact_equivalence_in_reverse_direction(self):
+        # Resolver-math coverage only: `resolve_overwhelm` stays
+        # direction-agnostic (fix-combat-session-roster-and-overwhelm D3),
+        # but the session facade never dispatches it for a foe-overwhelming
+        # verdict, so this is not a production dispatch contract.
         self._assert_direction_is_exact(strong_first=False)
 
     def test_real_bounded_multi_round_encounter_completes_and_renders(self):

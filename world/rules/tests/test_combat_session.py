@@ -22,6 +22,7 @@ from world.rules.action import (
 )
 from world.rules.clock import WorldClock
 from world.rules.combat import BattlefieldActionContext, run_round
+from world.rules.overwhelm import classify_overwhelm
 from world.rules.combat_session import (
     CombatSessionError,
     SessionReason,
@@ -634,6 +635,161 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
             result = submit_player_action(self.player, "flee", [])
         self.assertEqual(result["outcome"], "fled")
         self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    def test_solo_defeat_settlement_never_revives_the_player(self):
+        # A hostile defeat settles the dead player at 0 HP: the roster scope
+        # excludes HP-0 members and the actor-alive fallback guard means the
+        # settlement never regenerates a corpse (kill semantics), while the
+        # world clock still advances the accumulated rounds exactly once.
+        self.monster.traits.atk_phys.base = 100
+        self.player.traits.hp.base = 100
+        self.player.traits.hp.current = 1
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "fire_ball", [self.monster])
+        self.assertEqual(result["outcome"], "defeat")
+        self.assertEqual(self.player.traits.hp.current, 0)
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    def test_restored_dead_player_session_never_revives_the_player(self):
+        # A terminal hostile session restored with the player dead at 0 HP
+        # (the durable pre-settlement crash window) settles through the
+        # recovery fallback: the roster is unavailable, but the actor-alive
+        # guard keeps the corpse at 0 HP while the clock still advances.
+        self.monster.traits.atk_phys.base = 100
+        self.player.traits.hp.base = 100
+        self.player.traits.hp.current = 1
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        from world.rules.combat_session import _persist
+
+        _persist(
+            self.player,
+            from_storage(
+                {
+                    **to_storage(record),
+                    "rounds_elapsed": 1,
+                }
+            ),
+        )
+        self.player.traits.hp.current = 0
+        clock = WorldClock()
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            restore_active_session(self.player)
+        self.assertEqual(self.player.traits.hp.current, 0)
+        self.assertEqual(clock.tick, 6)
+        self.assertIsNone(self.player.db.active_combat)
+
+
+class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTest):
+    """fix-combat-session-roster-and-overwhelm D2: player-direction compression.
+
+    A foe-overwhelming verdict is informational only: each player submission
+    drives exactly one ordinary round and the compressed resolver is never
+    invoked, so the player keeps full per-round agency (skill choice and
+    flee) and no fight is an unavoidable compressed defeat. The
+    player-overwhelming path still dispatches the resolver.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="overwhelm direction arena")
+        self.player = _player("direction player")
+        self.player.location = self.room
+        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        # Foe team overwhelming by the power-ratio rule alone (>= 100x):
+        # monster power = (20+50+100) x 3000 = 510000 vs the player's
+        # (1+51+1) x 45 = 2385 (~214x), with a ~4.8-round estimate. The
+        # player acts first (agility 51 vs 50), survives the monster's
+        # roll-100 crit (2.0x = 39 damage: 45 -> 6), and the flee contest
+        # (100 + 51 >= 51 + 50) succeeds comfortably on the second round.
+        self.monster = _monster("overwhelming goblin", hp=3000, atk=20)
+        self.monster.traits.agility.base = 50
+        self.monster.traits.defense.base = 100
+        self.monster.location = self.room
+
+    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
+    @covers_requirement("single-shot-resolution::the-session-never-dispatches-compression-for-the-foe-overwhelming-direction")
+    def test_foe_overwhelming_plays_one_round_per_submission_never_compressed(self):
+        self.player.traits.hp.base = 45
+        self.player.traits.hp.current = 45
+        self.player.traits.agility.base = 51
+        engage(self.player, self.monster)
+        self.assertEqual(
+            classify_overwhelm(
+                reconstruct_battlefield(self.player, read_session(self.player))
+            ),
+            "foes",
+        )
+        clock = WorldClock()
+        with (
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError(
+                    "the compressed resolver must never dispatch for a "
+                    "foe-overwhelming verdict"
+                ),
+            ) as resolver,
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch(
+                "world.rules.monster_behaviour._should_flee",
+                return_value=False,
+            ),
+            patch("world.rules.clock.get_world_clock", return_value=clock),
+        ):
+            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            resolver.assert_not_called()
+            self.assertEqual(result["outcome"], "round")
+            self.assertEqual(result["overwhelming_team"], "foes")
+            self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+            self.assertEqual(clock.tick, 0)
+            # The player retains full agency: flee stays available next
+            # round, and the foe-overwhelming verdict still never compresses.
+            with patch("world.rules.disengage.roll_d100", return_value=100):
+                result = submit_player_action(self.player, "flee", [])
+            resolver.assert_not_called()
+        self.assertEqual(result["outcome"], "fled")
+        self.assertEqual(clock.tick, 12)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
+    def test_player_overwhelming_still_dispatches_the_resolver(self):
+        weak = _monster("weak goblin", hp=100, atk=10)
+        weak.location = self.room
+        for key in ("atk_phys", "agility", "defense", "magic_level"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        engage(self.player, weak)
+        self.assertEqual(
+            classify_overwhelm(
+                reconstruct_battlefield(self.player, read_session(self.player))
+            ),
+            "party",
+        )
+        from world.rules.overwhelm import resolve_overwhelm as real_resolve
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=real_resolve,
+            ) as resolver,
+            patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
+        ):
+            result = submit_player_action(self.player, "fire_ball", [weak])
+        resolver.assert_called_once()
+        self.assertEqual(result["outcome"], "victory")
         self.assertIsNone(self.player.db.active_combat)
 
 

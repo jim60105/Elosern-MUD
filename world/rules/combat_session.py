@@ -894,12 +894,22 @@ def submit_player_action(
             # process termination can never leave half-round durable state.
             # Later combat changes that edit this seam (roster-and-overwhelm,
             # friendly-fire reachability) must keep edits inside this block.
+            # Compression is player-direction only (fix-combat-session-roster-
+            # and-overwhelm D2). ``classify_overwhelm`` can return the foe
+            # team (reverse overwhelm) or None (contested); neither verdict
+            # ever dispatches the resolver. A foe-overwhelming encounter
+            # deliberately plays out one ordinary round per player submission
+            # so the player keeps full per-round agency (skill choice and
+            # flee) and is never forced into an unavoidable compressed defeat;
+            # the informational ``overwhelming_team`` output value is
+            # unchanged.
             if overwhelming == player_team:
                 provider = _overwhelm_provider(actor, request, battlefield, record)
                 result = resolve_overwhelm(battlefield, provider, max_rounds=12)
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:
+                # Foe-overwhelming and contested verdicts: one ordinary round.
                 provider = _round_provider(actor, request, battlefield, record)
                 logs = run_round(battlefield, provider)
                 gained = 1
@@ -1052,9 +1062,30 @@ def settle_session(
             from world.rules.guild_exams import settle_exam_outcome
 
             exam_result = settle_exam_outcome(actor, record, battlefield, outcome)
+        # Settlement regenerates every living, non-fled roster member
+        # (fix-combat-session-roster-and-overwhelm D1): companions and any
+        # non-defeated foe still present recover for the accumulated combat
+        # seconds, so a knocked-out companion can rise above the nonlethal
+        # HP floor and rejoin a later engagement. A member at 0 HP is dead
+        # and excluded (kill semantics). The actor alone keeps the historical
+        # scope only when the actor is still living (recovery fallback with a
+        # live actor, or a solo flee whose actor is alive); a dead actor is
+        # never passed, so settlement can never revive a defeated player.
+        participants = (
+            [
+                entity
+                for key, entity in battlefield.roster.items()
+                if key not in battlefield.fled
+                and _stored_trait_value(entity.traits.hp) > 0
+            ]
+            if battlefield is not None
+            else []
+        )
+        if not participants and _stored_trait_value(actor.traits.hp) > 0:
+            participants = [actor]
         events = settle_combat_result(
             SimpleNamespace(total_seconds=record.rounds_elapsed * _ROUND_SECONDS),
-            [actor],
+            participants,
         )
         # Record the world tick at which the settlement committed; a non-None
         # value marks the session as settled for any later reader.
