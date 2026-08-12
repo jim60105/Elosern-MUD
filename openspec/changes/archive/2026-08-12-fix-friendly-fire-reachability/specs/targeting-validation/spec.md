@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: Combat shortcuts expand to an explicit list and pass the same four validations`
+- TO: `### Requirement: Combat shortcuts are convenience UI, not permission boundaries`
+
 ## MODIFIED Requirements
 
 ### Requirement: Target resolution runs four ordered validations
@@ -75,3 +80,21 @@ if listed explicitly, and an `ANY` skill may still be given explicit ally or ene
 - **WHEN** `all-enemies` is supplied to `expand_target_shorthand()` with a context whose
   `battlefield` is `None`
 - **THEN** it rejects with `RejectReason.TARGET_SPEC_MISMATCH`
+
+### Requirement: Out-of-combat targeting has no hostility model
+`RoomActionContext.relation_to()` SHALL return `Relation.SELF` for the actor itself and
+`Relation.ALLY` for every other present entity — never `Relation.ENEMY` — so that a skill whose
+`faction_constraint` is `ANY` may target any present entity out of combat. The faction check
+enforces only the self-only rule, so the legacy `ENEMY`/`ALLY` constraint values (retained for
+legacy test data, never declared by shipped skills) restrict nothing.
+
+#### Scenario: Support magic, self-buffing, and sexual magic on a companion all validate identically
+- **WHEN** a `TargetSpec.SINGLE` skill whose `faction_constraint` is `FactionConstraint.ANY` is
+  resolved out of combat against (a) the actor itself, (b) a present companion entity, using
+  `RoomActionContext`
+- **THEN** both (a) and (b) pass faction validation with no special-cased branch distinguishing the two
+
+#### Scenario: A legacy enemy constraint restricts nothing out of combat
+- **WHEN** a skill whose `faction_constraint` is the legacy `FactionConstraint.ENEMY` value is resolved out of combat
+  against any present entity via `RoomActionContext`
+- **THEN** it passes faction validation, because only the self-only rule is enforced

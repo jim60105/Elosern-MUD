@@ -1,3 +1,8 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: SkillDef carries the action resolver's skill-owned faction constraint`
+- TO: `### Requirement: Skills declare only self-only or free target scope`
+
 ## MODIFIED Requirements
 
 ### Requirement: Skills declare only self-only or free target scope

@@ -40,9 +40,7 @@ from world.rules.combat_session import (
 from world.rules.party import join_party
 from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import (
-    FactionConstraint,
     SKILL_REGISTRY,
-    SkillDef,
     SkillKind,
     TargetSpec,
 )
@@ -395,7 +393,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
         self.assertEqual(clock.tick, 0)
 
-    def test_wrong_faction_target_rejects(self):
+    def test_ally_is_a_valid_target_for_any_skill(self):
         engage(self.player, self.monster_a)
         ally = _player("ally")
         ally.location = self.room
@@ -410,10 +408,12 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):
         from world.rules.combat_session import _persist
 
         _persist(self.player, record)
+        # Freely-targetable (ANY) skills accept an ally as an explicit target;
+        # the round resolves and the ally takes the damage instead of the
+        # faction check rejecting it (friendly-fire reachability).
         result = submit_player_action(self.player, "fire_ball", [ally])
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["reason"], RejectReason.TARGET_FACTION_FORBIDDEN)
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
     def test_old_single_object_input_is_rejected(self):
         engage(self.player, self.monster_a)
@@ -848,20 +848,9 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
 _EVENT_LOGS_SENTINEL = ()
 
 
-# Test-only ANY-faction area damage skill so the player's own action can hit an
-# ally-side companion in the seam flow (production skills are ENEMY-only).
-SEAM_AREA = SkillDef(
-    key="test_seam_area",
-    label="測試範圍",
-    description="測試用：對範圍內任何目標造成魔法傷害。",
-    kind=SkillKind.ACTIVE,
-    target_spec=TargetSpec.AREA,
-    cost={},
-    usable_out_of_combat=False,
-    element="fire",
-    effects=["damage:fire:magic"],
-    faction_constraint=FactionConstraint.ANY,
-)
+# Shipped ANY-faction AREA damage skill: with free target selection the
+# player's own action can hit an ally-side companion in the seam flow.
+SEAM_AREA_KEY = "wind_blade"
 
 
 class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
@@ -877,11 +866,11 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         register_catalog()
-        SKILL_REGISTRY[SEAM_AREA.key] = SEAM_AREA
+        # Shipped ANY area skill; the player needs its 24 MP cost, set below.
         self.room = create_object(Room, key="seam arena")
         self.player = _player("seam player")
         self.player.location = self.room
-        self.player.db.skills = {"active": [SEAM_AREA.key], "passive": []}
+        self.player.db.skills = {"active": [SEAM_AREA_KEY], "passive": []}
         for key in ("atk_phys", "agility", "defense", "magic_level"):
             getattr(self.player.traits, key).base = 2
         self.player.traits.hp.base = 390
@@ -920,7 +909,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
         self.monster.location = self.room
 
     def tearDown(self):
-        SKILL_REGISTRY.pop(SEAM_AREA.key, None)
+
         super().tearDown()
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
@@ -955,7 +944,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
             with patch("world.rules.combat.roll_d100", return_value=100):
                 result = submit_player_action(
                     self.player,
-                    SEAM_AREA.key,
+                    SEAM_AREA_KEY,
                     [self.monster, self.companion],
                 )
             self.assertEqual(result["outcome"], "round")
@@ -988,7 +977,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
                 with self.assertRaises(RuntimeError):
                     submit_player_action(
                         self.player,
-                        SEAM_AREA.key,
+                        SEAM_AREA_KEY,
                         [self.monster, self.companion],
                     )
             self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -1012,7 +1001,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
             ):
                 result = submit_player_action(
                     self.player,
-                    SEAM_AREA.key,
+                    SEAM_AREA_KEY,
                     [self.monster, self.companion],
                 )
             self.assertEqual(result["outcome"], "defeat")

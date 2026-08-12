@@ -215,9 +215,9 @@ implementation the caller supplies.
 
 #### Scenario: Identical code, different ActionContext, different faction outcome
 - **WHEN** `ActionResolver.resolve()` is called twice with byte-identical `ActionRequest`s (same actor,
-  same `skill_key` whose `SkillDef.faction_constraint` is `FactionConstraint.ENEMY`) differing only in
+  same `skill_key` whose `SkillDef.faction_constraint` is `FactionConstraint.SELF_ONLY`) differing only in
   which `ActionContext` is supplied — once with `RoomActionContext`, once with a test double whose
-  `relation_to()` reports `Relation.ENEMY` for the same target
+  `relation_to()` reports `Relation.SELF` for the same target
 - **THEN** the `RoomActionContext` call rejects with `RejectReason.TARGET_FACTION_FORBIDDEN` and the
   test-double call succeeds, with no difference in `action.py`'s or `targeting.py`'s executed source
   between the two calls

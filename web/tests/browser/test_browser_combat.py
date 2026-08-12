@@ -134,11 +134,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         target = self._basic_attack_target_identity(page)
 
-        # Root: first item is Attack. Open it, then the single target.
+        # Root: first item is Attack. Open it, then its single-target menu
+        # lists the actor and the monster (both valid for ANY scope); move
+        # past the actor to select the monster.
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowLeft")  # back to attack
         self._press(page, "Enter")  # open attack
-        self._press(page, "Enter")  # select the first valid target
+        self._press(page, "ArrowRight")  # past the actor to the monster
+        self._press(page, "Enter")  # select the monster target
 
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
@@ -158,7 +161,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "Enter")  # open skills list
         # Skills list starts at fire_ball (first owned active skill).
         self._press(page, "Enter")  # open fire_ball targets
-        self._press(page, "Enter")  # select first target
+        # The single-target menu lists the actor and the monster (both valid
+        # for ANY scope); move past the actor to select the monster.
+        self._press(page, "ArrowRight")
+        self._press(page, "Enter")  # select the monster target
 
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
@@ -223,9 +229,12 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")  # open wind_blade
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
-        self._press(page, "ArrowRight")  # first shorthand
+        # The actor is a valid candidate for ANY scope, so the first grid row
+        # holds the two candidates; the shorthand rows follow.
+        self._press(page, "ArrowDown")  # first shorthand row (all-enemies)
         self._press(page, "Enter")  # choose shorthand
-        self._press(page, "ArrowDown")  # confirm (second grid row)
+        self._press(page, "ArrowDown")  # shorthand row two
+        self._press(page, "ArrowRight")  # confirm (last grid cell)
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -358,10 +367,13 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")  # open wind_blade target menu
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
-        self._press(page, "Space")  # toggle the explicit candidate
-        # The confirm cell sits at the second grid row, second column.
-        self._press(page, "ArrowRight")
-        self._press(page, "ArrowDown")
+        # The actor is now a valid candidate, so the first grid row holds the
+        # two candidates; the confirm cell sits at the last grid row, second
+        # column. Move past the actor to the monster candidate and toggle it.
+        self._press(page, "ArrowRight")  # monster candidate
+        self._press(page, "Space")  # toggle the explicit monster candidate
+        self._press(page, "ArrowDown")  # shorthand row two
+        self._press(page, "ArrowDown")  # confirm row
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -553,6 +565,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "Enter")
         self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")
+        # The actor is now a valid candidate, so the first grid row holds the
+        # two candidates; move to the monster candidate before toggling.
+        self._press(page, "ArrowRight")  # monster candidate
 
         # Space once toggles the candidate: the selection marker appears and
         # the client-local selection has exactly one identity.
@@ -583,8 +598,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
 
         # Confirm casts exactly the one selected target.
-        self._press(page, "ArrowRight")  # shorthand column
-        self._press(page, "ArrowDown")  # confirm cell
+        self._press(page, "ArrowDown")  # shorthand row two
+        self._press(page, "ArrowDown")  # confirm row
         self._press(page, "Enter")
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)

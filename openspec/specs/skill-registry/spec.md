@@ -23,12 +23,16 @@ as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and sy
   present in `SKILL_REGISTRY` (e.g. `"fire_ball"`)
 - **THEN** no rejection is produced for that key
 
-### Requirement: SkillDef carries the action resolver's skill-owned faction constraint
+### Requirement: Skills declare only self-only or free target scope
 `world/skills/registry.py` SHALL define a frozen `SkillDef` dataclass with the required fields `key`, `label`, `description`, `kind`,
 `target_spec`, `cost`, `usable_out_of_combat`, `element`, `effects`, and `faction_constraint`.
 `label` and `description` SHALL be nonempty Traditional Chinese player-facing strings bounded to 128 and 512 Unicode code points respectively.
-`faction_constraint` SHALL be a `FactionConstraint` value (`ANY`, `ALLY`, `ENEMY`, or `SELF_ONLY`)
-and SHALL default to `ANY`. Its `cost` and `effects` collections SHALL reject mutation. Every
+`faction_constraint` SHALL be a `FactionConstraint` value
+and SHALL default to `ANY`. Every skill SHALL declare its `faction_constraint` explicitly: all attack and
+recovery skills SHALL use `FactionConstraint.ANY` (freely targetable among enemies and allies); only a
+skill whose effect is inherently self-only SHALL use `FactionConstraint.SELF_ONLY` and restrict its
+target to the actor. No skill SHALL be restricted to enemies or allies only; the legacy `ALLY`/`ENEMY`
+enum values are retained for legacy test data and restrict nothing. Its `cost` and `effects` collections SHALL reject mutation. Every
 production registry entry, including dynamically registered innate skills, SHALL supply all ten
 fields directly; no generated key fallback or permissive metadata default SHALL exist.
 
@@ -37,9 +41,21 @@ fields directly; no generated key fallback or permissive metadata default SHALL 
 - **THEN** it has all ten documented fields, its `faction_constraint` is a
   `FactionConstraint`, and its bounded label and description are nonempty
 
-#### Scenario: Direct offensive seed skills target enemies
-- **WHEN** the `fire_ball` and `wind_blade` definitions are inspected
-- **THEN** their `faction_constraint` is `FactionConstraint.ENEMY`
+#### Scenario: Attack skills can hit companions
+- **WHEN** a player casts any attack skill (`basic_attack`, `fire_ball`, `wind_blade`, `shadow_slash`) at an explicit companion target or an AREA selection including companions
+- **THEN** the targets pass faction validation and receive damage (with the friendly-fire penalty applying to companion hits)
+
+#### Scenario: Recovery skills can target allies and foes
+- **WHEN** a player casts a recovery skill at an ally, a companion, or an enemy
+- **THEN** the target passes faction validation and the skill resolves normally
+
+#### Scenario: Self-only skills accept only the actor
+- **WHEN** a `SELF_ONLY` skill is validated against any target other than the actor
+- **THEN** the target is rejected at the faction check
+
+#### Scenario: No skill is enemy-restricted
+- **WHEN** `SKILL_REGISTRY` is inspected
+- **THEN** no skill declares an ENEMY-only or ALLY-only constraint
 
 #### Scenario: Innate skills have curated display text
 - **WHEN** `basic_attack` and dynamically registered `flee` are presented to a player

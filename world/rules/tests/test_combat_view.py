@@ -88,9 +88,13 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotIn("defense_instinct", keys)
         wind = next(skill for skill in view.skills if skill.key == "wind_blade")
         self.assertEqual(wind.target_spec, "area")
-        self.assertEqual(wind.shorthands, ("all-enemies", "all"))
+        # With free targeting every approved shorthand expands to valid
+        # candidates, so all three are exposed as conveniences.
+        self.assertEqual(wind.shorthands, ("all-enemies", "all-allies", "all"))
         self.assertTrue(wind.enabled)
-        self.assertEqual(wind.valid_target_ids, (self.monster.pk,))
+        # With ANY scope every relation passes the faction check, so the
+        # actor itself is also a valid explicit target for the area skill.
+        self.assertEqual(wind.valid_target_ids, (self.player.pk, self.monster.pk))
         fire = next(skill for skill in view.skills if skill.key == "fire_ball")
         self.assertEqual(fire.cost, {"mp": 20})
         self.assertEqual(fire.element, "fire")
@@ -107,6 +111,34 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(fire.reason_message.strip())
         self.assertTrue(fire.label.strip())
         self.assertTrue(fire.description.strip())
+
+    @covers_requirement("webclient-combat-menu::menu-target-shorthands-are-convenience-ui")
+    def test_any_skill_offers_companion_as_explicit_target_alongside_shorthands(self):
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="view companion", location=self.room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        companion.traits.hp.base = 100
+        companion.traits.hp.current = 100
+        join_party(companion, self.player)
+        self.player.db.skills = {
+            "active": ["wind_blade", "fire_ball"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        self.assertTrue(wind.enabled)
+        # The menu's all-enemies shorthand remains a convenience, while the
+        # freely-targetable skill also lists the ally companion as an explicit
+        # target — the shorthand neither widens nor narrows the scope.
+        self.assertEqual(wind.shorthands, ("all-enemies", "all-allies", "all"))
+        self.assertIn(self.monster.pk, wind.valid_target_ids)
+        self.assertIn(companion.pk, wind.valid_target_ids)
+        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
+        self.assertIn(companion.pk, fire.valid_target_ids)
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
     def test_view_is_read_only(self):

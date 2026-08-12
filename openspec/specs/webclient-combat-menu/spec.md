@@ -96,6 +96,15 @@ The browser SHALL derive target controls only from the validated skill descripto
 - **WHEN** the player chooses the server-authored `all-enemies` descriptor
 - **THEN** one request carries that shorthand and no target-ID field
 
+### Requirement: Menu target shorthands are convenience UI
+
+The combat menu's target-selection options (`all-enemies`, `all-allies`, `all`) SHALL be presented as conveniences for constructing the target list; the underlying skills accept any explicit target their scope allows (enemy or ally for `ANY` skills), and the menu SHALL also allow explicit ally selection where the skill permits it.
+
+#### Scenario: Menu shorthands do not restrict targeting
+
+- **WHEN** the combat menu offers `all-enemies` for a damage skill
+- **THEN** the option is a convenience expansion; selecting an explicit ally target for the same skill is equally valid and submits normally
+
 ### Requirement: Production combat actions are narrow and server-authoritative
 The production action registry SHALL register exactly `combat.cast`, `combat.flee`, and `combat.forfeit` for this delivery unit in addition to no unrelated gameplay adapter. `combat.cast` SHALL accept only the TargetSpec-dependent exact payload forms and SHALL reject the reserved `flee` skill key; `combat.flee` SHALL accept exactly an empty object; and `combat.forfeit` SHALL accept exactly the current bounded session ID as a stale-selection guard. Every adapter SHALL obtain the actor from the authenticated session, re-read the active session, re-resolve referenced IDs from its participants, invoke a public combat-session API, and SHALL NOT assign `.db`, traits, buffs, sexual state, location, quests, wallet, inventory, or battlefield members directly.
 

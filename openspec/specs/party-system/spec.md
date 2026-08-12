@@ -184,8 +184,10 @@ The follow function in the party module SHALL move every companion of the traver
 When the player engages a hostile target, `engage` SHALL include every bound companion that is
 co-located, living, and not knocked out in the session's allied team (`player_ids`). The
 battlefield's two-team model SHALL treat companions as allies: `relation_to` returns ALLY for
-them, ALLY-targeting skills and the `all-allies` shorthand may include them, and the player's
-ENEMY-targeting skills SHALL NOT select them; opposing-team combatants SHALL be able to target
+them, freely-targetable (ANY) skills and the `all-allies` shorthand may include them, and the
+player SHALL be able to select companions as explicit damage targets — companion hits apply the
+friendly-fire penalty contract (affinity-friendly-fire) rather than being rejected; opposing-team
+combatants SHALL be able to target
 companions. Each companion SHALL receive at most one deterministic policy request per round
 through the session's non-player action provider (the same `monster_behaviour_policy` pipeline
 monsters use, whose target selection is team-relative), and SHALL NOT consume or delay the
@@ -205,9 +207,11 @@ player's queued request.
 - **THEN** the player's request is supplied exactly once, each companion receives at most one
   deterministic policy request targeting the opposing team, and each monster receives at most one
 
-#### Scenario: The player's enemy-targeting skills never select companions
-- **WHEN** the player resolves an ENEMY-targeting skill in combat with companions
-- **THEN** no companion appears among the selectable targets
+#### Scenario: A damage skill may select a companion as its explicit target
+- **WHEN** the player resolves a freely-targetable (ANY) damage skill with a companion as the
+  explicit target
+- **THEN** the companion appears among the selectable targets and the hit applies the
+  friendly-fire penalty contract instead of being rejected at the faction check
 
 #### Scenario: A companion's fallback policy attacks the opposing team without fleeing
 - **WHEN** a companion (which has no monster threat tier) acts through the policy provider

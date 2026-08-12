@@ -65,7 +65,14 @@ class TargetSpec(StrEnum):
 
 
 class FactionConstraint(StrEnum):
-    """Relations a skill permits the resolver to target."""
+    """Relations a skill permits the resolver to target.
+
+    ``ANY`` (the default) and ``SELF_ONLY`` are the only constraints shipped
+    content may declare: every attack and recovery skill is freely targetable
+    among enemies and allies, while a self-only effect restricts its target to
+    the actor. ``ALLY`` and ``ENEMY`` are retained as enum values for legacy
+    test data; no skill declares them.
+    """
 
     ANY = "any"
     ALLY = "ally"
@@ -172,11 +179,11 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         _skill(
             "basic_attack",
             "基本攻擊",
-            "以普通攻擊對單一敵人造成物理傷害。",
+            "以普通攻擊對單一目標造成物理傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             element="fire",
-            faction_constraint=FactionConstraint.ENEMY,
+            faction_constraint=FactionConstraint.ANY,
             effects=["damage:fire:physical"],
         ),
         _body_multiplier("body_enhancement", "身體強化", 100),
@@ -221,24 +228,24 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         _skill(
             "fire_ball",
             "火球術",
-            "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+            "凝聚火焰魔力，對單一目標造成魔法傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"mp": 20},
             element="fire",
+            faction_constraint=FactionConstraint.ANY,
             effects=["damage:fire:magic"],
-            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "wind_blade",
             "風刃術",
-            "颳起銳利風刃，對範圍內所有敵人造成魔法傷害。",
+            "颳起銳利風刃，對範圍內所有目標造成魔法傷害。",
             SkillKind.ACTIVE,
             TargetSpec.AREA,
             cost={"mp": 24},
             element="wind",
+            faction_constraint=FactionConstraint.ANY,
             effects=["damage:wind:magic"],
-            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "flight",
@@ -263,23 +270,23 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         _skill(
             "light_sword_style",
             "光劍架式",
-            "以光之劍的架式對單一敵人造成物理傷害。",
+            "以光之劍的架式對單一目標造成物理傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"sp": 6},
+            faction_constraint=FactionConstraint.ANY,
             effects=["weapon_style:light_sword"],
-            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "shadow_slash",
             "影斬",
-            "潛入闇影後對單一敵人斬出一記物理攻擊。",
+            "潛入闇影後對單一目標斬出一記物理攻擊。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"sp": 18},
             element="dark",
+            faction_constraint=FactionConstraint.ANY,
             effects=["damage:dark:physical"],
-            faction_constraint=FactionConstraint.ENEMY,
         ),
         _skill(
             "flash_step",

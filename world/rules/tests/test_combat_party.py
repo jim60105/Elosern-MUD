@@ -102,6 +102,9 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
         self.room = create_object(Room, key="combat party arena")
         self.player = _player()
         self.player.location = self.room
@@ -190,15 +193,24 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement("player-combat-session::engage-creates-one-persistent-local-combat-session")
     @covers_requirement("party-system::companions-fight-as-allies-in-the-player-s-combat-session")
-    def test_enemy_targeting_skill_never_selects_companion(self):
+    def test_freely_targetable_skill_can_select_companion_with_penalty(self):
         companion = _companion(self.player, "同伴")
         engage(self.player, self.monster)
-        result = submit_player_action(
-            self.player, "fire_ball", [companion]
+        # ANY damage skills accept a companion as an explicit target; the
+        # friendly-fire penalty contract applies instead of a faction
+        # rejection (friendly-fire reachability).
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+
+        apply_affinity_change(
+            companion, self.player, AffinitySource.QUEST_COMPLETION, 10
         )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["reason"], RejectReason.TARGET_FACTION_FORBIDDEN)
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = submit_player_action(
+                self.player, "fire_ball", [companion]
+            )
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+        self.assertEqual(companion.relations.affinity_for(self.player), 9)
 
     @covers_requirement("player-combat-session::engage-creates-one-persistent-local-combat-session")
     @covers_requirement("party-system::companions-fight-as-allies-in-the-player-s-combat-session")
