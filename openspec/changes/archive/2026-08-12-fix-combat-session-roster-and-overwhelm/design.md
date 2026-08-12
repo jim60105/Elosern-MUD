@@ -14,7 +14,7 @@
 
 ## Decisions
 
-**D1 — Settlement scope = living, non-fled roster.** In `settle_session`, build `participants = [entity for key, entity in battlefield.roster.items() if key not in battlefield.fled and stored_hp(entity) > 0] or [actor]` and pass it to `settle_combat_result`. If the roster is unavailable (recovery fallback), `[actor]` remains.
+**D1 — Settlement scope = living, non-fled roster.** In `settle_session`, build `participants = [entity for key, entity in battlefield.roster.items() if key not in battlefield.fled and stored_hp(entity) > 0]` and pass it to `settle_combat_result`. When the roster is unavailable (recovery fallback) or holds no living non-fled member, `[actor]` is used only while the actor's stored HP is above 0 — so a solo flee keeps its historical actor regen, but a defeated player at 0 HP is never revived by settlement (kill semantics; only the world clock advances).
 
 **D2 — Compression dispatch stays player-direction only; document it.** The existing gate `if overwhelming == player_team:` is the intended contract. The change adds an explicit guard/comment and spec coverage that a foe-overwhelming verdict (or a contested verdict) never dispatches `resolve_overwhelm`; the informational `overwhelming_team` value may still be reported to the UI.
 

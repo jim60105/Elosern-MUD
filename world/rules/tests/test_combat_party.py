@@ -420,6 +420,30 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTest):
         new_result = engage(self.player, self.monster)
         self.assertEqual(new_result["record"].player_ids, (self.player.pk,))
 
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    @covers_requirement("party-system::combat-settlement-includes-companions-in-the-regen-scope")
+    def test_terminal_settlement_regenerates_knocked_out_companion(self):
+        # The terminal settlement regenerates the whole living roster
+        # (fix-combat-session-roster-and-overwhelm D1): the first round
+        # floors the companion at 1 HP, the forfeit settlement advances the
+        # round's combat seconds and lifts the companion above the nonlethal
+        # floor, and a later engagement includes it again.
+        engage(self.player, self.monster)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = submit_player_action(
+                self.player, "fire_ball", [self.monster]
+            )
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(self.companion.traits.hp.current, 1)
+        result = forfeit(self.player)
+        self.assertEqual(result["outcome"], "defeat")
+        self.assertGreater(self.companion.traits.hp.current, 1)
+        new_result = engage(self.player, self.monster)
+        self.assertEqual(
+            new_result["record"].player_ids,
+            (self.player.pk, self.companion.pk),
+        )
+
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
     @covers_requirement("party-system::combat-terminal-rules-are-player-centric")
     def test_recovery_above_1_hp_rejoins_a_later_engagement(self):

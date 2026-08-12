@@ -362,8 +362,15 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
             result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
-        self.assertEqual(opponent.traits.hp.current, 1)
-        self.assertTrue(opponent.traits.hp.current > 0)
+        kinds = [entry.kind for log in result["logs"] for entry in log.entries]
+        self.assertIn("target_knocked_out", kinds)
+        self.assertNotIn("target_defeated", kinds)
+        # The knockout floored HP nonlethally at 1; the terminal settlement
+        # then regenerates the floored opponent with the roster scope
+        # (fix-combat-session-roster-and-overwhelm D1) before the temporary
+        # opponent is deleted.
+        self.assertGreater(opponent.traits.hp.current, 1)
+        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
 
     def test_promotion_preserves_merit(self):
         for key in ("atk_phys", "agility", "defense", "magic_level"):

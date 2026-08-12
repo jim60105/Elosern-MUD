@@ -31,7 +31,7 @@ encounters SHALL pause for player input between ordinary rounds.
 - **WHEN** one round ends with both teams active and no overwhelm verdict
 - **THEN** the session persists and no additional round runs before the player's next action
 
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Combat time settles once at terminal session outcome
 Session rounds SHALL accumulate without command-default cast time. On enemy defeat, player defeat,
@@ -39,7 +39,9 @@ successful flee, nonlethal exam outcome, or bounded terminal condition, the tota
 seconds SHALL settle once through `settle_combat_result()`, and the settlement entity scope SHALL be
 every living, non-fled member of the session's battlefield roster (player, companions, and any
 non-defeated foe still present), so all participants receive gauge regen for the accumulated combat
-time. Then active session/context state SHALL be cleared.
+time. Then active session/context state SHALL be cleared. The settlement SHALL be idempotent: a
+terminal outcome SHALL record a durable settled marker so a restart that re-reads the session can
+never settle the same rounds a second time.
 
 #### Scenario: Three-round victory advances eighteen seconds once
 - **WHEN** a hostile session ends after three completed rounds
@@ -49,11 +51,17 @@ time. Then active session/context state SHALL be cleared.
 #### Scenario: Flee closes the same session
 - **WHEN** the player's ordinary innate flee action succeeds
 - **THEN** the session settles elapsed rounds, clears combat state, and leaves no second disengagement path
-#### Scenario: Companion gauges regenerate from combat settlement
 
+#### Scenario: A restarted terminal session is not settled twice
+- **WHEN** a hostile session reached a terminal outcome and the process terminates before session clearing completes
+- **THEN** after restart the session's accumulated time is settled exactly once, not again by session restoration
+
+#### Scenario: Companion gauges regenerate from combat settlement
 - **WHEN** a session with a wounded or knocked-out companion reaches a terminal outcome
 - **THEN** the companion's HP/MP/SP are regenerated for the accumulated combat seconds, and a knocked-out
   companion rises above the nonlethal HP floor when its regen allows
+
+## ADDED Requirements
 
 ### Requirement: Overwhelm compression is player-direction only
 
