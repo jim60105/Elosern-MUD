@@ -360,8 +360,9 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
             cost={"sp": 6},
+            element="light",
             faction_constraint=FactionConstraint.ANY,
-            effects=["weapon_style:light_sword"],
+            effects=["damage:light:physical"],
         ),
         _skill(
             "shadow_slash",

@@ -7,6 +7,7 @@ from typing import Any
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
 from world.rules.rulebook.schema import evaluate_condition, load_rules
+from world.skills.equipment import dual_wielding_from_storage
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
 
@@ -78,7 +79,8 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     """Build the combat-modifier condition context from stored state only.
 
     Reads the persisted buff cache and stored sexual traits or baseline without
-    materializing ``entity.buffs`` or ``entity.sexual``. Returns a context
+    materializing ``entity.buffs`` or ``entity.sexual``, and the dual-wield
+    equipment fact without materializing ``entity.equipment``. Returns a context
     accepted by :func:`matched_combat_modifiers` so preview and revalidation
     never create a persistent attribute or write state. The entity itself is
     passed through for ``skill_owned`` conditions, which resolve against
@@ -92,6 +94,7 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
         elif isinstance(value, _StoredLevel):
             context[field] = value
     context["entity"] = entity
+    context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context
 
 
@@ -112,6 +115,7 @@ def _build_context(entity) -> dict[str, Any]:
         context["arousal"] = sexual.arousal
         context["climax_phase"] = sexual.climax_phase
     context["entity"] = entity
+    context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context
 
 
@@ -183,15 +187,17 @@ def matched_combat_modifiers(
     omitted it is rebuilt from ``entity``. A caller-supplied context is
     treated as a partial context: the entity is injected so ``skill_owned``
     conditions always resolve against the real entity rather than silently
-    never matching. A ``skill_owned`` rule that matches only through a
-    conferred grant (the entity does not own the skill) returns the grant's
-    scaled-down adjustment instead of the full bundle.
+    never matching, and the stored dual-wield equipment fact is injected the
+    same way. A ``skill_owned`` rule that matches only through a conferred
+    grant (the entity does not own the skill) returns the grant's scaled-down
+    adjustment instead of the full bundle.
     """
     if context is None:
         context = _build_context(entity)
     else:
         context = dict(context)
         context.setdefault("entity", entity)
+        context.setdefault("dual_wielding", dual_wielding_from_storage(entity))
     matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
         if not evaluate_condition(rule.when, context):

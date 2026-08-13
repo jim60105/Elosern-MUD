@@ -112,6 +112,63 @@ class CombatModifierTests(EvenniaTest):
         entity.db.skills = {"active": [], "passive": ["reincarnation_boon_yuka"]}
         self.assertEqual(evaluate_combat_modifiers(entity), {"agility": "+5%"})
 
+    def _dual_wielding(self):
+        entity = self._entity()
+        entity.db.equipment = {"weapon_main": "left_blade", "weapon_off": "right_blade"}
+        return entity
+
+    @covers_requirement("combat-modifier-table::dual-wield-style-grants-a-combat-adjustment-while-owned")
+    def test_rule_dual_wield_style_atk_phys_bonus(self):
+        entity = self._dual_wielding()
+        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        self.assertEqual(evaluate_combat_modifiers(entity), {"atk_phys": 5})
+
+    @covers_requirement("combat-modifier-table::dual-wield-style-grants-a-combat-adjustment-while-owned")
+    def test_dual_wield_style_bonus_never_grants_without_ownership(self):
+        entity = self._dual_wielding()
+        entity.db.skills = {"active": [], "passive": ["elf_longevity"]}
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+
+    def test_dual_wield_style_bonus_requires_two_equipped_weapons(self):
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        entity.db.equipment = {"weapon_main": "left_blade", "weapon_off": None}
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+
+    def test_dual_wielding_condition_matches_a_context_value(self):
+        self.assertTrue(
+            evaluate_condition(
+                {"dual_wielding": True},
+                {"dual_wielding": True},
+            )
+        )
+        self.assertFalse(
+            evaluate_condition(
+                {"dual_wielding": True},
+                {"dual_wielding": False},
+            )
+        )
+        self.assertFalse(evaluate_condition({"dual_wielding": True}, {}))
+        with self.assertRaisesRegex(ValueError, "boolean"):
+            evaluate_condition({"dual_wielding": "yes"}, {"dual_wielding": True})
+
+    def test_malformed_equipment_storage_fails_closed(self):
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        for malformed in ("corrupt", None, ["left_blade", "right_blade"]):
+            with self.subTest(malformed=malformed):
+                entity.db.equipment = malformed
+                self.assertEqual(evaluate_combat_modifiers(entity), {})
+
+    def test_no_create_evaluation_matches_dual_wield_row_without_handler(self):
+        entity = self._dual_wielding()
+        entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+
+        self.assertNotIn("equipment", vars(entity))
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"atk_phys": 5})
+        self.assertNotIn("equipment", vars(entity))
+
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_rows_do_not_match_without_ownership(self):
         entity = self._entity()

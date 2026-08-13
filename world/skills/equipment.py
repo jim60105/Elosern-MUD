@@ -1,5 +1,6 @@
 """Equipment and inventory handling from design sections 3.2 and 5.2."""
 
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
 
@@ -20,6 +21,25 @@ _EMPTY_EQUIPMENT = {
     "armor": None,
     "accessories": [],
 }
+
+
+def dual_wielding_from_storage(entity: Any) -> bool:
+    """Whether both weapon slots hold an equipped item key, read from storage.
+
+    Reads only the stored equipment mapping without materializing any handler,
+    so the no-create combat-modifier and status paths can supply the fact
+    without violating their no-create contracts. Malformed storage (missing,
+    non-mapping, or non-string slot values) fails closed to ``False``.
+    """
+    raw = entity.db.equipment
+    if not isinstance(raw, Mapping):
+        return False
+    main = raw.get("weapon_main")
+    off = raw.get("weapon_off")
+    return (
+        isinstance(main, str) and bool(main)
+        and isinstance(off, str) and bool(off)
+    )
 
 
 class EquipmentHandler:
@@ -47,6 +67,11 @@ class EquipmentHandler:
         if slot is EquipmentSlot.ACCESSORY:
             return list(self._raw.get("accessories", []))
         return self._raw.get(slot.value)
+
+    @property
+    def is_dual_wielding(self) -> bool:
+        """Whether both weapon slots hold an equipped item key."""
+        return dual_wielding_from_storage(self.entity)
 
 def list_items(entity: Any) -> list[str]:
     """Return a copy of the flat inventory."""

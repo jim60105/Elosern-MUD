@@ -469,6 +469,51 @@ class DualBladeMasteryCastTests(EvenniaTest):
         self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
 
 
+class LightSwordStyleCastTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="light sword actor")
+        self.target = create_object(PlayerCharacter, key="light sword target")
+        for entity in (self.actor, self.target):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        self.actor.db.skills = {"active": ["light_sword_style"], "passive": []}
+        self.target.db.skills = {"active": [], "passive": []}
+        battlefield = Battlefield(
+            {
+                "party": frozenset({"light sword actor"}),
+                "foes": frozenset({"light sword target"}),
+            },
+            {"light sword actor": self.actor, "light sword target": self.target},
+        )
+        self.request = ActionRequest(
+            self.actor,
+            "light_sword_style",
+            [self.target],
+            BattlefieldActionContext(battlefield),
+        )
+
+    @covers_requirement("skill-registry::light-sword-style-deals-damage-via-the-standard-damage-convention")
+    def test_light_sword_style_declares_the_damage_convention(self):
+        skill = SKILL_REGISTRY["light_sword_style"]
+        self.assertEqual(skill.effects, ["damage:light:physical"])
+        self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
+
+    @covers_requirement("skill-registry::light-sword-style-deals-damage-via-the-standard-damage-convention")
+    def test_cast_resolves_and_deals_light_elemental_physical_damage(self):
+        before = self.target.traits.hp.value
+        sp_before = self.actor.traits.sp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(self.request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(self.target.traits.hp.value, before)
+        self.assertEqual(
+            [entry.kind for entry in result.event_log.entries[:2]],
+            ["roll", "damage"],
+        )
+        self.assertEqual(self.actor.traits.sp.value, sp_before - 6)
+
+
 class DivineMysteryRegistryTests(unittest.TestCase):
     @covers_requirement("skill-registry::divine-sexual-mastery-and-divine-sexual-arts-exist-as-distinct-skills", "divine-mystery::unmechanized-divine-mysteries-are-explicitly-declared-not-silently-missing")
     def test_divine_mystery_family_ships_mechanized_and_flavor_entries(self):
