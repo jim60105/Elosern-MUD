@@ -22,6 +22,42 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+- key: water_shield
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: water_bind
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: earth_hardened_skin
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 3}
+- key: earth_stone_armor
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: earth_dust_veil
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds: {target: accuracy, ceiling: -5}
+- key: earth_root
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: earth_ward
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
 - key: focus
   duration: 60
   stacking: refresh

@@ -377,6 +377,57 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             ("phoenix_eternal_flame", "不滅鳳凰焰", "召喚不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal")),
             ("world_ending_blaze", "焚世終焰", "召喚足以焚盡世界的終焰，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
         ),
+        *_elemental_spells(
+            "water",
+            # 水 — 學徒
+            ("water_bolt", "水箭術", "凝聚水之魔力化為箭矢，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 12, ("damage:water:magic",)),
+            ("minor_heal", "治癒滴露", "凝聚如滴露般的光芒，恢復單一目標的生命力。", TargetSpec.SINGLE, 11, ("heal:single",)),
+            # 水 — 術師
+            ("healing_spring", "治癒之泉", "召喚治癒之泉，恢復範圍內所有目標的生命力。", TargetSpec.AREA, 28, ("heal:area",)),
+            ("water_shield", "水盾術", "以水之魔力形成護盾，提升單一目標的防禦。", TargetSpec.SINGLE, 22, ("buff_apply:water_shield",)),
+            # 水 — 大師
+            ("abyssal_whirlpool", "深海漩渦", "召喚深海漩渦，對範圍內所有目標造成魔法傷害並使其束縛。", TargetSpec.AREA, 50, ("damage:water:magic", "buff_apply:water_bind")),
+            ("wellspring_of_life", "生命湧泉", "引出生命的湧泉，大量恢復單一目標的生命力。", TargetSpec.SINGLE, 40, ("heal:single",)),
+            # 水 — 賢者
+            ("tsunami", "海嘯術", "喚起毀滅性的海嘯，對範圍內所有目標造成極高魔法傷害。", TargetSpec.AREA, 95, ("damage:water:magic",)),
+            ("tidal_revival", "復生之潮", "召喚復生之潮，大量恢復瀕危目標的生命力。", TargetSpec.SINGLE, 78, ("heal:single",)),
+            # 水 — 主宰
+            ("sea_of_life", "生命之海", "展開生命之海，大量恢復範圍內所有目標的生命力。", TargetSpec.AREA, 160, ("heal:area",)),
+            ("abyssal_tide", "深淵巨潮", "召喚深淵的巨潮，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 145, ("damage:water:magic",)),
+        ),
+        *_elemental_spells(
+            "earth",
+            # 土 — 學徒
+            ("stone_shard", "石礫術", "凝聚土之魔力擲出石礫，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 12, ("damage:earth:magic",)),
+            # 土 — 術師
+            ("stone_armor", "岩甲術", "以岩石覆蓋目標形成岩甲，提升防禦。", TargetSpec.SINGLE, 24, ("buff_apply:earth_stone_armor",)),
+            ("dust_veil", "沙塵術", "捲起漫天沙塵，降低範圍內所有目標的命中。", TargetSpec.AREA, 22, ("buff_apply:earth_dust_veil",)),
+            # 土 — 大師
+            ("earth_bind", "地縛術", "使大地隆起束縛目標，限制範圍內所有目標的行動。", TargetSpec.AREA, 42, ("buff_apply:earth_root",)),
+            ("rockslide", "岩壁崩落", "使岩壁崩落碾壓目標，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 48, ("damage:earth:magic",)),
+            # 土 — 賢者
+            ("earthquake", "地震術", "撼動大地引發地震，對範圍內所有目標造成極高魔法傷害。", TargetSpec.AREA, 90, ("damage:earth:magic",)),
+            ("earthen_ward", "大地庇護", "以大地之力庇護目標，提升範圍內所有目標的防禦。", TargetSpec.AREA, 75, ("buff_apply:earth_ward",)),
+            # 土 — 主宰
+            ("mountain_collapse", "山嶽崩落", "令山嶽崩落壓垮一切，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 150, ("damage:earth:magic",)),
+            ("earths_judgment", "大地審判", "喚起大地審判之力，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:earth:magic",)),
+        ),
+        # 土 — 學徒
+        # hardened_skin is inherently self-only (`self_buff_apply`), so it
+        # declares SELF_ONLY — the `_elemental_spells` builder fixes ANY, so
+        # this single entry is written out individually per the skill-registry
+        # spec's self-only constraint.
+        _skill(
+            "hardened_skin",
+            "硬化肌膚",
+            "使自身肌膚硬化如岩，提升防禦。",
+            SkillKind.ACTIVE,
+            TargetSpec.SELF,
+            cost={"mp": 10},
+            element="earth",
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            effects=["self_buff_apply:earth_hardened_skin"],
+        ),
         _skill(
             "wind_blade",
             "風刃術",

@@ -484,6 +484,58 @@ class ElementMasteryGateTests(EvenniaTest):
             with self.subTest(tier=tier, with_mastery=True):
                 self.assertTrue(can_cast_spell_tier(master, "fire", tier))
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_water_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        water_spell_tiers = {
+            "術師": (15, 16, ("healing_spring", "water_shield")),
+            "大師": (30, 31, ("abyssal_whirlpool", "wellspring_of_life")),
+            "賢者": (70, 71, ("tsunami", "tidal_revival")),
+            "主宰": (90, 91, ("sea_of_life", "abyssal_tide")),
+        }
+        for tier, (below, at, spell_keys) in water_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "water", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "water", tier)
+            )
+        master = self._caster("water-master", 1)
+        master.db.skills = {"active": [], "passive": ["water_mastery"]}
+        for tier in water_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "water", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_earth_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        earth_spell_tiers = {
+            "術師": (15, 16, ("stone_armor", "dust_veil")),
+            "大師": (30, 31, ("earth_bind", "rockslide")),
+            "賢者": (70, 71, ("earthquake", "earthen_ward")),
+            "主宰": (90, 91, ("mountain_collapse", "earths_judgment")),
+        }
+        for tier, (below, at, spell_keys) in earth_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "earth", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "earth", tier)
+            )
+        master = self._caster("earth-master", 1)
+        master.db.skills = {"active": [], "passive": ["earth_mastery"]}
+        for tier in earth_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "earth", tier))
+
     def test_created_humans_always_satisfy_the_apprentice_gate(self):
         from world.rules.character_creation import starting_magic_interval
 

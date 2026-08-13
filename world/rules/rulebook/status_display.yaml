@@ -26,6 +26,27 @@
 - code: fire_scorch
   label: 灼燒
   severity: harmful
+- code: water_shield
+  label: 水盾
+  severity: beneficial
+- code: water_bind
+  label: 束縛
+  severity: harmful
+- code: earth_hardened_skin
+  label: 硬化肌膚
+  severity: beneficial
+- code: earth_stone_armor
+  label: 岩甲
+  severity: beneficial
+- code: earth_dust_veil
+  label: 沙塵迷眼
+  severity: harmful
+- code: earth_root
+  label: 地縛
+  severity: harmful
+- code: earth_ward
+  label: 大地庇護
+  severity: beneficial
 - code: paralysis_locks_actions
   label: 麻痺鎖定行動
   severity: critical

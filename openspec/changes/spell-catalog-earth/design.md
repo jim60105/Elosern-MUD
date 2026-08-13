@@ -82,9 +82,12 @@ change maps consistently:
 | 單體(自) | `TargetSpec.SELF` | `FactionConstraint.SELF_ONLY` |
 | 範圍(友) | `TargetSpec.AREA` | `FactionConstraint.ANY` |
 
-"(自)" annotations become `SELF_ONLY` (cardinality and faction both narrow to the actor); "(友)"
-annotations stay `AREA`/`ANY` since the registry has no ally-only enum value that restricts anything —
-the narrower intent is presentation-only (label/description text), not a mechanical restriction.
+"(自)" annotations become `SELF_ONLY` (cardinality and faction both narrow to the actor): per the
+`skill-registry` spec, a skill whose effect is inherently self-only (here `hardened_skin`'s
+`self_buff_apply`) SHALL declare `FactionConstraint.SELF_ONLY` and restrict its target to the actor.
+"(友)" annotations stay `AREA`/`ANY` since the registry has no ally-only enum value that restricts
+anything — the narrower intent is presentation-only (label/description text), not a mechanical
+restriction.
 
 ### `effects` per spell
 
@@ -115,26 +118,38 @@ adds:
 - `earth_root`: marker control buff (empty `modifiers`, same shape as `paralysis`/`fear`) representing 束縛, applied by `earth_bind`
 - `earth_ward`: party shield buff (defense bounds ceiling), applied by `earthen_ward`
 
+The matching `earth_hardened_skin`/`earth_stone_armor`/`earth_dust_veil`/`earth_root`/`earth_ward`
+rows are also added to `world/rules/rulebook/status_display.yaml` (Traditional Chinese labels
+硬化肌膚/岩甲/沙塵迷眼/地縛/大地庇護, severities `beneficial`/`beneficial`/`harmful`/`harmful`/`beneficial`):
+`status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry,
+so a new buff key without one breaks module import at startup.
+
 ### Registry ordering makes tier obvious without a new field
 
 `SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
 in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
 `# 土 — 學徒` -style comment) inside one `*_elemental_spells("earth", ...)` block, and each pair's MP
-cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
-unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
-logic itself.
+cost falls inside §4.3's band for that tier. `hardened_skin` (the 學徒 單體(自) spell) is declared as
+its own `_skill(...)` call immediately after that block, still under its `# 土 — 學徒` tier comment:
+it is the one entry whose effect is inherently self-only, so it declares
+`FactionConstraint.SELF_ONLY`, which the builder fixes to `ANY`. This gives
+`element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without this
+change adding a tier field or re-deriving gate logic itself.
 
 ### Registry construction: reuse the `_elemental_spells` builder
 
-This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
-`spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
-each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
-`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
+This change expresses nine of its ten entries through the `_spell`/`_elemental_spells` builders
+introduced by `spell-catalog-fire` (see that change's design.md, "Registry construction helper")
+instead of writing each `_skill(...)` call by hand: the element is written once per set, and
+`SkillKind.ACTIVE` plus `FactionConstraint.ANY` are fixed by the builder. `hardened_skin` is the
+deliberate exception (see "Registry ordering" above) and is written as an explicit `_skill(...)` call
+with `FactionConstraint.SELF_ONLY`, because the builder's fixed `ANY` would contradict the
+`skill-registry` spec's self-only-constraint rule. Field values remain exactly this change's
 design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
@@ -143,8 +158,3 @@ design-doc table.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `earth_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

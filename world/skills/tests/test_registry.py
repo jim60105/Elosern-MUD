@@ -11,13 +11,15 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY, Element
-from world.rules.action import ActionRequest, ActionResolver
+from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.skills.effects import (
     BuffApplyEffect,
     DamageEffect,
     DivineMysteryEffect,
     ElementMasteryEffect,
+    HealEffect,
+    SelfBuffApplyEffect,
     SelfHealEffect,
     SexualMasteryEffect,
     parse_effect,
@@ -654,3 +656,198 @@ class FireSpellCatalogTests(unittest.TestCase):
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
         self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
         self.assertEqual(skill.effects, ["damage:fire:magic"])
+
+
+WATER_SPELL_CATALOG = (
+    ("water_bolt", "水箭術", TargetSpec.SINGLE, 12, ("damage:water:magic",)),
+    ("minor_heal", "治癒滴露", TargetSpec.SINGLE, 11, ("heal:single",)),
+    ("healing_spring", "治癒之泉", TargetSpec.AREA, 28, ("heal:area",)),
+    ("water_shield", "水盾術", TargetSpec.SINGLE, 22, ("buff_apply:water_shield",)),
+    (
+        "abyssal_whirlpool",
+        "深海漩渦",
+        TargetSpec.AREA,
+        50,
+        ("damage:water:magic", "buff_apply:water_bind"),
+    ),
+    ("wellspring_of_life", "生命湧泉", TargetSpec.SINGLE, 40, ("heal:single",)),
+    ("tsunami", "海嘯術", TargetSpec.AREA, 95, ("damage:water:magic",)),
+    ("tidal_revival", "復生之潮", TargetSpec.SINGLE, 78, ("heal:single",)),
+    ("sea_of_life", "生命之海", TargetSpec.AREA, 160, ("heal:area",)),
+    ("abyssal_tide", "深淵巨潮", TargetSpec.AREA, 145, ("damage:water:magic",)),
+)
+
+
+class WaterSpellCatalogTests(unittest.TestCase):
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_all_ten_water_spells_declare_the_exact_catalog_fields(self):
+        for key, label, target_spec, mp, effects in WATER_SPELL_CATALOG:
+            with self.subTest(spell=key):
+                skill = SKILL_REGISTRY[key]
+                self.assertEqual(skill.label, label)
+                self.assertIs(skill.kind, SkillKind.ACTIVE)
+                self.assertIs(skill.element, ELEMENT_REGISTRY["water"])
+                self.assertIs(skill.target_spec, target_spec)
+                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+                self.assertEqual(skill.cost, {"mp": mp})
+                self.assertEqual(tuple(skill.effects), effects)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_water_active_spell_keys_are_exactly_the_catalog_set(self):
+        self.assertEqual(
+            {
+                key
+                for key, skill in SKILL_REGISTRY.items()
+                if skill.element is ELEMENT_REGISTRY["water"]
+                and skill.kind is SkillKind.ACTIVE
+            },
+            {row[0] for row in WATER_SPELL_CATALOG},
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_every_water_spell_effect_round_trips_through_typed_dispatch(self):
+        for key, _label, _target_spec, _mp, effects in WATER_SPELL_CATALOG:
+            skill = SKILL_REGISTRY[key]
+            for effect_id in effects:
+                with self.subTest(spell=key, effect=effect_id):
+                    parsed = parse_effect(effect_id)
+                    if effect_id.startswith("damage:"):
+                        self.assertEqual(
+                            parsed,
+                            DamageEffect(element="water", school="magic"),
+                        )
+                    elif effect_id.startswith("buff_apply:"):
+                        self.assertEqual(
+                            parsed,
+                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
+                        )
+                    else:
+                        self.assertEqual(
+                            parsed,
+                            HealEffect(shape=effect_id.partition(":")[2]),
+                        )
+                    self.assertIn(parsed, skill.parsed_effects)
+
+
+EARTH_SPELL_CATALOG = (
+    ("stone_shard", "石礫術", TargetSpec.SINGLE, 12, ("damage:earth:magic",)),
+    (
+        "hardened_skin",
+        "硬化肌膚",
+        TargetSpec.SELF,
+        10,
+        ("self_buff_apply:earth_hardened_skin",),
+    ),
+    ("stone_armor", "岩甲術", TargetSpec.SINGLE, 24, ("buff_apply:earth_stone_armor",)),
+    ("dust_veil", "沙塵術", TargetSpec.AREA, 22, ("buff_apply:earth_dust_veil",)),
+    ("earth_bind", "地縛術", TargetSpec.AREA, 42, ("buff_apply:earth_root",)),
+    ("rockslide", "岩壁崩落", TargetSpec.AREA, 48, ("damage:earth:magic",)),
+    ("earthquake", "地震術", TargetSpec.AREA, 90, ("damage:earth:magic",)),
+    ("earthen_ward", "大地庇護", TargetSpec.AREA, 75, ("buff_apply:earth_ward",)),
+    ("mountain_collapse", "山嶽崩落", TargetSpec.AREA, 150, ("damage:earth:magic",)),
+    ("earths_judgment", "大地審判", TargetSpec.SINGLE, 130, ("damage:earth:magic",)),
+)
+
+
+class EarthSpellCatalogTests(unittest.TestCase):
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_all_ten_earth_spells_declare_the_exact_catalog_fields(self):
+        for key, label, target_spec, mp, effects in EARTH_SPELL_CATALOG:
+            with self.subTest(spell=key):
+                skill = SKILL_REGISTRY[key]
+                self.assertEqual(skill.label, label)
+                self.assertIs(skill.kind, SkillKind.ACTIVE)
+                self.assertIs(skill.element, ELEMENT_REGISTRY["earth"])
+                self.assertIs(skill.target_spec, target_spec)
+                self.assertEqual(skill.cost, {"mp": mp})
+                self.assertEqual(tuple(skill.effects), effects)
+                if key == "hardened_skin":
+                    self.assertIs(
+                        skill.faction_constraint,
+                        FactionConstraint.SELF_ONLY,
+                    )
+                else:
+                    self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_earth_active_spell_keys_are_exactly_the_catalog_set(self):
+        self.assertEqual(
+            {
+                key
+                for key, skill in SKILL_REGISTRY.items()
+                if skill.element is ELEMENT_REGISTRY["earth"]
+                and skill.kind is SkillKind.ACTIVE
+            },
+            {row[0] for row in EARTH_SPELL_CATALOG},
+        )
+
+
+class EarthHardenedSkinCastTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="hardened skin actor")
+        self.other = create_object(PlayerCharacter, key="hardened skin other")
+        for entity in (self.actor, self.other):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        self.actor.db.skills = {"active": ["hardened_skin"], "passive": []}
+        self.other.db.skills = {"active": [], "passive": []}
+        battlefield = Battlefield(
+            {
+                "party": frozenset({"hardened skin actor"}),
+                "foes": frozenset({"hardened skin other"}),
+            },
+            {"hardened skin actor": self.actor, "hardened skin other": self.other},
+        )
+        self.context = BattlefieldActionContext(battlefield)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_self_cast_applies_the_buff_to_the_caster(self):
+        request = ActionRequest(
+            self.actor,
+            "hardened_skin",
+            [],
+            self.context,
+        )
+        result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("earth_hardened_skin", self.actor.buffs.all)
+        self.assertNotIn("earth_hardened_skin", self.other.buffs.all)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_cast_at_an_explicit_other_target_is_rejected(self):
+        request = ActionRequest(
+            self.actor,
+            "hardened_skin",
+            [self.other],
+            self.context,
+        )
+        result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_every_earth_spell_effect_round_trips_through_typed_dispatch(self):
+        for key, _label, _target_spec, _mp, effects in EARTH_SPELL_CATALOG:
+            skill = SKILL_REGISTRY[key]
+            for effect_id in effects:
+                with self.subTest(spell=key, effect=effect_id):
+                    parsed = parse_effect(effect_id)
+                    if effect_id.startswith("damage:"):
+                        self.assertEqual(
+                            parsed,
+                            DamageEffect(element="earth", school="magic"),
+                        )
+                    elif effect_id.startswith("self_buff_apply:"):
+                        self.assertEqual(
+                            parsed,
+                            SelfBuffApplyEffect(
+                                buff_key=effect_id.partition(":")[2]
+                            ),
+                        )
+                    else:
+                        self.assertEqual(
+                            parsed,
+                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
+                        )
+                    self.assertIn(parsed, skill.parsed_effects)

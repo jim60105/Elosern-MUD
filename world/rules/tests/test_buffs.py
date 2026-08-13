@@ -152,6 +152,102 @@ class BuffIntegrationTests(EvenniaTest):
         tick_buffs(entity, 10)
         self.assertNotIn("fire_scorch", entity_active_buffs(entity))
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_buff_water_shield(self):
+        definition = BUFF_DEFINITIONS["water_shield"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "water_shield")
+        self.assertIn("water_shield", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_buff_water_bind(self):
+        definition = BUFF_DEFINITIONS["water_bind"]
+        self.assertEqual(definition.duration, 30)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(definition.modifiers, {})
+
+        entity = self._entity()
+        _add_buff(entity, "water_bind")
+        self.assertIn("water_bind", entity_active_buffs(entity))
+        self.assertFalse(blocks_action(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_buff_earth_hardened_skin(self):
+        definition = BUFF_DEFINITIONS["earth_hardened_skin"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "earth_hardened_skin")
+        self.assertIn("earth_hardened_skin", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_buff_earth_stone_armor(self):
+        definition = BUFF_DEFINITIONS["earth_stone_armor"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "earth_stone_armor")
+        self.assertIn("earth_stone_armor", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_buff_earth_dust_veil(self):
+        definition = BUFF_DEFINITIONS["earth_dust_veil"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "accuracy", "ceiling": -5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "earth_dust_veil")
+        self.assertIn("earth_dust_veil", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_buff_earth_root(self):
+        definition = BUFF_DEFINITIONS["earth_root"]
+        self.assertEqual(definition.duration, 30)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(definition.modifiers, {})
+
+        entity = self._entity()
+        _add_buff(entity, "earth_root")
+        self.assertIn("earth_root", entity_active_buffs(entity))
+        self.assertFalse(blocks_action(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_buff_earth_ward(self):
+        definition = BUFF_DEFINITIONS["earth_ward"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "earth_ward")
+        self.assertIn("earth_ward", entity_active_buffs(entity))
+
     def test_buff_tick_on_full_gauge_stores_integer(self):
         entity = self._entity()
         _add_buff(entity, "poisoned")

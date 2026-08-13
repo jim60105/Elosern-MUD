@@ -134,6 +134,11 @@ adds:
 - `water_shield`: bounds-shaped defense buff (temporarily raises the `defense` bounds ceiling), applied by `water_shield`
 - `water_bind`: marker control buff (empty `modifiers`, same shape as the existing `paralysis`/`fear` rows) representing 束縛, applied by `abyssal_whirlpool`
 
+The matching `water_shield`/`water_bind` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 水盾/束縛, severities
+`beneficial`/`harmful`): `status_display.py`'s fail-closed coverage requires every buff key to have
+exactly one display entry, so a new buff key without one breaks module import at startup.
+
 ### Registry ordering makes tier obvious without a new field
 
 `SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
