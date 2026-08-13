@@ -1,7 +1,11 @@
 """Player-facing character creation command and pending command gate."""
 
+import evennia
 from evennia import CmdSet, Command
 from evennia.commands.cmdhandler import CMD_NOMATCH, CMD_NOINPUT
+from evennia.utils import logger
+from evennia.utils.evmenu import InputCmdSet
+from evennia.utils.utils import inherits_from
 
 from commands.localized import CmdHelp, CmdQuit
 from server.ai_director_service import request_character_proposal
@@ -485,12 +489,57 @@ class _ConceptPromptCmdSet(CmdSet):
 
 
 class CmdCreationRequired(Command):
-    """Explain why an ordinary command is unavailable during creation."""
+    """Explain why an ordinary command is unavailable during creation.
+
+    The pending-character gate wins the ``__nomatch_command`` system-command
+    dedup against Evennia's ``InputCmdSet`` (priority 200 > 1), so every reply
+    to an open wizard ``get_input`` prompt lands here instead of on Evennia's
+    ``CmdGetInput``. When a prompt is actually open (``caller.ndb._getinput``
+    is set), this command routes the reply into the stored callback exactly
+    like ``CmdGetInput.func`` — resuming the wizard's ``yield`` chain —
+    instead of rejecting it with the creation-required message.
+    """
 
     key = CMD_NOMATCH
+    aliases = (CMD_NOINPUT,)
 
     def func(self) -> None:
-        self.caller.msg("你必須先完成角色建立。請輸入 character 查看建立方式。")
+        caller = self.caller
+        try:
+            getinput = caller.ndb._getinput
+            if not getinput and inherits_from(caller, evennia.DefaultObject):
+                getinput = caller.account.ndb._getinput
+                if getinput:
+                    caller = caller.account
+            if not getinput:
+                # No wizard prompt is open: preserve the exact gate behavior
+                # for every unmatched in-world command (and now also empty
+                # lines).
+                self.caller.msg("你必須先完成角色建立。請輸入 character 查看建立方式。")
+                return
+            callback = getinput._callback
+            caller.ndb._getinput._session = self.session
+            prompt = caller.ndb._getinput._prompt
+            args = caller.ndb._getinput._args
+            kwargs = caller.ndb._getinput._kwargs
+            result = self.raw_string.rstrip()  # strip the ending line break
+
+            ok = not callback(caller, prompt, result, *args, **kwargs)
+            if ok:
+                # only clear the state if the callback does not return
+                # anything
+                del caller.ndb._getinput
+                caller.cmdset.remove(InputCmdSet)
+        except Exception:
+            # never leak the prompt state or leave the gate replaced; the
+            # deterministic wizard stays usable and the player can retry.
+            # ``caller`` may have been reassigned to the account in the
+            # fallback branch; deleting on the (possibly absent) key is a
+            # quiet no-op for Evennia's in-memory nattr backend.
+            del caller.ndb._getinput
+            caller.msg("|rError in get_input. Choice not confirmed (report to admin)|n")
+            logger.log_trace("Error in get_input")
+            caller.cmdset.remove(InputCmdSet)
 
 
 class CharacterCreationCmdSet(CmdSet):

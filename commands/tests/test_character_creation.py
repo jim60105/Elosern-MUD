@@ -1,10 +1,22 @@
-"""Integration tests for the pending character command boundary."""
+"""Integration tests for the pending character command boundary.
+
+The real-handler end-to-end tests drive the wizard through the actual Evennia
+cmdhandler with a queued ``deferLater`` fixture: the reactor's real ordering is
+reply-command cleanup first (the handler deletes the old ``_getinput`` and
+removes ``InputCmdSet``) and the deferred generator resume later (the wizard
+mounts the next prompt). Draining the captured callbacks after each
+``execute_cmd`` reproduces that cleanup-before-resume sequence. A synchronous
+mock would instead resume the generator inside the reply command, and the
+handler's trailing cleanup would wipe the freshly mounted next prompt.
+"""
 
 from tools.spec_traceability import covers_requirement
 
 from django.db import transaction
 from unittest.mock import Mock, patch
 
+from evennia.commands.cmdhandler import CMD_NOMATCH, CMD_NOINPUT
+from evennia.utils.evmenu import CmdGetInput, InputCmdSet
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from world.rules.character_creation import CharacterCreationRequest
@@ -14,6 +26,7 @@ from commands.character_creation import (
     MAX_CONCEPT_LENGTH,
     CmdCharacter,
     CmdCharacterConcept,
+    CmdCreationRequired,
     CharacterCreationCmdSet,
     creation_start_screen,
 )
@@ -22,6 +35,55 @@ from typeclasses.characters import PlayerCharacter
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.ai.character_creation import CharacterProposal
+
+
+class QueuedDeferLater:
+    """Capture ``cmdhandler.deferLater`` calls instead of firing them.
+
+    Each call appends ``(callback, args, kwargs)`` to a FIFO queue; ``drain``
+    runs the captured callbacks in order. This preserves Evennia's real
+    cleanup-before-resume ordering for progressive commands: the reply
+    command's trailing teardown (``del _getinput`` + ``InputCmdSet`` removal)
+    completes before the deferred ``_progressive_cmd_run`` resumes the wizard
+    generator, so the newly mounted next prompt survives.
+    """
+
+    def __init__(self):
+        self._calls = []
+
+    def __call__(self, reactor, timedelay, callback, *args, **kwargs):
+        self._calls.append((callback, args, kwargs))
+        from twisted.internet import defer
+
+        return defer.Deferred()
+
+    def drain(self):
+        while self._calls:
+            callback, args, kwargs = self._calls.pop(0)
+            callback(*args, **kwargs)
+
+    def __enter__(self):
+        self._patch = patch("evennia.commands.cmdhandler.deferLater", self)
+        self._patch.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._patch.stop()
+
+
+def _prompt_stub(callback, prompt="角色姓名（輸入 cancel 取消）："):
+    """A minimal stand-in for ``evmenu._Prompt``."""
+    stub = Mock()
+    stub._callback = callback
+    stub._prompt = prompt
+    stub._session = None
+    stub._args = ()
+    stub._kwargs = {}
+    return stub
+
+
+def _messages(message_mock):
+    return [str(call.args[0]) for call in message_mock.call_args_list]
 
 
 def _proposal(**overrides):
@@ -104,6 +166,202 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(self.char1.creation_pending)
         self.char1.at_cmdset_get()
         self.assertTrue(self.char1.cmdset.has("CharacterCreation"))
+
+    def test_merged_cmdset_gate_wins_prompt_command_dedup(self):
+        merged = InputCmdSet(self.char1) + CharacterCreationCmdSet(self.char1)
+        nomatch = merged.get(CMD_NOMATCH)
+        self.assertIsInstance(nomatch, CmdCreationRequired)
+        self.assertFalse(any(isinstance(cmd, CmdGetInput) for cmd in merged.commands))
+        noinput = merged.get(CMD_NOINPUT)
+        self.assertIsInstance(noinput, CmdCreationRequired)
+
+    def test_gate_handler_forwards_open_prompt_reply_and_cleans_up(self):
+        callback = Mock(return_value=False)
+        self.char1.ndb._getinput = _prompt_stub(callback)
+        self.char1.cmdset.add(InputCmdSet, persistent=False)
+        command = CmdCreationRequired()
+        command.caller = self.char1
+        command.session = self.session
+        command.raw_string = "自訂者"
+        command.func()
+        callback.assert_called_once_with(
+            self.char1, "角色姓名（輸入 cancel 取消）：", "自訂者"
+        )
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
+
+    def test_gate_handler_keeps_prompt_state_when_callback_returns_truthy(self):
+        callback = Mock(return_value=True)
+        self.char1.ndb._getinput = _prompt_stub(callback)
+        self.char1.cmdset.add(InputCmdSet, persistent=False)
+        command = CmdCreationRequired()
+        command.caller = self.char1
+        command.session = self.session
+        command.raw_string = "再試"
+        command.func()
+        callback.assert_called_once_with(
+            self.char1, "角色姓名（輸入 cancel 取消）：", "再試"
+        )
+        self.assertTrue(self.char1.ndb._getinput)
+        self.assertTrue(self.char1.cmdset.has("input_cmdset"))
+
+    def test_gate_handler_no_prompt_keeps_creation_required_message(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            command = CmdCreationRequired()
+            command.caller = self.char1
+            command.raw_string = "rest 5s"
+            command.func()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("先完成角色建立" in text for text in messages))
+        self.assertFalse(self.char1.ndb._getinput)
+
+    def test_gate_handler_cleans_up_when_callback_raises(self):
+        def boom(caller, prompt, result):
+            raise RuntimeError("boom")
+
+        self.char1.ndb._getinput = _prompt_stub(boom)
+        self.char1.cmdset.add(InputCmdSet, persistent=False)
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            with patch("commands.character_creation.logger.log_trace") as log_trace:
+                command = CmdCreationRequired()
+                command.caller = self.char1
+                command.session = self.session
+                command.raw_string = "x"
+                command.func()
+        finally:
+            self.char1.msg = original_msg
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
+        log_trace.assert_called_once()
+        messages = _messages(message_mock)
+        self.assertTrue(any("Error in get_input" in text for text in messages))
+
+    def test_gate_handler_routes_account_level_prompt(self):
+        def callback(caller, prompt, result):
+            self.assertIs(
+                caller, self.account, "account-level prompt routes with the account as caller"
+            )
+            self.assertIs(
+                caller.ndb._getinput._session,
+                command.session,
+                "the account prompt's session is recorded on the account",
+            )
+            return False
+
+        self.account.ndb._getinput = _prompt_stub(callback)
+        self.account.cmdset.add(InputCmdSet, persistent=False)
+        command = CmdCreationRequired()
+        command.caller = self.char1
+        command.session = self.session
+        command.raw_string = "cancel"
+        command.func()
+        self.assertFalse(self.account.ndb._getinput)
+        self.assertFalse(self.account.cmdset.has("input_cmdset"))
+
+    @covers_requirement("character-creation-ux::the-interactive-creation-wizard-collects-every-unmatched-reply")
+    @covers_requirement("player-character-creation::newly-registered-accounts-have-an-inert-pending-player-character")
+    def test_real_handler_cancel_reply_exits_wizard_and_tears_down_prompt(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            with QueuedDeferLater() as queue:
+                self.char1.execute_cmd("character create", session=self.session)
+                prompts = _messages(message_mock)
+                self.assertTrue(any("角色姓名" in text for text in prompts))
+                self.assertTrue(self.char1.ndb._getinput)
+                self.assertTrue(self.char1.cmdset.has("input_cmdset"))
+                self.char1.execute_cmd("cancel", session=self.session)
+                queue.drain()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("已取消角色建立" in text for text in messages))
+        self.assertTrue(self.char1.creation_pending)
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
+
+    @covers_requirement("character-creation-ux::the-interactive-creation-wizard-collects-every-unmatched-reply")
+    @covers_requirement("player-character-creation::newly-registered-accounts-have-an-inert-pending-player-character")
+    def test_real_handler_custom_wizard_completes_through_real_pipeline(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        replies = [
+            "自訂者", "20", "20", "human", "",
+            "100", "50", "31", "0", "0", "0", "yes",
+        ]
+        try:
+            with QueuedDeferLater() as queue:
+                self.char1.execute_cmd("character create", session=self.session)
+                for reply in replies:
+                    self.char1.execute_cmd(reply, session=self.session)
+                    queue.drain()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("已建立" in text for text in messages))
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.key, "自訂者")
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
+
+    @covers_requirement("player-character-creation::newly-registered-accounts-have-an-inert-pending-player-character")
+    def test_real_handler_invalid_reply_reports_and_tears_down(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            with QueuedDeferLater() as queue:
+                self.char1.execute_cmd("character create", session=self.session)
+                for reply in ("自訂者", "abc"):
+                    self.char1.execute_cmd(reply, session=self.session)
+                    queue.drain()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("輸入無效" in text for text in messages))
+        self.assertTrue(self.char1.creation_pending)
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
+
+    @covers_requirement("character-creation-ux::the-interactive-creation-wizard-collects-every-unmatched-reply")
+    def test_reply_matching_gate_exposed_command_runs_the_command(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            with QueuedDeferLater() as queue:
+                self.char1.execute_cmd("character create", session=self.session)
+                self.assertTrue(self.char1.ndb._getinput)
+                self.char1.execute_cmd("character", session=self.session)
+                queue.drain()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("伊洛瑟恩大陸" in text for text in messages))
+        self.assertTrue(self.char1.ndb._getinput)
+        self.assertTrue(self.char1.cmdset.has("input_cmdset"))
+
+    @covers_requirement("player-character-creation::newly-registered-accounts-have-an-inert-pending-player-character")
+    def test_gate_rejects_empty_line_with_creation_required(self):
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            self.char1.execute_cmd("", session=self.session)
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("先完成角色建立" in text for text in messages))
 
     @covers_requirement("character-creation-ux::the-character-creation-command-presents-preset-previews")
     def test_status_and_preset_activation(self):
@@ -579,6 +837,32 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(draft["persona"]["personality"], "沉穩")
         self.assertEqual(self.char1.traits.all(), [])
         self.assertIsNone(self.char1.age)
+
+    @covers_requirement("character-creation-ux::the-interactive-creation-wizard-collects-every-unmatched-reply")
+    def test_real_handler_sync_concept_continuation_reaches_prompts(self):
+        self._propose(_proposal())
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            with QueuedDeferLater() as queue:
+                self.char1.execute_cmd(
+                    "character concept 流浪的精靈劍士", session=self.session
+                )
+                prompts = _messages(message_mock)
+                self.assertTrue(any("角色提案" in text for text in prompts))
+                self.assertTrue(any("角色姓名" in text for text in prompts))
+                self.assertTrue(self.char1.ndb._getinput)
+                self.assertTrue(self.char1.cmdset.has("input_cmdset"))
+                self.char1.execute_cmd("cancel", session=self.session)
+                queue.drain()
+        finally:
+            self.char1.msg = original_msg
+        messages = _messages(message_mock)
+        self.assertTrue(any("已取消角色建立" in text for text in messages))
+        self.assertTrue(self.char1.creation_pending)
+        self.assertFalse(self.char1.ndb._getinput)
+        self.assertFalse(self.char1.cmdset.has("input_cmdset"))
 
     def test_live_async_proposal_continues_interactively_when_it_fires(self):
         from twisted.internet import defer

@@ -5,7 +5,7 @@ Define account-bound player character creation that gates the blank Evennia shel
 ## Requirements
 
 ### Requirement: Newly registered accounts have an inert pending player character
-When Evennia creates the default `PlayerCharacter` for a newly registered account, the project account hook SHALL call its parent hook before marking that same account-owned character pending creation. While pending, command-set resolution SHALL derive a `mergetype="Replace"` creation-only gate with a priority above local exits and with `no_exits` and `no_objs` enabled. It SHALL expose only the character-creation command and harmless assistance or disconnect commands, rejecting every in-world command before it reaches a rules API or advances the world clock. The pending marker SHALL persist across logout, login, and server reload; activation SHALL only change the marker, not perform an independently fallible command-set removal.
+When Evennia creates the default `PlayerCharacter` for a newly registered account, the project account hook SHALL call its parent hook before marking that same account-owned character pending creation. While pending, command-set resolution SHALL derive a `mergetype="Replace"` creation-only gate with a priority above local exits and with `no_exits` and `no_objs` enabled. It SHALL expose only the character-creation command and harmless assistance or disconnect commands, rejecting every in-world command before it reaches a rules API or advances the world clock. While an interactive creation-wizard prompt that the creation surface itself started is open on the pending character, every unmatched or empty reply SHALL be delivered to that prompt so the wizard can resume, cancel, or reject it, and a completed, cancelled, or failed wizard SHALL tear down its prompt state so the gate never stays stuck; replies that match a command the gate exposes (for example `character`, `說明`, or `登出`) SHALL run that command instead. The pending marker SHALL persist across logout, login, and server reload; activation SHALL only change the marker, not perform an independently fallible command-set removal.
 
 #### Scenario: A new account cannot rest before completing creation
 - **WHEN** a newly registered account's auto-created character enters `rest 5s`
@@ -22,6 +22,22 @@ When Evennia creates the default `PlayerCharacter` for a newly registered accoun
 #### Scenario: The account hook retains Evennia ownership state
 - **WHEN** a new account is created
 - **THEN** its pending shell remains in `account.characters`, is the account's last puppet, and retains the parent hook's ownership locks
+
+#### Scenario: A reply to an open creation wizard prompt reaches the wizard
+- **WHEN** a pending character has an open `character create` wizard prompt and replies to it
+- **THEN** the reply is delivered to the wizard and advances, cancels, or rejects the flow exactly as the wizard defines, instead of being rejected by the gate
+
+#### Scenario: A cancelled wizard tears down its prompt state
+- **WHEN** a pending character replies `cancel` to an open creation wizard prompt
+- **THEN** the wizard exits with the cancellation message, the character remains pending, and no prompt state remains to swallow later input
+
+#### Scenario: A failed wizard tears down its prompt state
+- **WHEN** a pending character replies to an open creation wizard prompt with an invalid value, such as a non-integer age
+- **THEN** the wizard reports the invalid input, the character remains pending, and no prompt state remains to swallow later input
+
+#### Scenario: Empty input with no open prompt is rejected like any in-world input
+- **WHEN** a pending character sends an empty line while no creation wizard prompt is open
+- **THEN** it receives the creation-required message
 
 ### Requirement: Character creation offers preset and custom modes
 The pending character's creation command SHALL offer exactly two activation modes. A preset mode SHALL select a key from the immutable player-preset catalog. A custom mode SHALL collect a non-empty player-supplied display name, actual age, apparent age, a race key, an optional compatible subrace key, and six stat allocations. The custom mode SHALL not accept player-supplied raw magic level, guild merit, skills, equipment, or trait caps. The requested display name SHALL be trimmed, contain 1–64 printable non-control characters, contain no `|`, `/`, `:`, `{`, or `}` (the shared entity-key contract: no structural separator and no markup delimiter), and become the activated object's visible key.
