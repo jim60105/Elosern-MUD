@@ -590,6 +590,8 @@ _ENTRY_TEMPLATES = {
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
+    "heal": "{actor} 對 {target} 恢復了 {data[amount]} 點生命。",
+    "self_heal": "{actor} 恢復了 {data[amount]} 點生命。",
     "target_defeated": "{actor} 擊敗了 {target}。",
     "target_knocked_out": "{actor} 擊倒了 {target}。",
     "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
@@ -670,6 +672,12 @@ def _entries_from_effect(
                 else float(pursuer_agility)
             ),
         }
+    elif kind in ("heal", "self_heal"):
+        if len(values) != 1:
+            raise ValueError(
+                f"malformed heal pending effect {effect.description!r}"
+            )
+        data = {"amount": int(values[0])}
     elif kind == "combat_kill_xp":
         return ()
     elif kind == "knocked_out_mark":

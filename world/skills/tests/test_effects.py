@@ -16,9 +16,11 @@ from world.skills.effects import (
     ElementMasteryEffect,
     FlavorEffect,
     GrowthRateEffect,
+    HealEffect,
     MovementEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
+    SelfHealEffect,
     SexualEventEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
@@ -130,6 +132,27 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("damage:fire:physical"),
             DamageEffect(element="fire", school="physical"),
         )
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_heal_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("heal:single"),
+            HealEffect(shape="single"),
+        )
+        self.assertEqual(
+            parse_effect("heal:area"),
+            HealEffect(shape="area"),
+        )
+
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_self_heal_parses_into_its_dataclass(self):
+        self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
+
+    def test_malformed_heal_payload_raises(self):
+        for effect in ("heal", "heal:allies", "self_heal:single", "self_heal:area"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     def test_disengage_parses_into_its_dataclass(self):
         self.assertEqual(

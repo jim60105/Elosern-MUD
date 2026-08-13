@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
-from world.skills.effects import parse_effect
+from world.skills.effects import HealEffect, parse_effect
 
 
 class _FrozenDict(dict):
@@ -120,6 +120,33 @@ class SkillDef:
             "parsed_effects",
             tuple(parse_effect(effect_id) for effect_id in self.effects),
         )
+        self._validate_heal_shape()
+
+    def _validate_heal_shape(self) -> None:
+        """Reject a heal shape that contradicts the skill's target spec.
+
+        ``heal:<shape>`` names the cardinality the skill may declare: a single
+        heal fits SINGLE or SELF skills, an area heal only AREA skills. Without
+        this check the two shapes behave identically (the handler heals whatever
+        the pipeline resolved), silently ignoring the declared shape at use time
+        — the same class of failure the typed-effect dispatch eliminates.
+        """
+        for effect in self.parsed_effects:
+            if not isinstance(effect, HealEffect):
+                continue
+            if effect.shape == "single" and self.target_spec not in (
+                TargetSpec.SINGLE,
+                TargetSpec.SELF,
+            ):
+                raise ValueError(
+                    f"heal:single requires a SINGLE or SELF skill, "
+                    f"{self.key!r} declares {self.target_spec.value!r}"
+                )
+            if effect.shape == "area" and self.target_spec is not TargetSpec.AREA:
+                raise ValueError(
+                    f"heal:area requires an AREA skill, "
+                    f"{self.key!r} declares {self.target_spec.value!r}"
+                )
 
 
 def _validate_metadata(label: str, description: str) -> None:
