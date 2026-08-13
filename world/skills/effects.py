@@ -9,6 +9,7 @@ silently doing nothing at use time.
 
 from dataclasses import dataclass
 from math import isfinite
+from typing import Literal
 
 # Continuous-valued ownership effects read by deterministic consumers.
 # ``StatMultiplyEffect`` is consumed by ``SkillHandler.effective_value``;
@@ -136,6 +137,17 @@ class DamageEffect:
 
 
 @dataclass(frozen=True)
+class CleanseEffect:
+    """Remove every active debuff-polarity buff from each target.
+
+    The parsed segment is the scope (``cleanse:status`` removes all debuff-
+    classified active buffs); selective per-buff cleansing is unbuilt.
+    """
+
+    scope: Literal["status"]
+
+
+@dataclass(frozen=True)
 class DisengageEffect:
     """Attempt a disengage; the mode names the flavor (e.g. ``self``)."""
 
@@ -239,4 +251,11 @@ def parse_effect(effect_id: str) -> object:
         return DamageEffect(element=element, school=school)
     if prefix == "disengage":
         return DisengageEffect(mode=_parse_single_arg(effect_id, prefix))
+    if prefix == "cleanse":
+        scope = _parse_single_arg(effect_id, prefix)
+        if scope != "status":
+            raise ValueError(
+                f"cleanse effect must be cleanse:status, got {effect_id!r}"
+            )
+        return CleanseEffect(scope=scope)
     raise ValueError(f"unrecognized skill effect prefix {prefix!r} in {effect_id!r}")

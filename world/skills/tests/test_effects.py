@@ -6,6 +6,7 @@ import unittest
 
 from world.skills.effects import (
     BuffApplyEffect,
+    CleanseEffect,
     ConferGrowthRateEffect,
     ConferralEffect,
     DamageEffect,
@@ -125,6 +126,18 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("disengage:self"),
             DisengageEffect(mode="self"),
         )
+
+    def test_cleanse_status_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("cleanse:status"),
+            CleanseEffect(scope="status"),
+        )
+
+    def test_malformed_cleanse_raises(self):
+        for effect in ("cleanse", "cleanse:status:extra", "cleanse:banana"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_unknown_prefix_raises(self):

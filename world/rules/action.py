@@ -10,6 +10,7 @@ from django.db import transaction
 from typeclasses.monsters import Monster
 from world.rules.buffs import (
     _add_buff,
+    _handle_cleanse,
     blocks_action,
     entity_active_buffs,
     grant_conferred_growth_rate,
@@ -462,6 +463,12 @@ register_effect_handler(
     frozenset({"sexual", "traits"}),
     requires_event_context=frozenset(),
 )
+register_effect_handler(
+    "cleanse",
+    _handle_cleanse,
+    frozenset({"buffs"}),
+    requires_event_context=frozenset(),
+)
 
 
 def _effect_prefix(effect_id: str) -> str:
@@ -578,6 +585,7 @@ _ENTRY_TEMPLATES = {
     "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
+    "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
     "sexual_transition": "{target} 的狀態發生了變化。",
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
@@ -613,6 +621,12 @@ def _entries_from_effect(
         data = {"buff_key": values[0]}
     elif kind == "self_buff_applied":
         data = {"buff_key": values[0]}
+    elif kind == "buffs_cleansed":
+        if len(values) != 1:
+            raise ValueError(
+                f"malformed buffs_cleansed pending effect {effect.description!r}"
+            )
+        data = {"count": int(values[0])}
     elif kind == "sexual_transition":
         data = {"event": values[0]}
     elif kind == "damage":

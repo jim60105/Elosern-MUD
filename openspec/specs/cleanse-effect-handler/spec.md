@@ -1,4 +1,11 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `cleanse:<scope>` cast-time effect convention: every `buffs.yaml` entry carries a
+`polarity: buff | debuff` classification (defaulting to `buff`), and a `cleanse:status` effect handler
+registered through `world/rules/action.py`'s effect-handler registry removes every currently-active
+debuff-polarity buff from each resolved target.
+
+## Requirements
 
 ### Requirement: buffs.yaml entries declare a polarity, defaulting to buff
 Each entry in `world/rules/rulebook/buffs.yaml` MAY declare `polarity: debuff`; when absent, polarity
@@ -13,10 +20,12 @@ SHALL default to `buff`. `poisoned`, `paralysis`, and `fear` SHALL declare `pola
 - **THEN** it resolves to `polarity == "buff"`
 
 ### Requirement: cleanse:status removes every active debuff-polarity buff from the target
-`world/rules/buffs.py` SHALL register a `cleanse` effect handler via `register_effect_handler`,
-resolving `cleanse:status` by calling `entity.buffs.remove()` for every currently-active buff on the
-target whose `buffs.yaml` definition has `polarity == "debuff"`. Buffs with `polarity == "buff"` SHALL
-NOT be removed.
+`world/rules/buffs.py` SHALL define a `cleanse` effect handler, registered via
+`register_effect_handler` in `world/rules/action.py`, resolving `cleanse:status` by calling
+`entity.buffs.remove(..., dispel=True)` for every currently-active buff on the target whose
+`buffs.yaml` definition has `polarity == "debuff"`. Buffs with `polarity == "buff"` SHALL NOT be
+removed. The dispel flag routes the removal through Evennia's external-removal hooks (`at_dispel`
+then `at_remove`), recording cleanse as a forced external removal rather than a natural expiry.
 
 #### Scenario: Cleansing removes an active debuff
 - **WHEN** a `cleanse:status` effect resolves against a target with an active `poisoned` buff

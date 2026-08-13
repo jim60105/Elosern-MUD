@@ -50,7 +50,7 @@ does not guess a contract it does not own.
 
 ### A second, newly discovered gap: `purify`'s cleanse/dispel mechanism
 
-`purify`'s 解除異常狀態 (cleanse/dispel active debuffs) flavor has **no existing handler** in the codebase — grep across `world/rules/action.py`, `world/rules/buffs.py`, and `world/rules/combat.py` finds no `dispel`/`cleanse`/`purify` effect prefix or any `.remove()` call site for `BuffHandler`, even though `BuffHandler.remove()` itself exists per the `buff-handler-integration` spec. This is the same category of gap as the `heal:` prefix (a real mechanism the design doc's spell catalog implies but does not spell out), except it is not covered by any of this batch's declared dependencies. This proposal does not invent a new handler for it (that would exceed a content-change's scope per this change's Non-Goals) — it declares `purify`'s `effects` as `["cleanse:status"]` as a **provisional, unconfirmed** typed-effect grammar, and `tasks.md` includes a task to raise a `cleanse-effect-handler` prerequisite change (mirroring `heal-effect-handler`'s shape) and align `purify`'s effect string to whatever grammar that change settles on before this spell is cast-functional. Declaring `purify` with an empty `effects` list instead was rejected: that would ship a tenth dead spell, which is exactly the problem class this whole redesign exists to eliminate.
+`purify`'s 解除異常狀態 (cleanse/dispel active debuffs) flavor has **no existing handler** in the codebase — grep across `world/rules/action.py`, `world/rules/buffs.py`, and `world/rules/combat.py` finds no `dispel`/`cleanse`/`purify` effect prefix or any `.remove()` call site for `BuffHandler`, even though `BuffHandler.remove()` itself exists per the `buff-handler-integration` spec. This is the same category of gap as the `heal:` prefix (a real mechanism the design doc's spell catalog implies but does not spell out), except it is not covered by any of this batch's declared dependencies. This proposal does not invent a new handler for it (that would exceed a content-change's scope per this change's Non-Goals) — it declares `purify`'s `effects` as `["cleanse:status"]` with the follow-up `cleanse-effect-handler` change as a hard prerequisite. That change (raised, planned, and implemented as a sibling of this batch) settles the exact `cleanse:<scope>` grammar and adds the `polarity: debuff | buff` field to `buffs.yaml` that this spell's cleanse depends on; `purify`'s `effects=["cleanse:status"]` matches its settled grammar exactly, so no further edit to this spell's registry entry is needed once it lands. Declaring `purify` with an empty `effects` list instead was rejected: that would ship a tenth dead spell, which is exactly the problem class this whole redesign exists to eliminate.
 
 ## Goals / Non-Goals
 
@@ -152,7 +152,7 @@ this change adding a tier field or re-deriving gate logic itself.
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
 - [Risk] The provisional `heal:` grammar guessed here does not match what `heal-effect-handler` ships. -> Mitigation: tasks.md includes an explicit confirm/align task; the mismatch is caught at that change's own registry-load-time validation (an unrecognized prefix raises).
-- [Risk] `purify`'s provisional `cleanse:status` grammar has no owning change in this batch at all. -> Mitigation: tasks.md raises the follow-up `cleanse-effect-handler` prerequisite explicitly rather than silently shipping a dead or guessed-correct spell.
+- [Risk] `purify`'s `cleanse:status` grammar is owned by a sibling change, not this one. -> Mitigation: `cleanse-effect-handler` is a declared hard prerequisite; its settled grammar is exactly `cleanse:status`, matching this spell's effect string, and this change does not merge until that prerequisite lands.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `light_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
@@ -160,4 +160,5 @@ this change adding a tier field or re-deriving gate logic itself.
 ## Open Questions
 
 - Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here. Exact `cleanse:<...>` effect-ID grammar and its owning change — not yet raised as a formal OpenSpec change; tracked as a task here.
+  task here. The `cleanse:<scope>` grammar is settled by `cleanse-effect-handler` (a hard prerequisite
+  of this change): `purify` uses exactly `cleanse:status`.
