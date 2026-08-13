@@ -35,6 +35,12 @@ calls it from a cast-time effect. This gap was discovered while writing `spell-c
   precedent better than adding it to `combat.py`.
 - **`cleanse:<scope>` mirrors `heal:<shape>`'s grammar shape** (a bare descriptor, no embedded data) for
   consistency across the two sibling gap-filling changes.
+- **Cleanse routes through Evennia's dispel hooks, not the bare remove path.** `_remove_buff_keys`
+  calls `entity.buffs.remove(key, dispel=True)`, which fires `at_dispel` and then `at_remove`. A
+  cleanse is a forced external removal (dispel semantics), the opposite of a natural expiry.
+  `RulebookBuff` defines neither hook today (both are base-class no-ops), so this is a recorded
+  contract for future buffs that need "cleansed" cleanup — a future hook author knows cleanse reaches
+  the dispel path and cannot silently bypass it.
 
 ## Risks / Trade-offs
 

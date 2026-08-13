@@ -60,6 +60,19 @@ class BuffDefinitionValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_buff_definitions(path)
 
+    def test_polarity_defaults_to_buff(self):
+        path = _write_yaml("- key: a\n")
+        self.assertEqual(load_buff_definitions(path)["a"].polarity, "buff")
+
+    def test_polarity_debuff_is_accepted(self):
+        path = _write_yaml("- key: a\n  polarity: debuff\n")
+        self.assertEqual(load_buff_definitions(path)["a"].polarity, "debuff")
+
+    def test_unsupported_polarity_is_rejected(self):
+        path = _write_yaml("- key: a\n  polarity: wrong\n")
+        with self.assertRaises(ValueError):
+            load_buff_definitions(path)
+
     def test_noop_rate_target_tick_does_nothing(self):
         entity = SimpleNamespace(traits=SimpleNamespace())
         _apply_rate_modifier(entity, {"target": "magic_level_growth", "delta": 1})
@@ -159,6 +172,13 @@ class BuffIntegrationTests(EvenniaTest):
         before = entity.traits.magic_level.value
         tick_buffs(entity)
         self.assertEqual(entity.traits.magic_level.value, before)
+
+    @covers_requirement("cleanse-effect-handler::buffs-yaml-entries-declare-a-polarity-defaulting-to-buff")
+    def test_rulebook_polarity_classification(self):
+        for key in ("poisoned", "paralysis", "fear"):
+            self.assertEqual(BUFF_DEFINITIONS[key].polarity, "debuff")
+        for key in ("focus", "conferred_growth_rate"):
+            self.assertEqual(BUFF_DEFINITIONS[key].polarity, "buff")
 
     def test_handler_mount_is_read_only(self):
         entity = self._entity()

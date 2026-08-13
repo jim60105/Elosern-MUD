@@ -20,6 +20,7 @@ class BuffDefinition:
     tick_interval: int | None
     stacking: str
     modifiers: dict[str, Any]
+    polarity: str = "buff"
 
 
 def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
@@ -40,12 +41,16 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
         stacking = entry.get("stacking", "refresh")
         if stacking not in {"refresh", "unique_per_source"}:
             raise ValueError(f"{path}: buff {key!r} has unsupported stacking {stacking!r}")
+        polarity = entry.get("polarity", "buff")
+        if polarity not in {"buff", "debuff"}:
+            raise ValueError(f"{path}: buff {key!r} has unsupported polarity {polarity!r}")
         definitions[key] = BuffDefinition(
             key=key,
             duration=entry.get("duration"),
             tick_interval=entry.get("tick_interval"),
             stacking=stacking,
             modifiers=dict(modifiers),
+            polarity=polarity,
         )
     return definitions
 
@@ -190,6 +195,59 @@ def growth_rate_multiplier(entity) -> float:
         if buff.definition_key == "conferred_growth_rate":
             multiplier *= buff.scale
     return multiplier
+
+
+def _remove_buff_keys(entity, keys: tuple[str, ...]) -> None:
+    """Dispel one active buff instance per key; missing keys are no-ops.
+
+    ``dispel=True`` routes the removal through Evennia's external-removal
+    hooks (``at_dispel`` then ``at_remove``) rather than the bare remove path:
+    a cleanse is a forced external removal, not a natural expiry. ``RulebookBuff``
+    defines neither hook today, so this is a recorded semantic contract for
+    future buffs that need "cleansed" cleanup.
+    """
+    for key in keys:
+        entity.buffs.remove(key, dispel=True)
+
+
+def _handle_cleanse(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+) -> list[Any]:
+    """Stage removal of every active debuff-polarity buff on each target.
+
+    ``PendingEffect`` is imported lazily to keep ``world.rules.action``'s
+    top-level import of this module from forming an import cycle.
+    """
+    del actor, context
+    scope = effect_id.partition(":")[2]
+    if scope != "status":
+        raise ValueError(f"cleanse effect must be cleanse:status, got {effect_id!r}")
+    from world.rules.action import PendingEffect
+
+    pending: list[Any] = []
+    for target in targets:
+        debuffs = tuple(
+            buff
+            for buff in _active_buff_instances(target)
+            if BUFF_DEFINITIONS[buff.definition_key].polarity == "debuff"
+        )
+        if not debuffs:
+            continue
+        keys = tuple(buff.buffkey for buff in debuffs)
+        pending.append(
+            PendingEffect(
+                entity=target,
+                description=f"buffs_cleansed|{target.key}|{len(keys)}",
+                surfaces=frozenset(),
+                apply=lambda target=target, keys=keys: _remove_buff_keys(
+                    target, keys
+                ),
+            )
+        )
+    return pending
 
 
 def tick_buffs(entity, elapsed_seconds: int | None = None) -> None:

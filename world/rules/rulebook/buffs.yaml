@@ -2,15 +2,18 @@
   duration: 300
   tick_interval: 10
   stacking: refresh
+  polarity: debuff
   modifiers:
     rate: {target: hp, delta: -5}
 - key: paralysis
   duration: 30
   stacking: refresh
+  polarity: debuff
   modifiers: {}
 - key: fear
   duration: 60
   stacking: refresh
+  polarity: debuff
   modifiers: {}
 - key: focus
   duration: 60

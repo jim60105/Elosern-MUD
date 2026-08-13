@@ -3,7 +3,7 @@
 - [ ] 1.1 Confirm `skill-effects-typed-model` has landed and `world/skills/effects.py`'s typed dispatch table exists — every effect string this change adds must parse under it.
 - [ ] 1.2 Confirm `element-mastery-cast-gate` has landed and `can_cast_spell_tier(entity, element, tier)` exists in `world/rules/progression.py`, along with the `light_mastery` skill this element needs.
 - [ ] 1.3 Confirm `heal-effect-handler` has landed and record its final `heal:<...>` effect-ID grammar; if it differs from this change's provisional `heal:<single|area>` guess, update every affected spell's `effects` entry to match before merging.
-- [ ] 1.4 Confirm `cleanse-effect-handler` has landed (already raised as its own OpenSpec change) and that `purify`'s `effects=["cleanse:status"]` matches its settled `cleanse:<scope>` grammar exactly; adjust if the landed grammar differs from this provisional guess.
+- [ ] 1.4 Confirm `cleanse-effect-handler` has landed (already raised as its own OpenSpec change) and that `purify`'s `effects=["cleanse:status"]` matches its settled `cleanse:<scope>` grammar exactly; adjust if the landed grammar differs from `cleanse:status`.
 
 ## 2. Registry entries
 

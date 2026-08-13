@@ -10,9 +10,11 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.buffs import growth_rate_multiplier
+from world.rules.buffs import _add_buff, _handle_cleanse, growth_rate_multiplier
 from world.rules.action import (
     ActionRequest,
+    ActionResolver,
+    CommitFailed,
     PendingEffect,
     RejectReason,
     SNAPSHOTTED_SURFACES,
@@ -24,10 +26,33 @@ from world.rules.action import (
     _handle_confer_growth_rate,
     _handle_self_buff_apply,
     _step5_effect_resolution,
+    _step7_build_event_log,
     register_effect_handler,
 )
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY
+from world.skills.registry import (
+    FactionConstraint,
+    SKILL_REGISTRY,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
+
+# Test-only skill: no shipped skill declares `cleanse:status` yet (the
+# spell-catalog changes own that content), and the end-to-end scenario needs
+# exactly one such castable entry.
+PURIFY_TEST_SKILL = SkillDef(
+    key="test_purify",
+    label="測試淨化",
+    description="測試用：清除目標的異常狀態。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={},
+    usable_out_of_combat=True,
+    element="light",
+    effects=["cleanse:status"],
+    faction_constraint=FactionConstraint.ANY,
+)
 
 
 class EffectRegistryTests(unittest.TestCase):
@@ -183,3 +208,154 @@ class LandedEffectHandlerTests(EvenniaTest):
             caught.exception.reason,
             RejectReason.EFFECT_RESOLUTION_FAILED,
         )
+
+
+class CleanseHandlerTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.entity = create_object(PlayerCharacter, key="cleanse-target")
+        self.entity.race = "human"
+        self.entity.apply_race_baseline()
+
+    def _stage_and_commit(self, effects):
+        effects = [
+            replace(effect, surfaces=frozenset({"buffs"}))
+            for effect in effects
+        ]
+        _commit(effects)
+        return effects
+
+    @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
+    def test_cleanse_removes_an_active_debuff(self):
+        _add_buff(self.entity, "poisoned")
+        effects = self._stage_and_commit(
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        )
+        self.assertNotIn("poisoned", self.entity.buffs.all)
+        self.assertEqual(
+            effects[0].description,
+            "buffs_cleansed|cleanse-target|1",
+        )
+
+    @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
+    def test_cleanse_does_not_remove_a_beneficial_buff(self):
+        _add_buff(self.entity, "focus")
+        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        self.assertEqual(effects, [])
+        self._stage_and_commit(effects)
+        self.assertIn("focus", self.entity.buffs.all)
+
+    def test_cleanse_removes_only_debuffs_when_both_are_active(self):
+        _add_buff(self.entity, "poisoned")
+        _add_buff(self.entity, "focus")
+        self._stage_and_commit(
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        )
+        self.assertNotIn("poisoned", self.entity.buffs.all)
+        self.assertIn("focus", self.entity.buffs.all)
+
+    def test_cleanse_with_no_active_debuffs_stages_nothing(self):
+        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        self.assertEqual(effects, [])
+        self._stage_and_commit(effects)
+
+    def test_cleanse_multi_target_stages_one_entry_per_target(self):
+        other = create_object(PlayerCharacter, key="cleanse-target-2")
+        other.race = "human"
+        other.apply_race_baseline()
+        for entity in (self.entity, other):
+            _add_buff(entity, "poisoned")
+        effects = self._stage_and_commit(
+            _handle_cleanse(
+                self.entity,
+                [self.entity, other],
+                "cleanse:status",
+                {},
+            )
+        )
+        self.assertNotIn("poisoned", self.entity.buffs.all)
+        self.assertNotIn("poisoned", other.buffs.all)
+        self.assertEqual(len(effects), 2)
+
+    def test_cleanse_ignores_paused_and_expired_debuffs(self):
+        _add_buff(self.entity, "poisoned")
+        _add_buff(self.entity, "paralysis")
+        _add_buff(self.entity, "fear")
+        self.entity.buffs.all["poisoned"].remaining_seconds = 0
+        self.entity.buffs.all["paralysis"].paused = True
+        effects = self._stage_and_commit(
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        )
+        self.assertNotIn("fear", self.entity.buffs.all)
+        self.assertIn("poisoned", self.entity.buffs.all)
+        self.assertIn("paralysis", self.entity.buffs.all)
+        self.assertEqual(effects[0].description, "buffs_cleansed|cleanse-target|1")
+
+    def test_cleanse_commit_failure_restores_the_debuff(self):
+        _add_buff(self.entity, "poisoned")
+        effects = [
+            replace(effect, surfaces=frozenset({"buffs"}))
+            for effect in _handle_cleanse(
+                self.entity, [self.entity], "cleanse:status", {}
+            )
+        ]
+        effects.append(
+            PendingEffect(
+                self.entity,
+                "injected failure",
+                frozenset({"traits"}),
+                lambda: (_ for _ in ()).throw(RuntimeError("injected")),
+            )
+        )
+        with self.assertRaises(CommitFailed):
+            _commit(effects)
+        self.assertIn("poisoned", self.entity.buffs.all)
+
+    def test_cleanse_resolves_end_to_end_through_the_action_resolver(self):
+        SKILL_REGISTRY[PURIFY_TEST_SKILL.key] = PURIFY_TEST_SKILL
+        try:
+            self.entity.db.skills = {
+                "active": [PURIFY_TEST_SKILL.key],
+                "passive": [],
+            }
+            _add_buff(self.entity, "poisoned")
+            request = ActionRequest(
+                self.entity,
+                PURIFY_TEST_SKILL.key,
+                [self.entity],
+                RoomActionContext(self.room1),
+            )
+            result = ActionResolver.resolve(request)
+            self.assertEqual(result.outcome, "success")
+            self.assertNotIn("poisoned", self.entity.buffs.all)
+            self.assertIn(
+                "buffs_cleansed",
+                [entry.kind for entry in result.event_log.entries],
+            )
+        finally:
+            SKILL_REGISTRY.pop(PURIFY_TEST_SKILL.key, None)
+
+    def test_cleanse_rejects_an_unknown_scope(self):
+        with self.assertRaises(ValueError):
+            _handle_cleanse(self.entity, [self.entity], "cleanse:banana", {})
+
+    def test_cleanse_event_log_entry_reports_the_cleansed_count(self):
+        class Actor:
+            key = "cleanse-caster"
+
+        _add_buff(self.entity, "poisoned")
+        _add_buff(self.entity, "paralysis")
+        effects = self._stage_and_commit(
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        )
+        request = ActionRequest(
+            Actor(),
+            "fire_ball",
+            [],
+            RoomActionContext(None),
+        )
+        log = _step7_build_event_log(request, SKILL_REGISTRY["fire_ball"], effects)
+        entry = log.entries[0]
+        self.assertEqual(entry.kind, "buffs_cleansed")
+        self.assertEqual(entry.data, {"count": 2})
+        self.assertEqual(entry.text_template, "{actor} 淨化了 {target} 的異常狀態。")
