@@ -92,7 +92,16 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         checks.append(when["buff_active"] in context.get("active_buffs", set()))
     if "skill_owned" in when:
         entity = context.get("entity")
+        granted_keys = (
+            {grant.skill_key for grant in entity.skills.conferred_grants()}
+            if entity is not None
+            else set()
+        )
         checks.append(
-            entity is not None and when["skill_owned"] in entity.skills.owned_keys()
+            entity is not None
+            and (
+                when["skill_owned"] in entity.skills.owned_keys()
+                or when["skill_owned"] in granted_keys
+            )
         )
     return bool(checks) and all(checks)

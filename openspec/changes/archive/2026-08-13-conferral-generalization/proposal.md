@@ -18,7 +18,9 @@ generalization is done once both mechanisms exist rather than twice.
   and fold in `resolved_value * grant.scale`.
 - Conferral explicitly excludes gate-type effects (`ElementMasteryEffect`, `SexualMasteryEffect`,
   `set_disguise`) — attempting to confer one raises `EFFECT_RESOLUTION_FAILED` at cast-resolution time,
-  since "partial spell unlock" or "partial disguise" has no defined meaning.
+  since "partial spell unlock" or "partial disguise" has no defined meaning. The same rejection applies
+  to a skill carrying no continuous-valued effect any grant consumer can resolve (no
+  `StatMultiplyEffect`, no `RuleTableEffect`), so a grant can never be recorded as a silent no-op.
 
 ## Capabilities
 

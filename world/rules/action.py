@@ -26,6 +26,7 @@ from world.rules.progression import (
 from world.rules.skill_effects import (
     apply_disguise_effect,
     record_conferred_grant,
+    validate_conferrable_skill,
 )
 from world.rules.targeting import (
     ActionContext,
@@ -304,7 +305,7 @@ def _handle_confer_skill_partial(
     values = _require_context(context, "confer_skill_partial")
     skill_key = values["confer_skill_key"]
     scale = values["confer_scale"]
-    trait_keys = values["confer_trait_keys"]
+    validate_conferrable_skill(skill_key)
     target = targets[0]
     source_key = _entity_key(actor)
     return [
@@ -316,7 +317,6 @@ def _handle_confer_skill_partial(
                 target,
                 source_key,
                 skill_key,
-                tuple(trait_keys),
                 float(scale),
             ),
         )
@@ -488,9 +488,7 @@ register_effect_handler(
     "confer_skill_partial",
     _handle_confer_skill_partial,
     frozenset({"skill_grants"}),
-    requires_event_context=frozenset(
-        {"confer_skill_key", "confer_scale", "confer_trait_keys"}
-    ),
+    requires_event_context=frozenset({"confer_skill_key", "confer_scale"}),
 )
 register_effect_handler(
     "set_disguise",

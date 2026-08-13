@@ -11,12 +11,15 @@ multiplied by the grant's fractional `scale` into its multiplier computation, in
 entity's own owned skills. The `skill_owned` rule-table context builder (`world/rules/
 combat_modifiers.py`, added by `skill-owned-rule-condition`) SHALL likewise fold a conferred grant's
 scaled adjustment into its evaluated bundle when the grant references a skill whose parsed effect is a
-`RuleTableEffect`. Conferral of a gate-type effect (`ElementMasteryEffect`, `SexualMasteryEffect`,
-`DisguiseEffect`) SHALL raise `EFFECT_RESOLUTION_FAILED` at cast-resolution time rather than silently
-applying a no-op scale. The write primitive SHALL live at
-`world.rules.skill_effects.record_conferred_grant()` so `world/skills/` remains outside the
-single-writer core.
-
+`RuleTableEffect`. Conferral of a skill carrying a gate-type effect
+(`ElementMasteryEffect`, `SexualMasteryEffect`, `DisguiseEffect`) SHALL raise
+`EFFECT_RESOLUTION_FAILED` at cast-resolution time rather than silently
+applying a no-op scale, and conferral of a skill carrying no continuous-valued
+effect any grant consumer can resolve (no `StatMultiplyEffect` and no
+`RuleTableEffect`) SHALL likewise be rejected instead of recording a silent
+no-op grant. The write primitive SHALL live at
+`world.rules.skill_effects.record_conferred_grant()` so `world/skills/` remains
+outside the single-writer core.
 #### Scenario: A conferred grant applies its own scale, independent of the source skill's own multiplier
 - **WHEN** an entity has no `body_enhancement` skill of its own but has a `ConferredSkillGrant` with
   `skill_key="body_enhancement"`, `scale=0.1` (a ×10 partial effect of a ×100 source skill), and a base
@@ -40,6 +43,12 @@ single-writer core.
 #### Scenario: Conferring a gate-type effect is rejected
 - **WHEN** `record_conferred_grant` or its resolver-level caller attempts to confer a skill whose sole
   parsed effect is `ElementMasteryEffect`, `SexualMasteryEffect`, or `DisguiseEffect`
+- **THEN** the attempt raises `EFFECT_RESOLUTION_FAILED` and no `ConferredSkillGrant` is recorded
+
+#### Scenario: Conferring a skill without any continuous effect is rejected
+- **WHEN** `record_conferred_grant` or its resolver-level caller attempts to confer a skill whose
+  parsed effects include no `StatMultiplyEffect` and no `RuleTableEffect` (for example a damage-only
+  or flavor-only skill)
 - **THEN** the attempt raises `EFFECT_RESOLUTION_FAILED` and no `ConferredSkillGrant` is recorded
 
 #### Scenario: Casting 統御術 during play is not implemented by this change

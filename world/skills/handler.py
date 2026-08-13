@@ -18,11 +18,10 @@ if set(INNATE_SKILL_ORDER) != set(INNATE_SKILL_KEYS):
 
 @dataclass(frozen=True)
 class ConferredSkillGrant:
-    """A fractional grant of one source entity's multiplier skill."""
+    """A fractional grant of one source entity's continuous-valued skill effect."""
 
     source_key: str
     skill_key: str
-    trait_keys: tuple[str, ...]
     scale: float
 
 
@@ -62,8 +61,6 @@ class SkillHandler:
                 multiplier *= owned_multiplier
 
         for grant in self.conferred_grants():
-            if trait_key not in grant.trait_keys:
-                continue
             source_skill = SKILL_REGISTRY.get(grant.skill_key)
             if source_skill is None:
                 continue

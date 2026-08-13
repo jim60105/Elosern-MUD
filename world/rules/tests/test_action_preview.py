@@ -324,7 +324,6 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
             event_context={
                 "confer_skill_key": "body_enhancement",
                 "confer_scale": 0.1,
-                "confer_trait_keys": ("atk_phys",),
             },
         )
         preflight = ActionResolver.preflight(
