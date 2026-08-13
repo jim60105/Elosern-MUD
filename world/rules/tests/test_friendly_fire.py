@@ -71,6 +71,8 @@ def _player(key="friendly fire player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
+    # Human starting magic level (術師 tier) so element-gated spell casts pass.
+    player.traits.magic_level.base = 30
     player.traits.hp.base = 500
     player.traits.hp.current = 500
     return player

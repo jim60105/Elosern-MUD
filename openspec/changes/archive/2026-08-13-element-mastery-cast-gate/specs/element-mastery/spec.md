@@ -20,7 +20,9 @@ depend on any owned skill.
 bool`, returning `True` if `entity.traits.magic_level.value` meets `tier`'s band threshold, or `True`
 unconditionally if `f"{element}_mastery"` appears in `entity.skills.owned_keys()` (checked via direct
 ownership only, not via `entity.skills.conferred_grants()`). This function SHALL NOT consult
-`magic_rank_title`.
+`magic_rank_title`. The threshold table is 學徒 0 / 術師 16 / 大師 31 / 賢者 71 / 主宰 91: the lore's
+"90+" 主宰 display band resolves at 91 mechanically, so a human at the magic cap (90) reads as 賢者
+and never satisfies the 主宰 gate.
 
 #### Scenario: A low-level entity without mastery cannot cast a high-tier spell
 - **WHEN** `can_cast_spell_tier(entity, "fire", "大師")` is called on an entity with

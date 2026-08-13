@@ -41,7 +41,12 @@ class TargetDefeatedEventTests(EvenniaTest):
         self.actor = create_object(PlayerCharacter, key="actor")
         self.actor.race = "human"
         self.actor.apply_race_baseline()
-        self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
+        # Direct mastery keeps the cast gate open at magic level 0, preserving
+        # this class's small-damage profile for the defeat-event scenarios.
+        self.actor.db.skills = {
+            "active": ["fire_ball"],
+            "passive": ["fire_mastery"],
+        }
 
     def _monster(self, key: str, hp: int) -> Monster:
         monster = create_object(Monster, key=key)
@@ -137,6 +142,8 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTest):
         self.player = create_object(PlayerCharacter, key="planner-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
+        # Human starting magic level (術師 tier) so fire_ball casts pass.
+        self.player.traits.magic_level.current = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.low_hunt = register(quest("planner_hunt"))

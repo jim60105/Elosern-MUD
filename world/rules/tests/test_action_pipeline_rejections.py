@@ -10,6 +10,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action import (
     _EFFECT_HANDLERS,
     ActionRequest,
@@ -135,3 +136,95 @@ class ActionPipelineRejectionTests(EvenniaTest):
             SKILL_REGISTRY["status_disguise"] = original
         self.assertIs(result.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(dict(self.actor.traits.trait_data), before)
+
+
+class ElementTierCastGateTests(EvenniaTest):
+    """element-mastery cast gate wired into the action pipeline.
+
+    ``status_disguise`` is re-registered as a 賢者-tier fire spell (SELF
+    target, 78 MP sits in the 賢者 single/direct band) so the gate scenarios
+    have a real 賢者-tier elemental spell to cast without adding catalog
+    content that belongs to the ``spell-catalog-*`` changes.
+    """
+
+    SAGE_FIRE_MP = 78
+
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="tier-caster")
+        self.actor.race = "human"
+        self.actor.apply_race_baseline()
+        self.actor.traits.mp.current = 200
+        self.context = RoomActionContext(
+            self.actor.location,
+            {"disguise": {"atk_phys": 1}},
+        )
+        original = SKILL_REGISTRY["status_disguise"]
+        SKILL_REGISTRY["status_disguise"] = replace(
+            original,
+            element=ELEMENT_REGISTRY["fire"],
+            cost={"mp": self.SAGE_FIRE_MP},
+        )
+        self.addCleanup(
+            lambda: SKILL_REGISTRY.__setitem__("status_disguise", original)
+        )
+
+    def _request(self):
+        return ActionRequest(self.actor, "status_disguise", [], self.context)
+
+    @covers_requirement("action-resolution-pipeline::casting-an-elemental-spell-above-the-caster-s-tier-without-mastery-is-rejected")
+    def test_preflight_rejects_under_tier_cast_without_mastery(self):
+        self.actor.traits.magic_level.current = 20
+        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+        result = ActionResolver.preflight(self._request())
+        self.assertIs(result.outcome, "rejected")
+        self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
+
+    def test_preflight_succeeds_via_numeric_level_alone(self):
+        self.actor.traits.magic_level.current = 71
+        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+        result = ActionResolver.preflight(self._request())
+        self.assertIs(result.outcome, "success")
+
+    def test_preflight_succeeds_via_mastery_ownership_alone(self):
+        self.actor.traits.magic_level.current = 1
+        self.actor.db.skills = {
+            "active": ["status_disguise"],
+            "passive": ["fire_mastery"],
+        }
+        result = ActionResolver.preflight(self._request())
+        self.assertIs(result.outcome, "success")
+
+    def test_preflight_rejects_malformed_elemental_cost_fail_closed(self):
+        original = SKILL_REGISTRY["status_disguise"]
+        SKILL_REGISTRY["status_disguise"] = replace(
+            original,
+            element=ELEMENT_REGISTRY["fire"],
+            cost={"mp": 5},
+        )
+        try:
+            self.actor.traits.magic_level.current = 71
+            self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+            result = ActionResolver.preflight(self._request())
+            self.assertIs(result.outcome, "rejected")
+            self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
+        finally:
+            SKILL_REGISTRY["status_disguise"] = original
+
+    def test_resolve_rejects_under_tier_without_mastery(self):
+        self.actor.traits.magic_level.current = 20
+        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+        result = ActionResolver.resolve(self._request())
+        self.assertIs(result.outcome, "rejected")
+        self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
+        self.assertIsNone(self.actor.db.disguised_stats)
+
+    def test_resolve_succeeds_via_mastery_ownership_at_level_one(self):
+        self.actor.traits.magic_level.current = 1
+        self.actor.db.skills = {
+            "active": ["status_disguise"],
+            "passive": ["fire_mastery"],
+        }
+        result = ActionResolver.resolve(self._request())
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.db.disguised_stats, {"atk_phys": 1})
