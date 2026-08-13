@@ -8,6 +8,8 @@ from typing import Any, Callable, Literal
 from django.db import transaction
 
 from typeclasses.monsters import Monster
+from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import (
     _add_buff,
     _handle_cleanse,
@@ -30,8 +32,8 @@ from world.rules.targeting import (
     expand_target_shorthand,
     resolve_targets,
 )
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.skills.cost_tiers import spell_tier_for
+from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 
 
@@ -49,6 +51,7 @@ class RejectReason(StrEnum):
     TARGET_FACTION_FORBIDDEN = "target_faction_forbidden"
     NO_VALID_TARGETS_IN_AREA = "no_valid_targets_in_area"
     ACTION_FORBIDDEN = "action_forbidden"
+    DIVINE_ARTS_FORBIDDEN = "divine_arts_forbidden"
     UNKNOWN_EFFECT_ID = "unknown_effect_id"
     EFFECT_RESOLUTION_FAILED = "effect_resolution_failed"
     MISSING_EFFECT_CONTEXT = "missing_effect_context"
@@ -190,6 +193,22 @@ def _entity_key(entity: Any) -> str:
     return str(entity.key)
 
 
+def _step1_divine_arts_gate(actor: Any, skill: SkillDef) -> None:
+    """Reject divine-mystery casts for races without divine affinity.
+
+    The gate is data-driven: only skills declaring
+    ``SkillDef.requires_divine_arts`` are checked, and the check reuses the
+    already-landed ``RaceProfile.can_use_divine_arts`` field (no new race
+    surface). An actor without a resolvable race is also rejected so the
+    gate never silently opens.
+    """
+    if not skill.requires_divine_arts:
+        return
+    race = RACE_REGISTRY.get(getattr(actor, "race", None))
+    if race is None or not race.can_use_divine_arts:
+        raise RejectedAction(RejectReason.DIVINE_ARTS_FORBIDDEN, skill.key)
+
+
 def _event_context(request: ActionRequest) -> dict[str, Any]:
     return getattr(request.context, "event_context", {})
 
@@ -218,6 +237,7 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
             raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
     except ValueError as error:
         raise RejectedAction(RejectReason.UNKNOWN_SKILL, str(error)) from error
+    _step1_divine_arts_gate(request.actor, skill)
     return skill
 
 
@@ -407,6 +427,28 @@ def _handle_confer_growth_rate(
     ]
 
 
+def _handle_divine_mystery(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+) -> list[PendingEffect]:
+    """Resolve one divine-mystery effect; unmechanized entries stay inert.
+
+    ``DivineMysteryEffect(mechanized=False)`` is a deliberately declared
+    flavor category: the cast is accepted but stages no state change. A
+    mechanized entry has no cast path yet and must reject rather than
+    silently doing nothing.
+    """
+    del actor, targets, context
+    if parse_effect(effect_id).mechanized:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "mechanized divine mysteries have no cast path yet",
+        )
+    return []
+
+
 def _handle_sexual_event(
     actor: Any,
     targets: list[Any],
@@ -484,6 +526,12 @@ register_effect_handler(
     "cleanse",
     _handle_cleanse,
     frozenset({"buffs"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_mystery",
+    _handle_divine_mystery,
+    frozenset(),
     requires_event_context=frozenset(),
 )
 

@@ -100,6 +100,7 @@ class SkillDef:
     element: Element | None
     effects: list[str]
     faction_constraint: FactionConstraint = FactionConstraint.ANY
+    requires_divine_arts: bool = False
     parsed_effects: tuple = ()
 
     def __post_init__(self) -> None:
@@ -173,6 +174,7 @@ def _skill(
     element: str | None = None,
     effects: list[str] | None = None,
     faction_constraint: FactionConstraint = FactionConstraint.ANY,
+    requires_divine_arts: bool = False,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     _validate_metadata(label, description)
@@ -187,6 +189,7 @@ def _skill(
         element=None if element is None else ELEMENT_REGISTRY[element],
         effects=_FrozenList([] if effects is None else effects),
         faction_constraint=faction_constraint,
+        requires_divine_arts=requires_divine_arts,
     )
 
 
@@ -383,8 +386,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "status_disguise",
-            "狀態偽裝",
-            "偽裝自身的外貌與部分能力數值。",
+            "神之秘法：狀態偽裝",
+            "以神之秘法偽裝自身的外貌與部分能力數值。",
             SkillKind.ACTIVE,
             TargetSpec.SELF,
             usable_out_of_combat=True,
@@ -495,6 +498,65 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["sexual_magic_mastery"],
+        ),
+        _skill(
+            "divine_sexual_mastery",
+            "性魔法主宰",
+            "以神性掌握性魔法精髓的至高境界，被動證明對性魔法領域的絕對理解。",
+            SkillKind.PASSIVE,
+            TargetSpec.NONE,
+            requires_divine_arts=True,
+            effects=["sexual_magic_mastery"],
+        ),
+        _skill(
+            "divine_sexual_arts",
+            "神之秘法：性愛系統",
+            "以神之秘法引導的性愛技法，直接刺激目標的感官與慾望。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["sexual_event:stimulus_applied"],
+        ),
+        _skill(
+            "divine_time_dilation",
+            "神之秘法：時間加速",
+            "以神性加速或減緩時間流動的秘法。",
+            SkillKind.ACTIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["divine_mystery:時間加速"],
+        ),
+        _skill(
+            "divine_space_distortion",
+            "神之秘法：空間扭曲",
+            "以神性扭曲空間，使存在與景物移位重組的秘法。",
+            SkillKind.ACTIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["divine_mystery:空間扭曲"],
+        ),
+        _skill(
+            "divine_matter_transmutation",
+            "神之秘法：物質轉換",
+            "以神性改變物質本質，將萬物轉化為其他形態的秘法。",
+            SkillKind.ACTIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["divine_mystery:物質轉換"],
+        ),
+        _skill(
+            "divine_life_extension",
+            "神之秘法：生命延續",
+            "以神性延續生命與壽命的秘法，據說能超越種族的極限。",
+            SkillKind.ACTIVE,
+            TargetSpec.NONE,
+            usable_out_of_combat=True,
+            requires_divine_arts=True,
+            effects=["divine_mystery:生命延續"],
         ),
     )
 }

@@ -47,6 +47,11 @@ on its own.)
   check scattered at each divine-mystery skill's cast site — this field already exists for exactly this
   purpose (`lore-registries` spec, "Only elves can use divine arts"), so this change is purely a
   consumer of it, adding no new lore-registry surface.
+- **Which skills are gated is declared per-skill via `SkillDef.requires_divine_arts`**, not inferred
+  from effect prefixes: the six 神之秘法 skills set the flag, while the generic `sexual_event`
+  mechanism stays race-neutral so a future non-divine sexual skill is not silently made elf-only.
+  Rubber-duck review caught that an effect-family predicate including `sexual_event` would have
+  changed the generic mechanism's contract; the explicit marker keeps the gate data-driven.
 - **`divine_sexual_arts` reuses `sexual_event:<name>` targeting other entities.** `apply_event` (in
   `world/rules/sexual_transitions.py`) already supports an arbitrary target and arbitrary event name
   via its rule-table lookup — no new targeting mechanism needed, only new rule rows for whatever
