@@ -388,6 +388,32 @@ class SkillRegistryTests(unittest.TestCase):
             any(isinstance(effect, ElementMasteryEffect) for effect in parsed)
         )
 
+    @covers_requirement("skill-registry::reincarnation-boon-labels-match-the-preset-character-names")
+    def test_reincarnation_boon_labels_match_the_preset_character_names(self):
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        expected = {
+            "reincarnation_boon_elosia": (
+                "elosia_shadowmoon", "伊洛希雅", ("growth_rate:magic:100",),
+            ),
+            "reincarnation_boon_yuka": (
+                "yuka_darknight", "悠花", ("combat_prediction:武感",),
+            ),
+            "reincarnation_boon_yuna": (
+                "yuna_darknight", "悠奈", ("sexual_magic_mastery",),
+            ),
+        }
+        for key, (preset_key, display_name, effects) in expected.items():
+            with self.subTest(key=key):
+                skill = SKILL_REGISTRY[key]
+                preset = PLAYER_PRESET_REGISTRY[preset_key]
+                self.assertIn(key, (*preset.active_skills, *preset.passive_skills))
+                self.assertEqual(skill.label, f"轉生祝福·{display_name}")
+                self.assertIs(skill.kind, SkillKind.PASSIVE)
+                self.assertEqual(skill.target_spec, TargetSpec.NONE)
+                self.assertEqual(skill.cost, {})
+                self.assertEqual(tuple(skill.effects), effects)
+
 
 class SkillContentCompletionTests(unittest.TestCase):
     @covers_requirement("skill-registry::guardian-instinct-and-blade-art-mastery-display-text-reflects-character-sheet-flavor")

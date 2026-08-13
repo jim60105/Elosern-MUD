@@ -26,6 +26,11 @@ class StatusDisplayCoverageTests(unittest.TestCase):
         self.assertEqual(entry.label, "中毒")
         self.assertEqual(entry.severity, "harmful")
 
+    @covers_requirement("skill-registry::reincarnation-boon-labels-match-the-preset-character-names")
+    def test_reincarnation_boon_yuka_status_row_follows_the_corrected_name(self):
+        entry = STATUS_DISPLAY["reincarnation_boon_yuka_agility_bonus"]
+        self.assertEqual(entry.label, "轉生祝福·悠花敏捷提升")
+
 
 if __name__ == "__main__":
     unittest.main()

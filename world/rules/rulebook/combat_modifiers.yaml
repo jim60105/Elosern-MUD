@@ -60,7 +60,7 @@
   when: {skill_owned: guardian_instinct}
   then: {defense: 5}
 - id: reincarnation_boon_yuka_agility_bonus
-  # 轉生祝福·由花 (reincarnation_boon_yuka, combat_prediction:武感) — battle
+  # 轉生祝福·悠花 (reincarnation_boon_yuka, combat_prediction:武感) — battle
   # prediction reads as initiative/evasion, both of which resolve through
   # agility in this engine, so the adjustment is a percentage `agility` bonus.
   when: {skill_owned: reincarnation_boon_yuka}
