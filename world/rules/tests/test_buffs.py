@@ -394,7 +394,13 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
         self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "atk_phys", "ceiling": -5}}
+            definition.modifiers,
+            {
+                "bounds": [
+                    {"target": "atk_phys", "ceiling": -5},
+                    {"target": "magic_level", "ceiling": -5},
+                ]
+            },
         )
 
         entity = self._entity()
@@ -408,7 +414,14 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
         self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "atk_phys", "ceiling": -10}}
+            definition.modifiers,
+            {
+                "bounds": [
+                    {"target": "atk_phys", "ceiling": -10},
+                    {"target": "magic_level", "ceiling": -10},
+                    {"target": "agility", "ceiling": -10},
+                ]
+            },
         )
 
         entity = self._entity()

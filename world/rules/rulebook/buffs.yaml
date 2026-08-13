@@ -114,13 +114,18 @@
   stacking: refresh
   polarity: debuff
   modifiers:
-    bounds: {target: atk_phys, ceiling: -5}
+    bounds:
+      - {target: atk_phys, ceiling: -5}
+      - {target: magic_level, ceiling: -5}
 - key: dark_curse
   duration: 60
   stacking: refresh
   polarity: debuff
   modifiers:
-    bounds: {target: atk_phys, ceiling: -10}
+    bounds:
+      - {target: atk_phys, ceiling: -10}
+      - {target: magic_level, ceiling: -10}
+      - {target: agility, ceiling: -10}
 - key: dark_corrosion
   duration: 300
   tick_interval: 10
