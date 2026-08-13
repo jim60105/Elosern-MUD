@@ -60,6 +60,14 @@ class ActionPipelineRejectionTests(EvenniaTest):
             RejectReason.SKILL_NOT_ACTIVE,
         )
 
+    @covers_requirement("skill-registry::flight-and-flash-step-are-passive")
+    def test_cast_of_reclassified_flight_is_rejected_as_passive(self):
+        self.actor.db.skills = {"active": [], "passive": ["flight"]}
+        self.assertIs(
+            self.resolve("flight").reason,
+            RejectReason.SKILL_NOT_ACTIVE,
+        )
+
     def test_unknown_effect(self):
         original = SKILL_REGISTRY["status_disguise"]
         SKILL_REGISTRY["status_disguise"] = replace(

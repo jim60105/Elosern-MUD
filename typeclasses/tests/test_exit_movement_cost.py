@@ -14,6 +14,12 @@ from world.rules.clock import CLOCK_YAML, get_world_clock
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
 
+class FlightRequiredExit(Exit):
+    """A module-level flight-gated exit, importable for typeclass creation."""
+
+    requires_flight = True
+
+
 class MovementCostExitTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -110,3 +116,100 @@ class MovementCostMixinSourceTests(EvenniaTest):
         self.assertIn("charge_movement(traversing_object, cost_key)", helper)
         self.assertIn("record_arrival(traversing_object)", helper)
         self.assertNotIn("get_world_clock().advance", helper)
+
+
+class FlightRequiredExitTests(EvenniaTest):
+    """Flight-required exits gate on ``flight``/``flash_step`` ownership."""
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "Room1"
+        self.room2.key = "Room2"
+        self.room1.save()
+        self.room2.save()
+
+    def _traverse_via_command(self, exit_obj, caller):
+        from evennia.objects.objects import ExitCommand
+
+        command = ExitCommand()
+        command.obj = exit_obj
+        command.caller = caller
+        command.func()
+
+    @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
+    def test_flight_required_exit_denies_a_non_owner(self):
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        self.char1.db.skills = {"active": [], "passive": []}
+        self.assertFalse(exit_obj.access(self.char1, "traverse"))
+        before = get_world_clock().tick
+        self._traverse_via_command(exit_obj, self.char1)
+        self.assertIs(self.char1.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
+    def test_flight_required_exit_passes_a_flight_owner(self):
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        self.assertTrue(exit_obj.access(self.char1, "traverse"))
+        before = get_world_clock().tick
+        self._traverse_via_command(exit_obj, self.char1)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
+    def test_flight_required_exit_passes_a_flash_step_owner(self):
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        self.char1.db.skills = {"active": [], "passive": ["flash_step"]}
+        self.assertTrue(exit_obj.access(self.char1, "traverse"))
+        before = get_world_clock().tick
+        self._traverse_via_command(exit_obj, self.char1)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
+    def test_flight_required_exit_passes_a_superuser_without_ownership(self):
+        from evennia.utils.create import create_account
+
+        admin = create_account(
+            "admin",
+            email="admin@example.com",
+            password="test-superuser-password-2026",
+            is_superuser=True,
+        )
+        self.char1.db_account = admin
+        self.assertTrue(self.char1.is_superuser)
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        self.char1.db.skills = {"active": [], "passive": []}
+        self.assertTrue(exit_obj.access(self.char1, "traverse"))
+        before = get_world_clock().tick
+        self._traverse_via_command(exit_obj, self.char1)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
+    def test_no_shipped_exit_sets_requires_flight_by_default(self):
+        from typeclasses.exits import CostedXYZExit, MovementCostMixin, WildernessGateExit
+
+        for exit_class in (Exit, CostedXYZExit, WildernessGateExit):
+            self.assertIs(exit_class.requires_flight, False, exit_class)
+        self.assertIs(MovementCostMixin.requires_flight, False)
