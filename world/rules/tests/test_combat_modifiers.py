@@ -9,8 +9,12 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import (
+    evaluate_combat_modifiers,
+    evaluate_combat_modifiers_no_create,
+)
 from world.rules.rulebook.schema import evaluate_condition, load_rules
+from world.skills.handler import ConferredSkillGrant
 
 RULES = {
     rule.id: rule
@@ -134,6 +138,74 @@ class CombatModifierTests(EvenniaTest):
         self.assertFalse(evaluate_condition({"skill_owned": "defense_instinct"}, {}))
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_skill_owned_condition_matches_a_conferred_grant(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
+        ]
+        self.assertTrue(
+            evaluate_condition(
+                {"skill_owned": "defense_instinct"},
+                {"entity": entity},
+            )
+        )
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_conferred_grant_scales_the_skill_owned_adjustment(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
+        ]
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 2.5})
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_conferred_grants_of_one_skill_sum_their_scaled_adjustments(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "defense_instinct", 0.5),
+            ConferredSkillGrant("other", "defense_instinct", 0.25),
+        ]
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 3.75})
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_owned_skill_takes_the_full_adjustment_despite_a_grant(self):
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "defense_instinct", 0.5)
+        ]
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 5})
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_gate_type_grant_never_reaches_the_rule_table(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "fire_mastery", 0.5)
+        ]
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_zero_scale_grant_never_applies_the_full_adjustment(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "defense_instinct", 0.0)
+        ]
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
+    def test_scaled_percentage_merges_with_other_percentage_adjustments(self):
+        entity = self._entity()
+        entity.db.skill_grants = [
+            ConferredSkillGrant("elosia", "reincarnation_boon_yuka", 0.5)
+        ]
+        _add_buff(entity, "poisoned")
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"agility": "-7.5%"},
+        )
+
+    @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
     def test_skill_owned_rows_merge_with_buff_and_sexual_origin_rows(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
@@ -157,8 +229,6 @@ class CombatModifierTests(EvenniaTest):
     def test_no_create_evaluation_matches_skill_owned_rows(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
-        from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
-
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"defense": 5})
         self.assertIsNone(entity.attributes.get("sexual_traits", category="traits"))
 

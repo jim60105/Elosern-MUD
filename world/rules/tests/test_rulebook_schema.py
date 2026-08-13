@@ -19,6 +19,9 @@ def _entity_owning(*skill_keys: str):
         def owned_keys(self):
             return list(skill_keys)
 
+        def conferred_grants(self):
+            return []
+
     class _FakeEntity:
         skills = _FakeSkills()
 

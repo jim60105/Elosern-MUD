@@ -437,13 +437,13 @@ class ElementMasteryGateTests(EvenniaTest):
     def test_gate_mastery_override_is_direct_ownership_only(self):
         granted = self._caster("granted", 1)
         granted.db.skill_grants = [
-            ConferredSkillGrant("source", "fire_mastery", (), 1.0)
+            ConferredSkillGrant("source", "fire_mastery", 1.0)
         ]
         self.assertNotIn("fire_mastery", granted.skills.owned_keys())
         self.assertFalse(can_cast_spell_tier(granted, "fire", "主宰"))
         high = self._caster("granted-high", 100)
         high.db.skill_grants = [
-            ConferredSkillGrant("source", "fire_mastery", (), 1.0)
+            ConferredSkillGrant("source", "fire_mastery", 1.0)
         ]
         self.assertTrue(can_cast_spell_tier(high, "fire", "主宰"))
 

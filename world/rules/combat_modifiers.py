@@ -10,6 +10,11 @@ from world.rules.rulebook.schema import evaluate_condition, load_rules
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
 
+# Percentage adjustments may be fractional after a conferred grant scales a
+# whole-number percentage ("+5%" at scale 0.5 becomes "+2.5%"), so both the
+# merge and the scaling paths accept an optional fractional part.
+_PERCENT_RE = re.compile(r"[+-]\d+(?:\.\d+)?%")
+
 
 class _StoredLevel:
     """Read-only ordinal mirror for stored sexual-level comparisons."""
@@ -120,13 +125,51 @@ def _merge_adjustments(result: dict[str, Any], incoming: dict[str, Any]) -> dict
         elif (
             isinstance(value, str)
             and isinstance(current, str)
-            and re.fullmatch(r"[+-]\d+%", value)
-            and re.fullmatch(r"[+-]\d+%", current)
+            and _PERCENT_RE.fullmatch(value)
+            and _PERCENT_RE.fullmatch(current)
         ):
-            merged[key] = f"{int(current[:-1]) + int(value[:-1]):+d}%"
+            merged[key] = f"{float(current[:-1]) + float(value[:-1]):+g}%"
         else:
             merged[key] = value
     return merged
+
+
+def _conferred_rule_scale(entity: Any, skill_key: str) -> float:
+    """Return the summed fractional scale of grants referencing one skill.
+
+    Only grants whose referenced skill carries a ``RuleTableEffect`` count:
+    the rule-table consumer never folds in a grant that is not rule-table
+    shaped. Unknown skill keys contribute nothing.
+    """
+    from world.skills.effects import RuleTableEffect
+    from world.skills.registry import SKILL_REGISTRY
+
+    total = 0.0
+    for grant in entity.skills.conferred_grants():
+        if grant.skill_key != skill_key:
+            continue
+        skill = SKILL_REGISTRY.get(grant.skill_key)
+        if skill is None:
+            continue
+        if any(
+            isinstance(effect, RuleTableEffect)
+            for effect in skill.parsed_effects
+        ):
+            total += grant.scale
+    return total
+
+
+def _scale_adjustments(adjustments: dict[str, Any], scale: float) -> dict[str, Any]:
+    """Scale numeric and percentage adjustments by one fractional grant."""
+    scaled: dict[str, Any] = {}
+    for key, value in adjustments.items():
+        if isinstance(value, (int, float)):
+            scaled[key] = value * scale
+        elif isinstance(value, str) and _PERCENT_RE.fullmatch(value):
+            scaled[key] = f"{float(value[:-1]) * scale:+g}%"
+        else:
+            scaled[key] = value
+    return scaled
 
 
 def matched_combat_modifiers(
@@ -140,7 +183,9 @@ def matched_combat_modifiers(
     omitted it is rebuilt from ``entity``. A caller-supplied context is
     treated as a partial context: the entity is injected so ``skill_owned``
     conditions always resolve against the real entity rather than silently
-    never matching.
+    never matching. A ``skill_owned`` rule that matches only through a
+    conferred grant (the entity does not own the skill) returns the grant's
+    scaled-down adjustment instead of the full bundle.
     """
     if context is None:
         context = _build_context(entity)
@@ -149,8 +194,16 @@ def matched_combat_modifiers(
         context.setdefault("entity", entity)
     matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
-        if evaluate_condition(rule.when, context):
-            matches.append((rule.id, dict(rule.then)))
+        if not evaluate_condition(rule.when, context):
+            continue
+        adjustments = dict(rule.then)
+        skill_key = rule.when.get("skill_owned")
+        if skill_key is not None and skill_key not in entity.skills.owned_keys():
+            scale = _conferred_rule_scale(entity, skill_key)
+            if scale <= 0:
+                continue
+            adjustments = _scale_adjustments(adjustments, scale)
+        matches.append((rule.id, adjustments))
     return tuple(matches)
 
 
