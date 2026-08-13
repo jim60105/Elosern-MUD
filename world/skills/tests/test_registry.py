@@ -13,7 +13,11 @@ from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.skills.effects import ElementMasteryEffect, SexualMasteryEffect
+from world.skills.effects import (
+    DivineMysteryEffect,
+    ElementMasteryEffect,
+    SexualMasteryEffect,
+)
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
@@ -39,6 +43,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "element",
                 "effects",
                 "faction_constraint",
+                "requires_divine_arts",
                 "parsed_effects",
             ],
         )
@@ -462,3 +467,57 @@ class DualBladeMasteryCastTests(EvenniaTest):
             result = ActionResolver.resolve(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
+
+
+class DivineMysteryRegistryTests(unittest.TestCase):
+    @covers_requirement("skill-registry::divine-sexual-mastery-and-divine-sexual-arts-exist-as-distinct-skills", "divine-mystery::unmechanized-divine-mysteries-are-explicitly-declared-not-silently-missing")
+    def test_divine_mystery_family_ships_mechanized_and_flavor_entries(self):
+        mastery = SKILL_REGISTRY["divine_sexual_mastery"]
+        self.assertIs(mastery.kind, SkillKind.PASSIVE)
+        self.assertEqual(mastery.effects, ["sexual_magic_mastery"])
+
+        arts = SKILL_REGISTRY["divine_sexual_arts"]
+        self.assertIs(arts.kind, SkillKind.ACTIVE)
+        self.assertIs(arts.target_spec, TargetSpec.SINGLE)
+        self.assertTrue(arts.usable_out_of_combat)
+        self.assertEqual(arts.cost, {})
+        self.assertEqual(arts.effects, ["sexual_event:stimulus_applied"])
+
+        disguised = SKILL_REGISTRY["status_disguise"]
+        self.assertIn("神之秘法", disguised.label)
+        self.assertEqual(disguised.effects, ["set_disguise"])
+        self.assertFalse(disguised.requires_divine_arts)
+
+        for key, name in (
+            ("divine_time_dilation", "時間加速"),
+            ("divine_space_distortion", "空間扭曲"),
+            ("divine_matter_transmutation", "物質轉換"),
+            ("divine_life_extension", "生命延續"),
+        ):
+            with self.subTest(skill=key):
+                skill = SKILL_REGISTRY[key]
+                self.assertIs(skill.kind, SkillKind.ACTIVE)
+                self.assertIs(skill.target_spec, TargetSpec.NONE)
+                self.assertTrue(skill.usable_out_of_combat)
+                self.assertEqual(skill.effects, [f"divine_mystery:{name}"])
+                self.assertEqual(
+                    skill.parsed_effects,
+                    (DivineMysteryEffect(name=name, mechanized=False),),
+                )
+
+        for key in (
+            "divine_sexual_mastery",
+            "divine_sexual_arts",
+            "divine_time_dilation",
+            "divine_space_distortion",
+            "divine_matter_transmutation",
+            "divine_life_extension",
+        ):
+            with self.subTest(gated=key):
+                self.assertTrue(
+                    SKILL_REGISTRY[key].requires_divine_arts,
+                    key,
+                )
+        self.assertFalse(
+            SKILL_REGISTRY["reincarnation_boon_yuna"].requires_divine_arts
+        )

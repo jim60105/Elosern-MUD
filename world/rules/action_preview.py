@@ -26,6 +26,7 @@ from world.rules.action import (
     _EFFECT_HANDLERS,
     _EFFECT_HANDLER_REQUIRED_CONTEXT,
     _effect_prefix,
+    _step1_divine_arts_gate,
     _stored_trait_value,
 )
 from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage
@@ -88,6 +89,10 @@ def _skill_wide_failure(
         return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not skill.usable_out_of_combat and context.battlefield is None:
         return RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT, skill_key
+    try:
+        _step1_divine_arts_gate(actor, skill)
+    except RejectedAction as rejection:
+        return rejection.reason, rejection.detail
     for resource_key, amount in skill.cost.items():
         if _stored_trait_value(getattr(actor.traits, resource_key)) < amount:
             return RejectReason.INSUFFICIENT_RESOURCE, resource_key

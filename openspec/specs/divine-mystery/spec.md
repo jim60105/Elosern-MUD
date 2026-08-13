@@ -1,8 +1,16 @@
-## ADDED Requirements
+## Purpose
+
+Defines the 神之秘法 (Divine Mystery) skill family: which skills belong to it, how they are gated by
+race, and how the unmechanized mysteries are declared as deliberately inert flavor entries rather
+than silently missing content.
+
+## Requirements
 
 ### Requirement: Divine Mystery skills are gated by RaceProfile.can_use_divine_arts
-Every skill whose effects include a `divine_mystery` or `sexual_magic_mastery`-family entry SHALL be
-ownable/castable only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. This
+The six 神之秘法 family skills (`divine_sexual_mastery`, `divine_sexual_arts`, and the four
+unmechanized mysteries) SHALL declare `SkillDef.requires_divine_arts=True` and be ownable/castable
+only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. Skills without the marker
+(including the generic `sexual_event` mechanism) SHALL NOT be race-gated by this change. This
 change SHALL NOT modify `can_use_divine_arts` itself or its existing per-race values — it only adds
 consumers gated by the already-landed field.
 
