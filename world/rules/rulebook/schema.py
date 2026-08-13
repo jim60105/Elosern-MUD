@@ -58,7 +58,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     """Evaluate all recognized conditions in *when* with implicit AND."""
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
-        "buff_active",
+        "buff_active", "skill_owned",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -90,4 +90,9 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         raise ValueError("direction requires field_changed")
     if "buff_active" in when:
         checks.append(when["buff_active"] in context.get("active_buffs", set()))
+    if "skill_owned" in when:
+        entity = context.get("entity")
+        checks.append(
+            entity is not None and when["skill_owned"] in entity.skills.owned_keys()
+        )
     return bool(checks) and all(checks)

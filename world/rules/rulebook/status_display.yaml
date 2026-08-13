@@ -35,3 +35,27 @@
 - code: climax_in_progress_locks_actions
   label: 高潮進行中鎖定行動
   severity: warning
+- code: defense_instinct_defense_bonus
+  label: 防禦直覺防禦提升
+  severity: beneficial
+- code: blade_art_mastery_accuracy_bonus
+  label: 劍術精通準度提升
+  severity: beneficial
+- code: extreme_endurance_sp_cost_reduction
+  label: 極限耐力耐力消耗降低
+  severity: beneficial
+- code: magic_circle_comprehension_accuracy_bonus
+  label: 魔法陣理解施法準度提升
+  severity: beneficial
+- code: precise_mana_control_mp_cost_reduction
+  label: 精準魔力控制魔力消耗降低
+  severity: beneficial
+- code: retainer_martial_training_atk_phys_bonus
+  label: 隨從武藝訓練攻擊提升
+  severity: beneficial
+- code: guardian_instinct_defense_bonus
+  label: 守護直覺防禦提升
+  severity: beneficial
+- code: reincarnation_boon_yuka_agility_bonus
+  label: 轉生祝福·由花敏捷提升
+  severity: beneficial

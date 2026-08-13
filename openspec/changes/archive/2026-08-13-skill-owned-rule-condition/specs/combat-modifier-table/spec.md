@@ -26,9 +26,26 @@ conditions, with no special-casing by condition type in `combat_modifiers.py`.
 `combat_modifiers.yaml` SHALL contain one `skill_owned` row for each of `defense_instinct`,
 `blade_art_mastery`, `extreme_endurance`, `magic_circle_comprehension`, `precise_mana_control`,
 `retainer_martial_training`, `guardian_instinct`, and `reincarnation_boon_yuka`, each producing a
-nonzero adjustment consistent with the skill's Traditional-Chinese flavor description.
+nonzero adjustment consistent with the skill's Traditional-Chinese flavor description. Each row's
+adjustment SHALL surface through the same surfaces as every other combat-modifier row: the merged
+bundle returned by `evaluate_combat_modifiers()` and the player-visible WebClient status conditions
+(`build_status_read_model()`'s matched-modifier presentation). Row keys that live combat resolution
+reads today (`agility`, `accuracy`, `actions_per_turn`) take effect in combat math; the remaining
+vocabulary keys (`defense`, `atk_phys`, `sp_cost`, `mp_cost`) are documented bundle/status vocabulary
+whose consumption by the deterministic combat/resource math is owned by later changes.
 
 #### Scenario: Every one of the eight skills has a corresponding rule row
 - **WHEN** `combat_modifiers.yaml` is loaded
 - **THEN** it contains a `skill_owned` rule referencing each of the eight listed skill keys, and none
   of the eight produces an empty/no-op adjustment
+
+#### Scenario: An owned skill's adjustment is player-visible in the status panel
+- **WHEN** an entity that owns `defense_instinct` is presented through `build_status_read_model()`
+- **THEN** the read model's conditions include the `defense_instinct_defense_bonus` condition carrying
+  the row's adjustment as its modifiers
+
+#### Scenario: The no-create preview path evaluates skill_owned rows identically
+- **WHEN** an entity that owns `defense_instinct` is evaluated through
+  `evaluate_combat_modifiers_no_create()`
+- **THEN** the returned bundle includes the same `defense_instinct` row adjustment as
+  `evaluate_combat_modifiers()`, and the read creates no persistent attribute or handler state
