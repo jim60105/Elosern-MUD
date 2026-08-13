@@ -65,6 +65,11 @@ class BrowserVerificationContractTests(unittest.TestCase):
             gate_names.index("Verify successful requirement execution"),
             gate_names.index("Enforce aggregate coverage threshold"),
         )
+        gate_steps = {step["name"]: step for step in jobs["gate"]["steps"]}
+        self.assertIn(
+            "coverage report --fail-under=80",
+            gate_steps["Enforce aggregate coverage threshold"]["run"],
+        )
 
     @covers_requirement(
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"

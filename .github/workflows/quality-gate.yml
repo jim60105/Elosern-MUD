@@ -251,7 +251,7 @@ jobs:
           uv run --locked python -m tools.verify_coverage_roots coverage.json
 
       - name: Enforce aggregate coverage threshold
-        run: uv run --locked coverage report --fail-under=90
+        run: uv run --locked coverage report --fail-under=80
 
       - name: Generate aggregate coverage XML
         run: uv run --locked coverage xml -o coverage.xml

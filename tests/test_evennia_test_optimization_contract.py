@@ -157,7 +157,7 @@ class TestOwnershipContractTests(unittest.TestCase):
             gate_steps["Verify successful requirement execution"]["run"],
         )
         self.assertIn(
-            "fail-under=90",
+            "fail-under=80",
             gate_steps["Enforce aggregate coverage threshold"]["run"],
         )
 

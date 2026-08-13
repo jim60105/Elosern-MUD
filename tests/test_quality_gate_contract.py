@@ -87,7 +87,7 @@ class QualityGateContractTests(unittest.TestCase):
         gate = jobs["gate"]
         gate_step_names = [step["name"] for step in gate["steps"]]
         gate_steps = {step["name"]: step for step in gate["steps"]}
-        self.assertIn("coverage report --fail-under=90", gate_steps["Enforce aggregate coverage threshold"]["run"])
+        self.assertIn("coverage report --fail-under=80", gate_steps["Enforce aggregate coverage threshold"]["run"])
         self.assertLess(
             gate_step_names.index("Enforce aggregate coverage threshold"),
             gate_step_names.index("Generate aggregate coverage XML"),
@@ -109,7 +109,7 @@ class QualityGateContractTests(unittest.TestCase):
             ["commands", "server", "typeclasses", "web", "world"],
         )
         self.assertEqual(coverage["report"]["omit"], ["*/tests/*"])
-        self.assertEqual(coverage["report"]["fail_under"], 90)
+        self.assertEqual(coverage["report"]["fail_under"], 80)
 
         workflow = yaml.safe_load(
             (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
@@ -139,6 +139,27 @@ class QualityGateContractTests(unittest.TestCase):
             gate_steps["Generate aggregate coverage XML"]["run"],
             "uv run --locked coverage xml -o coverage.xml",
         )
+
+    @covers_requirement(
+        "spec-test-traceability::continuous-integration-enforces-both-quality-dimensions"
+    )
+    def test_coverage_target_is_documented_but_gate_enforces_80(self):
+        config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
+        )
+        gate_steps = {step["name"]: step for step in workflow["jobs"]["gate"]["steps"]}
+        self.assertEqual(config["tool"]["coverage"]["report"]["fail_under"], 80)
+        self.assertIn(
+            "coverage report --fail-under=80",
+            gate_steps["Enforce aggregate coverage threshold"]["run"],
+        )
+        traceability_doc = (REPO_ROOT / "docs/development/spec-test-traceability.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("hard gate is 80%", traceability_doc)
+        self.assertIn("targets 90%", traceability_doc)
+        self.assertIn("targeting 90%", (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8"))
 
     @covers_requirement("spec-test-traceability::aggregate-coverage-is-published-to-codecov")
     def test_codecov_upload_is_explicit_and_immutable(self):

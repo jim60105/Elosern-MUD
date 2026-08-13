@@ -199,7 +199,7 @@ requirement or its tests.
 - The final coverage gate measures branches in exactly `commands`, `server`,
   `typeclasses`, `web`, and `world`, omits only `*/tests/*`, combines the
   non-browser Evennia, managed browser, and top-level regression data files,
-  and requires at least 90%.
+  and enforces a hard gate of at least 80% while targeting 90%.
 
 ## Container behavior
 

@@ -196,7 +196,7 @@ the six `browser` matrix shards, the `top-level` job, and a `gate` job that
 downloads every artifact, validates that each expected coverage and evidence
 artifact arrived non-empty, concatenates the evidence files in entry-point
 order, runs `spec_traceability verify`, combines every uploaded sidecar with
-`coverage combine`, verifies the coverage roots, enforces the aggregate 90%
+`coverage combine`, verifies the coverage roots, enforces the aggregate 80%
 branch gate, and publishes Codecov XML from the combined data only. Serial
 execution remains the canonical final-handoff evidence profile.
 

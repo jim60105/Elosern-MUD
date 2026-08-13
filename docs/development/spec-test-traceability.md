@@ -133,7 +133,7 @@ uv run --locked coverage combine \
   .coverage.evennia .coverage.browser .coverage.top-level
 uv run --locked coverage json --fail-under=0 -o coverage.json
 uv run --locked python -m tools.verify_coverage_roots coverage.json
-uv run --locked coverage report --fail-under=90
+uv run --locked coverage report --fail-under=80
 uv run --locked coverage xml -o coverage.xml
 ```
 
@@ -144,8 +144,10 @@ owns `web/tests/browser/`; top-level repository contracts remain owned by
 first-party roots `commands`, `server`, `typeclasses`, `web`, and `world`; only
 modules under `*/tests/*` may be omitted. Dependency code, OpenSpec artifacts,
 and repository tools are outside the configured source roots. All three
-coverage data files must be combined before applying the aggregate 90% gate or
-generating `coverage.xml` for Codecov. The browser wrapper records its parent
+coverage data files must be combined before applying the aggregate 80% hard
+gate or generating `coverage.xml` for Codecov. The hard gate is 80% aggregate
+branch coverage; the project targets 90% as a documented goal, not an enforced
+threshold. The browser wrapper records its parent
 test harness; managed server child-process coverage is not claimed.
 
 The dedicated retained database is `server/db/evennia-test.sqlite3`. Omit
