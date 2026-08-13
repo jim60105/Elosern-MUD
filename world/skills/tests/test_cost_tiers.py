@@ -10,7 +10,7 @@ from world.skills.registry import SKILL_REGISTRY
 class SpellTierLookupTests(unittest.TestCase):
     def test_existing_spells_map_to_their_cost_bands(self):
         self.assertEqual(spell_tier_for(SKILL_REGISTRY["fire_ball"]), "學徒")
-        self.assertEqual(spell_tier_for(SKILL_REGISTRY["wind_blade"]), "術師")
+        self.assertEqual(spell_tier_for(SKILL_REGISTRY["wind_blade"]), "學徒")
 
     def test_non_spell_skills_are_never_gated(self):
         for key in (

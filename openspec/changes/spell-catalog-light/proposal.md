@@ -1,17 +1,18 @@
 ## Why
 
 The skill-system redesign (`docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md`, §4.4)
-defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries one
-seed spell for 光 magic. Without the
-other 10 光-element spells, players who invest in 光 magic have no tier progression to
+defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today carries no seed
+spell for 光 magic. Without the
+10 光-element spells, players who invest in 光 magic have no tier progression to
 grow into, and the new `can_cast_spell_tier` cast-gate (from `element-mastery-cast-gate`) has nothing
-to gate for this element beyond its single existing spell.
+to gate for this element.
 
 ## What Changes
 
 - Add the ten `光`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
 - Add 2 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
-- Declare `purify`'s effect using a provisional `cleanse:status` effect string pending a follow-up `cleanse-effect-handler` change; flag this gap explicitly rather than shipping a dead spell or inventing a handler out of scope.
+- Declare `purify`'s effect as `cleanse:status`, matching the `cleanse:<scope>` grammar settled by the landed `cleanse-effect-handler` change.
+- Add the matching rows to `world/rules/rulebook/status_display.yaml` — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry.
 
 ## Capabilities
 
@@ -27,7 +28,7 @@ to gate for this element beyond its single existing spell.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (2 new rows).
+- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (2 new rows)., `world/rules/rulebook/status_display.yaml` (new rows)
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve

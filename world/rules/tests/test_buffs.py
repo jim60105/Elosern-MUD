@@ -248,6 +248,192 @@ class BuffIntegrationTests(EvenniaTest):
         _add_buff(entity, "earth_ward")
         self.assertIn("earth_ward", entity_active_buffs(entity))
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
+    def test_buff_wind_haste(self):
+        definition = BUFF_DEFINITIONS["wind_haste"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "agility", "ceiling": 3}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "wind_haste")
+        self.assertIn("wind_haste", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
+    def test_buff_wind_haste_domain(self):
+        definition = BUFF_DEFINITIONS["wind_haste_domain"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "agility", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "wind_haste_domain")
+        self.assertIn("wind_haste_domain", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
+    def test_buff_lightning_static_ward(self):
+        definition = BUFF_DEFINITIONS["lightning_static_ward"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "lightning_static_ward")
+        self.assertIn("lightning_static_ward", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
+    def test_buff_lightning_extra_action(self):
+        definition = BUFF_DEFINITIONS["lightning_extra_action"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers,
+            {"bounds": {"target": "actions_per_turn", "ceiling": 1}},
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "lightning_extra_action")
+        self.assertIn("lightning_extra_action", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_buff_ice_slow(self):
+        definition = BUFF_DEFINITIONS["ice_slow"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "agility", "ceiling": -3}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "ice_slow")
+        self.assertIn("ice_slow", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_buff_ice_wall(self):
+        definition = BUFF_DEFINITIONS["ice_wall"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "ice_wall")
+        self.assertIn("ice_wall", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_buff_ice_freeze(self):
+        definition = BUFF_DEFINITIONS["ice_freeze"]
+        self.assertEqual(definition.duration, 30)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(definition.modifiers, {})
+
+        entity = self._entity()
+        _add_buff(entity, "ice_freeze")
+        self.assertIn("ice_freeze", entity_active_buffs(entity))
+        self.assertFalse(blocks_action(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_buff_ice_prison(self):
+        definition = BUFF_DEFINITIONS["ice_prison"]
+        self.assertEqual(definition.duration, 30)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(definition.modifiers, {})
+
+        entity = self._entity()
+        _add_buff(entity, "ice_prison")
+        self.assertIn("ice_prison", entity_active_buffs(entity))
+        self.assertFalse(blocks_action(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    def test_buff_light_holy_shield(self):
+        definition = BUFF_DEFINITIONS["light_holy_shield"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "light_holy_shield")
+        self.assertIn("light_holy_shield", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    def test_buff_light_blessing(self):
+        definition = BUFF_DEFINITIONS["light_blessing"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "buff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 3}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "light_blessing")
+        self.assertIn("light_blessing", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
+    def test_buff_dark_atk_down(self):
+        definition = BUFF_DEFINITIONS["dark_atk_down"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "atk_phys", "ceiling": -5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "dark_atk_down")
+        self.assertIn("dark_atk_down", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
+    def test_buff_dark_curse(self):
+        definition = BUFF_DEFINITIONS["dark_curse"]
+        self.assertEqual(definition.duration, 60)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers, {"bounds": {"target": "atk_phys", "ceiling": -10}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "dark_curse")
+        self.assertIn("dark_curse", entity_active_buffs(entity))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
+    def test_buff_dark_corrosion(self):
+        definition = BUFF_DEFINITIONS["dark_corrosion"]
+        self.assertEqual(definition.duration, 300)
+        self.assertEqual(definition.tick_interval, 10)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers, {"rate": {"target": "hp", "delta": -5}}
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "dark_corrosion")
+        before = entity.traits.hp.value
+        tick_buffs(entity)
+        self.assertEqual(entity.traits.hp.value, before - 5)
+        self.assertEqual(entity.buffs.all["dark_corrosion"].tick_interval, 10)
+        self.assertIn("dark_corrosion", entity_active_buffs(entity))
+
     def test_buff_tick_on_full_gauge_stores_integer(self):
         entity = self._entity()
         _add_buff(entity, "poisoned")

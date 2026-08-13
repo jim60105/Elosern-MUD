@@ -428,16 +428,37 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             faction_constraint=FactionConstraint.SELF_ONLY,
             effects=["self_buff_apply:earth_hardened_skin"],
         ),
+        *_elemental_spells(
+            "wind",
+            # 風 — 學徒
+            ("wind_blade", "風刃術", "颳起銳利風刃，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 14, ("damage:wind:magic",)),
+            # 風 — 術師
+            ("tornado_blade", "龍捲風刃", "捲起龍捲風刃，對單一目標造成高額魔法傷害。", TargetSpec.SINGLE, 26, ("damage:wind:magic",)),
+            # 風 — 大師
+            ("storm_domain", "暴風領域", "展開暴風領域，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 50, ("damage:wind:magic",)),
+            ("gale_dance_strike", "疾風刃舞", "以疾風之勢舞動刃擊，對單一目標造成多段魔法傷害。", TargetSpec.SINGLE, 40, ("damage:wind:magic",)),
+            # 風 — 賢者
+            ("heavens_wrath_storm", "天譴風暴", "喚起天譴風暴，對範圍內所有目標造成極高魔法傷害。", TargetSpec.AREA, 90, ("damage:wind:magic",)),
+            ("haste_domain", "神速領域", "展開神速領域，提升範圍內所有目標的速度。", TargetSpec.AREA, 70, ("buff_apply:wind_haste_domain",)),
+            # 風 — 主宰
+            ("vacuum_severance", "真空斬滅", "斬出真空之刃，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:wind:magic",)),
+            ("sky_tempest", "蒼穹暴風", "召喚蒼穹暴風，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 150, ("damage:wind:magic",)),
+        ),
+        # 風 — 學徒
+        # gale_step is inherently self-only (`self_buff_apply`), so it declares
+        # SELF_ONLY — the `_elemental_spells` builder fixes ANY, so this single
+        # entry is written out individually per the skill-registry spec's
+        # self-only constraint.
         _skill(
-            "wind_blade",
-            "風刃術",
-            "颳起銳利風刃，對範圍內所有目標造成魔法傷害。",
+            "gale_step",
+            "疾風術",
+            "以疾風強化自身，提升速度。",
             SkillKind.ACTIVE,
-            TargetSpec.AREA,
-            cost={"mp": 24},
+            TargetSpec.SELF,
+            cost={"mp": 10},
             element="wind",
-            faction_constraint=FactionConstraint.ANY,
-            effects=["damage:wind:magic"],
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            effects=["self_buff_apply:wind_haste"],
         ),
         _skill(
             "flight",
@@ -445,10 +466,108 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             "操控風元素飛行，可前往遠處的場合。",
             SkillKind.PASSIVE,
             TargetSpec.SELF,
-            cost={"mp": 10},
+            cost={"mp": 22},
             usable_out_of_combat=True,
             element="wind",
             effects=["movement:flight"],
+        ),
+        *_elemental_spells(
+            "lightning",
+            # 雷 — 學徒
+            ("spark_shock", "電擊術", "凝聚雷之魔力電擊，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 13, ("damage:lightning:magic",)),
+            # 雷 — 術師
+            ("chain_lightning", "雷鎖術", "釋放連鎖閃電，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 27, ("damage:lightning:magic",)),
+            ("paralyzing_bolt", "麻痺電擊", "射出麻痺電擊，對單一目標造成魔法傷害並使其麻痺。", TargetSpec.SINGLE, 24, ("damage:lightning:magic", "buff_apply:paralysis")),
+            # 雷 — 大師
+            ("thunder_combo", "雷霆連擊", "以雷霆之勢連續攻擊，對單一目標造成多段魔法傷害。", TargetSpec.SINGLE, 46, ("damage:lightning:magic",)),
+            ("lightning_strike", "落雷術", "召喚落雷，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 50, ("damage:lightning:magic",)),
+            # 雷 — 賢者
+            ("heavens_thunder", "天雷降臨", "召喚天雷降臨，對範圍內所有目標造成極高魔法傷害。", TargetSpec.AREA, 92, ("damage:lightning:magic",)),
+            # 雷 — 主宰
+            ("judgement_thunder", "審判雷霆", "喚起審判雷霆，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 135, ("damage:lightning:magic",)),
+            ("divine_lightning_slaughter", "神雷滅殺", "召喚神雷滅殺一切，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 155, ("damage:lightning:magic",)),
+        ),
+        # 雷 — 學徒
+        # static_ward and thunder_gods_haste are inherently self-only
+        # (`self_buff_apply`), so they declare SELF_ONLY — the
+        # `_elemental_spells` builder fixes ANY, so these entries are written
+        # out individually per the skill-registry spec's self-only constraint.
+        _skill(
+            "static_ward",
+            "靜電護體",
+            "以靜電護體，隨時反擊近身之敵。",
+            SkillKind.ACTIVE,
+            TargetSpec.SELF,
+            cost={"mp": 10},
+            element="lightning",
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            effects=["self_buff_apply:lightning_static_ward"],
+        ),
+        # 雷 — 賢者
+        _skill(
+            "thunder_gods_haste",
+            "雷神之速",
+            "獲得雷神之速，追加行動機會。",
+            SkillKind.ACTIVE,
+            TargetSpec.SELF,
+            cost={"mp": 68},
+            element="lightning",
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            effects=["self_buff_apply:lightning_extra_action"],
+        ),
+        *_elemental_spells(
+            "ice",
+            # 冰 — 學徒
+            ("ice_shard", "冰錐術", "凝聚冰之魔力化為冰錐，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 13, ("damage:ice:magic",)),
+            ("frost_breath", "凍結之息", "吐出凍結之息，降低單一目標的速度。", TargetSpec.SINGLE, 11, ("buff_apply:ice_slow",)),
+            # 冰 — 術師
+            ("ice_wall", "冰牆術", "築起冰牆，提升目標的防禦。", TargetSpec.SINGLE, 25, ("buff_apply:ice_wall",)),
+            ("frost_arrow_rain", "冷凍箭雨", "降下冷凍箭雨，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 28, ("damage:ice:magic",)),
+            # 冰 — 大師
+            ("permafrost_domain", "永凍領域", "展開永凍領域，凍結範圍內所有目標。", TargetSpec.AREA, 48, ("buff_apply:ice_freeze",)),
+            ("ice_prison", "冰封監牢", "以寒冰封鎖目標，定住其行動。", TargetSpec.SINGLE, 44, ("buff_apply:ice_prison",)),
+            # 冰 — 賢者
+            ("blizzard", "暴風雪", "喚起暴風雪，對範圍內所有目標造成極高魔法傷害。", TargetSpec.AREA, 88, ("damage:ice:magic",)),
+            ("absolute_tundra", "絕對凍土", "將大地凍結為絕對凍土，對範圍內所有目標造成魔法傷害並使其凍結。", TargetSpec.AREA, 82, ("damage:ice:magic", "buff_apply:ice_freeze")),
+            # 冰 — 主宰
+            ("absolute_zero", "絕對零度", "釋放絕對零度，對單一目標造成處決級魔法傷害並使其凍結。", TargetSpec.SINGLE, 140, ("damage:ice:magic", "buff_apply:ice_freeze")),
+            ("eternal_ice_field", "永夜冰原", "展開永夜的冰原，對範圍內所有目標造成毀滅級魔法傷害並使其凍結。", TargetSpec.AREA, 158, ("damage:ice:magic", "buff_apply:ice_freeze")),
+        ),
+        *_elemental_spells(
+            "light",
+            # 光 — 學徒
+            ("heal", "治癒術", "以光之魔力治癒，恢復單一目標的生命力。", TargetSpec.SINGLE, 12, ("heal:single",)),
+            ("light_arrow", "光箭術", "射出光之箭矢，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:light:magic",)),
+            # 光 — 術師
+            ("purify", "淨化術", "以淨化之光，解除單一目標的異常狀態。", TargetSpec.SINGLE, 22, ("cleanse:status",)),
+            ("mass_heal", "群體治癒", "施展群體治癒，恢復範圍內所有目標的生命力。", TargetSpec.AREA, 30, ("heal:area",)),
+            # 光 — 大師
+            ("advanced_heal", "高級治癒", "施展高級治癒，大量恢復單一目標的生命力。", TargetSpec.SINGLE, 46, ("heal:single",)),
+            ("holy_shield", "聖盾術", "以神聖之力形成聖盾，提升單一目標的防禦。", TargetSpec.SINGLE, 40, ("buff_apply:light_holy_shield",)),
+            # 光 — 賢者
+            ("holy_radiance", "神聖光輝", "綻放神聖光輝，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 90, ("damage:light:magic",)),
+            ("revival_light", "復甦之光", "綻放復甦之光，大量恢復瀕危目標的生命力。", TargetSpec.SINGLE, 82, ("heal:single",)),
+            # 光 — 主宰
+            ("goddess_blessing", "女神降福", "獲得女神的祝福，大量恢復範圍內所有目標的生命力並強化防禦。", TargetSpec.AREA, 145, ("heal:area", "buff_apply:light_blessing")),
+            ("heavens_judgment_light", "天啟聖裁", "喚起天啟聖裁，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 135, ("damage:light:magic",)),
+        ),
+        *_elemental_spells(
+            "dark",
+            # 暗 — 學徒
+            ("shadow_bolt", "暗影箭", "射出暗影之箭，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:dark:magic",)),
+            ("weaken", "衰弱術", "施展衰弱術，降低單一目標的攻擊。", TargetSpec.SINGLE, 11, ("buff_apply:dark_atk_down",)),
+            # 暗 — 術師
+            ("curse", "詛咒術", "施展詛咒，削弱單一目標的多項能力。", TargetSpec.SINGLE, 26, ("buff_apply:dark_curse",)),
+            ("dark_burst", "闇裂術", "釋放闇之爆裂，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 29, ("damage:dark:magic",)),
+            # 暗 — 大師
+            ("dark_corrosion_domain", "闇蝕領域", "展開闇蝕領域，對範圍內所有目標造成魔法傷害並使其腐蝕。", TargetSpec.AREA, 47, ("damage:dark:magic", "buff_apply:dark_corrosion")),
+            ("shadow_torment", "暗影凌遲", "以暗影凌遲目標，造成高額魔法傷害並使其腐蝕。", TargetSpec.SINGLE, 41, ("damage:dark:magic", "buff_apply:dark_corrosion")),
+            # 暗 — 賢者
+            ("abyss_devour", "深淵吞噬", "召喚深淵吞噬目標，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 85, ("damage:dark:magic",)),
+            ("dark_dominion", "黑暗支配", "展開黑暗支配，使範圍內所有目標陷入恐懼。", TargetSpec.AREA, 72, ("buff_apply:fear",)),
+            # 暗 — 主宰
+            ("void_annihilation", "終焉黑洞", "召喚終焉黑洞，對範圍內所有目標造成毀滅級魔法傷害。", TargetSpec.AREA, 155, ("damage:dark:magic",)),
+            ("netherworld_judgment", "冥府審判", "喚起冥府審判，對單一目標造成處決級魔法傷害。", TargetSpec.SINGLE, 135, ("damage:dark:magic",)),
         ),
         _skill(
             "dual_wield_style",

@@ -47,6 +47,45 @@
 - code: earth_ward
   label: 大地庇護
   severity: beneficial
+- code: wind_haste
+  label: 疾風
+  severity: beneficial
+- code: wind_haste_domain
+  label: 神速領域
+  severity: beneficial
+- code: lightning_static_ward
+  label: 靜電護體
+  severity: beneficial
+- code: lightning_extra_action
+  label: 雷神之速
+  severity: beneficial
+- code: ice_slow
+  label: 遲緩
+  severity: harmful
+- code: ice_wall
+  label: 冰牆
+  severity: beneficial
+- code: ice_freeze
+  label: 凍結
+  severity: harmful
+- code: ice_prison
+  label: 定身
+  severity: harmful
+- code: light_holy_shield
+  label: 聖盾
+  severity: beneficial
+- code: light_blessing
+  label: 女神降福
+  severity: beneficial
+- code: dark_atk_down
+  label: 衰弱
+  severity: harmful
+- code: dark_curse
+  label: 詛咒
+  severity: harmful
+- code: dark_corrosion
+  label: 腐蝕
+  severity: harmful
 - code: paralysis_locks_actions
   label: 麻痺鎖定行動
   severity: critical

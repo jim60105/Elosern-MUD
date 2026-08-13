@@ -1,11 +1,11 @@
 ## Why
 
 The skill-system redesign (`docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md`, §4.4)
-defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries one
-seed spell for 風 magic (`wind_blade`, `flight`). Without the
+defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries two
+seed spells for 風 magic (`wind_blade`, `flight`). Without the
 other 8 風-element spells, players who invest in 風 magic have no tier progression to
 grow into, and the new `can_cast_spell_tier` cast-gate (from `element-mastery-cast-gate`) has nothing
-to gate for this element beyond its single existing spell.
+to gate for this element beyond its two existing spells.
 
 ## What Changes
 
@@ -13,6 +13,7 @@ to gate for this element beyond its single existing spell.
 - Recost `wind_blade` from `mp=24` to `mp=14` per §4.3's MP cost-tier table — no other field of `wind_blade` changes.
 - Recost `flight` from `mp=10` to `mp=22` per §4.3's MP cost-tier table — no other field of `flight` changes.
 - Add 2 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
+- Add 2 matching rows to `world/rules/rulebook/status_display.yaml` — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry.
 
 ## Capabilities
 
@@ -28,7 +29,7 @@ to gate for this element beyond its single existing spell.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (8 new spell entries via the `_elemental_spells` builder, 2 existing entries edited in place (wind_blade, flight)), `world/rules/rulebook/buffs.yaml` (2 new rows).
+- **Affected code**: `world/skills/registry.py` (8 new spell entries — seven via the `_elemental_spells` builder plus the `gale_step` SELF_ONLY entry — and 2 existing entries edited in place (wind_blade, flight)), `world/rules/rulebook/buffs.yaml` (2 new rows), `world/rules/rulebook/status_display.yaml` (2 new rows).
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve

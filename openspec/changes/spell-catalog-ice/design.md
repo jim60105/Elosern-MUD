@@ -108,10 +108,16 @@ Per the shared scope boundary, every status-effect or shield spell in this set i
 existing constraints — no combat-stat multiplier configured in the buff definition itself). This change
 adds:
 
-- `ice_slow`: slow debuff (rate-shaped agility/speed reduction), applied by `frost_breath`
+- `ice_slow`: slow debuff (bounds-shaped agility reduction), applied by `frost_breath`
 - `ice_wall`: shield buff (defense bounds ceiling, self-or-ally target), applied by `ice_wall`
 - `ice_freeze`: marker control buff (empty `modifiers`, same shape as `paralysis`/`fear`) representing 凍結, applied by `permafrost_domain`, `absolute_tundra`, `absolute_zero`, and `eternal_ice_field`
 - `ice_prison`: marker control buff (empty `modifiers`) representing 定身, applied by `ice_prison`
+
+The matching `ice_slow`/`ice_wall`/`ice_freeze`/`ice_prison` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 遲緩/冰牆/凍結/定身, severities
+`harmful`/`beneficial`/`harmful`/`harmful`): `status_display.py`'s fail-closed coverage requires every
+buff key to have exactly one display entry, so a new buff key without one breaks module import at
+startup.
 
 ### Registry ordering makes tier obvious without a new field
 
@@ -132,7 +138,7 @@ design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
@@ -141,8 +147,3 @@ design-doc table.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `ice_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

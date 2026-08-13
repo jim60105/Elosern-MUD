@@ -109,12 +109,17 @@ Per the shared scope boundary, every status-effect or shield spell in this set i
 existing constraints — no combat-stat multiplier configured in the buff definition itself). This change
 adds:
 
-- `wind_haste`: self speed buff (rate/bounds-shaped agility increase), applied by `gale_step`
+- `wind_haste`: self speed buff (bounds-shaped agility increase), applied by `gale_step`
 - `wind_haste_domain`: party speed+evasion buff (broader bounds than `wind_haste`), applied by `haste_domain`
+
+The matching `wind_haste`/`wind_haste_domain` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 疾風/神速領域, severities
+`beneficial`/`beneficial`): `status_display.py`'s fail-closed coverage requires every buff key to have
+exactly one display entry, so a new buff key without one breaks module import at startup.
 
 ### Pre-existing anchor skill(s) are recosted in place, not duplicated
 
-- `wind_blade`: `mp=24` -> `mp=14` (its `effects`, `target_spec`, `label`, and every other field are unchanged — only the `cost` dict's `mp` value is edited)
+- `wind_blade`: `mp=24` -> `mp=14` (its `effects`, `target_spec`, `label`, and every other field are unchanged — only the `cost` dict's `mp` value is edited; the entry relocates into the wind `_elemental_spells` block, so it still appears exactly once)
 - `flight`: `mp=10` -> `mp=22` (its `effects`, `target_spec`, `label`, and every other field are unchanged — only the `cost` dict's `mp` value is edited)
 
 Per design doc §4.4: "Three keys already exist in `SKILL_REGISTRY` and are rebalanced to this table
@@ -133,8 +138,12 @@ spell in this table, all of which remain `ACTIVE` and genuinely spend their list
 
 `SkillDef` has no `tier` field — tier is derived from context. This change's spell rows are grouped
 in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 風 — 學徒` -style comment) inside one `*_elemental_spells("wind", ...)` block, and each pair's MP
-cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
+`# 風 — 學徒` -style comment) around one `*_elemental_spells("wind", ...)` block, and each pair's MP
+cost falls inside §4.3's band for that tier. `gale_step` (學徒 單體(自)) is declared as its own
+`_skill(...)` call directly after that block, still under its `# 風 — 學徒` tier comment: its
+`self_buff_apply` effect is inherently self-only, so it declares `FactionConstraint.SELF_ONLY`, which
+the builder fixes to `ANY`. `flight` (術師 單體(自)) is a PASSIVE movement skill and also keeps its
+own `_skill(...)` entry, recosted in place. This gives `element-mastery-cast-gate`'s tier lookup an
 unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
 logic itself.
 
@@ -143,13 +152,18 @@ logic itself.
 This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
 `spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
 each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
-`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
-design-doc table. `flight` is a PASSIVE movement skill, so it is NOT part of the `_elemental_spells`
-block; it keeps its existing `_skill(...)` entry and is recosted in place (task 5.2).
+`FactionConstraint.ANY` are fixed by the builder. `wind_blade` is moved into the wind builder block
+(recast there at `mp=14`), deleting its pre-existing standalone `_skill(...)` entry so it appears
+exactly once. `gale_step` is the deliberate exception (see "Registry ordering" above): it is written
+as an explicit `_skill(...)` call with `FactionConstraint.SELF_ONLY`, because the builder's fixed
+`ANY` would contradict the `skill-registry` spec's self-only-constraint rule. `flight` is a PASSIVE
+movement skill, so it is NOT part of the `_elemental_spells` block either; it keeps its existing
+`_skill(...)` entry and is recosted in place (task 5.2). Field values remain exactly this change's
+design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate`/`movement-skill-waiver` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
@@ -158,8 +172,3 @@ block; it keeps its existing `_skill(...)` entry and is recosted in place (task 
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `wind_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

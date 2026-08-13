@@ -108,8 +108,13 @@ Per the shared scope boundary, every status-effect or shield spell in this set i
 existing constraints — no combat-stat multiplier configured in the buff definition itself). This change
 adds:
 
-- `lightning_static_ward`: self counter-attack buff (rate/bounds-shaped), applied by `static_ward`
-- `lightning_extra_action`: self extra-action buff (bounds-shaped initiative/action-count increase), applied by `thunder_gods_haste`
+- `lightning_static_ward`: self counter-attack buff (bounds-shaped defense increase), applied by `static_ward`
+- `lightning_extra_action`: self extra-action buff (bounds-shaped `actions_per_turn` increase), applied by `thunder_gods_haste`
+
+The matching `lightning_static_ward`/`lightning_extra_action` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 靜電護體/雷神之速, severities
+`beneficial`/`beneficial`): `status_display.py`'s fail-closed coverage requires every buff key to have
+exactly one display entry, so a new buff key without one breaks module import at startup.
 
 ### Reused existing `buffs.yaml` rows (no new row)
 
@@ -117,24 +122,30 @@ adds:
 
 ### Registry ordering makes tier obvious without a new field
 
-`SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
+`SkillDef` has no `tier` field — tier is derived from context. This change's spell rows are grouped
 in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 雷 — 學徒` -style comment) inside one `*_elemental_spells("lightning", ...)` block, and each pair's
-MP cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup
-an unambiguous signal (position + cost band) without this change adding a tier field or re-deriving
-gate logic itself.
+`# 雷 — 學徒` -style comment) around one `*_elemental_spells("lightning", ...)` block, and each pair's
+MP cost falls inside §4.3's band for that tier. `static_ward` (學徒 單體(自)) and `thunder_gods_haste`
+(賢者 單體(自)) are declared as their own `_skill(...)` calls directly after that block, still under
+their tier comments: their `self_buff_apply` effects are inherently self-only, so they declare
+`FactionConstraint.SELF_ONLY`, which the builder fixes to `ANY`. This gives
+`element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without this
+change adding a tier field or re-deriving gate logic itself.
 
 ### Registry construction: reuse the `_elemental_spells` builder
 
-This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
-`spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
-each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
-`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
-design-doc table.
+This change expresses eight of its ten entries through the `_spell`/`_elemental_spells` builders
+introduced by `spell-catalog-fire` (see that change's design.md, "Registry construction helper")
+instead of writing each `_skill(...)` call by hand: the element is written once per set, and
+`SkillKind.ACTIVE` plus `FactionConstraint.ANY` are fixed by the builder. `static_ward` and
+`thunder_gods_haste` are the deliberate exceptions (see "Registry ordering" above) and are written as
+explicit `_skill(...)` calls with `FactionConstraint.SELF_ONLY`, because the builder's fixed `ANY`
+would contradict the `skill-registry` spec's self-only-constraint rule. Field values remain exactly
+this change's design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
@@ -143,8 +154,3 @@ design-doc table.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `lightning_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

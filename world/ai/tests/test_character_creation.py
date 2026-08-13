@@ -118,14 +118,21 @@ class CharacterCreationPromptTests(unittest.TestCase):
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_race_catalog_is_registry_derived_and_bounded(self):
+        from world.ai.character_creation import _TRUNCATION_MARKER
+
         catalog = build_race_catalog()
         self.assertLessEqual(len(catalog), MAX_CATALOG_LENGTH)
         for race_key in RACE_REGISTRY:
             self.assertIn(race_key, catalog)
         for subrace_key in SUBRACE_REGISTRY:
             self.assertIn(subrace_key, catalog)
-        for skill_key in SKILL_REGISTRY:
-            self.assertIn(skill_key, catalog)
+        skill_section = catalog.partition("可建議技能鍵值：")[2]
+        if catalog.endswith(_TRUNCATION_MARKER):
+            skill_section = skill_section[: -len(_TRUNCATION_MARKER)]
+            self.assertTrue(skill_section, "a truncated catalog still lists skills")
+        for segment in skill_section.split("、"):
+            self.assertTrue(segment)
+            self.assertIn(segment, SKILL_REGISTRY)
         self.assertEqual(build_race_catalog(), build_race_catalog())
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")

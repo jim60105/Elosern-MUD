@@ -135,7 +135,12 @@ existing constraints — no combat-stat multiplier configured in the buff defini
 adds:
 
 - `light_holy_shield`: shield buff (defense bounds ceiling), applied by `holy_shield`
-- `light_blessing`: party buff (rate/bounds-shaped multi-stat boost), applied by `goddess_blessing`
+- `light_blessing`: party buff (bounds-shaped multi-stat boost), applied by `goddess_blessing`
+
+The matching `light_holy_shield`/`light_blessing` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 聖盾/女神降福, severities
+`beneficial`/`beneficial`): `status_display.py`'s fail-closed coverage requires every buff key to have
+exactly one display entry, so a new buff key without one breaks module import at startup.
 
 ### Registry ordering makes tier obvious without a new field
 
@@ -160,7 +165,7 @@ design-doc table.
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
-- [Risk] The provisional `heal:` grammar guessed here does not match what `heal-effect-handler` ships. -> Mitigation: tasks.md includes an explicit confirm/align task; the mismatch is caught at that change's own registry-load-time validation (an unrecognized prefix raises).
+- [Risk] The provisional `heal:` grammar guessed here did not match what `heal-effect-handler` ships. -> Mitigation: `heal-effect-handler` has landed with exactly `heal:<single|area>`; task 1.3 confirmed and aligned this change's `heal:single`/`heal:area` entries against it.
 - [Risk] `purify`'s `cleanse:status` grammar is owned by a sibling change, not this one. -> Mitigation: `cleanse-effect-handler` is a declared hard prerequisite; its settled grammar is exactly `cleanse:status`, matching this spell's effect string, and this change does not merge until that prerequisite lands.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `light_`
@@ -168,6 +173,6 @@ design-doc table.
 
 ## Open Questions
 
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here. The `cleanse:<scope>` grammar is settled by `cleanse-effect-handler` (a hard prerequisite
-  of this change): `purify` uses exactly `cleanse:status`.
+- Resolved: the `heal:<single|area>` grammar is settled by the landed `heal-effect-handler`, and the
+  `cleanse:<scope>` grammar is settled by the landed `cleanse-effect-handler` — `purify` uses exactly
+  `cleanse:status`.
