@@ -117,6 +117,38 @@ class StatusReadModelTests(EvenniaTest):
         self.assertEqual(entry.severity, "beneficial")
         self.assertEqual(entry.label, "防禦直覺防禦提升")
 
+    def test_dual_wield_style_bonus_appears_only_while_dual_wielding(self):
+        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        self.actor.db.equipment = {
+            "weapon_main": "left_blade",
+            "weapon_off": "right_blade",
+        }
+        model = build_status_read_model(self.actor)
+        entry = next(
+            c for c in model.conditions if c.code == "dual_wield_style_atk_phys_bonus"
+        )
+        self.assertEqual(entry.modifiers, {"atk_phys": 5})
+        self.assertEqual(entry.severity, "beneficial")
+        self.assertEqual(entry.label, "雙持劍術攻擊提升")
+        self.actor.db.equipment = {"weapon_main": "left_blade", "weapon_off": None}
+        model = build_status_read_model(self.actor)
+        self.assertFalse(
+            any(
+                c.code == "dual_wield_style_atk_phys_bonus"
+                for c in model.conditions
+            )
+        )
+
+    def test_status_read_does_not_materialize_equipment_handler(self):
+        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        self.actor.db.equipment = {
+            "weapon_main": "left_blade",
+            "weapon_off": "right_blade",
+        }
+        self.assertNotIn("equipment", vars(self.actor))
+        build_status_read_model(self.actor)
+        self.assertNotIn("equipment", vars(self.actor))
+
     @covers_requirement(
         "webclient-status-presentation::status-presentation-has-no-mutation-side-effects"
     )

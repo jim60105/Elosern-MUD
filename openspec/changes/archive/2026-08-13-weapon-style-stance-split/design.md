@@ -30,6 +30,14 @@ to serve both shapes.
   `equipment-inventory` lives) before deciding — this is a task-list investigation step, not a
   pre-decided architecture choice, because the actual data model wasn't inspected as part of the
   design-doc approval pass.
+- **The rule-table condition reads the equipment fact from stored state, never through the
+  `entity.equipment` handler.** `evaluate_condition()` is a pure context-value matcher, so the
+  combat-modifier context builders (`build_no_create_condition_context`, `_build_context`, and the
+  WebClient status context) supply a boolean `dual_wielding` fact computed by
+  `world/skills/equipment.py::dual_wielding_from_storage` from `entity.db.equipment` alone. This
+  keeps the no-create preview and status paths free of lazy-handler materialization, and malformed
+  storage fails closed to `False`. The handler-level `EquipmentHandler.is_dual_wielding` property
+  exists as the general query API for code that already materializes the handler.
 
 ## Risks / Trade-offs
 

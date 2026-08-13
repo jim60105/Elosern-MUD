@@ -59,3 +59,6 @@
 - code: reincarnation_boon_yuka_agility_bonus
   label: 轉生祝福·由花敏捷提升
   severity: beneficial
+- code: dual_wield_style_atk_phys_bonus
+  label: 雙持劍術攻擊提升
+  severity: beneficial

@@ -72,6 +72,12 @@ class RulebookSchemaTests(TestCase):
                 {"entity": _entity_owning("blade_art_mastery")},
             )
         )
+        self.assertTrue(
+            evaluate_condition(
+                {"dual_wielding": True},
+                {"dual_wielding": True},
+            )
+        )
         combined = {"field": "level", "gte": 3, "buff_active": "fear"}
         self.assertFalse(evaluate_condition(combined, {"level": 4}))
         self.assertTrue(

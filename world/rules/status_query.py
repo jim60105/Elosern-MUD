@@ -15,6 +15,7 @@ from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import matched_combat_modifiers
 from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
 from world.rules.status_display import display_for
+from world.skills.equipment import dual_wielding_from_storage
 
 # Stable Traditional Chinese labels for the canonical trait keys, shared by
 # every presentation surface: the WebClient character panel and the
@@ -253,6 +254,7 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
         elif isinstance(value, _LevelRef):
             context[field] = value
     context["entity"] = entity
+    context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context
 
 

@@ -58,7 +58,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     """Evaluate all recognized conditions in *when* with implicit AND."""
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
-        "buff_active", "skill_owned",
+        "buff_active", "skill_owned", "dual_wielding",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -104,4 +104,8 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
                 or when["skill_owned"] in granted_keys
             )
         )
+    if "dual_wielding" in when:
+        if not isinstance(when["dual_wielding"], bool):
+            raise ValueError("dual_wielding condition requires a boolean value")
+        checks.append(context.get("dual_wielding") == when["dual_wielding"])
     return bool(checks) and all(checks)

@@ -65,3 +65,10 @@
   # agility in this engine, so the adjustment is a percentage `agility` bonus.
   when: {skill_owned: reincarnation_boon_yuka}
   then: {agility: "+5%"}
+- id: dual_wield_style_atk_phys_bonus
+  # 雙持劍術 (dual_wield_style, weapon_style:dual_wield) — "同時揮舞兩把武器進行
+  # 戰鬥的架式" reads as raw two-weapon offense; the closest existing damage
+  # adjustment field is a flat `atk_phys` bonus (the same vocabulary as
+  # retainer_martial_training_atk_phys_bonus), matching its magnitude.
+  when: {skill_owned: dual_wield_style, dual_wielding: true}
+  then: {atk_phys: 5}

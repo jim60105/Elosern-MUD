@@ -64,9 +64,7 @@ class FlavorEffect:
     name: str
 
 
-# Ownership-triggered movement waivers (flight/flash_step are PASSIVE) and
-# cast-triggered weapon-style effects (handlers land in later
-# skill-system-redesign proposals).
+# Ownership-triggered movement waivers (flight/flash_step are PASSIVE).
 @dataclass(frozen=True)
 class MovementEffect:
     """Name the movement mode granted by owning this skill.
@@ -81,7 +79,13 @@ class MovementEffect:
 
 @dataclass(frozen=True)
 class WeaponStyleEffect:
-    """Name the weapon style this skill enters."""
+    """Name the weapon stance this skill enters.
+
+    ``light_sword`` is no longer a ``weapon_style`` value — its skill moved to
+    the ``damage`` convention. The remaining stance case (``dual_wield``) is
+    consumed by the ``combat_modifiers.yaml`` rule table via the ``skill_owned``
+    and ``dual_wielding`` conditions.
+    """
 
     style: str
 

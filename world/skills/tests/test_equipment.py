@@ -11,6 +11,7 @@ from world.rules.equipment import equip_item, unequip_item
 from world.skills.equipment import (
     ACCESSORY_MAX_SLOTS,
     EquipmentSlot,
+    dual_wielding_from_storage,
 )
 
 
@@ -99,3 +100,21 @@ class EquipmentHandlerTests(EvenniaTest):
             reloaded.equipment.slot_contents(EquipmentSlot.ACCESSORY),
             ["crescent_earring"],
         )
+
+    def test_is_dual_wielding_requires_both_weapon_slots(self):
+        entity = self._entity()
+        self.assertFalse(entity.equipment.is_dual_wielding)
+        equip_item(entity, EquipmentSlot.WEAPON_MAIN, "left_blade")
+        self.assertFalse(entity.equipment.is_dual_wielding)
+        equip_item(entity, EquipmentSlot.WEAPON_OFF, "right_blade")
+        self.assertTrue(entity.equipment.is_dual_wielding)
+        unequip_item(entity, EquipmentSlot.WEAPON_OFF)
+        self.assertFalse(entity.equipment.is_dual_wielding)
+
+    def test_storage_fact_fails_closed_on_malformed_equipment(self):
+        entity = self._entity()
+        for malformed in (None, "corrupt", ["left_blade", "right_blade"]):
+            with self.subTest(malformed=malformed):
+                entity.db.equipment = malformed
+                self.assertFalse(dual_wielding_from_storage(entity))
+                self.assertFalse(entity.equipment.is_dual_wielding)
