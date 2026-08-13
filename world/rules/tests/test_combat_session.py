@@ -52,6 +52,8 @@ def _player(key="combat player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
+    # Human starting magic level (術師 tier) so element-gated spell casts pass.
+    player.traits.magic_level.base = 30
     return player
 
 
@@ -966,7 +968,13 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
         self.room = create_object(Room, key="seam arena")
         self.player = _player("seam player")
         self.player.location = self.room
-        self.player.db.skills = {"active": [SEAM_AREA_KEY], "passive": []}
+        # wind_mastery keeps the 術師-tier wind_blade castable at the tuned
+        # magic level 2 (the gate is satisfied by direct mastery, damage is
+        # unaffected).
+        self.player.db.skills = {
+            "active": [SEAM_AREA_KEY],
+            "passive": ["wind_mastery"],
+        }
         for key in ("atk_phys", "agility", "defense", "magic_level"):
             getattr(self.player.traits, key).base = 2
         self.player.traits.hp.base = 390

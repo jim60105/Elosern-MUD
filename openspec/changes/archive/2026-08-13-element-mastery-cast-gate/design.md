@@ -34,6 +34,26 @@ regardless of numeric level. No existing code implements either half.
   treats skill-ownership and skill-kind failures as the same rejection shape).
 - **Bands are a fixed constant table**, not a formula, matching `magic-level-progression`'s existing
   precedent of expressing tuning as data rather than computed curves.
+- **The resolver derives a spell's tier from its MP cost band**, via a new `spell_tier_for(skill)`
+  helper in `world/skills/cost_tiers.py`. `SkillDef` deliberately has no tier field; the sibling
+  `spell-catalog-*` changes guarantee each spell's tier is unambiguous from its MP cost band
+  ("position + cost band" — the position is for human review, the cost band is the mechanical
+  signal). `spell_tier_for` classifies only ACTIVE skills that carry both an element and an `mp`
+  cost (an "elemental spell"), preferring the §4.3 column matching the skill's `TargetSpec` (`SELF`
+  counts as single/direct) and falling back to the other column, since a few catalog costs sit in
+  the opposite column of their tier. An elemental spell whose `mp` cost is missing, non-positive,
+  or outside every band **fails closed**: `spell_tier_for` raises `ValueError` and the resolver
+  converts it into the same ownership-style rejection, so a malformed spell can never slip through
+  ungated. `monster_behaviour_policy` filters its candidate damage skills through the same gate, so
+  a monster (magic level 0 in production) never wastes a turn on an elemental spell the resolver
+  would reject; the spell-catalog recosts (e.g. `fire_ball` → 學徒) later re-open the two anchor
+  spells to monsters by lowering their threshold to 0.
+- **The 90/91 boundary resolves the lore's overlapping top bands.** The lore table writes 賢者 as
+  71–90 and 主宰 as 90+; the sibling spell-catalog gate scenarios pin magic level 90 as *below*
+  主宰 (level 90 without mastery is rejected for 主宰-tier spells), so the mechanical threshold
+  table sets 主宰 at 91. `magic_rank_title` scans the literal bands in order, resolving the overlap
+  at exactly 90 toward 賢者. With the human magic cap at 90, this makes "humans can rarely ever
+  cast 主宰-tier spells" (world lore) a mechanical fact.
 
 ## Risks / Trade-offs
 

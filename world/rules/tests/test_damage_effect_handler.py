@@ -112,6 +112,9 @@ class DamageResolverIntegrationTests(EvenniaTest):
         for entity in (self.actor, self.target):
             entity.race = "human"
             entity.apply_race_baseline()
+        # Human starting magic level (術師 tier) so the fire_ball cast passes
+        # the element-mastery cast gate.
+        self.actor.traits.magic_level.base = 30
         self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(

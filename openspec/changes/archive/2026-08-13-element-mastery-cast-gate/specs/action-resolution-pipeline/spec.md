@@ -14,3 +14,9 @@ rejection category already used for unowned-skill casts (no new `RejectReason` m
 - **WHEN** `preflight` is called for a cast of a 賢者-tier fire spell by an entity with either
   `magic_level.value >= 71` or owned `fire_mastery`
 - **THEN** this check does not reject the cast (other unrelated checks still apply normally)
+
+#### Scenario: A malformed elemental spell fails closed
+- **WHEN** `preflight` is called for a cast of an elemental spell whose `mp` cost falls outside
+  every §4.3 tier band (for example `mp == 5`) by an entity that would otherwise meet the gate
+- **THEN** it is rejected with the same category as an unowned-skill cast (the malformed spell
+  never passes ungated)

@@ -29,6 +29,60 @@ SKILL_PROFICIENCY_XP_PER_LEVEL = float(
 SKILL_PRACTICE_XP_PER_USE = float(PROGRESSION_YAML["skill_practice_xp_per_use"])
 MAGIC_GROWTH_MULTIPLIER_PREFIX = "growth_rate:magic:"
 
+# Display rank bands from world lore (skill-system-redesign design doc §4.1).
+# The lore table writes the top band as "90+"; scanning the bands in order
+# resolves the overlap at exactly 90 toward 賢者, so a human at the magic cap
+# (90) reads as 賢者 and never satisfies the 主宰 gate.
+MAGIC_RANK_BANDS: tuple[tuple[str, int, int | None], ...] = (
+    ("學徒", 0, 15),
+    ("術師", 16, 30),
+    ("大師", 31, 70),
+    ("賢者", 71, 90),
+    ("主宰", 90, None),
+)
+
+# Mechanical cast-gate thresholds, one per rank title. 主宰's threshold is 91
+# (not 90): the spell-catalog gate scenarios pin magic level 90 as below
+# 主宰, and combined with the human magic cap of 90 this makes "humans can
+# rarely ever cast 主宰-tier spells" (world lore) a mechanical fact.
+MAGIC_TIER_THRESHOLDS: dict[str, int] = {
+    "學徒": 0,
+    "術師": 16,
+    "大師": 31,
+    "賢者": 71,
+    "主宰": 91,
+}
+
+
+def magic_rank_title(entity: Any) -> str:
+    """Return the display-only rank title for an entity's numeric magic level.
+
+    Pure function of ``entity.traits.magic_level.value`` alone; never consults
+    owned skills or any other entity state.
+    """
+    level = float(entity.traits.magic_level.value)
+    for title, lower, upper in MAGIC_RANK_BANDS:
+        if level >= lower and (upper is None or level <= upper):
+            return title
+    raise ValueError(f"magic level {level:g} falls outside every rank band")
+
+
+def can_cast_spell_tier(entity: Any, element: str, tier: str) -> bool:
+    """Return whether an entity may cast one tier of one element's spells.
+
+    ``True`` when the entity's numeric magic level meets the tier's threshold,
+    or unconditionally when the entity directly owns that element's
+    ``<element>_mastery`` skill. Conferred grants never satisfy the mastery
+    override (design doc D4/D6): only ``entity.skills.owned_keys()`` counts,
+    never ``conferred_grants()``.
+    """
+    if f"{element}_mastery" in entity.skills.owned_keys():
+        return True
+    threshold = MAGIC_TIER_THRESHOLDS.get(tier)
+    if threshold is None:
+        raise ValueError(f"unknown magic tier {tier!r}")
+    return float(entity.traits.magic_level.value) >= threshold
+
 
 def _race_learning_multiplier(entity: Any) -> float:
     race_key = getattr(entity, "race", None)

@@ -58,6 +58,8 @@ def _player(key="combat party player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
+    # Human starting magic level (術師 tier) so element-gated spell casts pass.
+    player.traits.magic_level.base = 30
     player.db.skills = {"active": ["fire_ball", "wind_blade"], "passive": []}
     return player
 

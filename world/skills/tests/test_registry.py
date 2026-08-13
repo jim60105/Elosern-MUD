@@ -149,6 +149,25 @@ class SkillRegistryTests(unittest.TestCase):
             }
         )
 
+    @covers_requirement("skill-registry::all-eight-elements-have-a-mastery-skill")
+    def test_all_eight_elements_have_a_mastery_skill(self):
+        for element_key in (
+            "fire",
+            "water",
+            "wind",
+            "earth",
+            "lightning",
+            "ice",
+            "light",
+            "dark",
+        ):
+            with self.subTest(element=element_key):
+                skill = SKILL_REGISTRY[f"{element_key}_mastery"]
+                self.assertIs(skill.kind, SkillKind.PASSIVE)
+                self.assertIs(skill.target_spec, TargetSpec.NONE)
+                self.assertIs(skill.element, ELEMENT_REGISTRY[element_key])
+                self.assertEqual(skill.effects, ["element_mastery_rank:主宰"])
+
     @covers_requirement("skill-registry::the-seed-registry-spans-every-skill-category-inventoried-from-the-sample-cards")
     def test_seed_set_spans_every_required_category(self):
         for key in (

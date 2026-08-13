@@ -19,9 +19,12 @@ class FakeMonster(FakeEntity):
         *,
         threat_tier="low",
         behaviour_tree=None,
+        magic_level=30,
         **kwargs,
     ):
-        super().__init__(key, **kwargs)
+        # Default 30 keeps elemental spell picks castable (術師 tier); tests
+        # that exercise the element-mastery gate pass magic_level=0 instead.
+        super().__init__(key, magic_level=magic_level, **kwargs)
         self.threat_tier = threat_tier
         self.behaviour_tree = behaviour_tree
         self.traits.mp = FakeGauge(100, 100)
@@ -102,6 +105,29 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
             request = monster_behaviour_policy(actor, _field(actor, enemies))
         self.assertEqual(request.skill_key, "shadow_slash")
         self.assertNotEqual(request.targets, "all-enemies")
+
+    def test_elemental_spell_above_the_magic_tier_is_never_chosen(self):
+        # A production monster sits at magic level 0, so an owned 術師-tier
+        # fire_ball cannot resolve; the policy falls back to the innate
+        # physical attack instead of choosing an action the resolver rejects.
+        actor = FakeMonster(
+            "tierless",
+            magic_level=0,
+            owned=["fire_ball", "basic_attack"],
+        )
+        enemy = FakeEntity("enemy")
+        request = monster_behaviour_policy(actor, _field(actor, [enemy]))
+        self.assertEqual(request.skill_key, "basic_attack")
+
+    def test_direct_mastery_unlocks_an_elemental_spell_for_the_policy(self):
+        actor = FakeMonster(
+            "master",
+            magic_level=0,
+            owned=["fire_ball", "fire_mastery"],
+        )
+        enemy = FakeEntity("enemy")
+        request = monster_behaviour_policy(actor, _field(actor, [enemy]))
+        self.assertEqual(request.skill_key, "fire_ball")
 
     def test_source_has_no_forbidden_dependencies(self):
         source = (

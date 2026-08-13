@@ -825,6 +825,8 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         self.player = create_object(PlayerCharacter, key="offline-scene-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
+        # Human starting magic level (術師 tier) so fire_ball casts pass.
+        self.player.traits.magic_level.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
         self.player.location = self.anchor
         self.staff = create_object(NPC, key="scene staff", location=self.anchor)

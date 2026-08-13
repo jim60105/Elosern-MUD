@@ -95,3 +95,4 @@ class FakeEntity:
             owned,
         )
         self.traits = SimpleNamespace(hp=FakeGauge(hp, max_hp or hp))
+        self.traits.magic_level = FakeGauge(magic_level, magic_level)

@@ -16,9 +16,15 @@ rank-title function, and a mechanical cast-gate function — plus the four missi
   the entity's magic level meets the tier's band threshold, **or** `True` unconditionally if the entity
   owns that element's `<element>_mastery` skill (checked via direct ownership only — conferred grants
   do not satisfy this, per `conferral-generalization`'s explicit exclusion).
+- Add `spell_tier_for(skill)` to `world/skills/cost_tiers.py`: derive an elemental spell's tier from
+  its MP cost band (the `SkillDef` has no tier field; the `spell-catalog-*` changes keep each spell's
+  cost inside the §4.3 band of its declared tier). An elemental spell with a missing, non-positive,
+  or out-of-band `mp` cost fails closed (rejects like an unowned cast) rather than passing ungated.
 - Wire `can_cast_spell_tier` into the action-resolution pipeline's existing skill-ownership/kind
   validation step (`ActionResolver.preflight`/`resolve`), reusing the existing rejection category for
-  "may not cast this" rather than adding a new `RejectReason`.
+  "may not cast this" rather than adding a new `RejectReason`. `monster_behaviour_policy` filters its
+  candidate damage skills through the same gate so a magic-level-0 monster never wastes a turn on an
+  elemental spell the resolver would reject.
 - Add `water_mastery`, `earth_mastery`, `lightning_mastery`, `ice_mastery` to `SKILL_REGISTRY`, matching
   the existing four mastery skills' shape (`PASSIVE`, `ElementMasteryEffect`).
 
@@ -36,8 +42,9 @@ rank-title function, and a mechanical cast-gate function — plus the four missi
 ## Impact
 
 - `world/rules/progression.py` (two new pure functions), `world/skills/registry.py` (four new skills),
+  `world/skills/cost_tiers.py` (one new tier-lookup helper),
   `world/rules/action.py` or wherever `ActionResolver` lives (one new gate check in an existing
-  validation step).
+  validation step), `world/rules/monster_behaviour.py` (candidate-skill gate filter).
 - Depends on `skill-effects-typed-model` (uses `ElementMasteryEffect`).
 - Every `spell-catalog-*` proposal depends on this change landing first, since each new spell's
   tier-gated castability relies on `can_cast_spell_tier`.

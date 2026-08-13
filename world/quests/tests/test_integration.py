@@ -48,6 +48,8 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTest):
         self.player = create_object(PlayerCharacter, key="offline-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
+        # Human starting magic level (術師 tier) so fire_ball casts pass.
+        self.player.traits.magic_level.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
@@ -106,6 +108,8 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.player = create_object(PlayerCharacter, key="path-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
+        # Human starting magic level (術師 tier) so fire_ball casts pass.
+        self.player.traits.magic_level.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
@@ -149,6 +153,8 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
     def test_combat_round_executes_the_planner(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
+        # Human starting magic level (術師 tier) so fire_ball casts pass.
+        self.char1.traits.magic_level.base = 30
         self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
         monster = self._monster("round")
         field = self._field(self.char1, [monster])

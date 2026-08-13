@@ -26,11 +26,14 @@ from world.rules.progression import (
     MAGIC_XP_PER_LEVEL,
     SKILL_PRACTICE_XP_PER_USE,
     accrue_magic_study,
+    can_cast_spell_tier,
     effective_magic_growth_multiplier,
     grant_combat_kill_xp,
     grant_skill_practice_xp,
+    magic_rank_title,
     skill_proficiency_level,
 )
+from world.skills.handler import ConferredSkillGrant
 import world.rules.progression as progression
 
 
@@ -215,6 +218,8 @@ class ProgressionTests(EvenniaTest):
 
     def test_area_shorthand_awards_each_newly_defeated_monster_once(self):
         actor = self._character("area-fighter")
+        # Human starting magic level (術師 tier) so wind_blade passes the gate.
+        actor.traits.magic_level.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         first, second, corpse = (
             self._monster("first"),
@@ -250,6 +255,8 @@ class ProgressionTests(EvenniaTest):
 
     def test_duplicate_area_targets_reject_before_resolution(self):
         actor = self._character("duplicate-fighter")
+        # Human starting magic level (術師 tier) so wind_blade passes the gate.
+        actor.traits.magic_level.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         monster = self._monster("duplicate-goblin")
         monster.traits.hp.current = 1
@@ -347,3 +354,112 @@ class ProgressionTests(EvenniaTest):
         self.assertFalse(
             any("divine" in name for name in vars(progression))
         )
+
+
+class ElementMasteryGateTests(EvenniaTest):
+    """element-mastery: rank-title and cast-gate pure functions."""
+
+    def _caster(
+        self,
+        key: str,
+        magic_level: int,
+        race: str = "elf",
+    ) -> PlayerCharacter:
+        entity = create_object(PlayerCharacter, key=key)
+        entity.race = race
+        entity.apply_race_baseline()
+        entity.traits.magic_level.current = magic_level
+        entity.db.skills = {"active": [], "passive": []}
+        return entity
+
+    @covers_requirement("element-mastery::magic-rank-title-derives-a-display-only-title-from-numeric-magic-level")
+    def test_rank_title_matches_the_five_documented_bands(self):
+        cases = (
+            (0, "學徒"),
+            (15, "學徒"),
+            (16, "術師"),
+            (30, "術師"),
+            (31, "大師"),
+            (70, "大師"),
+            (71, "賢者"),
+            (90, "賢者"),
+            (91, "主宰"),
+            (873, "主宰"),
+        )
+        for level, expected in cases:
+            with self.subTest(level=level):
+                self.assertEqual(
+                    magic_rank_title(self._caster(f"rank-{level}", level)),
+                    expected,
+                )
+
+    def test_rank_title_ignores_owned_skills(self):
+        entity = self._caster("rank-with-skills", 5)
+        entity.db.skills = {
+            "active": [],
+            "passive": ["fire_mastery", "wind_mastery"],
+        }
+        self.assertEqual(magic_rank_title(entity), "學徒")
+
+    def test_gate_requires_numeric_threshold_without_mastery(self):
+        self.assertFalse(
+            can_cast_spell_tier(self._caster("below", 30), "fire", "大師")
+        )
+        self.assertTrue(
+            can_cast_spell_tier(self._caster("at-threshold", 31), "fire", "大師")
+        )
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_gate_boundaries_match_the_four_tier_thresholds(self):
+        for tier, below, at in (
+            ("術師", 15, 16),
+            ("大師", 30, 31),
+            ("賢者", 70, 71),
+            ("主宰", 90, 91),
+        ):
+            with self.subTest(tier=tier):
+                self.assertFalse(
+                    can_cast_spell_tier(
+                        self._caster(f"below-{tier}", below), "fire", tier
+                    )
+                )
+                self.assertTrue(
+                    can_cast_spell_tier(
+                        self._caster(f"at-{tier}", at), "fire", tier
+                    )
+                )
+
+    def test_gate_mastery_override_unlocks_every_tier_at_level_one(self):
+        entity = self._caster("master-wind", 1)
+        entity.db.skills = {"active": [], "passive": ["wind_mastery"]}
+        self.assertTrue(can_cast_spell_tier(entity, "wind", "主宰"))
+
+    def test_gate_mastery_override_is_direct_ownership_only(self):
+        granted = self._caster("granted", 1)
+        granted.db.skill_grants = [
+            ConferredSkillGrant("source", "fire_mastery", (), 1.0)
+        ]
+        self.assertNotIn("fire_mastery", granted.skills.owned_keys())
+        self.assertFalse(can_cast_spell_tier(granted, "fire", "主宰"))
+        high = self._caster("granted-high", 100)
+        high.db.skill_grants = [
+            ConferredSkillGrant("source", "fire_mastery", (), 1.0)
+        ]
+        self.assertTrue(can_cast_spell_tier(high, "fire", "主宰"))
+
+    def test_gate_and_rank_are_independent_at_the_top_boundary(self):
+        entity = self._caster("boundary", 90)
+        self.assertEqual(magic_rank_title(entity), "賢者")
+        self.assertFalse(can_cast_spell_tier(entity, "fire", "主宰"))
+
+    def test_gate_rejects_unknown_tier(self):
+        with self.assertRaises(ValueError):
+            can_cast_spell_tier(self._caster("unknown-tier", 50), "fire", "不存在")
+
+    def test_created_humans_always_satisfy_the_apprentice_gate(self):
+        from world.rules.character_creation import starting_magic_interval
+
+        low, _high = starting_magic_interval("human")
+        self.assertGreaterEqual(low, 16)
+        entity = self._caster("created-human", low, "human")
+        self.assertTrue(can_cast_spell_tier(entity, "fire", "術師"))

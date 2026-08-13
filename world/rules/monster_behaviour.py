@@ -12,6 +12,8 @@ from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.disengage import FLEE_SKILL_KEY
+from world.rules.progression import can_cast_spell_tier
+from world.skills.cost_tiers import spell_tier_for
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
@@ -150,6 +152,22 @@ def resolve_behaviour_profile(monster: Any) -> BehaviourProfile:
     return BEHAVIOUR_PROFILES[archetype_key]
 
 
+def _gate_allows(entity: Any, skill: SkillDef) -> bool:
+    """Return whether the entity could cast one elemental spell.
+
+    Applies the same element-mastery cast gate the resolver enforces, so the
+    policy never chooses an action the resolver would reject. A malformed
+    elemental spell (cost outside every tier band) fails closed.
+    """
+    try:
+        tier = spell_tier_for(skill)
+    except ValueError:
+        return False
+    if tier is None:
+        return True
+    return can_cast_spell_tier(entity, skill.element.key, tier)
+
+
 def _owned_damage_skills(entity: Any) -> list[SkillDef]:
     """Return affordable active damage skills in owned-key order."""
     return [
@@ -165,6 +183,7 @@ def _owned_damage_skills(entity: Any) -> list[SkillDef]:
             _stored_trait_value(getattr(entity.traits, resource)) >= amount
             for resource, amount in SKILL_REGISTRY[key].cost.items()
         )
+        and _gate_allows(entity, SKILL_REGISTRY[key])
     ]
 
 
