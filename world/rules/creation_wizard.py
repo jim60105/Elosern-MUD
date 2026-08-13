@@ -96,7 +96,7 @@ ALLOCATION_AXIS_LABELS: dict[str, str] = {
 }
 ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "hp": "生命值，決定你能承受多少傷害",
-    "mp": "魔力值，驅動法術的消耗",
+    "mp": "魔力值，驅動魔法的消耗",
     "sp": "體力值，支撐行動與攻擊",
     "atk_phys": "物理攻擊，影響造成的傷害",
     "agility": "敏捷，影響命中與迴避",

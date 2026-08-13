@@ -17,7 +17,7 @@ const CreationMenu = require("../elosern/creation_menu.js");
 function validPanel(overrides) {
   const axes = {
     hp: { axis: "hp", label: "生命值", explanation: "決定承受", minimum: 0, maximum: 100 },
-    mp: { axis: "mp", label: "魔力值", explanation: "驅動法術", minimum: 0, maximum: 100 },
+    mp: { axis: "mp", label: "魔力值", explanation: "驅動魔法", minimum: 0, maximum: 100 },
     sp: { axis: "sp", label: "體力值", explanation: "支撐行動", minimum: 0, maximum: 100 },
     atk_phys: { axis: "atk_phys", label: "物理攻擊", explanation: "影響傷害", minimum: 0, maximum: 21 },
     agility: { axis: "agility", label: "敏捷", explanation: "命中迴避", minimum: 0, maximum: 21 },

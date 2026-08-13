@@ -15,5 +15,6 @@
   - [引擎架構設計](/superpowers/specs/2026-07-29-ai-mud-engine-design)
 
 - Developer guides
+  - [新增魔法指南](/development/adding-spells)
   - [OpenSpec test traceability](/development/spec-test-traceability)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
