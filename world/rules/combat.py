@@ -336,6 +336,134 @@ register_effect_handler(
 )
 
 
+def _heal_magnitude(actor: Any) -> int:
+    """Return the caster-stat-derived HP restoration amount for one heal.
+
+    Substitutes a healing coefficient for damage's roll-derived multiplier and
+    drops the defense-mitigation term entirely (healing is not mitigated), so
+    the magnitude shares damage's ``round(effective value x multiplier)``
+    shape without inheriting its to-hit or defense assumptions (design.md
+    magnitude decision).
+    """
+    multiplier = float(COMBAT_YAML["heal"]["multiplier"])
+    return max(
+        round(actor.skills.effective_value("magic_level") * multiplier),
+        int(COMBAT_YAML["heal"]["floor"]),
+    )
+
+
+def _parse_heal_effect(effect_id: str) -> str:
+    parts = effect_id.split(":")
+    if len(parts) != 2 or parts[0] != "heal" or parts[1] not in {"single", "area"}:
+        raise ValueError("heal effect must be heal:single or heal:area")
+    return parts[1]
+
+
+def _restored_amount(entity: Any, amount: int) -> int:
+    """Return how much of a heal actually applies to one entity right now.
+
+    An entity that is not alive restores nothing (a heal never revives), and
+    the restoration is capped by the remaining gap to the entity's maximum so
+    the staged event log reflects the real HP increase.
+    """
+    current = _stored_trait_value(entity.traits.hp)
+    if current <= 0:
+        return 0
+    return min(amount, max(0, _max_hp(entity) - current))
+
+
+def _apply_heal(entity: Any, amount: int) -> None:
+    """Restore HP clamped to the entity's maximum; never revives or decreases.
+
+    The commit-time alive guard keeps the no-revival invariant even when an
+    earlier effect in the same action reduced the entity below 1 HP after
+    staging: such an entity stays knocked out.
+    """
+    trait = entity.traits.hp
+    current = _stored_trait_value(trait)
+    if current <= 0:
+        return
+    clamped = min(_max_hp(entity), current + amount)
+    if hasattr(trait, "current"):
+        trait.current = clamped
+    else:
+        trait.value = clamped
+
+
+def _handle_heal(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    event_context: dict[str, Any],
+) -> list[PendingEffect]:
+    """Stage one HP-restoring pending effect per already-validated target.
+
+    The magnitude is computed at staging time from caster stats, mirroring
+    ``damage``; the per-target restoration is clamped by that target's current
+    HP gap so the staged event log reports the real increase, and the
+    commit-time closure re-checks aliveness and the cap.
+    """
+    del event_context
+    _parse_heal_effect(effect_id)
+    amount = _heal_magnitude(actor)
+    pending: list[PendingEffect] = []
+    for target in targets:
+        key = str(target.key)
+        restored = _restored_amount(target, amount)
+        pending.append(
+            PendingEffect(
+                entity=target,
+                description=f"heal|{key}|{restored}",
+                surfaces=frozenset(),
+                apply=lambda target=target, restored=restored: _apply_heal(
+                    target, restored
+                ),
+            )
+        )
+    return pending
+
+
+def _handle_self_heal(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    event_context: dict[str, Any],
+) -> list[PendingEffect]:
+    """Stage one HP-restoring pending effect bound to the caster.
+
+    Mirrors ``self_buff_apply``'s actor-binding pattern: a target-list-driven
+    heal cannot express "the caster heals themself while the same cast also
+    damages an enemy", so this effect binds the actor instead of ``targets``.
+    """
+    del targets, event_context
+    if effect_id != "self_heal":
+        raise ValueError("self_heal effect takes no argument")
+    amount = _heal_magnitude(actor)
+    restored = _restored_amount(actor, amount)
+    return [
+        PendingEffect(
+            entity=actor,
+            description=f"self_heal|{str(actor.key)}|{restored}",
+            surfaces=frozenset(),
+            apply=lambda: _apply_heal(actor, restored),
+        )
+    ]
+
+
+register_effect_handler(
+    "heal",
+    _handle_heal,
+    surfaces=frozenset({"traits"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "self_heal",
+    _handle_self_heal,
+    surfaces=frozenset({"traits"}),
+    requires_event_context=frozenset(),
+)
+
+
 def roll_initiative(battlefield: Battlefield) -> list[str]:
     """Return living, active roster keys in descending initiative order."""
     weight = COMBAT_YAML["initiative"]["agility_weight"]

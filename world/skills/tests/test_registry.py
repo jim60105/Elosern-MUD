@@ -274,6 +274,46 @@ class SkillRegistryTests(unittest.TestCase):
                 effects=["not_a_real_prefix:x"],
             )
 
+    @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
+    def test_construction_rejects_a_heal_shape_mismatching_the_target_spec(self):
+        for target_spec, effects in (
+            (TargetSpec.AREA, ["heal:single"]),
+            (TargetSpec.SINGLE, ["heal:area"]),
+            (TargetSpec.NONE, ["heal:single"]),
+        ):
+            with self.subTest(target_spec=target_spec, effects=effects):
+                with self.assertRaises(ValueError):
+                    SkillDef(
+                        key="shape_mismatch",
+                        label="形狀不符",
+                        description="治療效果的形狀必須與目標規格一致。",
+                        kind=SkillKind.ACTIVE,
+                        target_spec=target_spec,
+                        cost={"mp": 5},
+                        usable_out_of_combat=True,
+                        element=None,
+                        effects=effects,
+                    )
+        for target_spec, effects in (
+            (TargetSpec.SINGLE, ["heal:single"]),
+            (TargetSpec.SELF, ["heal:single"]),
+            (TargetSpec.AREA, ["heal:area"]),
+            (TargetSpec.NONE, ["self_heal"]),
+            (TargetSpec.SINGLE, ["damage:fire:magic", "self_heal"]),
+        ):
+            with self.subTest(target_spec=target_spec, effects=effects):
+                SkillDef(
+                    key="shape_match",
+                    label="形狀相符",
+                    description="治療效果的形狀與目標規格一致的定義可以建構。",
+                    kind=SkillKind.ACTIVE,
+                    target_spec=target_spec,
+                    cost={"mp": 5},
+                    usable_out_of_combat=True,
+                    element=None,
+                    effects=effects,
+                )
+
     @covers_requirement("skill-effect-model::skilldef---post-init---rejects-unparseable-effects-at-construction")
     def test_every_registry_entry_parses_at_construction(self):
         for key, skill in SKILL_REGISTRY.items():

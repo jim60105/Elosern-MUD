@@ -154,6 +154,18 @@ class CleanseEffect:
 
 
 @dataclass(frozen=True)
+class HealEffect:
+    """Restore HP to every resolved target, capped at each target's maximum."""
+
+    shape: Literal["single", "area"]
+
+
+@dataclass(frozen=True)
+class SelfHealEffect:
+    """Restore the acting entity's HP, capped at the caster's maximum."""
+
+
+@dataclass(frozen=True)
 class DisengageEffect:
     """Attempt a disengage; the mode names the flavor (e.g. ``self``)."""
 
@@ -260,6 +272,16 @@ def parse_effect(effect_id: str) -> object:
                 f"damage effect must be damage:<element>:<school>, got {effect_id!r}"
             )
         return DamageEffect(element=element, school=school)
+    if prefix == "heal":
+        shape = _parse_single_arg(effect_id, prefix)
+        if shape not in {"single", "area"}:
+            raise ValueError(
+                f"heal shape must be 'single' or 'area', got {shape!r}"
+            )
+        return HealEffect(shape=shape)
+    if prefix == "self_heal":
+        _parse_bare(effect_id, prefix)
+        return SelfHealEffect()
     if prefix == "disengage":
         return DisengageEffect(mode=_parse_single_arg(effect_id, prefix))
     if prefix == "cleanse":

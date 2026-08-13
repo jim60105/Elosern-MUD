@@ -23,7 +23,9 @@ for a dozen-plus new spells, and no such handler exists.
   this change can or should route around. A spell whose flavor text implies "revives" or "rescues from
   near-death" (e.g. 瀕死急救, 解除瀕死) only restores HP on an already-alive target under this change;
   any dependent spell-catalog change claiming an actual revival mechanic must downgrade that specific
-  flavor claim rather than assume `heal`/`self_heal` provides it.
+  flavor claim rather than assume `heal`/`self_heal` provides it. As defense in depth, the heal/self_heal
+  apply closure is additionally a no-op when the affected entity is not alive at commit time (rubber-duck
+  hardening: a mid-action damage effect or a knocked-out caster can never be reversed into positive HP).
 - Magnitude formula (how much HP a given caster's heal restores) is out of scope for this proposal to
   invent from scratch — it SHALL reuse whatever caster-stat-driven magnitude computation `damage`
   already uses (e.g. keyed off `magic_level`/a magic-power trait), substituting a healing coefficient

@@ -10,6 +10,11 @@ damage:
   base_multiplier: 1.0
   floor: 1
 
+heal:
+  # Invented placeholder pending the later combat-balance pass.
+  multiplier: 1.0
+  floor: 1
+
 initiative:
   # Invented tuning: a ten-point agility gap dominates all d100 jitter.
   agility_weight: 10
