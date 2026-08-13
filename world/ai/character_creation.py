@@ -289,7 +289,11 @@ def build_race_catalog() -> str:
     )
     if len(catalog) <= MAX_CATALOG_LENGTH:
         return catalog
-    return catalog[: MAX_CATALOG_LENGTH - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
+    budget = MAX_CATALOG_LENGTH - len(_TRUNCATION_MARKER)
+    cut = catalog.rfind("、", 0, budget)
+    if cut == -1:
+        return catalog[:budget] + _TRUNCATION_MARKER
+    return catalog[:cut] + _TRUNCATION_MARKER
 
 
 def build_character_creation_prompt(concept: str) -> tuple[dict[str, str], dict[str, str]]:

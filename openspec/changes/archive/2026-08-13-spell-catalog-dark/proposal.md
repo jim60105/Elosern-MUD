@@ -1,17 +1,18 @@
 ## Why
 
 The skill-system redesign (`docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md`, §4.4)
-defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries one
-seed spell for 雷 magic. Without the
-other 10 雷-element spells, players who invest in 雷 magic have no tier progression to
+defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today carries no seed
+spell for 暗 magic. Without the
+10 暗-element spells, players who invest in 暗 magic have no tier progression to
 grow into, and the new `can_cast_spell_tier` cast-gate (from `element-mastery-cast-gate`) has nothing
-to gate for this element beyond its single existing spell.
+to gate for this element.
 
 ## What Changes
 
-- Add the ten `雷`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
-- Add 2 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
+- Add the ten `暗`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
+- Add 3 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
 - Reuse 1 existing `buffs.yaml` row as-is (no new row) where an exact semantic match already exists.
+- Add the matching rows to `world/rules/rulebook/status_display.yaml` — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry.
 
 ## Capabilities
 
@@ -21,13 +22,13 @@ to gate for this element beyond its single existing spell.
 
 ### Modified Capabilities
 
-- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 雷-element
-  spell set (tier, target, MP cost, and typed `effects`), and the pre-existing 雷 anchor skill(s)
+- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 暗-element
+  spell set (tier, target, MP cost, and typed `effects`), and the pre-existing 暗 anchor skill(s)
   (`n/a`) are recosted per §4.3's table rather than duplicated.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (2 new rows, 1 existing row reused).
+- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (3 new rows, 1 existing row reused)., `world/rules/rulebook/status_display.yaml` (new rows)
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve

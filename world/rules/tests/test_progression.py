@@ -484,6 +484,190 @@ class ElementMasteryGateTests(EvenniaTest):
             with self.subTest(tier=tier, with_mastery=True):
                 self.assertTrue(can_cast_spell_tier(master, "fire", tier))
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_water_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        water_spell_tiers = {
+            "術師": (15, 16, ("healing_spring", "water_shield")),
+            "大師": (30, 31, ("abyssal_whirlpool", "wellspring_of_life")),
+            "賢者": (70, 71, ("tsunami", "tidal_revival")),
+            "主宰": (90, 91, ("sea_of_life", "abyssal_tide")),
+        }
+        for tier, (below, at, spell_keys) in water_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "water", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "water", tier)
+            )
+        master = self._caster("water-master", 1)
+        master.db.skills = {"active": [], "passive": ["water_mastery"]}
+        for tier in water_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "water", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_earth_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        earth_spell_tiers = {
+            "術師": (15, 16, ("stone_armor", "dust_veil")),
+            "大師": (30, 31, ("earth_bind", "rockslide")),
+            "賢者": (70, 71, ("earthquake", "earthen_ward")),
+            "主宰": (90, 91, ("mountain_collapse", "earths_judgment")),
+        }
+        for tier, (below, at, spell_keys) in earth_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "earth", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "earth", tier)
+            )
+        master = self._caster("earth-master", 1)
+        master.db.skills = {"active": [], "passive": ["earth_mastery"]}
+        for tier in earth_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "earth", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
+    def test_wind_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        wind_spell_tiers = {
+            "術師": (15, 16, ("tornado_blade",)),
+            "大師": (30, 31, ("storm_domain", "gale_dance_strike")),
+            "賢者": (70, 71, ("heavens_wrath_storm", "haste_domain")),
+            "主宰": (90, 91, ("vacuum_severance", "sky_tempest")),
+        }
+        for tier, (below, at, spell_keys) in wind_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "wind", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "wind", tier)
+            )
+        master = self._caster("wind-master", 1)
+        master.db.skills = {"active": [], "passive": ["wind_mastery"]}
+        for tier in wind_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "wind", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
+    def test_lightning_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        lightning_spell_tiers = {
+            "術師": (15, 16, ("chain_lightning", "paralyzing_bolt")),
+            "大師": (30, 31, ("thunder_combo", "lightning_strike")),
+            "賢者": (70, 71, ("heavens_thunder", "thunder_gods_haste")),
+            "主宰": (90, 91, ("judgement_thunder", "divine_lightning_slaughter")),
+        }
+        for tier, (below, at, spell_keys) in lightning_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "lightning", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(
+                    self._caster(f"at-{tier}", at), "lightning", tier
+                )
+            )
+        master = self._caster("lightning-master", 1)
+        master.db.skills = {"active": [], "passive": ["lightning_mastery"]}
+        for tier in lightning_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "lightning", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_ice_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        ice_spell_tiers = {
+            "術師": (15, 16, ("ice_wall", "frost_arrow_rain")),
+            "大師": (30, 31, ("permafrost_domain", "ice_prison")),
+            "賢者": (70, 71, ("blizzard", "absolute_tundra")),
+            "主宰": (90, 91, ("absolute_zero", "eternal_ice_field")),
+        }
+        for tier, (below, at, spell_keys) in ice_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "ice", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "ice", tier)
+            )
+        master = self._caster("ice-master", 1)
+        master.db.skills = {"active": [], "passive": ["ice_mastery"]}
+        for tier in ice_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "ice", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    def test_light_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        light_spell_tiers = {
+            "術師": (15, 16, ("purify", "mass_heal")),
+            "大師": (30, 31, ("advanced_heal", "holy_shield")),
+            "賢者": (70, 71, ("holy_radiance", "revival_light")),
+            "主宰": (90, 91, ("goddess_blessing", "heavens_judgment_light")),
+        }
+        for tier, (below, at, spell_keys) in light_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "light", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "light", tier)
+            )
+        master = self._caster("light-master", 1)
+        master.db.skills = {"active": [], "passive": ["light_mastery"]}
+        for tier in light_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "light", tier))
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
+    def test_dark_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        dark_spell_tiers = {
+            "術師": (15, 16, ("curse", "dark_burst")),
+            "大師": (30, 31, ("dark_corrosion_domain", "shadow_torment")),
+            "賢者": (70, 71, ("abyss_devour", "dark_dominion")),
+            "主宰": (90, 91, ("void_annihilation", "netherworld_judgment")),
+        }
+        for tier, (below, at, spell_keys) in dark_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "dark", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "dark", tier)
+            )
+        master = self._caster("dark-master", 1)
+        master.db.skills = {"active": [], "passive": ["dark_mastery"]}
+        for tier in dark_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "dark", tier))
+
     def test_created_humans_always_satisfy_the_apprentice_gate(self):
         from world.rules.character_creation import starting_magic_interval
 

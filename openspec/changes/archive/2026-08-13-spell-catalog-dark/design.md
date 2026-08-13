@@ -111,6 +111,11 @@ adds:
 - `dark_curse`: multi-stat debuff (bounds-shaped reduction across several stats, per 減益(多項)), applied by `curse`
 - `dark_corrosion`: DoT (rate: hp delta negative, same shape as `poisoned`/`fire_scorch`), applied by `dark_corrosion_domain` and `shadow_torment`
 
+The matching `dark_atk_down`/`dark_curse`/`dark_corrosion` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 衰弱/詛咒/腐蝕, severities all
+`harmful`): `status_display.py`'s fail-closed coverage requires every buff key to have exactly one
+display entry, so a new buff key without one breaks module import at startup.
+
 ### Reused existing `buffs.yaml` rows (no new row)
 
 - `fear`: 黑暗支配 (`dark_dominion`) reuses the existing `fear` buff row exactly — no new row needed, matching this element's 恐懼 flavor precisely
@@ -134,7 +139,7 @@ design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
@@ -143,8 +148,3 @@ design-doc table.
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
   causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `dark_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

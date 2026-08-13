@@ -22,6 +22,117 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+- key: water_shield
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: water_bind
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: earth_hardened_skin
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 3}
+- key: earth_stone_armor
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: earth_dust_veil
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds: {target: accuracy, ceiling: -5}
+- key: earth_root
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: earth_ward
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: wind_haste
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: agility, ceiling: 3}
+- key: wind_haste_domain
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: agility, ceiling: 5}
+- key: lightning_static_ward
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 3}
+- key: lightning_extra_action
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: actions_per_turn, ceiling: 1}
+- key: ice_slow
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds: {target: agility, ceiling: -3}
+- key: ice_wall
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: ice_freeze
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: ice_prison
+  duration: 30
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
+- key: light_holy_shield
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 5}
+- key: light_blessing
+  duration: 60
+  stacking: refresh
+  modifiers:
+    bounds: {target: defense, ceiling: 3}
+- key: dark_atk_down
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: atk_phys, ceiling: -5}
+      - {target: magic_level, ceiling: -5}
+- key: dark_curse
+  duration: 60
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: atk_phys, ceiling: -10}
+      - {target: magic_level, ceiling: -10}
+      - {target: agility, ceiling: -10}
+- key: dark_corrosion
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -5}
 - key: focus
   duration: 60
   stacking: refresh

@@ -1,17 +1,17 @@
 ## Why
 
 The skill-system redesign (`docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md`, §4.4)
-defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries one
-seed spell for 暗 magic. Without the
-other 10 暗-element spells, players who invest in 暗 magic have no tier progression to
+defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today carries no seed
+spell for 水 magic. Without the
+10 水-element spells, players who invest in 水 magic have no tier progression to
 grow into, and the new `can_cast_spell_tier` cast-gate (from `element-mastery-cast-gate`) has nothing
-to gate for this element beyond its single existing spell.
+to gate for this element.
 
 ## What Changes
 
-- Add the ten `暗`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
-- Add 3 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
-- Reuse 1 existing `buffs.yaml` row as-is (no new row) where an exact semantic match already exists.
+- Add the ten `水`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
+- Add 2 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
+- Add 2 matching rows to `world/rules/rulebook/status_display.yaml` — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry.
 
 ## Capabilities
 
@@ -21,13 +21,13 @@ to gate for this element beyond its single existing spell.
 
 ### Modified Capabilities
 
-- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 暗-element
-  spell set (tier, target, MP cost, and typed `effects`), and the pre-existing 暗 anchor skill(s)
-  (`n/a`) are recosted per §4.3's table rather than duplicated.
+- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 水-element
+  spell set (tier, target, MP cost, and typed `effects`). All ten keys are new — 水 has no
+  pre-existing anchor skill to recost.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (3 new rows, 1 existing row reused).
+- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (2 new rows), `world/rules/rulebook/status_display.yaml` (2 new rows).
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve
@@ -39,6 +39,7 @@ to gate for this element beyond its single existing spell.
   water/earth/lightning/ice (fire/dark/wind/light already have theirs). This change's spells are
   gated by that function once it lands; until then the ten new keys exist in the registry but are not
   yet tier-gated.
+- `heal-effect-handler` (**must land first**) — defines the new `heal:<target-shape>` effect prefix and its cast-time handler in `world/rules/combat.py`, mirroring the existing working `damage:<element>:<type>` handler. **No heal mechanism exists in the codebase today** — this is a real gap the design doc's spell catalog implies (§4.4 lists multiple 水-element healing spells) but does not spell out explicitly, so this proposal states it plainly here rather than assuming the mechanism already exists.
 - **Parallel-safety**: this change does **not** depend on any of the other seven `spell-catalog-<element>`
   changes (fire/water/wind/earth/lightning/ice/light/dark are mutually independent). Once the two (or
   three, for fire/water/light) prerequisite changes above land, all eight `spell-catalog-<element>`

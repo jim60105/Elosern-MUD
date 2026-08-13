@@ -1,24 +1,24 @@
 ## Context
 
 `docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md` (§4.4) defines the full eight-
-element, five-tier, 80-entry spell catalog. This change implements only the 冰 (control/attack-focused) slice: ten
+element, five-tier, 80-entry spell catalog. This change implements only the 土 (defense/control-focused) slice: ten
 `SKILL_REGISTRY` entries at the keys, labels, tiers, targets, and MP costs below, unchanged from that
 table.
 
-**§4.4 excerpt — 冰 spells:**
+**§4.4 excerpt — 土 spells:**
 
 | Key | 名稱 | 位階 | 目標 | MP |
 |---|---|---|---|---|
-| `ice_shard` | 冰錐術 | 學徒 | 單體 | 13 |
-| `frost_breath` | 凍結之息 | 學徒 | 單體 | 11 |
-| `ice_wall` | 冰牆術 | 術師 | 單體(自/友) | 25 |
-| `frost_arrow_rain` | 冷凍箭雨 | 術師 | 範圍 | 28 |
-| `permafrost_domain` | 永凍領域 | 大師 | 範圍 | 48 |
-| `ice_prison` | 冰封監牢 | 大師 | 單體 | 44 |
-| `blizzard` | 暴風雪 | 賢者 | 範圍 | 88 |
-| `absolute_tundra` | 絕對凍土 | 賢者 | 範圍 | 82 |
-| `absolute_zero` | 絕對零度 | 主宰 | 單體 | 140 |
-| `eternal_ice_field` | 永夜冰原 | 主宰 | 範圍 | 158 |
+| `stone_shard` | 石礫術 | 學徒 | 單體 | 12 |
+| `hardened_skin` | 硬化肌膚 | 學徒 | 單體(自) | 10 |
+| `stone_armor` | 岩甲術 | 術師 | 單體 | 24 |
+| `dust_veil` | 沙塵術 | 術師 | 範圍 | 22 |
+| `earth_bind` | 地縛術 | 大師 | 範圍 | 42 |
+| `rockslide` | 岩壁崩落 | 大師 | 範圍 | 48 |
+| `earthquake` | 地震術 | 賢者 | 範圍 | 90 |
+| `earthen_ward` | 大地庇護 | 賢者 | 範圍(友) | 75 |
+| `mountain_collapse` | 山嶽崩落 | 主宰 | 範圍 | 150 |
+| `earths_judgment` | 大地審判 | 主宰 | 單體 | 130 |
 
 **§4.3 MP cost-tier table** (for reference — the MP column above is already the correct
 tier-consistent value, this table is the source it was drawn from):
@@ -35,7 +35,7 @@ tier-consistent value, this table is the source it was drawn from):
 ## Goals / Non-Goals
 
 **Goals:**
-- Add all ten 冰-element spells to `SKILL_REGISTRY` with the exact keys/labels/tiers/targets/costs
+- Add all ten 土-element spells to `SKILL_REGISTRY` with the exact keys/labels/tiers/targets/costs
   from §4.4, each with a typed-effect-compatible `effects` list.
 - Organize the registry entries so each spell's tier is unambiguous from its position and MP cost band
   alone, for `can_cast_spell_tier` (from `element-mastery-cast-gate`) to consume without this change
@@ -45,7 +45,7 @@ tier-consistent value, this table is the source it was drawn from):
 
 **Non-Goals:**
 - Damage spells use the existing `damage:<element>:<school>` effect convention exactly as `fire_ball`/
-  `wind_blade`/`shadow_slash` already use it today — a bare `damage:ice:magic` string with no numeric
+  `wind_blade`/`shadow_slash` already use it today — a bare `damage:earth:magic` string with no numeric
   magnitude encoded in the string. Magnitude is derived elsewhere in the existing combat formula from
   caster stats, unchanged by this proposal.
 - Flavor descriptions in §4.4's table such as "多段傷害" (multi-hit), "無視防禦" (ignores defense), "DoT"
@@ -79,26 +79,30 @@ change maps consistently:
 |---|---|---|
 | 單體 | `TargetSpec.SINGLE` | `FactionConstraint.ANY` |
 | 範圍 | `TargetSpec.AREA` | `FactionConstraint.ANY` |
-| 單體(自/友) | `TargetSpec.SINGLE` | `FactionConstraint.ANY` |
+| 單體(自) | `TargetSpec.SELF` | `FactionConstraint.SELF_ONLY` |
+| 範圍(友) | `TargetSpec.AREA` | `FactionConstraint.ANY` |
 
-"(自)" annotations become `SELF_ONLY` (cardinality and faction both narrow to the actor); "(友)"
-annotations stay `AREA`/`ANY` since the registry has no ally-only enum value that restricts anything —
-the narrower intent is presentation-only (label/description text), not a mechanical restriction.
+"(自)" annotations become `SELF_ONLY` (cardinality and faction both narrow to the actor): per the
+`skill-registry` spec, a skill whose effect is inherently self-only (here `hardened_skin`'s
+`self_buff_apply`) SHALL declare `FactionConstraint.SELF_ONLY` and restrict its target to the actor.
+"(友)" annotations stay `AREA`/`ANY` since the registry has no ally-only enum value that restricts
+anything — the narrower intent is presentation-only (label/description text), not a mechanical
+restriction.
 
 ### `effects` per spell
 
 | Key | `effects` | Note |
 |---|---|---|
-| `ice_shard` | `damage:ice:magic` |  |
-| `frost_breath` | `buff_apply:ice_slow` | pure debuff, no damage component |
-| `ice_wall` | `buff_apply:ice_wall` | pure shield, no damage component |
-| `frost_arrow_rain` | `damage:ice:magic` |  |
-| `permafrost_domain` | `buff_apply:ice_freeze` | pure control, no damage component |
-| `ice_prison` | `buff_apply:ice_prison` | pure control, no damage component |
-| `blizzard` | `damage:ice:magic` |  |
-| `absolute_tundra` | `damage:ice:magic`, `buff_apply:ice_freeze` |  |
-| `absolute_zero` | `damage:ice:magic`, `buff_apply:ice_freeze` |  |
-| `eternal_ice_field` | `damage:ice:magic`, `buff_apply:ice_freeze` |  |
+| `stone_shard` | `damage:earth:magic` |  |
+| `hardened_skin` | `self_buff_apply:earth_hardened_skin` |  |
+| `stone_armor` | `buff_apply:earth_stone_armor` | pure shield, no damage component |
+| `dust_veil` | `buff_apply:earth_dust_veil` | pure debuff, no damage component |
+| `earth_bind` | `buff_apply:earth_root` | pure control, no damage component |
+| `rockslide` | `damage:earth:magic` |  |
+| `earthquake` | `damage:earth:magic` |  |
+| `earthen_ward` | `buff_apply:earth_ward` | pure party shield, no damage component |
+| `mountain_collapse` | `damage:earth:magic` |  |
+| `earths_judgment` | `damage:earth:magic` |  |
 
 ### New `buffs.yaml` rows
 
@@ -108,41 +112,49 @@ Per the shared scope boundary, every status-effect or shield spell in this set i
 existing constraints — no combat-stat multiplier configured in the buff definition itself). This change
 adds:
 
-- `ice_slow`: slow debuff (rate-shaped agility/speed reduction), applied by `frost_breath`
-- `ice_wall`: shield buff (defense bounds ceiling, self-or-ally target), applied by `ice_wall`
-- `ice_freeze`: marker control buff (empty `modifiers`, same shape as `paralysis`/`fear`) representing 凍結, applied by `permafrost_domain`, `absolute_tundra`, `absolute_zero`, and `eternal_ice_field`
-- `ice_prison`: marker control buff (empty `modifiers`) representing 定身, applied by `ice_prison`
+- `earth_hardened_skin`: self defense buff (rate/bounds-shaped defense increase), applied by `hardened_skin`
+- `earth_stone_armor`: shield buff (defense bounds ceiling), applied by `stone_armor`
+- `earth_dust_veil`: accuracy-down debuff (bounds-shaped accuracy reduction), applied by `dust_veil`
+- `earth_root`: marker control buff (empty `modifiers`, same shape as `paralysis`/`fear`) representing 束縛, applied by `earth_bind`
+- `earth_ward`: party shield buff (defense bounds ceiling), applied by `earthen_ward`
+
+The matching `earth_hardened_skin`/`earth_stone_armor`/`earth_dust_veil`/`earth_root`/`earth_ward`
+rows are also added to `world/rules/rulebook/status_display.yaml` (Traditional Chinese labels
+硬化肌膚/岩甲/沙塵迷眼/地縛/大地庇護, severities `beneficial`/`beneficial`/`harmful`/`harmful`/`beneficial`):
+`status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry,
+so a new buff key without one breaks module import at startup.
 
 ### Registry ordering makes tier obvious without a new field
 
 `SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
 in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 冰 — 學徒` -style comment) inside one `*_elemental_spells("ice", ...)` block, and each pair's MP
-cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
-unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
-logic itself.
+`# 土 — 學徒` -style comment) inside one `*_elemental_spells("earth", ...)` block, and each pair's MP
+cost falls inside §4.3's band for that tier. `hardened_skin` (the 學徒 單體(自) spell) is declared as
+its own `_skill(...)` call immediately after that block, still under its `# 土 — 學徒` tier comment:
+it is the one entry whose effect is inherently self-only, so it declares
+`FactionConstraint.SELF_ONLY`, which the builder fixes to `ANY`. This gives
+`element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without this
+change adding a tier field or re-deriving gate logic itself.
 
 ### Registry construction: reuse the `_elemental_spells` builder
 
-This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
-`spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
-each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
-`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
+This change expresses nine of its ten entries through the `_spell`/`_elemental_spells` builders
+introduced by `spell-catalog-fire` (see that change's design.md, "Registry construction helper")
+instead of writing each `_skill(...)` call by hand: the element is written once per set, and
+`SkillKind.ACTIVE` plus `FactionConstraint.ANY` are fixed by the builder. `hardened_skin` is the
+deliberate exception (see "Registry ordering" above) and is written as an explicit `_skill(...)` call
+with `FactionConstraint.SELF_ONLY`, because the builder's fixed `ANY` would contradict the
+`skill-registry` spec's self-only-constraint rule. Field values remain exactly this change's
 design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
 
 
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
-  causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `ice_`
+  causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `earth_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

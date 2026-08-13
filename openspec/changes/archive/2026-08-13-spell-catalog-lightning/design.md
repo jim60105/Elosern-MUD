@@ -1,24 +1,24 @@
 ## Context
 
 `docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md` (§4.4) defines the full eight-
-element, five-tier, 80-entry spell catalog. This change implements only the 風 (speed/range-focused) slice: ten
+element, five-tier, 80-entry spell catalog. This change implements only the 雷 (fast-attack-focused) slice: ten
 `SKILL_REGISTRY` entries at the keys, labels, tiers, targets, and MP costs below, unchanged from that
 table.
 
-**§4.4 excerpt — 風 spells:**
+**§4.4 excerpt — 雷 spells:**
 
 | Key | 名稱 | 位階 | 目標 | MP |
 |---|---|---|---|---|
-| `wind_blade` *(existing, recost)* | 風刃術 | 學徒 | 範圍 | 14 |
-| `gale_step` | 疾風術 | 學徒 | 單體(自) | 10 |
-| `flight` *(existing, recost)* | 飛行術 | 術師 | 單體(自) | 22 |
-| `tornado_blade` | 龍捲風刃 | 術師 | 單體 | 26 |
-| `storm_domain` | 暴風領域 | 大師 | 範圍 | 50 |
-| `gale_dance_strike` | 疾風刃舞 | 大師 | 單體 | 40 |
-| `heavens_wrath_storm` | 天譴風暴 | 賢者 | 範圍 | 90 |
-| `haste_domain` | 神速領域 | 賢者 | 範圍(友) | 70 |
-| `vacuum_severance` | 真空斬滅 | 主宰 | 單體 | 130 |
-| `sky_tempest` | 蒼穹暴風 | 主宰 | 範圍 | 150 |
+| `spark_shock` | 電擊術 | 學徒 | 單體 | 13 |
+| `static_ward` | 靜電護體 | 學徒 | 單體(自) | 10 |
+| `chain_lightning` | 雷鎖術 | 術師 | 範圍 | 27 |
+| `paralyzing_bolt` | 麻痺電擊 | 術師 | 單體 | 24 |
+| `thunder_combo` | 雷霆連擊 | 大師 | 單體 | 46 |
+| `lightning_strike` | 落雷術 | 大師 | 範圍 | 50 |
+| `heavens_thunder` | 天雷降臨 | 賢者 | 範圍 | 92 |
+| `thunder_gods_haste` | 雷神之速 | 賢者 | 單體(自) | 68 |
+| `judgement_thunder` | 審判雷霆 | 主宰 | 單體 | 135 |
+| `divine_lightning_slaughter` | 神雷滅殺 | 主宰 | 範圍 | 155 |
 
 **§4.3 MP cost-tier table** (for reference — the MP column above is already the correct
 tier-consistent value, this table is the source it was drawn from):
@@ -35,17 +35,17 @@ tier-consistent value, this table is the source it was drawn from):
 ## Goals / Non-Goals
 
 **Goals:**
-- Add all ten 風-element spells to `SKILL_REGISTRY` with the exact keys/labels/tiers/targets/costs
+- Add all ten 雷-element spells to `SKILL_REGISTRY` with the exact keys/labels/tiers/targets/costs
   from §4.4, each with a typed-effect-compatible `effects` list.
 - Organize the registry entries so each spell's tier is unambiguous from its position and MP cost band
   alone, for `can_cast_spell_tier` (from `element-mastery-cast-gate`) to consume without this change
   re-deriving any gate logic.
 - Add the necessary `buffs.yaml` rows backing this element's status-effect and shield spells.
-- Recost the pre-existing 風 anchor skill(s) per §4.3, without duplicating them.
+
 
 **Non-Goals:**
 - Damage spells use the existing `damage:<element>:<school>` effect convention exactly as `fire_ball`/
-  `wind_blade`/`shadow_slash` already use it today — a bare `damage:wind:magic` string with no numeric
+  `wind_blade`/`shadow_slash` already use it today — a bare `damage:lightning:magic` string with no numeric
   magnitude encoded in the string. Magnitude is derived elsewhere in the existing combat formula from
   caster stats, unchanged by this proposal.
 - Flavor descriptions in §4.4's table such as "多段傷害" (multi-hit), "無視防禦" (ignores defense), "DoT"
@@ -80,7 +80,6 @@ change maps consistently:
 | 單體 | `TargetSpec.SINGLE` | `FactionConstraint.ANY` |
 | 範圍 | `TargetSpec.AREA` | `FactionConstraint.ANY` |
 | 單體(自) | `TargetSpec.SELF` | `FactionConstraint.SELF_ONLY` |
-| 範圍(友) | `TargetSpec.AREA` | `FactionConstraint.ANY` |
 
 "(自)" annotations become `SELF_ONLY` (cardinality and faction both narrow to the actor); "(友)"
 annotations stay `AREA`/`ANY` since the registry has no ally-only enum value that restricts anything —
@@ -90,16 +89,16 @@ the narrower intent is presentation-only (label/description text), not a mechani
 
 | Key | `effects` | Note |
 |---|---|---|
-| `wind_blade` | `damage:wind:magic` |  |
-| `gale_step` | `self_buff_apply:wind_haste` |  |
-| `flight` | `movement:flight` |  |
-| `tornado_blade` | `damage:wind:magic` |  |
-| `storm_domain` | `damage:wind:magic` |  |
-| `gale_dance_strike` | `damage:wind:magic` |  |
-| `heavens_wrath_storm` | `damage:wind:magic` |  |
-| `haste_domain` | `buff_apply:wind_haste_domain` | pure party buff, no damage component |
-| `vacuum_severance` | `damage:wind:magic` |  |
-| `sky_tempest` | `damage:wind:magic` |  |
+| `spark_shock` | `damage:lightning:magic` |  |
+| `static_ward` | `self_buff_apply:lightning_static_ward` |  |
+| `chain_lightning` | `damage:lightning:magic` |  |
+| `paralyzing_bolt` | `damage:lightning:magic`, `buff_apply:paralysis` |  |
+| `thunder_combo` | `damage:lightning:magic` |  |
+| `lightning_strike` | `damage:lightning:magic` |  |
+| `heavens_thunder` | `damage:lightning:magic` |  |
+| `thunder_gods_haste` | `self_buff_apply:lightning_extra_action` |  |
+| `judgement_thunder` | `damage:lightning:magic` |  |
+| `divine_lightning_slaughter` | `damage:lightning:magic` |  |
 
 ### New `buffs.yaml` rows
 
@@ -109,57 +108,49 @@ Per the shared scope boundary, every status-effect or shield spell in this set i
 existing constraints — no combat-stat multiplier configured in the buff definition itself). This change
 adds:
 
-- `wind_haste`: self speed buff (rate/bounds-shaped agility increase), applied by `gale_step`
-- `wind_haste_domain`: party speed+evasion buff (broader bounds than `wind_haste`), applied by `haste_domain`
+- `lightning_static_ward`: self counter-attack buff (bounds-shaped defense increase), applied by `static_ward`
+- `lightning_extra_action`: self extra-action buff (bounds-shaped `actions_per_turn` increase), applied by `thunder_gods_haste`
 
-### Pre-existing anchor skill(s) are recosted in place, not duplicated
+The matching `lightning_static_ward`/`lightning_extra_action` rows are also added to
+`world/rules/rulebook/status_display.yaml` (Traditional Chinese labels 靜電護體/雷神之速, severities
+`beneficial`/`beneficial`): `status_display.py`'s fail-closed coverage requires every buff key to have
+exactly one display entry, so a new buff key without one breaks module import at startup.
 
-- `wind_blade`: `mp=24` -> `mp=14` (its `effects`, `target_spec`, `label`, and every other field are unchanged — only the `cost` dict's `mp` value is edited)
-- `flight`: `mp=10` -> `mp=22` (its `effects`, `target_spec`, `label`, and every other field are unchanged — only the `cost` dict's `mp` value is edited)
+### Reused existing `buffs.yaml` rows (no new row)
 
-Per design doc §4.4: "Three keys already exist in `SKILL_REGISTRY` and are rebalanced to this table
-rather than duplicated." `fire_ball`/`wind_blade`/`flight` predate the §4.3 MP tier concept; this change
-brings them into that tier system for consistency with every other spell added across all eight
-`spell-catalog-<element>` changes.
-
-**`flight`'s recosted `mp=22` is display-only.** Found during rubber-duck review: this change now
-depends on `movement-skill-waiver` landing first (see `proposal.md`'s Impact section), which
-reclassifies `flight` from `ACTIVE` to `PASSIVE` — a `PASSIVE` skill never reaches
-`ActionResolver.resolve()`'s resource-check step, so `flight`'s `cost` field, while kept
-tier-consistent for presentational/UI purposes, is never actually spent. This is unlike every other
-spell in this table, all of which remain `ACTIVE` and genuinely spend their listed MP.
+- `paralysis`: 麻痺電擊 (`paralyzing_bolt`) reuses the existing `paralysis` buff row exactly — no new row needed, matching this element's 麻痺 flavor precisely
 
 ### Registry ordering makes tier obvious without a new field
 
 `SkillDef` has no `tier` field — tier is derived from context. This change's spell rows are grouped
 in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 風 — 學徒` -style comment) inside one `*_elemental_spells("wind", ...)` block, and each pair's MP
-cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
-unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
-logic itself.
+`# 雷 — 學徒` -style comment) around one `*_elemental_spells("lightning", ...)` block, and each pair's
+MP cost falls inside §4.3's band for that tier. `static_ward` (學徒 單體(自)) and `thunder_gods_haste`
+(賢者 單體(自)) are declared as their own `_skill(...)` calls directly after that block, still under
+their tier comments: their `self_buff_apply` effects are inherently self-only, so they declare
+`FactionConstraint.SELF_ONLY`, which the builder fixes to `ANY`. This gives
+`element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without this
+change adding a tier field or re-deriving gate logic itself.
 
 ### Registry construction: reuse the `_elemental_spells` builder
 
-This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
-`spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
-each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
-`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
-design-doc table. `flight` is a PASSIVE movement skill, so it is NOT part of the `_elemental_spells`
-block; it keeps its existing `_skill(...)` entry and is recosted in place (task 5.2).
+This change expresses eight of its ten entries through the `_spell`/`_elemental_spells` builders
+introduced by `spell-catalog-fire` (see that change's design.md, "Registry construction helper")
+instead of writing each `_skill(...)` call by hand: the element is written once per set, and
+`SkillKind.ACTIVE` plus `FactionConstraint.ANY` are fixed by the builder. `static_ward` and
+`thunder_gods_haste` are the deliberate exceptions (see "Registry ordering" above) and are written as
+explicit `_skill(...)` calls with `FactionConstraint.SELF_ONLY`, because the builder's fixed `ANY`
+would contradict the `skill-registry` spec's self-only-constraint rule. Field values remain exactly
+this change's design-doc table.
 
 ## Risks / Trade-offs
 
-- [Risk] This change lands before `heal-effect-handler`/`element-mastery-cast-gate` merge, leaving new
+- [Risk] This change lands before `element-mastery-cast-gate` merge, leaving new
   keys in the registry that either fail to parse (once `skill-effects-typed-model` lands) or cast
   ungated. -> Mitigation: `tasks.md`'s first task group is a hard prerequisite gate; do not merge this
   change's registry edits until its prerequisites are confirmed landed.
 
 
 - [Risk] A future `spell-catalog-<other-element>` change picks the same `buffs.yaml` key by coincidence,
-  causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `wind_`
+  causing a merge conflict. -> Mitigation: every new buff key in this change is prefixed with `lightning_`
   (or reuses an existing generic key verbatim, never inventing a second definition for it).
-
-## Open Questions
-
-- Exact `heal:<...>` effect-ID grammar — owned by `heal-effect-handler`, not this change; tracked as a
-  task here.

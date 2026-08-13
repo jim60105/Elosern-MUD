@@ -1,16 +1,17 @@
 ## Why
 
 The skill-system redesign (`docs/superpowers/specs/2026-08-12-skill-system-redesign-design.md`, §4.4)
-defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today only carries one
-seed spell for 冰 magic. Without the
-other 10 冰-element spells, players who invest in 冰 magic have no tier progression to
+defines a full eight-element, five-tier spell catalog, but `SKILL_REGISTRY` today carries no seed
+spell for 土 magic. Without the
+10 土-element spells, players who invest in 土 magic have no tier progression to
 grow into, and the new `can_cast_spell_tier` cast-gate (from `element-mastery-cast-gate`) has nothing
-to gate for this element beyond its single existing spell.
+to gate for this element.
 
 ## What Changes
 
-- Add the ten `冰`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
-- Add 4 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
+- Add the ten `土`-element spells from design doc §4.4 to `world/skills/registry.py`'s `SKILL_REGISTRY` (10 new keys).
+- Add 5 new rows to `world/rules/rulebook/buffs.yaml` (rate/bounds/decay shape only, per the `buff-handler-integration` spec's existing constraints) backing the status-effect and shield spells in this set.
+- Add 5 matching rows to `world/rules/rulebook/status_display.yaml` — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry.
 
 ## Capabilities
 
@@ -20,13 +21,13 @@ to gate for this element beyond its single existing spell.
 
 ### Modified Capabilities
 
-- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 冰-element
-  spell set (tier, target, MP cost, and typed `effects`), and the pre-existing 冰 anchor skill(s)
-  (`n/a`) are recosted per §4.3's table rather than duplicated.
+- `skill-registry`: `SKILL_REGISTRY` gains an ADDED requirement declaring the full ten-key 土-element
+  spell set (tier, target, MP cost, and typed `effects`). All ten keys are new — 土 has no
+  pre-existing anchor skill to recost.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (4 new rows).
+- **Affected code**: `world/skills/registry.py` (10 new spell entries via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (5 new rows), `world/rules/rulebook/status_display.yaml` (5 new rows).
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve
