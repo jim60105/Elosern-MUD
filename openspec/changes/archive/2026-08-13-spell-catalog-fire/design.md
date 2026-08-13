@@ -124,6 +124,7 @@ existing constraints — no combat-stat multiplier configured in the buff defini
 adds:
 
 - `fire_scorch`: DoT (rate: hp delta negative, duration + tick_interval, stacking refresh) — same shape as the existing `poisoned` row, applied by `scorching_wave`'s 灼燒 flavor
+- The matching `fire_scorch` row is also added to `world/rules/rulebook/status_display.yaml` (label 灼燒, severity `harmful`): `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry, so a new buff key without one breaks module import at startup.
 
 ### Pre-existing anchor skill(s) are recosted in place, not duplicated
 
@@ -136,11 +137,31 @@ brings it into that tier system for consistency with every other spell added acr
 
 ### Registry ordering makes tier obvious without a new field
 
-`SkillDef` has no `tier` field — tier is derived from context. This change's ten `_skill(...)` calls are
-grouped in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 火 — 學徒` -style comment), and each pair's MP cost falls inside §4.3's band for that tier. This
-gives `element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without
-this change adding a tier field or re-deriving gate logic itself.
+`SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
+in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
+`# 火 — 學徒` -style comment) inside one `*_elemental_spells("fire", ...)` block, and each pair's MP
+cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
+unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
+logic itself.
+
+### Registry construction helper (`_elemental_spells`)
+
+To keep the full 80-entry catalog DRY across all eight `spell-catalog-<element>` changes, this change
+adds two builders to `world/skills/registry.py` and uses them for its own entries:
+
+- `_spell(key, label, description, target_spec, *, mp, element, effects, usable_out_of_combat=False)`
+  builds one ACTIVE elemental spell with `faction_constraint=FactionConstraint.ANY` and
+  `cost={"mp": <value>}` — the exact §4.4 catalog shape, fixing `SkillKind.ACTIVE` and the target
+  scope so no entry repeats them.
+- `_elemental_spells(element, *rows)` builds one element's full spell set from
+  `(key, label, description, target_spec, mp, effects)` rows written in the exact order of the
+  design doc §4.4 table, with a `# 火 — <tier>` comment above each tier pair. The element is written
+  once per set instead of ten times.
+
+Every subsequent `spell-catalog-<element>` change SHALL express its ten entries as one
+`*_elemental_spells(<element>, ...)` block in `SKILL_REGISTRY` rather than inventing a new layout;
+the field values remain exactly the per-change design-doc table, and the builders impose no
+behaviour beyond the fixed catalog shape (tier stays MP-band-derived, never stored).
 
 ## Risks / Trade-offs
 

@@ -193,6 +193,65 @@ def _skill(
     )
 
 
+def _spell(
+    key: str,
+    label: str,
+    description: str,
+    target_spec: TargetSpec,
+    *,
+    mp: int,
+    element: str,
+    effects: tuple[str, ...],
+    usable_out_of_combat: bool = False,
+) -> SkillDef:
+    """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
+
+    Every catalog spell is an ACTIVE skill freely targetable among enemies
+    and allies at an integer MP cost, so this helper fixes exactly that
+    shape instead of repeating it in each entry.
+    """
+    return _skill(
+        key,
+        label,
+        description,
+        SkillKind.ACTIVE,
+        target_spec,
+        cost={"mp": mp},
+        usable_out_of_combat=usable_out_of_combat,
+        element=element,
+        effects=list(effects),
+        faction_constraint=FactionConstraint.ANY,
+    )
+
+
+def _elemental_spells(
+    element: str,
+    *spells: tuple[str, str, str, TargetSpec, int, tuple[str, ...]],
+) -> tuple[SkillDef, ...]:
+    """Build one element's full ACTIVE spell set (design doc §4.4).
+
+    Each row is ``(key, label, description, target_spec, mp, effects)`` in
+    the exact order of the design doc's catalog table. The element is written
+    once for the whole set. A spell's tier is deliberately NOT a stored
+    field: it stays derivable from the set's grouping and each row's MP cost
+    band (``spell_tier_for``), per the skill-registry spec.
+    """
+    if element not in ELEMENT_REGISTRY:
+        raise ValueError(f"unknown element {element!r} for elemental spell set")
+    return tuple(
+        _spell(
+            key,
+            label,
+            description,
+            target_spec,
+            mp=mp,
+            element=element,
+            effects=effects,
+        )
+        for key, label, description, target_spec, mp, effects in spells
+    )
+
+
 _BODY_TRAITS = ("atk_phys", "agility", "defense")
 
 
@@ -300,13 +359,124 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="ice",
             effects=["element_mastery_rank:主宰"],
         ),
+        # 火 — 學徒
+        *_elemental_spells(
+            "fire",
+            # 火 — 學徒
+            ("fire_ball", "火球術", "凝聚火焰魔力，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:fire:magic",)),
+            ("fire_arrow", "火焰箭", "射出火焰凝聚的箭矢，以低耗能對單一目標造成魔法傷害。", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
+            # 火 — 術師
+            ("firestorm", "火焰風暴", "召喚覆蓋範圍的火焰風暴，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 30, ("damage:fire:magic",)),
+            ("scorching_wave", "灼熱波動", "釋放灼熱的波動，對單一目標造成魔法傷害並使其灼燒。", TargetSpec.SINGLE, 24, ("damage:fire:magic", "buff_apply:fire_scorch")),
+            # 火 — 大師
+            ("lava_burst", "熔岩術", "使地面迸裂噴出熔岩，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 52, ("damage:fire:magic",)),
+            ("infernal_wrap", "業火纏繞", "以業火纏繞單一目標，造成高額魔法傷害。", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
+            # 火 — 賢者
+            ("dragon_flame", "龍炎術", "喚起龍之吐息，對範圍內所有目標造成高額魔法傷害。", TargetSpec.AREA, 95, ("damage:fire:magic",)),
+            ("hellfire", "煉獄業火", "召喚煉獄的業火，對單一目標造成極高魔法傷害。", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
+            # 火 — 主宰
+            ("phoenix_eternal_flame", "不滅鳳凰焰", "召喚不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal")),
+            ("world_ending_blaze", "焚世終焰", "召喚足以焚盡世界的終焰，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
+        ),
         _skill(
-            "fire_ball",
-            "火球術",
-            "凝聚火焰魔力，對單一目標造成魔法傷害。",
+            "fire_arrow",
+            "火焰箭",
+            "射出凝聚火焰的箭矢，對單一目標造成魔法傷害。",
             SkillKind.ACTIVE,
             TargetSpec.SINGLE,
-            cost={"mp": 20},
+            cost={"mp": 10},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        # 火 — 術師
+        _skill(
+            "firestorm",
+            "火焰風暴",
+            "召喚席捲大地的火焰風暴，對範圍內所有目標造成魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            cost={"mp": 30},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        _skill(
+            "scorching_wave",
+            "灼熱波動",
+            "釋放灼熱波動衝擊目標，造成魔法傷害並附加灼燒。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            cost={"mp": 24},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic", "buff_apply:fire_scorch"],
+        ),
+        # 火 — 大師
+        _skill(
+            "lava_burst",
+            "熔岩術",
+            "引爆地面滾燙的熔岩，對範圍內所有目標造成魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            cost={"mp": 52},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        _skill(
+            "infernal_wrap",
+            "業火纏繞",
+            "以業火纏繞目標，造成大量魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            cost={"mp": 42},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        # 火 — 賢者
+        _skill(
+            "dragon_flame",
+            "龍炎術",
+            "吐出龍之炎息，對範圍內所有目標造成大量魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            cost={"mp": 95},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        _skill(
+            "hellfire",
+            "煉獄業火",
+            "召喚煉獄業火吞噬目標，造成極高魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            cost={"mp": 78},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic"],
+        ),
+        # 火 — 主宰
+        _skill(
+            "phoenix_eternal_flame",
+            "不滅鳳凰焰",
+            "燃起不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。",
+            SkillKind.ACTIVE,
+            TargetSpec.AREA,
+            cost={"mp": 150},
+            element="fire",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:fire:magic", "self_heal"],
+        ),
+        _skill(
+            "world_ending_blaze",
+            "焚世終焰",
+            "釋放足以焚盡世界的終極烈焰，對單一目標造成毀滅級魔法傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            cost={"mp": 130},
             element="fire",
             faction_constraint=FactionConstraint.ANY,
             effects=["damage:fire:magic"],

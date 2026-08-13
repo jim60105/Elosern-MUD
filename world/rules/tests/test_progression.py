@@ -33,7 +33,9 @@ from world.rules.progression import (
     magic_rank_title,
     skill_proficiency_level,
 )
+from world.skills.cost_tiers import spell_tier_for
 from world.skills.handler import ConferredSkillGrant
+from world.skills.registry import SKILL_REGISTRY
 import world.rules.progression as progression
 
 
@@ -455,6 +457,32 @@ class ElementMasteryGateTests(EvenniaTest):
     def test_gate_rejects_unknown_tier(self):
         with self.assertRaises(ValueError):
             can_cast_spell_tier(self._caster("unknown-tier", 50), "fire", "不存在")
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_fire_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
+        fire_spell_tiers = {
+            "術師": (15, 16, ("firestorm", "scorching_wave")),
+            "大師": (30, 31, ("lava_burst", "infernal_wrap")),
+            "賢者": (70, 71, ("dragon_flame", "hellfire")),
+            "主宰": (90, 91, ("phoenix_eternal_flame", "world_ending_blaze")),
+        }
+        for tier, (below, at, spell_keys) in fire_spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+            self.assertFalse(
+                can_cast_spell_tier(
+                    self._caster(f"below-{tier}", below), "fire", tier
+                )
+            )
+            self.assertTrue(
+                can_cast_spell_tier(self._caster(f"at-{tier}", at), "fire", tier)
+            )
+        master = self._caster("fire-master", 1)
+        master.db.skills = {"active": [], "passive": ["fire_mastery"]}
+        for tier in fire_spell_tiers:
+            with self.subTest(tier=tier, with_mastery=True):
+                self.assertTrue(can_cast_spell_tier(master, "fire", tier))
 
     def test_created_humans_always_satisfy_the_apprentice_gate(self):
         from world.rules.character_creation import starting_magic_interval

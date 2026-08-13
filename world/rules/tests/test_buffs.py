@@ -127,6 +127,31 @@ class BuffIntegrationTests(EvenniaTest):
         tick_buffs(entity)
         self.assertEqual(entity.traits.hp.value, before - 5)
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_buff_fire_scorch(self):
+        definition = BUFF_DEFINITIONS["fire_scorch"]
+        self.assertEqual(definition.duration, 300)
+        self.assertEqual(definition.tick_interval, 10)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(definition.modifiers, {"rate": {"target": "hp", "delta": -5}})
+
+        entity = self._entity()
+        _add_buff(entity, "fire_scorch")
+        before = entity.traits.hp.value
+        tick_buffs(entity)
+        self.assertEqual(entity.traits.hp.value, before - 5)
+        self.assertEqual(entity.buffs.all["fire_scorch"].tick_interval, 10)
+        self.assertIn("fire_scorch", entity_active_buffs(entity))
+
+    def test_buff_fire_scorch_expires_by_explicit_game_seconds(self):
+        entity = self._entity()
+        _add_buff(entity, "fire_scorch")
+        tick_buffs(entity, 290)
+        self.assertIn("fire_scorch", entity_active_buffs(entity))
+        tick_buffs(entity, 10)
+        self.assertNotIn("fire_scorch", entity_active_buffs(entity))
+
     def test_buff_tick_on_full_gauge_stores_integer(self):
         entity = self._entity()
         _add_buff(entity, "poisoned")
