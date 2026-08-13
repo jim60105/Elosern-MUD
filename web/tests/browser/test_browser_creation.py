@@ -186,7 +186,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         page = self._login_creation()
         install_outbound_recorder(page)
         panel = self._wait_creation_available(page)
-        self.assertEqual(len(panel["presets"]), 3)
+        self.assertEqual(len(panel["presets"]), 8)
         self.assertEqual(self._dock_mode(page), "creation")
 
         # Focus the action dock and open the preset list (keyboard only).

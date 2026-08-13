@@ -76,6 +76,7 @@ class CharacterActivationTests(EvenniaTest):
         return CharacterCreationRequest(**values)
 
     @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_activation_persists_identity_traits_and_empty_mechanical_state(self):
         old_id, old_location = self.character.id, self.character.location
         result = activate_player_character(
@@ -173,6 +174,25 @@ class CharacterActivationTests(EvenniaTest):
         )
         self.assertEqual(result.magic_level, 330)
         self.assertEqual(self.character.race, "elf")
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_preset_activation_grants_the_declared_skill_kit(self):
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        for preset_key in ("yuna_darknight", "human_wanderer", "elf_guardian"):
+            with self.subTest(preset_key=preset_key):
+                character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
+                self.account.at_post_create_character(character)
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(mode="preset", preset_key=preset_key),
+                    sampler=lambda low, high: low,
+                )
+                self.assertEqual(
+                    character.db.skills,
+                    PLAYER_PRESET_REGISTRY[preset_key].skill_lists(),
+                )
+                self.assertFalse(character.creation_pending)
 
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):
         self.character.db.magic_xp = 9

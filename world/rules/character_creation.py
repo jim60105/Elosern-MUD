@@ -289,6 +289,11 @@ def activate_player_character(
 
     values = {**validated.values, "magic_level": magic_level}
     trait_config = trait_config_for_values(values, race.magic_cap)
+    skills_value = (
+        PLAYER_PRESET_REGISTRY[request.preset_key].skill_lists()
+        if request.mode == "preset"
+        else {"active": [], "passive": []}
+    )
     attribute_values = {
         "age": validated.age,
         "apparent_age": validated.apparent_age,
@@ -296,7 +301,7 @@ def activate_player_character(
         "subrace": validated.subrace,
         "magic_xp": 0,
         "skill_proficiency": {},
-        "skills": {"active": [], "passive": []},
+        "skills": skills_value,
         "skill_grants": [],
         "equipment": {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []},
         "inventory": [],

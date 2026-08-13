@@ -91,10 +91,19 @@ class CreationPanelValidationTests(unittest.TestCase):
         self.assertTrue(validated["available"])
         self.assertEqual(validated["kind"], "creation")
         self.assertIsNone(validated["draft"])
-        self.assertEqual(len(validated["presets"]), 3)
+        self.assertEqual(len(validated["presets"]), 8)
         self.assertEqual(
             [card["key"] for card in validated["presets"]],
-            ["human_wanderer", "foxkin_scout", "elf_guardian"],
+            [
+                "human_wanderer",
+                "foxkin_scout",
+                "elf_guardian",
+                "violet_altoria",
+                "lidzia_rosenthal",
+                "yuka_darknight",
+                "yuna_darknight",
+                "elosia_shadowmoon",
+            ],
         )
 
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
@@ -102,7 +111,16 @@ class CreationPanelValidationTests(unittest.TestCase):
         payload = validate_creation(_valid_payload())
         self.assertEqual(
             [card["key"] for card in payload["presets"]],
-            ["human_wanderer", "foxkin_scout", "elf_guardian"],
+            [
+                "human_wanderer",
+                "foxkin_scout",
+                "elf_guardian",
+                "violet_altoria",
+                "lidzia_rosenthal",
+                "yuka_darknight",
+                "yuna_darknight",
+                "elosia_shadowmoon",
+            ],
         )
         profile_keys = [(p["race"], p["subrace"]) for p in payload["custom"]["profiles"]]
         self.assertEqual(profile_keys[0], ("human", None))
@@ -528,7 +546,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(payload["kind"], "creation")
         self.assertEqual(payload["schema_version"], CREATION_SCHEMA_VERSION)
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 3)
+        self.assertEqual(len(payload["presets"]), 8)
         self.assertEqual(len(payload["custom"]["profiles"]), 13)
         # The read model is side-effect free: canonical state is unchanged.
         self.assertTrue(self.character.creation_pending)
@@ -608,7 +626,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 3)
+        self.assertEqual(len(payload["presets"]), 8)
         self.assertEqual(len(payload["custom"]["profiles"]), 13)
         # The whole panel remains schema-valid.
         validate_creation(payload)
@@ -630,7 +648,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
-        self.assertEqual(len(payload["presets"]), 3)
+        self.assertEqual(len(payload["presets"]), 8)
         validate_creation(payload)
 
     def test_saved_draft_round_trips_through_the_presenter(self):
