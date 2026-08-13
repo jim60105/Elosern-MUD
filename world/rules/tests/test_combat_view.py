@@ -96,7 +96,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
         # actor itself is also a valid explicit target for the area skill.
         self.assertEqual(wind.valid_target_ids, (self.player.pk, self.monster.pk))
         fire = next(skill for skill in view.skills if skill.key == "fire_ball")
-        self.assertEqual(fire.cost, {"mp": 20})
+        self.assertEqual(fire.cost, {"mp": 14})
         self.assertEqual(fire.element, "fire")
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")

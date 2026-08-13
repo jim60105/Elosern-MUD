@@ -136,11 +136,20 @@ adds:
 
 ### Registry ordering makes tier obvious without a new field
 
-`SkillDef` has no `tier` field — tier is derived from context. This change's ten `_skill(...)` calls are
-grouped in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
-`# 水 — 學徒` -style comment), and each pair's MP cost falls inside §4.3's band for that tier. This
-gives `element-mastery-cast-gate`'s tier lookup an unambiguous signal (position + cost band) without
-this change adding a tier field or re-deriving gate logic itself.
+`SkillDef` has no `tier` field — tier is derived from context. This change's ten spell rows are grouped
+in registry order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰, each pair preceded by a
+`# 水 — 學徒` -style comment) inside one `*_elemental_spells("water", ...)` block, and each pair's MP
+cost falls inside §4.3's band for that tier. This gives `element-mastery-cast-gate`'s tier lookup an
+unambiguous signal (position + cost band) without this change adding a tier field or re-deriving gate
+logic itself.
+
+### Registry construction: reuse the `_elemental_spells` builder
+
+This change expresses its entries through the `_spell`/`_elemental_spells` builders introduced by
+`spell-catalog-fire` (see that change's design.md, "Registry construction helper") instead of writing
+each `_skill(...)` call by hand: the element is written once per set, and `SkillKind.ACTIVE` plus
+`FactionConstraint.ANY` are fixed by the builder. Field values remain exactly this change's
+design-doc table.
 
 ## Risks / Trade-offs
 

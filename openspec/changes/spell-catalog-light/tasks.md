@@ -7,7 +7,7 @@
 
 ## 2. Registry entries
 
-- [ ] 2.1 Add 10 new `_skill(...)` entries to `SKILL_REGISTRY` in `world/skills/registry.py` for: `heal`, `light_arrow`, `purify`, `mass_heal`, `advanced_heal`, `holy_shield`, `holy_radiance`, `revival_light`, `goddess_blessing`, `heavens_judgment_light`.
+- [ ] 2.1 Add 10 new spell entries to `SKILL_REGISTRY` in `world/skills/registry.py` (via the `_elemental_spells` builder) for: `heal`, `light_arrow`, `purify`, `mass_heal`, `advanced_heal`, `holy_shield`, `holy_radiance`, `revival_light`, `goddess_blessing`, `heavens_judgment_light`.
 - [ ] 2.2 Group the ten entries in registry-literal order as five tier-labeled pairs (學徒/術師/大師/賢者/主宰) with a `# 光 — <tier>` comment above each pair, matching this change's `design.md` Decisions section.
 - [ ] 2.3 Set each entry's `key`, `label`, `description` (new Traditional Chinese flavor text consistent with §4.4's naming), `kind=SkillKind.ACTIVE`, `target_spec`, `cost`, `element`, and `effects` exactly per this change's `design.md` table — do not invent different numbers or names.
 - [ ] 2.4 Run `python -c "from world.skills.registry import SKILL_REGISTRY"` (once `skill-effects-typed-model` has landed) to confirm every new `effects` string parses without raising at import time.

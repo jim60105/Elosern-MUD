@@ -28,7 +28,7 @@ to gate for this element beyond its single existing spell.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (8 new `_skill(...)` entries, 2 existing entries edited in place (wind_blade, flight)), `world/rules/rulebook/buffs.yaml` (2 new rows).
+- **Affected code**: `world/skills/registry.py` (8 new spell entries via the `_elemental_spells` builder, 2 existing entries edited in place (wind_blade, flight)), `world/rules/rulebook/buffs.yaml` (2 new rows).
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve

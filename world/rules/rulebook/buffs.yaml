@@ -5,6 +5,13 @@
   polarity: debuff
   modifiers:
     rate: {target: hp, delta: -5}
+- key: fire_scorch
+  duration: 300
+  tick_interval: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    rate: {target: hp, delta: -5}
 - key: paralysis
   duration: 30
   stacking: refresh

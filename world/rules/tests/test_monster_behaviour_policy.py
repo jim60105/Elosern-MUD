@@ -108,12 +108,12 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     def test_elemental_spell_above_the_magic_tier_is_never_chosen(self):
         # A production monster sits at magic level 0, so an owned 術師-tier
-        # fire_ball cannot resolve; the policy falls back to the innate
+        # wind_blade cannot resolve; the policy falls back to the innate
         # physical attack instead of choosing an action the resolver rejects.
         actor = FakeMonster(
             "tierless",
             magic_level=0,
-            owned=["fire_ball", "basic_attack"],
+            owned=["wind_blade", "basic_attack"],
         )
         enemy = FakeEntity("enemy")
         request = monster_behaviour_policy(actor, _field(actor, [enemy]))
@@ -123,11 +123,11 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         actor = FakeMonster(
             "master",
             magic_level=0,
-            owned=["fire_ball", "fire_mastery"],
+            owned=["wind_blade", "wind_mastery"],
         )
         enemy = FakeEntity("enemy")
         request = monster_behaviour_policy(actor, _field(actor, [enemy]))
-        self.assertEqual(request.skill_key, "fire_ball")
+        self.assertEqual(request.skill_key, "wind_blade")
 
     def test_source_has_no_forbidden_dependencies(self):
         source = (

@@ -14,9 +14,13 @@ from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.skills.effects import (
+    BuffApplyEffect,
+    DamageEffect,
     DivineMysteryEffect,
     ElementMasteryEffect,
+    SelfHealEffect,
     SexualMasteryEffect,
+    parse_effect,
 )
 from world.skills.registry import (
     FactionConstraint,
@@ -566,3 +570,87 @@ class DivineMysteryRegistryTests(unittest.TestCase):
         self.assertFalse(
             SKILL_REGISTRY["reincarnation_boon_yuna"].requires_divine_arts
         )
+
+
+FIRE_SPELL_CATALOG = (
+    ("fire_ball", "火球術", TargetSpec.SINGLE, 14, ("damage:fire:magic",)),
+    ("fire_arrow", "火焰箭", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
+    ("firestorm", "火焰風暴", TargetSpec.AREA, 30, ("damage:fire:magic",)),
+    (
+        "scorching_wave",
+        "灼熱波動",
+        TargetSpec.SINGLE,
+        24,
+        ("damage:fire:magic", "buff_apply:fire_scorch"),
+    ),
+    ("lava_burst", "熔岩術", TargetSpec.AREA, 52, ("damage:fire:magic",)),
+    ("infernal_wrap", "業火纏繞", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
+    ("dragon_flame", "龍炎術", TargetSpec.AREA, 95, ("damage:fire:magic",)),
+    ("hellfire", "煉獄業火", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
+    (
+        "phoenix_eternal_flame",
+        "不滅鳳凰焰",
+        TargetSpec.AREA,
+        150,
+        ("damage:fire:magic", "self_heal"),
+    ),
+    ("world_ending_blaze", "焚世終焰", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
+)
+
+
+class FireSpellCatalogTests(unittest.TestCase):
+    def test_elemental_spells_builder_rejects_unknown_element(self):
+        from world.skills.registry import _elemental_spells
+
+        with self.assertRaises(ValueError):
+            _elemental_spells(
+                "bogus",
+                ("x", "X", "說明", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
+            )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_all_ten_fire_spells_declare_the_exact_catalog_fields(self):
+        for key, label, target_spec, mp, effects in FIRE_SPELL_CATALOG:
+            with self.subTest(spell=key):
+                skill = SKILL_REGISTRY[key]
+                self.assertEqual(skill.label, label)
+                self.assertIs(skill.kind, SkillKind.ACTIVE)
+                self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
+                self.assertIs(skill.target_spec, target_spec)
+                self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+                self.assertEqual(skill.cost, {"mp": mp})
+                self.assertEqual(tuple(skill.effects), effects)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_every_fire_spell_effect_round_trips_through_typed_dispatch(self):
+        for key, _label, _target_spec, _mp, effects in FIRE_SPELL_CATALOG:
+            skill = SKILL_REGISTRY[key]
+            for effect_id in effects:
+                with self.subTest(spell=key, effect=effect_id):
+                    parsed = parse_effect(effect_id)
+                    if effect_id.startswith("damage:"):
+                        self.assertEqual(
+                            parsed,
+                            DamageEffect(element="fire", school="magic"),
+                        )
+                    elif effect_id.startswith("buff_apply:"):
+                        self.assertEqual(
+                            parsed,
+                            BuffApplyEffect(buff_key="fire_scorch"),
+                        )
+                    else:
+                        self.assertEqual(parsed, SelfHealEffect())
+                    self.assertIn(parsed, skill.parsed_effects)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_fire_ball_was_recosted_in_place_not_duplicated(self):
+        self.assertEqual(
+            [skill.key for skill in SKILL_REGISTRY.values()].count("fire_ball"),
+            1,
+        )
+        skill = SKILL_REGISTRY["fire_ball"]
+        self.assertEqual(skill.cost, {"mp": 14})
+        self.assertEqual(skill.label, "火球術")
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
+        self.assertEqual(skill.effects, ["damage:fire:magic"])

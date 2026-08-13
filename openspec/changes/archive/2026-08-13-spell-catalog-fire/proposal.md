@@ -27,7 +27,7 @@ to gate for this element beyond its single existing spell.
 
 ## Impact
 
-- **Affected code**: `world/skills/registry.py` (9 new `_skill(...)` entries, 1 existing entry edited in place (fire_ball)), `world/rules/rulebook/buffs.yaml` (1 new row).
+- **Affected code**: `world/skills/registry.py` (9 new spell entries + `fire_ball` recosted in place, expressed via the `_elemental_spells` builder), `world/rules/rulebook/buffs.yaml` (1 new row), `world/rules/rulebook/status_display.yaml` (1 new row — `status_display.py`'s fail-closed coverage requires every buff key to have exactly one display entry).
 - **Dependencies (blocking prerequisites)**:
 - `skill-effects-typed-model` (**must land first**) — defines `world/skills/effects.py`'s typed
   effect dataclasses (e.g. `StatMultiplyEffect`) that every skill's parsed `effects` list must resolve

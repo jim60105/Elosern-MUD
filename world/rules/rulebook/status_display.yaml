@@ -23,6 +23,9 @@
 - code: poison_agility_penalty
   label: 中毒敏捷減損
   severity: harmful
+- code: fire_scorch
+  label: 灼燒
+  severity: harmful
 - code: paralysis_locks_actions
   label: 麻痺鎖定行動
   severity: critical
