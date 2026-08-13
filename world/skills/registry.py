@@ -277,6 +277,17 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             effects=["weapon_style:dual_wield"],
         ),
         _skill(
+            "dual_blade_mastery",
+            "雙刀流·宗師級",
+            "以宗師級的雙刀連擊，對單一目標造成物理傷害。",
+            SkillKind.ACTIVE,
+            TargetSpec.SINGLE,
+            cost={"sp": 30},
+            element="dark",
+            faction_constraint=FactionConstraint.ANY,
+            effects=["damage:dark:physical"],
+        ),
+        _skill(
             "light_sword_style",
             "光劍架式",
             "以光之劍的架式對單一目標造成物理傷害。",
@@ -345,7 +356,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         _skill(
             "blade_art_mastery",
             "劍術精通",
-            "被動提昇劍術相關技能的效果。",
+            "被動提昇劍術與刀術相關技能的效果。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:blade_arts"],
@@ -384,8 +395,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
         _skill(
             "guardian_instinct",
-            "守護直覺",
-            "被動強化守護同伴的直覺。",
+            "護主本能",
+            "被動強化守護主人、忠誠護衛的本能。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:guardian_instinct"],

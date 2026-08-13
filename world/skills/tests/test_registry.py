@@ -4,8 +4,15 @@ from tools.spec_traceability import covers_requirement
 
 from dataclasses import fields
 import unittest
+from unittest.mock import patch
 
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY, Element
+from world.rules.action import ActionRequest, ActionResolver
+from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.skills.effects import ElementMasteryEffect, SexualMasteryEffect
 from world.skills.registry import (
     FactionConstraint,
@@ -299,3 +306,91 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertFalse(
             any(isinstance(effect, ElementMasteryEffect) for effect in parsed)
         )
+
+
+class SkillContentCompletionTests(unittest.TestCase):
+    @covers_requirement("skill-registry::guardian-instinct-and-blade-art-mastery-display-text-reflects-character-sheet-flavor")
+    def test_guardian_instinct_display_text_matches_character_sheet(self):
+        skill = SKILL_REGISTRY["guardian_instinct"]
+        self.assertEqual(skill.label, "護主本能")
+        self.assertIn("守護主人", skill.description)
+        self.assertIs(skill.kind, SkillKind.PASSIVE)
+        self.assertEqual(skill.effects, ["passive_buff:guardian_instinct"])
+
+    @covers_requirement("skill-registry::guardian-instinct-and-blade-art-mastery-display-text-reflects-character-sheet-flavor")
+    def test_blade_art_mastery_description_covers_both_arts(self):
+        skill = SKILL_REGISTRY["blade_art_mastery"]
+        self.assertEqual(skill.label, "劍術精通")
+        self.assertIn("劍術", skill.description)
+        self.assertIn("刀術", skill.description)
+        self.assertIs(skill.kind, SkillKind.PASSIVE)
+        self.assertEqual(skill.effects, ["passive_buff:blade_arts"])
+
+    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
+    def test_dual_blade_mastery_is_a_higher_tier_sibling(self):
+        skill = SKILL_REGISTRY["dual_blade_mastery"]
+        self.assertEqual(skill.label, "雙刀流·宗師級")
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertEqual(skill.cost, {"sp": 30})
+        self.assertIs(skill.element, ELEMENT_REGISTRY["dark"])
+        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+        self.assertEqual(skill.effects, ["damage:dark:physical"])
+
+        style = SKILL_REGISTRY["dual_wield_style"]
+        self.assertEqual(style.label, "雙持劍術")
+        self.assertEqual(style.cost, {"sp": 8})
+        self.assertEqual(style.effects, ["weapon_style:dual_wield"])
+
+
+class DualBladeMasteryCastTests(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="dual blade actor")
+        self.target = create_object(PlayerCharacter, key="dual blade target")
+        for entity in (self.actor, self.target):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        self.actor.db.skills = {"active": ["dual_blade_mastery"], "passive": []}
+        self.target.db.skills = {"active": [], "passive": []}
+        battlefield = Battlefield(
+            {
+                "party": frozenset({"dual blade actor"}),
+                "foes": frozenset({"dual blade target"}),
+            },
+            {"dual blade actor": self.actor, "dual blade target": self.target},
+        )
+        self.request = ActionRequest(
+            self.actor,
+            "dual_blade_mastery",
+            [self.target],
+            BattlefieldActionContext(battlefield),
+        )
+
+    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
+    def test_cast_resolves_via_damage_handler_without_dual_wield_style(self):
+        self.assertNotIn("dual_wield_style", self.actor.skills.owned_keys())
+        before = self.target.traits.hp.value
+        sp_before = self.actor.traits.sp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(self.request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(self.target.traits.hp.value, before)
+        self.assertEqual(
+            [entry.kind for entry in result.event_log.entries[:2]],
+            ["roll", "damage"],
+        )
+        self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
+
+    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
+    def test_dual_wield_style_ownership_has_no_bearing_on_cost(self):
+        self.actor.db.skills = {
+            "active": ["dual_blade_mastery", "dual_wield_style"],
+            "passive": [],
+        }
+        self.assertIn("dual_wield_style", self.actor.skills.owned_keys())
+        sp_before = self.actor.traits.sp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(self.request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
