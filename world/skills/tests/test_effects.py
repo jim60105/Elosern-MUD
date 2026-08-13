@@ -75,6 +75,16 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("movement:flight"),
             MovementEffect(mode="flight"),
         )
+        self.assertEqual(
+            parse_effect("movement:flash_step"),
+            MovementEffect(mode="flash_step"),
+        )
+
+    def test_movement_rejects_unrecognized_modes(self):
+        for effect in ("movement:swim", "movement:teleport", "movement:fly"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     def test_weapon_style_parses_into_its_dataclass(self):
         self.assertEqual(

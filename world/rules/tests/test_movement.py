@@ -54,3 +54,36 @@ class ChargeMovementTests(EvenniaTest):
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],
         )
+
+    @covers_requirement("movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function")
+    def test_flight_owner_is_waived_the_wilderness_move_cost(self):
+        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        before = get_world_clock().tick
+        charge_movement(self.char1, "wilderness_move")
+        self.assertEqual(get_world_clock().tick, before)
+
+    def test_flight_owner_still_pays_other_cost_keys(self):
+        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        before = get_world_clock().tick
+        charge_movement(self.char1, "move")
+        self.assertEqual(
+            get_world_clock().tick,
+            before + CLOCK_YAML["command_defaults"]["move"],
+        )
+
+    def test_non_flight_owner_pays_wilderness_move_normally(self):
+        before = get_world_clock().tick
+        charge_movement(self.char1, "wilderness_move")
+        self.assertEqual(
+            get_world_clock().tick,
+            before + CLOCK_YAML["command_defaults"]["wilderness_move"],
+        )
+
+    def test_flash_step_owner_does_not_get_the_wilderness_waiver(self):
+        self.char1.db.skills = {"active": [], "passive": ["flash_step"]}
+        before = get_world_clock().tick
+        charge_movement(self.char1, "wilderness_move")
+        self.assertEqual(
+            get_world_clock().tick,
+            before + CLOCK_YAML["command_defaults"]["wilderness_move"],
+        )

@@ -76,6 +76,69 @@ class MovementCostMixin:
     """
 
     movement_cost_key: str = "move"
+    # Opt-in per-exit flight gate (movement-skill-waiver). Off for every
+    # shipped exit; future map content sets it True on its exit typeclass.
+    requires_flight: bool = False
+
+    def access(
+        self,
+        accessing_obj,
+        access_type="access",
+        default=False,
+        no_superuser_bypass=False,
+        **kwargs,
+    ):
+        """Deny ``traverse`` access on a flight-required exit to non-owners.
+
+        Runs alongside every other lock on the exit: the flight gate is an
+        additional access condition, so a denied traverser hits the same
+        locked-exit path (never reaches ``at_traverse``, never charges, never
+        records) as a lock-denied one. Superusers keep the stock lock-bypass
+        semantics (unless ``no_superuser_bypass`` is set), so an admin can
+        always reach a flight-required area. Only the ``traverse`` access type
+        is gated; viewing, examining, and all other access types are untouched.
+        """
+        if (
+            access_type == "traverse"
+            and self.requires_flight
+            and not self._owns_movement_waiver(accessing_obj)
+            and not self._has_lock_bypass(accessing_obj, no_superuser_bypass)
+        ):
+            return False
+        return super().access(
+            accessing_obj,
+            access_type,
+            default=default,
+            no_superuser_bypass=no_superuser_bypass,
+            **kwargs,
+        )
+
+    def _owns_movement_waiver(self, traversing_object) -> bool:
+        """Return whether the traverser owns ``flight`` or ``flash_step``."""
+        skills = getattr(traversing_object, "skills", None)
+        if skills is None:
+            return False
+        owned = set(skills.owned_keys())
+        return bool(owned & {"flight", "flash_step"})
+
+    def _has_lock_bypass(self, accessing_obj, no_superuser_bypass: bool) -> bool:
+        """Mirror Evennia's stock lock-bypass (superuser) semantics.
+
+        The lock handler grants a superuser every access unless
+        ``no_superuser_bypass`` is set; the flight gate must not be stricter
+        than every other lock on the same exit.
+        """
+        if no_superuser_bypass:
+            return False
+        try:
+            if accessing_obj.locks.lock_bypass:
+                return True
+        except AttributeError:
+            pass
+        if getattr(accessing_obj, "is_superuser", False):
+            return True
+        account = getattr(accessing_obj, "account", None)
+        return bool(getattr(account, "is_superuser", False))
 
     def at_post_traverse(self, traversing_object, source_location, **kwargs):
         super().at_post_traverse(traversing_object, source_location, **kwargs)

@@ -64,13 +64,19 @@ class FlavorEffect:
     name: str
 
 
-# Cast-triggered movement and weapon-style effects (handlers land in later
+# Ownership-triggered movement waivers (flight/flash_step are PASSIVE) and
+# cast-triggered weapon-style effects (handlers land in later
 # skill-system-redesign proposals).
 @dataclass(frozen=True)
 class MovementEffect:
-    """Name the movement mode granted by this cast."""
+    """Name the movement mode granted by owning this skill.
 
-    mode: str
+    The waiver set is consumed by ``world.rules.movement.charge_movement``:
+    owning ``flight`` waives the ``wilderness_move`` clock cost, and owning
+    either mode passes any exit marked ``requires_flight``.
+    """
+
+    mode: Literal["flight", "flash_step"]
 
 
 @dataclass(frozen=True)
@@ -221,7 +227,12 @@ def parse_effect(effect_id: str) -> object:
     if prefix == "passive_trait":
         return FlavorEffect(name=_parse_single_arg(effect_id, prefix))
     if prefix == "movement":
-        return MovementEffect(mode=_parse_single_arg(effect_id, prefix))
+        mode = _parse_single_arg(effect_id, prefix)
+        if mode not in ("flight", "flash_step"):
+            raise ValueError(
+                f"movement effect mode must be flight or flash_step, got {effect_id!r}"
+            )
+        return MovementEffect(mode=mode)
     if prefix == "weapon_style":
         return WeaponStyleEffect(style=_parse_single_arg(effect_id, prefix))
     if prefix == "divine_mystery":

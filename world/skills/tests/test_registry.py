@@ -298,6 +298,15 @@ class SkillRegistryTests(unittest.TestCase):
                 key,
             )
 
+    @covers_requirement("skill-registry::flight-and-flash-step-are-passive")
+    def test_flight_and_flash_step_are_passive(self):
+        for key in ("flight", "flash_step"):
+            self.assertIs(
+                SKILL_REGISTRY[key].kind,
+                SkillKind.PASSIVE,
+                key,
+            )
+
     @covers_requirement("skill-registry::reincarnation-boon-yuna-s-effect-string-is-well-formed")
     def test_reincarnation_boon_yuna_parses_as_sexual_mastery_effect(self):
         parsed = SKILL_REGISTRY["reincarnation_boon_yuna"].parsed_effects
