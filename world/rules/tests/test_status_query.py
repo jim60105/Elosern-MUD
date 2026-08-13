@@ -105,6 +105,19 @@ class StatusReadModelTests(EvenniaTest):
         self.assertEqual(entry.severity, "warning")
 
     @covers_requirement(
+        "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
+    )
+    def test_owned_skill_adjustment_appears_in_status_conditions(self):
+        self.actor.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        model = build_status_read_model(self.actor)
+        entry = next(
+            c for c in model.conditions if c.code == "defense_instinct_defense_bonus"
+        )
+        self.assertEqual(entry.modifiers, {"defense": 5})
+        self.assertEqual(entry.severity, "beneficial")
+        self.assertEqual(entry.label, "防禦直覺防禦提升")
+
+    @covers_requirement(
         "webclient-status-presentation::status-presentation-has-no-mutation-side-effects"
     )
     def test_unmaterialized_sexual_baseline_remains_unmaterialized(self):

@@ -14,6 +14,17 @@ from world.rules.rulebook.schema import (
 )
 
 
+def _entity_owning(*skill_keys: str):
+    class _FakeSkills:
+        def owned_keys(self):
+            return list(skill_keys)
+
+    class _FakeEntity:
+        skills = _FakeSkills()
+
+    return _FakeEntity()
+
+
 class RulebookSchemaTests(TestCase):
     def _rules(self, content):
         with TemporaryDirectory() as directory:
@@ -52,6 +63,12 @@ class RulebookSchemaTests(TestCase):
                 {"buff_active": "fear"}, {"active_buffs": {"fear"}}
             )
         )
+        self.assertTrue(
+            evaluate_condition(
+                {"skill_owned": "blade_art_mastery"},
+                {"entity": _entity_owning("blade_art_mastery")},
+            )
+        )
         combined = {"field": "level", "gte": 3, "buff_active": "fear"}
         self.assertFalse(evaluate_condition(combined, {"level": 4}))
         self.assertTrue(
@@ -61,6 +78,7 @@ class RulebookSchemaTests(TestCase):
     @covers_requirement("rulebook-schema::evaluate-condition-is-the-one-shared-matcher-for-event-field-threshold", "rulebook-schema::every-rule-carries-a-required-unique-id")
     def test_missing_context_is_false_and_unknown_key_raises(self):
         self.assertFalse(evaluate_condition({"field": "level", "gte": 3}, {}))
+        self.assertFalse(evaluate_condition({"skill_owned": "x"}, {}))
         with self.assertRaisesRegex(ValueError, "unknown"):
             evaluate_condition({"unknown": "x"}, {})
 

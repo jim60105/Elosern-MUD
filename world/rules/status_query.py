@@ -252,6 +252,7 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
             context[field] = _LevelRef(_ordinal_of(levels, value), levels)
         elif isinstance(value, _LevelRef):
             context[field] = value
+    context["entity"] = entity
     return context
 
 

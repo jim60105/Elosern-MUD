@@ -75,7 +75,9 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     Reads the persisted buff cache and stored sexual traits or baseline without
     materializing ``entity.buffs`` or ``entity.sexual``. Returns a context
     accepted by :func:`matched_combat_modifiers` so preview and revalidation
-    never create a lazy handler or default attribute.
+    never create a persistent attribute or write state. The entity itself is
+    passed through for ``skill_owned`` conditions, which resolve against
+    ``entity.skills.owned_keys()`` (a pure stored-data read).
     """
     context: dict[str, Any] = {"active_buffs": active_buff_keys_from_storage(entity)}
     for field, levels in (("arousal", AROUSAL_LEVELS), ("climax_phase", CLIMAX_PHASE_LEVELS)):
@@ -84,6 +86,7 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
             context[field] = _StoredLevel(levels.index(value), levels)
         elif isinstance(value, _StoredLevel):
             context[field] = value
+    context["entity"] = entity
     return context
 
 
@@ -103,6 +106,7 @@ def _build_context(entity) -> dict[str, Any]:
     if sexual is not None:
         context["arousal"] = sexual.arousal
         context["climax_phase"] = sexual.climax_phase
+    context["entity"] = entity
     return context
 
 
@@ -133,10 +137,16 @@ def matched_combat_modifiers(
     This read-only query exposes the deterministic per-rule matches so
     presentation can show each condition without re-evaluating thresholds or
     reproducing modifier math. ``context`` is the condition context; when
-    omitted it is rebuilt from ``entity``.
+    omitted it is rebuilt from ``entity``. A caller-supplied context is
+    treated as a partial context: the entity is injected so ``skill_owned``
+    conditions always resolve against the real entity rather than silently
+    never matching.
     """
     if context is None:
         context = _build_context(entity)
+    else:
+        context = dict(context)
+        context.setdefault("entity", entity)
     matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
         if evaluate_condition(rule.when, context):
