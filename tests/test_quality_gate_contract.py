@@ -172,7 +172,7 @@ class QualityGateContractTests(unittest.TestCase):
         )
         self.assertEqual(
             upload["uses"],
-            "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac",
+            "codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f",
         )
         self.assertRegex(upload["uses"], r"codecov/codecov-action@[0-9a-f]{40}$")
         self.assertEqual(upload["with"]["token"], "${{ secrets.CODECOV_TOKEN }}")
