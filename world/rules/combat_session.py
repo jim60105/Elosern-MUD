@@ -255,6 +255,15 @@ def read_session(actor: Any) -> CombatSessionRecord | None:
         return from_storage(dict(raw))
     except CombatSessionError:
         raise
+    except (TypeError, ValueError) as error:
+        # Raw-conversion shape failures (a string or an integer payload, or
+        # an exotic iterable that from_storage cannot read) normalize to the
+        # malformed-session contract instead of leaking a bare conversion
+        # error to active-session queries and commands.
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "active_combat could not be converted to a session record",
+        ) from error
 
 
 _TOKEN_RE = None
@@ -1250,19 +1259,35 @@ def forfeit(actor: Any) -> dict[str, Any]:
 def restore_active_session(actor: Any) -> None:
     """Reconstruct a valid persisted session or terminate it diagnostically.
 
-    Missing, deleted, moved, duplicated, or malformed participants close the
-    session deterministically: hostile sessions settle as defeat, examinations
-    as FAIL, leaving no orphan opponent and no blocked player. A record that
-    already carries a durable ``settled_tick`` marker is never settled again:
-    its time already committed, so restoration only clears the leftover
-    session state (fix-combat-settlement-recovery D2).
+    The strict parse runs inside the recovery boundary: a record that cannot
+    be parsed at all (for example ``{"not": "a valid record"}``) is cleared
+    with a diagnostic and never settled, because its untrusted fields must
+    not drive a time settlement or participant effects. Missing, deleted,
+    moved, duplicated, or malformed participants of a well-formed record
+    close the session deterministically: hostile sessions settle as defeat,
+    examinations as FAIL, leaving no orphan opponent and no blocked player.
+    A record that already carries a durable ``settled_tick`` marker is never
+    settled again: its time already committed, so restoration only clears the
+    leftover session state (fix-combat-settlement-recovery D2). Unrelated
+    restoration or settlement failures propagate with the durable record
+    intact for retry.
     """
-    record = read_session(actor)
+    from evennia.utils.logger import log_warn
+
+    try:
+        record = read_session(actor)
+    except CombatSessionError as error:
+        # Unparseable payload: clear without settlement. The actor's own
+        # skip-safety registration is the only key gating the actor's skips,
+        # and untrusted ids must never drive participant cleanup.
+        log_warn(
+            f"combat_session: clearing unparseable session for {actor.key}: {error}"
+        )
+        clear_session(actor, None, None)
+        return
     if record is None:
         return
     if record.settled_tick is not None:
-        from evennia.utils.logger import log_warn
-
         log_warn(
             f"combat_session: skipping settlement of already-settled session "
             f"{record.session_id} (settled at tick {record.settled_tick})"
@@ -1271,14 +1296,7 @@ def restore_active_session(actor: Any) -> None:
         return
     try:
         battlefield = reconstruct_battlefield(actor, record)
-        outcome = _terminal_outcome(actor, battlefield, record)
-        if outcome is not None:
-            _settle_with_restore(actor, record, battlefield, outcome)
-            return
-        register_active_battlefield(battlefield)
-    except Exception as error:
-        from evennia.utils.logger import log_warn
-
+    except CombatSessionError as error:
         log_warn(
             f"combat_session: terminating invalid session for {actor.key}: {error}"
         )
@@ -1288,3 +1306,9 @@ def restore_active_session(actor: Any) -> None:
             None,
             "defeat" if record.mode == "hostile" else "exam_failed",
         )
+        return
+    outcome = _terminal_outcome(actor, battlefield, record)
+    if outcome is not None:
+        _settle_with_restore(actor, record, battlefield, outcome)
+        return
+    register_active_battlefield(battlefield)

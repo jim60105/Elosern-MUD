@@ -544,6 +544,130 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTest):
         self.assertFalse(is_in_active_session(self.player))
 
 
+class MalformedSessionNormalizationTests(BattlefieldIsolation, EvenniaTest):
+    """fix-malformed-combat-recovery: raw-conversion failures fail closed.
+
+    ``read_session`` normalizes every raw-conversion or strict-parsing
+    failure of the persisted payload into ``CombatSessionError`` with the
+    ``malformed_session`` reason, and every active-session query or command
+    inherits the normalization without leaking a bare ``TypeError`` or
+    ``ValueError``.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="malformed arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.monster = _monster("malformed goblin")
+        self.monster.location = self.room
+
+    def test_read_session_normalizes_malformed_payloads(self):
+        for payload in ({"not": "a valid record"}, 7, "not a dict"):
+            self.player.db.active_combat = payload
+            with self.assertRaises(CombatSessionError) as raised:
+                read_session(self.player)
+            self.assertEqual(
+                raised.exception.args[0], SessionReason.MALFORMED_SESSION
+            )
+            self.assertFalse(is_in_active_session(self.player))
+            if not isinstance(payload, dict):
+                # Raw-conversion failures chain the original conversion error
+                # for traceability (fix-malformed-combat-recovery D1).
+                self.assertIsInstance(
+                    raised.exception.__cause__, (TypeError, ValueError)
+                )
+
+    @covers_requirement("player-combat-session::malformed-session-payloads-fail-closed-without-unhandled-conversion-errors")
+    def test_engage_and_forfeit_reject_persisted_malformed_payload(self):
+        for payload in ({"not": "a valid record"}, 7, "not a dict"):
+            self.player.db.active_combat = payload
+            with self.assertRaises(CombatSessionError) as raised:
+                engage(self.player, self.monster)
+            self.assertEqual(
+                raised.exception.args[0], SessionReason.MALFORMED_SESSION
+            )
+            with self.assertRaises(CombatSessionError) as raised:
+                forfeit(self.player)
+            self.assertEqual(
+                raised.exception.args[0], SessionReason.MALFORMED_SESSION
+            )
+
+
+class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTest):
+    """fix-malformed-combat-recovery: startup clears unparseable records.
+
+    An unparseable persisted record is cleared with a diagnostic, never
+    settled: no world time advances and no participant effects derive from
+    the untrusted fields, and the player stays unblocked for ordinary hostile
+    engagement. Unrelated settlement failures leave a valid record intact.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="malformed recovery arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.monster = _monster("malformed recovery goblin")
+        self.monster.location = self.room
+
+    @covers_requirement("player-combat-session::startup-restores-valid-sessions-and-terminates-invalid-references-safely")
+    def test_restore_active_session_clears_malformed_record(self):
+        engage(self.player, self.monster)
+        self.player.db.active_combat = {"not": "a valid record"}
+        self.player.ndb.action_context = {"stale": True}
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        self.assertIn(str(self.player.pk), _BATTLEFIELDS)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            patch("world.rules.combat_session.settle_combat_result") as settle,
+        ):
+            restore_active_session(self.player)
+        settle.assert_not_called()
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertIsNone(self.player.ndb.action_context)
+        self.assertNotIn(str(self.player.pk), _BATTLEFIELDS)
+        self.assertEqual(clock.tick, 0)
+
+    @covers_requirement("player-combat-session::startup-restores-valid-sessions-and-terminates-invalid-references-safely")
+    def test_startup_clears_malformed_record_and_engage_succeeds(self):
+        from world.rules.guild_economy import restore_persisted_sessions
+
+        self.player.db.active_combat = {"not": "a valid record"}
+        restore_persisted_sessions()
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertFalse(is_in_active_session(self.player))
+        result = engage(self.player, self.monster)
+        self.assertEqual(result["record"].mode, "hostile")
+        self.assertIsNotNone(read_session(self.player))
+
+    def test_unrelated_settlement_failure_propagates_with_record_intact(self):
+        # A well-formed terminal session whose settlement raises is never
+        # re-settled as a defeat: the exception propagates (the startup
+        # wrapper logs it) with the durable record intact for exactly one
+        # retry and zero re-settlement attempts.
+        self.monster.traits.hp.base = 1
+        self.monster.traits.hp.current = 1
+        engage(self.player, self.monster)
+        self.monster.traits.hp.current = 0
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat_session.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.combat_session.settle_combat_result",
+                side_effect=RuntimeError("clock write failed"),
+            ) as settle,
+        ):
+            with self.assertRaises(RuntimeError):
+                restore_active_session(self.player)
+        settle.assert_called_once()
+        self.assertEqual(clock.tick, 0)
+        self.assertIsNotNone(self.player.db.active_combat)
+        self.assertTrue(is_in_active_session(self.player))
+
+
 class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
     """fix-combat-settlement-recovery: settled marker and atomic round chain."""
 
