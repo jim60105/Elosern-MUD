@@ -14,7 +14,10 @@ from typing import Any, Literal
 
 from jsonschema import Draft202012Validator
 
-from world.art.subjects import MAX_SUBJECT_KEY_BYTES
+from world.art.subjects import (
+    MAX_SUBJECT_KEY_BYTES,
+    is_reserved_player_stable_key,
+)
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
@@ -99,20 +102,48 @@ def _structural_issues(
     ]
 
 
-def _check_entity_key_contract(record: dict[str, Any]) -> list[Issue]:
-    """Mirror the shared art subject-key contract for imported entity keys.
+_DIGIT_ONLY_RESERVED_MESSAGE = (
+    "digit-only entity keys are reserved for player characters "
+    "(portrait stable-key collision)"
+)
 
-    The schema pattern excludes the reserved separators, the 64-code-point
-    bound, and C0/DEL/C1 controls structurally; this check mirrors
-    ``world.art.subjects._validate_subject_key`` (fix-art-pipeline-contracts
-    D1) for everything a regex cannot express: anything not ``isprintable()``
-    or in a Unicode ``C*`` category (format, surrogate, private-use etc.), and
-    keys exceeding the UTF-8 byte bound so the worker output filename always
-    stays within the filesystem name-length limit.
+
+def _digit_only_key_issues(record: dict[str, Any]) -> list[Issue]:
+    """Named rejection for the digit-only region reserved for player pks.
+
+    Runs in the structural phase (``validate_character``/``validate_world_entry``
+    append it alongside the schema issues): a digit-only key always fails the
+    schema pattern, so without this check the named message would never reach
+    the report once the semantic phase is skipped (fix-portrait-stable-key-
+    collision D2).
     """
     key = record.get("key")
     if not isinstance(key, str):
         return []
+    if is_reserved_player_stable_key(key):
+        return [Issue("key", _DIGIT_ONLY_RESERVED_MESSAGE)]
+    return []
+
+
+def _check_entity_key_contract(record: dict[str, Any]) -> list[Issue]:
+    """Mirror the shared art subject-key contract for imported entity keys.
+
+    The schema pattern excludes the reserved separators, the 64-code-point
+    bound, C0/DEL/C1 controls, and digit-only keys structurally; this check
+    mirrors ``world.art.subjects._validate_subject_key``
+    (fix-art-pipeline-contracts D1) for everything a regex cannot express:
+    anything not ``isprintable()`` or in a Unicode ``C*`` category (format,
+    surrogate, private-use etc.), and keys exceeding the UTF-8 byte bound so
+    the worker output filename always stays within the filesystem name-length
+    limit. The digit-only reservation (fix-portrait-stable-key-collision D2)
+    mirrors the schema's negative lookahead through the shared predicate.
+    """
+    key = record.get("key")
+    if not isinstance(key, str):
+        return []
+    reserved = _digit_only_key_issues(record)
+    if reserved:
+        return reserved
     for char in key:
         if not char.isprintable() or unicodedata.category(char).startswith("C"):
             return [
@@ -344,6 +375,11 @@ def _flag_duplicate_keys(
 def validate_character(record: dict[str, Any]) -> RecordReport:
     report = RecordReport(str(record.get("key", "<unknown>")), record=record)
     report.rejections.extend(_structural_issues(record, CHARACTER_SCHEMA_V1))
+    # The digit-only reservation is part of the structural phase: a digit-only
+    # key always fails the schema pattern, so its named message is appended
+    # here, before the semantic phase is skipped (fix-portrait-stable-key-
+    # collision D2).
+    report.rejections.extend(_digit_only_key_issues(record))
     if report.rejections:
         return report
     report.rejections.extend(_check_entity_key_contract(record))
@@ -359,6 +395,9 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
 def validate_world_entry(record: dict[str, Any]) -> RecordReport:
     report = RecordReport(str(record.get("key", "<unknown>")), record=record)
     report.rejections.extend(_structural_issues(record, WORLD_SCHEMA_V1))
+    # Same structural-phase placement as ``validate_character``: the named
+    # digit-only reservation message must reach the report.
+    report.rejections.extend(_digit_only_key_issues(record))
     if report.rejections:
         return report
     report.rejections.extend(_check_entity_key_contract(record))

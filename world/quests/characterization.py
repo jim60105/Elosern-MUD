@@ -20,6 +20,7 @@ from world.art.subjects import (
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
     MAX_SUBJECT_KEY_BYTES,
     MAX_SUBJECT_KEY_LENGTH,
+    is_reserved_player_stable_key,
 )
 
 # Bounded text/key caps for the characterization fields. ``stable_key`` obeys
@@ -77,7 +78,11 @@ def characterize_errors(
       ``None`` value is not an absence and rejects.
     - ``portrait``, when declared, is a mapping with exactly one ``stable_key``
       field whose value obeys the shared subject-key contract (bounded
-      non-empty text, no reserved separators, no control characters).
+      non-empty text, no reserved separators, no control characters) and is
+      not digit-only -- the digit-only region of the character-portrait
+      keyspace is reserved for player characters (whose stable keys are
+      ``str(pk)``), so a blueprint can never claim a player's portrait subject
+      (fix-portrait-stable-key-collision D2).
     """
     errors: list[str] = []
 
@@ -146,6 +151,12 @@ def characterize_errors(
                     errors.append(
                         f"portrait.stable_key exceeds the "
                         f"{MAX_STABLE_KEY_LENGTH}-character cap"
+                    )
+                elif is_reserved_player_stable_key(stable_key):
+                    errors.append(
+                        "portrait.stable_key is digit-only: the digit-only "
+                        "region of the character-portrait keyspace is reserved "
+                        "for player characters"
                     )
 
     if "persona" in entry:

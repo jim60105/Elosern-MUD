@@ -143,6 +143,34 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         self.assertTrue(characterize_errors(_entry(age=1300, apparent_age=1300), lifespan_upper_bound=1200))
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_digit_only_stable_key_rejects(self):
+        for stable_key in ("7", "42", "0"):
+            with self.subTest(stable_key=stable_key):
+                errors = characterize_errors(
+                    _entry(portrait={"stable_key": stable_key}),
+                    lifespan_upper_bound=80,
+                )
+                self.assertTrue(errors, stable_key)
+                self.assertIn(
+                    "reserved for player characters",
+                    " ".join(errors),
+                )
+
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_alphanumeric_stable_keys_still_pass(self):
+        for stable_key in ("bandit_02", "elf_300", "a1"):
+            with self.subTest(stable_key=stable_key):
+                self.assertEqual(
+                    characterize_errors(
+                        _entry(portrait={"stable_key": stable_key}),
+                        lifespan_upper_bound=80,
+                    ),
+                    [],
+                )
+
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_malformed_stable_key_rejects(self):
         for portrait in (
             {"stable_key": ""},

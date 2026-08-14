@@ -919,6 +919,18 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
                 with self.assertRaises(QuestCompileError):
                     compile_quest_blueprint(bad)
 
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_digit_only_stable_key_rejects_at_compile(self):
+        for stable_key in ("7", "42"):
+            with self.subTest(stable_key=stable_key):
+                bad = _characterized_payload()
+                bad["stages"][0]["npc_req"][0]["portrait"] = {
+                    "stable_key": stable_key
+                }
+                with self.assertRaises(QuestCompileError):
+                    compile_quest_blueprint(bad)
+
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
     def test_conflicting_duplicate_stable_key_rejects_at_compile(self):
         bad = _characterized_payload()

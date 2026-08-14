@@ -6,6 +6,7 @@ import unittest
 from evennia.utils.test_resources import EvenniaTest
 
 from world.art.subjects import (
+    DIGITS_ONLY_KEY_PATTERN,
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
     MAX_SUBJECT_KEY_BYTES,
     MAX_SUBJECT_KEY_LENGTH,
@@ -15,6 +16,7 @@ from world.art.subjects import (
     character_description,
     character_subject_for,
     description_for,
+    is_reserved_player_stable_key,
     monster_description,
     monster_subject_for,
     parse_subject,
@@ -159,6 +161,45 @@ class RegistryResolutionTests(unittest.TestCase):
                     scene_subject_for(bad)
                 with self.assertRaises(ArtSubjectError):
                     monster_subject_for(bad)
+
+
+class ReservedPlayerStableKeyTests(unittest.TestCase):
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_digit_only_keys_are_reserved(self):
+        for key in ("42", "7", "0", "042", "12345678901234567890"):
+            with self.subTest(key=key):
+                self.assertTrue(is_reserved_player_stable_key(key), key)
+
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_non_digit_keys_are_not_reserved(self):
+        for key in (
+            "forest_bandit_chief",
+            "library_keeper",
+            "bandit_02",
+            "a1b2c3",
+            "_42",
+            "42_",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(is_reserved_player_stable_key(key), key)
+
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_empty_and_whitespace_keys_are_not_reserved(self):
+        for key in ("", "   ", "\t42\n"):
+            with self.subTest(key=key):
+                self.assertFalse(is_reserved_player_stable_key(key), key)
+
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_unicode_digits_are_not_reserved(self):
+        # Full-width digits cannot equal an ASCII pk string, so they stay
+        # legal for non-player producers (design D1).
+        for key in ("０４２", "١٢٣", "42٠"):
+            with self.subTest(key=key):
+                self.assertFalse(is_reserved_player_stable_key(key), key)
+
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_pattern_constant_is_the_ascii_digits_class(self):
+        self.assertEqual(DIGITS_ONLY_KEY_PATTERN, r"[0-9]+")
 
 
 class PortraitPolicyTests(EvenniaTest):

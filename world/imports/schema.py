@@ -3,6 +3,7 @@
 import re
 
 from world.art.subjects import (
+    DIGITS_ONLY_KEY_PATTERN,
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
     MAX_SUBJECT_KEY_LENGTH,
 )
@@ -25,13 +26,18 @@ _NONNEGATIVE = {"type": "integer", "minimum": 0}
 # exactly the same rule set. The pattern uses absolute ``\\A``/``\\Z``
 # anchors so a trailing newline or any other excluded character fails the
 # whole-string match (the naive ``^...$`` form would let ``$`` match before
-# a final newline).
+# a final newline). The digit-only negative lookahead is derived from the
+# shared ``DIGITS_ONLY_KEY_PATTERN``: the digit-only region of the
+# character-portrait keyspace is reserved for player pks (``str(pk)``), so an
+# imported entity key can never collide with a player's portrait subject
+# (fix-portrait-stable-key-collision D1/D2).
 MAX_ENTITY_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 _FORBIDDEN_CLASS = "".join(
     re.escape(char) for char in sorted(FORBIDDEN_SUBJECT_KEY_CHARACTERS)
 )
 ENTITY_KEY_PATTERN_V1 = (
-    rf"\A[^{_FORBIDDEN_CLASS}\x00-\x1f\x7f\x80-\x9f]{{1,{MAX_ENTITY_KEY_LENGTH}}}\Z"
+    rf"\A(?!{DIGITS_ONLY_KEY_PATTERN}\Z)"
+    rf"[^{_FORBIDDEN_CLASS}\x00-\x1f\x7f\x80-\x9f]{{1,{MAX_ENTITY_KEY_LENGTH}}}\Z"
 )
 _ENTITY_KEY_RULES = {
     "type": "string",
