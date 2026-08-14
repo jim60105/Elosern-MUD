@@ -2,7 +2,10 @@
 
 from .catalog import register_catalog
 from .compile import payload_to_registrations, register_restored_quest
-from .deadlines import settle_quest_deadlines
+from .deadlines import (
+    settle_quest_deadlines,
+    snapshot_quest_deadline_surfaces,
+)
 from .generated_quest_store import list_payloads
 from .planner import quest_event_effect_planner
 from world.rules.action import register_event_effect_planner
@@ -35,4 +38,8 @@ def sync_quest_runtime() -> None:
     restore_generated_quests()
     register_catalog()
     register_event_effect_planner("quest", quest_event_effect_planner)
-    register_event_source("quest_deadlines", settle_quest_deadlines)
+    register_event_source(
+        "quest_deadlines",
+        settle_quest_deadlines,
+        snapshot_quest_deadline_surfaces,
+    )

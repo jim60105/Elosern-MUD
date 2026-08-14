@@ -1,6 +1,6 @@
 """Player-driven deterministic world time and settlement ordering."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from math import floor, gcd
@@ -55,7 +55,38 @@ _STAGE_ORDER = (
     "npc_schedules",
     "instance_reclamation",
 )
-_EVENT_SOURCES: dict[str, Callable[[int, int], list["ScheduledEvent"]]] = {}
+
+
+@dataclass
+class SurfaceSnapshot:
+    """One object's durable pre-advance state, captured by a pure read.
+
+    ``attributes`` maps ``(key, category)`` to ``(existed, deepcopy(value))``
+    exactly as the shared ``attribute_snapshot`` helper returns. ``location``
+    is ``(existed, pre-advance db_location pk)`` when the declaring source may
+    move the object: the location is stored as a plain primary key, never a
+    live object, because a room deleted inside the rolled-back transaction has
+    ``pk = None`` on its stale instance and restoring ``db_location`` from that
+    instance would orphan the moved occupant.
+    """
+
+    attributes: dict[tuple[str, str | None], tuple[bool, Any]]
+    location: tuple[bool, int] | None = None
+
+
+@dataclass(frozen=True)
+class EventSourceRegistration:
+    """One registered boundary-stage source plus its advance-surface contract.
+
+    ``surfaces`` is ``None`` for a read-only seam (or a test/synthetic
+    source): ``advance()`` performs no snapshot or restore for it.
+    """
+
+    settle: Callable[[int, int], list["ScheduledEvent"]]
+    surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None
+
+
+_EVENT_SOURCES: dict[str, EventSourceRegistration] = {}
 
 
 class DaypartError(ValueError):
@@ -194,9 +225,22 @@ def _try_accrue_magic_study(entities: tuple[Any, ...], seconds: int, source: Adv
     accrue_magic_study(entities, seconds, source)
 
 
-def register_event_source(kind: str, source: Callable[[int, int], list[ScheduledEvent]]) -> None:
-    """Register a boundary-query seam owned by a future subsystem."""
-    _EVENT_SOURCES[kind] = source
+def register_event_source(
+    kind: str,
+    source: Callable[[int, int], list[ScheduledEvent]],
+    surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None,
+) -> None:
+    """Register a boundary-query seam owned by a future subsystem.
+
+    ``surfaces`` is the optional advance-surface contract: a pure, read-only
+    callable ``(start_tick, end_tick) -> mapping[id(obj), SurfaceSnapshot]``
+    that re-discovers, with the same deterministic queries its settlement
+    uses, every object the source may write and snapshots each durable
+    surface. A source that writes durable state SHALL ship a contract; a
+    source registered with ``surfaces=None`` is a read-only seam (or a test
+    seam) and is never snapshotted or restored by ``advance()``.
+    """
+    _EVENT_SOURCES[kind] = EventSourceRegistration(source, surfaces)
 
 
 def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any, ...]) -> list[ScheduledEvent]:
@@ -208,9 +252,9 @@ def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any,
                 reset_daily_counters(entity)
         events.append(ScheduledEvent("daily_reset", day * _DAY_SECONDS, {}))
     for kind in _STAGE_ORDER[5:]:
-        source = _EVENT_SOURCES.get(kind)
-        if source is not None:
-            events.extend(source(start_tick, end_tick))
+        registration = _EVENT_SOURCES.get(kind)
+        if registration is not None:
+            events.extend(registration.settle(start_tick, end_tick))
     return events
 
 
@@ -238,19 +282,6 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
 ) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
 
 
-def _snapshot_advance_entities(entities: tuple[Any, ...]) -> dict[int, dict[str, tuple[bool, Any]]]:
-    """Snapshot the durable surfaces ``advance`` may write on each entity."""
-    snapshots: dict[int, dict[str, tuple[bool, Any]]] = {}
-    for entity in entities:
-        if not hasattr(entity, "attributes"):
-            continue
-        snapshots[id(entity)] = {
-            key: attribute_snapshot(entity, key, category)
-            for key, category in _ADVANCE_ENTITY_SURFACES
-        }
-    return snapshots
-
-
 def _snapshot_clock_tick(clock: "WorldClock") -> tuple[int, tuple[bool, Any] | None]:
     """Snapshot the in-memory tick and the persisted tick attribute."""
     script = getattr(clock, "_script", None)
@@ -272,17 +303,187 @@ def _restore_clock_tick(
         restore_attribute_best_effort(script, "tick", tick_snapshot)
 
 
-def _restore_advance_entities(
-    entities: tuple[Any, ...],
-    snapshots: dict[int, dict[str, tuple[bool, Any]]],
-) -> None:
-    """Restore snapshotted surfaces and refresh caches after a rolled-back advance."""
+def build_advance_snapshot_registry(
+    clock: "WorldClock",
+    seconds: int,
+    source: AdvanceSource,
+    entities: Iterable[Any],
+) -> dict[int, SurfaceSnapshot]:
+    """Build the merged pre-advance snapshot registry, keyed by object id.
+
+    Merges, by object identity: (a) the existing caller-entity surfaces
+    (``_ADVANCE_ENTITY_SURFACES``, unchanged), then (b) every registered
+    stage kind's advance-surface contract in ``_STAGE_ORDER[5:]`` order. A
+    caller-supplied entity that a contract also discovers (a player with a
+    due quest, a schedule-tagged NPC) is snapshotted once with the union of
+    surfaces. Kinds registered without a contract are skipped entirely, so
+    plain advances never run contract DB queries; a raising contract fails
+    the advance before any write (fail-closed, no partial state).
+
+    This is the outer-owner seam: an outer ``transaction.atomic()`` wrapping
+    ``advance()`` (the movement and cast settlement changes) SHALL build this
+    registry before its transaction opens and restore it together with the
+    clock-tick snapshot after an outer-commit failure, so callback-owned
+    surfaces are covered whichever boundary fails.
+    """
+    registry: dict[int, SurfaceSnapshot] = {}
     for entity in entities:
-        snapshot = snapshots.get(id(entity))
-        if snapshot is None:
+        if not hasattr(entity, "attributes"):
             continue
-        for key, category in _ADVANCE_ENTITY_SURFACES:
-            restore_attribute_best_effort(entity, key, snapshot[key], category)
+        registry[id(entity)] = SurfaceSnapshot(
+            attributes={
+                (key, category): attribute_snapshot(entity, key, category)
+                for key, category in _ADVANCE_ENTITY_SURFACES
+            }
+        )
+    for kind in _STAGE_ORDER[5:]:
+        registration = _EVENT_SOURCES.get(kind)
+        if registration is None or registration.surfaces is None:
+            continue
+        for obj_id, snapshot in registration.surfaces(clock.tick, clock.tick + seconds).items():
+            existing = registry.get(obj_id)
+            if existing is None:
+                registry[obj_id] = snapshot
+            else:
+                existing.attributes.update(snapshot.attributes)
+                if snapshot.location is not None:
+                    existing.location = snapshot.location
+    return registry
+
+
+def _flush_deleted_instance(obj: Any) -> None:
+    """Force a cached-but-deleted instance out of the idmapper cache.
+
+    ``delete()`` evicts only when ``at_idmapper_flush()`` returns True, which
+    ``TypedObject`` overrides to False when the object holds any NAttribute,
+    so a deleted instance can survive in the cache with ``pk = None``. The
+    next fetch must re-read the rolled-back rows, so the entry is removed by
+    identity from the shared instance cache.
+    """
+    from evennia.objects.models import ObjectDB
+
+    cache = getattr(ObjectDB, "__instance_cache__", None)
+    if cache is None:
+        return
+    for key, instance in list(cache.items()):
+        if instance is obj:
+            del cache[key]
+
+
+def _restore_advance_location(obj: Any, target_pk: int) -> None:
+    """Re-point one moved object at its pre-advance room after a rollback.
+
+    The target is re-fetched by its snapshot pk: after the rollback the rows
+    are back, and a cached-but-deleted target instance is flushed first so the
+    fetch returns a fresh live object. The location setter reconciles the
+    source and destination rooms' contents caches; the re-fetched room's
+    contents cache is then reset so the next read agrees with the database. A
+    vanished target is skipped with a bounded diagnostic.
+    """
+    from evennia.objects.models import ObjectDB
+    from evennia.utils.logger import log_warn
+
+    # A deleted instance that survived eviction stays in the cache under its
+    # ORIGINAL pk key (Django nulls ``pk`` only after the collector finishes,
+    # so the cached entry can no longer be found by comparing ``pk``); flush
+    # it by key so the fetch below re-reads the rolled-back rows.
+    cache = getattr(ObjectDB, "__instance_cache__", None)
+    if cache is not None:
+        stale = cache.get(target_pk)
+        if stale is not None and getattr(stale, "_is_deleted", False):
+            _flush_deleted_instance(stale)
+    target = ObjectDB.objects.filter(id=target_pk).first()
+    if target is None:
+        log_warn(
+            f"clock advance could not restore {obj} to room #{target_pk}: "
+            "the room vanished after rollback"
+        )
+        return
+    obj.location = target
+    target.contents_cache.clear()
+
+
+def _restore_registry_attribute(
+    obj: Any,
+    key: str,
+    category: str | None,
+    snapshot: tuple[bool, Any],
+) -> None:
+    """Restore one registry attribute, degrading to a cache reset on failure.
+
+    Writes the snapshot value directly instead of through the shared
+    ``restore_attribute`` deepcopy: a contract surface may embed live database
+    objects (the instance contract's ``owned_entities``), which plain
+    ``deepcopy`` cannot copy; Evennia's ``attributes.add`` re-encodes through
+    ``dbserialize`` and handles them natively.
+    """
+    from evennia.utils.logger import log_warn
+
+    existed, value = snapshot
+    try:
+        if existed:
+            obj.attributes.add(key, value, category=category)
+        else:
+            obj.attributes.remove(key, category=category)
+    except Exception as error:
+        try:
+            obj.attributes.reset_cache()
+        except Exception:
+            pass
+        log_warn(f"clock advance could not restore {key!r} on {obj}: {error}")
+
+
+def _restore_advance_registry(
+    registry: dict[int, SurfaceSnapshot],
+    entities: Iterable[Any],
+) -> None:
+    """Restore every registry surface after a rolled-back advance.
+
+    For each registry entry: an object deleted during settlement is skipped
+    (its still-cached deleted instance, when NAttributes kept it, is flushed
+    so the next fetch re-reads the rolled-back rows); each attribute surface
+    is restored; an optional location surface re-fetches the pre-advance room
+    by its snapshot pk and assigns it through the location setter. Objects are
+    resolved from the caller's own entities first -- a caller-supplied
+    instance evicted from the idmapper without deletion (a theoretical
+    maintenance path; nothing flushes the cache inside a synchronous
+    ``advance()``) is still restored from the caller's reference -- then from
+    the idmapper cache for contract-discovered objects. Caller-scope entities
+    finish with the existing trait/sexual cache refresh.
+    """
+    from evennia.objects.models import ObjectDB
+
+    objects: dict[int, Any] = {id(obj): obj for obj in entities}
+    objects.update(
+        {id(obj): obj for obj in ObjectDB.get_all_cached_instances()}
+    )
+    for obj_id, snapshot in registry.items():
+        obj = objects.get(obj_id)
+        if obj is None:
+            continue
+        if getattr(obj, "_is_deleted", False):
+            _flush_deleted_instance(obj)
+            continue
+        for key, category in snapshot.attributes:
+            _restore_registry_attribute(
+                obj, key, category, snapshot.attributes[(key, category)]
+            )
+        if snapshot.location is not None:
+            existed, target_pk = snapshot.location
+            try:
+                if existed:
+                    _restore_advance_location(obj, target_pk)
+                else:
+                    obj.location = None
+            except Exception as error:
+                from evennia.utils.logger import log_warn
+
+                log_warn(
+                    f"clock advance could not restore the location of {obj}: {error}"
+                )
+    for entity in entities:
+        if not hasattr(entity, "attributes"):
+            continue
         _refresh_advance_entity_caches(entity)
 
 
@@ -321,7 +522,7 @@ class WorldClock:
                 f"advance of {seconds}s exceeds the {MAX_ADVANCE_SECONDS}s bound"
             )
         scope = tuple(entities)
-        snapshots = _snapshot_advance_entities(scope)
+        registry = build_advance_snapshot_registry(self, seconds, source, scope)
         tick_snapshot = _snapshot_clock_tick(self)
         try:
             with transaction.atomic():
@@ -332,7 +533,7 @@ class WorldClock:
                     persist(self.tick)
         except Exception:
             _restore_clock_tick(self, tick_snapshot)
-            _restore_advance_entities(scope, snapshots)
+            _restore_advance_registry(registry, scope)
             raise
         return events
 

@@ -13,11 +13,43 @@ from evennia.utils.logger import log_warn
 
 from typeclasses.npcs import NPC
 from typeclasses.components import Merchant
-from world.rules.clock import CLOCK_YAML, ScheduledEvent, register_event_source
+from world.rules.clock import CLOCK_YAML, ScheduledEvent, SurfaceSnapshot, register_event_source
 from world.rules.guild_config import get_catalog
+from world.rules.surfaces import attribute_snapshot
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 _HOUR_SECONDS = int(CLOCK_YAML["seconds_per_hour"])
+
+
+def _merchant_surface_keys() -> tuple[str, ...]:
+    """The host-attribute keys backing ``Merchant``'s restock DBFields.
+
+    Component DBFields persist as host attributes keyed
+    ``"{slot}::{field}"`` with no category (evennia contrib
+    ``components.dbfield``); the keys stay next to the ``Merchant``
+    declaration so a key drift fails the behavioral test, not silently.
+    """
+    slot = Merchant.get_component_slot()
+    return (f"{slot}::merchant_stock", f"{slot}::last_restock_day")
+
+
+def snapshot_caravan_arrival_surfaces(
+    start_tick: int, end_tick: int
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot the durable surfaces ``settle_caravan_arrivals`` may write.
+
+    The advance-surface contract for the ``caravan_arrivals`` source: the
+    restock host attributes of every NPC host carrying the ``Merchant``
+    component, using the same ``_merchants()`` discovery as settlement. Pure
+    read: no attribute, location, or tag changes.
+    """
+    keys = _merchant_surface_keys()
+    registry: dict[int, SurfaceSnapshot] = {}
+    for host, _ in _merchants():
+        registry[id(host)] = SurfaceSnapshot(
+            attributes={(key, None): attribute_snapshot(host, key) for key in keys}
+        )
+    return registry
 
 
 def _current_boundary_day(end_tick: int, restock_hour: int) -> int:
@@ -149,4 +181,8 @@ def settle_caravan_arrivals(start_tick: int, end_tick: int) -> list[ScheduledEve
 
 def register_caravan_arrivals() -> None:
     """Register the ``caravan_arrivals`` clock source idempotently."""
-    register_event_source("caravan_arrivals", settle_caravan_arrivals)
+    register_event_source(
+        "caravan_arrivals",
+        settle_caravan_arrivals,
+        snapshot_caravan_arrival_surfaces,
+    )

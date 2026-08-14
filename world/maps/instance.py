@@ -3,6 +3,7 @@ seams that keep a due room alive or resolve its non-player occupants
 (map-instance)."""
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 from django.conf import settings
@@ -14,7 +15,14 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
 from typeclasses.exits import Exit
 from typeclasses.rooms import InstanceRoom
-from world.rules.clock import ScheduledEvent, get_world_clock, register_event_source
+from world.rules.clock import (
+    ScheduledEvent,
+    SurfaceSnapshot,
+    get_world_clock,
+    register_event_source,
+)
+from world.rules.map_knowledge import KNOWLEDGE_ATTR
+from world.rules.surfaces import attribute_snapshot
 
 INSTANCE_PROTOTYPE_WHITELIST: tuple[str, ...] = ("instance_room",)
 
@@ -23,6 +31,31 @@ INSTANCE_YAML = yaml.safe_load(
         encoding="utf-8"
     )
 )
+
+_INSTANCE_ROOM_SURFACES: tuple[str, ...] = (
+    "expire_tick",
+    "named",
+    "interacted",
+    "pin_reasons",
+    "owned_entities",
+)
+
+
+def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
+    """Snapshot one attribute whose value may embed live database objects.
+
+    ``owned_entities`` unpacks to live ``LivingEntity`` instances, which a
+    plain ``deepcopy`` cannot copy (Evennia objects carry a ``DbHolder`` in
+    their instance dict); the ``dbserialize`` round-trip is the established
+    deepcopy for values that may embed database objects.
+    """
+    from evennia.utils.dbserialize import from_pickle, to_pickle
+
+    exists = obj.attributes.has(key)
+    value = (
+        from_pickle(to_pickle(obj.attributes.get(key))) if exists else None
+    )
+    return exists, value
 
 
 def _validate_prototype_parent(prototype: dict) -> None:
@@ -234,6 +267,65 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
     return events
 
 
+def snapshot_instance_reclamation_surfaces(
+    start_tick: int, end_tick: int
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot the durable surfaces ``reclaim_due_instances`` may write.
+
+    The advance-surface contract for the ``instance_reclamation`` source:
+    every ``InstanceRoom``'s reclaimable fields, every player's
+    ``map_knowledge`` record (which ``prune_reclaimed_room`` may rewrite),
+    and the ``location`` of every non-owned ``LivingEntity`` occupant (the
+    ``_clear_non_player_entities`` relocation set, stored as a plain pk so a
+    reclaimed room can be re-fetched fresh after rollback). Pure read: no
+    attribute, location, or tag changes.
+    """
+    registry: dict[int, SurfaceSnapshot] = {}
+    for room in InstanceRoom.objects.all():
+        attributes = {
+            (key, None): attribute_snapshot(room, key)
+            for key in _INSTANCE_ROOM_SURFACES
+            if key != "owned_entities"
+        }
+        attributes[("owned_entities", None)] = _db_safe_attribute_snapshot(
+            room, "owned_entities"
+        )
+        registry[id(room)] = SurfaceSnapshot(attributes=attributes)
+    for character in _characters_with_map_knowledge():
+        snapshot = registry.get(id(character))
+        if snapshot is None:
+            registry[id(character)] = SurfaceSnapshot(
+                attributes={("map_knowledge", None): attribute_snapshot(character, "map_knowledge")}
+            )
+        else:
+            snapshot.attributes[("map_knowledge", None)] = attribute_snapshot(
+                character, "map_knowledge"
+            )
+    for room in InstanceRoom.objects.all():
+        owned = {obj for obj in (room.db.owned_entities or []) if obj and obj.pk}
+        for entity in list(room.contents):
+            if not isinstance(entity, LivingEntity) or entity in owned:
+                continue
+            registry[id(entity)] = SurfaceSnapshot(
+                attributes={},
+                location=(True, int(room.pk)),
+            )
+    return registry
+
+
+def _characters_with_map_knowledge() -> list[Any]:
+    """Every ``PlayerCharacter`` that already carries ``map_knowledge``."""
+    return list(
+        PlayerCharacter.objects.all_family().filter(
+            db_attributes__db_key=KNOWLEDGE_ATTR
+        )
+    )
+
+
 def register_instance_reclamation() -> None:
     """Register this module's reclamation as the live boundary-stage source."""
-    register_event_source("instance_reclamation", reclaim_due_instances)
+    register_event_source(
+        "instance_reclamation",
+        reclaim_due_instances,
+        snapshot_instance_reclamation_surfaces,
+    )

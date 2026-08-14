@@ -258,5 +258,142 @@ class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
         self.assertFalse(InstanceRoom.objects.filter(id=room.id).exists())
 
 
+class DeadlineRollbackCacheTests(QuestRegistryIsolation, EvenniaTest):
+    """A rolled-back advance restores quest logs and room pins (F5).
+
+    ``WorldClock.advance`` snapshots every durable surface the
+    ``quest_deadlines`` contract declares -- the player's ``quest_log`` and
+    each bound room's ``pin_reasons`` -- and restores them after a later
+    stage or the final persist fails, so the in-process cache never serves
+    state the rolled-back transaction did not commit.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import world.rules.clock as clock_module
+
+        self.player = create_object(PlayerCharacter, key="deadline-rollback-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.hours = 3600
+        self.due = register(quest("deadline_rollback_due", deadline_hours=2))
+        self._sources = dict(clock_module._EVENT_SOURCES)
+
+    def tearDown(self):
+        import world.rules.clock as clock_module
+
+        clock_module._EVENT_SOURCES.clear()
+        clock_module._EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    def _accept_bound(self):
+        from world.quests.definitions import QuestStage
+
+        bound_def = register(
+            quest(
+                "deadline_rollback_bound",
+                deadline_hours=2,
+                stages=(QuestStage(0, reach(bound_instance_locator())),),
+            )
+        )
+        with patch("world.quests.runtime._current_tick", return_value=0):
+            record = accept_quest(self.player, bound_def.key)
+        room = create_object(InstanceRoom, key="deadline-rollback-room")
+        bind_stage_runtime(self.player, record.quest_id, room=room)
+        return room
+
+    def _raw_attribute(self, obj, key):
+        row = (
+            obj.db_attributes.through.objects.filter(
+                objectdb_id=obj.pk, attribute__db_key=key
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+        return None if row is None else row
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_later_stage_failure_restores_quest_log_and_pins(self):
+        from world.maps.instance import snapshot_instance_reclamation_surfaces
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import get_world_clock, register_event_source
+
+        room = self._accept_bound()
+        before_log = list(self.player.db.quest_log)
+        before_pins = list(room.db.pin_reasons)
+        sync_quest_runtime()
+
+        def raising_settle(start_tick, end_tick):
+            raise RuntimeError("simulated later-stage failure")
+
+        register_event_source(
+            "instance_reclamation",
+            raising_settle,
+            snapshot_instance_reclamation_surfaces,
+        )
+        clock = get_world_clock()
+        before_tick = clock.tick
+        with self.assertRaises(RuntimeError):
+            clock.advance(2 * self.hours, AdvanceSource.SKIP, [self.player])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(self.player.db.quest_log, before_log)
+        self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
+        self.assertEqual(room.db.pin_reasons, before_pins)
+        self.assertEqual(self._raw_attribute(room, "pin_reasons"), before_pins)
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_failing_final_persist_restores_quest_log_and_pins(self):
+        from evennia.utils.search import search_script
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import get_world_clock
+
+        room = self._accept_bound()
+        before_log = list(self.player.db.quest_log)
+        before_pins = list(room.db.pin_reasons)
+        sync_quest_runtime()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        script = search_script("world_clock")[0]
+
+        def failing_persist(tick):
+            script.db.tick = tick
+            raise RuntimeError("simulated persist failure")
+
+        clock._persist = failing_persist
+        with self.assertRaises(RuntimeError):
+            clock.advance(2 * self.hours, AdvanceSource.SKIP, [self.player])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        self.assertEqual(self.player.db.quest_log, before_log)
+        self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
+        self.assertEqual(room.db.pin_reasons, before_pins)
+        self.assertEqual(self._raw_attribute(room, "pin_reasons"), before_pins)
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_successful_advance_with_a_due_deadline_still_commits(self):
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import get_world_clock
+
+        room = self._accept_bound()
+        sync_quest_runtime()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        events = clock.advance(2 * self.hours, AdvanceSource.SKIP, [self.player])
+        self.assertTrue(
+            any(event.kind == "quest_deadline_expired" for event in events)
+        )
+        stored = [to_storage(record) for record in read_records(self.player)][0]
+        self.assertEqual(stored["state"], "failed")
+        self.assertEqual(stored["failure_reason"], "deadline_expired")
+        self.assertEqual(stored["stage_room_id"], None)
+        self.assertEqual(room.db.pin_reasons, [])
+        self.assertEqual(clock.tick, before_tick + 2 * self.hours)
+        self.assertEqual(get_world_clock().tick, before_tick + 2 * self.hours)
+        self.assertEqual(self._raw_attribute(self.player, "quest_log"), self.player.db.quest_log)
+
+
 if __name__ == "__main__":
     unittest.main()

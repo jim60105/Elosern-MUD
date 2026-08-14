@@ -13,18 +13,26 @@ from world.rules.clock import (
     DaypartError,
     MAX_ADVANCE_SECONDS,
     ScheduledEvent,
+    SurfaceSnapshot,
     WorldClock,
     WorldDateTime,
     _STAGE_ORDER,
+    _EVENT_SOURCES,
     _has_settlement_work,
+    _restore_advance_registry,
+    _restore_clock_tick,
     _settle_buffs_and_decay,
     _settle_gauge_regen,
+    _snapshot_clock_tick,
     _try_accrue_magic_study,
+    build_advance_snapshot_registry,
     settle_combat_result,
     register_event_source,
     seconds_until_daypart,
 )
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import PlayerCharacter
 
 
 class Gauge:
@@ -396,3 +404,301 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before_tick)
         self.assertEqual(self.player.traits.hp.current, 10)
         self.assertEqual(self._stored_hp(), 10)
+
+
+class _FakeAttributeStore:
+    """Minimal in-memory attribute handler for pure registry unit tests."""
+
+    def __init__(self, values):
+        self._values = dict(values)
+
+    def has(self, key, category=None):
+        return (key, category) in self._values
+
+    def get(self, key, category=None):
+        return self._values.get((key, category))
+
+
+class AdvanceSurfaceContractUnitTests(unittest.TestCase):
+    """Pure unit tests for the merged snapshot-registry builder (D2)."""
+
+    def setUp(self):
+        self._sources = dict(_EVENT_SOURCES)
+
+    def tearDown(self):
+        _EVENT_SOURCES.clear()
+        _EVENT_SOURCES.update(self._sources)
+
+    def _entity(self, marker):
+        return SimpleNamespace(
+            attributes=_FakeAttributeStore(
+                {("traits", "traits"): {"hp": marker}, ("buffs", None): [marker]}
+            )
+        )
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_registry_merges_caller_and_contract_surfaces_by_identity(self):
+        caller = self._entity(1)
+        discovered = self._entity(2)
+        register_event_source(
+            "quest_deadlines",
+            lambda start, end: [],
+            lambda start, end: {
+                id(caller): SurfaceSnapshot(
+                    attributes={("quest_log", None): (True, ["due"])}
+                ),
+                id(discovered): SurfaceSnapshot(
+                    attributes={("mark", None): (True, "x")}
+                ),
+            },
+        )
+        registry = build_advance_snapshot_registry(
+            WorldClock(), 60, AdvanceSource.SKIP, [caller]
+        )
+        # The caller entity appears once, with the union of both surfaces.
+        self.assertEqual(len(registry), 2)
+        caller_snapshot = registry[id(caller)]
+        self.assertIn(("traits", "traits"), caller_snapshot.attributes)
+        self.assertIn(("quest_log", None), caller_snapshot.attributes)
+        self.assertEqual(caller_snapshot.attributes[("quest_log", None)], (True, ["due"]))
+        # The contract-only object carries only its declared surface.
+        self.assertEqual(
+            registry[id(discovered)].attributes,
+            {("mark", None): (True, "x")},
+        )
+
+    def test_kinds_without_a_contract_are_skipped_by_the_builder(self):
+        called = []
+        register_event_source(
+            "caravan_arrivals",
+            lambda start, end: called.append("settle") or [],
+        )
+        registry = build_advance_snapshot_registry(
+            WorldClock(), 60, AdvanceSource.SKIP, []
+        )
+        self.assertEqual(registry, {})
+        self.assertEqual(called, [])
+
+    def test_contracts_run_in_stage_order(self):
+        order = []
+        for kind in ("caravan_arrivals", "shop_hours", "quest_deadlines"):
+            register_event_source(
+                kind,
+                lambda start, end: [],
+                lambda start, end, kind=kind: order.append(kind) or {},
+            )
+        build_advance_snapshot_registry(WorldClock(), 60, AdvanceSource.SKIP, [])
+        self.assertEqual(order, ["caravan_arrivals", "shop_hours", "quest_deadlines"])
+
+    def test_a_raising_contract_fails_the_advance_before_any_write(self):
+        register_event_source(
+            "npc_schedules",
+            lambda start, end: [],
+            lambda start, end: (_ for _ in ()).throw(RuntimeError("contract failed")),
+        )
+        with self.assertRaises(RuntimeError):
+            build_advance_snapshot_registry(WorldClock(), 60, AdvanceSource.SKIP, [])
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_stage_sequence_and_day_bound_are_unchanged(self):
+        self.assertEqual(
+            _STAGE_ORDER,
+            (
+                "gauge_regen",
+                "buff_ticks",
+                "sexual_decay",
+                "magic_study",
+                "daily_resets",
+                "caravan_arrivals",
+                "shop_hours",
+                "quest_deadlines",
+                "npc_schedules",
+                "instance_reclamation",
+            ),
+        )
+        self.assertEqual(MAX_ADVANCE_SECONDS, 86400)
+
+
+class AdvanceSurfaceContractTests(EvenniaTest):
+    """Completeness guard and pure-read contract behavior (D4/D5)."""
+
+    def setUp(self):
+        super().setUp()
+        self._sources = dict(_EVENT_SOURCES)
+
+    def tearDown(self):
+        _EVENT_SOURCES.clear()
+        _EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    @covers_requirement("world-clock::every-registered-boundary-stage-source-declares-the-durable-surfaces-it-may-write")
+    def test_completeness_guard_writing_sources_declare_contracts(self):
+        from world.maps.instance import register_instance_reclamation
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.caravan_arrivals import register_caravan_arrivals
+        from world.rules.npc_schedules import register_npc_schedules
+        from world.rules.shop_hours import register_shop_hours
+
+        sync_quest_runtime()
+        register_caravan_arrivals()
+        register_npc_schedules()
+        register_instance_reclamation()
+        register_shop_hours()
+        for kind in (
+            "caravan_arrivals",
+            "quest_deadlines",
+            "npc_schedules",
+            "instance_reclamation",
+        ):
+            registration = _EVENT_SOURCES[kind]
+            self.assertIsNotNone(
+                registration.surfaces,
+                f"{kind} writes durable state and must declare a contract",
+            )
+        self.assertIsNone(
+            _EVENT_SOURCES["shop_hours"].surfaces,
+            "shop_hours is a read-only seam and must not declare a contract",
+        )
+
+    def test_synthetic_two_argument_source_still_runs_without_a_contract(self):
+        entity = Entity()
+        clock = WorldClock(86399)
+        register_event_source(
+            "caravan_arrivals",
+            lambda start, end: [ScheduledEvent("caravan", end, {"key": "x"})],
+        )
+        events = clock.advance(2, AdvanceSource.COMBAT, [entity])
+        self.assertEqual([event.kind for event in events], ["daily_reset", "caravan"])
+
+    @covers_requirement("world-clock::every-registered-boundary-stage-source-declares-the-durable-surfaces-it-may-write")
+    def test_contract_is_a_pure_read_that_never_mutates_state(self):
+        from typeclasses.npcs import NPC
+        from world.rules.npc_schedules import (
+            SCHEDULE_TAG,
+            set_npc_schedule,
+            snapshot_npc_schedule_surfaces,
+        )
+
+        npc = create_object(NPC, key="pure-read-npc", location=self.room1)
+        set_npc_schedule(
+            npc,
+            {
+                "schema_version": 1,
+                "entries": [
+                    {"tick_offset": 21600, "kind": "state", "state": "resting"}
+                ],
+            },
+        )
+        npc.db.schedule_state = "duty"
+        before_state = npc.db.schedule_state
+        before_location = npc.location
+        snapshot_npc_schedule_surfaces(0, 86400)
+        self.assertEqual(npc.db.schedule_state, before_state)
+        self.assertIs(npc.location, before_location)
+        self.assertTrue(npc.tags.has(SCHEDULE_TAG))
+
+    def test_contracts_run_before_any_stage_write(self):
+        order = []
+        from world.rules.clock import _settle_boundary_stages
+
+        register_event_source(
+            "quest_deadlines",
+            lambda start, end: order.append("settle") or [],
+            lambda start, end: order.append("contract") or {},
+        )
+        with patch("world.rules.clock._settle_boundary_stages", wraps=_settle_boundary_stages):
+            WorldClock().advance(60, AdvanceSource.COMBAT, [Entity()])
+        self.assertEqual(order, ["contract", "settle"])
+
+    @covers_requirement("world-clock::advance-has-a-bounded-settlement-budget-per-call")
+    def test_oversized_advance_raises_before_contracts_run(self):
+        called = []
+        register_event_source(
+            "quest_deadlines",
+            lambda start, end: [],
+            lambda start, end: called.append(True) or {},
+        )
+        with self.assertRaises(ClockAdvanceBoundError):
+            WorldClock().advance(MAX_ADVANCE_SECONDS + 1, AdvanceSource.SKIP, [Entity()])
+        self.assertEqual(called, [])
+
+
+class OuterOwnerSeamTests(EvenniaTest):
+    """The outer-owner seam: registry plus tick snapshot/restore around an
+    outer transaction (D6, consumed by the movement/cast settlement changes)."""
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.runtime import QUEST_DEFINITION_REGISTRY
+
+        self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._sources = dict(_EVENT_SOURCES)
+        self.player = create_object(PlayerCharacter, key="outer-seam-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.hours = 3600
+
+    def tearDown(self):
+        from world.quests.runtime import QUEST_DEFINITION_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._registry_items)
+        _EVENT_SOURCES.clear()
+        _EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    def _accept_due(self):
+        from world.quests.tests._fixtures import quest, register
+
+        self.due = register(quest("outer_seam_due", deadline_hours=1))
+        with patch("world.quests.runtime._current_tick", return_value=0):
+            from world.quests.runtime import accept_quest
+
+            return accept_quest(self.player, self.due.key)
+
+    def _raw_attribute(self, obj, key):
+        """The raw stored Attribute row value for ``key``, read via SQL only.
+
+        Reads through the ``db_attributes`` M2M join without instantiating any
+        idmapper-cached Attribute model, so the value proves the database row
+        (after rollback) rather than any in-process cache.
+        """
+        row = (
+            obj.db_attributes.through.objects.filter(
+                objectdb_id=obj.pk, attribute__db_key=key
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+        return None if row is None else row
+
+    @covers_requirement("world-clock::advance-persists-the-tick-and-entity-state-atomically")
+    def test_outer_commit_failure_restores_registry_and_tick(self):
+        from django.db import transaction
+        from evennia.utils.search import search_script
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import get_world_clock
+
+        self._accept_due()
+        sync_quest_runtime()
+        clock = get_world_clock()
+        script = search_script("world_clock")[0]
+        before_tick = clock.tick
+        before_log = list(self.player.db.quest_log)
+
+        registry = build_advance_snapshot_registry(
+            clock, 2 * self.hours, AdvanceSource.SKIP, [self.player]
+        )
+        tick_snapshot = _snapshot_clock_tick(clock)
+        with transaction.atomic():
+            clock.advance(2 * self.hours, AdvanceSource.SKIP, [self.player])
+            # Simulate an outer-commit failure: the block exits rolled back
+            # with no exception, leaving every cache advanced.
+            transaction.set_rollback(True)
+        _restore_clock_tick(clock, tick_snapshot)
+        _restore_advance_registry(registry, [self.player])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        self.assertEqual(self.player.db.quest_log, before_log)
+        self.assertEqual(self._raw_attribute(self.player, "quest_log"), before_log)
