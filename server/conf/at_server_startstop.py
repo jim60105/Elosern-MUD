@@ -171,17 +171,22 @@ def at_server_start():
     sync_all()
     sync_limbo()
     sync_grid()
+    # Every world-event clock source must be registered before any startup
+    # operation can advance time: the service interiors, quest runtime, guild
+    # economy, guard, and NPC-schedule syncs all move ahead of session
+    # restoration so a recovery settlement runs the complete stage set
+    # (fix-startup-clock-source-order D1).
+    sync_service_interiors()
+    sync_quest_runtime()
+    sync_guild_economy()
+    sync_guard_npc()
+    sync_npc_schedules()
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a
     # committed session must not be deleted or respawned first
     # (fix-startup-session-restore-order D1).
     restore_persisted_sessions()
     sync_wilderness()
-    sync_service_interiors()
-    sync_quest_runtime()
-    sync_guild_economy()
-    sync_guard_npc()
-    sync_npc_schedules()
 
     # Prompt library: validate every YAML prompt file and mark broken keys
     # unavailable. Failures are bounded per key and logged; server startup

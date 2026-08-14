@@ -68,11 +68,33 @@ class NoGenerativeImportTests(unittest.TestCase):
             source.index("sync_wilderness()"),
         )
 
+    def test_startup_registers_every_clock_source_before_session_restoration(self):
+        # Every world-event clock source must be registered before any startup
+        # operation can advance time: the five syncs that register the quest,
+        # caravan, shop-hours, and NPC-schedule stages all run before session
+        # restoration, and restoration still precedes wilderness sync
+        # (fix-startup-clock-source-order D1).
+        from server.conf.at_server_startstop import at_server_start
+
+        source = inspect.getsource(at_server_start)
+        for sync in (
+            "sync_service_interiors()",
+            "sync_quest_runtime()",
+            "sync_guild_economy()",
+            "sync_guard_npc()",
+            "sync_npc_schedules()",
+        ):
+            with self.subTest(sync=sync):
+                self.assertLess(source.index(sync), source.index("restore_persisted_sessions()"))
+
     @covers_requirement("player-combat-session::startup-restores-combat-sessions-before-wilderness-population-reconciliation")
+    @covers_requirement("player-combat-session::startup-combat-restoration-advances-time-only-after-every-deterministic-clock-source-is-registered")
     def test_startup_invokes_restore_before_wilderness_sync(self):
         # Behavioral twin of the source-order guard above: every startup step
         # is stubbed, so the assertion covers the actual invocation sequence of
-        # the composition root, not its source text.
+        # the composition root, not its source text. All five clock-source
+        # syncs must run strictly before session restoration, which runs
+        # strictly before wilderness reconciliation.
         from contextlib import ExitStack
         from unittest.mock import patch
 
@@ -118,6 +140,18 @@ class NoGenerativeImportTests(unittest.TestCase):
             for patcher in patchers:
                 stack.enter_context(patcher)
             at_server_start()
+        for sync in (
+            "sync_service_interiors",
+            "sync_quest_runtime",
+            "sync_guild_economy",
+            "sync_guard_npc",
+            "sync_npc_schedules",
+        ):
+            self.assertLess(
+                order.index(sync),
+                order.index("restore_persisted_sessions"),
+                f"{sync} must run before session restoration",
+            )
         self.assertLess(
             order.index("restore_persisted_sessions"),
             order.index("sync_wilderness"),

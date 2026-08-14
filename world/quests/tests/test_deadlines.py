@@ -156,9 +156,63 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTest):
         )
 
     def test_server_start_calls_quest_sync_after_map_sync(self):
+        # The quest runtime sync must run after the lore/map syncs but before
+        # session restoration and wilderness reconciliation, so a recovery
+        # advance settles with ``quest_deadlines`` registered
+        # (fix-startup-clock-source-order D1).
         source = inspect.getsource(at_server_start)
         self.assertIn("sync_quest_runtime()", source)
-        self.assertLess(source.index("sync_wilderness()"), source.index("sync_quest_runtime()"))
+        self.assertLess(source.index("sync_all()"), source.index("sync_quest_runtime()"))
+        self.assertLess(source.index("sync_grid()"), source.index("sync_quest_runtime()"))
+        self.assertLess(source.index("sync_quest_runtime()"), source.index("sync_wilderness()"))
+
+
+class StartupRecoveryDeadlineTests(QuestRegistryIsolation, EvenniaTest):
+    """A startup recovery advance fails quests due inside its window (F8)."""
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.monsters import Monster
+
+        self.player = create_object(PlayerCharacter, key="deadline-recovery-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.monster = create_object(Monster, key="荒原野豬", location=self.room1)
+        self.monster.threat_tier = "low"
+        self.monster.apply_monster_tier("floor")
+        self.due = register(quest("recovery_due", deadline_hours=1))
+        self.hours = 3600
+
+    @covers_requirement("player-combat-session::startup-combat-restoration-advances-time-only-after-every-deterministic-clock-source-is-registered")
+    def test_recovery_advance_fails_a_quest_deadline_inside_its_window(self):
+        from dataclasses import replace
+
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session import _persist, engage, read_session
+        from world.rules.guild_economy import restore_persisted_sessions
+
+        with patch("world.quests.runtime._current_tick", return_value=0):
+            record = accept_quest(self.player, self.due.key)
+        self.assertEqual(record.deadline_tick, self.hours)
+        # A well-formed hostile session whose accumulated rounds cross the
+        # deadline tick (600 rounds x 6 s = 3600 s), with its recorded enemy
+        # gone: restoration terminates it as invalid and settles the window.
+        engage(self.player, self.monster)
+        session = read_session(self.player)
+        _persist(self.player, replace(session, rounds_elapsed=600))
+        self.monster.delete()
+
+        # The deterministic startup sequence registers the quest deadline
+        # source before session restoration (fix-startup-clock-source-order
+        # D1), so the deadline due inside the recovery window fails.
+        sync_quest_runtime()
+        restore_persisted_sessions()
+
+        stored = [to_storage(r) for r in read_records(self.player)][0]
+        self.assertEqual(stored["state"], "failed")
+        self.assertEqual(stored["failure_reason"], "deadline_expired")
+        self.assertEqual(get_world_clock().tick, self.hours)
 
 
 class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
