@@ -16,7 +16,7 @@ const CharacterMenu = require("../elosern/character_menu.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "character",
       traits: [
@@ -30,6 +30,7 @@ function validPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
+      persona: { background: null },
     },
     overrides || {}
   );
@@ -82,4 +83,23 @@ test("an undisguised actor has no disguise section", () => {
   const menu = CharacterMenu.buildMenu(validPanel());
   const labels = menu.items.map((item) => item.label);
   assert.ok(!labels.includes("偽裝"));
+});
+
+test("persona background renders as a display-only row when present", () => {
+  const menu = CharacterMenu.buildMenu(
+    validPanel({ persona: { background: "在公會登記的新人冒險者" } })
+  );
+  const labels = menu.items.map((item) => item.label);
+  assert.ok(labels.includes("背景"));
+  assert.ok(labels.includes("背景：在公會登記的新人冒險者"));
+  menu.items.forEach((item) => {
+    assert.equal(item.enabled, false);
+    assert.equal(item.actionId, null);
+  });
+});
+
+test("a character without a background renders no persona row", () => {
+  const menu = CharacterMenu.buildMenu(validPanel());
+  const labels = menu.items.map((item) => item.label);
+  assert.ok(!labels.includes("背景"));
 });

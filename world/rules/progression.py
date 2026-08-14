@@ -1,11 +1,13 @@
 """Deterministic magic-level and skill-practice progression rules."""
 
+from collections.abc import Sequence
+from math import floor, isfinite
 from pathlib import Path
-from math import isfinite
 from typing import Any, Iterable
 
 import yaml
 
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import growth_rate_multiplier
 from world.rules.clock import AdvanceSource
@@ -27,7 +29,27 @@ SKILL_PROFICIENCY_XP_PER_LEVEL = float(
     PROGRESSION_YAML["skill_proficiency_xp_per_level"]
 )
 SKILL_PRACTICE_XP_PER_USE = float(PROGRESSION_YAML["skill_practice_xp_per_use"])
+AFFINITY_ELEMENT_MULTIPLIER = float(
+    PROGRESSION_YAML["affinity_element_multiplier"]
+)
+NON_AFFINITY_ELEMENT_MULTIPLIER = float(
+    PROGRESSION_YAML["non_affinity_element_multiplier"]
+)
 MAGIC_GROWTH_MULTIPLIER_PREFIX = "growth_rate:magic:"
+
+
+def _validate_nonnegative_multiplier(value: float, name: str) -> None:
+    """Fail closed on a non-finite or negative balance constant (design D5)."""
+    if not isfinite(value) or value < 0:
+        raise ValueError(
+            f"progression constant {name} must be finite and non-negative"
+        )
+
+
+_validate_nonnegative_multiplier(AFFINITY_ELEMENT_MULTIPLIER, "affinity_element_multiplier")
+_validate_nonnegative_multiplier(
+    NON_AFFINITY_ELEMENT_MULTIPLIER, "non_affinity_element_multiplier"
+)
 
 # Display rank bands from world lore (skill-system-redesign design doc §4.1).
 # The lore table writes the top band as "90+"; scanning the bands in order
@@ -67,21 +89,84 @@ def magic_rank_title(entity: Any) -> str:
     raise ValueError(f"magic level {level:g} falls outside every rank band")
 
 
+def _affinity_elements(entity: Any) -> list[str]:
+    """Return the validated lowercase affinity-element keys or an empty list.
+
+    Reads ``entity.db.affinity_elements`` when the Evennia attribute handler
+    exists (real characters, monsters, and NPCs), and falls back to a plain
+    ``affinity_elements`` attribute so pure in-memory test entities stay
+    supported. Evennia returns ``_SaverList`` wrappers (not ``list``), so the
+    check accepts any non-string sequence. An absent or empty collection reads
+    as neutral.
+    """
+    db = getattr(entity, "db", None)
+    value = None
+    if db is not None:
+        value = getattr(db, "affinity_elements", None)
+    if value is None:
+        value = getattr(entity, "affinity_elements", None)
+    if not value:
+        return []
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("affinity_elements must be a sequence of element keys")
+    return [str(entry) for entry in value]
+
+
+def element_affinity_multiplier(entity: Any, element: str) -> float:
+    """Return the finite per-element effective-level multiplier (element-affinity D2).
+
+    Pure read-only query over ``entity.db.affinity_elements``: exactly ``1.1``
+    when ``element`` is a declared affinity, ``0.9`` when the entity declares
+    affinities and ``element`` is not among them, and exactly ``1.0`` for an
+    entity with no declared affinities (the current-behavior-preserving
+    default). An unrecognized element key raises ``ValueError``. Never writes
+    any entity attribute.
+    """
+    if element not in ELEMENT_REGISTRY:
+        raise ValueError(f"unknown element {element!r}")
+    affinities = _affinity_elements(entity)
+    if not affinities:
+        return 1.0
+    if element in affinities:
+        return AFFINITY_ELEMENT_MULTIPLIER
+    return NON_AFFINITY_ELEMENT_MULTIPLIER
+
+
+def _element_effective_magic_level(entity: Any, element: str) -> int:
+    """Return ``floor(magic_level * element_affinity_multiplier)`` (design D1).
+
+    The element-effective level is a transient gate-only value: it is never a
+    stored trait, never replaces ``magic_level``, and never changes
+    ``magic_level.max``. It exists only for the ``can_cast_spell_tier``
+    comparison.
+    """
+    return floor(
+        float(entity.traits.magic_level.value)
+        * element_affinity_multiplier(entity, element)
+    )
+
+
 def can_cast_spell_tier(entity: Any, element: str, tier: str) -> bool:
     """Return whether an entity may cast one tier of one element's spells.
 
-    ``True`` when the entity's numeric magic level meets the tier's threshold,
-    or unconditionally when the entity directly owns that element's
-    ``<element>_mastery`` skill. Conferred grants never satisfy the mastery
-    override (design doc D4/D6): only ``entity.skills.owned_keys()`` counts,
-    never ``conferred_grants()``.
+    The element key is validated against ``ELEMENT_REGISTRY`` first and an
+    unrecognized element raises ``ValueError`` even when the entity owns a
+    fabricated ``<element>_mastery`` (design D6, fail-closed). ``True`` when
+    the entity directly owns that element's ``<element>_mastery`` skill
+    (unconditionally), or when the element-effective magic level
+    ``floor(magic_level × element_affinity_multiplier)`` meets the tier's
+    threshold. Conferred grants never satisfy the mastery override (design doc
+    D4/D6): only ``entity.skills.owned_keys()`` counts, never
+    ``conferred_grants()``.
     """
+    if element not in ELEMENT_REGISTRY:
+        raise ValueError(f"unknown element {element!r}")
     if f"{element}_mastery" in entity.skills.owned_keys():
         return True
     threshold = MAGIC_TIER_THRESHOLDS.get(tier)
     if threshold is None:
         raise ValueError(f"unknown magic tier {tier!r}")
-    return float(entity.traits.magic_level.value) >= threshold
+    return _element_effective_magic_level(entity, element) >= threshold
 
 
 def _race_learning_multiplier(entity: Any) -> float:

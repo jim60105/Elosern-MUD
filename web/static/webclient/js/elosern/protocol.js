@@ -152,6 +152,7 @@
   var CREATION_MAX_DESCRIPTION = 512;
   var CREATION_MAX_EMPHASIS = 256;
   var CREATION_MAX_BACKGROUND = 256;
+  var CREATION_MAX_PERSONA_BACKGROUND = 600;
   var CREATION_MAX_SUBRACE_KEY = 64;
   var CREATION_MAX_SPECIALTY = 256;
   var CREATION_MAX_LABEL = 128;
@@ -162,6 +163,16 @@
   var CREATION_PRESET_STAGE = "preset_selected";
   var CREATION_CUSTOM_STAGE = "custom_filled";
   var CREATION_CONCEPT_STAGE = "concept_filled";
+  // Affinity picker bounds (mirror of web.webclient.presentation.creation and
+  // the deterministic max_affinity_elements mapping). The race maxima are
+  // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
+  // elements.
+  var CREATION_MAX_AFFINITY_ELEMENTS = 8;
+  var CREATION_AFFINITY_ELEMENTS = [
+    "fire", "water", "wind", "earth", "lightning", "ice", "light", "dark",
+  ];
+  var CREATION_AFFINITY_RACES = ["human", "beastfolk", "elf"];
+  var CREATION_AFFINITY_MAXIMUMS = { human: 2, beastfolk: 1, elf: 0 };
 
   var MESSAGE_NAMES = {
     ui_snapshot: true,
@@ -180,7 +191,7 @@
     services: 1,
     creation: 1,
     exploration: 1,
-    character: 1,
+    character: 2,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -1818,7 +1829,7 @@
     requireExactFields(
       value,
       "custom",
-      ["name", "adult", "races", "subraces", "profiles"],
+      ["name", "adult", "races", "subraces", "profiles", "affinity"],
       []
     );
     validateCreationName(value.name);
@@ -1832,7 +1843,94 @@
       throw new Error("profiles must be a non-empty list within its bound");
     }
     value.profiles.forEach(validateCreationProfile);
+    validateCreationAffinity(value.affinity);
     return value;
+  }
+
+  function validateCreationAffinity(value) {
+    if (!isPlainObject(value)) {
+      throw new Error("affinity must be an object");
+    }
+    var keys = Object.keys(value).sort().join(",");
+    if (keys !== CREATION_AFFINITY_RACES.slice().sort().join(",")) {
+      throw new Error("affinity must map human, beastfolk, and elf");
+    }
+    CREATION_AFFINITY_RACES.forEach(function (raceKey) {
+      validateCreationRaceAffinity(value[raceKey], raceKey);
+    });
+  }
+
+  function validateCreationRaceAffinity(value, raceKey) {
+    requireExactFields(value, "affinity " + raceKey, ["maximum", "elements"], []);
+    var maximum = requireInt(value.maximum, "maximum", 0, MAX_SAFE_INTEGER);
+    if (maximum !== CREATION_AFFINITY_MAXIMUMS[raceKey]) {
+      throw new Error(
+        "affinity " + raceKey + " maximum does not match the race bound"
+      );
+    }
+    if (
+      !Array.isArray(value.elements) ||
+      value.elements.length === 0 ||
+      value.elements.length > CREATION_MAX_AFFINITY_ELEMENTS
+    ) {
+      throw new Error("affinity elements must be a non-empty bounded list");
+    }
+    var seen = {};
+    var elementKeys = [];
+    value.elements.forEach(function (entry) {
+      requireExactFields(entry, "affinity element", ["key", "label"], []);
+      var key = validateIdentifier(entry.key, "affinity key");
+      if (CREATION_AFFINITY_ELEMENTS.indexOf(key) === -1) {
+        throw new Error("affinity key " + key + " is not a lore element");
+      }
+      if (seen[key]) {
+        throw new Error("affinity element keys must be unique");
+      }
+      seen[key] = true;
+      elementKeys.push(key);
+      requireString(entry.label, "affinity label", CREATION_MAX_LABEL);
+      if (!entry.label.trim()) {
+        throw new Error("affinity element label must be non-empty");
+      }
+    });
+    var expected = CREATION_AFFINITY_ELEMENTS.slice().sort();
+    if (elementKeys.slice().sort().join(",") !== expected.join(",")) {
+      throw new Error("affinity elements must be exactly the eight lore elements");
+    }
+  }
+
+  function validateCreationDraftAffinity(value, raceKey) {
+    if (value === null) {
+      return [];
+    }
+    if (!Array.isArray(value)) {
+      throw new Error("affinity_elements must be a list or null");
+    }
+    if (value.length > CREATION_MAX_AFFINITY_ELEMENTS) {
+      throw new Error("affinity_elements exceeds its bound");
+    }
+    if (raceKey === "elf" && value.length > 0) {
+      throw new Error(
+        "an elf must not supply affinity_elements; the subrace is the authority"
+      );
+    }
+    if (value.length > CREATION_AFFINITY_MAXIMUMS[raceKey]) {
+      throw new Error(
+        "affinity_elements exceeds the " + raceKey + " maximum of " +
+        CREATION_AFFINITY_MAXIMUMS[raceKey]
+      );
+    }
+    var seen = {};
+    value.forEach(function (entry) {
+      if (CREATION_AFFINITY_ELEMENTS.indexOf(entry) === -1) {
+        throw new Error("unknown affinity element " + entry);
+      }
+      if (seen[entry]) {
+        throw new Error("duplicate affinity element " + entry);
+      }
+      seen[entry] = true;
+    });
+    return value.slice();
   }
 
   function validateCreationDraft(value) {
@@ -1861,7 +1959,7 @@
       requireExactFields(
         value,
         "custom draft",
-        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background_generated"],
+        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "background_generated", "affinity_elements"],
         []
       );
       if (value.stage !== CREATION_CUSTOM_STAGE) {
@@ -1882,10 +1980,15 @@
       if (codePoints(race) > CREATION_MAX_RACE_KEY) {
         throw new Error("draft race exceeds its bound");
       }
-      if (value.subrace !== null) {
-        var subrace = validateIdentifier(value.subrace, "draft subrace");
-        if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
-          throw new Error("draft subrace exceeds its bound");
+      var subrace = validateIdentifier(value.subrace, "draft subrace");
+      if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("draft subrace exceeds its bound");
+      }
+      var background = value.background;
+      if (background !== null) {
+        background = requireString(background, "draft background", CREATION_MAX_PERSONA_BACKGROUND);
+        if (!background.trim()) {
+          background = null;
         }
       }
       return {
@@ -1895,16 +1998,18 @@
         age: value.age,
         apparent_age: value.apparent_age,
         race: race,
-        subrace: value.subrace,
+        subrace: subrace,
         allocations: validateCreationDraftAllocations(value),
+        background: background,
         background_generated: value.background_generated,
+        affinity_elements: validateCreationDraftAffinity(value.affinity_elements, race),
       };
     }
     if (value.mode === "concept") {
       requireExactFields(
         value,
         "concept draft",
-        ["mode", "stage", "race", "subrace", "allocations", "background_generated"],
+        ["mode", "stage", "race", "subrace", "allocations", "background", "background_generated"],
         []
       );
       if (value.stage !== CREATION_CONCEPT_STAGE) {
@@ -1917,18 +2022,24 @@
       if (codePoints(conceptRace) > CREATION_MAX_RACE_KEY) {
         throw new Error("draft race exceeds its bound");
       }
-      if (value.subrace !== null) {
-        var conceptSubrace = validateIdentifier(value.subrace, "draft subrace");
-        if (codePoints(conceptSubrace) > CREATION_MAX_SUBRACE_KEY) {
-          throw new Error("draft subrace exceeds its bound");
+      var conceptSubrace = validateIdentifier(value.subrace, "draft subrace");
+      if (codePoints(conceptSubrace) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("draft subrace exceeds its bound");
+      }
+      var conceptBackground = value.background;
+      if (conceptBackground !== null) {
+        conceptBackground = requireString(conceptBackground, "draft background", CREATION_MAX_PERSONA_BACKGROUND);
+        if (!conceptBackground.trim()) {
+          conceptBackground = null;
         }
       }
       return {
         mode: "concept",
         stage: CREATION_CONCEPT_STAGE,
         race: conceptRace,
-        subrace: value.subrace,
+        subrace: conceptSubrace,
         allocations: validateCreationDraftAllocations(value),
+        background: conceptBackground,
         background_generated: value.background_generated,
       };
     }
@@ -2462,7 +2573,21 @@
     return value;
   }
 
-  // Exact available character panel v1 schema (design D10).
+  var CHARACTER_MAX_BACKGROUND = 600;
+
+  function validateCharacterPersona(value) {
+    requireExactFields(value, "persona", ["background"], []);
+    if (value.background === null) {
+      return { background: null };
+    }
+    var background = requireString(value.background, "persona.background", CHARACTER_MAX_BACKGROUND);
+    if (!background.trim()) {
+      return { background: null };
+    }
+    return { background: background.trim() };
+  }
+
+  // Exact available character panel v2 schema (design D10).
   function validateCharacterPanel(payload) {
     if (payload.available === false) {
       // The common unavailable discriminator; validateStatusPanel handles it.
@@ -2473,11 +2598,10 @@
     requireExactFields(
       payload,
       "character panel",
-      ["schema_version", "available", "kind", "traits", "passives", "equipment", "disguise", "guild", "wallet"],
+      ["schema_version", "available", "kind", "traits", "passives", "equipment", "disguise", "guild", "wallet", "persona"],
       []
     );
-    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
@@ -2505,9 +2629,10 @@
     validateCharacterDisguise(payload.disguise);
     validateCharacterGuild(payload.guild);
     requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
+    var persona = validateCharacterPersona(payload.persona);
 
     var result = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -2516,6 +2641,7 @@
       disguise: payload.disguise,
       guild: payload.guild,
       wallet: payload.wallet,
+      persona: persona,
     };
     // Envelope guarantee (design D10): an over-limit payload fails closed.
     if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
@@ -2983,6 +3109,7 @@
     CHARACTER_MAX_LABEL: CHARACTER_MAX_LABEL,
     CHARACTER_MAX_DESCRIPTION: CHARACTER_MAX_DESCRIPTION,
     CHARACTER_MAX_SLOT: CHARACTER_MAX_SLOT,
+    CHARACTER_MAX_BACKGROUND: CHARACTER_MAX_BACKGROUND,
     CREATION_MAX_PRESETS: CREATION_MAX_PRESETS,
     CREATION_MAX_RACES: CREATION_MAX_RACES,
     CREATION_MAX_SUBRACES: CREATION_MAX_SUBRACES,
@@ -2999,6 +3126,7 @@
     CREATION_MAX_DESCRIPTION: CREATION_MAX_DESCRIPTION,
     CREATION_MAX_EMPHASIS: CREATION_MAX_EMPHASIS,
     CREATION_MAX_BACKGROUND: CREATION_MAX_BACKGROUND,
+    CREATION_MAX_PERSONA_BACKGROUND: CREATION_MAX_PERSONA_BACKGROUND,
     CREATION_MAX_SUBRACE_KEY: CREATION_MAX_SUBRACE_KEY,
     CREATION_MAX_SPECIALTY: CREATION_MAX_SPECIALTY,
     CREATION_MAX_LABEL: CREATION_MAX_LABEL,

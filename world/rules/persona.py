@@ -1,13 +1,17 @@
 """Read-only persona handler over an entity's verbatim persona record.
 
-``PersonaStore`` reads the opaque persona dict stored verbatim on
-``entity.db.persona`` by ``world/imports/loader.py`` (the only writer) and
-exposes keyed retrieval plus bounded prompt-block flattening over the
-``personality``, ``life_story``, and ``habit`` fields. The handler carries no
-write API, imports no state-mutating module, and never touches traits,
-attributes beyond the single persona record, or the world clock. A missing,
-malformed, or content-free record always degrades to ``None`` rather than
-raising, so a persona can never break a look or a conversation.
+``PersonaStore`` reads the opaque persona dict stored on ``entity.db.persona``
+and exposes keyed retrieval plus bounded prompt-block flattening over the
+``personality``, ``life_story``, and ``habit`` fields (and an explicitly
+requested ``background`` field). The handler carries no write API, imports no
+state-mutating module, and never touches traits, attributes beyond the single
+persona record, or the world clock. A missing, malformed, or content-free
+record always degrades to ``None`` rather than raising, so a persona can never
+break a look or a conversation.
+
+``PersonaStore`` is read-only; persona records are written only by the import
+loader, the ``world.rules`` deterministic services (activation and
+``world.rules.persona_edit``), or the scene-builder characterization seam.
 """
 
 from collections.abc import Mapping
@@ -21,20 +25,23 @@ BLOCK_LIMIT = 2000
 
 _TRUNCATION_MARKER = "…"
 
-# Canonical Traditional Chinese labels for the three flattened fields. Unknown
-# fields fall back to their raw key as the label.
+# Canonical Traditional Chinese labels for the flattened fields. ``background``
+# is included only when explicitly requested by the caller; unknown fields fall
+# back to their raw key as the label.
 _FIELD_LABELS = {
     "personality": "性格：",
     "life_story": "人生經歷：",
     "habit": "習慣：",
+    "background": "背景：",
 }
 
 
 class PersonaStore:
     """Read-only handler over an entity's verbatim persona record.
 
-    Reads resolve against ``entity.db.persona`` and never persist anything; the
-    import loader remains the only writer.
+    Reads resolve against ``entity.db.persona`` and never persist anything;
+    persona records are written only by the import loader, the ``world.rules``
+    deterministic services, or the scene-builder characterization seam.
     """
 
     def __init__(

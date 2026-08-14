@@ -62,8 +62,8 @@ class CreationWizardTests(EvenniaTest):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
-            "allocations": balanced_allocations("human"),
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -332,7 +332,7 @@ class CreationWizardTests(EvenniaTest):
                 "age": 17,
                 "apparent_age": 20,
                 "race": "human",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             },
             "unknown race": {
@@ -343,7 +343,7 @@ class CreationWizardTests(EvenniaTest):
                 "age": 20,
                 "apparent_age": 20,
                 "race": "dragon",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             },
             "incompatible subrace": {
@@ -365,7 +365,7 @@ class CreationWizardTests(EvenniaTest):
                 "age": 20,
                 "apparent_age": 20,
                 "race": "human",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {"hp": 0},
             },
             "out of range allocation": {
@@ -376,7 +376,7 @@ class CreationWizardTests(EvenniaTest):
                 "age": 20,
                 "apparent_age": 20,
                 "race": "human",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {**{axis: 0 for axis in ALLOCATABLE_AXES}, "hp": 20000},
             },
         }
@@ -403,8 +403,8 @@ PERSONA_BLOCK = {
 def concept_proposal(**overrides):
     proposal = {
         "race_key": "human",
-        "subrace_key": None,
-        "allocations": balanced_allocations("human"),
+        "subrace_key": "human_commoner",
+        "allocations": balanced_allocations("human", "human_commoner"),
         "persona": dict(PERSONA_BLOCK),
     }
     proposal.update(overrides)
@@ -429,8 +429,8 @@ class ConceptDraftTests(EvenniaTest):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
-            "allocations": balanced_allocations("human"),
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -531,10 +531,10 @@ class ConceptDraftTests(EvenniaTest):
             self.account, self.character, concept_proposal(),
             expected_fingerprint=fingerprint,
         )
-        elf_allocations = balanced_allocations("elf")
+        elf_allocations = balanced_allocations("elf", "fionnen")
         draft = save_custom_draft(
             self.account, self.character,
-            self.custom_request(race="elf", allocations=elf_allocations),
+            self.custom_request(race="elf", subrace="fionnen", allocations=elf_allocations),
         )
         self.assertEqual(draft["mode"], "custom")
         self.assertEqual(draft["race"], "elf")
@@ -668,7 +668,7 @@ class ConceptDraftTests(EvenniaTest):
                 "mode": "concept",
                 "stage": "custom_filled",
                 "race": "human",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             },
             "unknown race": {
@@ -676,7 +676,7 @@ class ConceptDraftTests(EvenniaTest):
                 "mode": "concept",
                 "stage": "concept_filled",
                 "race": "dragon",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             },
             "malformed persona": {
@@ -684,7 +684,7 @@ class ConceptDraftTests(EvenniaTest):
                 "mode": "concept",
                 "stage": "concept_filled",
                 "race": "human",
-                "subrace": None,
+                "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": {"personality": "沉穩"},
             },
@@ -695,3 +695,79 @@ class ConceptDraftTests(EvenniaTest):
                 self.assertIsNone(read_draft(self.character), label)
                 self.assertTrue(self.character.creation_pending)
                 self.assertEqual(self.character.traits.all(), [])
+
+    @covers_requirement("creation-persona-persistence::the-background-survives-the-draft-concept-custom-save-and-activation-journey")
+    def test_background_alone_survives_save_and_activation(self):
+        save_custom_draft(self.account, self.character, self.custom_request(background=" 背景文字 "))
+        draft = read_draft(self.character)
+        self.assertEqual(draft["background"], "背景文字")
+        self.assertEqual(self.character.age, None)
+        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        self.assertFalse(self.character.creation_pending)
+        self.assertIsNone(read_draft(self.character))
+        self.assertEqual(self.character.db.persona["background"], "背景文字")
+
+    @covers_requirement("creation-persona-persistence::the-background-survives-the-draft-concept-custom-save-and-activation-journey")
+    def test_background_survives_a_later_concept_apply(self):
+        save_custom_draft(self.account, self.character, self.custom_request(background="背景文字"))
+        fingerprint = draft_fingerprint(self.character)
+        apply_concept_proposal(
+            self.account, self.character, concept_proposal(),
+            expected_fingerprint=fingerprint,
+        )
+        # The concept-apply never overwrites a player-authored background: it
+        # carries the accepted text forward in the concept draft.
+        draft = read_draft(self.character)
+        self.assertEqual(draft["mode"], "concept")
+        self.assertEqual(draft["background"], "背景文字")
+        self.assertEqual(draft["persona"], PERSONA_BLOCK)
+
+    @covers_requirement("creation-persona-persistence::the-background-survives-the-draft-concept-custom-save-and-activation-journey")
+    def test_background_survives_concept_apply_then_custom_save(self):
+        fingerprint = draft_fingerprint(self.character)
+        apply_concept_proposal(
+            self.account, self.character, concept_proposal(),
+            expected_fingerprint=fingerprint,
+        )
+        save_custom_draft(
+            self.account, self.character,
+            self.custom_request(background="背景文字"),
+        )
+        draft = read_draft(self.character)
+        self.assertEqual(draft["mode"], "custom")
+        self.assertEqual(draft["background"], "背景文字")
+        self.assertEqual(draft["persona"], PERSONA_BLOCK)
+        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        self.assertFalse(self.character.creation_pending)
+        stored = self.character.db.persona
+        self.assertEqual(stored["background"], "背景文字")
+        self.assertEqual(stored["personality"], "沉穩")
+
+    @covers_requirement("creation-persona-persistence::the-background-survives-the-draft-concept-custom-save-and-activation-journey")
+    def test_full_journey_background_then_concept_then_custom_save_then_activation(self):
+        # Mirrors the WebClient concept journey: the player enters a background,
+        # applies a concept (which preserves the background), re-saves the custom
+        # form (still carrying the restored background), and activates.
+        save_custom_draft(
+            self.account, self.character,
+            self.custom_request(background="背景文字"),
+        )
+        apply_concept_proposal(
+            self.account, self.character, concept_proposal(),
+            expected_fingerprint=draft_fingerprint(self.character),
+        )
+        draft = read_draft(self.character)
+        self.assertEqual(draft["mode"], "concept")
+        self.assertEqual(draft["background"], "背景文字")
+        save_custom_draft(
+            self.account, self.character,
+            self.custom_request(background=draft["background"]),
+        )
+        draft = read_draft(self.character)
+        self.assertEqual(draft["background"], "背景文字")
+        self.assertEqual(draft["persona"], PERSONA_BLOCK)
+        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        self.assertFalse(self.character.creation_pending)
+        stored = self.character.db.persona
+        self.assertEqual(stored["background"], "背景文字")
+        self.assertEqual(stored["personality"], "沉穩")

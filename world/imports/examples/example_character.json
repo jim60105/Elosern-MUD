@@ -1,28 +1,29 @@
 {
   "record_type": "character",
   "schema_version": 1,
-  "key": "ciaran_reference",
-  "display_name": "基亞蘭參考角色",
+  "key": "human_reference",
+  "display_name": "人類參考角色",
   "age": 22,
   "apparent_age": 22,
-  "race": "elf",
-  "subrace": "ciaran",
+  "race": "human",
+  "subrace": "human_commoner",
   "stats": {
-    "hp": 10000,
-    "mp": 10000,
-    "sp": 10000,
-    "atk_phys": 88,
-    "agility": 84,
-    "defense": 76,
-    "magic_level": 120,
+    "hp": 150,
+    "mp": 120,
+    "sp": 140,
+    "atk_phys": 12,
+    "agility": 14,
+    "defense": 11,
+    "magic_level": 60,
     "guild_merit": 0
   },
   "disguised_stats": {
-    "atk_phys": 12,
-    "agility": 10
+    "atk_phys": 8,
+    "agility": 9
   },
+  "affinity_elements": ["fire", "wind"],
   "skills": [],
-  "passives": ["body_enhancement", "elf_longevity"],
+  "passives": ["body_enhancement"],
   "equipment": {},
   "inventory": [],
   "sexual_baseline": {
@@ -34,11 +35,12 @@
     }
   },
   "persona": {
-    "identity": "A reference adult Ciaran elf.",
+    "identity": "A reference adult human commoner.",
     "personality": "Calm and observant.",
     "life_story": "A placeholder history for import validation.",
     "habit": "Keeps careful field notes.",
-    "appearance": "Dark hair and practical traveling clothes.",
-    "social_connection": "Maintains ties with the Ciaran village."
+    "appearance": "Practical traveling clothes and a short sword.",
+    "social_connection": "Maintains ties with the southern borderlands.",
+    "background": "A visiting scholar documenting the southern trade routes."
   }
 }

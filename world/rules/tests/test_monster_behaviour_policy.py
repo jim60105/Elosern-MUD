@@ -129,6 +129,23 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         request = monster_behaviour_policy(actor, _field(actor, [enemy]))
         self.assertEqual(request.skill_key, "wind_blade")
 
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_malformed_element_spell_is_denied_not_raised(self):
+        from world.skills.registry import SKILL_REGISTRY
+
+        actor = FakeMonster(
+            "malformed",
+            magic_level=0,
+            owned=["wind_blade", "basic_attack"],
+        )
+        enemy = FakeEntity("enemy")
+        with patch(
+            "world.rules.monster_behaviour.can_cast_spell_tier",
+            side_effect=ValueError("unknown element"),
+        ):
+            request = monster_behaviour_policy(actor, _field(actor, [enemy]))
+        self.assertEqual(request.skill_key, "basic_attack")
+
     def test_source_has_no_forbidden_dependencies(self):
         source = (
             Path(__file__).parents[1] / "monster_behaviour.py"

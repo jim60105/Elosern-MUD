@@ -303,10 +303,11 @@ class CustomCreationJourneys(CreationBrowserTest):
             page.evaluate("document.getElementById('creation-race-1').checked"),
             "beastfolk race radio must be selected",
         )
-        # Select the foxkin subrace radio with keyboard arrows from the default
-        # "none" option (beastfolk has seven subraces; foxkin is the last).
+        # Select the foxkin subrace radio with keyboard arrows from the first
+        # beastfolk subrace (beastfolk has seven subraces; foxkin is the last,
+        # so six ArrowDown presses from the first reach it).
         page.evaluate("document.querySelector('input[name=creation-subrace]').focus()")
-        for _ in range(7):
+        for _ in range(6):
             _press(page, "ArrowDown")
         page.wait_for_timeout(150)
         foxkin_checked = page.evaluate(
@@ -366,6 +367,11 @@ class CustomCreationJourneys(CreationBrowserTest):
         page.keyboard.type("24")
         _press(page, "Tab")
         page.keyboard.type("24")
+        # Select the default race's first subrace (human_commoner) so the
+        # allocation fields render; every race now requires a subrace.
+        page.evaluate("document.querySelector('input[name=creation-subrace]').focus()")
+        _press(page, "ArrowDown")
+        page.wait_for_timeout(150)
         for axis, value in (
             ("hp", "50"), ("mp", "50"), ("sp", "50"),
             ("atk_phys", "10"), ("agility", "10"), ("defense", "11"),
@@ -422,7 +428,8 @@ class CustomCreationJourneys(CreationBrowserTest):
                   age: 17,
                   apparent_age: 24,
                   race: 'human',
-                  subrace: null,
+                  subrace: "human_commoner",
+                  background: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -474,7 +481,8 @@ class CustomCreationJourneys(CreationBrowserTest):
                   age: 24,
                   apparent_age: 17,
                   race: 'human',
-                  subrace: null,
+                  subrace: "human_commoner",
+                  background: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -698,7 +706,8 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   age: 20,
                   apparent_age: 20,
                   race: 'human',
-                  subrace: null,
+                  subrace: "human_commoner",
+                  background: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -731,9 +740,10 @@ class CreationDispatchJourneys(CreationBrowserTest):
                       display_name: '重複角色',
                       age: 20,
                       apparent_age: 20,
-                      race: 'human',
-                      subrace: null,
-                      allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  race: 'human',
+                  subrace: 'human_commoner',
+                  background: null,
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                     },
                   }], {});
                 }""",
@@ -791,7 +801,8 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   age: 20,
                   apparent_age: 20,
                   race: 'human',
-                  subrace: null,
+                  subrace: "human_commoner",
+                  background: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -927,6 +938,75 @@ class ViewportCreationJourney(CreationBrowserTest):
         creation = self._creation_panel(page)
         for forbidden in ("persona", "skills", "equipment", "inventory", "magic_level"):
             self.assertNotIn(forbidden, creation)
+
+
+class PointerCreationJourneys(CreationBrowserTest):
+    """Pointer activation for the creation form action buttons (design D6).
+
+    Each click must traverse the router's in-flight / awaiting-revision gate,
+    emit exactly one mutation, and never log an unclaimed keydown while the
+    form owns focus.
+    """
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_pointer_click_on_submit_emits_exactly_one_custom_save(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+        page.wait_for_function(
+            "() => document.getElementById('creation-submit') !== null"
+        )
+        page.evaluate("document.getElementById('creation-field-displayName').focus()")
+        page.keyboard.type("滑鼠角色")
+        _press(page, "Tab")
+        page.keyboard.type("20")
+        _press(page, "Tab")
+        page.keyboard.type("20")
+        # Select a subrace so the allocation fields render (required now).
+        page.evaluate("document.querySelector('input[name=creation-subrace]').focus()")
+        _press(page, "ArrowDown")
+        page.wait_for_timeout(150)
+        for axis, value in (
+            ("hp", "100"), ("mp", "50"), ("sp", "31"),
+            ("atk_phys", "0"), ("agility", "0"), ("defense", "0"),
+        ):
+            page.evaluate(
+                "document.getElementById('creation-field-%s').focus()" % axis
+            )
+            page.keyboard.type(value)
+        # Pointer click (not keyboard Enter) on the submit button.
+        page.locator("#creation-submit").click()
+        page.wait_for_timeout(200)
+        self.assertEqual(
+            sent_action_count(page, "creation.custom"), 1,
+            "a pointer click must submit exactly one creation.custom",
+        )
+        # No unclaimed keydown reached the stock handler while the form lived.
+        for cmd, args, _kw in outbound_messages(page):
+            self.assertNotIn("NO plugin handled this Keydown", str(args))
+
+    @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
+    def test_pointer_click_on_reset_opens_the_destructive_confirm(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+        page.wait_for_function(
+            "() => document.getElementById('creation-reset') !== null"
+        )
+        page.locator("#creation-reset").click()
+        page.wait_for_timeout(200)
+        self.assertEqual(
+            page.locator(".creation-confirm").count(), 1,
+            "a pointer click on reset must open the confirmation",
+        )
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
+        self.assertEqual(sent_action_count(page, "creation.activate"), 0)
 
 
 if __name__ == "__main__":

@@ -40,17 +40,25 @@ When Evennia creates the default `PlayerCharacter` for a newly registered accoun
 - **THEN** it receives the creation-required message
 
 ### Requirement: Character creation offers preset and custom modes
-The pending character's creation command SHALL offer exactly two activation modes. A preset mode SHALL select a key from the immutable player-preset catalog. A custom mode SHALL collect a non-empty player-supplied display name, actual age, apparent age, a race key, an optional compatible subrace key, and six stat allocations. The custom mode SHALL not accept player-supplied raw magic level, guild merit, skills, equipment, or trait caps. The requested display name SHALL be trimmed, contain 1–64 printable non-control characters, contain no `|`, `/`, `:`, `{`, or `}` (the shared entity-key contract: no structural separator and no markup delimiter), and become the activated object's visible key.
+The pending character's creation command SHALL offer exactly two activation modes. A preset mode SHALL select a key from the immutable player-preset catalog. A custom mode SHALL collect a non-empty player-supplied display name, actual age, apparent age, a race key, a required compatible subrace key (every race has at least one registered subrace, so no "none" selection exists), six stat allocations, and an optional bounded player-authored background (flavor) text. The custom mode SHALL not accept player-supplied raw magic level, guild merit, skills, equipment, or trait caps. The requested display name SHALL be trimmed, contain 1–64 printable non-control characters, contain no `|`, `/`, `:`, `{`, or `}` (the shared entity-key contract: no structural separator and no markup delimiter), and become the activated object's visible key. The background SHALL be accepted when present as a text field within the shared persona-field bound, may be left blank, and SHALL be persisted at activation inside the character's persona record so it survives every reload and can be inspected and freely updated by the owner afterwards.
 
-The deterministic core MAY additionally persist a bounded, versioned `creation_draft` staging attribute on the pending character, written only through a `world.rules` creation-wizard service, to satisfy the WebClient's reconnect-at-saved-stage requirement. The staging attribute is not canonical identity: writing it SHALL NOT set `age`, `apparent_age`, `race`, `subrace`, the object key, traits, or `creation_pending` on the character, and it SHALL be cleared by the same atomic transaction that activates the character. A rejected or cancelled draft save SHALL leave the canonical identity attributes, the trait set, and any previously validated staging draft unchanged.
+The deterministic core MAY additionally persist a bounded, versioned `creation_draft` staging attribute on the pending character, written only through a `world.rules` creation-wizard service, to satisfy the WebClient's reconnect-at-saved-stage requirement. The staging attribute is not canonical identity: writing it SHALL NOT set `age`, `apparent_age`, `race`, `subrace`, the object key, traits, or `creation_pending` on the character, and it SHALL be cleared by the same atomic transaction that activates the character. A rejected or cancelled draft save SHALL leave the canonical identity attributes, the trait set, and any previously validated staging draft unchanged. A custom draft SHALL carry the accepted optional background text, which survives reconnect and is cleared atomically with the draft.
 
 #### Scenario: A player selects a shipped preset
 - **WHEN** a pending player selects a registered preset key
 - **THEN** the system derives the preset's validated identity and allocation, initializes the account-owned character, and marks it active
 
 #### Scenario: A player creates a custom character
-- **WHEN** a pending player completes the custom creation prompts with a valid name, adult identity, compatible race/subrace, and valid allocations
-- **THEN** the system initializes that account-owned character with the chosen identity and calculated trait values, then marks it active
+- **WHEN** a pending player completes the custom creation prompts with a valid name, adult identity, compatible race and required subrace, valid allocations, and an optional background
+- **THEN** the system initializes that account-owned character with the chosen identity and calculated trait values, persists the background in the persona record when supplied, then marks it active
+
+#### Scenario: A custom creation without a subrace is rejected before activation
+- **WHEN** custom creation supplies a race but omits a subrace (or sends an empty or `none` value)
+- **THEN** activation is rejected with an explanation, and the account-owned shell retains its existing key and pending state
+
+#### Scenario: The custom background is persisted and later updatable
+- **WHEN** a custom character activates with a non-empty background and the owner later updates the background
+- **THEN** the persona record contains the submitted background after activation, and the later update changes only that field through the deterministic persona-write service, leaving the rest of the character state unchanged
 
 #### Scenario: An invalid display name is rejected before activation
 - **WHEN** custom creation supplies a blank, overlong, control-character, structural-separator-bearing, or markup-delimiter-bearing display name
@@ -62,10 +70,10 @@ The deterministic core MAY additionally persist a bounded, versioned `creation_d
 
 #### Scenario: Activation clears the staging draft atomically
 - **WHEN** a validated staging draft is activated through the deterministic service
-- **THEN** the draft is cleared in the same all-or-nothing transaction that writes the character's identity, traits, and initial mechanical state, so no completed character retains a draft
+- **THEN** the draft (including any background text) is cleared in the same all-or-nothing transaction that writes the character's identity, traits, and initial mechanical state, so no completed character retains a draft
 
 ### Requirement: Character creation enforces adult identity and registry compatibility
-Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values of at least 18. The selected race SHALL exist in `RACE_REGISTRY`; an optional subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race. Successful activation SHALL persist the accepted age, apparent age, race, subrace, and display name on the player character.
+Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values of at least 18. The selected race SHALL exist in `RACE_REGISTRY`. A subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race; in custom mode the subrace is required (every race has at least one registered subrace), while preset mode uses the preset's declared subrace. Successful activation SHALL persist the accepted age, apparent age, race, subrace, and display name on the player character.
 
 #### Scenario: Actual age below adulthood is rejected
 - **WHEN** custom creation supplies `age=17` with an adult apparent age
@@ -78,6 +86,14 @@ Both preset and custom activation SHALL require `age` and `apparent_age` to be i
 #### Scenario: A subrace belonging to another race is rejected
 - **WHEN** custom creation chooses a subrace whose registry `race_key` differs from the selected race
 - **THEN** activation is rejected before persistence with an explanation of the mismatch
+
+#### Scenario: A custom creation with no subrace is rejected
+- **WHEN** custom creation supplies a race and a valid adult identity but no subrace
+- **THEN** activation is rejected before persistence with an explanation, and the character remains pending
+
+#### Scenario: An imported character without a subrace is rejected
+- **WHEN** a character import record supplies a race but omits, blanks, or mis-assigns the subrace
+- **THEN** the import rejects the record before any entity is created, since every race has at least one registered subrace and no imported character bypasses the mandatory-subrace contract
 
 ### Requirement: Activation is an all-or-nothing deterministic-core operation
 The creation command SHALL submit a validated request to a deterministic `world.rules` creation
@@ -155,5 +171,77 @@ payload are unchanged.
 - **WHEN** a preset declares a skill key absent from `SKILL_REGISTRY`, an active key whose registry
   `SkillKind` is `PASSIVE` (or vice versa), or a `requires_divine_arts` skill on a race without
   `can_use_divine_arts`
+- **THEN** importing `world.lore.player_presets` raises, so the invalid kit can never reach a
+  player's activation
+
+### Requirement: Custom creation collects a race-bounded affinity element set
+Custom mode SHALL additionally collect an optional element-affinity set whose size bound depends on
+the selected race: a human may pick at most 2 elements, a beastfolk at most 1, and an elf picks none
+(an elf's affinity set SHALL be derived from the chosen subrace's `affinity_elements`, and a
+player-supplied affinity set on an elf SHALL be rejected). Every supplied element SHALL be a
+lowercase key present in `ELEMENT_REGISTRY`, with no duplicates. Preset mode SHALL not collect an
+affinity set; it SHALL derive the set from the selected preset's declared `affinity_elements`.
+Activation SHALL write the resulting set to `entity.db.affinity_elements` inside the same
+all-or-nothing activation transaction that writes identity, traits, and the remaining initial
+mechanical state. An empty set yields neutral progression (×1.0 for every element).
+
+#### Scenario: A human custom character picks two affinity elements
+- **WHEN** custom creation chooses `race == "human"` and supplies `affinity_elements == ["fire",
+  "wind"]`
+- **THEN** activation persists `entity.db.affinity_elements == ["fire", "wind"]` and both elements
+  are favored
+
+#### Scenario: A human picking a third element is rejected
+- **WHEN** custom creation chooses `race == "human"` and supplies three elements
+- **THEN** activation is rejected before persistence with an explanation of the two-element human
+  bound
+
+#### Scenario: A beastfolk picks at most one affinity element
+- **WHEN** custom creation chooses `race == "beastfolk"` and supplies exactly one element
+- **THEN** activation persists that single element, while a two-element beastfolk request is
+  rejected before persistence
+
+#### Scenario: An elf cannot supply an affinity set
+- **WHEN** custom creation chooses `race == "elf"` and supplies any player-chosen affinity set
+- **THEN** activation is rejected before persistence, and the elf's affinity set is instead seeded
+  from the chosen subrace's `affinity_elements`
+
+#### Scenario: An elf subrace seeds the affinity set at activation
+- **WHEN** custom creation chooses `race == "elf"` and `subrace == "fionnen"` with no affinity input
+- **THEN** activation persists `entity.db.affinity_elements == ["light"]`, matching
+  `SUBRACE_REGISTRY["fionnen"].affinity_elements`
+
+#### Scenario: Unknown or duplicate affinity elements are rejected
+- **WHEN** custom creation supplies an element key absent from `ELEMENT_REGISTRY`, or repeats the
+  same element twice
+- **THEN** activation is rejected before persistence
+
+### Requirement: Preset activation persists the preset's declared affinity set
+Preset mode SHALL persist the selected preset's `affinity_elements` (possibly empty) into
+`entity.db.affinity_elements` in the same all-or-nothing activation transaction that grants the
+preset's skill kit. An elf preset SHALL declare an empty set — the elf's set is seeded from its
+subrace at activation, never from the preset. The registry SHALL reject a preset whose declared
+affinity elements include an unknown key, a duplicate, or (for an elf preset) any element — at
+registry load, never at player activation.
+
+#### Scenario: A preset with declared affinities activates with them
+- **WHEN** a pending player activates a human or beastfolk preset whose `affinity_elements ==
+  ["fire", "wind"]`
+- **THEN** the activated character's `entity.db.affinity_elements` equals `["fire", "wind"]`
+
+#### Scenario: A preset with an empty affinity set stays neutral
+- **WHEN** a pending player activates a preset whose `affinity_elements` is empty
+- **THEN** the activated character's `entity.db.affinity_elements` is empty and every element keeps
+  the neutral ×1.0 multiplier
+
+#### Scenario: An elf preset activates with its subrace seed, not a preset set
+- **WHEN** a pending player activates an elf preset whose race/subrace is `fionnen`
+- **THEN** the activated character's `entity.db.affinity_elements` equals
+  `SUBRACE_REGISTRY["fionnen"].affinity_elements` (`["light"]`) regardless of the preset's own
+  (empty) field
+
+#### Scenario: A preset with an invalid affinity element fails at load
+- **WHEN** a preset declares an affinity element absent from `ELEMENT_REGISTRY`, a duplicate, or any
+  non-empty set on an elf preset
 - **THEN** importing `world.lore.player_presets` raises, so the invalid kit can never reach a
   player's activation

@@ -43,6 +43,10 @@ CREATION_REASON_MESSAGES: dict[str, str] = {
     "concept_unavailable": "生成不可用，請手動創角",
     "concept_stale": "構想草稿已被修改，請重新提交。",
     "malformed_request": "角色建立要求格式有誤。",
+    "unknown_affinity_element": "屬性親和包含未註冊的元素。",
+    "duplicate_affinity_element": "屬性親和不能重複選擇同一個元素。",
+    "over_bound_affinity": "屬性親和超出該種族允許的上限。",
+    "elf_affinity_rejected": "精靈的屬性親和由子種族決定，不能自行選擇。",
 }
 
 # Exact message fragments emitted by the deterministic service, mapped to
@@ -65,11 +69,19 @@ _MESSAGE_CODE_MATCHES: tuple[tuple[str, str], ...] = (
     ("does not belong to race", "incompatible_subrace"),
     ("unknown subrace", "unknown_subrace"),
     ("subrace must be a registry key or omitted", "unknown_subrace"),
+    ("custom creation requires a registered subrace", "unknown_subrace"),
+    ("subrace must be a registered registry key", "unknown_subrace"),
     ("unknown race", "unknown_race"),
     ("race must be a registry key", "unknown_race"),
     ("allocations must sum exactly to", "off_budget_allocations"),
     ("allocation for", "out_of_span_allocation"),
     ("allocations must contain exactly the six starting axes", "malformed_allocations"),
+    ("affinity_elements exceeds the", "over_bound_affinity"),
+    ("affinity_elements must be empty for an elf", "elf_affinity_rejected"),
+    ("subrace affinity seed contains unknown element", "unknown_affinity_element"),
+    ("subrace affinity seed contains duplicate element", "duplicate_affinity_element"),
+    ("affinity_elements contains unknown element", "unknown_affinity_element"),
+    ("affinity_elements contains duplicate element", "duplicate_affinity_element"),
 )
 
 

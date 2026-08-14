@@ -61,7 +61,7 @@ class BatchTests(EvenniaTest):
         )
         entities = load_batch([EXAMPLE_PATH, world_path])
         self.assertEqual(len(entities), 1)
-        self.assertEqual(entities[0].key, "ciaran_reference")
+        self.assertEqual(entities[0].key, "human_reference")
 
     def test_duplicate_world_keys_reject_every_duplicate(self):
         world = {
@@ -99,7 +99,7 @@ class BatchTests(EvenniaTest):
             side_effect=fail_second,
         ), self.assertRaises(RuntimeError):
             load_batch([EXAMPLE_PATH, second_path])
-        self.assertFalse(NPC.objects.filter(db_key__in=["ciaran_reference", "second_reference"]).exists())
+        self.assertFalse(NPC.objects.filter(db_key__in=["human_reference", "second_reference"]).exists())
 
     def test_world_key_with_report_words_is_still_detected_as_duplicate(self):
         world = {
@@ -150,5 +150,5 @@ class BatchTests(EvenniaTest):
         self.assertTrue(report.all_valid)
         self.assertEqual(
             [record["key"] for record in report.character_records],
-            ["ciaran_reference", "second_reference"],
+            ["human_reference", "second_reference"],
         )

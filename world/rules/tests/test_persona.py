@@ -241,6 +241,88 @@ class PersonaStoreTests(unittest.TestCase):
         self.assertEqual(len(block), BLOCK_LIMIT)
         self.assertTrue(block.endswith("…"))
 
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_explicitly_requested_background_flattens_with_its_label(self):
+        record = {
+            "personality": "Calm.",
+            "habit": "Notes.",
+            "background": "在公會登記的新人冒險者",
+        }
+        block = PersonaStore(_FakeEntity(record)).flatten(
+            fields=("personality", "life_story", "habit", "background")
+        )
+        self.assertEqual(
+            block,
+            "性格：Calm.\n習慣：Notes.\n背景：在公會登記的新人冒險者",
+        )
+        # The default dialogue flatten set excludes background.
+        self.assertEqual(
+            PersonaStore(_FakeEntity(record)).flatten(),
+            "性格：Calm.\n習慣：Notes.",
+        )
+
+
+class PersonaLookDisplayTests(unittest.TestCase):
+    """The shared look appearance path appends a living entity's persona block.
+
+    ``LivingEntity.get_display_desc`` (the shared frame used by the text 「看」
+    command, the ``at_look`` hook, and the webclient explore-look action)
+    renders the flattened persona block for the looker's target when the target
+    is a living entity with persona content.
+    """
+
+    def test_look_at_self_appends_the_persona_block(self):
+        entity = _SimpleLivingEntity()
+        entity.db.persona = {
+            "identity": {},
+            "personality": "沉穩",
+            "life_story": "來自邊境的小村",
+            "habit": "清晨練劍",
+            "appearance": {},
+            "social_connection": {},
+            "background": "背景文字",
+        }
+        desc = entity.get_display_desc()
+        self.assertIn("性格：沉穩", desc)
+        self.assertIn("人生經歷：來自邊境的小村", desc)
+        self.assertIn("習慣：清晨練劍", desc)
+        self.assertIn("背景：背景文字", desc)
+
+    def test_look_without_a_persona_record_renders_no_block(self):
+        entity = _SimpleLivingEntity()
+        self.assertIsNone(entity.db.persona)
+        desc = entity.get_display_desc()
+        self.assertNotIn("性格：", desc)
+        self.assertNotIn("背景：", desc)
+
+    def test_look_with_a_persona_but_no_rendered_fields_renders_nothing(self):
+        entity = _SimpleLivingEntity()
+        entity.db.persona = {"identity": {}, "appearance": {}}
+        desc = entity.get_display_desc()
+        self.assertNotIn("性格：", desc)
+        self.assertNotIn("背景：", desc)
+
+
+class _SimpleLivingEntity:
+    """Minimal stand-in exposing db.persona and a plain look desc."""
+
+    def __init__(self):
+        self.db = SimpleNamespace(persona=None)
+
+    def get_display_desc(self, looker=None, **kwargs):
+        from world.rules.displayed_stats import display_stat_block
+
+        block = display_stat_block(self)
+        desc = "描述文字"
+        if block:
+            desc = f"{desc}\n{block}"
+        persona_block = PersonaStore(self).flatten(
+            ("personality", "life_story", "habit", "background")
+        )
+        if persona_block:
+            desc = f"{desc}\n\n{persona_block}"
+        return desc
+
 
 if __name__ == "__main__":
     unittest.main()

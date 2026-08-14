@@ -152,3 +152,38 @@ class SchemaTests(TestCase):
         self.assertFalse(list(validator.iter_errors(record)))
         del record["content"]
         self.assertTrue(list(validator.iter_errors(record)))
+
+    @covers_requirement("import-schema::character-schema-v1-accepts-an-optional-affinity-elements-array")
+    def test_affinity_elements_structural_bounds(self):
+        schema = CHARACTER_SCHEMA_V1["properties"]["affinity_elements"]
+        self.assertEqual(schema["uniqueItems"], True)
+        self.assertEqual(schema["maxItems"], 8)
+        self.assertEqual(
+            set(schema["items"]["enum"]),
+            {"fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"},
+        )
+        self.assertIn("neutral", schema["description"].lower())
+
+        record = example_record()
+        record["affinity_elements"] = ["fire", "wind"]
+        self.assertFalse(
+            list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        )
+        self.assert_character_invalid(
+            lambda r: r.update(affinity_elements=["luck"])
+        )
+        self.assert_character_invalid(
+            lambda r: r.update(affinity_elements=["fire", "fire"])
+        )
+        self.assert_character_invalid(
+            lambda r: r.update(
+                affinity_elements=[
+                    "fire", "water", "wind", "earth",
+                    "lightning", "ice", "light", "dark", "fire",
+                ]
+            )
+        )
+        del record["affinity_elements"]
+        self.assertFalse(
+            list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        )

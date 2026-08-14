@@ -77,7 +77,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace=None, allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e", background="b",
             )
             values.update(overrides)
             return PlayerPreset(**values)
@@ -91,4 +91,70 @@ class PlayerPresetTests(unittest.TestCase):
         for preset, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 _validate_preset_skill_kits({"x": preset})
-        _validate_preset_skill_kits({"x": make(race="elf", passive_skills=("divine_sexual_mastery",))})
+        _validate_preset_skill_kits({"x": make(race="elf", subrace="fionnen", passive_skills=("divine_sexual_mastery",))})
+
+    def test_identity_validation_rejects_unknown_and_incompatible_subraces(self):
+        from world.lore.player_presets import _validate_preset_identities
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        for preset, message in (
+            (make(subrace="not_a_subrace"), "unknown subrace"),
+            (make(subrace="foxkin"), "belonging to race"),
+            (make(race="not_a_race"), "unknown race"),
+        ):
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                _validate_preset_identities({"x": preset})
+        _validate_preset_identities({"x": make()})
+
+    def test_catalog_ships_human_and_beastfolk_affinity_from_lore(self):
+        self.assertEqual(
+            PLAYER_PRESET_REGISTRY["violet_altoria"].affinity_elements,
+            ("fire", "wind"),
+        )
+        self.assertEqual(
+            PLAYER_PRESET_REGISTRY["foxkin_scout"].affinity_elements,
+            ("wind",),
+        )
+        for key in ("human_wanderer", "lidzia_rosenthal"):
+            self.assertEqual(PLAYER_PRESET_REGISTRY[key].affinity_elements, ())
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_elf_presets_must_declare_an_empty_affinity_set(self):
+        for key in ("elf_guardian", "yuka_darknight", "yuna_darknight", "elosia_shadowmoon"):
+            with self.subTest(preset=key):
+                self.assertEqual(PLAYER_PRESET_REGISTRY[key].race, "elf")
+                self.assertEqual(
+                    PLAYER_PRESET_REGISTRY[key].affinity_elements, ()
+                )
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_affinity_validation_rejects_unknown_duplicate_and_elf_non_empty(self):
+        from world.lore.player_presets import _validate_preset_affinity_elements
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        cases = (
+            (make(affinity_elements=("luck",)), "unknown affinity element"),
+            (make(affinity_elements=("fire", "fire")), "duplicate affinity element"),
+            (make(race="elf", subrace="fionnen", affinity_elements=("light",)), "elf preset"),
+        )
+        for preset, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                _validate_preset_affinity_elements({"x": preset})
+        _validate_preset_affinity_elements({"x": make(affinity_elements=("fire", "wind"))})
+        _validate_preset_affinity_elements(
+            {"x": make(race="elf", subrace="fionnen")}
+        )

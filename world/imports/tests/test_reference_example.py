@@ -24,3 +24,13 @@ class ReferenceExampleTests(TestCase):
         self.assertTrue(record["skills"] or record["passives"])
         self.assertGreater(len(record["sexual_baseline"]), 3)
         self.assertGreater(len(record["persona"]), 1)
+
+    @covers_requirement("import-reference-example::the-reference-example-exercises-the-persona-block-with-a-background")
+    def test_reference_persona_demonstrates_the_background_key(self):
+        report = validate_batch([EXAMPLE_PATH])
+        self.assertTrue(report.all_valid)
+        record = example_record()
+        persona = record["persona"]
+        self.assertIsInstance(persona, dict)
+        self.assertIn("background", persona)
+        self.assertTrue(persona["background"].strip())

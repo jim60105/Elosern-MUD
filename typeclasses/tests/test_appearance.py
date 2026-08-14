@@ -373,3 +373,82 @@ class DisplayedStatsBlockTests(EvenniaTest):
         self.assertIn("攻擊：60", appearance)
         self.assertTrue(self.char1.first_arrival_seen)
         self.assertEqual(self.char1.onboarding_beat, GUIDANCE_BEAT_ID)
+
+
+class PersonaBlockLookTests(EvenniaTest):
+    """The persona block rides the shared look appearance path (persona-store)."""
+
+    _PERSONA = {
+        "identity": {},
+        "personality": "沉穩",
+        "life_story": "來自邊境的小村",
+        "habit": "清晨練劍",
+        "appearance": {},
+        "social_connection": {},
+        "background": "在公會登記的新人冒險者",
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "測試房間"
+        self.room1.save()
+        self.char1.location = self.room1
+        self.char1.db.persona = dict(self._PERSONA)
+        self.npc = create_object("typeclasses.npcs.NPC", key="店長", location=self.room1)
+        self.npc.db.persona = dict(self._PERSONA)
+        self.npc.db.desc = "一位笑容可掬的店長。"
+
+    @covers_requirement("persona-store::the-look-appearance-path-renders-a-living-entity-s-persona-block")
+    def test_looking_at_yourself_shows_the_persona_block(self):
+        appearance = self.char1.at_look(self.char1)
+        self.assertIn("性格：沉穩", appearance)
+        self.assertIn("背景：在公會登記的新人冒險者", appearance)
+
+    @covers_requirement("persona-store::the-look-appearance-path-renders-a-living-entity-s-persona-block")
+    def test_looking_at_another_player_shows_that_character_s_persona_block(self):
+        self.char2.race = "human"
+        self.char2.apply_race_baseline()
+        self.char2.location = self.room1
+        self.char2.db.persona = {
+            "identity": {},
+            "personality": "開朗",
+            "life_story": "來自北方",
+            "habit": "清晨慢跑",
+            "appearance": {},
+            "social_connection": {},
+            "background": "另一位冒險者的背景",
+        }
+        appearance = self.char1.at_look(self.char2)
+        self.assertIn("性格：開朗", appearance)
+        self.assertIn("背景：另一位冒險者的背景", appearance)
+        # The looker's own block is not the target's.
+        self.assertNotIn("背景：在公會登記的新人冒險者", appearance)
+
+    @covers_requirement("persona-store::the-look-appearance-path-renders-a-living-entity-s-persona-block")
+    def test_looking_at_an_npc_shows_its_persona_block(self):
+        appearance = self.char1.at_look(self.npc)
+        self.assertIn("性格：沉穩", appearance)
+        self.assertIn("背景：在公會登記的新人冒險者", appearance)
+
+    @covers_requirement("persona-store::the-look-appearance-path-renders-a-living-entity-s-persona-block")
+    def test_looking_at_the_room_or_an_object_omits_any_persona_block(self):
+        room_appearance = self.char1.at_look(self.room1)
+        self.assertNotIn("性格：", room_appearance)
+        self.assertNotIn("背景：", room_appearance)
+        thing = create_object(
+            "typeclasses.objects.Object", key="石頭", location=self.room1
+        )
+        object_appearance = self.char1.at_look(thing)
+        self.assertNotIn("性格：", object_appearance)
+        self.assertNotIn("背景：", object_appearance)
+
+    @covers_requirement("persona-store::the-look-appearance-path-renders-a-living-entity-s-persona-block")
+    def test_persona_less_entity_renders_no_block(self):
+        monster = create_object(
+            "typeclasses.monsters.Monster", key="野狼", location=self.room1
+        )
+        monster.threat_tier = "low"
+        monster.apply_monster_tier()
+        appearance = self.char1.at_look(monster)
+        self.assertNotIn("性格：", appearance)
+        self.assertNotIn("背景：", appearance)

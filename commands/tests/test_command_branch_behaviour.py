@@ -466,7 +466,9 @@ class CharacterCreationCommandBranchTests(TestCase):
             generator.send("18")
             generator.send("18")
             generator.send("human")
-            generator.send("none")
+            generator.send("human_commoner")
+            generator.send("")
+            generator.send("")
             with self.assertRaises(StopIteration):
                 generator.send("no")
         command.caller.msg.assert_called_with("已取消角色建立。")

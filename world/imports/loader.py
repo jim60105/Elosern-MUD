@@ -13,7 +13,7 @@ from world.imports.validate import (
     validate_batch,
     validate_character,
 )
-from world.lore.races import RACE_REGISTRY
+from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.traits import _trait_config, race_floor
 
 
@@ -38,6 +38,24 @@ def instantiate_character(
     return _instantiate_validated_character(record, typeclass)
 
 
+def _resolve_affinity_elements(record: dict[str, Any]) -> list[str]:
+    """Resolve the record's affinity set or the elf subrace seed.
+
+    A record carrying ``affinity_elements`` persists it verbatim (validated
+    semantically before load). An elf record never carries a set -- the loader
+    seeds it from ``SUBRACE_REGISTRY[subrace].affinity_elements`` so no elf
+    can contradict its subrace (element-affinity-progression D3).
+    """
+    race_key = record["race"]
+    if race_key == "elf":
+        from world.rules.character_creation import validate_affinity_seed
+
+        subrace = SUBRACE_REGISTRY[record["subrace"]]
+        seed = validate_affinity_seed(subrace.affinity_elements)
+        return list(seed)
+    return list(record.get("affinity_elements") or ())
+
+
 def _instantiate_validated_character(
     record: dict[str, Any], typeclass: type[LivingEntity] = NPC
 ) -> LivingEntity:
@@ -56,6 +74,7 @@ def _instantiate_validated_character(
     }
     entity.db.equipment = record["equipment"]
     entity.db.inventory = record["inventory"]
+    entity.db.affinity_elements = _resolve_affinity_elements(record)
     # Persist the adult identity the art gate reads, and establish the explicit
     # named portrait policy (design D2): the character's unique-portrait subject
     # derives only from this policy, never from its display name or role.

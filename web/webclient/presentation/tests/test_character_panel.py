@@ -52,7 +52,7 @@ def _trait(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "character",
         "traits": [_trait(), _trait(key="atk_phys", label="攻擊", current=5, max=None)],
@@ -65,6 +65,7 @@ def _valid_panel(**overrides):
         },
         "guild": {"rank": None, "merit": 0},
         "wallet": 100,
+        "persona": {"background": None},
     }
     value.update(overrides)
     return value
@@ -208,7 +209,9 @@ class CharacterSchemaTests(unittest.TestCase):
 
     def test_rejects_wrong_version_kind_and_row_counts(self):
         with self.assertRaises(CharacterPanelError):
-            validate_character(_valid_panel(schema_version=2))
+            validate_character(_valid_panel(schema_version=1))
+        with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(schema_version=3))
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(available=False))
         with self.assertRaises(CharacterPanelError):
@@ -290,7 +293,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-1-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-2-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -318,7 +321,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, before_wallet)
         self.assertEqual(self.player.db.equipment, before_equipment)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-1-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-2-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -331,7 +334,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotEqual(atk["current"], 12)
         self.assertEqual(self.player.traits.atk_phys.base, atk["current"])
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-1-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-2-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -354,7 +357,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["rank"], "F")
         self.assertEqual(payload["guild"]["merit"], 60)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-1-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-2-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()

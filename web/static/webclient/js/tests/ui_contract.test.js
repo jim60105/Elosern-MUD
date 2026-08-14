@@ -220,3 +220,39 @@ test("creation dock adult fields advertise the 18 minimum", () => {
   assert.match(source, /實際年齡（至少 18）/);
   assert.match(source, /外表年齡（至少 18）/);
 });
+
+test("creation form claims its keydowns without breaking native input", () => {
+  const source = read("web/static/webclient/js/plugins/creation_dock.js");
+  // The capture-phase form handler claims every keydown while the form owns
+  // focus (design D6) so no unclaimed keydown reaches the stock handler...
+  assert.match(source, /_formKeyBound/);
+  assert.match(source, /stopPropagation/);
+  // ...while never preventing Tab, modifier keys, or IME composition, so
+  // native focus movement, text input, and Chinese IME keep working.
+  assert.match(source, /event\.key === "Tab"/);
+  assert.match(source, /event\.isComposing/);
+  assert.match(source, /\.inputfieldwrapper/);
+  // The form action buttons are pointer-operable through the shared
+  // in-flight / awaiting-revision gate and the exact-once click detail check.
+  assert.match(source, /form\.addEventListener\("click"/);
+  assert.match(source, /isMutationInFlight/);
+  assert.match(source, /isAwaitingRevision/);
+  assert.match(source, /event\.detail !== 1/);
+});
+
+test("creation form requires a subrace and shows the allocation briefing", () => {
+  const menu = read("web/static/webclient/js/elosern/creation_menu.js");
+  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
+  // The "無子種族" radio is gone and a missing subrace is an advisory error.
+  assert.strictEqual(/subrace-none/.test(menu), false, "no subrace-none item");
+  assert.strictEqual(/無子種族/.test(dock), false, "no 無子種族 radio");
+  assert.match(menu, /errors\.subrace/);
+  // The allocation briefing facts are derived from the server profile.
+  assert.match(menu, /briefingFor/);
+  assert.match(menu, /六項配點總和必須恰好等於/);
+  assert.match(dock, /配點說明：共 /);
+  assert.match(dock, /briefing\.rule/);
+  // The bounded background field is part of the custom form.
+  assert.match(dock, /背景設定（風味文字）/);
+  assert.match(menu, /background: ""/);
+});

@@ -38,6 +38,7 @@ _CREATION_CONSTANTS = (
     ("MAX_SPECIALTY_CODE_POINTS", "CREATION_MAX_SPECIALTY"),
     ("MAX_LABEL_CODE_POINTS", "CREATION_MAX_LABEL"),
     ("MAX_EXPLANATION_CODE_POINTS", "CREATION_MAX_EXPLANATION"),
+    ("MAX_AFFINITY_CHOICES", "CREATION_MAX_AFFINITY_ELEMENTS"),
 )
 
 
@@ -100,9 +101,55 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(values["wizard"], values["layer persona"])
         self.assertEqual(values["wizard"], "600")
 
+    def test_custom_draft_background_bound_matches_the_persona_field_cap(self):
+        # The custom/concept draft background travels in the wire draft and is
+        # validated by the Python presenter against the persona field cap; the
+        # JS validator must use the same numeric bound (not the preset-card
+        # prose bound, which is smaller).
+        py_source = (REPO_ROOT / "world/rules/character_creation.py").read_text(encoding="utf-8")
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        py_match = re.search(r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*([0-9]+)", py_source, re.MULTILINE)
+        js_match = re.search(r"var CREATION_MAX_PERSONA_BACKGROUND\s*=\s*([0-9]+)", js_source)
+        self.assertIsNotNone(py_match, "Python MAX_PERSONA_FIELD_LENGTH missing")
+        self.assertIsNotNone(js_match, "JS CREATION_MAX_PERSONA_BACKGROUND missing")
+        self.assertEqual(py_match.group(1), js_match.group(1))
+        self.assertEqual(js_match.group(1), "600")
+
     def test_panel_allowlist_contains_creation_v1(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
         self.assertIn("creation: 1", js_source)
+
+    def test_affinity_race_maxima_match_the_deterministic_bound_mapping(self):
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        match = re.search(
+            r"var CREATION_AFFINITY_MAXIMUMS\s*=\s*\{([^}]*)\}", js_source
+        )
+        self.assertIsNotNone(match, "JS affinity maxima mapping missing")
+        pairs = re.findall(r"(\w+)\s*:\s*(\d+)", match.group(1))
+        py_source = (
+            REPO_ROOT / "world/rules/character_creation.py"
+        ).read_text(encoding="utf-8")
+        py_match = re.search(
+            r"_AFFINITY_INPUT_BOUNDS:\s*dict\[str, int\]\s*=\s*\{(.*?)\}",
+            py_source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(py_match, "Python affinity bound mapping missing")
+        py_pairs = re.findall(r"\"(\w+)\":\s*(\d+)", py_match.group(1))
+        self.assertEqual(
+            {race: int(value) for race, value in pairs},
+            {race: int(value) for race, value in py_pairs},
+        )
+        self.assertEqual(
+            {race: int(value) for race, value in py_pairs},
+            {"human": 2, "beastfolk": 1, "elf": 0},
+        )
+        py_creation = (REPO_ROOT / "web/webclient/presentation/creation.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("max_affinity_elements", py_creation)
+        # The JS validator derives its descriptor bound from the same mapping.
+        self.assertIn("CREATION_AFFINITY_MAXIMUMS", js_source)
 
 
 if __name__ == "__main__":

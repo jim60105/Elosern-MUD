@@ -377,18 +377,6 @@
         var subraceTitle = makeElement("div", "creation-field-label");
         setText(subraceTitle, "子種族");
         subraceGroup.appendChild(subraceTitle);
-        var noSub = makeElement("label", "creation-radio");
-        var noInput = document.createElement("input");
-        noInput.type = "radio";
-        noInput.name = "creation-subrace";
-        noInput.value = "";
-        noInput.checked = state.subraceKey === null;
-        noInput.addEventListener("change", function () {
-          self._selectSubrace(null);
-        });
-        noSub.appendChild(noInput);
-        noSub.appendChild(document.createTextNode("無子種族"));
-        subraceGroup.appendChild(noSub);
         subraces.forEach(function (entry, index) {
           var label = makeElement("label", "creation-radio");
           var input = document.createElement("input");
@@ -406,13 +394,27 @@
         form.appendChild(subraceGroup);
       }
 
-      var profile = window.Elosern.CreationMenu.profileFor(panel, state.raceKey, state.subraceKey);
-      var budget = profile ? profile.budget : null;
-      if (budget !== null) {
-        var budgetLine = makeElement("div", "creation-budget");
-        setText(budgetLine, "配點總和需等於 " + budget + "。");
-        form.appendChild(budgetLine);
+      var briefing = window.Elosern.CreationMenu.briefingFor(panel, state);
+      if (briefing !== null) {
+        var briefingLines = ["配點說明：共 " + briefing.axisCount + " 個項目，可用點數 " + briefing.budget + "。"];
+        briefing.spans.forEach(function (span) {
+          briefingLines.push("  " + span.label + "：0–" + span.maximum);
+        });
+        briefingLines.push(briefing.rule);
+        var briefingBlock = makeElement("div", "creation-briefing");
+        setText(briefingBlock, briefingLines.join("\n"));
+        form.appendChild(briefingBlock);
       }
+
+      self._appendField(
+        form,
+        "背景設定（風味文字）",
+        "background",
+        state.background || "",
+        "text",
+        600,
+        "背景設定（風味文字，可留空，上限 600 字）"
+      );
 
       var axes = window.Elosern.CreationMenu.axisFields(panel, state);
       axes.forEach(function (field) {
@@ -440,9 +442,60 @@
       actions.appendChild(reset);
       var cancel = makeElement("button", "creation-control creation-cancel");
       cancel.type = "button";
+      cancel.id = "creation-cancel";
       setText(cancel, "返回");
       actions.appendChild(cancel);
       form.appendChild(actions);
+
+      // Pointer activation for the form's action buttons. Each click routes
+      // through the identical handler the keyboard Enter uses, gated by the
+      // router's in-flight / awaiting-revision lock and the exact-once
+      // primary-single-activation check (design D6): a real pointer click
+      // (detail === 1) on a connected button runs exactly one mutation, and a
+      // simultaneous keyboard Enter cannot double-submit.
+      var self = this;
+      var buttonIds = {
+        "creation-submit": function () {
+          self._submitCustom();
+        },
+        "creation-reset": function () {
+          self._openResetConfirm();
+        },
+        "creation-cancel": function () {
+          self._leaveCustom();
+        },
+        "creation-concept-submit": function () {
+          self._submitConcept();
+        },
+      };
+      form.addEventListener("click", function (event) {
+        if (event.detail !== 1) {
+          return;
+        }
+        var target = event.target && event.target.closest
+          ? event.target.closest("button")
+          : null;
+        if (!target || !target.isConnected) {
+          return;
+        }
+        var run = buttonIds[target.id];
+        if (!run) {
+          return;
+        }
+        var keyboard = getKeyboard();
+        if (keyboard && keyboard.isMutationInFlight && keyboard.isMutationInFlight()) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (keyboard && keyboard.isAwaitingRevision && keyboard.isAwaitingRevision()) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        event.preventDefault();
+        run();
+      });
 
       // A rejected save stays on the form and renders its stable rejection
       // here (fix-creation-finalization-safety D1); the live region carries
@@ -498,6 +551,8 @@
         this._customState.age = value;
       } else if (key === "apparentAge") {
         this._customState.apparentAge = value;
+      } else if (key === "background") {
+        this._customState.background = value;
       } else if (this._customState.allocations[key] !== undefined) {
         this._customState.allocations[key] = value;
       }
@@ -562,6 +617,44 @@
         if (!self._mounted || self._view !== "custom") {
           return;
         }
+        var target = event.target;
+        // The drawer field keeps its plugin-contract routing even while the
+        // form is open: this capture-phase handler fires before Evennia's
+        // bubble-phase dispatch, so a key typed (or Enter pressed) in the
+        // drawer field is ignored here and reaches routeKeyboard.
+        if (
+          target &&
+          target.closest &&
+          target.closest(".inputfieldwrapper")
+        ) {
+          return;
+        }
+        // Claim every other keydown while the form owns focus so no key falls
+        // through to the stock plugin handler and "NO plugin handled this
+        // Keydown" is never logged (design D6). The claim is at the router
+        // layer only: preventDefault is applied where the form consumes the
+        // key (Escape/Enter), never on Tab, modifier keys, IME composition, or
+        // character input, so native focus movement, text input, and Chinese
+        // IME continue to work.
+        var isModifier =
+          event.ctrlKey || event.metaKey || event.altKey;
+        if (
+          event.key === "Tab" ||
+          event.key === "Shift" ||
+          event.key === "Control" ||
+          event.key === "Alt" ||
+          event.key === "Meta" ||
+          event.key === "CapsLock" ||
+          event.key === "Dead" ||
+          event.key === "Process" ||
+          isModifier ||
+          event.isComposing
+        ) {
+          // Claimed without preventDefault so Tab moves focus and IME
+          // composition is unaffected.
+          event.stopPropagation();
+          return;
+        }
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
@@ -569,37 +662,51 @@
           return;
         }
         if (event.key === "Enter") {
-          var target = event.target;
-          if (target && (target.id === "creation-submit" || target.id === "creation-reset" || target.id === "creation-concept-submit" || target.id === "creation-field-concept" || target.id === "creation-field-age" || target.id === "creation-field-apparentAge")) {
+          var enterTarget = event.target;
+          if (enterTarget && (enterTarget.id === "creation-submit" || enterTarget.id === "creation-reset" || enterTarget.id === "creation-concept-submit" || enterTarget.id === "creation-field-concept" || enterTarget.id === "creation-field-age" || enterTarget.id === "creation-field-apparentAge" || enterTarget.id === "creation-cancel")) {
             // The form owns these Enter keys; stop propagation so the same
             // keydown can never confirm a menu pushed by the handler itself.
             event.preventDefault();
             event.stopPropagation();
-            if (target.id === "creation-submit") {
+            if (enterTarget.id === "creation-submit") {
               self._submitCustom();
               return;
             }
-            if (target.id === "creation-reset") {
+            if (enterTarget.id === "creation-reset") {
               self._openResetConfirm();
               return;
             }
-            if (target.id === "creation-concept-submit" || target.id === "creation-field-concept") {
+            if (enterTarget.id === "creation-cancel") {
+              self._leaveCustom();
+              return;
+            }
+            if (enterTarget.id === "creation-concept-submit" || enterTarget.id === "creation-field-concept") {
               self._submitConcept();
               return;
             }
-            if (target.id === "creation-field-age") {
+            if (enterTarget.id === "creation-field-age") {
               var next = el("creation-field-apparentAge");
               if (next) {
                 next.focus();
               }
               return;
             }
-            if (target.id === "creation-field-apparentAge") {
+            if (enterTarget.id === "creation-field-apparentAge") {
               self._submitCustom();
               return;
             }
+          } else {
+            // Enter in an ordinary field is claimed (so the stock handler
+            // never logs an unclaimed keydown) without preventDefault, which
+            // lets the native form's default submission path stay available.
+            event.stopPropagation();
+            return;
           }
         }
+        // Every other key (characters, arrows, backspace, ...) is claimed by
+        // stopping propagation so no unclaimed-keydown log can occur, without
+        // preventing the native behavior the field needs.
+        event.stopPropagation();
       };
       document.addEventListener("keydown", this._formKeyBound, true);
     },

@@ -16,6 +16,7 @@ from jsonschema import Draft202012Validator
 
 from world.art.subjects import MAX_SUBJECT_KEY_BYTES
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 
 
@@ -147,8 +148,12 @@ def _check_race_subrace(record: dict[str, Any]) -> list[Issue]:
     if race_key not in RACE_REGISTRY:
         return [Issue("race", f"{race_key!r} not found in race registry")]
     subrace_key = record.get("subrace")
-    if subrace_key is None:
-        return []
+    if subrace_key is None or not isinstance(subrace_key, str) or not subrace_key:
+        # Every race has at least one registered subrace and no player-facing
+        # selection ever offers "none", so an imported character without a
+        # subrace is a hard rejection
+        # (fix-custom-creation-information-and-background D2).
+        return [Issue("subrace", "a character requires a registered subrace")]
     subrace = SUBRACE_REGISTRY.get(subrace_key)
     if subrace is None:
         return [Issue("subrace", f"{subrace_key!r} not found in subrace registry")]
@@ -203,6 +208,68 @@ def _check_magic_cap(record: dict[str, Any]) -> list[Issue]:
             f"{magic_level} exceeds {race.key!r} magic cap {race.magic_cap}",
         )
     ]
+
+
+# Race-aware affinity input bounds (element-affinity-progression D3/D4): a
+# single deterministic mapping shared with custom creation and the WebClient
+# descriptor so the layers cannot drift.
+_AFFINITY_INPUT_BOUNDS: dict[str, int] = {
+    "human": 2,
+    "beastfolk": 1,
+    "elf": 0,
+}
+
+
+def _check_affinity_elements(record: dict[str, Any]) -> list[Issue]:
+    """Reject an affinity set that violates registry or race-bound rules.
+
+    The schema already constrains structural shape (enum, uniqueness, size).
+    Semantically: every key must exist in ``ELEMENT_REGISTRY``, no duplicate,
+    and the count must respect the race bound -- at most 2 for a human, at
+    most 1 for a beastfolk, and none for an elf (an elf's affinity is
+    subrace-derived, so an elf record must not supply the field at all, not
+    even an empty array). A record without the field produces no rejection
+    here.
+    """
+    race_key = record.get("race")
+    if race_key == "elf" and "affinity_elements" in record:
+        return [
+            Issue(
+                "affinity_elements",
+                "an elf's affinity is subrace-derived; an elf record must not "
+                "supply affinity_elements",
+            )
+        ]
+    affinity = record.get("affinity_elements")
+    if affinity is None:
+        return []
+    issues: list[Issue] = []
+    seen: set[str] = set()
+    for element in affinity:
+        if element not in ELEMENT_REGISTRY:
+            issues.append(
+                Issue(
+                    "affinity_elements",
+                    f"unknown affinity element {element!r}",
+                )
+            )
+        if element in seen:
+            issues.append(
+                Issue(
+                    "affinity_elements",
+                    f"duplicate affinity element {element!r}",
+                )
+            )
+        seen.add(element)
+    if race_key in _AFFINITY_INPUT_BOUNDS and len(affinity) > _AFFINITY_INPUT_BOUNDS[race_key]:
+        bound = _AFFINITY_INPUT_BOUNDS[race_key]
+        issues.append(
+            Issue(
+                "affinity_elements",
+                f"affinity_elements exceeds the {race_key} bound of {bound} elements",
+            )
+        )
+    return issues
 
 
 def _resolve_skill_registry() -> Mapping[str, Any] | None:
@@ -283,6 +350,7 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
     report.rejections.extend(_check_magic_cap(record))
+    report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_skills(record))
     report.warnings.extend(_check_stats_band(record))
     return report

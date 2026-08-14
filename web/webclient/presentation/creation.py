@@ -29,16 +29,24 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.lore.elements import ELEMENT_REGISTRY
+from world.rules.character_creation import (
+    MAX_PERSONA_FIELD_LENGTH,
+    max_affinity_elements,
+)
 from world.rules.creation_wizard import (
     CONCEPT_STAGE,
     CUSTOM_STAGE,
     PRESET_STAGE,
     AdultBoundsView,
+    AffinityElementView,
+    AffinityView,
     AllocationAxisView,
     CreationView,
     CustomFormView,
     PresetCardView,
     ProfileView,
+    RaceAffinityBoundsView,
     RaceOptionView,
     SubraceView,
     read_creation_view,
@@ -68,6 +76,12 @@ MAX_SUBRACE_KEY_CODE_POINTS = 64
 MAX_SPECIALTY_CODE_POINTS = 256
 MAX_LABEL_CODE_POINTS = 128
 MAX_EXPLANATION_CODE_POINTS = 256
+# The exact eight lore element choices and their Chinese labels. The bound
+# mapping (human 2 / beastfolk 1 / elf 0) is derived from the deterministic
+# ``max_affinity_elements`` so the panel cannot drift from custom creation.
+AFFINITY_ELEMENT_KEYS = tuple(ELEMENT_REGISTRY)
+MAX_AFFINITY_CHOICES = 8
+MAX_AFFINITY_ELEMENTS = 8
 
 ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense")
 
@@ -271,7 +285,7 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "custom",
-        {"name", "adult", "races", "subraces", "profiles"},
+        {"name", "adult", "races", "subraces", "profiles", "affinity"},
         {},
     )
     name = _validate_name(value["name"])
@@ -291,7 +305,60 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     if not profiles:
         raise ProtocolValidationError("profiles must not be empty")
     profiles = [_validate_profile(entry) for entry in profiles]
-    return {"name": name, "adult": adult, "races": races, "subraces": subraces, "profiles": profiles}
+    affinity = _validate_affinity(value["affinity"])
+    return {
+        "name": name,
+        "adult": adult,
+        "races": races,
+        "subraces": subraces,
+        "profiles": profiles,
+        "affinity": affinity,
+    }
+
+
+def _validate_affinity_element(value: Any) -> dict[str, Any]:
+    _require_exact_fields(value, "affinity element", {"key", "label"}, {})
+    key = _validate_key(value["key"], "affinity key", MAX_SUBRACE_KEY_CODE_POINTS)
+    if key not in AFFINITY_ELEMENT_KEYS:
+        raise ProtocolValidationError(f"affinity key {key!r} is not a lore element")
+    label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise ProtocolValidationError("affinity element label must be non-empty")
+    return {"key": key, "label": label}
+
+
+def _validate_race_affinity(value: Any, race_key: str) -> dict[str, Any]:
+    _require_exact_fields(value, f"affinity {race_key}", {"maximum", "elements"}, {})
+    maximum = _require_int(value, "maximum", minimum=0, maximum=MAX_SAFE_INTEGER)
+    if maximum != max_affinity_elements(race_key):
+        raise ProtocolValidationError(
+            f"affinity {race_key} maximum does not match the race bound"
+        )
+    elements = value["elements"]
+    if not isinstance(elements, list) or not elements or len(elements) > MAX_AFFINITY_CHOICES:
+        raise ProtocolValidationError("affinity elements must be a non-empty bounded list")
+    element_keys = []
+    normalized_elements = []
+    for entry in elements:
+        normalized = _validate_affinity_element(entry)
+        element_keys.append(normalized["key"])
+        normalized_elements.append(normalized)
+    if set(element_keys) != set(AFFINITY_ELEMENT_KEYS):
+        raise ProtocolValidationError(
+            "affinity elements must be exactly the eight lore elements"
+        )
+    return {"maximum": maximum, "elements": normalized_elements}
+
+
+def _validate_affinity(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ProtocolValidationError("affinity must be an object")
+    if set(value) != set(("human", "beastfolk", "elf")):
+        raise ProtocolValidationError("affinity must map human, beastfolk, and elf")
+    normalized: dict[str, Any] = {}
+    for race_key in ("human", "beastfolk", "elf"):
+        normalized[race_key] = _validate_race_affinity(value[race_key], race_key)
+    return normalized
 
 
 def _validate_allocations(value: dict[str, Any], name: str) -> dict[str, Any]:
@@ -304,6 +371,57 @@ def _validate_allocations(value: dict[str, Any], name: str) -> dict[str, Any]:
             allocations, axis, minimum=0, maximum=10000
         )
     return normalized_allocations
+
+
+def _validate_affinity_elements(value: Any, race_key: str) -> list[str]:
+    """Validate one draft affinity set against the race-dependent maximum.
+
+    An absent value normalizes to ``[]``; a non-list, unknown element, or
+    over-bound set degrades the draft so an invalid set never reaches the
+    browser. Elf drafts always carry ``[]`` (the subrace seeds at activation).
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ProtocolValidationError("affinity_elements must be a list or null")
+    if len(value) > MAX_AFFINITY_ELEMENTS:
+        raise ProtocolValidationError("affinity_elements exceeds its bound")
+    if race_key == "elf" and value:
+        raise ProtocolValidationError(
+            "an elf must not supply affinity_elements; the subrace is the authority"
+        )
+    maximum = max_affinity_elements(race_key)
+    if len(value) > maximum:
+        raise ProtocolValidationError(
+            f"affinity_elements exceeds the {race_key} maximum of {maximum}"
+        )
+    checked = []
+    for entry in value:
+        if not isinstance(entry, str) or entry not in ELEMENT_REGISTRY:
+            raise ProtocolValidationError(f"unknown affinity element {entry!r}")
+        if entry in checked:
+            raise ProtocolValidationError(f"duplicate affinity element {entry!r}")
+        checked.append(entry)
+    return checked
+
+
+def _validate_background(value: Any) -> str | None:
+    """Validate one nullable bounded background text field.
+
+    A missing or blank value normalizes to ``None``; a non-string or
+    over-bound value rejects. The bound mirrors ``MAX_PERSONA_FIELD_LENGTH`` so
+    a validated draft always fits the persona-field contract.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ProtocolValidationError("background must be text or null")
+    text = value.strip()
+    if not text:
+        return None
+    if sum(1 for _ in text) > MAX_PERSONA_FIELD_LENGTH:
+        raise ProtocolValidationError("background exceeds its bound")
+    return text
 
 
 def _validate_draft(value: Any) -> dict[str, Any] | None:
@@ -329,7 +447,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         _require_exact_fields(
             value,
             "custom draft",
-            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background_generated"},
+            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "background_generated", "affinity_elements"},
             {},
         )
         if value["stage"] != CUSTOM_STAGE:
@@ -344,10 +462,12 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             value, "apparent_age", minimum=APPARENT_AGE_MINIMUM, maximum=APPARENT_AGE_MAXIMUM
         )
         race = _validate_key(value["race"], "draft race", MAX_RACE_KEY_CODE_POINTS)
-        subrace = value["subrace"]
-        if subrace is not None:
-            subrace = _validate_key(subrace, "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+        subrace = _validate_key(value["subrace"], "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+        background = _validate_background(value["background"])
         background_generated = _require_bool(value, "background_generated")
+        affinity_elements = _validate_affinity_elements(
+            value["affinity_elements"], race
+        )
         return {
             "mode": "custom",
             "stage": CUSTOM_STAGE,
@@ -357,24 +477,26 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             "race": race,
             "subrace": subrace,
             "allocations": _validate_allocations(value, "custom draft"),
+            "background": background,
             "background_generated": background_generated,
+            "affinity_elements": affinity_elements,
         }
     if mode == "concept":
-        # The concept draft carries the finite controls plus the non-content
-        # background indicator; the server-owned persona block is never part
-        # of any wire payload (creation-persona-persistence D4).
+        # The concept draft carries the finite controls, the background flavor,
+        # and the non-content background indicator; the server-owned persona
+        # block is never part of any wire payload (creation-persona-persistence
+        # D4).
         _require_exact_fields(
             value,
             "concept draft",
-            {"mode", "stage", "race", "subrace", "allocations", "background_generated"},
+            {"mode", "stage", "race", "subrace", "allocations", "background", "background_generated"},
             {},
         )
         if value["stage"] != CONCEPT_STAGE:
             raise ProtocolValidationError("unsupported concept draft stage")
         race = _validate_key(value["race"], "draft race", MAX_RACE_KEY_CODE_POINTS)
-        subrace = value["subrace"]
-        if subrace is not None:
-            subrace = _validate_key(subrace, "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+        subrace = _validate_key(value["subrace"], "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+        background = _validate_background(value["background"])
         background_generated = _require_bool(value, "background_generated")
         return {
             "mode": "concept",
@@ -382,6 +504,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             "race": race,
             "subrace": subrace,
             "allocations": _validate_allocations(value, "concept draft"),
+            "background": background,
             "background_generated": background_generated,
         }
     raise ProtocolValidationError("draft has an unknown mode")
@@ -502,6 +625,26 @@ def _serialize_profile(profile: ProfileView) -> dict[str, Any]:
     }
 
 
+def _serialize_affinity_element(element: AffinityElementView) -> dict[str, Any]:
+    return {"key": element.key, "label": element.label}
+
+
+def _serialize_race_affinity(bounds: RaceAffinityBoundsView) -> dict[str, Any]:
+    return {
+        "maximum": bounds.maximum,
+        "elements": [
+            _serialize_affinity_element(element) for element in bounds.elements
+        ],
+    }
+
+
+def _serialize_affinity(affinity: AffinityView) -> dict[str, Any]:
+    return {
+        race_key: _serialize_race_affinity(bounds)
+        for race_key, bounds in affinity.bounds.items()
+    }
+
+
 def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
     return {
         "name": _serialize_name(custom.name),
@@ -509,6 +652,7 @@ def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
         "races": [_serialize_race_option(race) for race in custom.races],
         "subraces": _serialize_subraces(custom.subraces),
         "profiles": [_serialize_profile(profile) for profile in custom.profiles],
+        "affinity": _serialize_affinity(custom.affinity),
     }
 
 
@@ -523,14 +667,15 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         }
     if draft["mode"] == "concept":
         # The persona block never leaves the server: the wire draft carries
-        # only the finite controls and the non-content background indicator
-        # (creation-persona-persistence D4).
+        # only the finite controls, the background flavor, and the non-content
+        # background indicator (creation-persona-persistence D4).
         return {
             "mode": "concept",
             "stage": CONCEPT_STAGE,
             "race": draft["race"],
             "subrace": draft["subrace"],
             "allocations": dict(draft["allocations"]),
+            "background": draft.get("background"),
             "background_generated": bool(draft.get("persona")),
         }
     return {
@@ -542,7 +687,9 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         "race": draft["race"],
         "subrace": draft["subrace"],
         "allocations": dict(draft["allocations"]),
+        "background": draft.get("background"),
         "background_generated": bool(draft.get("persona")),
+        "affinity_elements": list(draft.get("affinity_elements") or []),
     }
 
 
@@ -573,11 +720,14 @@ def creation_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "AGE_MAXIMUM",
     "AGE_MINIMUM",
+    "AFFINITY_ELEMENT_KEYS",
     "APPARENT_AGE_MAXIMUM",
     "APPARENT_AGE_MINIMUM",
     "ALLOCATABLE_AXES",
     "CREATION_SCHEMA_VERSION",
     "CreationPanelError",
+    "MAX_AFFINITY_CHOICES",
+    "MAX_AFFINITY_ELEMENTS",
     "MAX_BACKGROUND_CODE_POINTS",
     "MAX_DESCRIPTION_CODE_POINTS",
     "MAX_DISPLAY_NAME_CODE_POINTS",

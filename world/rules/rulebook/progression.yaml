@@ -9,3 +9,6 @@ combat_kill_xp:
   calamity: 500
 skill_proficiency_xp_per_level: 50
 skill_practice_xp_per_use: 1.0
+# Element-affinity effective-level multipliers (element-affinity-progression D5).
+affinity_element_multiplier: 1.1
+non_affinity_element_multiplier: 0.9

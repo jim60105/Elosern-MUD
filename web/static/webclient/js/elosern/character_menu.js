@@ -91,6 +91,11 @@
     items.push(displayItem("guild-rank", "階級：" + rankText, null));
     items.push(displayItem("guild-merit", "功績：" + ((guild && guild.merit) || 0), null));
     items.push(displayItem("wallet", "錢包：" + ((panel && panel.wallet) || 0) + " 銅", null));
+    var persona = panel && panel.persona;
+    if (persona && persona.background) {
+      items.push(sectionItem("section-persona", "背景"));
+      items.push(displayItem("persona-background", "背景：" + persona.background, null));
+    }
     return { items: items, focusKey: null, panel: panel, grid: true, gridCols: 2 };
   }
 

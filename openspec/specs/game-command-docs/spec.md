@@ -28,8 +28,18 @@ the `UnloggedinCmdSet` are outside the in-game input surface and are not require
 - **WHEN** a player is in character-creation mode
 - **THEN** the reference SHALL document `character` as one entry whose syntax covers
   `character preset <key>` and `character create` and whose description explains the interactive
-  wizard and the `cancel` escape, and SHALL state that the creation cmdset replaces other game
-  commands while the localized `說明` and `登出` (aliases `help` and `quit`) remain available
+  wizard (including that a subrace must be chosen for every race, the allocation budget and
+  summing rule shown before the allocation step, and the optional background field) and the
+  `cancel` escape, and SHALL state that the creation cmdset replaces other game commands while the
+  localized `說明` and `登出` (aliases `help` and `quit`) remain available
+
+#### Scenario: The background command is documented
+
+- **WHEN** a player looks up the background command
+- **THEN** the reference SHALL document `設定背景` (alias `背景`) as a canonical entry whose syntax
+  covers setting and clearing the character's own background text and whose context is the active
+  character, matching the command class definition, and SHALL NOT list it among the localized
+  Evennia-default wrappers
 
 #### Scenario: Contrib commands are documented
 

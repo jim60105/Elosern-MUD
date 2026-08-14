@@ -155,7 +155,9 @@
       raceKey: races.length > 0 ? races[0].key : null,
       subraceKey: null,
       allocations: emptyAllocations(),
+      background: "",
       concept: "",
+      affinityElements: [],
     };
   }
 
@@ -166,9 +168,14 @@
     }
     // A concept draft pre-fills the finite controls (race/subrace/allocations)
     // while the name and both ages stay player-entered; a custom draft
-    // restores every accepted value.
+    // restores every accepted value. The preserved background rides both
+    // draft kinds: ``apply_concept_proposal`` carries a player-authored
+    // background forward into the concept draft, so the restored form must
+    // show it (fix-custom-creation-information-and-background D4).
     state.raceKey = draft.race || state.raceKey;
     state.subraceKey = draft.subrace || null;
+    state.background = draft.background || "";
+    state.affinityElements = (draft.affinity_elements || []).slice();
     var allocations = draft.allocations || {};
     Object.keys(allocations).forEach(function (axis) {
       if (state.allocations[axis] !== undefined) {
@@ -209,28 +216,41 @@
     };
   }
 
-  function noneSubraceItem() {
-    return {
-      key: "subrace-none",
-      label: "無子種族",
-      enabled: true,
-      actionId: null,
-      payload: null,
-      subraceKey: null,
-      description: "不選擇子種族。",
-    };
-  }
-
   function subraceItems(panel, state) {
     var options = subraceOptions(panel, state.raceKey);
     if (options === null) {
       return null;
     }
-    var items = [noneSubraceItem()];
+    var items = [];
     options.forEach(function (entry, index) {
       items.push(subraceItem(entry, index));
     });
     return items;
+  }
+
+  // The allocation briefing facts shown above the allocation fields: the total
+  // budget, the six-axis count, each axis's 0–span, and the sum-must-equal-
+  // budget rule. Derived entirely from the server-owned profile so the web
+  // form can never drift from ``resolve_starting_profile`` (design D3).
+  function briefingFor(panel, state) {
+    var profile = profileFor(panel, state.raceKey, state.subraceKey);
+    if (!profile) {
+      return null;
+    }
+    var spans = profile.axes.map(function (axis) {
+      return {
+        axis: axis.axis,
+        label: axis.label,
+        minimum: axis.minimum,
+        maximum: axis.maximum,
+      };
+    });
+    return {
+      budget: profile.budget,
+      axisCount: spans.length,
+      spans: spans,
+      rule: "六項配點總和必須恰好等於 " + profile.budget + "。",
+    };
   }
 
   // One field descriptor for an allocation axis of the active profile.
@@ -294,7 +314,13 @@
     }
     var profile = profileFor(panel, state.raceKey, state.subraceKey);
     if (!profile) {
-      errors.race = "請選擇種族與子種族。";
+      if (!state.raceKey) {
+        errors.race = "請選擇種族。";
+      } else if (!state.subraceKey) {
+        errors.subrace = "請選擇子種族。";
+      } else {
+        errors.race = "請選擇種族與子種族。";
+      }
     } else {
       Object.keys(state.allocations).forEach(function (axis) {
         var field = axisField(profile, axis);
@@ -319,6 +345,89 @@
     };
   }
 
+  // The affinity picker geometry for the selected race, derived entirely from
+  // the server-owned ``affinity`` descriptor so the web form can never drift
+  // from ``max_affinity_elements`` (design D3/D4).
+  function affinityFor(panel, raceKey) {
+    var affinity = panel.custom && panel.custom.affinity;
+    if (!affinity) {
+      return null;
+    }
+    return affinity[raceKey] || null;
+  }
+
+  function affinityElementKeys(panel, raceKey) {
+    var bounds = affinityFor(panel, raceKey);
+    if (!bounds || !bounds.elements) {
+      return [];
+    }
+    return bounds.elements.map(function (element) {
+      return element.key;
+    });
+  }
+
+  function affinityMaximum(panel, raceKey) {
+    var bounds = affinityFor(panel, raceKey);
+    return bounds ? bounds.maximum : 0;
+  }
+
+  // One choice descriptor for the affinity picker, derived from the
+  // server-owned element list.
+  function affinityChoice(panel, raceKey, elementKey) {
+    var bounds = affinityFor(panel, raceKey);
+    if (!bounds || !bounds.elements) {
+      return null;
+    }
+    for (var i = 0; i < bounds.elements.length; i++) {
+      if (bounds.elements[i].key === elementKey) {
+        return {
+          key: bounds.elements[i].key,
+          label: bounds.elements[i].label,
+        };
+      }
+    }
+    return null;
+  }
+
+  function affinityChoices(panel, raceKey) {
+    var bounds = affinityFor(panel, raceKey);
+    if (!bounds || !bounds.elements) {
+      return [];
+    }
+    return bounds.elements.map(function (element) {
+      return { key: element.key, label: element.label };
+    });
+  }
+
+  function affinityItems(panel, raceKey) {
+    return affinityChoices(panel, raceKey).map(function (element, index) {
+      return {
+        key: "affinity-" + index,
+        label: element.label + "（" + element.key + "）",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        affinityKey: element.key,
+        description: "",
+      };
+    });
+  }
+
+  function toggleAffinity(state, elementKey) {
+    var index = state.affinityElements.indexOf(elementKey);
+    if (index >= 0) {
+      state.affinityElements.splice(index, 1);
+      return state;
+    }
+    // The bound is only advisory here; the server re-validates every submit.
+    state.affinityElements.push(elementKey);
+    return state;
+  }
+
+  function affinitySelected(state, elementKey) {
+    return state.affinityElements.indexOf(elementKey) >= 0;
+  }
+
   // The exact wire payload for `creation.custom`. Undefined/blank fields are
   // emitted as their JSON-safe defaults so the server revalidates everything.
   function customPayload(state) {
@@ -332,7 +441,9 @@
       age: parseInt(state.age, 10) || 0,
       apparent_age: parseInt(state.apparentAge, 10) || 0,
       race: state.raceKey || "",
-      subrace: state.subraceKey || null,
+      subrace: state.subraceKey || "",
+      background: (state.background || "").trim() || null,
+      affinity_elements: state.affinityElements.slice(),
       allocations: allocations,
     };
   }
@@ -399,14 +510,22 @@
     stateFromDraft: stateFromDraft,
     raceItem: raceItem,
     subraceItem: subraceItem,
-    noneSubraceItem: noneSubraceItem,
     subraceItems: subraceItems,
+    briefingFor: briefingFor,
     axisField: axisField,
     axisFields: axisFields,
     budgetFor: budgetFor,
     allocatedTotal: allocatedTotal,
     validateCustom: validateCustom,
     customPayload: customPayload,
+    affinityFor: affinityFor,
+    affinityElementKeys: affinityElementKeys,
+    affinityMaximum: affinityMaximum,
+    affinityChoice: affinityChoice,
+    affinityChoices: affinityChoices,
+    affinityItems: affinityItems,
+    toggleAffinity: toggleAffinity,
+    affinitySelected: affinitySelected,
     confirmMenu: confirmMenu,
     activateConfirm: activateConfirm,
   };

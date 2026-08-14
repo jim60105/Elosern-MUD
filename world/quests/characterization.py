@@ -32,6 +32,16 @@ from world.art.subjects import (
 MAX_DISPLAY_NAME_LENGTH = 64
 MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 
+# The optional authored persona/background flavor fields share the persona
+# field bound (fix-custom-creation-information-and-background D7): a generated
+# NPC's flavor text must always fit the read-only ``PersonaStore`` contract so
+# the look appearance path can render it unchanged. The value mirrors
+# ``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``; this module
+# cannot import ``world.rules`` (the shared-helper purity contract), so a
+# parity contract pins the two numbers together.
+MAX_PERSONA_FIELD_LENGTH = 600
+PERSONA_PROSE_KEYS = ("personality", "life_story", "habit")
+
 _AGE_FIELDS = ("age", "apparent_age")
 
 
@@ -137,6 +147,45 @@ def characterize_errors(
                         f"portrait.stable_key exceeds the "
                         f"{MAX_STABLE_KEY_LENGTH}-character cap"
                     )
+
+    if "persona" in entry:
+        persona = entry["persona"]
+        if persona is None or not isinstance(persona, Mapping):
+            errors.append("persona must be an object with optional prose fields")
+        else:
+            extra = sorted(set(persona) - set(PERSONA_PROSE_KEYS))
+            if extra:
+                # The persona block is exactly the three prose fields; a nested
+                # ``background`` (or any other key) is not part of the authored
+                # contract and would be silently dropped at compile, so it is
+                # rejected here. Background flavor belongs at the top level
+                # (fix-custom-creation-information-and-background D7).
+                errors.append(
+                    "persona may only carry personality, life_story, and habit"
+                )
+            for field in PERSONA_PROSE_KEYS:
+                if field not in persona:
+                    continue
+                value = persona[field]
+                if value is None or not isinstance(value, str) or not value.strip():
+                    errors.append(f"persona.{field} must be non-empty text")
+                elif len(value) > MAX_PERSONA_FIELD_LENGTH:
+                    errors.append(
+                        f"persona.{field} exceeds the "
+                        f"{MAX_PERSONA_FIELD_LENGTH}-character cap"
+                    )
+    if "background" in entry:
+        # The top-level ``background`` is the canonical authored flavor surface
+        # for a characterization entry, validated independently of whether a
+        # ``persona`` object is also present.
+        value = entry["background"]
+        if value is None or not isinstance(value, str):
+            errors.append("background must be text")
+        elif value.strip() and len(value) > MAX_PERSONA_FIELD_LENGTH:
+            errors.append(
+                f"background exceeds the "
+                f"{MAX_PERSONA_FIELD_LENGTH}-character cap"
+            )
     return errors
 
 
@@ -144,10 +193,10 @@ def duplicate_stable_key_errors(entries: list[Mapping[str, Any]]) -> list[str]:
     """Return errors when shared portrait ``stable_key`` entries disagree.
 
     Two ``npc_req`` entries sharing a ``stable_key`` in one blueprint SHALL
-    declare the same ``display_name`` and ages; conflicting characterization
-    under the same key is a blueprint error and rejects (design D6). Entries
-    without a well-formed portrait key are ignored -- ``characterize_errors``
-    reports them.
+    declare the same ``display_name``, ages, persona/background flavor, and
+    portrait key; conflicting characterization under the same key is a
+    blueprint error and rejects (design D6). Entries without a well-formed
+    portrait key are ignored -- ``characterize_errors`` reports them.
     """
     seen: dict[str, tuple[Any, ...]] = {}
     errors: list[str] = []
@@ -162,6 +211,8 @@ def duplicate_stable_key_errors(entries: list[Mapping[str, Any]]) -> list[str]:
             entry.get("display_name"),
             entry.get("age"),
             entry.get("apparent_age"),
+            entry.get("persona"),
+            entry.get("background"),
         )
         if stable_key in seen and seen[stable_key] != identity:
             errors.append(

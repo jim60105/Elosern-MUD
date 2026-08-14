@@ -595,6 +595,82 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
             {"mode": "named", "stable_key": "forest_bandit_chief"},
         )
 
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_authored_persona_and_background_land_on_the_spawned_npc(self):
+        npc = self._spawned_npc(
+            self._characterized(
+                persona={
+                    "personality": "沉穩",
+                    "life_story": "守護森林多年的老獵人",
+                    "habit": "黃昏時擦拭獵弓",
+                },
+                background="來自邊境村莊的資深嚮導",
+            )
+        )
+        self.assertEqual(
+            npc.db.persona,
+            {
+                "identity": {},
+                "personality": "沉穩",
+                "life_story": "守護森林多年的老獵人",
+                "habit": "黃昏時擦拭獵弓",
+                "appearance": {},
+                "social_connection": {},
+                "background": "來自邊境村莊的資深嚮導",
+            },
+        )
+        # The flavor never feeds a stored stat.
+        self.assertIsNotNone(npc.traits.atk_phys)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_an_npc_without_a_persona_block_carries_none(self):
+        npc = self._spawned_npc(self._characterized())
+        self.assertIsNone(npc.db.persona)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_over_bound_or_non_text_persona_fields_are_rejected_at_compile(self):
+        from world.quests.compile import compile_quest_blueprint
+
+        for overrides in (
+            {"persona": {"personality": "x" * 601}},
+            {"background": "x" * 601},
+            {"persona": {"personality": 42}},
+        ):
+            with self.subTest(overrides=overrides):
+                payload = self._characterized(**overrides)
+                with self.assertRaises(ValueError):
+                    compile_quest_blueprint(payload)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_forged_over_bound_persona_is_rejected_before_any_spawn(self):
+        from world.quests.scene_builder import SceneBuilderSpawnError
+
+        record, _ = self._accept(self._characterized())
+        forged = (
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.DEFEAT,
+                location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                archetype="forest_path",
+                anchor_near="capital_altoria",
+                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                npc_reqs=(("bandit", "bandit", None),),
+                characterizations=(
+                    StageNpcCharacterization(
+                        background="x" * 601,
+                    ),
+                ),
+            ),
+        )
+        SCENE_REQUIREMENT_REGISTRY[record.definition_key] = forged
+        rooms_before = InstanceRoom.objects.all().count()
+        with self.assertRaises(SceneBuilderSpawnError):
+            materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
+        self.assertEqual(
+            InstanceRoom.objects.all().count(), rooms_before,
+            "a rejected persona must not spawn a room",
+        )
+
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_portrait_only_occupant_receives_the_adult_baseline(self):
         npc = self._spawned_npc(

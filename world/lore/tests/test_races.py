@@ -23,13 +23,20 @@ BEASTFOLK_SUBRACES = {
     "foxkin",
 }
 ELF_BRANCHES = {"fionnen", "ciaran", "eolas"}
+HUMAN_SUBRACES = {
+    "human_royal",
+    "human_noble",
+    "human_wealthy",
+    "human_commoner",
+    "human_laborer",
+}
 
 
 class RaceRegistryTests(unittest.TestCase):
     def test_registry_membership(self):
         self.assertEqual(set(RACE_REGISTRY), {"human", "beastfolk", "elf"})
         self.assertEqual(len(STATIC_TIER_REGISTRY), 11)
-        self.assertEqual(len(SUBRACE_REGISTRY), 10)
+        self.assertEqual(len(SUBRACE_REGISTRY), 15)
 
     def test_magic_cap_and_divine_arts(self):
         beastfolk = RACE_REGISTRY["beastfolk"]
@@ -122,12 +129,47 @@ class RaceRegistryTests(unittest.TestCase):
         for key, modifiers in expected.items():
             self.assertEqual(SUBRACE_REGISTRY[key].static_modifiers, modifiers)
 
-    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-and-beastfolk-subspecies-with-stat-modifiers")
+    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-social-classes-with-stat-modifiers")
     def test_beastfolk_modifiers_sum_to_zero(self):
         for key in BEASTFOLK_SUBRACES:
             modifiers = SUBRACE_REGISTRY[key].static_modifiers
             total = modifiers.atk_phys + modifiers.agility + modifiers.defense
             self.assertLessEqual(abs(total), 1e-12, key)
+
+    def test_human_subraces_exist_with_social_class_names(self):
+        expected_names = {
+            "human_royal": "王族",
+            "human_noble": "貴族",
+            "human_wealthy": "富裕平民",
+            "human_commoner": "平民",
+            "human_laborer": "底層平民",
+        }
+        for key, display_name in expected_names.items():
+            subrace = SUBRACE_REGISTRY[key]
+            self.assertEqual(subrace.display_name_zh, display_name)
+            self.assertEqual(subrace.race_key, "human")
+            self.assertIsNone(subrace.population)
+
+    def test_every_race_has_at_least_one_subrace(self):
+        for race_key in RACE_REGISTRY:
+            with self.subTest(race=race_key):
+                self.assertTrue(
+                    any(
+                        subrace.race_key == race_key
+                        for subrace in SUBRACE_REGISTRY.values()
+                    ),
+                    f"race {race_key} has no subrace",
+                )
+
+    @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-social-classes-with-stat-modifiers")
+    def test_human_modifiers_sum_to_zero(self):
+        for key in HUMAN_SUBRACES:
+            modifiers = SUBRACE_REGISTRY[key].static_modifiers
+            total = modifiers.atk_phys + modifiers.agility + modifiers.defense
+            self.assertLessEqual(abs(total), 1e-12, key)
+
+    def test_human_royal_overrides_the_mp_vital_band(self):
+        self.assertEqual(SUBRACE_REGISTRY["human_royal"].vital_overrides, {"mp": (120, 220)})
 
     def test_subrace_population_and_overrides(self):
         for key in BEASTFOLK_SUBRACES:
@@ -137,7 +179,7 @@ class RaceRegistryTests(unittest.TestCase):
             self.assertIsNone(SUBRACE_REGISTRY[key].vital_overrides)
         self.assertEqual(SUBRACE_REGISTRY["foxkin"].vital_overrides, {"mp": (50, 70)})
         for key, subrace in SUBRACE_REGISTRY.items():
-            if key != "foxkin":
+            if key not in ("foxkin", "human_royal"):
                 self.assertIsNone(subrace.vital_overrides)
 
 

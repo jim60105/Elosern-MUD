@@ -76,7 +76,7 @@ def _proposal_text(**overrides):
     """A schema-valid human proposal whose allocations sum to the budget."""
     payload = {
         "race_key": "human",
-        "subrace_key": None,
+        "subrace_key": "human_commoner",
         "allocations": {
             "hp": 100,
             "mp": 50,
@@ -164,7 +164,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         result = self._run(client)
         self.assertIsInstance(result, CharacterProposal)
         self.assertEqual(result.race_key, "human")
-        self.assertIsNone(result.subrace_key)
+        self.assertEqual(result.subrace_key, "human_commoner")
         self.assertEqual(
             result.allocations,
             {"hp": 100, "mp": 50, "sp": 0, "atk_phys": 10, "agility": 10, "defense": 11},
@@ -229,6 +229,22 @@ class CharacterCreationProposalTests(unittest.TestCase):
         messages = [call.messages[-1]["content"] for call in client.calls]
         self.assertIn("does not belong to race", messages[1])
         self.assertIn("not a registered subrace", messages[2])
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_a_proposal_without_a_subrace_is_rejected_and_retried(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _proposal_text(subrace_key=None),
+        )
+        client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
+        result = self._run(client)
+        self.assertEqual(result.subrace_key, "human_commoner")
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn(
+            "subrace_key must be a registered subrace",
+            client.calls[1].messages[-1]["content"],
+        )
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_unregistered_skill_key_is_rejected_and_retried(self):
@@ -472,7 +488,7 @@ class AllocationParityTests(unittest.TestCase):
         from world.rules.character_creation import resolve_starting_profile
 
         for race_key in RACE_REGISTRY:
-            subrace_keys = [None] + [
+            subrace_keys = [
                 key for key, subrace in SUBRACE_REGISTRY.items()
                 if subrace.race_key == race_key
             ]

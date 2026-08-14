@@ -150,7 +150,7 @@ def _browser_concept_proposal(client=None, *, concept):
     return defer.succeed(
         CharacterProposal(
             race_key="human",
-            subrace_key=None,
+            subrace_key="human_commoner",
             allocations={
                 "hp": 50, "mp": 50, "sp": 50,
                 "atk_phys": 10, "agility": 10, "defense": 11,

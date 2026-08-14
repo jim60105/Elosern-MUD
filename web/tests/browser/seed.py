@@ -556,8 +556,8 @@ def main() -> None:
         age=20,
         apparent_age=20,
         race="human",
-        subrace=None,
-        allocations=balanced_allocations("human"),
+        subrace="human_commoner",
+        allocations=balanced_allocations("human", "human_commoner"),
     )
     result = activate_player_character(account, character, request, sampler=sampler)
 

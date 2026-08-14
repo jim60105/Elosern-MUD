@@ -1,10 +1,12 @@
-"""Exact schema-version-1 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-2 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
 trait/equipment/disguise source the compact ``status`` panel builds from
 through ``world.rules.status_query`` so the two panels can never drift apart,
-and it never substitutes a disguised value for a true trait.
+and it never substitutes a disguised value for a true trait. Version 2 adds the
+display-only ``persona`` section carrying the character's own background flavor
+text; it is never used to infer any mechanical value.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -35,7 +37,7 @@ from world.rules.status_query import (
 )
 from world.skills.registry import SKILL_REGISTRY
 
-CHARACTER_SCHEMA_VERSION = 1
+CHARACTER_SCHEMA_VERSION = 2
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -46,6 +48,10 @@ MAX_KEY_CODE_POINTS = 64
 MAX_LABEL_CODE_POINTS = 128
 MAX_DESCRIPTION_CODE_POINTS = 256
 MAX_SLOT_CODE_POINTS = 32
+# The display-only persona background bound mirrors the persona-field cap
+# (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
+# contract pins the JS validator to this same number.
+MAX_PERSONA_BACKGROUND_CODE_POINTS = 600
 
 _DISGUISE_DESCRIPTION = (
     "目前以偽裝的外貌示人，以下是他人所見的數值。真實數值不因此改變。"
@@ -139,6 +145,27 @@ def _validate_guild(value: Any) -> dict[str, Any]:
     return {"rank": rank, "merit": merit}
 
 
+def _validate_persona(value: Any) -> dict[str, Any]:
+    """Validate the display-only ``persona`` section of the character panel.
+
+    Carries exactly ``background`` (a nullable bounded string from the
+    character's persona record). The section is presentation data and is never
+    used to infer any mechanical value.
+    """
+    _require_exact_fields(value, "persona", {"background"}, {})
+    background = value["background"]
+    if background is None:
+        return {"background": None}
+    if not isinstance(background, str):
+        raise ProtocolValidationError("persona.background must be text or null")
+    text = background.strip()
+    if not text:
+        return {"background": None}
+    if sum(1 for _ in text) > MAX_PERSONA_BACKGROUND_CODE_POINTS:
+        raise ProtocolValidationError("persona.background exceeds its bound")
+    return {"background": text}
+
+
 def validate_character(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``character`` payload.
 
@@ -158,6 +185,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
             "disguise",
             "guild",
             "wallet",
+            "persona",
         },
         {},
     )
@@ -193,6 +221,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
     disguise = _validate_disguise(payload["disguise"])
     guild = _validate_guild(payload["guild"])
     wallet = _require_int(payload, "wallet", minimum=0, maximum=MAX_SAFE_INTEGER)
+    persona = _validate_persona(payload["persona"])
 
     result = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
@@ -204,6 +233,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
         "disguise": disguise,
         "guild": guild,
         "wallet": wallet,
+        "persona": persona,
     }
     # Envelope guarantee (design D10): a conforming payload must serialize
     # within the OOB envelope limit; an over-limit payload fails closed.
@@ -238,7 +268,7 @@ def _in_exploration_mode(actor: Any) -> bool:
     return True
 
 
-def _serialize(model: CharacterReadModel) -> dict[str, Any]:
+def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, Any]:
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
     return {
         "schema_version": CHARACTER_SCHEMA_VERSION,
@@ -270,6 +300,7 @@ def _serialize(model: CharacterReadModel) -> dict[str, Any]:
         },
         "guild": {"rank": model.guild_rank, "merit": model.guild_merit},
         "wallet": model.wallet,
+        "persona": {"background": background},
     }
 
 
@@ -289,7 +320,12 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         model = build_character_read_model(actor)
     except StatusQueryError:
         raise PanelUnavailableError
-    return validate_character(_serialize(model))
+    background = actor.persona.get("background")
+    if background is not None and not isinstance(background, str):
+        background = None
+    if background is not None and not background.strip():
+        background = None
+    return validate_character(_serialize(model, background))
 
 
 __all__ = [
@@ -299,6 +335,8 @@ __all__ = [
     "MAX_EQUIPMENT_ROWS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_PASSIVE_ROWS",
+    "MAX_PERSONA_BACKGROUND_CODE_POINTS",
+    "MAX_SLOT_CODE_POINTS",
     "MAX_TRAIT_ROWS",
     "TRAIT_LABELS",
     "character_presenter",

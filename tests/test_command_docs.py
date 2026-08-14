@@ -149,6 +149,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "耳語": {"syntax": "耳語 <角色> = <訊息>", "context": "一般"},
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
     "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
+    "設定背景": {"syntax": "設定背景 <文字>", "context": "一般（已啟用的角色）"},
     "登出": {"syntax": "登出", "context": "一般（隨時可用）"},
     "在線": {"syntax": "在線", "context": "一般"},
     "離開角色": {"syntax": "離開角色", "context": "一般"},

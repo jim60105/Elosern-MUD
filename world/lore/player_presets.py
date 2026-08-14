@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass
 
-from world.lore.races import RACE_REGISTRY
+from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -15,12 +16,13 @@ class PlayerPreset:
     age: int
     apparent_age: int
     race: str
-    subrace: str | None
+    subrace: str
     allocations: tuple[tuple[str, int], ...]
     emphasis: str
     background: str
     active_skills: tuple[str, ...] = ()
     passive_skills: tuple[str, ...] = ()
+    affinity_elements: tuple[str, ...] = ()
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -33,7 +35,7 @@ class PlayerPreset:
 
 PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "human_wanderer": PlayerPreset(
-        "human_wanderer", "艾琳", 24, 24, "human", None,
+        "human_wanderer", "艾琳", 24, 24, "human", "human_commoner",
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
          ("agility", 10), ("defense", 11)),
         "生命力與魔力均衡的開局配點",
@@ -51,6 +53,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "疾風術與瞬步是她的雙腿，總能在危險降臨之前，先把消息帶回夥伴身邊。",
         ("gale_step",),
         ("flash_step",),
+        ("wind",),
     ),
     "elf_guardian": PlayerPreset(
         "elf_guardian", "瑟芮雅", 180, 24, "elf", "fionnen",
@@ -63,7 +66,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("defense_instinct", "elf_longevity"),
     ),
     "violet_altoria": PlayerPreset(
-        "violet_altoria", "薇歐蕾特", 18, 18, "human", None,
+        "violet_altoria", "薇歐蕾特", 18, 18, "human", "human_royal",
         (("hp", 50), ("mp", 67), ("sp", 50), ("atk_phys", 4),
          ("agility", 5), ("defense", 5)),
         "魔力優先、體力與生命力兼顧的術師配點",
@@ -72,9 +75,10 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "飛行術則使她習慣從高處俯瞰世界。",
         ("fire_ball", "wind_blade"),
         ("magic_circle_comprehension", "precise_mana_control", "flight"),
+        ("fire", "wind"),
     ),
     "lidzia_rosenthal": PlayerPreset(
-        "lidzia_rosenthal", "莉茲婭", 18, 18, "human", None,
+        "lidzia_rosenthal", "莉茲婭", 18, 18, "human", "human_noble",
         (("hp", 55), ("mp", 39), ("sp", 60), ("atk_phys", 9),
          ("agility", 10), ("defense", 8)),
         "體力與生命力優先、均衡的近侍劍術配點",
@@ -122,6 +126,26 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
 }
 
 
+def _validate_preset_identities(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a preset whose race/subrace pair could never activate.
+
+    Every preset carries a subrace (no "none" presets exist), so a null,
+    unregistered, or race-incompatible subrace raises at import the same way an
+    unknown skill kit does.
+    """
+    for preset in registry.values():
+        if preset.race not in RACE_REGISTRY:
+            raise ValueError(f"preset {preset.key!r} declares unknown race {preset.race!r}")
+        subrace = SUBRACE_REGISTRY.get(preset.subrace)
+        if subrace is None:
+            raise ValueError(f"preset {preset.key!r} declares unknown subrace {preset.subrace!r}")
+        if subrace.race_key != preset.race:
+            raise ValueError(
+                f"preset {preset.key!r} declares subrace {preset.subrace!r} "
+                f"belonging to race {subrace.race_key!r}, not {preset.race!r}"
+            )
+
+
 def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
     """Reject a preset kit that could never resolve at activation time.
 
@@ -154,4 +178,33 @@ def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
                     )
 
 
+def _validate_preset_affinity_elements(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a preset whose declared affinity set could never resolve.
+
+    Every key must exist in ``ELEMENT_REGISTRY``, must not repeat, and an elf
+    preset SHALL declare an empty set -- an elf's affinity is seeded from its
+    subrace at activation, never from the preset (element-affinity-progression
+    D3).
+    """
+    for preset in registry.values():
+        seen: set[str] = set()
+        for element in preset.affinity_elements:
+            if element not in ELEMENT_REGISTRY:
+                raise ValueError(
+                    f"preset {preset.key!r} declares unknown affinity element {element!r}"
+                )
+            if element in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate affinity element {element!r}"
+                )
+            seen.add(element)
+        if preset.race == "elf" and preset.affinity_elements:
+            raise ValueError(
+                f"elf preset {preset.key!r} must declare an empty affinity set; "
+                "its affinity is seeded from the subrace"
+            )
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
+_validate_preset_identities(PLAYER_PRESET_REGISTRY)
+_validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)

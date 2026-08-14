@@ -282,6 +282,12 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
                             portrait=BlueprintPortrait(
                                 stable_key="forest_bandit_chief"
                             ),
+                            background="來自邊境的資深嚮導",
+                            persona=(
+                                ("personality", "沉穩"),
+                                ("life_story", "守護森林多年"),
+                                ("habit", "黃昏時擦拭獵弓"),
+                            ),
                         ),
                     ),
                 ),
@@ -295,6 +301,15 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         self.assertEqual(requirement.age, 35)
         self.assertEqual(requirement.apparent_age, 35)
         self.assertEqual(requirement.portrait.stable_key, "forest_bandit_chief")
+        self.assertEqual(requirement.background, "來自邊境的資深嚮導")
+        self.assertEqual(
+            dict(requirement.persona),
+            {
+                "personality": "沉穩",
+                "life_story": "守護森林多年",
+                "habit": "黃昏時擦拭獵弓",
+            },
+        )
 
     @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
     def test_field_less_blueprint_round_trips_byte_identically(self):
@@ -502,6 +517,61 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
             d = generate_quest_blueprint(client, context=_context())
             result = await_result(d)
         self.assertEqual(result, good)
+
+    @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
+    def test_npc_persona_and_background_are_validated_through_the_shared_helper(self):
+        validators = scenario_director._VALIDATORS
+        validate_npc = validators["npc_characterization"]
+        good = {
+            "stages": [
+                {
+                    "npc_req": [
+                        {
+                            "role": "bandit",
+                            "tier": "bandit",
+                            "persona": {
+                                "personality": "沉穩",
+                                "life_story": "守護森林多年",
+                                "habit": "黃昏時擦拭獵弓",
+                            },
+                            "background": "來自邊境的嚮導",
+                        }
+                    ]
+                }
+            ]
+        }
+        self.assertEqual(validate_npc(good), [])
+        over_bound = {
+            "stages": [
+                {
+                    "npc_req": [
+                        {
+                            "role": "bandit",
+                            "tier": "bandit",
+                            "persona": {"personality": "x" * 601},
+                        }
+                    ]
+                }
+            ]
+        }
+        errors = validate_npc(over_bound)
+        self.assertTrue(
+            any("persona.personality" in error for error in errors), errors
+        )
+        non_text = {
+            "stages": [
+                {
+                    "npc_req": [
+                        {
+                            "role": "bandit",
+                            "tier": "bandit",
+                            "background": 42,
+                        }
+                    ]
+                }
+            ]
+        }
+        self.assertTrue(validate_npc(non_text))
 
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_unknown_monster_tier_is_rejected(self):

@@ -23,6 +23,7 @@ from typing import Any
 
 from django.db import transaction
 
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.character_creation import (
@@ -36,8 +37,10 @@ from world.rules.character_creation import (
     _validate_allocations,
     _validate_persona_block,
     activate_player_character,
+    max_affinity_elements,
     preflight_character_creation,
     resolve_starting_profile,
+    validate_affinity_elements,
 )
 from world.rules.surfaces import (
     restore_attributes,
@@ -179,6 +182,34 @@ class ProfileView:
 
 
 @dataclass(frozen=True)
+class AffinityElementView:
+    """One element choice in the affinity picker."""
+
+    key: str
+    label: str
+
+
+@dataclass(frozen=True)
+class RaceAffinityBoundsView:
+    """The player-input affinity bound for one race (D3/D4)."""
+
+    maximum: int
+    elements: tuple[AffinityElementView, ...]
+
+
+@dataclass(frozen=True)
+class AffinityView:
+    """The affinity picker descriptor derived from the race bound mapping.
+
+    Maps each race key (``human``, ``beastfolk``, ``elf``) to exactly
+    ``max_affinity_elements(race_key)`` (2/1/0) and the eight lore element
+    choices from ``ELEMENT_REGISTRY``.
+    """
+
+    bounds: dict[str, RaceAffinityBoundsView]
+
+
+@dataclass(frozen=True)
 class CustomFormView:
     """The complete custom-form descriptor built from immutable registries."""
 
@@ -187,6 +218,7 @@ class CustomFormView:
     races: tuple[RaceOptionView, ...]
     subraces: dict[str, SubraceView]
     profiles: tuple[ProfileView, ...]
+    affinity: AffinityView
 
 
 @dataclass(frozen=True)
@@ -259,7 +291,7 @@ def _profiles() -> tuple[ProfileView, ...]:
         subrace_keys = tuple(
             key for key, subrace in SUBRACE_REGISTRY.items() if subrace.race_key == race_key
         )
-        for subrace_key in (None,) + subrace_keys:
+        for subrace_key in subrace_keys:
             profile = resolve_starting_profile(race_key, subrace_key)
             profiles.append(
                 ProfileView(
@@ -272,6 +304,24 @@ def _profiles() -> tuple[ProfileView, ...]:
             if len(profiles) >= MAX_PROFILES:
                 return tuple(profiles)
     return tuple(profiles)
+
+
+def _affinity_view() -> AffinityView:
+    """Compose the affinity picker descriptor from the race bound mapping."""
+    element_choices = tuple(
+        AffinityElementView(
+            key=element.key, label=element.display_name_zh
+        )
+        for element in ELEMENT_REGISTRY.values()
+    )
+    bounds = {
+        race_key: RaceAffinityBoundsView(
+            maximum=max_affinity_elements(race_key),
+            elements=element_choices,
+        )
+        for race_key in RACE_REGISTRY
+    }
+    return AffinityView(bounds)
 
 
 def build_custom_form() -> CustomFormView:
@@ -302,6 +352,7 @@ def build_custom_form() -> CustomFormView:
         races=tuple(races),
         subraces=subraces,
         profiles=_profiles(),
+        affinity=_affinity_view(),
     )
 
 
@@ -342,16 +393,53 @@ def _normalize_persona(persona: Any) -> dict[str, str] | None:
         return None
 
 
+def _normalize_background(background: Any) -> str | None:
+    """Return the bounded trimmed background text or ``None`` when malformed.
+
+    A blank value normalizes to ``None`` (the key is simply omitted); a
+    non-string or over-bound value is malformed and degrades the draft.
+    """
+    if background is None:
+        return None
+    if not isinstance(background, str):
+        return None
+    text = background.strip()
+    if not text:
+        return None
+    if len(text) > MAX_PERSONA_FIELD_LENGTH:
+        return None
+    return text
+
+
+def _normalize_affinity(affinity: Any, race_key: str) -> list[str] | None:
+    """Return the validated affinity-element list or ``None`` when malformed.
+
+    A missing value normalizes to an empty list; an unknown element, duplicate,
+    or race-bound violation (human 2 / beastfolk 1 / elf none) degrades the
+    draft so an invalid set can never be persisted.
+    """
+    if affinity is None:
+        return []
+    try:
+        return list(validate_affinity_elements(affinity, race_key))
+    except CharacterCreationError:
+        return None
+
+
 def _normalize_identity_choices(race: Any, subrace: Any) -> bool:
-    """True when the stored race/subrace pair is registered and compatible."""
-    if not isinstance(race, str) or not (subrace is None or isinstance(subrace, str)):
+    """True when the stored race/subrace pair is registered and compatible.
+
+    Subrace is required on every creation path now that every race has at
+    least one registered subrace; a custom/concept draft without one is
+    corrupt.
+    """
+    if not isinstance(race, str) or not isinstance(subrace, str):
         return False
     if race not in RACE_REGISTRY:
         return False
-    if subrace is not None:
-        entry = SUBRACE_REGISTRY.get(subrace)
-        if entry is None or entry.race_key != race:
-            return False
+    entry = SUBRACE_REGISTRY.get(subrace)
+    if entry is None or entry.race_key != race:
+        return False
     return True
 
 
@@ -399,6 +487,11 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
         checked_allocations = _normalize_allocations(storage.get("allocations"))
         if checked_allocations is None:
             return None
+        affinity_elements = _normalize_affinity(
+            storage.get("affinity_elements"), storage["race"]
+        )
+        if affinity_elements is None:
+            return None
         normalized: dict[str, Any] = {
             "mode": "custom",
             "stage": stage,
@@ -406,9 +499,16 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
             "age": age,
             "apparent_age": apparent_age,
             "race": storage["race"],
-            "subrace": storage.get("subrace"),
+            "subrace": storage["subrace"],
             "allocations": checked_allocations,
         }
+        if affinity_elements:
+            normalized["affinity_elements"] = affinity_elements
+        if "background" in storage:
+            background = _normalize_background(storage["background"])
+            if background is None:
+                return None
+            normalized["background"] = background
         if "persona" in storage:
             persona = _normalize_persona(storage["persona"])
             if persona is None:
@@ -431,6 +531,11 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
             "subrace": storage.get("subrace"),
             "allocations": checked_allocations,
         }
+        if "background" in storage:
+            background = _normalize_background(storage["background"])
+            if background is None:
+                return None
+            normalized["background"] = background
         if "persona" in storage:
             persona = _normalize_persona(storage["persona"])
             if persona is None:
@@ -504,8 +609,8 @@ def apply_concept_proposal(
     subrace_key = proposal["subrace_key"]
     if not isinstance(race_key, str) or not race_key:
         raise CharacterCreationError("race must be a registry key")
-    if subrace_key is not None and (not isinstance(subrace_key, str) or not subrace_key):
-        raise CharacterCreationError("subrace must be a registry key or omitted")
+    if not isinstance(subrace_key, str) or not subrace_key:
+        raise CharacterCreationError("subrace must be a registered registry key")
     profile = resolve_starting_profile(race_key, subrace_key)
     checked_allocations = _validate_allocations(profile, proposal["allocations"])
     persona_block = None
@@ -524,6 +629,18 @@ def apply_concept_proposal(
     with transaction.atomic():
         if draft_fingerprint(character) != expected_fingerprint:
             raise ConceptDraftStaleError("concept draft fingerprint changed")
+        # The concept-apply service never overwrites a player-authored
+        # background: a custom draft's accepted background survives the apply
+        # so the journey (background, then concept, then custom save, then
+        # activation) keeps the text at every step
+        # (creation-persona-persistence D4).
+        previous = _normalize_draft(getattr(character, "creation_draft", None))
+        if (
+            previous is not None
+            and previous.get("mode") == "custom"
+            and previous.get("background") is not None
+        ):
+            storage["background"] = previous["background"]
         _write_draft(character, storage)
     return read_draft(character)
 
@@ -545,6 +662,8 @@ def _request_from_draft(draft: dict[str, Any]) -> CharacterCreationRequest:
         race=draft["race"],
         subrace=draft["subrace"],
         allocations=dict(draft["allocations"]),
+        background=draft.get("background"),
+        affinity_elements=tuple(draft.get("affinity_elements") or ()),
     )
 
 
@@ -600,6 +719,10 @@ def save_custom_draft(
         "subrace": validated.subrace,
         "allocations": dict(request.allocations),
     }
+    if validated.affinity_elements:
+        storage["affinity_elements"] = list(validated.affinity_elements)
+    if validated.background is not None:
+        storage["background"] = validated.background
     if persona_block is not None:
         storage["persona"] = persona_block
     _write_draft(character, storage)
@@ -684,6 +807,8 @@ __all__ = [
     "APPARENT_AGE_MAXIMUM",
     "APPARENT_AGE_MINIMUM",
     "AdultBoundsView",
+    "AffinityElementView",
+    "AffinityView",
     "AllocationAxisView",
     "CONCEPT_STAGE",
     "ConceptDraftStaleError",
@@ -700,6 +825,7 @@ __all__ = [
     "PRESET_STAGE",
     "PresetCardView",
     "ProfileView",
+    "RaceAffinityBoundsView",
     "RaceOptionView",
     "SubraceView",
     "activate_draft",

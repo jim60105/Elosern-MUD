@@ -85,15 +85,18 @@ class StageNpcCharacterization:
     """Optional frozen characterization of one spawned occupant.
 
     Carries the validated per-occupant characterization fields in deterministic
-    order (design D5): ``display_name``, paired ``age``/``apparent_age``, and the
-    named portrait ``stable_key``. ``None`` fields mean the blueprint declared
-    nothing for that surface; a fully-absent occupant keeps today's shape.
+    order (design D5): ``display_name``, paired ``age``/``apparent_age``, the
+    named portrait ``stable_key``, and the optional authored persona/background
+    flavor block. ``None`` fields mean the blueprint declared nothing for that
+    surface; a fully-absent occupant keeps today's shape.
     """
 
     display_name: str | None = None
     age: int | None = None
     apparent_age: int | None = None
     portrait_stable_key: str | None = None
+    background: str | None = None
+    persona: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -284,11 +287,23 @@ def _compile_characterization(
 
     Returns ``None`` when the entry declares no characterization surface, so a
     field-less blueprint keeps today's exact requirement shape (design D5).
+    The optional authored persona/background flavor is preserved in
+    deterministic field order (fix-custom-creation-information-and-background
+    D7).
     """
     portrait = requirement.get("portrait")
     stable_key = None
     if isinstance(portrait, dict):
         stable_key = portrait.get("stable_key")
+    background = requirement.get("background")
+    persona = requirement.get("persona")
+    persona_prose = ()
+    if isinstance(persona, dict):
+        persona_prose = tuple(
+            (field, persona[field])
+            for field in ("personality", "life_story", "habit")
+            if isinstance(persona.get(field), str) and persona[field].strip()
+        )
     if all(
         value is None
         for value in (
@@ -296,14 +311,17 @@ def _compile_characterization(
             requirement.get("age"),
             requirement.get("apparent_age"),
             stable_key,
+            background,
         )
-    ):
+    ) and not persona_prose:
         return None
     return StageNpcCharacterization(
         display_name=requirement.get("display_name"),
         age=requirement.get("age"),
         apparent_age=requirement.get("apparent_age"),
         portrait_stable_key=stable_key,
+        background=background if isinstance(background, str) else None,
+        persona=persona_prose,
     )
 
 
@@ -512,6 +530,10 @@ def _npc_req_canonical(
             canonical["portrait"] = {
                 "stable_key": characterization.portrait_stable_key
             }
+        if characterization.background is not None:
+            canonical["background"] = characterization.background
+        if characterization.persona:
+            canonical["persona"] = dict(characterization.persona)
     return canonical
 
 
@@ -841,6 +863,8 @@ def _characterization_from_payload(
         age=data["age"],
         apparent_age=data["apparent_age"],
         portrait_stable_key=data["portrait_stable_key"],
+        background=data.get("background"),
+        persona=tuple(tuple(pair) for pair in data.get("persona") or ()),
     )
 
 

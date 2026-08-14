@@ -60,6 +60,55 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         )
         self.assertEqual(characterize_errors(entry, lifespan_upper_bound=80), [])
 
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_valid_persona_and_background_pass(self):
+        entry = _entry(
+            display_name="莉絲·晨星",
+            persona={
+                "personality": "沉穩",
+                "life_story": "守護圖書館多年",
+                "habit": "黃昏時整理書架",
+            },
+            background="來自邊境的旅人",
+        )
+        self.assertEqual(characterize_errors(entry, lifespan_upper_bound=80), [])
+
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_over_bound_or_non_text_persona_fields_reject(self):
+        cases = (
+            {"persona": {"personality": "x" * 601}},
+            {"persona": {"personality": ""}},
+            {"persona": {"personality": 42}},
+            {"persona": "not-an-object"},
+            {"background": "x" * 601},
+            {"background": 42},
+        )
+        for entry in cases:
+            with self.subTest(entry=entry):
+                self.assertTrue(
+                    characterize_errors(entry, lifespan_upper_bound=80),
+                    entry,
+                )
+
+    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
+    def test_duplicate_stable_key_agreement_includes_persona_identity(self):
+        base = {
+            "display_name": "莉絲·晨星",
+            "age": 68,
+            "apparent_age": 68,
+            "portrait": {"stable_key": "library_keeper"},
+            "persona": {"personality": "沉穩"},
+        }
+        twin = dict(base)
+        twin["persona"] = {"personality": "開朗"}
+        self.assertEqual(
+            duplicate_stable_key_errors([base, base]),
+            [],
+        )
+        errors = duplicate_stable_key_errors([base, twin])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("conflicting characterization", errors[0])
+
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_elf_of_several_centuries_passes_within_the_elf_band(self):
         entry = _entry(age=300, apparent_age=300)

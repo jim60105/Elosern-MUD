@@ -226,7 +226,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="character",
-            schema_version=1,
+            schema_version=2,
             unavailable_reason=("character_unavailable", "角色狀態目前無法顯示"),
             presenter=character_presenter,
         )

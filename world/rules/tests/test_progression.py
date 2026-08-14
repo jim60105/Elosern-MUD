@@ -22,12 +22,15 @@ from world.rules.buffs import _add_buff
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
 from world.rules.progression import (
+    AFFINITY_ELEMENT_MULTIPLIER,
+    NON_AFFINITY_ELEMENT_MULTIPLIER,
     COMBAT_KILL_XP_TABLE,
     MAGIC_XP_PER_LEVEL,
     SKILL_PRACTICE_XP_PER_USE,
     accrue_magic_study,
     can_cast_spell_tier,
     effective_magic_growth_multiplier,
+    element_affinity_multiplier,
     grant_combat_kill_xp,
     grant_skill_practice_xp,
     magic_rank_title,
@@ -411,7 +414,7 @@ class ElementMasteryGateTests(EvenniaTest):
             can_cast_spell_tier(self._caster("at-threshold", 31), "fire", "大師")
         )
 
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-numeric-level-overridden-by-direct-mastery-ownership")
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
     def test_gate_boundaries_match_the_four_tier_thresholds(self):
         for tier, below, at in (
             ("術師", 15, 16),
@@ -675,3 +678,94 @@ class ElementMasteryGateTests(EvenniaTest):
         self.assertGreaterEqual(low, 16)
         entity = self._caster("created-human", low, "human")
         self.assertTrue(can_cast_spell_tier(entity, "fire", "術師"))
+
+
+class ElementAffinityProgressionTests(EvenniaTest):
+    """element-affinity: multiplicative effective-level derivation and gate."""
+
+    def _caster(
+        self,
+        key: str,
+        magic_level: int,
+        race: str = "human",
+        affinity: tuple[str, ...] | None = None,
+    ) -> PlayerCharacter:
+        entity = create_object(PlayerCharacter, key=key)
+        entity.race = race
+        entity.apply_race_baseline()
+        entity.traits.magic_level.current = magic_level
+        entity.db.skills = {"active": [], "passive": []}
+        if affinity is not None:
+            entity.db.affinity_elements = list(affinity)
+        return entity
+
+    @covers_requirement("element-affinity::element-affinity-multiplier-derives-a-finite-per-element-multiplier")
+    def test_neutral_default_returns_exactly_one_point_zero(self):
+        entity = self._caster("neutral", 50)
+        self.assertEqual(element_affinity_multiplier(entity, "fire"), 1.0)
+        self.assertEqual(
+            AFFINITY_ELEMENT_MULTIPLIER, 1.1
+        )
+        self.assertEqual(
+            NON_AFFINITY_ELEMENT_MULTIPLIER, 0.9
+        )
+
+    @covers_requirement("element-affinity::element-affinity-multiplier-derives-a-finite-per-element-multiplier")
+    def test_favored_and_non_favored_elements_return_the_yaml_constants(self):
+        entity = self._caster("violet", 50, affinity=("fire", "wind"))
+        self.assertEqual(
+            element_affinity_multiplier(entity, "fire"),
+            AFFINITY_ELEMENT_MULTIPLIER,
+        )
+        self.assertEqual(
+            element_affinity_multiplier(entity, "wind"),
+            AFFINITY_ELEMENT_MULTIPLIER,
+        )
+        self.assertEqual(
+            element_affinity_multiplier(entity, "water"),
+            NON_AFFINITY_ELEMENT_MULTIPLIER,
+        )
+
+    @covers_requirement("element-affinity::element-affinity-multiplier-derives-a-finite-per-element-multiplier")
+    def test_unknown_element_key_fails_closed_and_writes_nothing(self):
+        entity = self._caster("unknown-element", 50)
+        with self.assertRaises(ValueError):
+            element_affinity_multiplier(entity, "not_an_element")
+        self.assertIsNone(entity.db.affinity_elements)
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_favored_element_unlocks_a_tier_earlier(self):
+        entity = self._caster("fire-affinity", 29, affinity=("fire",))
+        self.assertTrue(can_cast_spell_tier(entity, "fire", "大師"))
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_non_favored_element_unlocks_a_tier_later(self):
+        below = self._caster("non-favored-below", 34, affinity=("wind",))
+        self.assertFalse(can_cast_spell_tier(below, "fire", "大師"))
+        at = self._caster("non-favored-at", 35, affinity=("wind",))
+        self.assertTrue(can_cast_spell_tier(at, "fire", "大師"))
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_human_reaches_dominance_only_for_a_favored_element(self):
+        entity = self._caster("dominant-human", 83, affinity=("fire",))
+        self.assertTrue(can_cast_spell_tier(entity, "fire", "主宰"))
+        for level in (84, 90):
+            with self.subTest(level=level):
+                entity.traits.magic_level.current = level
+                self.assertFalse(can_cast_spell_tier(entity, "wind", "主宰"))
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_mastery_override_still_wins_over_affinity_scaling(self):
+        entity = self._caster("mastery-wins", 1, affinity=("water",))
+        entity.db.skills = {"active": [], "passive": ["fire_mastery"]}
+        self.assertTrue(can_cast_spell_tier(entity, "fire", "主宰"))
+
+    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
+    def test_unknown_element_fails_closed_even_with_a_fabricated_mastery(self):
+        entity = self._caster("fabricated-mastery", 90)
+        entity.db.skills = {
+            "active": [],
+            "passive": ["not_an_element_mastery"],
+        }
+        with self.assertRaises(ValueError):
+            can_cast_spell_tier(entity, "not_an_element", "學徒")

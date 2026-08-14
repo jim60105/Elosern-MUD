@@ -157,15 +157,16 @@ def _gate_allows(entity: Any, skill: SkillDef) -> bool:
 
     Applies the same element-mastery cast gate the resolver enforces, so the
     policy never chooses an action the resolver would reject. A malformed
-    elemental spell (cost outside every tier band) fails closed.
+    elemental spell (cost outside every tier band) or an unrecognized element
+    key fails closed.
     """
     try:
         tier = spell_tier_for(skill)
+        if tier is None:
+            return True
+        return can_cast_spell_tier(entity, skill.element.key, tier)
     except ValueError:
         return False
-    if tier is None:
-        return True
-    return can_cast_spell_tier(entity, skill.element.key, tier)
 
 
 def _owned_damage_skills(entity: Any) -> list[SkillDef]:

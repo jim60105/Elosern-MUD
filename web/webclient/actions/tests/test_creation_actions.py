@@ -66,8 +66,10 @@ def custom_payload(**overrides):
         "age": 20,
         "apparent_age": 20,
         "race": "human",
-        "subrace": None,
-        "allocations": balanced_allocations("human"),
+        "subrace": "human_commoner",
+        "allocations": balanced_allocations("human", "human_commoner"),
+        "background": None,
+        "affinity_elements": None,
     }
     value.update(overrides)
     return value
@@ -190,6 +192,35 @@ class CreationPayloadValidationTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_creation_reset_payload(bad)
 
+    def test_custom_affinity_payload_is_exact_and_race_bounded(self):
+        self.assertEqual(
+            validate_creation_custom_payload(
+                custom_payload(affinity_elements=["fire", "wind"])
+            )["affinity_elements"],
+            ("fire", "wind"),
+        )
+        self.assertEqual(
+            validate_creation_custom_payload(custom_payload())["affinity_elements"],
+            None,
+        )
+        self.assertEqual(
+            validate_creation_custom_payload(
+                custom_payload(affinity_elements=[])
+            )["affinity_elements"],
+            (),
+        )
+        for bad in (
+            {**custom_payload(), "affinity_elements": "fire"},
+            {**custom_payload(), "affinity_elements": ["luck"]},
+            {**custom_payload(), "affinity_elements": ["fire", "fire"]},
+            {**custom_payload(), "affinity_elements": ["fire", "wind", "water"]},
+            {**custom_payload(race="elf", subrace="fionnen"), "affinity_elements": ["light"]},
+            {**custom_payload(), "affinity_elements": {"fire": True}},
+        ):
+            with self.subTest(payload=bad):
+                with self.assertRaises(Exception):
+                    validate_creation_custom_payload(bad)
+
 
 class CreationAdapterTests(CreationActionBase):
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
@@ -220,6 +251,59 @@ class CreationAdapterTests(CreationActionBase):
         self.assertEqual(draft["display_name"], "新角色")
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.age, None)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_custom_save_persists_race_bounded_affinity(self):
+        result = _creation_custom_adapter(
+            self.character, custom_payload(affinity_elements=["fire", "wind"])
+        )
+        self.assertEqual(result["outcome"], "success")
+        draft = read_draft(self.character)
+        self.assertEqual(draft["affinity_elements"], ["fire", "wind"])
+
+    def test_custom_over_bound_affinity_rejected_without_mutation(self):
+        before = self.character.attributes.get("creation_draft")
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(affinity_elements=["fire", "wind", "water"]),
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "over_bound_affinity")
+        self.assertEqual(self.character.attributes.get("creation_draft"), before)
+        self.assertTrue(self.character.creation_pending)
+
+    def test_custom_elf_affinity_rejected_without_mutation(self):
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(
+                race="elf", subrace="fionnen",
+                allocations=balanced_allocations("elf", "fionnen"),
+                affinity_elements=["light"],
+            ),
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "elf_affinity_rejected")
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+
+    def test_custom_elf_empty_affinity_is_neutral_and_activates_with_subrace_seed(self):
+        # The WebClient always emits ``affinity_elements`` (possibly ``[]``), so
+        # an empty elf set is neutral player input, not a rejected contradiction;
+        # activation still seeds the elf from its subrace.
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(
+                race="elf", subrace="fionnen",
+                allocations=balanced_allocations("elf", "fionnen"),
+                affinity_elements=[],
+            ),
+        )
+        self.assertEqual(result["outcome"], "success")
+        draft = read_draft(self.character)
+        self.assertNotIn("affinity_elements", draft)
+        _creation_activate_adapter(self.character, {})
+        self.assertFalse(self.character.creation_pending)
+        self.assertEqual(self.character.db.affinity_elements, ["light"])
 
     @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
     def test_underage_fields_rejected_independently(self):
@@ -388,8 +472,8 @@ class CreationFingerprintBindingTests(CreationActionBase):
                 age=21,
                 apparent_age=21,
                 race="human",
-                subrace=None,
-                allocations=balanced_allocations("human"),
+                subrace="human_commoner",
+                allocations=balanced_allocations("human", "human_commoner"),
             ),
         )
         result = _creation_activate_adapter(self.character, {})
@@ -622,8 +706,8 @@ def _proposal(**overrides):
 
     payload = {
         "race_key": "human",
-        "subrace_key": None,
-        "allocations": balanced_allocations("human"),
+        "subrace_key": "human_commoner",
+        "allocations": balanced_allocations("human", "human_commoner"),
         "suggested_skills": ("flight",),
         "persona": {
             "personality": "沉穩",

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from world.imports.tests.helpers import example_record
 from world.imports.validate import (
+    _check_affinity_elements,
     _check_disguised_stats_subset,
     _check_race_subrace,
     _check_skills,
@@ -29,6 +30,22 @@ class SemanticValidationTests(TestCase):
         self.assertTrue(_check_race_subrace(record))
         record["subrace"] = "foxkin"
         self.assertTrue(_check_race_subrace(record))
+
+    @covers_requirement("import-validation::race-and-subrace-must-resolve-in-the-lore-registries-with-subrace-cross-checked-against-race")
+    def test_a_character_without_a_subrace_is_rejected(self):
+        for missing in (None, "", "  "):
+            with self.subTest(missing=missing):
+                record = example_record()
+                record["subrace"] = missing
+                errors = _check_race_subrace(record)
+                self.assertEqual(len(errors), 1)
+                self.assertEqual(errors[0].field, "subrace")
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+                self.assertTrue(
+                    any(issue.field == "subrace" for issue in report.rejections),
+                    report.rejections,
+                )
 
     def test_stats_band_warns_and_honors_foxkin_override(self):
         record = example_record()
@@ -106,6 +123,59 @@ class SemanticValidationTests(TestCase):
         ):
             issues = _check_skills(record)
         self.assertEqual([issue.message for issue in issues], ["'unknown' not found in skill registry"])
+
+    @covers_requirement("import-validation::import-validation-enforces-race-aware-affinity-counts-and-registry-membership")
+    def test_affinity_unknown_and_duplicate_rejected(self):
+        record = example_record()
+        record["affinity_elements"] = ["luck", "wind"]
+        issues = _check_affinity_elements(record)
+        self.assertTrue(
+            any("unknown affinity element 'luck'" in issue.message for issue in issues)
+        )
+        record = example_record()
+        record["affinity_elements"] = ["fire", "fire"]
+        issues = _check_affinity_elements(record)
+        self.assertTrue(
+            any("duplicate affinity element 'fire'" in issue.message for issue in issues)
+        )
+
+    @covers_requirement("import-validation::import-validation-enforces-race-aware-affinity-counts-and-registry-membership")
+    def test_affinity_race_aware_counts(self):
+        human = example_record()
+        human["affinity_elements"] = ["fire", "wind", "water"]
+        issues = _check_affinity_elements(human)
+        self.assertTrue(
+            any("exceeds the human bound of 2" in issue.message for issue in issues)
+        )
+        beast = example_record()
+        beast["race"], beast["subrace"] = "beastfolk", "foxkin"
+        beast["affinity_elements"] = ["fire", "wind"]
+        issues = _check_affinity_elements(beast)
+        self.assertTrue(
+            any("exceeds the beastfolk bound of 1" in issue.message for issue in issues)
+        )
+
+    @covers_requirement("import-validation::import-validation-enforces-race-aware-affinity-counts-and-registry-membership")
+    def test_elf_record_supplying_affinity_is_rejected(self):
+        for supplied in (["light"], []):
+            with self.subTest(supplied=supplied):
+                record = example_record()
+                record["race"], record["subrace"] = "elf", "fionnen"
+                record["affinity_elements"] = supplied
+                issues = _check_affinity_elements(record)
+                self.assertTrue(
+                    any("subrace-derived" in issue.message for issue in issues)
+                )
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+
+    @covers_requirement("import-validation::import-validation-enforces-race-aware-affinity-counts-and-registry-membership")
+    def test_record_without_affinity_produces_no_rejection(self):
+        record = example_record()
+        record.pop("affinity_elements", None)
+        self.assertEqual(_check_affinity_elements(record), [])
+        report = validate_character(record)
+        self.assertTrue(report.is_valid)
 
     def test_internal_registry_import_failure_is_not_misreported_as_absent(self):
         error = ModuleNotFoundError("broken dependency")

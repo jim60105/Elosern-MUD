@@ -13,6 +13,7 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
+    MAX_PERSONA_FIELD_LENGTH,
     CharacterCreationError,
     CharacterCreationRequest,
     activate_player_character,
@@ -69,8 +70,8 @@ class CharacterActivationTests(EvenniaTest):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
-            "allocations": balanced_allocations("human"),
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -144,6 +145,19 @@ class CharacterActivationTests(EvenniaTest):
                     self.account, self.character, self.request(),
                     sampler=lambda low, high, value=sample: value,
                 )
+
+    @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
+    def test_custom_creation_without_a_subrace_is_rejected(self):
+        for missing in (None, "", "  ", "none"):
+            with self.subTest(missing=missing):
+                request = self.request(subrace=missing)
+                with self.assertRaisesRegex(
+                    CharacterCreationError, "requires a registered subrace"
+                ):
+                    activate_player_character(self.account, self.character, request)
+                self.assertTrue(self.character.creation_pending)
+                self.assertEqual(self.character.traits.all(), [])
+                self.assertIsNone(self.character.age)
 
     def test_display_name_rejects_separators_and_the_shared_length_bound(self):
         for name in ("角色/名", "角色:名", "角色}名", "x" * 65):
@@ -337,8 +351,8 @@ class PortraitFinalizationTests(EvenniaTest):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
-            "allocations": balanced_allocations("human"),
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -383,8 +397,8 @@ class PortraitFinalizationTests(EvenniaTest):
                 "age": 20,
                 "apparent_age": 20,
                 "race": "human",
-                "subrace": None,
-                "allocations": balanced_allocations("human"),
+                "subrace": "human_commoner",
+                "allocations": balanced_allocations("human", "human_commoner"),
             },
         )
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
@@ -427,6 +441,225 @@ class PortraitFinalizationTests(EvenniaTest):
         )
 
 
+class AffinityCreationTests(EvenniaTest):
+    """Custom and preset activation affinity (element-affinity-progression)."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+
+    def request(self, **overrides):
+        values = {
+            "mode": "custom",
+            "display_name": "  新角色  ",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
+        }
+        values.update(overrides)
+        return CharacterCreationRequest(**values)
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_human_two_elements_accepted_three_rejected(self):
+        result = activate_player_character(
+            self.account, self.character,
+            self.request(affinity_elements=("fire", "wind")),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(result.display_name, "新角色")
+        self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
+        character = create_object(PlayerCharacter, key="three-shell")
+        self.account.at_post_create_character(character)
+        with self.assertRaisesRegex(CharacterCreationError, "exceeds the human bound"):
+            activate_player_character(
+                self.account, character,
+                self.request(affinity_elements=("fire", "wind", "water")),
+                sampler=lambda low, high: low,
+            )
+        self.assertTrue(character.creation_pending)
+        self.assertFalse(character.attributes.has("affinity_elements"))
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_beastfolk_one_element_accepted_two_rejected(self):
+        allocations = balanced_allocations("beastfolk", "foxkin")
+        result = activate_player_character(
+            self.account, self.character,
+            self.request(
+                race="beastfolk", subrace="foxkin", allocations=allocations,
+                affinity_elements=("wind",),
+            ),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(self.character.db.affinity_elements, ["wind"])
+        character = create_object(PlayerCharacter, key="beast-two-shell")
+        self.account.at_post_create_character(character)
+        with self.assertRaisesRegex(CharacterCreationError, "exceeds the beastfolk bound"):
+            activate_player_character(
+                self.account, character,
+                self.request(
+                    race="beastfolk", subrace="foxkin", allocations=allocations,
+                    affinity_elements=("wind", "fire"),
+                ),
+                sampler=lambda low, high: low,
+            )
+        self.assertTrue(character.creation_pending)
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_elf_supplied_set_rejected_and_subrace_seeds_at_activation(self):
+        elf_allocations = balanced_allocations("elf", "fionnen")
+        for supplied in (("light",), ("fire", "wind")):
+            with self.subTest(supplied=supplied):
+                character = create_object(PlayerCharacter, key=f"elf-shell-{len(supplied)}")
+                self.account.at_post_create_character(character)
+                with self.assertRaisesRegex(CharacterCreationError, "seeded from the subrace"):
+                    activate_player_character(
+                        self.account, character,
+                        self.request(
+                            race="elf", subrace="fionnen", allocations=elf_allocations,
+                            affinity_elements=supplied,
+                        ),
+                        sampler=lambda low, high: low,
+                    )
+                self.assertTrue(character.creation_pending)
+        activated = create_object(PlayerCharacter, key="elf-activate")
+        self.account.at_post_create_character(activated)
+        activate_player_character(
+            self.account, activated,
+            self.request(
+                race="elf", subrace="fionnen", allocations=elf_allocations,
+                affinity_elements=(),
+            ),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(activated.db.affinity_elements, ["light"])
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_eolas_seeds_all_eight_and_each_is_favored(self):
+        from world.lore.elements import ELEMENT_REGISTRY
+        from world.rules.progression import element_affinity_multiplier
+
+        eolas_allocations = balanced_allocations("elf", "eolas")
+        character = create_object(PlayerCharacter, key="eolas-activate")
+        self.account.at_post_create_character(character)
+        activate_player_character(
+            self.account, character,
+            self.request(
+                race="elf", subrace="eolas", allocations=eolas_allocations,
+                affinity_elements=(),
+            ),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(
+            set(character.db.affinity_elements), set(ELEMENT_REGISTRY)
+        )
+        for element in ELEMENT_REGISTRY:
+            self.assertEqual(element_affinity_multiplier(character, element), 1.1)
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_unknown_and_duplicate_affinity_elements_are_rejected(self):
+        for supplied, message in (
+            (("luck",), "unknown element"),
+            (("fire", "fire"), "duplicate element"),
+        ):
+            with self.subTest(supplied=supplied, message=message):
+                character = create_object(PlayerCharacter, key=f"bad-affinity-{message.split()[0]}")
+                self.account.at_post_create_character(character)
+                with self.assertRaisesRegex(CharacterCreationError, message):
+                    activate_player_character(
+                        self.account, character,
+                        self.request(affinity_elements=supplied),
+                        sampler=lambda low, high: low,
+                    )
+                self.assertTrue(character.creation_pending)
+                self.assertFalse(character.attributes.has("affinity_elements"))
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
+    def test_human_preset_persists_declared_affinity(self):
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
+    def test_neutral_human_preset_stays_neutral(self):
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(self.character.db.affinity_elements, [])
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
+    def test_elf_preset_seeds_affinity_from_subrace(self):
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key="elf_guardian"),
+            sampler=lambda low, high: low,
+        )
+        self.assertEqual(self.character.db.affinity_elements, ["light"])
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_affinity_write_failure_rolls_back_the_whole_activation(self):
+        old_key = self.character.key
+
+        def fail(stage):
+            if stage == "affinity_elements":
+                raise RuntimeError("injected affinity failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected affinity failure"):
+            activate_player_character(
+                self.account, self.character,
+                self.request(affinity_elements=("fire",)),
+                sampler=lambda low, high: low,
+                write_observer=fail,
+            )
+        self.assertEqual(self.character.key, old_key)
+        self.assertTrue(self.character.creation_pending)
+        self.assertFalse(self.character.attributes.has("affinity_elements"))
+        self.assertEqual(self.character.traits.all(), [])
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_invalid_subrace_seed_fails_closed(self):
+        from dataclasses import replace
+
+        from world.lore.races import SUBRACE_REGISTRY
+        from world.rules import character_creation as cc
+
+        real_fionnen = SUBRACE_REGISTRY["fionnen"]
+        elf_allocations = balanced_allocations("elf", "fionnen")
+        for bad_seed, message in (
+            (("luck",), "unknown element"),
+            (("light", "light"), "duplicate element"),
+        ):
+            with self.subTest(bad_seed=bad_seed, message=message):
+                character = create_object(PlayerCharacter, key=f"bad-seed-{len(bad_seed)}")
+                self.account.at_post_create_character(character)
+                with patch.dict(
+                    cc.SUBRACE_REGISTRY,
+                    {"fionnen": replace(real_fionnen, affinity_elements=bad_seed)},
+                ):
+                    with self.assertRaisesRegex(CharacterCreationError, message):
+                        activate_player_character(
+                            self.account, character,
+                            self.request(
+                                race="elf", subrace="fionnen", allocations=elf_allocations,
+                                affinity_elements=(),
+                            ),
+                            sampler=lambda low, high: low,
+                        )
+                self.assertTrue(character.creation_pending)
+                self.assertFalse(character.attributes.has("affinity_elements"))
+
+
+
 PERSONA_BLOCK = {
     "personality": "沉穩",
     "life_story": "來自邊境的小村，靠磨劍維生",
@@ -452,8 +685,8 @@ class PersonaActivationTests(EvenniaTest):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
-            "allocations": balanced_allocations("human"),
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -505,6 +738,53 @@ class PersonaActivationTests(EvenniaTest):
         )
         self.assertFalse(self.character.creation_pending)
         self.assertFalse(self.character.attributes.has("persona"))
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_custom_background_is_persisted_inside_the_persona_record(self):
+        activate_player_character(
+            self.account, self.character,
+            self.request(background="在公會登記的新人冒險者"),
+            sampler=lambda low, high: low,
+        )
+        self.assertFalse(self.character.creation_pending)
+        stored = self.character.db.persona
+        self.assertEqual(stored["background"], "在公會登記的新人冒險者")
+        for key in ("identity", "personality", "life_story", "habit",
+                    "appearance", "social_connection"):
+            self.assertIn(key, stored)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    def test_background_merges_with_a_concept_persona_block(self):
+        activate_player_character(
+            self.account, self.character,
+            self.request(background="背景文字"),
+            persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+        )
+        stored = self.character.db.persona
+        self.assertEqual(stored["background"], "背景文字")
+        self.assertEqual(stored["personality"], "沉穩")
+        self.assertEqual(stored["life_story"], "來自邊境的小村，靠磨劍維生")
+
+    def test_blank_or_over_bound_background_is_rejected_or_omitted(self):
+        for background in ("  ", "", None):
+            with self.subTest(background=background):
+                activate_player_character(
+                    self.account, self.character,
+                    self.request(background=background),
+                    sampler=lambda low, high: low,
+                )
+                self.assertFalse(self.character.creation_pending)
+                if background in ("  ", "", None):
+                    self.assertFalse(self.character.attributes.has("persona"))
+                self.character.creation_pending = True
+                self.character.attributes.reset_cache()
+        with self.assertRaises(CharacterCreationError):
+            activate_player_character(
+                self.account, self.character,
+                self.request(background="x" * (MAX_PERSONA_FIELD_LENGTH + 1)),
+                sampler=lambda low, high: low,
+            )
+        self.assertTrue(self.character.creation_pending)
 
     def test_malformed_persona_is_rejected_without_mutation(self):
         cases = (

@@ -89,7 +89,7 @@ def _messages(message_mock):
 def _proposal(**overrides):
     payload = {
         "race_key": "human",
-        "subrace_key": None,
+        "subrace_key": "human_commoner",
         "allocations": {
             "hp": 100,
             "mp": 50,
@@ -296,8 +296,8 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         message_mock = Mock()
         self.char1.msg = message_mock
         replies = [
-            "自訂者", "20", "20", "human", "",
-            "100", "50", "31", "0", "0", "0", "yes",
+            "自訂者", "20", "20", "human", "human_commoner",
+            "", "100", "50", "31", "0", "0", "0", "", "yes",
         ]
         try:
             with QueuedDeferLater() as queue:
@@ -393,17 +393,145 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         command.caller = self.char1
         command.account = self.account
         command.args = "create"
-        generator = command.func()
-        replies = ["自訂者", "20", "20", "human", "none"] + ["0"] * 6
-        prompts = [next(generator)]
-        for reply in replies:
-            prompts.append(generator.send(reply))
-        joined = "".join(prompts)
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            replies = ["自訂者", "20", "20", "human", "human_commoner"] + [""] + ["0"] * 6 + [""]
+            prompts = [next(generator)]
+            for reply in replies:
+                prompts.append(generator.send(reply))
+        finally:
+            self.char1.msg = original_msg
+        joined = "".join(prompts) + "".join(_messages(message_mock))
         for race in ("human", "beastfolk", "elf"):
             self.assertIn(race, joined)
         for axis, explanation in ALLOCATION_AXIS_EXPLANATIONS.items():
             self.assertIn(axis, joined)
             self.assertIn(explanation, joined)
+        self.assertIn("王族", joined)
+        self.assertIn("平民", joined)
+        self.assertIn("配點說明", joined)
+        self.assertIn("六項配點總和必須恰好等於", joined)
+        self.assertIn("屬性親和", joined)
+        self.assertIn("背景設定", joined)
+
+    def test_custom_wizard_rejects_an_empty_or_unknown_subrace(self):
+        for subrace in ("", "none", "foxkin"):
+            with self.subTest(subrace=subrace):
+                command = CmdCharacter()
+                command.caller = self.char1
+                command.account = self.account
+                command.args = "create"
+                generator = command.func()
+                replies = ["自訂者", "20", "20", "human", subrace]
+                next(generator)
+                try:
+                    for reply in replies:
+                        generator.send(reply)
+                except StopIteration:
+                    pass
+                self.assertTrue(self.char1.creation_pending)
+                self.assertEqual(self.char1.traits.all(), [])
+
+    def test_custom_wizard_collects_an_optional_background(self):
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        generator = command.func()
+        replies = (
+            ["自訂者", "20", "20", "human", "human_commoner"]
+            + [""]
+            + ["100", "50", "31", "0", "0", "0"]
+            + ["在公會登記的新人冒險者", "yes"]
+        )
+        next(generator)
+        for reply in replies:
+            try:
+                generator.send(reply)
+            except StopIteration:
+                break
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.db.persona["background"], "在公會登記的新人冒險者")
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_custom_wizard_collects_race_bounded_affinity(self):
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        generator = command.func()
+        replies = (
+            ["自訂者", "20", "20", "human", "human_commoner"]
+            + ["fire wind"]
+            + ["100", "50", "31", "0", "0", "0"]
+            + ["", "yes"]
+        )
+        next(generator)
+        for reply in replies:
+            try:
+                generator.send(reply)
+            except StopIteration:
+                break
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.db.affinity_elements, ["fire", "wind"])
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_custom_wizard_rejects_an_over_bound_affinity_set(self):
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        generator = command.func()
+        replies = (
+            ["自訂者", "20", "20", "human", "human_commoner"]
+            + ["fire wind water"]
+            + ["100", "50", "31", "0", "0", "0"]
+            + ["", "yes"]
+        )
+        try:
+            next(generator)
+            for reply in replies:
+                generator.send(reply)
+        except StopIteration:
+            pass
+        finally:
+            self.char1.msg = original_msg
+        self.assertTrue(self.char1.creation_pending)
+        self.assertEqual(self.char1.traits.all(), [])
+        messages = [str(call.args[0]) for call in message_mock.call_args_list]
+        self.assertTrue(
+            any("最多只能選擇 2 個屬性" in text for text in messages),
+            messages,
+        )
+
+    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    def test_custom_wizard_skips_affinity_prompt_for_elf(self):
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        generator = command.func()
+        replies = (
+            ["瑟芮雅", "180", "24", "elf", "fionnen"]
+            + ["0", "0", "0", "12", "12", "13"]
+            + ["", "yes"]
+        )
+        prompts = [next(generator)]
+        for reply in replies:
+            try:
+                prompts.append(generator.send(reply))
+            except StopIteration:
+                break
+        self.assertFalse(self.char1.creation_pending)
+        self.assertEqual(self.char1.db.affinity_elements, ["light"])
+        joined = "".join(prompts)
+        self.assertNotIn("屬性親和（可選擇", joined)
 
     def test_real_rest_reaches_clock_after_activation(self):
         self.call(CmdCharacter(), "preset human_wanderer")
@@ -420,8 +548,8 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_custom_wizard_activates_the_existing_shell(self):
         old_id, old_location = self.char1.id, self.char1.location
         replies = [
-            "自訂者", "20", "20", "human", "none",
-            "100", "50", "31", "0", "0", "0", "yes",
+            "自訂者", "20", "20", "human", "human_commoner",
+            "fire", "100", "50", "31", "0", "0", "0", "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -456,8 +584,8 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_restyled_custom_prompts_still_reject_age_17(self):
         old_key = self.char1.key
         replies = [
-            "新冒險者", "17", "20", "human", "none",
-            "100", "50", "31", "0", "0", "0", "yes",
+            "新冒險者", "17", "20", "human", "human_commoner",
+            "fire", "100", "50", "31", "0", "0", "0", "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -749,7 +877,7 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.account, self.char1,
                 CharacterCreationRequest(
                     mode="custom", display_name="其他角色", age=20,
-                    apparent_age=20, race="human", subrace=None,
+                    apparent_age=20, race="human", subrace="human_commoner",
                     allocations={
                         "hp": 50, "mp": 50, "sp": 50,
                         "atk_phys": 10, "agility": 10, "defense": 11,
@@ -800,7 +928,7 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.account, self.char1,
                 CharacterCreationRequest(
                     mode="custom", display_name="其他角色", age=20,
-                    apparent_age=20, race="human", subrace=None,
+                    apparent_age=20, race="human", subrace="human_commoner",
                     allocations={
                         "hp": 50, "mp": 50, "sp": 50,
                         "atk_phys": 10, "agility": 10, "defense": 11,

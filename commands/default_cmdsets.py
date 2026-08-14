@@ -18,6 +18,7 @@ from evennia import default_cmds
 
 from commands.action import CmdCast
 from commands.art import CmdArtRequeue, CmdArtRetry, CmdArtRun, CmdArtStatus
+from commands.background import CmdBackground
 from commands.combat import (
     CmdCombatActions,
     CmdCombatForfeit,
@@ -177,6 +178,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdInvite)
         self.add(CmdLeave)
         self.add(CmdLore)
+        self.add(CmdBackground)
         self.add(ProjectXYZGridCmdSet)
 
 

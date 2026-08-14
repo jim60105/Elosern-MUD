@@ -16,9 +16,9 @@ class LoaderTraitTests(EvenniaTest):
         record = example_record()
         del record["stats"]["guild_merit"]
         values = _resolve_trait_values(record)
-        self.assertEqual(values["atk_phys"], 88)
+        self.assertEqual(values["atk_phys"], 12)
         self.assertEqual(
-            values["guild_merit"], race_floor(RACE_REGISTRY["elf"])["guild_merit"]
+            values["guild_merit"], race_floor(RACE_REGISTRY["human"])["guild_merit"]
         )
 
     @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
@@ -67,6 +67,40 @@ class LoaderTraitTests(EvenniaTest):
     @covers_requirement("import-validation::physical-and-vital-stats-outside-plausible-bands-warn-magic-above-its-cap-rejects")
     def test_magic_above_race_cap_is_rejected_before_trait_clamping(self):
         record = example_record()
-        record["stats"]["magic_level"] = RACE_REGISTRY["elf"].magic_cap + 1
+        record["stats"]["magic_level"] = RACE_REGISTRY["human"].magic_cap + 1
+        with self.assertRaises(ImportRejected):
+            instantiate_character(record)
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_loaded_human_affinity_elements_persist_verbatim(self):
+        record = example_record()
+        entity = instantiate_character(record)
+        self.assertEqual(entity.db.affinity_elements, ["fire", "wind"])
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_loaded_elf_affinity_seeds_from_subrace_not_the_record(self):
+        record = example_record()
+        record["race"], record["subrace"] = "elf", "fionnen"
+        record["stats"] = {
+            "hp": 10000, "mp": 10000, "sp": 10000,
+            "atk_phys": 88, "agility": 84, "defense": 76,
+            "magic_level": 120, "guild_merit": 0,
+        }
+        record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
+        record.pop("affinity_elements", None)
+        entity = instantiate_character(record)
+        self.assertEqual(entity.db.affinity_elements, ["light"])
+
+    @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
+    def test_elf_record_with_supplied_affinity_is_rejected_by_the_loader(self):
+        record = example_record()
+        record["race"], record["subrace"] = "elf", "fionnen"
+        record["stats"] = {
+            "hp": 10000, "mp": 10000, "sp": 10000,
+            "atk_phys": 88, "agility": 84, "defense": 76,
+            "magic_level": 120, "guild_merit": 0,
+        }
+        record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
+        record["affinity_elements"] = ["light"]
         with self.assertRaises(ImportRejected):
             instantiate_character(record)

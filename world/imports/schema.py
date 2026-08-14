@@ -52,6 +52,7 @@ CHARACTER_SCHEMA_V1 = {
         "age",
         "apparent_age",
         "race",
+        "subrace",
         "stats",
         "disguised_stats",
         "skills",
@@ -139,6 +140,24 @@ CHARACTER_SCHEMA_V1 = {
             "description": (
                 "Opaque persona payload. Validation confirms only that it is an "
                 "object and never inspects or constrains its nested content."
+            ),
+        },
+        "affinity_elements": {
+            "type": "array",
+            "items": {
+                "enum": [
+                    "fire", "water", "wind", "earth",
+                    "lightning", "ice", "light", "dark",
+                ],
+            },
+            "uniqueItems": True,
+            "maxItems": 8,
+            "description": (
+                "Optional element-affinity set for cast-tier progression. At most "
+                "8 unique lowercase keys from exactly the eight lore elements. An "
+                "absent or empty array means neutral progression; an elf record "
+                "must not supply a set (its affinity is subrace-derived, enforced "
+                "semantically)."
             ),
         },
     },

@@ -19,10 +19,13 @@ from typing import Any
 from twisted.internet.defer import Deferred
 
 from typeclasses.characters import PlayerCharacter
+from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
+    MAX_PERSONA_FIELD_LENGTH,
     CharacterCreationError,
     CharacterCreationRequest,
+    max_affinity_elements,
 )
 from world.rules.creation_messages import rejection_code, rejection_message
 from world.rules.creation_wizard import (
@@ -124,10 +127,12 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise CreationActionError("creation.custom payload must be an object")
     if set(payload) != {
         "display_name", "age", "apparent_age", "race", "subrace", "allocations",
+        "background", "affinity_elements",
     }:
         raise CreationActionError(
             "creation.custom requires exactly display_name, age, apparent_age, "
-            "race, subrace, and allocations"
+            "race, subrace, allocations, an optional background, and an optional "
+            "affinity_elements"
         )
     display_name = _require_non_empty_string(
         payload["display_name"], "display_name", MAX_NAME_CODE_POINTS
@@ -137,9 +142,7 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         payload["apparent_age"], "apparent_age", APPARENT_AGE_WIRE_MINIMUM, APPARENT_AGE_MAXIMUM
     )
     race = _require_non_empty_string(payload["race"], "race", MAX_KEY_CODE_POINTS)
-    subrace = payload["subrace"]
-    if subrace is not None:
-        subrace = _require_non_empty_string(subrace, "subrace", MAX_KEY_CODE_POINTS)
+    subrace = _require_non_empty_string(payload["subrace"], "subrace", MAX_KEY_CODE_POINTS)
     allocations = payload["allocations"]
     if not isinstance(allocations, dict) or set(allocations) != set(ALLOCATABLE_AXES):
         raise CreationActionError(
@@ -150,6 +153,10 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         checked_allocations[axis] = _require_int_in_range(
             allocations[axis], axis, ALLOCATION_MINIMUM, ALLOCATION_MAXIMUM
         )
+    background = _validate_background(payload["background"])
+    affinity_elements = _validate_affinity_elements(
+        payload["affinity_elements"], race
+    )
     return {
         "display_name": display_name,
         "age": age,
@@ -157,7 +164,58 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "race": race,
         "subrace": subrace,
         "allocations": checked_allocations,
+        "background": background,
+        "affinity_elements": affinity_elements,
     }
+
+
+def _validate_affinity_elements(value: Any, race: str) -> tuple[str, ...] | None:
+    """Validate one optional custom affinity set against the race bound.
+
+    ``None`` normalizes to ``None`` (neutral); a non-list, unknown element,
+    duplicate, over-bound set, or any set on an elf rejects structurally before
+    the deterministic service runs (webclient-character-creation-ui D4).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise CreationActionError("affinity_elements must be a list or null")
+    if race == "elf" and value:
+        raise CreationActionError(
+            "an elf must not supply affinity_elements; the subrace is the authority"
+        )
+    maximum = max_affinity_elements(race)
+    if len(value) > maximum:
+        raise CreationActionError(
+            f"affinity_elements exceeds the {race} maximum of {maximum}"
+        )
+    checked: list[str] = []
+    for entry in value:
+        if not isinstance(entry, str) or entry not in ELEMENT_REGISTRY:
+            raise CreationActionError(f"unknown affinity element {entry!r}")
+        if entry in checked:
+            raise CreationActionError(f"duplicate affinity element {entry!r}")
+        checked.append(entry)
+    return tuple(checked)
+
+
+def _validate_background(value: Any) -> str | None:
+    """Validate one optional bounded background text field.
+
+    A missing or blank value normalizes to ``None`` (the persona record omits
+    the key); a non-string or over-bound value rejects structurally before the
+    deterministic service runs (webclient-character-creation-ui D4).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise CreationActionError("background must be text or null")
+    text = value.strip()
+    if not text:
+        return None
+    if sum(1 for _ in text) > MAX_PERSONA_FIELD_LENGTH:
+        raise CreationActionError("background exceeds its bound")
+    return text
 
 
 def validate_creation_activate_payload(payload: dict[str, Any]) -> dict[str, Any]:

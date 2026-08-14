@@ -172,6 +172,10 @@ def _revalidate_characterization(
         entry["apparent_age"] = characterization.apparent_age
     if characterization.portrait_stable_key is not None:
         entry["portrait"] = {"stable_key": characterization.portrait_stable_key}
+    if characterization.background is not None:
+        entry["background"] = characterization.background
+    if characterization.persona:
+        entry["persona"] = dict(characterization.persona)
     if not entry:
         return
     for message in characterize_errors(
@@ -240,6 +244,26 @@ def _apply_characterization(
             "mode": "named",
             "stable_key": characterization.portrait_stable_key,
         }
+    persona = dict(characterization.persona)
+    if characterization.background is not None:
+        persona["background"] = characterization.background
+    if persona:
+        # The scene-builder characterization seam is one of the two NPC-persona
+        # writers (the import loader is the other); the authored flavor text
+        # lands verbatim so the look appearance path renders it. The record is
+        # kept in the import-card shape (empty containers for non-prose keys)
+        # so every PersonaStore consumer sees the documented six-key contract.
+        record = {
+            "identity": {},
+            "personality": persona.get("personality", ""),
+            "life_story": persona.get("life_story", ""),
+            "habit": persona.get("habit", ""),
+            "appearance": {},
+            "social_connection": {},
+        }
+        if characterization.background is not None:
+            record["background"] = characterization.background
+        npc.db.persona = record
 
 
 def _spawn_npc(

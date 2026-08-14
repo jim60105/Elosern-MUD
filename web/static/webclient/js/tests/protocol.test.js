@@ -1969,7 +1969,7 @@ function validCreationPanel(overrides) {
           display_name: "艾琳",
           race: "human",
           race_description: "人類",
-          subrace: null,
+          subrace: "human_commoner",
           emphasis: "均衡",
           background: "旅人",
         },
@@ -1992,16 +1992,60 @@ function validCreationPanel(overrides) {
           apparent_age_maximum: 10000,
         },
         races: [
-          { key: "human", description: "人類", subraces: null },
+          { key: "human", description: "人類", subraces: ["human_commoner"] },
           { key: "elf", description: "精靈", subraces: ["fionnen", "ciaran"] },
         ],
         subraces: {
+          human_commoner: { display_name_zh: "平民", common_name_zh: "普通平民", specialty: "工匠" },
           fionnen: { display_name_zh: "斐歐恩族", common_name_zh: "森林精靈", specialty: "射術" },
+          ciaran: { display_name_zh: "基亞蘭族", common_name_zh: "黑暗精靈", specialty: "劍術" },
         },
         profiles: [
-          { race: "human", subrace: null, budget: 181, axes },
+          { race: "human", subrace: "human_commoner", budget: 181, axes },
           { race: "elf", subrace: "fionnen", budget: 37, axes },
+          { race: "elf", subrace: "ciaran", budget: 37, axes },
         ],
+        affinity: {
+          human: {
+            maximum: 2,
+            elements: [
+              { key: "fire", label: "火" },
+              { key: "water", label: "水" },
+              { key: "wind", label: "風" },
+              { key: "earth", label: "土" },
+              { key: "lightning", label: "雷" },
+              { key: "ice", label: "冰" },
+              { key: "light", label: "光" },
+              { key: "dark", label: "暗" },
+            ],
+          },
+          beastfolk: {
+            maximum: 1,
+            elements: [
+              { key: "fire", label: "火" },
+              { key: "water", label: "水" },
+              { key: "wind", label: "風" },
+              { key: "earth", label: "土" },
+              { key: "lightning", label: "雷" },
+              { key: "ice", label: "冰" },
+              { key: "light", label: "光" },
+              { key: "dark", label: "暗" },
+            ],
+          },
+          elf: {
+            maximum: 0,
+            elements: [
+              { key: "fire", label: "火" },
+              { key: "water", label: "水" },
+              { key: "wind", label: "風" },
+              { key: "earth", label: "土" },
+              { key: "lightning", label: "雷" },
+              { key: "ice", label: "冰" },
+              { key: "light", label: "光" },
+              { key: "dark", label: "暗" },
+            ],
+          },
+        },
       },
     },
     overrides
@@ -2042,7 +2086,8 @@ test("creation panel accepts a valid concept draft with the background indicator
       mode: "concept",
       stage: "concept_filled",
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: {
         hp: 50,
         mp: 50,
@@ -2064,7 +2109,8 @@ test("creation panel accepts a valid concept draft with the background indicator
       mode: "concept",
       stage: "custom_filled",
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: {
         hp: 50,
         mp: 50,
@@ -2082,7 +2128,8 @@ test("creation panel accepts a valid concept draft with the background indicator
       mode: "concept",
       stage: "concept_filled",
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: {
         hp: 50,
         mp: 50,
@@ -2100,7 +2147,8 @@ test("creation panel accepts a valid concept draft with the background indicator
       mode: "concept",
       stage: "concept_filled",
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: {
         hp: 50,
         mp: 50,
@@ -2136,9 +2184,11 @@ test("creation panel enforces per-field bounds", () => {
       age: 17,
       apparent_age: 20,
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0 },
       background_generated: false,
+      affinity_elements: [],
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(underageDraft));
@@ -2150,9 +2200,11 @@ test("creation panel enforces per-field bounds", () => {
       age: 20,
       apparent_age: 20,
       race: "human",
-      subrace: null,
+      subrace: "human_commoner",
+      background: null,
       allocations: { hp: 0 },
       background_generated: false,
+      affinity_elements: [],
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(badAllocations));
@@ -2201,6 +2253,13 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     budget: 999999,
     axes,
   };
+  const affinityElement = {
+    key: "fire",
+    label: "x".repeat(Protocol.CREATION_MAX_LABEL),
+  };
+  const affinityElements = ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"].map(
+    (key) => Object.assign({}, affinityElement, { key })
+  );
   const payload = {
     schema_version: 1,
     available: true,
@@ -2218,6 +2277,11 @@ test("creation payload maximizing every string field fails the byte gate", () =>
       races: Array(Protocol.CREATION_MAX_RACES).fill(Object.assign({}, race)),
       subraces,
       profiles: Array(Protocol.CREATION_MAX_PROFILES).fill(Object.assign({}, profile)),
+      affinity: {
+        human: { maximum: 2, elements: affinityElements },
+        beastfolk: { maximum: 1, elements: affinityElements },
+        elf: { maximum: 0, elements: affinityElements },
+      },
     },
   };
   assert.ok(Protocol.jsonByteSize(payload) > Protocol.MAX_CANONICAL_JSON_BYTES);
@@ -2636,7 +2700,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -2660,7 +2724,7 @@ test("exploration and character are in the production panel allowlist", () => {
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "character",
       traits: [
@@ -2674,6 +2738,7 @@ function validCharacterPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
+      persona: { background: null },
     },
     overrides || {}
   );
@@ -2687,7 +2752,8 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
-  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 1 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
 });
 
 test("enforces character D10 bounds and disguise honesty", () => {
@@ -2734,4 +2800,27 @@ test("enforces character D10 bounds and disguise honesty", () => {
   );
   // A wallet is a non-negative safe integer.
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ wallet: -1 })));
+});
+
+test("character panel v2 persona.background round-trips bounded text", () => {
+  const withBackground = Protocol.validateCharacterPanel(
+    validCharacterPanel({ persona: { background: "  在公會登記的新人冒險者  " } })
+  );
+  assert.equal(withBackground.persona.background, "在公會登記的新人冒險者");
+  const without = Protocol.validateCharacterPanel(
+    validCharacterPanel({ persona: { background: null } })
+  );
+  assert.equal(without.persona.background, null);
+  const blank = Protocol.validateCharacterPanel(
+    validCharacterPanel({ persona: { background: "   " } })
+  );
+  assert.equal(blank.persona.background, null);
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        persona: { background: "x".repeat(Protocol.CHARACTER_MAX_BACKGROUND + 1) },
+      })
+    ),
+    /exceeds/
+  );
 });

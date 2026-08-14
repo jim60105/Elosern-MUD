@@ -125,6 +125,19 @@ This function is called by the same action-resolution step that already validate
 before allowing a cast, so an ungated spell attempt fails the same way an unowned-skill cast fails
 today (`RejectedAction`), not a new reject reason.
 
+> **Amended 2026-08-14 (change `element-affinity-progression`).** D4's cast gate now compares an
+> **element-effective** magic level instead of the raw counter: `can_cast_spell_tier` validates the
+> element key against `ELEMENT_REGISTRY` first (an unrecognized key raises `ValueError` even when the
+> entity owns a fabricated `<element>_mastery`), applies the mastery override, then compares
+> `floor(magic_level × element_affinity_multiplier(entity, element))` against the fixed five-tier
+> threshold table. The multiplier is `1.1` for a declared affinity element, `0.9` for a non-affinity
+> element on an affinity-bearing entity, and exactly `1.0` (current behavior) for an entity with no
+> declared affinities. For elves the chosen subrace is the **sole affinity authority** in every
+> identity channel (custom creation, preset, import): the set is always seeded from
+> `SUBRACE_REGISTRY[subrace].affinity_elements`, never player-chosen or preset-declared. The mastery
+> override, the threshold table, `magic_rank_title`, and `effective_value("magic_level")` are
+> unchanged.
+
 ### 4.3 MP cost tiers (D9)
 
 | Tier | Level band | Single/direct-effect MP | Area/strong-effect MP |

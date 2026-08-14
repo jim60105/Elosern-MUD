@@ -1,6 +1,6 @@
 """Deterministic validation and activation for account-owned player shells."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import random
 import unicodedata
@@ -9,6 +9,7 @@ from typing import Any
 from django.db import transaction
 
 from world.imports.schema import MAX_ENTITY_KEY_LENGTH
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.rules.surfaces import (
@@ -24,8 +25,104 @@ _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "magic_xp", "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
-    "portrait_policy",
+    "portrait_policy", "affinity_elements",
 )
+
+# The single deterministic race-bound mapping every identity channel and the
+# WebClient descriptor derive their affinity numbers from (D3): a human may
+# pick up to 2 elements, a beastfolk up to 1, and an elf picks none (its set
+# is seeded from the chosen subrace).
+_AFFINITY_INPUT_BOUNDS: dict[str, int] = {
+    "human": 2,
+    "beastfolk": 1,
+    "elf": 0,
+}
+
+
+def max_affinity_elements(race_key: str) -> int:
+    """Return the player-input affinity-element bound for one race key.
+
+    The single deterministic mapping (``human`` 2, ``beastfolk`` 1, ``elf`` 0)
+    from which custom-creation validation, import validation, and the
+    WebClient custom-form descriptor all derive their numbers so the layers
+    cannot drift.
+    """
+    if race_key not in _AFFINITY_INPUT_BOUNDS:
+        raise CharacterCreationError(f"unknown race {race_key!r}")
+    return _AFFINITY_INPUT_BOUNDS[race_key]
+
+
+def validate_affinity_seed(
+    seed: Any, label: str = "subrace affinity seed"
+) -> tuple[str, ...]:
+    """Validate one affinity seed: registry membership and uniqueness only.
+
+    Subrace seeds are the sole source of an elf's affinity and may exceed the
+    player-input bound (eolas seeds all eight), so the bound is deliberately
+    NOT applied here -- only that every key exists in ``ELEMENT_REGISTRY`` and
+    no key repeats. An invalid seed raises, so it can never be persisted.
+    """
+    if isinstance(seed, (str, bytes)) or not isinstance(seed, Sequence):
+        raise CharacterCreationError(
+            f"{label} must be a sequence of element keys"
+        )
+    seen: set[str] = set()
+    checked: list[str] = []
+    for entry in seed:
+        if not isinstance(entry, str) or entry not in ELEMENT_REGISTRY:
+            raise CharacterCreationError(
+                f"{label} contains unknown element {entry!r}"
+            )
+        if entry in seen:
+            raise CharacterCreationError(
+                f"{label} contains duplicate element {entry!r}"
+            )
+        seen.add(entry)
+        checked.append(entry)
+    return tuple(checked)
+
+
+def validate_affinity_elements(
+    elements: Any, race_key: str
+) -> tuple[str, ...]:
+    """Validate one player- or import-supplied affinity set against the race bound.
+
+    Every key must exist in ``ELEMENT_REGISTRY`` with no duplicates, and the
+    count must respect ``max_affinity_elements(race_key)``. An elf-supplied set
+    is rejected entirely (an elf's affinity is subrace-seeded). ``None`` and
+    an empty set normalize to ``()`` (neutral).
+    """
+    if elements is None:
+        return ()
+    checked = validate_affinity_seed(elements, "affinity_elements")
+    if not checked:
+        return ()
+    if race_key == "elf":
+        raise CharacterCreationError(
+            "affinity_elements must be empty for an elf; "
+            "its affinity is seeded from the subrace"
+        )
+    bound = max_affinity_elements(race_key)
+    if len(checked) > bound:
+        raise CharacterCreationError(
+            f"affinity_elements exceeds the {race_key} bound of {bound} elements"
+        )
+    return checked
+
+
+def _resolved_affinity_elements(validated: "_ValidatedCreation") -> tuple[str, ...]:
+    """Resolve the single affinity source at activation time.
+
+    An elf's set is always seeded from ``SUBRACE_REGISTRY[subrace]`` (validated
+    so an invalid seed can never be persisted); every other race uses the
+    validated player/preset-supplied set.
+    """
+    if validated.race == "elf":
+        subrace = SUBRACE_REGISTRY[validated.subrace]
+        return validate_affinity_seed(
+            subrace.affinity_elements, "subrace affinity seed"
+        )
+    return validated.affinity_elements
 
 # The persona draft's exact prose field set (creation-persona-persistence D3).
 # Mirrors the generative layer's ``PERSONA_FIELDS``; a parity test keeps the
@@ -75,6 +172,8 @@ class CharacterCreationRequest:
     subrace: str | None = None
     allocations: Mapping[str, int] | None = None
     preset_key: str | None = None
+    background: str | None = None
+    affinity_elements: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +194,8 @@ class _ValidatedCreation:
     race: str
     subrace: str | None
     values: dict[str, int]
+    background: str | None = None
+    affinity_elements: tuple[str, ...] = ()
 
 
 def resolve_starting_profile(race_key: str, subrace_key: str | None = None) -> StartingProfile:
@@ -163,6 +264,28 @@ def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[st
     return checked
 
 
+def _validate_background(value: Any) -> str | None:
+    """Validate one optional player-authored background (flavor) text field.
+
+    A blank or missing value is accepted and becomes ``None`` (the persona
+    record simply omits the key); a non-string or over-bound value rejects.
+    The bound mirrors ``MAX_PERSONA_FIELD_LENGTH`` so the validated draft
+    always fits the read-only persona contract.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise CharacterCreationError("background must be text")
+    text = value.strip()
+    if not text:
+        return None
+    if len(text) > MAX_PERSONA_FIELD_LENGTH:
+        raise CharacterCreationError(
+            f"background exceeds the {MAX_PERSONA_FIELD_LENGTH}-character length cap"
+        )
+    return text
+
+
 def _validate_persona_block(value: Any) -> dict[str, str]:
     """Validate one deterministic persona block: exactly the three prose fields.
 
@@ -208,9 +331,11 @@ def preflight_character_creation(
             raise CharacterCreationError("unknown player preset")
         name, age, apparent_age = preset.display_name, preset.age, preset.apparent_age
         race, subrace, allocations = preset.race, preset.subrace, preset.allocation_dict()
+        affinity_elements = preset.affinity_elements
     elif request.mode == "custom":
         name, age, apparent_age = request.display_name, request.age, request.apparent_age
         race, subrace, allocations = request.race, request.subrace, request.allocations
+        affinity_elements = request.affinity_elements
     else:
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
 
@@ -219,7 +344,18 @@ def preflight_character_creation(
     valid_apparent_age = _validate_adult(apparent_age, "apparent_age")
     if not isinstance(race, str):
         raise CharacterCreationError("race must be a registry key")
-    if subrace is not None and not isinstance(subrace, str):
+    if request.mode == "custom":
+        # Every race has at least one registered subrace, so custom creation
+        # never offers "none": a missing, blank, literal "none", or non-string
+        # subrace is rejected here with a stable message before the profile
+        # resolves.
+        if (
+            not isinstance(subrace, str)
+            or not subrace.strip()
+            or subrace.strip().lower() == "none"
+        ):
+            raise CharacterCreationError("custom creation requires a registered subrace")
+    elif subrace is not None and not isinstance(subrace, str):
         raise CharacterCreationError("subrace must be a registry key or omitted")
     profile = resolve_starting_profile(race, subrace)
     checked = _validate_allocations(profile, allocations)
@@ -228,8 +364,24 @@ def preflight_character_creation(
     for key in STATIC_KEYS:
         values[key] = round(values[key] * (1 + getattr(profile.static_modifiers, key)))
     values["guild_merit"] = 0
+    if request.mode == "custom":
+        # Custom-mode affinity is race-bounded player input (D4): an elf
+        # rejects any player-supplied set, and the race-dependent bound
+        # (human 2 / beastfolk 1 / elf 0) is enforced here.
+        checked_affinity = validate_affinity_elements(affinity_elements, race)
+    else:
+        # Preset-mode affinity is the preset's own declared set (already
+        # validated at registry load); the elf's set is resolved from the
+        # subrace at activation.
+        checked_affinity = tuple(affinity_elements or ())
+    background = (
+        _validate_background(request.background)
+        if request.mode == "custom"
+        else None
+    )
     return _ValidatedCreation(
-        valid_name, valid_age, valid_apparent_age, race, subrace, values
+        valid_name, valid_age, valid_apparent_age, race, subrace, values,
+        background, checked_affinity,
     )
 
 
@@ -309,6 +461,7 @@ def activate_player_character(
         "quest_log": [],
         "guild_rank": None,
         "creation_pending": False,
+        "affinity_elements": list(_resolved_affinity_elements(validated)),
     }
     persona_record = None
     if persona is not None:
@@ -320,6 +473,21 @@ def activate_player_character(
             "habit": checked_persona["habit"],
             "appearance": {},
             "social_connection": {},
+        }
+        if validated.background is not None:
+            persona_record["background"] = validated.background
+    elif validated.background is not None:
+        # A custom draft with a background but no concept persona block still
+        # persists an import-card-shaped record so the owner can inspect and
+        # update the flavor text (creation-persona-persistence D4).
+        persona_record = {
+            "identity": {},
+            "personality": "",
+            "life_story": "",
+            "habit": "",
+            "appearance": {},
+            "social_connection": {},
+            "background": validated.background,
         }
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)

@@ -166,11 +166,12 @@ class BlueprintNpcReq:
     """One stage's NPC requirement: role, tier, disposition, and optional
     story-driven characterization (design D1).
 
-    ``display_name``, paired ``age``/``apparent_age``, and ``portrait`` are
-    optional per-occupant fields authored by the generative layer like speech
-    and bounded deterministically by the shared ``world.quests.characterization``
-    helper. ``portrait`` is a frozen value object so the immutability-by-
-    construction guard stays intact.
+    ``display_name``, paired ``age``/``apparent_age``, ``portrait``, and the
+    optional authored persona/background flavor block are optional per-occupant
+    fields authored by the generative layer like speech and bounded
+    deterministically by the shared ``world.quests.characterization`` helper.
+    ``portrait`` is a frozen value object so the immutability-by-construction
+    guard stays intact.
     """
 
     role: str
@@ -180,6 +181,8 @@ class BlueprintNpcReq:
     age: int | None = None
     apparent_age: int | None = None
     portrait: BlueprintPortrait | None = None
+    background: str | None = None
+    persona: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
@@ -363,6 +366,16 @@ class QuestBlueprint:
                                 if requirement.portrait is not None
                                 else {}
                             ),
+                            **(
+                                {"background": requirement.background}
+                                if requirement.background is not None
+                                else {}
+                            ),
+                            **(
+                                {"persona": dict(requirement.persona)}
+                                if requirement.persona
+                                else {}
+                            ),
                         }
                         for requirement in stage.npc_reqs
                     ],
@@ -425,6 +438,11 @@ class QuestBlueprint:
                             )
                             if requirement.get("portrait") is not None
                             else None
+                        ),
+                        background=requirement.get("background"),
+                        persona=tuple(
+                            tuple(pair)
+                            for pair in (requirement.get("persona") or {}).items()
                         ),
                     )
                     for requirement in stage.get("npc_req") or ()
@@ -548,6 +566,16 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                     "required": ["stable_key"],
                                     "properties": {
                                         "stable_key": {"type": "string"},
+                                    },
+                                    "additionalProperties": False,
+                                },
+                                "background": {"type": ["string", "null"]},
+                                "persona": {
+                                    "type": ["object", "null"],
+                                    "properties": {
+                                        "personality": {"type": "string"},
+                                        "life_story": {"type": "string"},
+                                        "habit": {"type": "string"},
                                     },
                                     "additionalProperties": False,
                                 },

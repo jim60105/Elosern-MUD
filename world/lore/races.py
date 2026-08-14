@@ -169,6 +169,29 @@ STATIC_TIER_REGISTRY: dict[str, StaticTier] = {
 _ALL_ELEMENTS = ("fire", "water", "wind", "earth", "lightning", "ice", "light", "dark")
 
 SUBRACE_REGISTRY: dict[str, Subrace] = {
+    "human_royal": Subrace(
+        "human_royal", "human", "王族", "皇族與大貴族", None, None, (),
+        "Royal blood and high-noble upbringing; education over combat.",
+        StatModifiers(-0.05, -0.05, 0.10), {"mp": (120, 220)},
+    ),
+    "human_noble": Subrace(
+        "human_noble", "human", "貴族", "中小貴族", None, None, (),
+        "Minor nobility such as 侍從貴族 (薇歐蕾特's attendant 莉茲婭).",
+        StatModifiers(0.10, 0.05, -0.15),
+    ),
+    "human_wealthy": Subrace(
+        "human_wealthy", "human", "富裕平民", "商人與高階冒險者", None, None, (),
+        "Wealthy commoners: big merchants, senior adventurers, mages.",
+        StatModifiers(0.05, 0.10, -0.15),
+    ),
+    "human_commoner": Subrace(
+        "human_commoner", "human", "平民", "普通平民", None, None, (),
+        "Ordinary commoners: artisans, shopkeepers, adventurers.", StatModifiers(),
+    ),
+    "human_laborer": Subrace(
+        "human_laborer", "human", "底層平民", "農民與勞工", None, None, (),
+        "The lower class: farmers and laborers.", StatModifiers(0.10, -0.15, 0.05),
+    ),
     "fionnen": Subrace(
         "fionnen", "elf", "斐歐恩族", "森林精靈", 120, "village_fionnen",
         ("light",), "Excels at archery and light magic.", StatModifiers(),

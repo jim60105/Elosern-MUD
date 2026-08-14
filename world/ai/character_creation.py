@@ -84,11 +84,13 @@ class CharacterProposal:
 
     Every key is a real registry key or an in-band allocation value; the
     persona draft is the only free-form text. The proposal carries no age and
-    no number outside ``allocations``.
+    no number outside ``allocations``. ``subrace_key`` is always a registered
+    subrace belonging to ``race_key`` (every race has at least one subrace, so
+    a null subrace is a whole-proposal failure).
     """
 
     race_key: str
-    subrace_key: str | None
+    subrace_key: str
     allocations: Mapping[str, int]
     suggested_skills: tuple[str, ...]
     persona: Mapping[str, str]
@@ -99,7 +101,7 @@ CHARACTER_CREATION_OUTPUT_SCHEMA: dict[str, Any] = {
     "required": ["race_key", "subrace_key", "allocations", "suggested_skills", "persona"],
     "properties": {
         "race_key": {"type": "string"},
-        "subrace_key": {"type": ["string", "null"]},
+        "subrace_key": {"type": "string"},
         "allocations": {
             "type": "object",
             "additionalProperties": {"type": "integer"},
@@ -151,9 +153,13 @@ def _validate_subrace(parsed: Any) -> list[str]:
         return []
     race_key = parsed.get("race_key")
     subrace_key = parsed.get("subrace_key")
-    if subrace_key is None:
+    if not isinstance(subrace_key, str) or not subrace_key:
+        return ["subrace_key must be a registered subrace of the chosen race"]
+    if not isinstance(race_key, str) or race_key not in RACE_REGISTRY:
+        # The race validator reports the unknown race; subrace compatibility
+        # cannot be derived without a valid race.
         return []
-    if not isinstance(subrace_key, str) or subrace_key not in SUBRACE_REGISTRY:
+    if subrace_key not in SUBRACE_REGISTRY:
         return [f"subrace_key {subrace_key!r} is not a registered subrace"]
     if SUBRACE_REGISTRY[subrace_key].race_key != race_key:
         return [

@@ -123,8 +123,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             ],
         )
         profile_keys = [(p["race"], p["subrace"]) for p in payload["custom"]["profiles"]]
-        self.assertEqual(profile_keys[0], ("human", None))
-        self.assertEqual(profile_keys[1], ("beastfolk", None))
+        self.assertEqual(profile_keys[0], ("human", "human_royal"))
+        self.assertEqual(profile_keys[1], ("human", "human_noble"))
         self.assertIn(("elf", "fionnen"), profile_keys)
         self.assertEqual(
             [axis["axis"] for axis in payload["custom"]["profiles"][0]["axes"]],
@@ -359,7 +359,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             "age": 20,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
+            "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
         }
         payload = _valid_payload(draft=draft)
@@ -389,7 +389,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             "mode": "concept",
             "stage": "concept_filled",
             "race": "human",
-            "subrace": None,
+            "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "persona": {"personality": "沉穩", "life_story": "故事", "habit": "習慣"},
         }
@@ -421,7 +421,7 @@ class CreationPanelValidationTests(unittest.TestCase):
         size = json_byte_size(payload)
         self.assertLess(
             size,
-            MAX_CANONICAL_JSON_BYTES // 4,
+            MAX_CANONICAL_JSON_BYTES // 3,
             f"realistic creation payload must be far below the envelope: {size} bytes",
         )
 
@@ -474,6 +474,14 @@ class CreationPanelValidationTests(unittest.TestCase):
             "budget": 999999,
             "axes": axes(),
         }
+        affinity_element = {
+            "key": "fire",
+            "label": "l" * MAX_LABEL_CODE_POINTS,
+        }
+        affinity_elements = [
+            dict(affinity_element, key=key)
+            for key in ("fire", "water", "wind", "earth", "lightning", "ice", "light", "dark")
+        ]
         payload = {
             "schema_version": 1,
             "available": True,
@@ -493,6 +501,11 @@ class CreationPanelValidationTests(unittest.TestCase):
                     "s%d" % i: dict(subrace_entry) for i in range(MAX_SUBRACES)
                 },
                 "profiles": [dict(profile) for _ in range(MAX_PROFILES)],
+                "affinity": {
+                    "human": {"maximum": 2, "elements": list(affinity_elements)},
+                    "beastfolk": {"maximum": 1, "elements": list(affinity_elements)},
+                    "elf": {"maximum": 0, "elements": list(affinity_elements)},
+                },
             },
         }
         self.assertGreater(
@@ -524,6 +537,38 @@ class CreationPanelValidationTests(unittest.TestCase):
             for profile in payload["custom"]["profiles"]:
                 self.assertNotIn(forbidden, profile)
 
+    @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
+    def test_affinity_descriptor_advertises_race_bounded_maxima_and_eight_elements(self):
+        from world.lore.elements import ELEMENT_REGISTRY
+        from world.rules.character_creation import max_affinity_elements
+
+        payload = validate_creation(_valid_payload())
+        affinity = payload["custom"]["affinity"]
+        self.assertEqual(set(affinity), {"human", "beastfolk", "elf"})
+        for race_key, entry in affinity.items():
+            self.assertEqual(entry["maximum"], max_affinity_elements(race_key))
+            keys = [element["key"] for element in entry["elements"]]
+            self.assertEqual(set(keys), set(ELEMENT_REGISTRY))
+            for element in entry["elements"]:
+                self.assertIn(element["key"], ELEMENT_REGISTRY)
+                self.assertTrue(element["label"])
+
+    def test_affinity_descriptor_rejects_wrong_bounds_and_unknown_elements(self):
+        payload = _valid_payload()
+        affinity = payload["custom"]["affinity"]
+        bad = deepcopy(affinity)
+        bad["human"]["maximum"] = 99
+        bad_payload = deepcopy(payload)
+        bad_payload["custom"]["affinity"] = bad
+        with self.assertRaises(Exception):
+            validate_creation(bad_payload)
+        bad = deepcopy(affinity)
+        bad["human"]["elements"] = bad["human"]["elements"][:-1]
+        bad_payload = deepcopy(payload)
+        bad_payload["custom"]["affinity"] = bad
+        with self.assertRaises(Exception):
+            validate_creation(bad_payload)
+
 
 class CreationPanelPresenterTests(EvenniaTest):
     def setUp(self):
@@ -547,7 +592,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(payload["schema_version"], CREATION_SCHEMA_VERSION)
         self.assertIsNone(payload["draft"])
         self.assertEqual(len(payload["presets"]), 8)
-        self.assertEqual(len(payload["custom"]["profiles"]), 13)
+        self.assertEqual(len(payload["custom"]["profiles"]), 15)
         # The read model is side-effect free: canonical state is unchanged.
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
@@ -569,7 +614,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 age=20,
                 apparent_age=20,
                 race="human",
-                subrace=None,
+                subrace="human_commoner",
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
@@ -584,7 +629,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 age=20,
                 apparent_age=20,
                 race="human",
-                subrace=None,
+                subrace="human_commoner",
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
@@ -627,7 +672,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
         self.assertEqual(len(payload["presets"]), 8)
-        self.assertEqual(len(payload["custom"]["profiles"]), 13)
+        self.assertEqual(len(payload["custom"]["profiles"]), 15)
         # The whole panel remains schema-valid.
         validate_creation(payload)
 
@@ -642,7 +687,7 @@ class CreationPanelPresenterTests(EvenniaTest):
             "age": 17,
             "apparent_age": 20,
             "race": "human",
-            "subrace": None,
+            "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
         }
         payload = self._render()
@@ -664,7 +709,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 age=20,
                 apparent_age=20,
                 race="human",
-                subrace=None,
+                subrace="human_commoner",
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
@@ -686,7 +731,7 @@ class CreationPanelPresenterTests(EvenniaTest):
             self.character,
             {
                 "race_key": "human",
-                "subrace_key": None,
+                "subrace_key": "human_commoner",
                 "allocations": {
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
@@ -724,7 +769,7 @@ class CreationPanelPresenterTests(EvenniaTest):
             self.character,
             {
                 "race_key": "human",
-                "subrace_key": None,
+                "subrace_key": "human_commoner",
                 "allocations": {
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
@@ -751,7 +796,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 age=20,
                 apparent_age=20,
                 race="human",
-                subrace=None,
+                subrace="human_commoner",
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,

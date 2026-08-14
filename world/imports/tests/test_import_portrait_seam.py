@@ -73,7 +73,7 @@ class ImportPortraitSeamTests(EvenniaTest):
         self.assertEqual(callbacks, [])
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
         self.assertFalse(
-            NPC.objects.filter(db_key="ciaran_reference").exists()
+            NPC.objects.filter(db_key="human_reference").exists()
         )
 
     @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
@@ -90,7 +90,7 @@ class ImportPortraitSeamTests(EvenniaTest):
         self.assertEqual(len(entities), 1)
         self.assertEqual(len(callbacks), 1)
         self.assertTrue(
-            NPC.objects.filter(db_key="ciaran_reference").exists()
+            NPC.objects.filter(db_key="human_reference").exists()
         )
 
 

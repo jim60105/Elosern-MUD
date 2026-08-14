@@ -9,13 +9,16 @@ from evennia.utils.utils import inherits_from
 
 from commands.localized import CmdHelp, CmdQuit
 from server.ai_director_service import request_character_proposal
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
+    MAX_PERSONA_FIELD_LENGTH,
     CharacterCreationError,
     CharacterCreationRequest,
     activate_player_character,
+    max_affinity_elements,
     resolve_starting_profile,
 )
 from world.rules.creation_wizard import (
@@ -52,6 +55,37 @@ ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "agility": "敏捷，影響命中與迴避",
     "defense": "防禦，減免受到的傷害",
 }
+
+
+def _collect_affinity_elements(
+    race: str, max_elements: int
+):
+    """Yield the affinity-choice prompt and collect the race-bounded set.
+
+    A generator driven by the wizard's ``yield`` machinery. Human (0-2) and
+    beastfolk (0-1) players pick from the eight lore elements; an elf skips the
+    prompt entirely (its set is seeded from the chosen subrace, never
+    player-chosen).
+    """
+    element_lines = "\n".join(
+        f"  {key}：{ELEMENT_REGISTRY[key].display_name_zh}"
+        for key in ELEMENT_REGISTRY
+    )
+    prompt = (
+        f"屬性親和（可選擇 0–{max_elements} 個，各屬性以空格分隔，"
+        f"留空表示無，可輸入 cancel 取消）：\n{element_lines}\n"
+    )
+    response = (yield prompt).strip()
+    if response.lower() == "cancel":
+        raise CharacterCreationError("角色建立已取消")
+    if not response:
+        return ()
+    keys = [key for key in response.split() if key]
+    if len(keys) > max_elements:
+        raise CharacterCreationError(
+            f"屬性親和最多只能選擇 {max_elements} 個屬性"
+        )
+    return tuple(keys)
 
 
 def creation_start_screen() -> str:
@@ -157,16 +191,42 @@ class CmdCharacter(Command):
                 self.caller.msg("已取消角色建立。")
                 return
             available = [key for key, value in SUBRACE_REGISTRY.items() if value.race_key == race]
-            prompt = "子種族（可留空或輸入 none）"
-            if available:
-                prompt += f"（{'、'.join(available)}）"
-            subrace = (yield prompt + "：").strip() or None
-            if subrace and subrace.lower() == "none":
-                subrace = None
-            if subrace and subrace.lower() == "cancel":
+            if not available:
+                raise CharacterCreationError(f"種族 {race} 沒有可用的子種族")
+            subrace_lines = "\n".join(
+                f"  {key}：{SUBRACE_REGISTRY[key].display_name_zh}（{SUBRACE_REGISTRY[key].common_name_zh}）"
+                f"——{SUBRACE_REGISTRY[key].specialty}"
+                for key in available
+            )
+            prompt = (
+                f"子種族（請選擇一個，可輸入 cancel 取消）：\n{subrace_lines}\n"
+            )
+            subrace = (yield prompt).strip()
+            if subrace.lower() == "cancel":
                 self.caller.msg("已取消角色建立。")
                 return
+            if subrace not in available:
+                raise CharacterCreationError(
+                    f"子種族必須是 {race} 的已註冊子種族（{'、'.join(available)}）"
+                )
+            affinity_max = max_affinity_elements(race)
+            affinity_elements: tuple[str, ...] = ()
+            if affinity_max > 0:
+                # Human/beastfolk collect a race-bounded affinity pick; an elf
+                # picks none (its set is seeded from the subrace, D4).
+                affinity_elements = yield from _collect_affinity_elements(
+                    race, affinity_max
+                )
             profile = resolve_starting_profile(race, subrace)
+            briefing_lines = [
+                f"配點說明：共 {len(ALLOCATABLE_AXES)} 個項目，可用點數 {profile.budget}。",
+            ]
+            for axis, (lower, upper) in profile.bounds:
+                span = upper - lower
+                label = ALLOCATION_AXIS_EXPLANATIONS.get(axis, "")
+                briefing_lines.append(f"  {axis} {label}：0–{span}")
+            briefing_lines.append(f"六項配點總和必須恰好等於 {profile.budget}。")
+            self.caller.msg("\n".join(briefing_lines))
             allocations: dict[str, int] = {}
             for axis, (lower, upper) in profile.bounds:
                 span = upper - lower
@@ -174,10 +234,29 @@ class CmdCharacter(Command):
                 allocations[axis] = _integer(
                     (yield f"{axis} 配點（0–{span}）：{explanation}\n"), axis
                 )
+            background = (yield (
+                f"背景設定（風味文字，可留空或輸入 cancel 取消，上限 {MAX_PERSONA_FIELD_LENGTH} 字）："
+            )).strip()
+            if background.lower() == "cancel":
+                self.caller.msg("已取消角色建立。")
+                return
+            if len(background) > MAX_PERSONA_FIELD_LENGTH:
+                raise CharacterCreationError(
+                    f"背景設定超過 {MAX_PERSONA_FIELD_LENGTH} 字上限"
+                )
+            background = background or None
+            affinity_label = (
+                "、".join(
+                    f"{key}（{ELEMENT_REGISTRY[key].display_name_zh}）"
+                    for key in affinity_elements
+                )
+                or "無"
+            )
             summary = (
                 f"姓名 {name.strip()}，年齡 {age}/{apparent_age}，種族 {race}，"
-                f"子種族 {subrace or '無'}，配點總和 {sum(allocations.values())}/"
-                f"{profile.budget}。輸入 yes 確認，或 cancel 取消："
+                f"子種族 {subrace}，屬性親和 {affinity_label}，配點總和 "
+                f"{sum(allocations.values())}/{profile.budget}。"
+                f"輸入 yes 確認，或 cancel 取消："
             )
             confirmation = (yield summary).strip().lower()
             if confirmation != "yes":
@@ -186,7 +265,8 @@ class CmdCharacter(Command):
             self._activate(CharacterCreationRequest(
                 mode="custom", display_name=name, age=age,
                 apparent_age=apparent_age, race=race, subrace=subrace,
-                allocations=allocations,
+                allocations=allocations, background=background,
+                affinity_elements=affinity_elements,
             ))
         except CharacterCreationError as error:
             if str(error) == "角色建立已取消":
@@ -220,10 +300,11 @@ def _proposal_summary(proposal) -> str:
     ordinary activation path.
     """
     race = RACE_REGISTRY[proposal.race_key]
+    subrace = SUBRACE_REGISTRY[proposal.subrace_key]
     lines = [
         "角色提案（依你的構想生成）：",
         f"種族：{proposal.race_key}（{race.description}）",
-        f"子種族：{proposal.subrace_key or '無'}",
+        f"子種族：{proposal.subrace_key}（{subrace.display_name_zh}——{subrace.specialty}）",
         "配點：" + "、".join(
             f"{axis} {value}" for axis, value in proposal.allocations.items()
         ),
