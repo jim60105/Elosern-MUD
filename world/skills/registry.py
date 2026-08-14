@@ -573,9 +573,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             "dual_wield_style",
             "雙持劍術",
             "同時揮舞兩把武器進行戰鬥的架式。",
-            SkillKind.ACTIVE,
-            TargetSpec.SELF,
-            cost={"sp": 8},
+            SkillKind.PASSIVE,
+            TargetSpec.NONE,
             effects=["weapon_style:dual_wield"],
         ),
         _skill(

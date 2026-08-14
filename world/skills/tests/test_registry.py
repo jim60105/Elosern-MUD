@@ -444,9 +444,13 @@ class SkillContentCompletionTests(unittest.TestCase):
         self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
         self.assertEqual(skill.effects, ["damage:dark:physical"])
 
+    @covers_requirement("skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill")
+    def test_dual_wield_style_is_a_passive_stance(self):
         style = SKILL_REGISTRY["dual_wield_style"]
         self.assertEqual(style.label, "雙持劍術")
-        self.assertEqual(style.cost, {"sp": 8})
+        self.assertIs(style.kind, SkillKind.PASSIVE)
+        self.assertIs(style.target_spec, TargetSpec.NONE)
+        self.assertEqual(style.cost, {})
         self.assertEqual(style.effects, ["weapon_style:dual_wield"])
 
 
@@ -492,8 +496,8 @@ class DualBladeMasteryCastTests(EvenniaTest):
     @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
     def test_dual_wield_style_ownership_has_no_bearing_on_cost(self):
         self.actor.db.skills = {
-            "active": ["dual_blade_mastery", "dual_wield_style"],
-            "passive": [],
+            "active": ["dual_blade_mastery"],
+            "passive": ["dual_wield_style"],
         }
         self.assertIn("dual_wield_style", self.actor.skills.owned_keys())
         sp_before = self.actor.traits.sp.value

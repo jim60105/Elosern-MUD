@@ -170,6 +170,14 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(preview.valid_targets, ())
         self.assertEqual(preview.shorthands, ())
 
+    @covers_requirement("skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill")
+    def test_preview_reports_owned_dual_wield_style_as_passive(self):
+        self.player.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        context = self._context()
+        preview = preview_skill(self.player, "dual_wield_style", context, [])
+        self.assertFalse(preview.enabled)
+        self.assertIs(preview.reason, RejectReason.SKILL_NOT_ACTIVE)
+
     def test_area_shorthands_are_exposed(self):
         self.player.db.skills = {"active": ["wind_blade"], "passive": []}
         context = self._context()
