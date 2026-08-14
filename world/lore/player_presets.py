@@ -95,9 +95,9 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "暗影谷村出身的黑暗精靈雙刀使，罕見的黑短髮在銀髮同族中格外醒目。"
         "宗師級雙刀流與影斬令她名聲在外，轉生祝福的武感使她總能先一步抵達對手要害。"
         "陽光開朗，視戰鬥為與自身極限的對話。",
-        ("dual_wield_style", "dual_blade_mastery", "shadow_slash"),
-        ("blade_art_mastery", "extreme_endurance", "body_enhancement_extreme",
-         "reincarnation_boon_yuka"),
+        ("dual_blade_mastery", "shadow_slash"),
+        ("dual_wield_style", "blade_art_mastery", "extreme_endurance",
+         "body_enhancement_extreme", "reincarnation_boon_yuka"),
     ),
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",

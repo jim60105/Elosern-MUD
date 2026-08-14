@@ -69,6 +69,14 @@ class ActionPipelineRejectionTests(EvenniaTest):
             RejectReason.SKILL_NOT_ACTIVE,
         )
 
+    @covers_requirement("skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill")
+    def test_cast_of_reclassified_dual_wield_style_is_rejected_as_passive(self):
+        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        self.assertIs(
+            self.resolve("dual_wield_style").reason,
+            RejectReason.SKILL_NOT_ACTIVE,
+        )
+
     def test_unknown_effect(self):
         original = SKILL_REGISTRY["status_disguise"]
         SKILL_REGISTRY["status_disguise"] = replace(

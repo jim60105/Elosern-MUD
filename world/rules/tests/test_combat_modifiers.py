@@ -117,7 +117,10 @@ class CombatModifierTests(EvenniaTest):
         entity.db.equipment = {"weapon_main": "left_blade", "weapon_off": "right_blade"}
         return entity
 
-    @covers_requirement("combat-modifier-table::dual-wield-style-grants-a-combat-adjustment-while-owned")
+    @covers_requirement(
+        "combat-modifier-table::dual-wield-style-grants-a-combat-adjustment-while-owned",
+        "skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill",
+    )
     def test_rule_dual_wield_style_atk_phys_bonus(self):
         entity = self._dual_wielding()
         entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}
