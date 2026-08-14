@@ -1,5 +1,8 @@
 from tools.spec_traceability import covers_requirement
 
+import json
+import tempfile
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -11,6 +14,7 @@ from world.imports.validate import (
     _check_skills,
     _check_stats_band,
     collect_degraded_checks,
+    validate_batch,
     validate_character,
 )
 
@@ -72,6 +76,53 @@ class SemanticValidationTests(TestCase):
                 report = validate_character(record)
                 self.assertFalse(report.is_valid)
                 self.assertIn("key", {issue.field for issue in report.rejections})
+
+    @covers_requirement("import-validation::key-charset-is-checked-at-import-validation")
+    def test_digit_only_keys_are_structural_rejections_naming_the_reserved_region(self):
+        for bad in ("42", "7", "0"):
+            with self.subTest(key=bad):
+                record = example_record()
+                record["key"] = bad
+                report = validate_character(record)
+                self.assertFalse(report.is_valid)
+                self.assertIn("key", {issue.field for issue in report.rejections})
+                self.assertIn(
+                    "reserved for player characters",
+                    " ".join(issue.message for issue in report.rejections),
+                )
+
+    @covers_requirement("import-validation::key-charset-is-checked-at-import-validation")
+    def test_digit_only_keys_in_a_batch_are_rejected_and_never_instantiated(self):
+        bad_character = example_record()
+        bad_character["key"] = "42"
+        bad_world = {
+            "record_type": "world_entry",
+            "schema_version": 1,
+            "key": "7",
+            "content": "Numeric world key.",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            good_path = root / "good.json"
+            good_path.write_text(
+                json.dumps(example_record(), ensure_ascii=False), encoding="utf-8"
+            )
+            bad_character_path = root / "bad_character.json"
+            bad_character_path.write_text(
+                json.dumps(bad_character, ensure_ascii=False), encoding="utf-8"
+            )
+            bad_world_path = root / "bad_world.json"
+            bad_world_path.write_text(
+                json.dumps(bad_world, ensure_ascii=False), encoding="utf-8"
+            )
+            report = validate_batch([good_path, bad_character_path, bad_world_path])
+        self.assertFalse(report.all_valid)
+        rejected = {item.key for item in report.records if item.rejections}
+        self.assertEqual(rejected, {"42", "7"})
+        self.assertEqual(
+            [record["key"] for record in report.character_records],
+            ["human_reference"],
+        )
 
     @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
     def test_every_reserved_separator_and_overlong_key_rejects_without_an_entity(self):

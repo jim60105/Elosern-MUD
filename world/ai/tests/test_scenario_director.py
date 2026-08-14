@@ -974,6 +974,32 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_digit_only_portrait_stable_key_rejects_and_retries(self):
+        client = FakeLLMClient()
+        bad = self._instance_bound_payload()
+        bad["stages"][0]["npc_req"][0]["portrait"] = {"stable_key": "7"}
+        self.assertTrue(
+            any(
+                validator_fn(bad)
+                for validator_fn in scenario_director._VALIDATORS.values()
+            )
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3,
+            json.dumps(_payload(), ensure_ascii=False),
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
     def test_overlong_display_name_rejects_and_retries(self):
         client = FakeLLMClient()
         bad = self._instance_bound_payload()

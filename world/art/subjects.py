@@ -13,6 +13,7 @@ database key shape, or LLM authorship (design D2, focused design §3.3).
 
 from dataclasses import dataclass
 from enum import StrEnum
+import re
 import unicodedata
 
 from world.lore.monsters import MONSTER_TIER_REGISTRY
@@ -36,6 +37,28 @@ from world.prompts.loader import PromptUnavailableError, render_prompt
 MAX_SUBJECT_KEY_LENGTH = 64
 MAX_SUBJECT_KEY_BYTES = 200
 FORBIDDEN_SUBJECT_KEY_CHARACTERS = frozenset("|/:{}")
+
+# The digit-only region of the character-portrait keyspace is reserved for
+# player characters, whose named-portrait stable keys are ``str(pk)`` (ASCII
+# digit-only by construction). Every non-player producer -- the import schema
+# pattern, the import key-contract check, and the quest characterization
+# helper -- rejects a digit-only key through ``is_reserved_player_stable_key``
+# below, so no import record, quest blueprint, or template can ever claim a
+# player's portrait subject. The art layer itself keeps accepting digit-only
+# keys: players are the legitimate owners and the policy dict cannot
+# distinguish a player from an NPC.
+DIGITS_ONLY_KEY_PATTERN = r"[0-9]+"
+
+
+def is_reserved_player_stable_key(key: str) -> bool:
+    """True when ``key`` occupies the digit-only region reserved for players.
+
+    ASCII digits only: Django pks are ASCII-digit strings, so a key containing
+    any non-ASCII digit (e.g. full-width ``０``) cannot equal a pk and stays
+    legal. An empty string never matches and is handled by the callers' own
+    non-empty checks.
+    """
+    return re.fullmatch(DIGITS_ONLY_KEY_PATTERN, key) is not None
 
 
 class ArtSubjectError(ValueError):

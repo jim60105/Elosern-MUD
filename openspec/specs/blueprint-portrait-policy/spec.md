@@ -20,8 +20,11 @@ is no `mode` field in the blueprint. The adult invariant is a hard floor: every 
 entry's tier through `NPC_TIER_REGISTRY[tier].race_key` — never a copied constant. `age` and
 `apparent_age` SHALL be paired (both present or both absent); a key present with a `None` value is
 not an absence and rejects. `portrait` SHALL be a mapping with exactly one `stable_key` field (no
-extra keys) whose value is bounded non-empty text without colons or control characters. All four
-fields SHALL be optional; a blueprint without them SHALL validate and compile exactly as today.
+extra keys) whose value is bounded non-empty text without colons or control characters, and not
+digit-only — the digit-only region of the character-portrait keyspace is reserved for player
+characters (whose stable keys are `str(pk)`), so a blueprint can never claim a player's portrait
+subject. All four fields SHALL be optional; a blueprint without them SHALL validate and compile
+exactly as today.
 `BlueprintNpcReq.portrait` SHALL be a frozen value object so the blueprint's immutability-by-
 construction guard (`_reject_mutable_containers`) is preserved.
 
@@ -55,6 +58,11 @@ construction guard (`_reject_mutable_containers`) is preserved.
 - **WHEN** `portrait` is not a mapping, carries any key other than exactly one `stable_key`, or its
   `stable_key` is empty, colon-containing, control-character-containing, or overlong
 - **THEN** the blueprint is rejected
+
+#### Scenario: A digit-only portrait stable key is rejected
+- **WHEN** an `npc_req` entry declares `portrait: {"stable_key": "7"}` (ASCII digits only)
+- **THEN** the blueprint is rejected by the shared characterization helper, because the digit-only
+  region of the character-portrait keyspace is reserved for player characters
 
 #### Scenario: An empty or overlong display name is rejected
 - **WHEN** `display_name` is empty, non-text, or exceeds its bound

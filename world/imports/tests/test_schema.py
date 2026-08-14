@@ -10,6 +10,7 @@ from world.art.subjects import (
 )
 from world.imports.schema import (
     CHARACTER_SCHEMA_V1,
+    ENTITY_KEY_PATTERN_V1,
     MAX_ENTITY_KEY_LENGTH,
     WORLD_SCHEMA_V1,
 )
@@ -109,6 +110,40 @@ class SchemaTests(TestCase):
         self.assertFalse(
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
+
+    @covers_requirement("import-schema::imported-entity-keys-use-a-safe-character-set")
+    def test_digit_only_keys_fail_structural_validation_for_both_record_kinds(self):
+        for bad in ("42", "7", "0"):
+            with self.subTest(key=bad):
+                self.assert_character_invalid(lambda r, bad=bad: r.update(key=bad))
+                record = {
+                    "record_type": "world_entry",
+                    "schema_version": 1,
+                    "key": bad,
+                    "content": "...",
+                }
+                self.assertTrue(
+                    list(Draft202012Validator(WORLD_SCHEMA_V1).iter_errors(record))
+                )
+
+    @covers_requirement("import-schema::imported-entity-keys-use-a-safe-character-set")
+    def test_keys_with_letters_and_digits_pass(self):
+        for good in ("bandit_02", "elf_300", "a1"):
+            with self.subTest(key=good):
+                record = example_record()
+                record["key"] = good
+                self.assertFalse(
+                    list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+                )
+
+    @covers_requirement("art-stable-key-contract::the-character-portrait-keyspace-reserves-the-digit-only-region-for-player-characters")
+    def test_schema_pattern_derives_the_digit_only_lookahead_from_the_shared_constant(self):
+        from world.art.subjects import DIGITS_ONLY_KEY_PATTERN
+
+        self.assertIn(DIGITS_ONLY_KEY_PATTERN, ENTITY_KEY_PATTERN_V1)
+        # A trailing-newline digit-only key still fails the whole-string
+        # anchor set under the schema's re.search semantics.
+        self.assert_character_invalid(lambda r: r.update(key="42\n"))
 
     @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
     def test_schema_pattern_derives_from_the_shared_art_contract(self):
