@@ -13,15 +13,20 @@ from tools.spec_traceability import covers_requirement
 import inspect
 import unittest
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
+from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, Room
+from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.clock import AdvanceSource, ScheduledEvent, get_world_clock
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.rules.npc_schedules import (
     SCHEDULE_BLOCKED_REASON,
     ScheduleError,
@@ -643,6 +648,97 @@ class SourceRegistrationTests(EvenniaTest):
         }
         self.assertLess(stage_positions["daily_resets"], stage_positions["npc_schedules"])
         self.assertLess(stage_positions["npc_schedules"], stage_positions["instance_reclamation"])
+
+
+class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+    """Cold-start probes: a startup recovery advance settles with sources registered.
+
+    ``restore_persisted_sessions`` may advance the world clock while settling
+    an invalid persisted session; every world-event clock source must already
+    be registered so an occurrence due inside the recovery window settles
+    exactly as in an ordinary advance (audit finding run-3 F8,
+    fix-startup-clock-source-order D1). The startup syncs register process-
+    global catalog content, so the registries are snapshotted around each
+    test (registry-isolation contract).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(
+            PlayerCharacter, key="recovery-player", location=self.room1
+        )
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.npc = create_object(NPC, key="巡邏守衛", location=self.room1)
+        self.enemy = create_object(Monster, key="荒原野豬", location=self.room1)
+        self.enemy.threat_tier = "low"
+        self.enemy.apply_monster_tier("floor")
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-is-registered-before-startup-combat-recovery-advances-time")
+    def test_recovery_advance_settles_an_occurrence_due_inside_its_window(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+
+        from world.maps.bootstrap import sync_grid, sync_service_interiors
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.rules.clock import settle_combat_result
+        from world.rules.combat_session import _persist, engage, read_session
+        from world.rules.guild_economy import (
+            restore_persisted_sessions,
+            sync_guild_economy,
+        )
+        from world.rules.npc_schedules import sync_npc_schedules
+        from world.rules.onboarding import sync_guard_npc
+
+        clock = get_world_clock()
+        self.assertEqual(clock.tick, 0)
+        # A schedule effective from tick 0 with a state entry due at tick 3,
+        # inside the (0, 6] window of a one-round recovery advance.
+        set_npc_schedule(
+            self.npc,
+            {
+                "schema_version": 1,
+                "entries": [
+                    {"tick_offset": 3, "kind": "state", "state": "resting"}
+                ],
+            },
+        )
+        # A well-formed one-round session whose recorded enemy is gone, as
+        # after a crash before settlement: restoration terminates it as
+        # invalid and settles the accumulated round time.
+        engage(self.player, self.enemy)
+        record = read_session(self.player)
+        _persist(self.player, replace(record, rounds_elapsed=record.rounds_elapsed + 1))
+        self.enemy.delete()
+
+        captured: dict[str, Any] = {}
+
+        def spy(result, entities):
+            events = settle_combat_result(result, entities)
+            captured["total_seconds"] = result.total_seconds
+            captured["events"] = events
+            return events
+
+        # The deterministic startup sequence registers every clock source
+        # before session restoration (fix-startup-clock-source-order D1).
+        with patch("world.rules.combat_session.settle_combat_result", side_effect=spy):
+            sync_grid()
+            sync_service_interiors()
+            sync_quest_runtime()
+            sync_guild_economy()
+            sync_guard_npc()
+            sync_npc_schedules()
+            restore_persisted_sessions()
+
+        self.assertEqual(captured["total_seconds"], 6)
+        self.assertEqual(get_world_clock().tick, 6)
+        self.assertEqual(self.npc.db.schedule_state, "resting")
+        self.assertTrue(
+            any(
+                event.kind == "npc_state_changed" and event.due_tick == 3
+                for event in captured["events"]
+            )
+        )
 
 
 class SettlementGuardTests(unittest.TestCase):
