@@ -12,7 +12,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
-from world.rules.clock import _STAGE_ORDER, register_event_source
+from world.rules.clock import AdvanceSource, _STAGE_ORDER, register_event_source
 from world.rules.guild_config import CATALOG, load_catalog_into_cache
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.shop_hours import _boundary_ticks, settle_shop_hours
@@ -170,6 +170,78 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTest):
         self.assertEqual(len(events), 1)
         self.assertEqual(bad_merchant.merchant_stock, {"meal": "oops"})
         self.assertGreaterEqual(self.merchant.merchant_stock["meal"], 5)
+
+
+class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTest):
+    """A rolled-back advance restores merchant stock caches (F5)."""
+
+    def setUp(self):
+        super().setUp()
+        import world.rules.clock as clock_module
+
+        load_catalog_into_cache()
+        self.store = create_object(Room, key="store")
+        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant = Merchant.create(
+            self.merchant_npc,
+            service_id="merchant",
+            shop_key="altoria_general_store",
+        )
+        self.merchant_npc.components.add(self.merchant)
+        self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
+        self.merchant.last_restock_day = 0
+        self._sources = dict(clock_module._EVENT_SOURCES)
+
+    def tearDown(self):
+        import world.rules.clock as clock_module
+
+        clock_module._EVENT_SOURCES.clear()
+        clock_module._EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    def _raw_attribute(self, obj, key):
+        row = (
+            obj.db_attributes.through.objects.filter(
+                objectdb_id=obj.pk, attribute__db_key=key
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+        return None if row is None else row
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_failing_persist_restores_merchant_stock_and_restock_day(self):
+        from evennia.utils.search import search_script
+        from world.rules.caravan_arrivals import register_caravan_arrivals
+        from world.rules.clock import get_world_clock
+
+        # Advance into day 0's late afternoon so a further advance crosses the
+        # day-1 06:00 restock boundary without exceeding the one-day bound.
+        get_world_clock().advance(60000, AdvanceSource.SKIP, [])
+        register_caravan_arrivals()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        before_stock = dict(self.merchant.merchant_stock)
+        before_day = self.merchant.last_restock_day
+        script = search_script("world_clock")[0]
+
+        def failing_persist(tick):
+            script.db.tick = tick
+            raise RuntimeError("simulated persist failure")
+
+        clock._persist = failing_persist
+        with self.assertRaises(RuntimeError):
+            clock.advance(60000, AdvanceSource.SKIP, [])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        self.assertEqual(self.merchant.merchant_stock, before_stock)
+        self.assertEqual(self.merchant.last_restock_day, before_day)
+        from world.rules.caravan_arrivals import _merchant_surface_keys
+
+        stock_key, day_key = _merchant_surface_keys()
+        self.assertEqual(self._raw_attribute(self.merchant_npc, stock_key), before_stock)
+        self.assertEqual(self._raw_attribute(self.merchant_npc, day_key), before_day)
 
 
 class StageOrderAndRegistrationTests(ClockRegistryIsolation, EvenniaTest):

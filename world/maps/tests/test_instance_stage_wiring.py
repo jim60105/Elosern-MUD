@@ -73,7 +73,9 @@ class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     @covers_requirement("instance-reclamation::reclaim-due-instances-is-registered-as-the-instance-reclamation-event-source-at-server-start")
     def test_server_start_registers_instance_reclamation(self):
         at_server_start()
-        self.assertIs(clock_module._EVENT_SOURCES["instance_reclamation"], reclaim_due_instances)
+        registration = clock_module._EVENT_SOURCES["instance_reclamation"]
+        self.assertIs(registration.settle, reclaim_due_instances)
+        self.assertIsNotNone(registration.surfaces)
 
 
 class QuestDeadlinesOrderProofTests(EvenniaTest):

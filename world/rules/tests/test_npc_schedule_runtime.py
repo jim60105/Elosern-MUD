@@ -586,7 +586,9 @@ class SourceRegistrationTests(EvenniaTest):
 
         sync_npc_schedules()
         # A dict key holds exactly one source, so one key means one source.
-        self.assertIs(_EVENT_SOURCES["npc_schedules"], settle_npc_schedules)
+        registration = _EVENT_SOURCES["npc_schedules"]
+        self.assertIs(registration.settle, settle_npc_schedules)
+        self.assertIsNotNone(registration.surfaces)
 
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
     def test_duplicate_key_npcs_tie_break_by_stable_primary_key(self):
@@ -619,7 +621,7 @@ class SourceRegistrationTests(EvenniaTest):
 
         sync_npc_schedules()
         sync_npc_schedules()
-        self.assertIs(_EVENT_SOURCES["npc_schedules"], settle_npc_schedules)
+        self.assertIs(_EVENT_SOURCES["npc_schedules"].settle, settle_npc_schedules)
 
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
     def test_advance_includes_npc_schedule_events_at_the_stage_position(self):
@@ -648,6 +650,92 @@ class SourceRegistrationTests(EvenniaTest):
         }
         self.assertLess(stage_positions["daily_resets"], stage_positions["npc_schedules"])
         self.assertLess(stage_positions["npc_schedules"], stage_positions["instance_reclamation"])
+
+
+class ScheduleRollbackCacheTests(EvenniaTest):
+    """A rolled-back advance restores schedule state and location (F5)."""
+
+    def setUp(self):
+        super().setUp()
+        import world.rules.clock as clock_module
+
+        self.north_gate = AnchorRoom.create(key="北門", xyz=(9, 9, "test_map"))[0]
+        self.north_gate.db.anchor_key = "north_gate"
+        self.barracks = AnchorRoom.create(key="營房", xyz=(9, 10, "test_map"))[0]
+        self.barracks.db.anchor_key = "barracks"
+        create_object(Exit, key="門", location=self.north_gate, destination=self.barracks)
+        self.npc = create_object(NPC, key="巡邏守衛", location=self.north_gate)
+        set_npc_schedule(
+            self.npc,
+            {
+                "schema_version": 1,
+                "entries": [
+                    {"tick_offset": 21600, "kind": "state", "state": "resting"},
+                    {"tick_offset": 64800, "kind": "move", "target": "barracks"},
+                ],
+            },
+        )
+        self._sources = dict(clock_module._EVENT_SOURCES)
+
+    def tearDown(self):
+        import world.rules.clock as clock_module
+
+        clock_module._EVENT_SOURCES.clear()
+        clock_module._EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    def _raw_attribute(self, obj, key):
+        row = (
+            obj.db_attributes.through.objects.filter(
+                objectdb_id=obj.pk, attribute__db_key=key
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+        return None if row is None else row
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_failing_persist_restores_schedule_state_and_location(self):
+        from evennia.utils.search import search_script
+        from world.rules.clock import get_world_clock
+        from world.rules.npc_schedules import register_npc_schedules
+
+        before_state = self.npc.db.schedule_state
+        before_location = self.npc.location
+        register_npc_schedules()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        script = search_script("world_clock")[0]
+
+        def failing_persist(tick):
+            script.db.tick = tick
+            raise RuntimeError("simulated persist failure")
+
+        clock._persist = failing_persist
+        with self.assertRaises(RuntimeError):
+            clock.advance(DAY_SECONDS, AdvanceSource.SKIP, [])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        self.assertEqual(self.npc.db.schedule_state, before_state)
+        self.assertEqual(self._raw_attribute(self.npc, "schedule_state"), before_state)
+        self.assertIs(self.npc.location, before_location)
+        self.assertIn(self.npc, self.north_gate.contents)
+        self.assertNotIn(self.npc, self.barracks.contents)
+        self.assertIn(self.npc, [o for o in self.north_gate.contents])
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_successful_advance_settles_state_and_move_committed(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.npc_schedules import register_npc_schedules
+
+        register_npc_schedules()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        clock.advance(DAY_SECONDS, AdvanceSource.SKIP, [])
+        self.assertEqual(clock.tick, before_tick + DAY_SECONDS)
+        self.assertEqual(self.npc.db.schedule_state, None)
+        self.assertIs(self.npc.location, self.barracks)
 
 
 class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -746,7 +834,10 @@ class SettlementGuardTests(unittest.TestCase):
         from world.rules import npc_schedules
 
         source = inspect.getsource(npc_schedules)
-        self.assertIn('register_event_source("npc_schedules", settle_npc_schedules)', source)
+        self.assertIn("register_event_source", source)
+        self.assertIn('"npc_schedules"', source)
+        self.assertIn("settle_npc_schedules", source)
+        self.assertIn("snapshot_npc_schedule_surfaces", source)
         self.assertNotIn("world.ai", source)
 
 

@@ -46,9 +46,11 @@ from typeclasses.npcs import NPC
 from world.rules.clock import (
     CLOCK_YAML,
     ScheduledEvent,
+    SurfaceSnapshot,
     get_world_clock,
     register_event_source,
 )
+from world.rules.surfaces import attribute_snapshot
 
 SCHEMA_VERSION = 1
 SCHEDULE_TAG = "schedule"
@@ -579,6 +581,34 @@ def sync_npc_schedules() -> None:
         )
 
 
+def snapshot_npc_schedule_surfaces(
+    start_tick: int, end_tick: int
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot the durable surfaces ``settle_npc_schedules`` may write.
+
+    The advance-surface contract for the ``npc_schedules`` source: every
+    schedule-tagged NPC's ``schedule_state`` attribute plus the ``location``
+    of every tagged NPC (a due ``move`` entry may relocate any of them),
+    using the same tag discovery as settlement. The location is stored as a
+    plain pk so a room deleted inside the rolled-back transaction can be
+    re-fetched fresh after rollback. Pure read: no attribute, location, or
+    tag changes.
+    """
+    from evennia.utils.search import search_object_by_tag
+
+    tagged = [
+        npc for npc in search_object_by_tag(SCHEDULE_TAG) if isinstance(npc, NPC)
+    ]
+    registry: dict[int, SurfaceSnapshot] = {}
+    for npc in tagged:
+        location = npc.location
+        registry[id(npc)] = SurfaceSnapshot(
+            attributes={("schedule_state", None): attribute_snapshot(npc, "schedule_state")},
+            location=(location is not None, int(location.pk)) if location is not None else None,
+        )
+    return registry
+
+
 def register_npc_schedules() -> None:
     """Register the ``npc_schedules`` clock source idempotently.
 
@@ -587,7 +617,11 @@ def register_npc_schedules() -> None:
     that already runs at startup (after the guild-economy sync) attaches this
     module's settlement as the stage's only source.
     """
-    register_event_source("npc_schedules", settle_npc_schedules)
+    register_event_source(
+        "npc_schedules",
+        settle_npc_schedules,
+        snapshot_npc_schedule_surfaces,
+    )
 
 
 def interaction_reason(npc: Any, interaction_kind: str) -> str | None:

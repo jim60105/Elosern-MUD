@@ -2,10 +2,11 @@
 
 from typing import Any
 
+from evennia.objects.models import ObjectDB
 from evennia.utils.logger import log_warn
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.clock import ScheduledEvent
+from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 
 from .runtime import (
     QuestDataError,
@@ -13,7 +14,53 @@ from .runtime import (
     fail_record,
     read_records,
 )
-from .transitions import apply_quest_log_replacement, release_stage_binding
+from .transitions import (
+    apply_quest_log_replacement,
+    release_stage_binding,
+    snapshot_pin_reasons,
+    snapshot_quest_log,
+)
+
+
+def snapshot_quest_deadline_surfaces(
+    start_tick: int, end_tick: int
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot the durable surfaces ``settle_quest_deadlines`` may write.
+
+    The advance-surface contract for the ``quest_deadlines`` source: every
+    player with a non-empty quest log (whose ``quest_log`` may be replaced)
+    plus every room an in-progress record currently binds (whose
+    ``pin_reasons`` ``release_stage_binding`` may rewrite). Reuses the shared
+    quest-log and pin snapshot handlers so the contract cannot drift from the
+    transition layer. Pure read: no attribute, location, or tag changes.
+    """
+    registry: dict[int, SurfaceSnapshot] = {}
+    for player in PlayerCharacter.objects.all_family():
+        raw_log = player.db.quest_log
+        if not raw_log:
+            continue
+        registry[id(player)] = SurfaceSnapshot(
+            attributes={("quest_log", None): snapshot_quest_log(player)}
+        )
+        try:
+            records = read_records(player)
+        except QuestDataError as error:
+            log_warn(f"quest_deadlines: {player.key}: malformed quest log: {error}")
+            continue
+        for record in records:
+            if record.state is not QuestState.IN_PROGRESS or record.stage_room_id is None:
+                continue
+            room = ObjectDB.objects.filter(id=record.stage_room_id).first()
+            if room is None:
+                continue
+            snapshot = registry.get(id(room))
+            if snapshot is None:
+                registry[id(room)] = SurfaceSnapshot(
+                    attributes={("pin_reasons", None): snapshot_pin_reasons(room)}
+                )
+            else:
+                snapshot.attributes[("pin_reasons", None)] = snapshot_pin_reasons(room)
+    return registry
 
 
 def settle_quest_deadlines(start_tick: int, end_tick: int) -> list[ScheduledEvent]:

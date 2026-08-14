@@ -66,5 +66,9 @@ def settle_shop_hours(start_tick: int, end_tick: int) -> list[ScheduledEvent]:
 
 
 def register_shop_hours() -> None:
-    """Register the ``shop_hours`` clock source idempotently."""
+    """Register the ``shop_hours`` clock source idempotently.
+
+    Read-only seam: settlement only emits events from the clock calendar and
+    never writes durable state, so no advance-surface contract is declared.
+    """
     register_event_source("shop_hours", settle_shop_hours)

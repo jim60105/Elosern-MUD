@@ -479,3 +479,130 @@ class ReclaimKnowledgePruneTests(EvenniaTest):
             events,
         )
         self.assertEqual(self.char1.attributes.get("map_knowledge"), before)
+
+
+class ReclaimRollbackCacheTests(EvenniaTest):
+    """A rolled-back advance restores reclaimed-room state (F5).
+
+    ``reclaim_due_instances`` deletes a due room, prunes ``map_knowledge``,
+    and relocates unowned occupants; when a later persist fails, the
+    ``instance_reclamation`` contract restores every surface in cache and
+    storage, and a relocated occupant points back into the re-fetched
+    (rolled-back) room rather than at a deleted object or ``None``.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import world.rules.clock as clock_module
+
+        self._sources = dict(clock_module._EVENT_SOURCES)
+
+    def tearDown(self):
+        import world.rules.clock as clock_module
+
+        clock_module._EVENT_SOURCES.clear()
+        clock_module._EVENT_SOURCES.update(self._sources)
+        super().tearDown()
+
+    def _raw_attribute(self, obj, key):
+        row = (
+            obj.db_attributes.through.objects.filter(
+                objectdb_id=obj.pk, attribute__db_key=key
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+        return None if row is None else row
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_failing_persist_restores_reclaimed_room_knowledge_and_occupants(self):
+        from evennia.utils.search import search_script
+        from world.maps.instance import register_instance_reclamation
+        from world.rules.clock import AdvanceSource, get_world_clock
+
+        room = create_object(InstanceRoom, key="rollback_reclaim")
+        room_id = int(room.pk)
+        room.db.expire_tick = 50
+        room.db.named = False
+        room.db.interacted = False
+        # An NAttribute makes ``at_idmapper_flush`` refuse the deleted
+        # instance's eviction, so the restore must flush the stale entry
+        # before the next fetch re-reads the rolled-back rows.
+        room.ndb.survivor = "kept across the rolled-back delete"
+        npc = create_object(NPC, key="relocated_on_rollback")
+        npc.move_to(room, quiet=True)
+        before_knowledge = {
+            "schema_version": 1,
+            "visited": {
+                f"room:{room_id}": {"first_seen_tick": 10, "last_seen_tick": 20},
+                f"room:{self.room1.id}": {"first_seen_tick": 30, "last_seen_tick": 30},
+            },
+        }
+        self.char1.attributes.add("map_knowledge", before_knowledge)
+        before_surfaces = {
+            "expire_tick": room.db.expire_tick,
+            "named": room.db.named,
+            "interacted": room.db.interacted,
+            "pin_reasons": room.db.pin_reasons,
+            "owned_entities": room.db.owned_entities,
+        }
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+
+        register_instance_reclamation()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        script = search_script("world_clock")[0]
+
+        def failing_persist(tick):
+            script.db.tick = tick
+            raise RuntimeError("simulated persist failure")
+
+        clock._persist = failing_persist
+        with self.assertRaises(RuntimeError):
+            clock.advance(100, AdvanceSource.SKIP, [self.char1])
+
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(script.db.tick, before_tick)
+        # The deleted-then-rolled-back room re-fetches as a live object.
+        self.assertTrue(InstanceRoom.objects.filter(id=room_id).exists())
+        refetched = InstanceRoom.objects.get(id=room_id)
+        self.assertIsNot(refetched, room)
+        # Every surface matches its pre-advance value in cache and in the raw
+        # Attribute rows (defaulted surfaces never gained a row).
+        self.assertEqual(refetched.db.expire_tick, before_surfaces["expire_tick"])
+        self.assertEqual(self._raw_attribute(refetched, "expire_tick"), before_surfaces["expire_tick"])
+        self.assertEqual(refetched.db.named, before_surfaces["named"])
+        self.assertEqual(self._raw_attribute(refetched, "named"), before_surfaces["named"])
+        self.assertEqual(refetched.db.interacted, before_surfaces["interacted"])
+        self.assertEqual(self._raw_attribute(refetched, "interacted"), before_surfaces["interacted"])
+        self.assertEqual(refetched.db.pin_reasons, before_surfaces["pin_reasons"])
+        self.assertEqual(self._raw_attribute(refetched, "pin_reasons"), before_surfaces["pin_reasons"])
+        self.assertEqual(refetched.db.owned_entities, before_surfaces["owned_entities"])
+        self.assertEqual(self._raw_attribute(refetched, "owned_entities"), before_surfaces["owned_entities"])
+        # The pruned player knowledge is restored in cache and storage.
+        self.assertEqual(self.char1.attributes.get("map_knowledge"), before_knowledge)
+        self.assertEqual(self._raw_attribute(self.char1, "map_knowledge"), before_knowledge)
+        # The relocated occupant points back into the re-fetched room.
+        self.assertEqual(npc.location.pk, room_id)
+        self.assertNotEqual(npc.location.dbref, settings.DEFAULT_HOME)
+        self.assertIn(npc, refetched.contents)
+
+    @covers_requirement("world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities")
+    def test_successful_advance_commits_reclamation_with_tick(self):
+        from world.maps.instance import register_instance_reclamation
+        from world.rules.clock import AdvanceSource, get_world_clock
+
+        room = create_object(InstanceRoom, key="committed_reclaim")
+        room_id = int(room.pk)
+        room.db.expire_tick = 50
+        register_instance_reclamation()
+        clock = get_world_clock()
+        before_tick = clock.tick
+        events = clock.advance(100, AdvanceSource.SKIP, [])
+        self.assertIn(
+            ScheduledEvent("instance_reclaimed", before_tick + 100, {"room": room.key}),
+            events,
+        )
+        self.assertEqual(clock.tick, before_tick + 100)
+        self.assertFalse(InstanceRoom.objects.filter(id=room_id).exists())
