@@ -202,6 +202,21 @@ end-of-round upkeep, entity in 進行中:
 餘韻, 300 s later → 未達                 [existing decay]
 ```
 
+### 3.2a One added rule row: `penetrative_sex_with_male`
+
+`sexual.yaml` ships `experience_lesbian_added` (`penetrative_sex_with_female` → `女女性愛`) with no
+male-male counterpart. Overview D-12 makes same-sex intercourse a real branch in the act catalog, so
+the asymmetry becomes visible: a female-female act would record an experience type while a male-male
+act recorded nothing.
+
+`B3` adds one row, `experience_gay_added` (`penetrative_sex_with_male` → `男男性愛`), because `B3`
+already owns `sexual.yaml` and the catalog proposals are deliberately kept to pure data. It carries
+its own `test_rule_<id>` function, as the shipped structural check
+`test_every_rule_id_has_a_test()` requires.
+
+Neither same-sex rule touches `virgin`; only `virginity_once`, conditioned on
+`first_vaginal_penetration`, does. That separation is shipped behaviour and is not modified.
+
 ### 3.3 Emission sites
 
 `climax_ends` and `climax_extended` are emitted from the **two call sites that already invoke

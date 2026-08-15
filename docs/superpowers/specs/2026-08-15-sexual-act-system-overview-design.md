@@ -84,6 +84,7 @@ one unsorted array. This is already marginal; adding 69 acts makes it unusable.
 | D-9 | **神之秘法 acts are exempt from D-4 and from every counter gate.** The exemption is keyed on the existing data field `requires_divine_arts`, never on a hardcoded key list. | 神之秘法 is defined in world lore as the highest technique for altering the world through divinity, and is deliberately positioned to break game balance. The exemption from self-inflicted pleasure is precisely what makes it break: every other act punishes overuse, these do not. Containment is the pre-existing, very narrow `RaceProfile.can_use_divine_arts` gate enforced by `_step1_divine_arts_gate`, not a resource cost — consistent with the skill-system redesign's D7, which shipped divine mysteries as free-cost and race-gated. |
 | D-10 | **`無垢回歸` restores `virgin` through a separately named mutator, `SexualState.restore_purity()`; `experience_types` is never cleared.** This is an explicit amendment to `2026-07-29-ai-mud-engine-design.md` §6.4's "one-way, irreversible" description. | The shipped `sexual-state-handler` requirement constrains *the public setter* ("no later mutation **through that public setter**"), so a separately named mutator does not weaken it — every ordinary rule path stays one-way. The same requirement's `experience_types` clause is absolute ("SHALL expose no replacement or removal method"), so clearing it would require rewriting a live requirement; leaving experience intact avoids that and reads better besides (the body is restored, the memory is not). |
 | D-11 | **The act catalog is a package with one module per line, and the empty line modules plus their `__init__.py` imports ship in the registry proposal before any catalog content.** | Six catalog proposals can then be implemented fully in parallel, each owning exactly one file. If the catalog were one module, or if `__init__.py` grew an import per line, every catalog proposal would conflict with every other. See §4. |
+| D-12 | **`virgin` breaks only on vaginal intercourse with an opposite-sex partner.** A same-sex act, an anal act, and any act against a `Monster` never break it. This requires a new `sex` field on entities, which does not exist anywhere in the codebase today. | The rulebook already draws this distinction and has since it shipped: `virginity_once` is conditioned on `first_vaginal_penetration`, while the same-sex path `penetrative_sex_with_female` adds the `女女性愛` experience type and deliberately never touches `virgin`. The branch therefore belongs in the act catalog, not in the rules — but nothing can currently *evaluate* it, because `CHARACTER_SCHEMA_V1` declares `age`, `apparent_age`, `race`, and `subrace` and no notion of sex. An entity whose sex is unknown or `other` never breaks virginity, which makes the monster case fall out for free instead of needing a special case. |
 
 ---
 
@@ -122,13 +123,14 @@ already atomic.
 
 ## 4. Implementation Sequence
 
-Twenty-one proposals, each sized for one working day. The organising principle is **disjoint file
+Twenty-two proposals, each sized for one working day. The organising principle is **disjoint file
 ownership**: no two proposals in the same batch touch the same file. That is the only real lever on
 rebase cost.
 
 ### 4.1 Dependency graph
 
 ```
+S1 ──────────────────────────────────────────────────────── C4
 C1 ─────────────────────────────┐
 A1 ──┬── A2                     │
      ├── A3                     │
@@ -143,6 +145,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 
 | # | Key | Content | Depends on | Files owned exclusively |
 |---|---|---|---|---|
+| S1 | `entity-sex-field` | `sex` (`female` / `male` / `other`) on the character schema and on `LivingEntity`; import validation; example record update. Required for characters, defaulting to `other` for entities with no record. **Prerequisite for D-12; no such field exists today.** | — | `world/imports/schema.py`, `world/imports/examples/`, `typeclasses/` |
 | C1 | `sexual-body-parts` | `BODY_PARTS` (10) and `GENERIC_BODY_PART` as pure vocabulary constants. `resolve_part()` itself lives in `B5`, because this module's spec forbids it from containing behaviour. | — | `world/lore/sexual_vocab.py` |
 | A1 | `skill-category-registry` | `SkillCategory`, `category`/`group` fields, all 117 assignments, structural tests | — | `world/skills/registry.py` |
 | B1 | `pleasure-gauge` | `pleasure` authoritative, `arousal` derived, band table, rewrite the four arousal-writing rules | — | `sexual_state.py`, `sexual.yaml`, `sexual_transitions.py` |
@@ -150,7 +153,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | A2 | `skill-category-combat-panel` | `context_actions` v2→v3 grouped payload, telnet parity, Node/browser tests, spec delta | A1 | `combat_view.py`, `web/` |
 | A3 | `skill-category-status-listing` | Out-of-combat listing reads `owned_keys()` and groups; fixes innate skills being invisible | A1 | `status_query.py` |
 | B2 | `sexual-counters` | Eleven counter traits plus one sole mutator each | B1 | `sexual_state.py` |
-| B3 | `climax-settlement` | Emit `climax_ends` from both existing decay call sites, `climax_extended`, extension threshold, **fixes the `進行中` dead end** | B1, B2 | `sexual_state.py`, `sexual.yaml`, `combat.py`, `clock.py` |
+| B3 | `climax-settlement` | Emit `climax_ends` from both existing decay call sites, `climax_extended`, extension threshold, the `penetrative_sex_with_male` rule row (D-12 symmetry), **fixes the `進行中` dead end** | B1, B2 | `sexual_state.py`, `sexual.yaml`, `combat.py`, `clock.py` |
 | B4 | `sexual-act-registry` | `SexualActDef`, `_act_family()`, `unlocked_act_keys()` incl. mastery blanket unlock, `owned_keys()` integration, **six empty line-module stubs** | A1, B2 | `world/skills/sexual_acts/`, `handler.py` |
 | B5 | `sexual-act-effects` | `pleasure:` / `sexual_counter:` prefixes and handlers, bidirectional participant application, part resolution | C1, B1, B4 | `effects.py`, `action.py`, `world/rules/sexual_acts.py` |
 | B6a | `sexual-resist-contest` | Contest as a pure function, affinity modifier table, `auto_comply`, the first-five-climax-turns short circuit | B3, B4 | `world/rules/sexual_resist.py`, `sexual_resist.yaml` |
@@ -158,7 +161,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | B8 | `sexual-act-seeds` | Seven seeds plus one representative upper-tier act per line (~14) | B5, B6b | the six line modules |
 | C2 | `sexual-catalog-solo` | 獨處線, 17 acts | B8 | `sexual_acts/solo.py` |
 | C3 | `sexual-catalog-shame` | 羞恥線, 10 acts | B8 | `sexual_acts/shame.py` |
-| C4 | `sexual-catalog-partner` | 關係線, 18 acts | B8 | `sexual_acts/partner.py` |
+| C4 | `sexual-catalog-partner` | 關係線, 18 acts; the D-12 opposite-sex branch on 交合 / 深度交合 | B8, **S1** | `sexual_acts/partner.py` |
 | C5 | `sexual-catalog-combat` | 戰鬥線, 10 acts | B8 | `sexual_acts/combat.py` |
 | C6 | `sexual-catalog-interspecies` | 異種線, 7 acts, `異種次數` wiring | B8 | `sexual_acts/interspecies.py` |
 | C7a | `divine-sexual-arts-reuse` | 絕頂律令 / 時姦 / 神域搾取 — the three 神之秘法 needing no new `SexualState` surface | B8 | `sexual_acts/divine.py` |
@@ -169,7 +172,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 
 | Batch | Parallel tracks | Notes |
 |---|---|---|
-| 1 | `C1` ∥ `A1` ∥ `B1` ∥ `B7` | Four independent tracks. `B7` can run alongside `B1` **only because** D-3 keeps `arousal` comparable, so `combat_modifiers.yaml` needs no edit from `B1`. |
+| 1 | `S1` ∥ `C1` ∥ `A1` ∥ `B1` ∥ `B7` | Five independent tracks. `B7` can run alongside `B1` **only because** D-3 keeps `arousal` comparable, so `combat_modifiers.yaml` needs no edit from `B1`. `S1` owns `world/imports/` and `typeclasses/`, which nothing else in the set touches. |
 | 2 | `A2` ∥ `A3` ∥ `B2` | `A2` is the tightest single day in the plan: each combat browser test boots its own Evennia server (~35–70 s each). Do not pair a second track with it for the same implementer. |
 | 3 | `B3` ∥ `B4` | `B3` owns `combat.py`/`clock.py`; `B4` owns `world/skills/`. |
 | 4 | `B5` ∥ `B6a` | `B6a` is deliberately specified as a pure function so it can run beside `B5`. |

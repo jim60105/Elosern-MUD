@@ -129,20 +129,52 @@ comply, per [Act Resolution](2026-08-15-sexual-act-resolution-design.md) §5.
 | 2 | 雙人 ≥ 15 | 乳交 | 乳房; emits `breast_sex_performed` |
 | 2 | 雙人 ≥ 15 | 腿間摩擦 | 大腿 |
 | 2 | 雙人 ≥ 15 | 足部服務 | 足部 |
-| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 交合 | 私處; emits `first_vaginal_penetration` |
-| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 深度交合 | 私處 |
-| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 後庭交合 | 後庭 |
+| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 交合 | 私處; sex-dependent event, §4.1 |
+| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 深度交合 | 私處; sex-dependent event, §4.1 |
+| 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 後庭交合 | 後庭; never breaks `virgin`, §4.1 |
 | 3 | 雙人 ≥ 30, 高潮 ≥ 10 | 相互自慰 | bidirectional gain doubled |
 | 4 | 雙人 ≥ 30 | 多人愛撫 | AREA |
 | 4 | 多人 ≥ 15 | 多人交歡 | AREA |
 | 4 | 多人 ≥ 30 | 群體服務 | AREA |
 
-交合 is the sole emitter of `first_vaginal_penetration`, which drives the shipped one-way `virgin`
-flag and the `陰道性交` experience type. 乳交 is the sole emitter of `breast_sex_performed`. Both
-rules have existed unemitted since the transition rulebook landed.
+乳交 is the sole emitter of `breast_sex_performed`, a rule that has existed unemitted since the
+transition rulebook landed.
 
 牽手交纏 exists as a deliberate low-magnitude, affinity-positive opener: it lets a player raise a
 companion toward the `至愛` auto-comply threshold without ever forcing anything.
+
+### 4.1 Which acts break `virgin` (overview D-12)
+
+`virgin` breaks **only on vaginal intercourse with an opposite-sex partner**. The rulebook already
+draws this line and always has: `virginity_once` is conditioned on `first_vaginal_penetration`, while
+`penetrative_sex_with_female` adds the `女女性愛` experience type and deliberately never touches
+`virgin`. No rule change is needed — the branch lives here, in which event each act emits.
+
+The branch reads the new `sex` field introduced by proposal `S1` (overview §4.2). Nothing in the
+codebase carries sex data today; `CHARACTER_SCHEMA_V1` declares `age`, `apparent_age`, `race`, and
+`subrace` only.
+
+| Act | Partner | Event emitted | Breaks `virgin` |
+|---|---|---|---|
+| 交合 / 深度交合 | opposite sex | `first_vaginal_penetration` | **yes** |
+| 交合 / 深度交合 | both female | `penetrative_sex_with_female` | no (adds `女女性愛`) |
+| 交合 / 深度交合 | both male | `penetrative_sex_with_male` | no (adds `男男性愛`) |
+| 交合 / 深度交合 | either party `other` / unknown | `penetrative_sex_with_female`'s shape, no virgin rule | no |
+| 後庭交合 | any | no penetration event | no |
+| 異種交合 | a `Monster` (always `other`) | `sexual_activity_with_nonhuman` | no |
+
+Two consequences worth stating:
+
+- **`virgin` breaks symmetrically.** Because acts apply to every participant, an opposite-sex 交合
+  breaks it for both parties at once, which is correct and needs no extra logic.
+- **The monster case falls out for free.** A `Monster` has no sex record and resolves to `other`, so
+  異種交合 can never break virginity without any special-casing — the same shape as the
+  `GENERIC_BODY_PART` collapse.
+
+`penetrative_sex_with_male` and its `男男性愛` experience type do **not** exist in the shipped
+`sexual.yaml`; only the female-female counterpart does. Adding that one rule row is scoped to
+proposal `B3`, which already owns `sexual.yaml`, so this catalog proposal stays pure data. Without
+it the table would be asymmetric — female-female recorded, male-male silently unrecorded.
 
 ---
 
@@ -235,9 +267,13 @@ near-identical restatements. Coverage is structural plus representative instead:
   ledger, and the events emitted.
 - **Per line, one unlock-boundary test**: the act is absent from `owned_keys()` one point below its
   threshold and present at it.
-- **Sole-emitter tests** for the three acts that are the only emitter of a shipped rule's event:
-  交合 → `first_vaginal_penetration`, 乳交 → `breast_sex_performed`,
-  異種交合 → `sexual_activity_with_nonhuman`.
+- **Sole-emitter tests** for the acts that are the only emitter of a shipped rule's event:
+  乳交 → `breast_sex_performed`, 異種交合 → `sexual_activity_with_nonhuman`, and 交合 against an
+  opposite-sex partner → `first_vaginal_penetration`.
+- **Virgin branch (§4.1):** one test per table row. The load-bearing ones are that a same-sex 交合
+  leaves `virgin` `True` while adding the correct experience type, that 後庭交合 never breaks it,
+  that 異種交合 never breaks it with no monster special-case in the implementation, and that an
+  opposite-sex 交合 breaks it for **both** participants in the same resolution.
 - **Seed availability**: all seven seeds are present in `owned_keys()` for a freshly created
   character with every counter at zero.
 - **Sensitivity divergence**: two same-tier acts on different parts, repeated, produce measurably
