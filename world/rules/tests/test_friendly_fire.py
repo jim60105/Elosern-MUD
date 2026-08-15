@@ -44,6 +44,7 @@ from .combat_fixtures import BattlefieldIsolation
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
+    SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
@@ -62,6 +63,7 @@ FRIENDLY_DOUBLE = SkillDef(
     element="fire",
     effects=["damage:fire:magic", "damage:fire:magic"],
     faction_constraint=FactionConstraint.ANY,
+    category=SkillCategory.UTILITY,
 )
 
 _TEST_SKILLS = (FRIENDLY_DOUBLE,)
@@ -548,6 +550,7 @@ class HealingWithoutPenaltyTests(FriendlyFireBase):
             element="light",
             effects=["buff_apply:focus"],
             faction_constraint=FactionConstraint.ANY,
+            category=SkillCategory.UTILITY,
         )
 
     @covers_requirement("affinity-friendly-fire::healing-allies-or-foes-carries-no-penalty")

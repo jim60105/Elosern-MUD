@@ -1,5 +1,8 @@
-## ADDED Requirements
+# skill-category-registry Specification
 
+## Purpose
+TBD - created by archiving change skill-category-registry. Update Purpose after archive.
+## Requirements
 ### Requirement: SkillCategory enumerates exactly eight presentation categories
 `world/skills/registry.py` SHALL declare `SkillCategory`, a `StrEnum` with exactly eight members in
 this declaration order: `ELEMENTAL_MAGIC`, `MARTIAL_ARTS`, `ENHANCEMENT`, `INNATE_GIFT`, `MOVEMENT`,
@@ -23,6 +26,10 @@ is not a non-empty string.
 #### Scenario: An empty-string group raises at construction
 - **WHEN** `SkillDef(...)` is constructed with `group=""`
 - **THEN** `__post_init__` raises `ValueError` naming the skill's key
+
+#### Scenario: A non-string group raises at construction
+- **WHEN** `SkillDef(...)` is constructed with `group=123`
+- **THEN** `__post_init__` raises `ValueError` naming the skill's key (not `AttributeError`)
 
 #### Scenario: A None group is accepted
 - **WHEN** `SkillDef(...)` is constructed with `group` omitted (defaulting to `None`)
@@ -73,3 +80,4 @@ requirement's classification was introduced.
 #### Scenario: An elemental spell's element field is unaffected by its group assignment
 - **WHEN** any `SKILL_REGISTRY` entry classified `ELEMENTAL_MAGIC` is inspected
 - **THEN** its `element` field's key equals its `group` value, and its `effects` are unchanged from their pre-classification values
+

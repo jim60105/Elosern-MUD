@@ -19,7 +19,13 @@ from world.rules.action import (
     register_event_effect_planner,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
 from world.quests.planner import quest_event_effect_planner
 
 from ._fixtures import QuestRegistryIsolation, defeat, quest, register
@@ -114,6 +120,7 @@ class TargetDefeatedEventTests(EvenniaTest):
             usable_out_of_combat=False,
             element=None,
             effects=["damage:fire:magic", "damage:fire:magic"],
+            category=SkillCategory.UTILITY,
         )
         self.actor.db.skills = {"active": [skill_key], "passive": []}
         monster = self._monster("goblin-double", hp=1)

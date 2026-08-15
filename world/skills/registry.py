@@ -81,6 +81,25 @@ class FactionConstraint(StrEnum):
     SELF_ONLY = "self_only"
 
 
+class SkillCategory(StrEnum):
+    """Presentation taxonomy for the whole skill registry.
+
+    Declaration order is the display order consumed by the combat panel and
+    out-of-combat listing, so it is fixed and must not be reordered. ``group``
+    is the optional second level inside a category (an element key for
+    ``ELEMENTAL_MAGIC``, a line name for ``SEXUAL_ACT``).
+    """
+
+    ELEMENTAL_MAGIC = "elemental_magic"
+    MARTIAL_ARTS = "martial_arts"
+    ENHANCEMENT = "enhancement"
+    INNATE_GIFT = "innate_gift"
+    MOVEMENT = "movement"
+    DIVINE_MYSTERY = "divine_mystery"
+    UTILITY = "utility"
+    SEXUAL_ACT = "sexual_act"
+
+
 # Presentation metadata bounds shared by every immutable skill definition.
 LABEL_MAX = 128
 DESCRIPTION_MAX = 512
@@ -99,6 +118,8 @@ class SkillDef:
     usable_out_of_combat: bool
     element: Element | None
     effects: list[str]
+    category: SkillCategory
+    group: str | None = None
     faction_constraint: FactionConstraint = FactionConstraint.ANY
     requires_divine_arts: bool = False
     parsed_effects: tuple = ()
@@ -114,6 +135,13 @@ class SkillDef:
         unrecognized prefix raises here (registry-load time), not at use.
         """
         _validate_metadata(self.label, self.description)
+        if self.group is not None and (
+            not isinstance(self.group, str) or not self.group.strip()
+        ):
+            raise ValueError(
+                f"skill {self.key!r} declares an invalid group; "
+                "group must be a non-empty string when present"
+            )
         object.__setattr__(self, "cost", _FrozenDict(self.cost))
         object.__setattr__(self, "effects", _FrozenList(self.effects))
         object.__setattr__(
@@ -175,6 +203,8 @@ def _skill(
     effects: list[str] | None = None,
     faction_constraint: FactionConstraint = FactionConstraint.ANY,
     requires_divine_arts: bool = False,
+    category: SkillCategory,
+    group: str | None = None,
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     _validate_metadata(label, description)
@@ -190,6 +220,8 @@ def _skill(
         effects=_FrozenList([] if effects is None else effects),
         faction_constraint=faction_constraint,
         requires_divine_arts=requires_divine_arts,
+        category=category,
+        group=group,
     )
 
 
@@ -203,6 +235,8 @@ def _spell(
     element: str,
     effects: tuple[str, ...],
     usable_out_of_combat: bool = False,
+    category: SkillCategory,
+    group: str | None = None,
 ) -> SkillDef:
     """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
 
@@ -221,6 +255,8 @@ def _spell(
         element=element,
         effects=list(effects),
         faction_constraint=FactionConstraint.ANY,
+        category=category,
+        group=group,
     )
 
 
@@ -247,6 +283,8 @@ def _elemental_spells(
             mp=mp,
             element=element,
             effects=effects,
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group=element,
         )
         for key, label, description, target_spec, mp, effects in spells
     )
@@ -268,6 +306,7 @@ def _body_multiplier(key: str, label: str, multiplier: float) -> SkillDef:
             f"stat_multiply:{trait_key}:{multiplier:g}"
             for trait_key in _BODY_TRAITS
         ],
+        category=SkillCategory.ENHANCEMENT,
     )
 
 
@@ -283,6 +322,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="fire",
             faction_constraint=FactionConstraint.ANY,
             effects=["damage:fire:physical"],
+            category=SkillCategory.MARTIAL_ARTS,
         ),
         _body_multiplier("body_enhancement", "身體強化", 100),
         _body_multiplier("body_enhancement_extreme", "身體超強化", 1000),
@@ -295,6 +335,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="fire",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="fire",
         ),
         _skill(
             "dark_mastery",
@@ -304,6 +346,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="dark",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="dark",
         ),
         _skill(
             "wind_mastery",
@@ -313,6 +357,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="wind",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="wind",
         ),
         _skill(
             "light_mastery",
@@ -322,6 +368,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="light",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="light",
         ),
         _skill(
             "water_mastery",
@@ -331,6 +379,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="water",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="water",
         ),
         _skill(
             "earth_mastery",
@@ -340,6 +390,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="earth",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="earth",
         ),
         _skill(
             "lightning_mastery",
@@ -349,6 +401,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="lightning",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="lightning",
         ),
         _skill(
             "ice_mastery",
@@ -358,6 +412,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             element="ice",
             effects=["element_mastery_rank:主宰"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="ice",
         ),
         *_elemental_spells(
             "fire",
@@ -427,6 +483,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="earth",
             faction_constraint=FactionConstraint.SELF_ONLY,
             effects=["self_buff_apply:earth_hardened_skin"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="earth",
         ),
         *_elemental_spells(
             "wind",
@@ -459,6 +517,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="wind",
             faction_constraint=FactionConstraint.SELF_ONLY,
             effects=["self_buff_apply:wind_haste"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="wind",
         ),
         _skill(
             "flight",
@@ -470,6 +530,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             element="wind",
             effects=["movement:flight"],
+            category=SkillCategory.MOVEMENT,
         ),
         *_elemental_spells(
             "lightning",
@@ -502,6 +563,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="lightning",
             faction_constraint=FactionConstraint.SELF_ONLY,
             effects=["self_buff_apply:lightning_static_ward"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="lightning",
         ),
         # 雷 — 賢者
         _skill(
@@ -514,6 +577,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="lightning",
             faction_constraint=FactionConstraint.SELF_ONLY,
             effects=["self_buff_apply:lightning_extra_action"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            group="lightning",
         ),
         *_elemental_spells(
             "ice",
@@ -576,6 +641,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["weapon_style:dual_wield"],
+            category=SkillCategory.MARTIAL_ARTS,
         ),
         _skill(
             "dual_blade_mastery",
@@ -587,6 +653,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="dark",
             faction_constraint=FactionConstraint.ANY,
             effects=["damage:dark:physical"],
+            category=SkillCategory.MARTIAL_ARTS,
         ),
         _skill(
             "light_sword_style",
@@ -598,6 +665,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="light",
             faction_constraint=FactionConstraint.ANY,
             effects=["damage:light:physical"],
+            category=SkillCategory.MARTIAL_ARTS,
         ),
         _skill(
             "shadow_slash",
@@ -609,6 +677,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             element="dark",
             faction_constraint=FactionConstraint.ANY,
             effects=["damage:dark:physical"],
+            category=SkillCategory.MARTIAL_ARTS,
         ),
         _skill(
             "flash_step",
@@ -619,6 +688,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             cost={"sp": 12},
             usable_out_of_combat=True,
             effects=["movement:flash_step"],
+            category=SkillCategory.MOVEMENT,
         ),
         _skill(
             "status_disguise",
@@ -628,6 +698,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.SELF,
             usable_out_of_combat=True,
             effects=["set_disguise"],
+            category=SkillCategory.UTILITY,
         ),
         _skill(
             "concentration",
@@ -637,6 +708,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             cost={"mp": 5},
             effects=["self_buff_apply:focus"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "dominion_art",
@@ -646,6 +718,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.SINGLE,
             usable_out_of_combat=True,
             effects=["confer_skill_partial"],
+            category=SkillCategory.UTILITY,
         ),
         _skill(
             "defense_instinct",
@@ -654,6 +727,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:defense_small"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "blade_art_mastery",
@@ -662,6 +736,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:blade_arts"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "extreme_endurance",
@@ -670,6 +745,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:endurance_extreme"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "magic_circle_comprehension",
@@ -678,6 +754,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:magic_circle_comprehension"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "precise_mana_control",
@@ -686,6 +763,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:mana_precision"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "retainer_martial_training",
@@ -694,6 +772,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:retainer_training"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "guardian_instinct",
@@ -702,6 +781,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_buff:guardian_instinct"],
+            category=SkillCategory.ENHANCEMENT,
         ),
         _skill(
             "elf_longevity",
@@ -710,6 +790,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["passive_trait:elf_longevity"],
+            category=SkillCategory.INNATE_GIFT,
         ),
         _skill(
             "reincarnation_boon_elosia",
@@ -718,6 +799,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["growth_rate:magic:100"],
+            category=SkillCategory.INNATE_GIFT,
         ),
         _skill(
             "reincarnation_boon_yuka",
@@ -726,6 +808,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["combat_prediction:武感"],
+            category=SkillCategory.INNATE_GIFT,
         ),
         _skill(
             "reincarnation_boon_yuna",
@@ -734,6 +817,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             SkillKind.PASSIVE,
             TargetSpec.NONE,
             effects=["sexual_magic_mastery"],
+            category=SkillCategory.SEXUAL_ACT,
+            group="精通",
         ),
         _skill(
             "divine_sexual_mastery",
@@ -743,6 +828,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             TargetSpec.NONE,
             requires_divine_arts=True,
             effects=["sexual_magic_mastery"],
+            category=SkillCategory.SEXUAL_ACT,
+            group="精通",
         ),
         _skill(
             "divine_sexual_arts",
@@ -753,6 +840,8 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["sexual_event:stimulus_applied"],
+            category=SkillCategory.SEXUAL_ACT,
+            group="神之秘法",
         ),
         _skill(
             "divine_time_dilation",
@@ -763,6 +852,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["divine_mystery:時間加速"],
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "divine_space_distortion",
@@ -773,6 +863,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["divine_mystery:空間扭曲"],
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "divine_matter_transmutation",
@@ -783,6 +874,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["divine_mystery:物質轉換"],
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
         _skill(
             "divine_life_extension",
@@ -793,6 +885,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             usable_out_of_combat=True,
             requires_divine_arts=True,
             effects=["divine_mystery:生命延續"],
+            category=SkillCategory.DIVINE_MYSTERY,
         ),
     )
 }

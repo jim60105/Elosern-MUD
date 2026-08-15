@@ -15,6 +15,7 @@ from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
+    SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
@@ -37,6 +38,7 @@ SKILL_REGISTRY[FLEE_SKILL_KEY] = SkillDef(
     usable_out_of_combat=False,
     element=None,
     effects=["disengage:self"],
+    category=SkillCategory.MOVEMENT,
 )
 
 

@@ -33,6 +33,7 @@ from world.rules.targeting import RoomActionContext
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
+    SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
@@ -52,6 +53,7 @@ PURIFY_TEST_SKILL = SkillDef(
     element="light",
     effects=["cleanse:status"],
     faction_constraint=FactionConstraint.ANY,
+    category=SkillCategory.UTILITY,
 )
 
 
