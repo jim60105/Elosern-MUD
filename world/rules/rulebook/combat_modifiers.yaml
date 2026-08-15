@@ -17,9 +17,9 @@
   when: {field: climax_phase, equals: 進行中}
   then: {actions_per_turn: 0}
 - id: defense_instinct_defense_bonus
-  # 防禦直覺 (defense_instinct, passive_buff:defense_small) — the flavor is
-  # "被動強化自身的防禦能力", so the closest existing adjustment field is a
-  # small flat `defense` bonus.
+  # 防禦直覺 (defense_instinct, passive_buff:defense_small) — "被動強化自身的
+  # 防禦能力" reads as a small flat `defense` bonus; the value enters damage
+  # mitigation as a flat addition to the defender's effective defense.
   when: {skill_owned: defense_instinct}
   then: {defense: 5}
 - id: blade_art_mastery_accuracy_bonus
@@ -30,8 +30,8 @@
   then: {accuracy: 5}
 - id: extreme_endurance_sp_cost_reduction
   # 極限耐力 (extreme_endurance, passive_buff:endurance_extreme) — "被動強化
-  # 自身的耐力上限" reads as stamina preservation; the shared cost vocabulary
-  # expresses it as a percentage SP-cost reduction.
+  # 自身的耐力上限" reads as stamina preservation; the percentage `sp_cost`
+  # value reduces the SP cost in both the resource check and the deduction.
   when: {skill_owned: extreme_endurance}
   then: {sp_cost: "-10%"}
 - id: magic_circle_comprehension_accuracy_bonus
@@ -42,21 +42,24 @@
   then: {accuracy: 5}
 - id: precise_mana_control_mp_cost_reduction
   # 精準魔力控制 (precise_mana_control, passive_buff:mana_precision) — "被動
-  # 強化對魔力的精準控制" reads as MP-cost reduction; the field is distinct
-  # from magic_circle_comprehension's accuracy so the two adjustments stay
-  # independently readable.
+  # 強化對魔力的精準控制" reads as MP-cost reduction; the percentage `mp_cost`
+  # value reduces the MP cost in both the resource check and the deduction,
+  # distinct from magic_circle_comprehension's accuracy so the two adjustments
+  # stay independently readable.
   when: {skill_owned: precise_mana_control}
   then: {mp_cost: "-10%"}
 - id: retainer_martial_training_atk_phys_bonus
   # 隨從武藝訓練 (retainer_martial_training, passive_buff:retainer_training) —
-  # "被動提昇隨從角色的武藝水準" reads as a flat `atk_phys` bonus for martial
-  # training; defense is already the guardian/instinct pair's field.
+  # "被動提昇隨從角色的武藝水準" reads as a flat `atk_phys` bonus; the value
+  # enters physical damage magnitude as a flat addition to the attacker's
+  # effective physical attack. Defense stays the guardian/instinct pair's field.
   when: {skill_owned: retainer_martial_training}
   then: {atk_phys: 5}
 - id: guardian_instinct_defense_bonus
   # 守護直覺 (guardian_instinct, passive_buff:guardian_instinct) — "被動強化
   # 守護同伴的直覺" has no protect/cover mechanic to hook into, so it grants a
-  # flat `defense` bonus consistent with guarding.
+  # flat `defense` bonus consistent with guarding; the value enters damage
+  # mitigation like defense_instinct's.
   when: {skill_owned: guardian_instinct}
   then: {defense: 5}
 - id: reincarnation_boon_yuka_agility_bonus
@@ -67,8 +70,8 @@
   then: {agility: "+5%"}
 - id: dual_wield_style_atk_phys_bonus
   # 雙持劍術 (dual_wield_style, weapon_style:dual_wield) — "同時揮舞兩把武器進行
-  # 戰鬥的架式" reads as raw two-weapon offense; the closest existing damage
-  # adjustment field is a flat `atk_phys` bonus (the same vocabulary as
+  # 戰鬥的架式" reads as raw two-weapon offense; the flat `atk_phys` bonus
+  # enters physical damage magnitude (the same vocabulary as
   # retainer_martial_training_atk_phys_bonus), matching its magnitude.
   when: {skill_owned: dual_wield_style, dual_wielding: true}
   then: {atk_phys: 5}

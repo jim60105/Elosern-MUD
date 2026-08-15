@@ -133,6 +133,19 @@ class HitRateTests(unittest.TestCase):
                 0,
             )
 
+    @covers_requirement(
+        "combat-modifier-table::damage-estimation-surfaces-mirror-the-live-adjusted-damage-math"
+    )
+    def test_estimate_terms_include_the_flat_bundle_bonuses(self):
+        attacker = FakeEntity(
+            "attacker", atk_phys=20, agility=10
+        )
+        attacker.skills._owned = ["retainer_martial_training"]
+        defender = FakeEntity("defender", defense=5, agility=10)
+        defender.skills._owned = ["guardian_instinct"]
+        estimate = _expected_damage_per_attack(attacker, defender)
+        self.assertAlmostEqual(estimate, 0.5 * (round((20 + 5) * 1.0) - (5 + 5)))
+
 
 class RoundEstimateTests(unittest.TestCase):
     def test_calibration_examples(self):

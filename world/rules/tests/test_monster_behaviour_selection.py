@@ -119,3 +119,27 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
                 physical,
             )
         roller.assert_called_once_with()
+
+    @covers_requirement(
+        "combat-modifier-table::damage-estimation-surfaces-mirror-the-live-adjusted-damage-math"
+    )
+    def test_physical_candidate_ranks_with_its_atk_phys_bonus(self):
+        entity = FakeEntity("actor", atk_phys=30, magic_level=30)
+        entity.skills._owned = ["retainer_martial_training"]
+        target = FakeEntity("target", defense=12)
+        physical = SKILL_REGISTRY["shadow_slash"]
+        magic = SKILL_REGISTRY["fire_ball"]
+        with patch(
+            "world.rules.monster_behaviour.dice.roll_d100",
+            return_value=0,
+        ) as roller:
+            self.assertIs(
+                _choose_skill(
+                    entity,
+                    [physical, magic],
+                    "highest_expected_damage",
+                    target,
+                ),
+                physical,
+            )
+        roller.assert_not_called()

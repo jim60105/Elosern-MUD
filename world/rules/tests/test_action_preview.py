@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -19,6 +20,8 @@ from world.rules.buffs import _add_buff
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.sexual_state import AROUSAL_LEVELS
+from world.rules.targeting import RoomActionContext
+from world.skills.registry import SKILL_REGISTRY
 from .combat_fixtures import BattlefieldIsolation
 
 
@@ -340,6 +343,126 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
             )
         )
         self.assertEqual(preflight.outcome, "success")
+
+
+class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTest):
+    """Preview/preflight/resolve parity for adjusted resource costs."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = _player("cost preview player")
+        self.context = RoomActionContext(
+            self.player.location,
+            {"disguise": {"atk_phys": 1}},
+        )
+        original = SKILL_REGISTRY["status_disguise"]
+        SKILL_REGISTRY["status_disguise"] = replace(original, cost={"sp": 10})
+        self.addCleanup(
+            lambda: SKILL_REGISTRY.__setitem__("status_disguise", original)
+        )
+
+    def _preview(self):
+        return preview_skill(self.player, "status_disguise", self.context, [])
+
+    def _preflight(self):
+        return ActionResolver.preflight(
+            ActionRequest(self.player, "status_disguise", [], self.context)
+        )
+
+    def _resolve(self):
+        return ActionResolver.resolve(
+            ActionRequest(self.player, "status_disguise", [], self.context)
+        )
+
+    @covers_requirement(
+        "combat-modifier-table::preview-preflight-and-resolve-agree-on-adjusted-resource-costs"
+    )
+    def test_preview_enables_exactly_the_casts_preflight_allows_under_reduction(self):
+        self.player.db.skills = {
+            "active": ["status_disguise"],
+            "passive": ["extreme_endurance"],
+        }
+        self.player.traits.sp.base = 20
+        self.player.traits.sp.current = 9
+        self.assertTrue(self._preview().enabled)
+        self.assertEqual(self._preflight().outcome, "success")
+        result = self._resolve()
+        self.assertEqual(result.outcome, "success")
+        spend = next(
+            e for e in result.event_log.entries if e.kind == "resource_spend"
+        )
+        self.assertEqual(spend.data, {"resource_key": "sp", "amount": 9})
+
+    @covers_requirement(
+        "combat-modifier-table::preview-preflight-and-resolve-agree-on-adjusted-resource-costs"
+    )
+    def test_preview_rejects_exactly_the_casts_preflight_rejects_under_reduction(self):
+        self.player.db.skills = {
+            "active": ["status_disguise"],
+            "passive": ["extreme_endurance"],
+        }
+        self.player.traits.sp.base = 20
+        self.player.traits.sp.current = 8
+        preview = self._preview()
+        self.assertFalse(preview.enabled)
+        self.assertIs(preview.reason, RejectReason.INSUFFICIENT_RESOURCE)
+        self.assertEqual(preview.detail, "sp")
+        self.assertIs(self._preflight().reason, RejectReason.INSUFFICIENT_RESOURCE)
+        result = self._resolve()
+        self.assertIs(result.reason, RejectReason.INSUFFICIENT_RESOURCE)
+        self.assertEqual(result.detail, "sp")
+        self.assertEqual(self.player.traits.sp.value, 8)
+
+    def test_fractional_grant_percentage_parity_across_all_three_surfaces(self):
+        self.player.db.skills = {
+            "active": ["status_disguise"],
+            "passive": [],
+        }
+        self.player.traits.sp.base = 20
+        self.player.traits.sp.current = 9
+        bundle = {"sp_cost": "-5%"}
+        with (
+            patch(
+                "world.rules.action_preview.evaluate_combat_modifiers_no_create",
+                return_value=bundle,
+            ),
+            patch(
+                "world.rules.action.evaluate_combat_modifiers",
+                return_value=bundle,
+            ),
+        ):
+            self.assertTrue(self._preview().enabled)
+            self.assertEqual(self._preflight().outcome, "success")
+            result = self._resolve()
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.player.traits.sp.value, 0)
+
+    @covers_requirement(
+        "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
+    )
+    def test_conferred_grant_scale_floors_identically_across_all_surfaces(self):
+        from world.skills.handler import ConferredSkillGrant
+
+        original = SKILL_REGISTRY["status_disguise"]
+        SKILL_REGISTRY["status_disguise"] = replace(original, cost={"mp": 10})
+        try:
+            self.player.db.skills = {"active": ["status_disguise"], "passive": []}
+            self.player.db.skill_grants = [
+                ConferredSkillGrant("elosia", "precise_mana_control", 0.5)
+            ]
+            self.player.traits.mp.base = 20
+            self.player.traits.mp.current = 9
+            self.assertTrue(self._preview().enabled)
+            self.assertEqual(self._preflight().outcome, "success")
+            result = self._resolve()
+        finally:
+            SKILL_REGISTRY["status_disguise"] = original
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.player.traits.mp.value, 0)
+        spend = next(
+            e for e in result.event_log.entries if e.kind == "resource_spend"
+        )
+        self.assertEqual(spend.data, {"resource_key": "mp", "amount": 9})
 
 
 if __name__ == "__main__":

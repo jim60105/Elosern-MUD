@@ -1,5 +1,6 @@
 """Pure combat-modifier query for design section 6.4."""
 
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -136,6 +137,24 @@ def _merge_adjustments(result: dict[str, Any], incoming: dict[str, Any]) -> dict
         else:
             merged[key] = value
     return merged
+
+
+def apply_cost_modifier(amount: int, percentage: str | None) -> int:
+    """Apply one signed percentage cost adjustment with floor rounding.
+
+    ``None`` returns ``amount`` unchanged. Otherwise the signed, possibly
+    fractional percentage (the ``X_cost`` bundle vocabulary) is parsed with
+    ``_PERCENT_RE`` and the adjusted cost is
+    ``max(0, floor(amount * (1 + pct / 100)))``: reductions can make a cast
+    free at zero but never negative. A missing, non-string, or malformed
+    percentage raises ``ValueError`` (fail loud, matching
+    ``combat._apply_percent_mod``).
+    """
+    if percentage is None:
+        return amount
+    if not isinstance(percentage, str) or _PERCENT_RE.fullmatch(percentage) is None:
+        raise ValueError(f"invalid percentage modifier {percentage!r}")
+    return max(0, math.floor(amount * (1 + float(percentage[:-1]) / 100)))
 
 
 def _conferred_rule_scale(entity: Any, skill_key: str) -> float:

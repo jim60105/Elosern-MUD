@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 from pathlib import Path
+import unittest
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -10,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff
 from world.rules.combat_modifiers import (
+    apply_cost_modifier,
     evaluate_combat_modifiers,
     evaluate_combat_modifiers_no_create,
 )
@@ -311,3 +313,45 @@ class CombatModifierTests(EvenniaTest):
     @covers_requirement("buff-handler-integration::entity-buffs-is-mounted-as-the-real-buffhandler-replacing-the-change-3-placeholder")
     def test_no_state_returns_empty_and_sexual_rules_are_inert(self):
         self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
+
+
+class ApplyCostModifierTests(unittest.TestCase):
+    """Unit tests for the shared cost-adjustment helper (floor, zero clamp)."""
+
+    def test_no_modifier_returns_amount_unchanged(self):
+        self.assertEqual(apply_cost_modifier(10, None), 10)
+        self.assertEqual(apply_cost_modifier(0, None), 0)
+
+    def test_integer_percentages_round_down_on_reduction(self):
+        self.assertEqual(apply_cost_modifier(10, "-10%"), 9)
+        self.assertEqual(apply_cost_modifier(10, "+10%"), 11)
+        self.assertEqual(apply_cost_modifier(10, "-100%"), 0)
+        self.assertEqual(apply_cost_modifier(10, "+100%"), 20)
+        self.assertEqual(apply_cost_modifier(0, "-10%"), 0)
+
+    def test_fractional_percentage_floors_deterministically(self):
+        self.assertEqual(apply_cost_modifier(10, "-5%"), 9)
+        self.assertEqual(apply_cost_modifier(10, "-2.5%"), 9)
+        self.assertEqual(apply_cost_modifier(10, "+2.5%"), 10)
+
+    def test_zero_clamp_never_goes_negative(self):
+        self.assertEqual(apply_cost_modifier(10, "-100%"), 0)
+        self.assertEqual(apply_cost_modifier(10, "-150%"), 0)
+        self.assertEqual(apply_cost_modifier(10, "-1500%"), 0)
+        self.assertEqual(apply_cost_modifier(4, "-10%"), 3)
+
+    def test_malformed_percentage_raises(self):
+        for malformed in ("10%", "5", "-10", "%", "abc", "-1.2.3%", "  -10%"):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(ValueError):
+                    apply_cost_modifier(10, malformed)
+
+    def test_non_string_values_raise_value_error_not_type_error(self):
+        for malformed in (5, 2.5, -10, {}, []):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(ValueError):
+                    apply_cost_modifier(10, malformed)
+
+    def test_floor_not_truncation_on_fractional_product(self):
+        self.assertEqual(apply_cost_modifier(10, "-5%"), 9)
+        self.assertEqual(apply_cost_modifier(9, "-10%"), 8)

@@ -117,6 +117,47 @@ class StatusReadModelTests(EvenniaTest):
         self.assertEqual(entry.severity, "beneficial")
         self.assertEqual(entry.label, "防禦直覺防禦提升")
 
+    @covers_requirement(
+        "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
+    )
+    def test_all_sink_skill_conditions_match_the_bundle_verbatim(self):
+        self.actor.db.skills = {
+            "active": [],
+            "passive": [
+                "defense_instinct",
+                "guardian_instinct",
+                "retainer_martial_training",
+                "precise_mana_control",
+                "extreme_endurance",
+            ],
+        }
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+
+        self.assertEqual(
+            evaluate_combat_modifiers(self.actor),
+            {
+                "defense": 10,
+                "atk_phys": 5,
+                "mp_cost": "-10%",
+                "sp_cost": "-10%",
+            },
+        )
+        model = build_status_read_model(self.actor)
+        conditions = {c.code: c for c in model.conditions}
+        expected = {
+            "defense_instinct_defense_bonus": {"defense": 5},
+            "guardian_instinct_defense_bonus": {"defense": 5},
+            "retainer_martial_training_atk_phys_bonus": {"atk_phys": 5},
+            "precise_mana_control_mp_cost_reduction": {"mp_cost": "-10%"},
+            "extreme_endurance_sp_cost_reduction": {"sp_cost": "-10%"},
+        }
+        self.assertEqual(set(conditions) & set(expected), set(expected))
+        for code, modifiers in expected.items():
+            with self.subTest(code=code):
+                self.assertEqual(conditions[code].modifiers, modifiers)
+                self.assertEqual(conditions[code].severity, "beneficial")
+                self.assertTrue(conditions[code].label)
+
     def test_dual_wield_style_bonus_appears_only_while_dual_wielding(self):
         self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
         self.actor.db.equipment = {
