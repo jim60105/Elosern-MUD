@@ -1,0 +1,32 @@
+# Stat-blend weights, climax short-circuit limit, and per-affinity-stage
+# resist modifiers for the sexual resist contest (sexual-resist-contest B6a).
+#
+# Each participant's contest score blends effective agility (the speed to
+# break away) with effective atk_phys (the strength to physically break free).
+# Both weights must be non-negative and sum to exactly 1.0; the loader fails
+# closed on any deviation.
+agility_weight: 0.6
+atk_phys_weight: 0.4
+
+# A resister in 進行中 auto-complies for its first `climax_turn_auto_comply_limit`
+# consecutive settlement points; from the next one the ordinary contest
+# applies. Must be a positive integer.
+climax_turn_auto_comply_limit: 5
+
+# Per-affinity-stage resist modifier, keyed to the seven shipped affinity
+# stage ids (rulebook/affinity.yaml). A positive value raises the resister's
+# score (easier to refuse a stranger); 羈絆 goes negative (a closer companion
+# resists forcing less effectively). 至愛 and 絕對羈絆 — the stages at and above
+# the natural cap — carry `auto_comply: true` instead of a number, because no
+# finite bonus can guarantee compliance against an out-scaled stat build.
+# The key set must equal exactly the shipped stage ids, no extra and no
+# missing; every value must be a finite number or the single-key mapping
+# `{auto_comply: true}`.
+affinity_resist_modifier:
+  acquaintance: 15
+  familiar: 10
+  warm: 5
+  trusted: 0
+  bonded: -10
+  beloved: {auto_comply: true}
+  absolute_bond: {auto_comply: true}
