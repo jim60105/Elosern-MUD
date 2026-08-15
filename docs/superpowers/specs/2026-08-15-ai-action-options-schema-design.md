@@ -99,9 +99,9 @@ inherited from the canonical affordance payload (§3 stage 9); there is no free-
 
 ## 3. Validation Ladder
 
-`validate_optionset(raw: Any, *, fingerprint: str, affordances: tuple[Affordance, ...]) -> OptionSet`
-— pure; raises one named error per stage; the caller (the generative layer) maps any error to
-degrade. Ladder order is fixed:
+`validate_optionset(raw: Any, *, fingerprint: str, affordances: tuple[Affordance, ...],
+leak_blocklist: frozenset[str] = frozenset()) -> OptionSet` — pure; raises one named error per
+stage; the caller (the generative layer) maps any error to degrade. Ladder order is fixed:
 
 | # | Stage | Rule | Rejection code |
 |---|---|---|---|
@@ -114,12 +114,16 @@ degrade. Ladder order is fixed:
 | 6 | Label | Non-empty, ≤ 24 chars, **contains at least one CJK codepoint** | `empty_label` / `label_too_long` / `non_cjk_label` |
 | 7 | Placeholder gate | No `{...}` template placeholder pattern in any label/hint | `placeholder_label` |
 | 8 | Digit gate | No ASCII digit in any label (aligns with the narrator's mechanical no-digit gate) | `digit_in_label` |
-| 9 | Canonical match | `known_action`: `(action_code, params)` must **exactly match one entry of `affordances`** (`action_code == affordance.action_id` and the params compare equal); the canonical payload replaces whatever the model typed; `freeform`: `action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` where that `npc_id` equals a freeform affordance's bound target | `unknown_action_code` / `no_such_affordance` / `unknown_target` |
+| 9 | Canonical match | `known_action`: the model's `params` are **curation hints, never equality-checked**; stage 9 resolves `action_code` to the unique current affordance entry and **unconditionally replaces the card's params with that affordance's canonical payload** — after this stage the card always satisfies `(action_code, params) == (affordance.action_id, affordance.params)`, which is what the wire-shape guarantee means (round-three review, refined in the `action-options-schema` change); `freeform`: `action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` where that `npc_id` equals a freeform affordance's bound target | `unknown_action_code` / `no_such_affordance` / `unknown_target` |
 | 10 | Hint gate | Hint ≤ 60 chars; placeholder gate (stage 7) applies; numeric gate (§4) applies to labels and hints only — never to `params` | `hint_too_long` / `placeholder_label` / `leak_detected` |
 | 11 | Normalization | Sort nothing; keep LLM order (it is the curatorial intent) | — |
 
-Stages 6–8 reuse the exact validator imports from `world/ai/narrator.py` (`_validate_has_cjk`,
-`_validate_no_template_placeholder`, and the narrator's digit gate).
+Stages 6–8 amendment (landed with the `action-options-schema` change): the CJK check reuses the
+exact `world/ai/narrator.py` `_validate_has_cjk` import, but the placeholder and digit gates are
+implemented **locally in the action_options module** — narrator's `_TEMPLATE_PLACEHOLDER_RE` is
+token-specific (`{actor}|{target}|{data[...]}`) and narrator has no digit gate. The card gates
+are: a generic `{...}` placeholder pattern (`re.compile(r"\{[^{}]+\}")`) for stage 7 and a
+mechanical ASCII-digit check for stage 8, both pure and tested in this module.
 
 ### 3.1 The affordances argument
 
@@ -134,10 +138,12 @@ selects and curates, the ladder verifies.
 The wire-shape guarantee (rubber-duck R13, refined round three): each `known_action` affordance
 entry's `params` is produced *by the action's own registered validator* (`validate_move_payload`
 etc.), so a card shipped to the client is byte-for-byte the payload the dispatcher accepts — no
-mediation layer, no shape drift between "affordance shape" and "adapter shape". The **single
-exception is the `freeform` card**, whose `{npc_id}` binding shape is not producible by any
-validator (talk_freeform requires `speech`); its dispatcher payload is completed client-side by
-appending `speech: label` (§1, webclient doc §3) before the full validator runs.
+mediation layer, no shape drift between "affordance shape" and "adapter shape". Stage 9 achieves
+this by **replacing** model-typed params with the canonical copy (model params are curation hints,
+never equality-checked), so the guarantee holds on the validated result, not on the model's
+input. The **single exception is the `freeform` card**, whose `{npc_id}` binding shape is not
+producible by any validator (talk_freeform requires `speech`); its dispatcher payload is completed
+client-side by appending `speech: label` (§1, webclient doc §3) before the full validator runs.
 
 ---
 
@@ -165,8 +171,9 @@ and hidden trait keys of the deterministic view); the validator applies it to la
 - The generative layer requests `response_format` inline JSON schema (schema_id `action_options`,
   registered in `world/ai/schemas/registry.py`), matching the card dicts **without** `fingerprint`
   and `status` (caller-side). `known_action` cards emit `{"action_code", "label", "params"?,
-  "hint"?}` — `params` is optional because stage 9 discards model-typed values and replaces them
-  with the canonical copy; unknown `action_code` values reject at stage 9. `freeform` cards emit
+  "hint"?}` — `params` is optional and is at most a curation hint: stage 9 never validates it for
+  equality and always replaces it with the canonical copy; unknown `action_code` values reject at
+  stage 9. `freeform` cards emit
   `{"npc_index": <int>, "label", "hint"?}` — enrichment resolves `npc_index` to
   `{"action_code": "explore.talk_freeform", "params": {"npc_id": int}}` against the prompt's bound
   NPC list before validation (stage 0).
