@@ -106,7 +106,9 @@ class JSONSafetyTests(unittest.TestCase):
         check_json_safety({"nested": [1, 2, 3]})
         value = {}
         node = value
-        for _ in range(9):
+        # Depth 12 is the raised bound (nested context_actions v3 shape); the
+        # deepest legitimate leaf sits at depth 11, so 13 levels must fail.
+        for _ in range(13):
             node["child"] = {}
             node = node["child"]
         with self.assertRaises(JSONSafetyError):

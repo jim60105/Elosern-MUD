@@ -72,8 +72,24 @@
     return byId;
   }
 
+  // Flatten the v3 nested `category -> groups -> skills` payload back into a
+  // plain ordered skill list, preserving the server's per-group order. The
+  // nesting is presentation metadata for headings; the menu itself still
+  // presents one complete active-skill list (the approved keyboard hierarchy
+  // has Skills open the flat list, not category navigation).
   function panelSkills(panel) {
-    return (panel && panel.skills) || [];
+    if (!panel || !panel.skills) {
+      return [];
+    }
+    var skills = [];
+    panel.skills.forEach(function (category) {
+      (category.groups || []).forEach(function (subGroup) {
+        (subGroup.skills || []).forEach(function (skill) {
+          skills.push(skill);
+        });
+      });
+    });
+    return skills;
   }
 
   function panelParticipants(panel) {

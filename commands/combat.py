@@ -13,6 +13,7 @@ from world.rules.combat_session import (
 from world.rules.combat_view import (
     CombatViewError,
     build_combat_view,
+    group_skill_views,
 )
 from world.rules.guild_exams import (
     ExamReason,
@@ -98,22 +99,27 @@ class CmdCombatActions(Command):
             self.caller.msg("戰鬥紀錄異常，無法列出動作。可使用「投降」結束戰鬥。")
             return
         lines = ["可用技能與目標代號："]
-        for skill in view.skills:
-            target_tokens = [
-                p.token
-                for p in view.participants
-                if p.identity in skill.valid_target_ids
-            ]
-            if target_tokens:
-                targets = "可指定：" + "、".join(target_tokens)
-            elif skill.target_spec == "none":
-                targets = "無需目標"
-            elif skill.target_spec == "self":
-                targets = "指定自己"
-            else:
-                targets = "目前無有效目標"
-            status = "可用" if skill.enabled else skill.reason_message or "無法使用"
-            lines.append(f"  {skill.key}（{skill.label}）：{status}｜{targets}")
+        for category in group_skill_views(view.skills):
+            lines.append(f"◆ {category.label}")
+            for sub_group in category.groups:
+                if sub_group.label is not None:
+                    lines.append(f"  {sub_group.label}")
+                for skill in sub_group.skills:
+                    target_tokens = [
+                        p.token
+                        for p in view.participants
+                        if p.identity in skill.valid_target_ids
+                    ]
+                    if target_tokens:
+                        targets = "可指定：" + "、".join(target_tokens)
+                    elif skill.target_spec == "none":
+                        targets = "無需目標"
+                    elif skill.target_spec == "self":
+                        targets = "指定自己"
+                    else:
+                        targets = "目前無有效目標"
+                    status = "可用" if skill.enabled else skill.reason_message or "無法使用"
+                    lines.append(f"  {skill.key}（{skill.label}）：{status}｜{targets}")
         lines.append("目標代號：")
         lines.append(
             "  " + "、".join(f"{p.token}＝{p.display_name}" for p in view.participants)

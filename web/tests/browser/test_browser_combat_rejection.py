@@ -75,7 +75,13 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         panel = self._combat_panel(page)
-        fire = next(s for s in panel["skills"] if s["key"] == "fire_ball")
+        fire = next(
+            s
+            for category in panel["skills"]
+            for group in category["groups"]
+            for s in group["skills"]
+            if s["key"] == "fire_ball"
+        )
         self.assertTrue(fire["enabled"])
 
         page.wait_for_function(

@@ -79,7 +79,9 @@ specifically: only three `sexual_act` skills exist in the shipped registry (`div
 order is unobservable and untestable today, and hardcoding it here would let this presentation-only
 change silently assert a catalog-content decision that belongs to the sexual-act-catalog change. When
 that change lands, it either supplies the canonical order or this decision is revisited — noted as an
-Open Question below.
+Open Question below. A `sexual_act` skill whose `group` is `None` is its own first-seen bucket
+(`group=None`/`label=None`), so a line-less act is still presented rather than silently dropped —
+the same co-nullable shape every other category emits.
 
 **D-5: `validate_context_actions()`'s existing whole-payload invariants are preserved by validating
 after flattening, and one of them — the `MAX_SKILLS` bound — must be re-asserted explicitly, not
@@ -104,6 +106,17 @@ and proposal.md's "every existing validation ... unchanged" claim is read as *be
 **D-6: The `_validate_skill()` per-descriptor validator is unchanged.** Because the individual skill
 descriptor object is byte-identical to schema version 2 (proposal), the existing validator is reused
 inside a new `_validate_skill_group()` / `_validate_category_group()` wrapper, not rewritten.
+
+**D-7: The global JSON-safety `MAX_DEPTH` bound is raised from 8 to 12.** The v3 envelope nests the
+descriptor two levels deeper than v2 (`skills → category → groups → skill group → skills →
+descriptor`), pushing the deepest legitimate leaf (a `freeform_scales` entry's `mp_cost` inside a
+nested descriptor) from depth 6 to depth 11. `MAX_DEPTH = 8` was sized for the flat v2 shape and
+would reject every v3 payload at `check_envelope` time — both the Python table
+(`web/webclient/presentation/protocol.py`) and its JS mirror (`protocol.js`) are raised to 12 in
+lockstep, and the depth tests in `test_protocol.py` / `protocol.test.js` pin the new bound by
+rejecting 13-level nesting. This is an implementation consequence of the required nested shape, not
+a weakening: every other global bound (fields, list items, string length, byte size) is unchanged,
+and 12 still rejects pathological nesting with margin.
 
 **D-7: The three production WebClient JS files that read `context_actions.skills` are updated in the
 same commit as the server-side schema bump, not left for a later change.**

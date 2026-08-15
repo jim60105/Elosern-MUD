@@ -666,13 +666,56 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         mp_after_value = int(mp_after.split(" / ")[0])
         self.assertEqual(mp_before_value - mp_after_value, 28)
 
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_panel_groups_skills_by_category_in_enum_order(self):
+        page = self.logged_in_page()
+        self._engage(page)
+        panel = self._combat_panel(page)
+        # The seeded character owns elemental spells, martial-arts innates,
+        # enhancement, utility, and movement skills; the payload lists only
+        # the categories that have owned active skills, in SkillCategory
+        # declaration order (sexual_act and others are omitted entirely).
+        self.assertEqual(
+            [category["category"] for category in panel["skills"]],
+            ["elemental_magic", "martial_arts", "enhancement", "movement", "utility"],
+        )
+        elemental = panel["skills"][0]
+        self.assertEqual(elemental["label"], "元素魔法")
+        # Element sub-groups follow ELEMENT_REGISTRY declaration order
+        # (fire before wind), not ownership order.
+        self.assertEqual(
+            [group["group"] for group in elemental["groups"]],
+            ["fire", "wind"],
+        )
+        fire = elemental["groups"][0]
+        self.assertEqual(fire["label"], "火")
+        self.assertEqual(
+            [skill["key"] for skill in fire["skills"]],
+            ["fire_ball"],
+        )
+        # A category without a group carries exactly one null-keyed sub-group.
+        enhancement = panel["skills"][2]
+        self.assertEqual(enhancement["category"], "enhancement")
+        self.assertEqual(len(enhancement["groups"]), 1)
+        self.assertIsNone(enhancement["groups"][0]["group"])
+        self.assertIsNone(enhancement["groups"][0]["label"])
+        self.assertEqual(
+            [skill["key"] for skill in enhancement["groups"][0]["skills"]],
+            ["concentration"],
+        )
+
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_panel_advertises_scales_only_for_the_mastered_element(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
         panel = self._combat_panel(page)
-        by_key = {skill["key"]: skill for skill in panel["skills"]}
+        by_key = {
+            skill["key"]: skill
+            for category in panel["skills"]
+            for group in category["groups"]
+            for skill in group["skills"]
+        }
         # The seeded wind_mastery entitles only wind_blade; every other skill
         # omits the field entirely, so a non-master's panel would reveal
         # nothing at all.
