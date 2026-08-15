@@ -28,7 +28,13 @@ from world.rules.combat import (
     _heal_magnitude,
     _parse_heal_effect,
 )
-from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
 
 from .combat_fixtures import FakeEntity
 
@@ -193,6 +199,7 @@ class HealResolverIntegrationTests(EvenniaTest):
             usable_out_of_combat=True,
             element=None,
             effects=effects,
+            category=SkillCategory.UTILITY,
         )
         previous = SKILL_REGISTRY.get(self._TEST_SKILL_KEY)
 

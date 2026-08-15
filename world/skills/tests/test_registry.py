@@ -29,6 +29,7 @@ from world.skills.effects import (
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
+    SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
@@ -50,6 +51,8 @@ class SkillRegistryTests(unittest.TestCase):
                 "usable_out_of_combat",
                 "element",
                 "effects",
+                "category",
+                "group",
                 "faction_constraint",
                 "requires_divine_arts",
                 "parsed_effects",
@@ -254,6 +257,8 @@ class SkillRegistryTests(unittest.TestCase):
             usable_out_of_combat=False,
             element=None,
             effects=["set_disguise"],
+            category=SkillCategory.UTILITY,
+            group=None,
         )
         with self.assertRaises(TypeError):
             skill.cost["mp"] = 0
@@ -270,6 +275,7 @@ class SkillRegistryTests(unittest.TestCase):
                 usable_out_of_combat=False,
                 element=None,
                 effects=[],
+                category=SkillCategory.UTILITY,
             )
         with self.assertRaises(ValueError):
             SkillDef(
@@ -282,6 +288,7 @@ class SkillRegistryTests(unittest.TestCase):
                 usable_out_of_combat=False,
                 element=None,
                 effects=[],
+                category=SkillCategory.UTILITY,
             )
         # Every registered definition, including the dynamically registered
         # production `flee`, stays immutable at runtime.
@@ -304,6 +311,7 @@ class SkillRegistryTests(unittest.TestCase):
                 usable_out_of_combat=False,
                 element=None,
                 effects=["not_a_real_prefix:x"],
+                category=SkillCategory.UTILITY,
             )
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
@@ -325,6 +333,7 @@ class SkillRegistryTests(unittest.TestCase):
                         usable_out_of_combat=True,
                         element=None,
                         effects=effects,
+                        category=SkillCategory.UTILITY,
                     )
         for target_spec, effects in (
             (TargetSpec.SINGLE, ["heal:single"]),
@@ -344,6 +353,7 @@ class SkillRegistryTests(unittest.TestCase):
                     usable_out_of_combat=True,
                     element=None,
                     effects=effects,
+                    category=SkillCategory.UTILITY,
                 )
 
     @covers_requirement("skill-effect-model::skilldef---post-init---rejects-unparseable-effects-at-construction")
@@ -1307,4 +1317,336 @@ class DarkSpellCatalogTests(unittest.TestCase):
             },
             {row[0] for row in DARK_SPELL_CATALOG}
             | {"shadow_slash", "dual_blade_mastery"},
+        )
+
+
+_CATALOG_EFFECTS = {
+    row[0]: row[4]
+    for rows in (
+        FIRE_SPELL_CATALOG,
+        WATER_SPELL_CATALOG,
+        EARTH_SPELL_CATALOG,
+        WIND_SPELL_CATALOG,
+        LIGHTNING_SPELL_CATALOG,
+        ICE_SPELL_CATALOG,
+        LIGHT_SPELL_CATALOG,
+        DARK_SPELL_CATALOG,
+    )
+    for row in rows
+}
+
+_CATEGORY_ORDER = [
+    SkillCategory.ELEMENTAL_MAGIC,
+    SkillCategory.MARTIAL_ARTS,
+    SkillCategory.ENHANCEMENT,
+    SkillCategory.INNATE_GIFT,
+    SkillCategory.MOVEMENT,
+    SkillCategory.DIVINE_MYSTERY,
+    SkillCategory.UTILITY,
+    SkillCategory.SEXUAL_ACT,
+]
+
+_UNGROUPED_CATEGORIES = (
+    SkillCategory.MARTIAL_ARTS,
+    SkillCategory.ENHANCEMENT,
+    SkillCategory.INNATE_GIFT,
+    SkillCategory.MOVEMENT,
+    SkillCategory.DIVINE_MYSTERY,
+    SkillCategory.UTILITY,
+)
+
+_MASTERY_KEYS = frozenset(
+    f"{element_key}_mastery"
+    for element_key in ELEMENT_REGISTRY
+)
+
+
+class SkillCategoryClassificationTests(unittest.TestCase):
+    """Structural proof that the 118-skill classification partition is exact.
+
+    The suite imports ``world.rules.disengage`` so ``flee`` is registered
+    before these tests run, matching how the registry exists at runtime.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import world.rules.disengage  # noqa: F401  (registers flee)
+
+    @covers_requirement("skill-category-registry::skillcategory-enumerates-exactly-eight-presentation-categories")
+    def test_skill_category_declares_the_exact_member_set_in_order(self):
+        self.assertEqual(list(SkillCategory), _CATEGORY_ORDER)
+        self.assertEqual(
+            {member.value for member in SkillCategory},
+            {
+                "elemental_magic",
+                "martial_arts",
+                "enhancement",
+                "innate_gift",
+                "movement",
+                "divine_mystery",
+                "utility",
+                "sexual_act",
+            },
+        )
+
+    @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
+    def test_constructing_without_category_raises_type_error(self):
+        with self.assertRaises(TypeError):
+            SkillDef(
+                key="no_category",
+                label="無分類",
+                description="缺少 category 的定義必須在建構時失敗。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SELF,
+                cost={},
+                usable_out_of_combat=False,
+                element=None,
+                effects=[],
+            )
+
+    @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
+    def test_empty_string_group_raises_value_error(self):
+        with self.assertRaises(ValueError) as caught:
+            SkillDef(
+                key="empty_group",
+                label="空群組",
+                description="空的 group 字串必須被拒絕。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SELF,
+                cost={},
+                usable_out_of_combat=False,
+                element=None,
+                effects=[],
+                category=SkillCategory.UTILITY,
+                group="",
+            )
+        self.assertIn("empty_group", str(caught.exception))
+
+    @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
+    def test_non_string_group_raises_value_error(self):
+        with self.assertRaises(ValueError) as caught:
+            SkillDef(
+                key="numeric_group",
+                label="數值群組",
+                description="非字串的 group 必須被拒絕，而非觸發 AttributeError。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SELF,
+                cost={},
+                usable_out_of_combat=False,
+                element=None,
+                effects=[],
+                category=SkillCategory.UTILITY,
+                group=123,
+            )
+        self.assertIn("numeric_group", str(caught.exception))
+
+    @covers_requirement("skill-category-registry::every-skilldef-declares-a-required-category-and-an-optional-group")
+    def test_group_omission_defaults_to_none(self):
+        skill = SkillDef(
+            key="null_group",
+            label="無群組",
+            description="省略 group 時應預設為 None。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SELF,
+            cost={},
+            usable_out_of_combat=False,
+            element=None,
+            effects=[],
+            category=SkillCategory.UTILITY,
+        )
+        self.assertIsNone(skill.group)
+
+    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    def test_every_registry_key_has_a_valid_category(self):
+        for key in SKILL_REGISTRY:
+            with self.subTest(key=key):
+                self.assertIsInstance(
+                    SKILL_REGISTRY[key].category,
+                    SkillCategory,
+                    key,
+                )
+
+    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    def test_per_category_partition_covers_the_registry_exactly(self):
+        per_category = {
+            category: {key for key, skill in SKILL_REGISTRY.items() if skill.category is category}
+            for category in SkillCategory
+        }
+        self.assertEqual(set(SKILL_REGISTRY.keys()), set().union(*per_category.values()))
+        self.assertEqual(
+            sum(len(members) for members in per_category.values()),
+            len(SKILL_REGISTRY),
+            "a key may appear in only one category",
+        )
+
+    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    def test_per_category_key_sets_match_the_d4_classification_table(self):
+        expected = {
+            SkillCategory.MARTIAL_ARTS: {
+                "basic_attack",
+                "dual_blade_mastery",
+                "light_sword_style",
+                "shadow_slash",
+                "dual_wield_style",
+            },
+            SkillCategory.ENHANCEMENT: {
+                "body_enhancement",
+                "body_enhancement_extreme",
+                "body_enhancement_basic",
+                "defense_instinct",
+                "blade_art_mastery",
+                "extreme_endurance",
+                "retainer_martial_training",
+                "guardian_instinct",
+                "magic_circle_comprehension",
+                "precise_mana_control",
+                "concentration",
+            },
+            SkillCategory.INNATE_GIFT: {
+                "reincarnation_boon_elosia",
+                "reincarnation_boon_yuka",
+                "elf_longevity",
+            },
+            SkillCategory.MOVEMENT: {"flight", "flash_step", "flee"},
+            SkillCategory.DIVINE_MYSTERY: {
+                "divine_time_dilation",
+                "divine_space_distortion",
+                "divine_matter_transmutation",
+                "divine_life_extension",
+            },
+            SkillCategory.UTILITY: {"status_disguise", "dominion_art"},
+            SkillCategory.SEXUAL_ACT: {
+                "divine_sexual_arts",
+                "divine_sexual_mastery",
+                "reincarnation_boon_yuna",
+            },
+        }
+        pinned = set().union(*expected.values())
+        expected[SkillCategory.ELEMENTAL_MAGIC] = set(SKILL_REGISTRY) - pinned
+        for category, keys in expected.items():
+            with self.subTest(category=category.value):
+                self.assertEqual(
+                    {
+                        key
+                        for key, skill in SKILL_REGISTRY.items()
+                        if skill.category is category
+                    },
+                    keys,
+                )
+
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    def test_every_elemental_magic_group_is_its_own_element_key(self):
+        for key, skill in SKILL_REGISTRY.items():
+            if skill.category is not SkillCategory.ELEMENTAL_MAGIC:
+                continue
+            with self.subTest(key=key):
+                self.assertIsNotNone(skill.group)
+                self.assertIsNotNone(skill.element)
+                self.assertIn(skill.element.key, ELEMENT_REGISTRY)
+                self.assertEqual(skill.group, skill.element.key)
+
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    def test_every_sexual_act_group_is_a_non_empty_string(self):
+        sexual_acts = [
+            skill
+            for skill in SKILL_REGISTRY.values()
+            if skill.category is SkillCategory.SEXUAL_ACT
+        ]
+        self.assertGreaterEqual(len(sexual_acts), 1)
+        for skill in sexual_acts:
+            self.assertTrue(skill.group)
+            self.assertTrue(skill.group.strip())
+
+    @covers_requirement("skill-category-registry::elemental-magic-and-sexual-act-members-declare-a-non-null-group-every-other-category-s-members-declare-a-null-group")
+    def test_every_ungrouped_category_member_declares_null_group(self):
+        for key, skill in SKILL_REGISTRY.items():
+            if skill.category not in _UNGROUPED_CATEGORIES:
+                continue
+            with self.subTest(key=key):
+                self.assertIsNone(skill.group, key)
+
+    @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
+    def test_divine_sexual_arts_keeps_its_mechanics_after_reclassification(self):
+        skill = SKILL_REGISTRY["divine_sexual_arts"]
+        self.assertTrue(skill.requires_divine_arts)
+        self.assertEqual(skill.effects, ["sexual_event:stimulus_applied"])
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertEqual(skill.cost, {})
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertIs(skill.category, SkillCategory.SEXUAL_ACT)
+        self.assertEqual(skill.group, "神之秘法")
+
+    @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
+    def test_elemental_magic_effects_are_unchanged_from_their_catalog_values(self):
+        for key, skill in SKILL_REGISTRY.items():
+            if skill.category is not SkillCategory.ELEMENTAL_MAGIC:
+                continue
+            with self.subTest(key=key):
+                if key in _MASTERY_KEYS:
+                    self.assertEqual(
+                        tuple(skill.effects),
+                        ("element_mastery_rank:主宰",),
+                    )
+                else:
+                    self.assertEqual(
+                        tuple(skill.effects),
+                        _CATALOG_EFFECTS[key],
+                        f"skill {key!r} effects drifted from its catalog row",
+                    )
+
+
+class FleeCategoryDeclarationTests(unittest.TestCase):
+    """The ``flee`` classification is declared at its own construction site."""
+
+    @classmethod
+    def setUpClass(cls):
+        import world.rules.disengage  # noqa: F401  (registers flee)
+
+    @covers_requirement("universal-action-ownership::flee-declares-its-skill-category-at-its-own-construction-site")
+    def test_flee_is_classified_movement_with_null_group(self):
+        skill = SKILL_REGISTRY["flee"]
+        self.assertIs(skill.category, SkillCategory.MOVEMENT)
+        self.assertIsNone(skill.group)
+
+    @covers_requirement("universal-action-ownership::flee-declares-its-skill-category-at-its-own-construction-site")
+    def test_disengage_source_supplies_an_explicit_category_argument(self):
+        import ast
+        import pathlib
+
+        source = pathlib.Path(
+            pathlib.Path(__file__).resolve().parents[2],
+            "rules",
+            "disengage.py",
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        flee_calls = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            if not isinstance(node.value, ast.Call):
+                continue
+            call = node.value
+            if not (isinstance(call.func, ast.Name) and call.func.id == "SkillDef"):
+                continue
+            for target in node.targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "SKILL_REGISTRY"
+                ):
+                    flee_calls.append(call)
+        self.assertEqual(
+            len(flee_calls),
+            1,
+            "expected exactly one SKILL_REGISTRY[...] SkillDef construction (flee)",
+        )
+        call = flee_calls[0]
+        keywords = {keyword.arg for keyword in call.keywords if keyword.arg}
+        self.assertIn("category", keywords, "flee must supply category explicitly")
+        category_value = next(
+            keyword.value for keyword in call.keywords if keyword.arg == "category"
+        )
+        self.assertIn(
+            "SkillCategory.MOVEMENT",
+            ast.unparse(category_value),
         )

@@ -72,8 +72,10 @@ obligation (per repository convention).
   classification call sites, two bulk classifications via existing builders), `world/rules/
   disengage.py` (one explicit classification).
 - **Tests**: new structural tests in `world/skills/tests/` proving the classification partition is
-  exact and complete; no existing test's *assertions* change (no skill's `kind`, `cost`, `effects`,
-  `element`, or `target_spec` changes), but thirteen test-only `SkillDef(...)` construction sites
+  exact and complete; no existing test's *assertions* change except the single exact-field-list
+  assertion in `test_registry_uses_the_exact_forward_declared_contract` (it must gain `category` and
+  `group` to keep matching the dataclass; see tasks.md 9.11). No skill's `kind`, `cost`, `effects`,
+  `element`, or `target_spec` changes, but thirteen test-only `SkillDef(...)` construction sites
   (see BREAKING above) each gain a `category` argument so their modules keep importing and their
   intended pass/fail paths keep exercising what they were written to test.
 - **Downstream**: this change deliberately does not touch presentation. `world/rules/combat_view.py`,

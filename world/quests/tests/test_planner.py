@@ -29,7 +29,13 @@ from world.rules.action import (
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party import join_party
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
 
 from ._fixtures import (
     QuestRegistryIsolation,
@@ -51,6 +57,7 @@ CLAW_SKILL = SkillDef(
     usable_out_of_combat=False,
     element=None,
     effects=["damage:dark:physical"],
+    category=SkillCategory.UTILITY,
 )
 
 STRIKE_SKILL = SkillDef(
@@ -63,6 +70,7 @@ STRIKE_SKILL = SkillDef(
     usable_out_of_combat=True,
     element=None,
     effects=["damage:dark:physical"],
+    category=SkillCategory.UTILITY,
 )
 
 
