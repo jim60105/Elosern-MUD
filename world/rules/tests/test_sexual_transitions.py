@@ -12,6 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from world.rules.rulebook.schema import Rule, load_rules
 from world.rules import sexual_transitions
+from world.rules.sexual_state import decay_tick
 from world.rules.sexual_transitions import (
     FIELD_KINDS,
     RuleConvergenceError,
@@ -49,33 +50,87 @@ class SexualTransitionTests(EvenniaTest):
 
     def test_rule_arousal_up_on_stimulus(self):
         entity = self._entity()
-        rng = FixedRng(2)
+        rng = FixedRng(14)
         apply_event(entity, "stimulus_applied", rng=rng)
-        self.assertEqual(entity.sexual.arousal.value, 2)
-        self.assertIn((1, 2), rng.calls)
+        self.assertEqual(entity.sexual.pleasure.value, 14)
+        self.assertIn((8, 14), rng.calls)
 
-    @covers_requirement("sexual-transition-rulebook::ordered-level-field-rules-write-through-the-field-s-own-live-trait-object-never-through-a-second-write-path")
+    @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
     def test_rule_arousal_up_on_sustained_stimulus(self):
         entity = self._entity()
         apply_event(entity, "sustained_stimulus_applied")
-        self.assertEqual(entity.sexual.arousal.value, 1)
+        self.assertEqual(entity.sexual.pleasure.value, 6)
 
     def test_rule_arousal_extreme_stimulus_to_max(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "微興奮"
+        entity.sexual.pleasure.base = 15
         apply_event(entity, "extreme_stimulus_applied")
+        self.assertEqual(entity.sexual.pleasure.value, 100)
         self.assertEqual(entity.sexual.arousal.level, "極限")
 
     def test_rule_arousal_reset_after_climax(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         apply_event(entity, "climax_ends", rng=FixedRng(-25))
+        self.assertEqual(entity.sexual.pleasure.value, 15)
         self.assertEqual(entity.sexual.arousal.level, "微興奮")
 
+    @covers_requirement("sexual-transition-rulebook::ordered-level-field-rules-write-through-the-field-s-own-live-trait-object-never-through-a-second-write-path")
     def test_rule_wetness_follows_arousal(self):
         entity = self._entity()
-        apply_event(entity, "sustained_stimulus_applied")
+        entity.sexual.pleasure.base = 10
+        apply_event(entity, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(entity.sexual.wetness.value, 1)
+
+    @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
+    def test_band_crossing_pleasure_delta_reports_an_arousal_change(self):
+        entity = self._entity()
+        entity.sexual.pleasure.base = 10
+        changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
+        self.assertEqual(entity.sexual.pleasure.value, 18)
+        self.assertEqual(changes, {"arousal": "up", "wetness": "up"})
+        self.assertEqual(entity.sexual.wetness.value, 1)
+
+    @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
+    def test_band_staying_pleasure_delta_reports_no_change(self):
+        entity = self._entity()
+        entity.sexual.pleasure.base = 20
+        changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
+        self.assertEqual(entity.sexual.pleasure.value, 28)
+        self.assertEqual(changes, {})
+        self.assertEqual(entity.sexual.wetness.value, 0)
+
+    @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
+    def test_climax_gate_still_fires_from_a_pleasure_driven_arousal_change(self):
+        entity = self._entity()
+        apply_event(entity, "extreme_stimulus_applied")
+        self.assertEqual(entity.sexual.pleasure.value, 100)
+        self.assertEqual(entity.sexual.arousal.level, "極限")
+        self.assertEqual(entity.sexual.climax_phase.level, "接近")
+
+    def test_pleasure_engine_never_uses_the_counter_current_channel(self):
+        # CounterTrait.value is (current + mod) * mult and falls back to base
+        # only while no "current" key is stored: one stray .current write
+        # would freeze the gauge and hide every later .base write. The engine
+        # writes base exclusively; pin the raw-storage invariant across rule
+        # mutation and decay.
+        entity = self._entity()
+        entity.sexual.pleasure.base = 10
+        apply_event(entity, "stimulus_applied", rng=FixedRng(8))
+        decay_tick(entity, 1800)
+        raw = entity.attributes.get(
+            "sexual_traits", default={}, category="traits"
+        )["pleasure"]
+        self.assertNotIn("current", raw)
+        self.assertEqual(raw["base"], entity.sexual.pleasure.value)
+
+    def test_pleasure_writes_route_through_base_only(self):
+        source = inspect.getsource(sexual_transitions)
+        self.assertNotIn(".pleasure.current", source)
+        self.assertIn("trait.base +=", source)
+        state_source = inspect.getsource(decay_tick)
+        self.assertNotIn(".current", state_source)
+        self.assertIn("trait.base =", state_source)
 
     def test_rule_wetness_up_on_direct_stimulus(self):
         entity = self._entity()
@@ -114,14 +169,14 @@ class SexualTransitionTests(EvenniaTest):
     def test_rule_climax_phase_critical_point_to_in_progress(self):
         entity = self._entity()
         entity.sexual.climax_phase.value = "接近"
-        apply_event(entity, "stimulus_applied", rng=FixedRng(1))
+        apply_event(entity, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(entity.sexual.climax_phase.level, "進行中")
         other = self._entity()
-        apply_event(other, "stimulus_applied", rng=FixedRng(1))
+        apply_event(other, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(other.sexual.climax_phase.level, "未達")
         high = self._entity()
-        high.sexual.arousal.value = "高度"
-        apply_event(high, "stimulus_applied", rng=FixedRng(1))
+        high.sexual.pleasure.base = 85
+        apply_event(high, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(high.sexual.climax_phase.level, "接近")
 
     def test_rule_climax_phase_ends_to_afterglow(self):
@@ -258,7 +313,7 @@ class SexualTransitionTests(EvenniaTest):
 
     def test_fixed_point_loop_terminates_on_a_synthetic_oscillation(self):
         rules = [
-            Rule("start", {"event": "start"}, {"field": "arousal", "delta": "+1"}),
+            Rule("start", {"event": "start"}, {"field": "pleasure", "delta": "+6"}),
             Rule(
                 "a_up",
                 {"field_changed": "arousal", "direction": "up"},
@@ -267,7 +322,7 @@ class SexualTransitionTests(EvenniaTest):
             Rule(
                 "e_up",
                 {"field_changed": "exposure", "direction": "up"},
-                {"field": "arousal", "delta": "-1"},
+                {"field": "pleasure", "delta": "-6"},
             ),
             Rule(
                 "a_down",
@@ -277,11 +332,11 @@ class SexualTransitionTests(EvenniaTest):
             Rule(
                 "e_down",
                 {"field_changed": "exposure", "direction": "down"},
-                {"field": "arousal", "delta": "+1"},
+                {"field": "pleasure", "delta": "+6"},
             ),
         ]
         entity = self._entity()
-        entity.sexual.arousal.value = 1
+        entity.sexual.pleasure.base = 10
         entity.sexual.exposure.value = 1
         with patch.object(sexual_transitions, "_RULES", rules):
             with self.assertRaises(RuleConvergenceError):
@@ -321,25 +376,25 @@ class SexualTransitionTests(EvenniaTest):
 
     def test_pass_context_is_snapshotted_before_mutation(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "高度"
-        apply_event(entity, "stimulus_applied", rng=FixedRng(1))
+        entity.sexual.pleasure.base = 71
+        apply_event(entity, "stimulus_applied", rng=FixedRng(14))
         self.assertEqual(entity.sexual.arousal.level, "極限")
         self.assertEqual(entity.sexual.climax_phase.level, "接近")
 
     @covers_requirement("sexual-transition-rulebook::sexual-yaml-loads-through-change-6-s-shared-rule-loader-with-no-second-parser")
     def test_yaml_order_does_not_change_pass_matching(self):
         expected = self._entity()
-        expected.sexual.arousal.value = "高度"
-        apply_event(expected, "stimulus_applied", rng=FixedRng(1))
+        expected.sexual.pleasure.base = 71
+        apply_event(expected, "stimulus_applied", rng=FixedRng(14))
 
         reversed_order = self._entity()
-        reversed_order.sexual.arousal.value = "高度"
+        reversed_order.sexual.pleasure.base = 71
         with patch.object(
             sexual_transitions,
             "_RULES",
             list(reversed(sexual_transitions._RULES)),
         ):
-            apply_event(reversed_order, "stimulus_applied", rng=FixedRng(1))
+            apply_event(reversed_order, "stimulus_applied", rng=FixedRng(14))
         self.assertEqual(
             reversed_order.sexual.climax_phase.level,
             expected.sexual.climax_phase.level,
@@ -348,7 +403,7 @@ class SexualTransitionTests(EvenniaTest):
     @covers_requirement("sexual-transition-rulebook::every-climax-phase-targeting-rule-routes-exclusively-through-change-7-s--apply-climax-phase-set")
     def test_climax_gate_does_not_apply_from_afterglow(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "極限"
+        entity.sexual.pleasure.base = 85
         entity.sexual.climax_phase.value = "餘韻"
         apply_event(entity, "unrelated_event")
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")

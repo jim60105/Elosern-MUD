@@ -60,7 +60,7 @@ class ActionPipelineAtomicityTests(EvenniaTest):
                 "sexual failure",
                 frozenset({"sexual"}),
                 lambda: (
-                    setattr(entity.sexual.arousal, "value", 2),
+                    setattr(entity.sexual.pleasure, "base", 2),
                     (_ for _ in ()).throw(RuntimeError("injected")),
                 ),
             ),

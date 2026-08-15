@@ -62,7 +62,8 @@ This is proposal `B1` in that document set's [Sexual Pleasure Model](../../../do
   live trait object, never through a second write path" no longer covers `arousal` (no rule targets
   it via `then.field` anymore); its two `arousal`-example scenarios are replaced with equivalent
   `wetness`-example scenarios that still exercise the same `OrderedLevelTrait`-mutation mechanism the
-  requirement is actually about.
+  requirement is actually about. It also gains one `ADDED Requirement` (see design.md D-4) pinning
+  the new `bounded_counter` kind's write path and its `"arousal"` changed-field alias.
 - `combat-modifier-table`: `ADDED` — one new requirement pinning that the no-create preview/preflight
   path (`build_no_create_condition_context()`) resolves `pleasure`'s stored value to the correct
   derived arousal level, matching what the live, handler-based `evaluate_combat_modifiers()` path
@@ -84,10 +85,14 @@ This is proposal `B1` in that document set's [Sexual Pleasure Model](../../../do
 - `world/rules/combat_modifiers.py` and `world/rules/status_query.py` — one new branch each in their
   respective raw-storage sexual-level readers (design.md D-7). Neither file's `evaluate_condition()`
   usage, merge logic, or any other behaviour changes; only the `field == "arousal"` raw-lookup path.
-- Nine test files (twenty call sites) migrated: `test_combat_modifiers.py`,
-  `test_combat_modifiers_self_arming.py`, `test_combat_modifiers_matched.py`,
-  `test_sexual_transitions.py`, `test_sexual_state.py`, `test_sexual_decay_and_reset.py`,
-  `test_monster_sexual_baseline.py`, `test_status_query.py`, `test_status_boundary.py`.
+- Twelve test files migrated (see tasks.md section 7 for the full enumeration): the nine files the
+  original draft listed — `test_combat_modifiers.py`, `test_combat_modifiers_self_arming.py`,
+  `test_combat_modifiers_matched.py`, `test_sexual_transitions.py`, `test_sexual_state.py`,
+  `test_sexual_decay_and_reset.py`, `test_monster_sexual_baseline.py`, `test_status_query.py`,
+  `test_status_boundary.py` — plus three more surfaced by the full-suite run during implementation:
+  `test_action_pipeline_atomicity.py` (one `setattr` prime), `test_sexual_event_self_arming.py`, and
+  `test_divine_mystery_gate.py` (two before/after ordinal *read* sites whose band-staying deltas no
+  longer move the derived ordinal). See design.md D-6.
 - No change to `world/rules/rulebook/combat_modifiers.yaml`, `world/rules/overwhelm.py`, or
   `world/rules/rulebook/status_display.yaml` — the entire point of keeping `arousal` comparable.
   (`world/rules/combat_modifiers.py` and `world/rules/status_query.py` — the *Python modules*, not

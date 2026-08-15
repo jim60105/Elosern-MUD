@@ -1,15 +1,15 @@
 - id: arousal_up_on_stimulus
   when: {event: stimulus_applied}
-  then: {field: arousal, delta: "+1..+2"}
+  then: {field: pleasure, delta: "+8..+14"}
 - id: arousal_up_on_sustained_stimulus
   when: {event: sustained_stimulus_applied}
-  then: {field: arousal, delta: "+1"}
+  then: {field: pleasure, delta: "+6"}
 - id: arousal_extreme_stimulus_to_max
   when: {event: extreme_stimulus_applied}
-  then: {field: arousal, set: 極限}
+  then: {field: pleasure, set: 100}
 - id: arousal_reset_after_climax
   when: {event: climax_ends}
-  then: {field: arousal, set: 微興奮}
+  then: {field: pleasure, set: 15}
 - id: wetness_follows_arousal
   when: {field_changed: arousal, direction: up}
   then: {field: wetness, delta: "+1"}

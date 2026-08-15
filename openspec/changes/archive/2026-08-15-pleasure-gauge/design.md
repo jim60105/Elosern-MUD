@@ -114,12 +114,17 @@ shape.
 
 `pleasure` is added as `trait_type="counter", base=0, min=0, max=100`. `CounterTrait.base`'s own
 setter enforces the `[min, max]` clamp on every assignment
-(`.venv/.../evennia/contrib/rpg/traits/traits.py::CounterTrait.base`), so no manual clamping code is
-written anywhere in this codebase — the same "the gauge's own floor/ceiling does the work" discipline
-the shipped `sp_cost_on_climax` requirement already relies on for `GaugeTrait`. All mutation and
-reads go through `.base`, mirroring `record_climax()`'s existing `self._traits.climax_today.base +=
-1` — never `.current` (that property exists for `GaugeTrait`'s rate-of-change use, unused here, and
-`magic_level`'s own construction never touches it either).
+(`CounterTrait` at `.../evennia/contrib/rpg/traits/traits.py` line 1379 — confirmed empirically:
+`base += 14` from `95` stores `100`, never `109`), so no manual clamping code is written anywhere in
+this codebase — the same "the gauge's own floor/ceiling does the work" discipline the shipped
+`sp_cost_on_climax` requirement already relies on for `GaugeTrait`. All mutation and reads go
+through `.base`, mirroring `record_climax()`'s existing `self._traits.climax_today.base += 1` —
+never `.current`. That rule carries one invariant worth pinning: `CounterTrait.value` is
+`(current + mod) * mult`, and `current` falls back to `base` only while no `"current"` key is
+stored — so a single stray write to `.current` would freeze `.value` at that value and make every
+later `.base` write invisible. Nothing in this codebase writes `.current` on any sexual trait today
+(`grep` clean), and a regression test pins the invariant (no `"current"` key appears in raw
+`pleasure` storage after rule mutations and decay, and `value == base` throughout).
 
 **Construction from an imported baseline (`entity.db.sexual`).** The import contract is untouched
 (Non-Goals): `entity.db.sexual["arousal"]` is still a level string. `_build_from_baseline()` reads
@@ -243,6 +248,14 @@ else:
 (`decay_tick()` is a module-level function in `sexual_state.py`, same as `PLEASURE_CONFIG`'s own
 module — no import needed for this call site, unlike the `sexual_transitions.py` one above.)
 
+The rename has one collateral consumer inside `world/rules/clock.py` (a file the overview assigns to
+the later `climax-settlement` proposal, but which B1 must leave working): `_has_settlement_work()`
+iterates `DECAY_CONFIG` to decide whether a settlement quantum has work, reading
+`getattr(sexual, field).level` — a property `CounterTrait` does not expose. B1 teaches it a
+counter-aware branch: when the trait has no `.level`, the pleasure field counts as "not at rest"
+whenever `trait.value != PLEASURE_CONFIG.floor_for_level(config["floor"])` (the `平靜` band floor,
+`0`), and as at rest otherwise — mirroring the old arousal predicate `level != "平靜"`.
+
 `current_band_floor - 1` lands one point below the current band's floor, guaranteeing the pleasure
 value crosses into the next-lower band regardless of where within the current band it started —
 reproducing "at most one level of decay" as an *observable arousal-level* effect, exactly matching
@@ -259,11 +272,15 @@ read by the new branch.
 
 ### D-6: Existing direct-write test call sites are migrated, not left to fail
 
-Twenty call sites across nine test files write `entity.sexual.arousal.value = "<level>"` (or, once,
-an integer ordinal) to arm a threshold condition for the test that follows. Since D-3 makes
-`.arousal` read-only, every one of these must become
-`entity.sexual.pleasure.base = <band-floor-for-that-level>` instead. The floor values, from D-1's
-table: `平靜→0, 微興奮→15, 中等→35, 高度→60, 極限→85`. This is a mechanical, one-line-per-site
+Twenty-one call sites across nine test files write `entity.sexual.arousal.value = "<level>"` (or,
+once, an integer ordinal) to arm a threshold condition for the test that follows. The full-suite
+run additionally surfaces one `setattr(entity.sexual.arousal, "value", ...)` prime in
+`test_action_pipeline_atomicity.py` and two before/after ordinal *read* assertions
+(`test_sexual_event_self_arming.py`, `test_divine_mystery_gate.py`) whose deltas stay within one
+band and therefore no longer move the derived ordinal. Since D-3 makes `.arousal` read-only, every
+one of these must become `entity.sexual.pleasure.base = <band-floor-for-that-level>` instead (the
+read sites become `pleasure` reads). The floor values, from D-1's table:
+`平靜→0, 微興奮→15, 中等→35, 高度→60, 極限→85`. This is a mechanical, one-line-per-site
 migration; tasks.md enumerates every file. None of these files are otherwise touched by this
 proposal's production code, and none of the fixes conflict with `exposure-combat-modifier`'s (already
 proposed) sole edit to `test_combat_modifiers.py`, which only *adds* new test methods rather than
@@ -313,8 +330,13 @@ task list — neither file appeared anywhere in this proposal's original scope.
 `"arousal"`) in the raw traits mapping, read its stored `base` (an int — a `CounterTrait`'s raw
 `_data` has no `"value"` key at all; `.value` is a computed property, never persisted, confirmed
 against Evennia's `CounterTrait.default_keys` and the base `Trait.__init__`/`validate_input` storage
-contract), and convert that int to an ordinal via `PLEASURE_CONFIG.ordinal_for(...)`, returning the
-same `_StoredLevel`/`_LevelRef` wrapper type each file already uses for `climax_phase`. The outer
+contract), and convert it to an ordinal via `PLEASURE_CONFIG.ordinal_for(...)`, returning the same
+`_StoredLevel`/`_LevelRef` wrapper type each file already uses for `climax_phase`. Two defensive
+guards keep malformed storage from mis-resolving: the stored value is clamped into `[0, 100]` before
+the ordinal lookup (harmless normally — `CounterTrait.base`'s own setter already clamps writes — but
+it turns a corrupted out-of-range `base` into a determinable level instead of a
+`PleasureConfigError`), and a `bool` base is rejected the same way every other strict parser in
+these two modules rejects booleans (Python treats `True` as `int` 1). The outer
 context key produced stays `"arousal"` (unchanged — `combat_modifiers.yaml`'s conditions still read
 `field: arousal`); only the *inner* raw-storage field name and value-parsing logic changes for this
 one field. The baseline-fallback branch (used only when the trait handler was never materialized at
@@ -329,9 +351,13 @@ def _stored_sexual_level(entity: Any, field: str) -> Any:
     if field == "arousal":
         if isinstance(traits, Mapping) and "pleasure" in traits:
             raw = traits["pleasure"]
-            if isinstance(raw, Mapping) and isinstance(raw.get("base"), int):
+            base = raw.get("base") if isinstance(raw, Mapping) else None
+            if isinstance(base, int) and not isinstance(base, bool):
+                # Defensive: base writes are clamped by CounterTrait, so an
+                # out-of-range stored value implies corrupted storage.
+                base = min(100, max(0, base))
                 return _StoredLevel(
-                    PLEASURE_CONFIG.ordinal_for(raw["base"]), AROUSAL_LEVELS
+                    PLEASURE_CONFIG.ordinal_for(base), AROUSAL_LEVELS
                 )
             return None
         # traits materialized but pleasure not yet present, or traits absent entirely —

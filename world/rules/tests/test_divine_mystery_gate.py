@@ -98,7 +98,7 @@ class DivineMysteryGateTests(EvenniaTest):
         self.actor.apply_race_baseline()
         self.actor.db.skills = {"active": ["divine_sexual_arts"], "passive": []}
         target = self._target()
-        before = target.sexual.arousal.value
+        before = target.sexual.pleasure.value
         result = self.resolve(
             "divine_sexual_arts",
             targets=[target],
@@ -106,7 +106,7 @@ class DivineMysteryGateTests(EvenniaTest):
         )
         self.assertEqual(result.outcome, "success")
         self.assertEqual(result.reason, None)
-        self.assertGreater(target.sexual.arousal.value, before)
+        self.assertGreater(target.sexual.pleasure.value, before)
         self.assertIn(
             "sexual_transition",
             [entry.kind for entry in result.event_log.entries],

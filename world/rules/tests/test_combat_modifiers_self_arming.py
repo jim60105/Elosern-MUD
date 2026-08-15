@@ -28,7 +28,7 @@ class SexualStateLandingTests(EvenniaTest):
     def test_high_arousal_rule_fires_once_sexual_state_exists(self):
         entity = create_object(PlayerCharacter, key="sexual-state integration")
         self.assertIsNotNone(entity.sexual)
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         self.assertEqual(
             evaluate_combat_modifiers(entity),
             {"agility": "-20%", "accuracy": -15},
