@@ -252,6 +252,57 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
     """
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    def test_restore_reconciles_climax_bookkeeping_surfaces(self):
+        # The target-side surface list mirrors the clock advance declaration;
+        # a target that carried climax bookkeeping before the cast must get it
+        # back after a rolled-back settlement.
+        self.char2.race = "human"
+        self.char2.apply_race_baseline()
+        self.char2.attributes.add("climax_turns", 2, category="sexual_state")
+        self.char2.attributes.add(
+            "pending_climax_extension", 1, category="sexual_state"
+        )
+        self.char2.sexual.record_climax_count()
+        clock = WorldClock()
+        field = Battlefield(
+            {
+                "party": frozenset({self.char1.key}),
+                "foes": frozenset({self.char2.key}),
+            },
+            {self.char1.key: self.char1, self.char2.key: self.char2},
+        )
+        request = ActionRequest(
+            actor=self.char1,
+            skill_key="status_disguise",
+            targets=[self.char2],
+            context=BattlefieldActionContext(field),
+        )
+        snapshot = _snapshot_settlement_state(request, clock)
+        # Deliberately diverge the climax bookkeeping in process.
+        self.char2.attributes.add("climax_turns", 9, category="sexual_state")
+        self.char2.attributes.add(
+            "pending_climax_extension", 5, category="sexual_state"
+        )
+        self.char2.sexual.record_climax_count()
+        self.char2.sexual.record_climax_count()
+        _restore_settlement_state(snapshot, clock)
+        # Cache and raw rows both equal the pre-action (rolled-back) state.
+        self.assertEqual(
+            self.char2.attributes.get("climax_turns", category="sexual_state"), 2
+        )
+        self.assertEqual(
+            self.char2.attributes.get(
+                "pending_climax_extension", category="sexual_state"
+            ),
+            1,
+        )
+        self.assertEqual(self.char2.sexual.climax_count, 1)
+        self.assertEqual(self._raw_attribute(self.char2, "climax_turns"), 2)
+        self.assertEqual(
+            self._raw_attribute(self.char2, "pending_climax_extension"), 1
+        )
+
+    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
     def test_restore_reconciles_divergent_in_process_state_with_storage(self):
         self.char2.race = "human"
         self.char2.apply_race_baseline()

@@ -212,6 +212,19 @@ class SexualTransitionTests(EvenniaTest):
         apply_event(entity, "penetrative_sex_with_female")
         self.assertIn("女女性愛", entity.sexual.experience_types)
 
+    def test_rule_experience_gay_added(self):
+        entity = self._entity()
+        apply_event(entity, "penetrative_sex_with_male")
+        self.assertIn("男男性愛", entity.sexual.experience_types)
+
+    @covers_requirement("climax-settlement::penetrative-sex-with-male-mirrors-the-shipped-female-counterpart-and-never-touches-virgin")
+    def test_experience_gay_never_touches_virgin(self):
+        entity = self._entity()
+        self.assertTrue(entity.sexual.virgin)
+        apply_event(entity, "penetrative_sex_with_male")
+        self.assertIn("男男性愛", entity.sexual.experience_types)
+        self.assertTrue(entity.sexual.virgin)
+
     def test_rule_experience_titfuck_added(self):
         entity = self._entity()
         apply_event(entity, "breast_sex_performed")
@@ -261,6 +274,39 @@ class SexualTransitionTests(EvenniaTest):
         entity.traits.sp.current = 10
         apply_event(entity, "climax_ends", rng=FixedRng(-25))
         self.assertEqual(entity.traits.sp.value, 0)
+
+    def test_rule_sp_cost_on_climax_extension(self):
+        entity = self._entity()
+        before = entity.traits.sp.value
+        rng = FixedRng(-12)
+        apply_event(entity, "climax_extended", rng=rng)
+        self.assertEqual(entity.traits.sp.value, before - 12)
+        entity.traits.sp.current = 10
+        apply_event(entity, "climax_extended", rng=FixedRng(-12))
+        self.assertEqual(entity.traits.sp.value, 0)
+
+    @covers_requirement("climax-settlement::climax-extended-costs-half-of-climax-ends-stamina-and-does-not-change-climax-phase")
+    def test_climax_extended_never_moves_climax_phase(self):
+        entity = self._entity()
+        entity.sexual.climax_phase.value = "進行中"
+        apply_event(entity, "climax_extended", rng=FixedRng(-12))
+        self.assertEqual(entity.sexual.climax_phase.level, "進行中")
+        extension_rules = [
+            rule
+            for rule in RULES.values()
+            if rule.when.get("event") == "climax_extended"
+        ]
+        self.assertTrue(extension_rules)
+        for rule in extension_rules:
+            self.assertNotEqual(rule.then.get("field"), "climax_phase")
+
+    @covers_requirement("climax-settlement::penetrative-sex-with-male-mirrors-the-shipped-female-counterpart-and-never-touches-virgin")
+    def test_same_sex_rules_are_symmetric_in_shape(self):
+        for rule_id in ("experience_lesbian_added", "experience_gay_added"):
+            rule = RULES[rule_id]
+            self.assertEqual(rule.then["field"], "experience_types")
+            self.assertIn("add", rule.then)
+            self.assertEqual(set(rule.then), {"field", "add"})
 
     def test_every_rule_id_has_a_test(self):
         expected = {f"test_rule_{rule_id}" for rule_id in RULES}

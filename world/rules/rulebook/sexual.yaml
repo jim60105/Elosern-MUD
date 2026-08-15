@@ -46,6 +46,9 @@
 - id: experience_lesbian_added
   when: {event: penetrative_sex_with_female}
   then: {field: experience_types, add: 女女性愛}
+- id: experience_gay_added
+  when: {event: penetrative_sex_with_male}
+  then: {field: experience_types, add: 男男性愛}
 - id: experience_titfuck_added
   when: {event: breast_sex_performed}
   then: {field: experience_types, add: 乳交}
@@ -73,3 +76,6 @@
 - id: sp_cost_on_climax
   when: {event: climax_ends}
   then: {field: sp, delta: "-30..-20"}
+- id: sp_cost_on_climax_extension
+  when: {event: climax_extended}
+  then: {field: sp, delta: "-15..-10"}

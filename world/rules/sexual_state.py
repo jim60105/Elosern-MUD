@@ -539,6 +539,44 @@ class SexualState:
         self._traits.climax_today.base += 1
 
     @property
+    def climax_turns(self) -> int:
+        """Return the consecutive settlement points spent in 進行中."""
+        return int(
+            self._entity.attributes.get(
+                "climax_turns",
+                default=0,
+                category=_STATE_CATEGORY,
+            )
+        )
+
+    @property
+    def pending_climax_extension(self) -> int:
+        """Return the staged-but-unconsumed climax-extension count."""
+        return int(
+            self._entity.attributes.get(
+                "pending_climax_extension",
+                default=0,
+                category=_STATE_CATEGORY,
+            )
+        )
+
+    def stage_climax_extension(self, count: int = 1) -> None:
+        """Add ``count`` to the pending extension stage. The sole write path.
+
+        ``count`` must be a positive integer; any other value raises
+        ``ValueError`` without changing the counter, so a future act-effect
+        caller cannot stage a value the settlement decision would silently
+        treat as "no extension staged".
+        """
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError("count must be a positive integer")
+        self._entity.attributes.add(
+            "pending_climax_extension",
+            self.pending_climax_extension + count,
+            category=_STATE_CATEGORY,
+        )
+
+    @property
     def masturbation_count(self) -> int:
         """Return the lifetime masturbation occurrence counter."""
         return int(self._traits.masturbation_count.value)
@@ -763,6 +801,55 @@ def reset_daily_counters(entity) -> None:
     entity.sexual._traits.climax_today.base = 0
 
 
+def climax_settlement_action(entity) -> str | None:
+    """Advance climax-turn bookkeeping and report which settlement action to take.
+
+    Returns ``"extend"`` when a staged extension is consumed, ``"end"`` when
+    the entity must resolve its climax normally, or ``None`` when
+    ``climax_phase`` is not 進行中 (``climax_turns`` is reset to ``0`` in this
+    case, if it was nonzero).
+
+    This performs every mutation that does not require the ``sexual.yaml``
+    rule cascade: ``climax_turns`` and ``pending_climax_extension``
+    bookkeeping, and the two lifetime counter increments. It does NOT call
+    ``apply_event()`` — the caller (``combat.py`` or ``clock.py``) does that,
+    using the returned action to choose between ``"climax_extended"`` and
+    ``"climax_ends"``.
+    """
+    sexual = getattr(entity, "sexual", None)
+    if sexual is None:
+        return None
+    if sexual.climax_phase.level != "進行中":
+        if sexual.climax_turns != 0:
+            entity.attributes.add(
+                "climax_turns",
+                0,
+                category=_STATE_CATEGORY,
+            )
+        if sexual.pending_climax_extension != 0:
+            entity.attributes.add(
+                "pending_climax_extension",
+                0,
+                category=_STATE_CATEGORY,
+            )
+        return None
+    entity.attributes.add(
+        "climax_turns",
+        sexual.climax_turns + 1,
+        category=_STATE_CATEGORY,
+    )
+    if sexual.pending_climax_extension > 0:
+        entity.attributes.add(
+            "pending_climax_extension",
+            sexual.pending_climax_extension - 1,
+            category=_STATE_CATEGORY,
+        )
+        sexual.record_climax_extension()
+        return "extend"
+    sexual.record_climax_count()
+    return "end"
+
+
 __all__ = [
     "DECAY_CONFIG",
     "PLEASURE_CONFIG",
@@ -774,6 +861,7 @@ __all__ = [
     "_VALID_CLIMAX_TRANSITIONS",
     "_apply_climax_phase_set",
     "build_monster_sexual_baseline",
+    "climax_settlement_action",
     "decay_tick",
     "load_pleasure_config",
     "reset_daily_counters",

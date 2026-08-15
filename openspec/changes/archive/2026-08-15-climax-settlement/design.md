@@ -178,6 +178,20 @@ document guessing a name that could drift from what actually shipped. This is a 
 inter-proposal binding done at implementation time, not proposal-writing time — by the time this
 change is applied, `sexual-counters` is real, inspectable code.
 
+The binding is to the *settlement decision*, not to the raw event name, even though the
+pleasure-model design's counter table phrases it as "`climax_ends` fires" / "`climax_extended`
+fires (once per extension turn)" and the requirement heading repeats that wording. The two bindings
+coincide in production: the settlement decision at the two call sites is the *sole* production
+emitter of either event, and the events only ever fire immediately after the decision returned
+`"end"`/`"extend"`. Binding to the decision instead of the event keeps the counters at exactly
+once-per-actual-resolution semantics: a direct, out-of-flow `apply_event(entity, "climax_ends")`
+call (an existing test seam; nothing in this design set emits one in production) does not mint a
+lifetime climax that no settlement point ever observed, and the rule evaluator stays free of
+counter bookkeeping (D1). The delta spec requirement text below ("increment ... each time
+`climax_settlement_action()` returns") is the operative contract; the title's "per
+`climax_ends`/`climax_extended`" phrasing describes the same production flow through the event
+names.
+
 ### D4 — `_has_settlement_work` gains one more disjunct: `climax_phase == 進行中`
 
 `clock.py::_has_settlement_work` currently returns `True` when any buff needs ticking, or when any
@@ -230,12 +244,16 @@ transactional resolver snapshots/restores the keys enumerated in `_snapshot_enti
 `_restore_entity_state()` (the `sexual_event` effect handler declares the `{"sexual", "traits"}`
 surfaces). Membership is by explicit `(key, category)` enumeration, never by attribute category —
 `virgin`/`experience_types` are covered because they are listed, not because they live in
-`_STATE_CATEGORY`. This change therefore adds `climax_turns` and `pending_climax_extension` to both
-enumerations, and task 1.2 additionally confirms where the two lifetime counters are persisted
-(`sexual_traits` internals are covered for free by both enumerations; a `sexual_state`-category
-attribute would need the same listing) so rollback coverage is complete whether or not the sibling
-proposal's storage shape requires it. Rollback regression tests (tasks.md §6) cover a failed
-`advance()`, a failed action commit, and a failed combat-session round.
+`_STATE_CATEGORY`. This change therefore adds `climax_turns` and `pending_climax_extension` to all
+three explicit `sexual_state`-category enumerations — `clock.py::_ADVANCE_ENTITY_SURFACES`,
+`action.py::_snapshot_entity_state`/`_restore_entity_state`, and
+`cast_settlement.py::_ENTITY_SURFACES` (the out-of-combat cast boundary's actor/target surface
+list, which mirrors `_ADVANCE_ENTITY_SURFACES` minus the decay accumulators) — and task 1.2
+additionally confirms where the two lifetime counters are persisted (`sexual_traits` internals are
+covered for free by both enumerations; a `sexual_state`-category attribute would need the same
+listing) so rollback coverage is complete whether or not the sibling proposal's storage shape
+requires it. Rollback regression tests (tasks.md §6) cover a failed `advance()`, a failed action
+commit, a failed combat-session round, and the cast boundary's target-side restoration.
 
 `climax_settlement_action()` guards on the absence of a sexual handler
 (`getattr(entity, "sexual", None) is None` → return `None` with no writes), mirroring
