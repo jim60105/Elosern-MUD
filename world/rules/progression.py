@@ -11,6 +11,7 @@ from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import growth_rate_multiplier
 from world.rules.clock import AdvanceSource
+from world.skills.cost_tiers import spell_tier_for
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -167,6 +168,27 @@ def can_cast_spell_tier(entity: Any, element: str, tier: str) -> bool:
     if threshold is None:
         raise ValueError(f"unknown magic tier {tier!r}")
     return _element_effective_magic_level(entity, element) >= threshold
+
+
+def can_cast_skill(entity: Any, skill: Any) -> bool:
+    """Return whether the entity may cast one skill (the shared cast gate).
+
+    The single authoritative cast-eligibility query consumed by the action
+    resolver and every deterministic AI combat policy. A skill with no derived
+    tier (``spell_tier_for`` returns ``None`` — e.g. ``basic_attack``) always
+    passes; an elemental spell passes only when ``can_cast_spell_tier`` allows
+    it for the skill's element and tier. Any ``ValueError`` raised by either
+    underlying query (a malformed MP cost, an unrecognized element key, or an
+    unknown tier) is converted to ``False``, so the gate fails closed and never
+    propagates into policy or preview consumers.
+    """
+    try:
+        tier = spell_tier_for(skill)
+        if tier is None:
+            return True
+        return can_cast_spell_tier(entity, skill.element.key, tier)
+    except ValueError:
+        return False
 
 
 def _race_learning_multiplier(entity: Any) -> float:

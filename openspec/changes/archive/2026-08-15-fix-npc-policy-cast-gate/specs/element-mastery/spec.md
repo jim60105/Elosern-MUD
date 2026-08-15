@@ -26,5 +26,5 @@
 
 #### Scenario: A malformed elemental spell is denied, not raised
 
-- **WHEN** `can_cast_skill(entity, skill)` is called for an elemental spell whose MP cost is missing, non-positive, or outside every tier band (so `spell_tier_for` raises `ValueError`), or whose element is unrecognized
-- **THEN** it returns `False` instead of raising, so policy and preview consumers never see an exception from a content-authoring error
+- **WHEN** `can_cast_skill(entity, skill)` is called for an elemental spell whose MP cost is non-positive or outside every tier band (so `spell_tier_for` raises `ValueError`), or whose element is unrecognized
+- **THEN** it returns `False` instead of raising, so policy and preview consumers never see an exception from a content-authoring error. (A spell with no MP cost at all derives no tier and is not gated — `basic_attack` carries an element but is never blocked.)

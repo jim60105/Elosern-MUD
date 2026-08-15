@@ -19,7 +19,7 @@ from world.rules.buffs import (
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
-    can_cast_spell_tier,
+    can_cast_skill,
     grant_combat_kill_xp,
     grant_skill_practice_xp,
 )
@@ -33,7 +33,6 @@ from world.rules.targeting import (
     expand_target_shorthand,
     resolve_targets,
 )
-from world.skills.cost_tiers import spell_tier_for
 from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 
@@ -226,18 +225,14 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
             RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
             request.skill_key,
         )
-    # Elemental spells are additionally gated by the caster's magic tier,
-    # unless the caster directly owns the element's mastery skill. An unmet
-    # gate — or a malformed elemental spell whose cost matches no tier band —
-    # rejects like an unowned-skill cast (no new RejectReason member).
-    try:
-        tier = spell_tier_for(skill)
-        if tier is not None and not can_cast_spell_tier(
-            request.actor, skill.element.key, tier
-        ):
-            raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
-    except ValueError as error:
-        raise RejectedAction(RejectReason.UNKNOWN_SKILL, str(error)) from error
+    # Elemental spells are additionally gated by the caster's magic tier
+    # through the shared cast-eligibility predicate
+    # (``progression.can_cast_skill``), unless the caster directly owns the
+    # element's mastery skill. An unmet gate — or a malformed elemental spell
+    # that the predicate fails closed on — rejects like an unowned-skill cast
+    # (no new RejectReason member).
+    if not can_cast_skill(request.actor, skill):
+        raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
     _step1_divine_arts_gate(request.actor, skill)
     return skill
 

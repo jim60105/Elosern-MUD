@@ -12,7 +12,7 @@ from world.rules.combat import (
     run_round,
 )
 
-from .combat_fixtures import FakeEntity
+from .combat_fixtures import FakeEntity, FakeGauge
 
 
 class InitiativeAndTurnLoopTests(unittest.TestCase):
@@ -69,3 +69,36 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             },
         )()
         self.assertIsNone(default_attack_policy(actor, battlefield))
+
+
+class DefaultAttackPolicyCastGateTests(unittest.TestCase):
+    """The generic policy never proposes a tier-blocked elemental spell."""
+
+    def _npc(self, key: str, owned: list[str]) -> FakeEntity:
+        # magic_level 15 with no affinities and no mastery: floor(15 * 1.0)
+        # is below the 術師 threshold, so an owned 術師-tier firestorm is
+        # blocked even though the entity could afford its 30 MP cost. The
+        # innate basic_attack is always owned, exactly as the skills handler
+        # guarantees for real entities.
+        actor = FakeEntity(key, magic_level=15, owned=[*owned, "basic_attack"])
+        actor.traits.mp = FakeGauge(30, 30)
+        return actor
+
+    def _field(self, actor: FakeEntity) -> Battlefield:
+        enemy = FakeEntity("enemy")
+        return Battlefield(
+            {"a": frozenset({actor.key}), "b": frozenset({enemy.key})},
+            {actor.key: actor, enemy.key: enemy},
+        )
+
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-is-never-proposed-a-tier-blocked-elemental-spell")
+    def test_over_tier_affordable_spell_falls_back_to_basic_attack(self):
+        actor = self._npc("npc", ["firestorm"])
+        request = default_attack_policy(actor, self._field(actor))
+        self.assertEqual(request.skill_key, "basic_attack")
+        self.assertEqual([str(target.key) for target in request.targets], ["enemy"])
+
+    def test_mastery_owned_spell_is_still_chosen_by_the_delegated_policy(self):
+        actor = self._npc("npc-master", ["firestorm", "fire_mastery"])
+        request = default_attack_policy(actor, self._field(actor))
+        self.assertEqual(request.skill_key, "firestorm")

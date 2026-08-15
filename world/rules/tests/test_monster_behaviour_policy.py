@@ -140,7 +140,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         )
         enemy = FakeEntity("enemy")
         with patch(
-            "world.rules.monster_behaviour.can_cast_spell_tier",
+            "world.rules.progression.can_cast_spell_tier",
             side_effect=ValueError("unknown element"),
         ):
             request = monster_behaviour_policy(actor, _field(actor, [enemy]))
