@@ -99,6 +99,47 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(fire.cost, {"mp": 14})
         self.assertEqual(fire.element, "fire")
 
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_freeform_scales_only_for_a_masters_eligible_spells(self):
+        self.player.db.skills = {
+            "active": ["wind_blade", "gale_step"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        self.assertEqual(wind.freeform_scales, ())
+        gale = next(skill for skill in view.skills if skill.key == "gale_step")
+        self.assertEqual(gale.freeform_scales, ())
+
+        self.player.db.skills = {
+            "active": ["wind_blade", "gale_step"],
+            "passive": ["wind_mastery"],
+        }
+        view = build_combat_view(self.player)
+        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        self.assertEqual(
+            wind.freeform_scales,
+            (
+                (0.25, "1/4", 4),
+                (0.5, "1/2", 7),
+                (1.0, "1", 14),
+                (2.0, "2", 28),
+                (4.0, "4", 56),
+            ),
+        )
+        gale = next(skill for skill in view.skills if skill.key == "gale_step")
+        self.assertEqual(gale.freeform_scales, ())
+
+        # Wind mastery never advertises scales for another element's spells.
+        self.player.db.skills = {
+            "active": ["light_arrow"],
+            "passive": ["wind_mastery"],
+        }
+        view = build_combat_view(self.player)
+        light = next(skill for skill in view.skills if skill.key == "light_arrow")
+        self.assertEqual(light.freeform_scales, ())
+
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_disabled_skill_keeps_stable_reason(self):
         self.player.traits.mp.base = 0

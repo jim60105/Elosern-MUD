@@ -242,13 +242,14 @@ def _handle_cleanse(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[Any]:
     """Stage removal of every active debuff-polarity buff on each target.
 
     ``PendingEffect`` is imported lazily to keep ``world.rules.action``'s
     top-level import of this module from forming an import cycle.
     """
-    del actor, context
+    del actor, context, scale
     scope = effect_id.partition(":")[2]
     if scope != "status":
         raise ValueError(f"cleanse effect must be cleanse:status, got {effect_id!r}")

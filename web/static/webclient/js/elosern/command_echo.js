@@ -147,7 +147,16 @@
       } else if (isNonEmpty(display && display.targetLabel)) {
         target = display.targetLabel;
       }
-      return target === null ? join(["cast", skill]) : join(["cast", skill + "=" + target]);
+      // The chosen freeform magnitude is echoed as a display-only suffix
+      // (e.g. 「施展 風刃術（威力×2）」), composed from the server-authored
+      // canonical scale label carried by the menu descriptor.
+      var scaleSuffix = label(display && display.scaleLabel);
+      var skillPart = scaleSuffix === null
+        ? skill
+        : skill + "（威力×" + scaleSuffix + "）";
+      return target === null
+        ? join(["cast", skillPart])
+        : join(["cast", skillPart + "=" + target]);
     },
     "combat.forfeit": function () {
       return "combat forfeit";

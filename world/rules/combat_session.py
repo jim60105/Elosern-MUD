@@ -857,13 +857,18 @@ def submit_player_action(
     actor: Any,
     skill_key: str,
     targets_or_shorthand: list[Any] | str,
+    scale: float = 1.0,
 ) -> dict[str, Any]:
     """Run one ordinary round (or overwhelm compression) for one player action.
 
     ``targets_or_shorthand`` is either a concrete list of live participant
     objects or one approved AREA shorthand (``all-enemies``, ``all-allies``,
     ``all``). Player-facing NONE and SELF input must be an empty list; SELF is
-    bound to the actor inside the rules layer. The facade revalidates the
+    bound to the actor inside the rules layer. ``scale`` is the optional
+    freeform magnitude modifier (default ``1.0``), threaded into the preview,
+    preflight, and the round's ``ActionRequest``; a scale the deterministic
+    gate forbids rejects before initiative and consumes no round or world
+    time. The facade revalidates the
     submitted target value through the shared side-effect-free preview, runs
     ``ActionResolver.preflight()``, and only then starts one round (or the
     resolver-backed overwhelm compression). A rejection returns before
@@ -885,7 +890,7 @@ def submit_player_action(
 
     context = _context_for(battlefield, record)
     preview = revalidate_submission(
-        actor, skill_key, context, targets_or_shorthand
+        actor, skill_key, context, targets_or_shorthand, scale=scale
     )
     if not preview.enabled:
         return {
@@ -899,6 +904,7 @@ def submit_player_action(
         skill_key=skill_key,
         targets=targets_or_shorthand,
         context=context,
+        scale=scale,
     )
     preflight = ActionResolver.preflight(request)
     if preflight.outcome == "rejected":

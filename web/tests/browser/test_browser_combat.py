@@ -230,7 +230,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
         self._press(page, "ArrowRight")  # wind_blade
-        self._press(page, "Enter")  # open wind_blade
+        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         # The actor is a valid candidate for ANY scope, so the first grid row
         # holds the two candidates; the shorthand rows follow.
@@ -368,7 +369,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")  # open skills
         self._press(page, "ArrowRight")  # wind_blade
-        self._press(page, "Enter")  # open wind_blade target menu
+        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         # The actor is now a valid candidate, so the first grid row holds the
         # two candidates; the confirm cell sits at the last grid row, second
@@ -567,7 +569,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "Enter")
         self._press(page, "ArrowRight")  # wind_blade
-        self._press(page, "Enter")
+        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        self._press(page, "Enter")  # choose the preselected 威力×1
         # The actor is now a valid candidate, so the first grid row holds the
         # two candidates; move to the monster candidate before toggling.
         self._press(page, "ArrowRight")  # monster candidate
@@ -610,3 +613,73 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(envelope["action_id"], "combat.cast")
         self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
         self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)
+
+    @covers_requirement("webclient-combat-menu::the-combat-dock-offers-a-scale-choice-step-only-for-masters")
+    def test_master_scale_step_casts_at_the_chosen_magnitude(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        target = self._fire_ball_identity(page)
+        mp_before = page.locator(
+            ".status-resources .resource-mp .resource-value"
+        ).inner_text()
+
+        # Skills -> wind_blade opens the 威力 scale step (the seeded character
+        # owns wind_mastery); 威力×2 is the fourth cell of the five-cell grid.
+        self._press(page, "ArrowRight")  # skills
+        self._press(page, "Enter")  # open skills
+        self._press(page, "ArrowRight")  # wind_blade
+        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        scale_rows = page.locator(".combat-controls .dock-row")
+        self.assertGreaterEqual(scale_rows.count(), 5)
+        self.assertIn(
+            "威力×",
+            scale_rows.first.inner_text(),
+            "the scale step labels the power choice",
+        )
+        self._press(page, "ArrowRight")  # 威力×2 (right of the preselected ×1)
+        self._press(page, "Enter")  # choose 威力×2 -> target flow
+        self._press(page, "ArrowRight")  # the monster candidate
+        self._press(page, "Space")  # toggle the explicit monster candidate
+        self._press(page, "ArrowDown")  # shorthand row
+        self._press(page, "ArrowDown")  # confirm row
+        self._press(page, "Enter")  # cast at scale 2
+
+        actions = self._ui_actions(page)
+        self.assertEqual(len(actions), 1, actions)
+        envelope = actions[0][1][0]
+        self.assertEqual(envelope["action_id"], "combat.cast")
+        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["scale"], 2)
+        self.assertEqual(envelope["payload"]["target_ids"], [target])
+        # The scaled cast deducts 28 MP (wind_blade costs 14 at 2×); the
+        # status panel reflects the true resource pool after the round.
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            mp_after = page.locator(
+                ".status-resources .resource-mp .resource-value"
+            ).inner_text()
+            if mp_after != mp_before:
+                break
+            page.wait_for_timeout(250)
+        mp_before_value = int(mp_before.split(" / ")[0])
+        mp_after_value = int(mp_after.split(" / ")[0])
+        self.assertEqual(mp_before_value - mp_after_value, 28)
+
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_panel_advertises_scales_only_for_the_mastered_element(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        panel = self._combat_panel(page)
+        by_key = {skill["key"]: skill for skill in panel["skills"]}
+        # The seeded wind_mastery entitles only wind_blade; every other skill
+        # omits the field entirely, so a non-master's panel would reveal
+        # nothing at all.
+        self.assertIn("freeform_scales", by_key["wind_blade"])
+        self.assertEqual(
+            [entry["scale"] for entry in by_key["wind_blade"]["freeform_scales"]],
+            [0.25, 0.5, 1, 2, 4],
+        )
+        for key in ("fire_ball", "concentration", "flee", "basic_attack"):
+            self.assertNotIn("freeform_scales", by_key[key])

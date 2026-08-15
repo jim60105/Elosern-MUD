@@ -27,6 +27,7 @@ from world.rules.player_messages import (
     rejection_message,
     session_reason_message,
 )
+from world.rules.progression import FREEFORM_SCALE_VALUES
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
 
 # Bounded wire limits for target references (equal or below protocol limits).
@@ -68,6 +69,22 @@ def _validate_session_id(value: Any) -> str:
     return value
 
 
+def _validate_scale(value: Any) -> float:
+    """Validate the optional freeform ``scale`` field.
+
+    The value must be a JSON number exactly equal to one member of the
+    ``freeform_cast_scales`` table (every allowed value is exactly
+    binary-representable, so float equality is safe); a boolean, a non-number,
+    or a non-member number is rejected as a malformed payload.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise CombatActionError("scale must be a number")
+    scale = float(value)
+    if scale not in FREEFORM_SCALE_VALUES:
+        raise CombatActionError("scale must be a member of the freeform scale set")
+    return scale
+
+
 def validate_cast_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate the exact TargetSpec-dependent ``combat.cast`` payload.
 
@@ -76,10 +93,19 @@ def validate_cast_payload(payload: dict[str, Any]) -> dict[str, Any]:
     - SINGLE: ``{skill_key, target_ids: [one positive int]}``;
     - AREA: ``{skill_key, target_ids: [one or more unique positive ints]}`` or
       ``{skill_key, target_shorthand: one approved shorthand}``, never both.
+
+    Every form MAY additionally carry an optional ``scale`` field (one member
+    of the freeform scale set, default ``1.0``) on every target form,
+    including shorthands.
     """
     if not isinstance(payload, dict):
         raise CombatActionError("combat.cast payload must be an object")
-    unknown = set(payload) - {"skill_key", "target_ids", "target_shorthand"}
+    unknown = set(payload) - {
+        "skill_key",
+        "target_ids",
+        "target_shorthand",
+        "scale",
+    }
     if unknown:
         raise CombatActionError(f"combat.cast has unknown fields {sorted(unknown)}")
     if "skill_key" not in payload:
@@ -89,6 +115,7 @@ def validate_cast_payload(payload: dict[str, Any]) -> dict[str, Any]:
     has_shorthand = "target_shorthand" in payload
     if has_ids and has_shorthand:
         raise CombatActionError("combat.cast target fields are mutually exclusive")
+    scale = _validate_scale(payload.get("scale", 1.0))
     if skill_key == RESERVED_FLEE_KEY:
         raise CombatActionError("combat.cast must not be used for the reserved flee skill")
     skill = SKILL_REGISTRY.get(skill_key)
@@ -132,6 +159,7 @@ def validate_cast_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "skill_key": skill_key,
         "target_ids": tuple(target_ids),
         "target_shorthand": target_shorthand,
+        "scale": scale,
     }
 
 
@@ -200,7 +228,13 @@ def _cast_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
             targets.append(entity)
         target_value = targets
 
-    preview = revalidate_submission(actor, skill_key, context, target_value)
+    preview = revalidate_submission(
+        actor,
+        skill_key,
+        context,
+        target_value,
+        scale=payload["scale"],
+    )
     if not preview.enabled:
         reason = preview.reason or RejectReason.UNKNOWN_SKILL
         return {
@@ -210,7 +244,12 @@ def _cast_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
         }
 
     try:
-        result = submit_player_action(actor, skill_key, target_value)
+        result = submit_player_action(
+            actor,
+            skill_key,
+            target_value,
+            scale=payload["scale"],
+        )
     except CombatSessionError as error:
         return _rejected_result(error.args[0])
     emit_settlement(actor, result)

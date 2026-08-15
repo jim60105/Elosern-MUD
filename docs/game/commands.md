@@ -51,7 +51,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`cast`](/game/command-reference?id=cast) | 施放技能。 |
+| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。 |
 
 ## 公會
 

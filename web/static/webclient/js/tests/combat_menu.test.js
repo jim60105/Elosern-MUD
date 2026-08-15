@@ -312,3 +312,152 @@ test("no focus packet is emitted for portrait participants", () => {
   assert.equal(JSON.stringify(combat).indexOf("portrait_ref") !== -1, true);
   assert.equal(JSON.stringify(combat).indexOf("focus-packet") === -1, true);
 });
+
+function freeformSkill(overrides) {
+  return validSkill(
+    Object.assign(
+      {
+        key: "wind_blade",
+        label: "風刃術",
+        target_spec: "area",
+        targets: [2],
+        shorthands: ["all-enemies"],
+        freeform_scales: [
+          { scale: 0.25, label: "1/4", mp_cost: 4 },
+          { scale: 0.5, label: "1/2", mp_cost: 7 },
+          { scale: 1, label: "1", mp_cost: 14 },
+          { scale: 2, label: "2", mp_cost: 28 },
+          { scale: 4, label: "4", mp_cost: 56 },
+        ],
+      },
+      overrides
+    )
+  );
+}
+
+test("a master skill opens the 威力 scale step before the target flow", () => {
+  const panel = readyPanel({ skills: [freeformSkill()] });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const menu = CombatMenu.openSkill(combat, "wind_blade");
+  assert.deepEqual(
+    menu.items.map((item) => item.key),
+    ["scale-1/4", "scale-1/2", "scale-1", "scale-2", "scale-4"]
+  );
+  assert.deepEqual(
+    menu.items.map((item) => item.label),
+    ["威力×1/4", "威力×1/2", "威力×1", "威力×2", "威力×4"]
+  );
+  assert.deepEqual(
+    menu.items.map((item) => item.description),
+    ["MP 4", "MP 7", "MP 14", "MP 28", "MP 56"]
+  );
+  menu.items.forEach((item) => {
+    assert.equal(item.actionId, "choose-scale");
+    assert.equal(item.enabled, true);
+  });
+  // `1` is preselected in the client-local selection state.
+  assert.equal(combat.skillByKey.wind_blade.scale, 1);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.wind_blade), "1");
+});
+
+test("choose-scale records the member choice and opens the target flow", () => {
+  const panel = readyPanel({ skills: [freeformSkill()] });
+  const combat = CombatMenu.buildMenus(panel, {});
+  assert.equal(CombatMenu.chooseScale(combat, "wind_blade", 2), true);
+  assert.equal(combat.skillByKey.wind_blade.scale, 2);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.wind_blade), "2");
+  const targets = CombatMenu.openSkillTargets(combat, "wind_blade");
+  assert.equal(targets.items[0].actionId, "toggle-target");
+  assert.equal(CombatMenu.chooseScale(combat, "wind_blade", 3), false);
+  assert.equal(combat.skillByKey.wind_blade.scale, 2);
+});
+
+test("every target form carries the chosen scale for a master skill", () => {
+  const panel = readyPanel({ skills: [freeformSkill()] });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const skill = combat.skillByKey.wind_blade;
+  CombatMenu.chooseScale(combat, "wind_blade", 2);
+
+  // AREA shorthand
+  CombatMenu.chooseShorthand(combat, "wind_blade", "all-enemies");
+  assert.deepEqual(CombatMenu.areaPayload(skill), {
+    skill_key: "wind_blade",
+    scale: 2,
+    target_shorthand: "all-enemies",
+  });
+
+  // AREA explicit list (presenter order)
+  CombatMenu.toggleArea(combat, "wind_blade", 2);
+  assert.deepEqual(CombatMenu.areaPayload(skill), {
+    skill_key: "wind_blade",
+    scale: 2,
+    target_ids: [2],
+  });
+
+  // SINGLE target flow
+  const singlePanel = readyPanel({
+    skills: [freeformSkill({ key: "tornado_blade", target_spec: "single", targets: [2], shorthands: [] })],
+  });
+  const singleCombat = CombatMenu.buildMenus(singlePanel, {});
+  CombatMenu.chooseScale(singleCombat, "tornado_blade", 0.5);
+  const singleMenu = CombatMenu.openSkillTargets(singleCombat, "tornado_blade");
+  assert.deepEqual(singleMenu.items[0].payload, {
+    skill_key: "tornado_blade",
+    scale: 0.5,
+    target_ids: [2],
+  });
+
+  // NONE and SELF flows
+  for (const spec of ["none", "self"]) {
+    const p = readyPanel({
+      skills: [freeformSkill({ key: "probe", target_spec: spec, targets: [], shorthands: [] })],
+    });
+    const c = CombatMenu.buildMenus(p, {});
+    CombatMenu.chooseScale(c, "probe", 4);
+    const m = CombatMenu.openSkillTargets(c, "probe");
+    assert.deepEqual(m.items[0].payload, { skill_key: "probe", scale: 4 });
+  }
+});
+
+test("non-master skills keep today's exact flow and payloads", () => {
+  const panel = readyPanel();
+  const combat = CombatMenu.buildMenus(panel, {});
+  // fire_ball carries no freeform_scales: openSkill goes straight to targets.
+  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  assert.equal(menu.items[0].key, "target-2");
+  assert.deepEqual(menu.items[0].payload, { skill_key: "fire_ball", target_ids: [2] });
+  assert.equal("scale" in menu.items[0].payload, false);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.fire_ball), null);
+
+  // The AREA path without freeform scales stays byte-identical.
+  const areaCombat = CombatMenu.buildMenus(
+    readyPanel({ skills: [validSkill({ key: "wind_blade", target_spec: "area", targets: [2], shorthands: ["all"] })] }),
+    {}
+  );
+  CombatMenu.toggleArea(areaCombat, "wind_blade", 2);
+  assert.deepEqual(CombatMenu.areaPayload(areaCombat.skillByKey.wind_blade), {
+    skill_key: "wind_blade",
+    target_ids: [2],
+  });
+  assert.equal("scale" in CombatMenu.areaPayload(areaCombat.skillByKey.wind_blade), false);
+});
+
+test("rebuildForPanel preserves a still-valid scale choice and resets invalid", () => {
+  const panel = readyPanel({ skills: [freeformSkill()] });
+  const combat = CombatMenu.buildMenus(panel, {});
+  CombatMenu.chooseScale(combat, "wind_blade", 2);
+  const rebuilt = CombatMenu.rebuildForPanel(combat, panel, {
+    skillKey: "wind_blade",
+    skillByKey: combat.skillByKey,
+  });
+  assert.equal(rebuilt.skillByKey.wind_blade.scale, 2);
+
+  const narrowed = readyPanel({
+    skills: [freeformSkill({ freeform_scales: [{ scale: 1, label: "1", mp_cost: 14 }] })],
+  });
+  const rebuiltNarrow = CombatMenu.rebuildForPanel(combat, narrowed, {
+    skillKey: "wind_blade",
+    skillByKey: combat.skillByKey,
+  });
+  assert.equal(rebuiltNarrow.skillByKey.wind_blade.scale, 1);
+});

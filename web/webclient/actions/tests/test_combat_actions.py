@@ -101,6 +101,43 @@ class CastPayloadValidationTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_forfeit_payload({"session_id": "hostile:1:0", "extra": 1})
 
+    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
+    def test_member_scale_is_accepted_on_every_target_form(self):
+        validated = validate_cast_payload(
+            {"skill_key": "wind_blade", "target_ids": [3, 4], "scale": 2.0}
+        )
+        self.assertEqual(validated["scale"], 2.0)
+        validated = validate_cast_payload(
+            {"skill_key": "wind_blade", "target_shorthand": "all-enemies", "scale": 0.5}
+        )
+        self.assertEqual(validated["scale"], 0.5)
+        validated = validate_cast_payload({"skill_key": "concentration", "scale": 4.0})
+        self.assertEqual(validated["scale"], 4.0)
+        validated = validate_cast_payload(
+            {"skill_key": "hardened_skin", "scale": 1.0}
+        )
+        self.assertEqual(validated["scale"], 1.0)
+
+    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
+    def test_non_member_scale_is_rejected_as_malformed(self):
+        for bad_scale in (3.0, "2", True, None):
+            with self.subTest(scale=bad_scale):
+                with self.assertRaises(Exception):
+                    validate_cast_payload(
+                        {
+                            "skill_key": "wind_blade",
+                            "target_ids": [3],
+                            "scale": bad_scale,
+                        }
+                    )
+
+    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
+    def test_absent_scale_defaults_to_one(self):
+        validated = validate_cast_payload(
+            {"skill_key": "wind_blade", "target_shorthand": "all-enemies"}
+        )
+        self.assertEqual(validated["scale"], 1.0)
+
 
 class CombatAdapterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
@@ -230,6 +267,55 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTest):
             )
         self.assertIn(result["outcome"], ("success", "rejected"))
         self.assertLessEqual(self.monster.traits.hp.current, 100)
+
+    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
+    def test_scaled_cast_adapter_path_deducts_scaled_mp(self):
+        engage(self.player, self.monster)
+        self.player.db.skills = {
+            "active": ["wind_blade"],
+            "passive": ["wind_mastery"],
+        }
+        self.player.traits.mp.base = 500
+        self.player.traits.mp.current = 500
+        # A scaled crit must not end the round (a terminal settlement would
+        # regenerate MP through the clock), so the monster survives it.
+        self.monster.traits.hp.base = 500
+        self.monster.traits.hp.current = 500
+        mp_before = self.player.traits.mp.value
+        from unittest.mock import patch
+
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = _cast_adapter(
+                self.player,
+                validate_cast_payload(
+                    {
+                        "skill_key": "wind_blade",
+                        "target_ids": [self.monster.pk],
+                        "scale": 2.0,
+                    }
+                ),
+            )
+        self.assertIn(result["outcome"], ("success", "rejected"))
+        self.assertEqual(self.player.traits.mp.value, mp_before - 28)
+        self.assertLess(self.monster.traits.hp.current, 500)
+
+    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
+    def test_scaled_cast_without_mastery_rejects_before_initiative(self):
+        engage(self.player, self.monster)
+        self.player.db.skills = {"active": ["wind_blade"], "passive": []}
+        result = _cast_adapter(
+            self.player,
+            validate_cast_payload(
+                {
+                    "skill_key": "wind_blade",
+                    "target_ids": [self.monster.pk],
+                    "scale": 2.0,
+                }
+            ),
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "scaled_cast_forbidden")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
     def test_flee_adapter_rejects_without_session(self):
         result = _flee_adapter(self.player, {})

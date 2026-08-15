@@ -200,6 +200,10 @@ def _require_exact_fields(payload: Any, name: str, required: set[str], condition
             raise ProtocolValidationError(f"{name} requires {field!r}")
         if requirement == "forbidden" and present:
             raise ProtocolValidationError(f"{name} must not contain {field!r}")
+        if requirement not in {"required", "forbidden", "optional", "conditional"}:
+            raise ProtocolValidationError(
+                f"{name} declares unknown requirement {requirement!r} for {field!r}"
+            )
 
 
 def _require_int(payload: dict[str, Any], field: str, *, minimum: int, maximum: int) -> int:

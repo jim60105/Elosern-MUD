@@ -180,5 +180,5 @@ class DivineMysteryGateTests(EvenniaTest):
             return_value=DivineMysteryEffect(name="時間加速", mechanized=True),
         ):
             with self.assertRaises(Exception) as caught:
-                _handle_divine_mystery(self.actor, [], "divine_mystery:時間加速", {})
+                _handle_divine_mystery(self.actor, [], "divine_mystery:時間加速", {}, 1.0)
         self.assertEqual(caught.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)

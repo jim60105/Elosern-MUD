@@ -135,7 +135,7 @@ class DisengageStagingTests(unittest.TestCase):
         with self.assertRaises(UnsnapshottedSurfaceError):
             register_effect_handler(
                 "test_inventory_disengage",
-                lambda actor, targets, effect_id, context: [],
+                lambda actor, targets, effect_id, context, scale: [],
                 frozenset({"inventory"}),
                 requires_event_context=frozenset(),
             )
@@ -144,7 +144,7 @@ class DisengageStagingTests(unittest.TestCase):
     def test_missing_battlefield_is_named_rejection(self):
         actor = FakeEntity("actor")
         with self.assertRaises(RejectedAction) as caught:
-            _handle_disengage(actor, [actor], "disengage:self", {})
+            _handle_disengage(actor, [actor], "disengage:self", {}, 1.0)
         self.assertIs(
             caught.exception.reason,
             RejectReason.EFFECT_RESOLUTION_FAILED,
@@ -167,12 +167,14 @@ class DisengageStagingTests(unittest.TestCase):
                 [actor],
                 "disengage:self",
                 {"battlefield": field},
+                1.0,
             )[0]
             failure = _handle_disengage(
                 actor,
                 [actor],
                 "disengage:self",
                 {"battlefield": field},
+                1.0,
             )[0]
         success_entry = _entries_from_effect(actor.key, success)[0]
         failure_entry = _entries_from_effect(actor.key, failure)[0]
@@ -251,6 +253,7 @@ class DisengageGoldenTests(unittest.TestCase):
                 [actor],
                 "disengage:self",
                 {"battlefield": field},
+                1.0,
             )[0]
 
     def test_same_tier_fixed_seed_has_exact_event_and_state(self):

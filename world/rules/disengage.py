@@ -106,8 +106,10 @@ def _handle_disengage(
     targets: list[Any],
     effect_id: str,
     event_context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Stage one battlefield-level flee outcome."""
+    del targets, effect_id, scale
     battlefield = event_context.get("battlefield")
     if battlefield is None:
         raise RejectedAction(

@@ -298,6 +298,8 @@ class ContextActionsSchemaTests(unittest.TestCase):
         panel["skills"][0]["description"] = "  "
         with self.assertRaises(Exception):
             validate_context_actions(panel)
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
         panel = _valid_panel()
         panel["skills"][0]["cost"] = {"mp": -1}
         with self.assertRaises(Exception):
@@ -338,6 +340,71 @@ class ContextActionsSchemaTests(unittest.TestCase):
             validate_context_actions(panel)
         panel = _valid_panel()
         panel["secondary_actions"] = ["forfeit", "forfeit"]
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_freeform_scales_field_is_optional_and_exact(self):
+        # Absent field is accepted (the server omits it for non-masters).
+        payload = _valid_panel()
+        normalized = validate_context_actions(payload)
+        self.assertNotIn("freeform_scales", normalized["skills"][0])
+
+        payload = _valid_panel()
+        payload["skills"][0]["freeform_scales"] = [
+            {"scale": 0.25, "label": "1/4", "mp_cost": 5},
+            {"scale": 0.5, "label": "1/2", "mp_cost": 10},
+            {"scale": 1.0, "label": "1", "mp_cost": 20},
+            {"scale": 2.0, "label": "2", "mp_cost": 40},
+            {"scale": 4.0, "label": "4", "mp_cost": 80},
+        ]
+        normalized = validate_context_actions(payload)
+        self.assertEqual(
+            normalized["skills"][0]["freeform_scales"][0]["mp_cost"],
+            5,
+        )
+
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_freeform_scales_malformed_entries_reject(self):
+        valid_entries = [
+            {"scale": 0.25, "label": "1/4", "mp_cost": 5},
+            {"scale": 0.5, "label": "1/2", "mp_cost": 10},
+            {"scale": 1.0, "label": "1", "mp_cost": 20},
+            {"scale": 2.0, "label": "2", "mp_cost": 40},
+            {"scale": 4.0, "label": "4", "mp_cost": 80},
+        ]
+        cases = {
+            "non-member scale": [{"scale": 3.0, "label": "3", "mp_cost": 60}],
+            "non-ascending": list(reversed(valid_entries)),
+            "duplicate scale": valid_entries[:2] + valid_entries[1:3],
+            "unknown label": [{"scale": 1.0, "label": "x", "mp_cost": 20}],
+            "swapped label pairing": [
+                {"scale": 0.25, "label": "4", "mp_cost": 5},
+                {"scale": 0.5, "label": "1/2", "mp_cost": 10},
+                {"scale": 1.0, "label": "1", "mp_cost": 20},
+                {"scale": 2.0, "label": "2", "mp_cost": 40},
+                {"scale": 4.0, "label": "1/4", "mp_cost": 80},
+            ],
+            "wrong mp_cost": [
+                {"scale": 1.0, "label": "1", "mp_cost": 21}
+            ],
+            "partial set": valid_entries[:3],
+            "empty array": [],
+            "entry with extra key": [
+                {"scale": 1.0, "label": "1", "mp_cost": 20, "extra": 1}
+            ],
+            "missing field": [{"scale": 1.0, "label": "1"}],
+        }
+        for name, entries in cases.items():
+            with self.subTest(case=name):
+                panel = _valid_panel()
+                panel["skills"][0]["freeform_scales"] = entries
+                with self.assertRaises(Exception):
+                    validate_context_actions(panel)
+        # A skill without an mp cost can never carry the field.
+        panel = _valid_panel()
+        panel["skills"][0]["cost"] = {}
+        panel["skills"][0]["freeform_scales"] = valid_entries
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -468,6 +535,46 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
                     "missing_effect_context",
                 )
                 self.assertTrue(skill["disabled_reason"]["message"].strip())
+
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_panel_advertises_freeform_scales_only_for_masters(self):
+        self.player.db.skills = {
+            "active": ["wind_blade", "gale_step"],
+            "passive": ["wind_mastery"],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        by_key = {skill["key"]: skill for skill in payload["skills"]}
+        wind = by_key["wind_blade"]
+        self.assertEqual(
+            wind["freeform_scales"],
+            [
+                {"scale": 0.25, "label": "1/4", "mp_cost": 4},
+                {"scale": 0.5, "label": "1/2", "mp_cost": 7},
+                {"scale": 1.0, "label": "1", "mp_cost": 14},
+                {"scale": 2.0, "label": "2", "mp_cost": 28},
+                {"scale": 4.0, "label": "4", "mp_cost": 56},
+            ],
+        )
+        self.assertNotIn("freeform_scales", by_key["gale_step"])
+
+    @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
+    def test_non_master_panel_reveals_nothing(self):
+        self.player.db.skills = {
+            "active": ["wind_blade"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        for skill in payload["skills"]:
+            self.assertNotIn("freeform_scales", skill)
+        self.assertNotIn("威力", repr(payload["skills"]))
 
     def test_presenter_isolation_on_missing_session(self):
         payload = self.registry.render(

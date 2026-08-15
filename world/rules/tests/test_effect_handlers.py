@@ -59,7 +59,7 @@ class EffectRegistryTests(unittest.TestCase):
     def test_supported_handler_can_be_registered(self):
         register_effect_handler(
             "test_supported",
-            lambda actor, targets, effect_id, context: [],
+            lambda actor, targets, effect_id, context, scale: [],
             frozenset({"traits"}),
             requires_event_context=frozenset(),
         )
@@ -68,7 +68,7 @@ class EffectRegistryTests(unittest.TestCase):
         with self.assertRaises(UnsnapshottedSurfaceError):
             register_effect_handler(
                 "test_inventory",
-                lambda actor, targets, effect_id, context: [],
+                lambda actor, targets, effect_id, context, scale: [],
                 frozenset({"inventory"}),
                 requires_event_context=frozenset(),
             )
@@ -131,6 +131,7 @@ class EffectRegistryTests(unittest.TestCase):
                     [object()],
                     "sexual_event:stimulus_applied",
                     {},
+                    1.0,
                 )
         self.assertEqual(
             caught.exception.reason,
@@ -151,6 +152,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             [self.entity],
             "buff_apply:paralysis",
             {},
+            1.0,
         )
         effects = [
             replace(effect, surfaces=frozenset({"buffs"}))
@@ -165,6 +167,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             [],
             "self_buff_apply:focus",
             {},
+            1.0,
         )
         effects = [
             replace(effect, surfaces=frozenset({"buffs"}))
@@ -179,6 +182,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             [self.entity],
             "confer_growth_rate",
             {"confer_scale": 0.5},
+            1.0,
         )
         effects = [
             replace(effect, surfaces=frozenset({"buffs"}))
@@ -200,7 +204,7 @@ class LandedEffectHandlerTests(EvenniaTest):
         skill = SKILL_REGISTRY["fire_ball"]
         with patch.dict(
             _EFFECT_HANDLERS,
-            {"damage": lambda actor, targets, effect_id, context: [object()]},
+            {"damage": lambda actor, targets, effect_id, context, scale: [object()]},
         ):
             with self.assertRaises(Exception) as caught:
                 _step5_effect_resolution(request, skill, [])
@@ -238,6 +242,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {},
+                1.0,
             )
         )
         buff = self.target.buffs.all["fire_scorch"]
@@ -250,6 +255,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {"buff_kwargs": {"source_pk": int(self.target.pk)}},
+                1.0,
             )
         )
         buff = self.target.buffs.all["fire_scorch"]
@@ -265,6 +271,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {},
+                1.0,
             )
         self.assertEqual(
             caught.exception.reason,
@@ -284,6 +291,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {},
+                1.0,
             )
         )
         other = create_object(PlayerCharacter, key="other-caster")
@@ -295,6 +303,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {},
+                1.0,
             )
         )
         buff = self.target.buffs.all["fire_scorch"]
@@ -307,6 +316,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:fire_scorch",
                 {},
+                1.0,
             )
         )
         _add_buff(self.target, "fire_scorch")
@@ -320,6 +330,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTest):
                 [self.target],
                 "buff_apply:paralysis",
                 {},
+                1.0,
             )
         )
         buff = self.target.buffs.all["paralysis"]
@@ -345,7 +356,7 @@ class CleanseHandlerTests(EvenniaTest):
     def test_cleanse_removes_an_active_debuff(self):
         _add_buff(self.entity, "poisoned")
         effects = self._stage_and_commit(
-            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
         self.assertNotIn("poisoned", self.entity.buffs.all)
         self.assertEqual(
@@ -356,7 +367,7 @@ class CleanseHandlerTests(EvenniaTest):
     @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
     def test_cleanse_does_not_remove_a_beneficial_buff(self):
         _add_buff(self.entity, "focus")
-        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         self.assertEqual(effects, [])
         self._stage_and_commit(effects)
         self.assertIn("focus", self.entity.buffs.all)
@@ -365,13 +376,13 @@ class CleanseHandlerTests(EvenniaTest):
         _add_buff(self.entity, "poisoned")
         _add_buff(self.entity, "focus")
         self._stage_and_commit(
-            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
         self.assertNotIn("poisoned", self.entity.buffs.all)
         self.assertIn("focus", self.entity.buffs.all)
 
     def test_cleanse_with_no_active_debuffs_stages_nothing(self):
-        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+        effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         self.assertEqual(effects, [])
         self._stage_and_commit(effects)
 
@@ -387,6 +398,7 @@ class CleanseHandlerTests(EvenniaTest):
                 [self.entity, other],
                 "cleanse:status",
                 {},
+                1.0,
             )
         )
         self.assertNotIn("poisoned", self.entity.buffs.all)
@@ -400,7 +412,7 @@ class CleanseHandlerTests(EvenniaTest):
         self.entity.buffs.all["poisoned"].remaining_seconds = 0
         self.entity.buffs.all["paralysis"].paused = True
         effects = self._stage_and_commit(
-            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
         self.assertNotIn("fear", self.entity.buffs.all)
         self.assertIn("poisoned", self.entity.buffs.all)
@@ -412,7 +424,7 @@ class CleanseHandlerTests(EvenniaTest):
         effects = [
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in _handle_cleanse(
-                self.entity, [self.entity], "cleanse:status", {}
+                self.entity, [self.entity], "cleanse:status", {}, 1.0
             )
         ]
         effects.append(
@@ -453,7 +465,7 @@ class CleanseHandlerTests(EvenniaTest):
 
     def test_cleanse_rejects_an_unknown_scope(self):
         with self.assertRaises(ValueError):
-            _handle_cleanse(self.entity, [self.entity], "cleanse:banana", {})
+            _handle_cleanse(self.entity, [self.entity], "cleanse:banana", {}, 1.0)
 
     def test_cleanse_event_log_entry_reports_the_cleansed_count(self):
         class Actor:
@@ -462,7 +474,7 @@ class CleanseHandlerTests(EvenniaTest):
         _add_buff(self.entity, "poisoned")
         _add_buff(self.entity, "paralysis")
         effects = self._stage_and_commit(
-            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {})
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
         request = ActionRequest(
             Actor(),

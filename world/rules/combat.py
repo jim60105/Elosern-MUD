@@ -20,7 +20,7 @@ from world.rules.buffs import TickRecord, tick_buffs
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
-from world.rules.progression import can_cast_skill
+from world.rules.progression import can_cast_skill, scaled_magnitude
 from world.rules.sexual_state import decay_tick
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
@@ -270,6 +270,7 @@ def _handle_damage(
     targets: list[Any],
     effect_id: str,
     event_context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Stage d100 hit and damage results; commit only the computed hp delta.
 
@@ -280,12 +281,17 @@ def _handle_damage(
     by the per-entity key set also stages a battlefield ``knocked_out`` mark
     inside the same commit, so the in-round initiative, targeting, overwhelm,
     and terminal consumers observe the knockout through the shared predicate.
+
+    The final per-target amount is scaled by ``scaled_magnitude`` and clamped
+    at the unscaled ``combat.yaml`` damage floor (the floor itself is never
+    scaled, so even a 1/4 cast lands its minimum hit).
     """
     _, school = _parse_damage_effect(effect_id)
     attack_key = "atk_phys" if school == "physical" else "magic_level"
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
+    floor = int(COMBAT_YAML["damage"]["floor"])
     pending: list[PendingEffect] = []
     for target in targets:
         raw_roll = roll_d100()
@@ -295,10 +301,8 @@ def _handle_damage(
             multiplier = _roll_multiplier(raw_roll, margin)
             attack = _adjusted_attack(actor, attack_key)
             defense = _adjusted_defense(target)
-            amount = max(
-                round(attack * multiplier) - defense,
-                int(COMBAT_YAML["damage"]["floor"]),
-            )
+            base_amount = int(max(round(attack * multiplier) - defense, floor))
+            amount = max(scaled_magnitude(base_amount, scale), floor)
             amount = int(amount)
         key = str(target.key)
         protected = session_nonlethal or key in nonlethal_keys
@@ -387,12 +391,14 @@ def _restored_amount(entity: Any, amount: int) -> int:
 
     An entity that is not alive restores nothing (a heal never revives), and
     the restoration is capped by the remaining gap to the entity's maximum so
-    the staged event log reflects the real HP increase.
+    the staged event log reflects the real HP increase. The result is always
+    an integer: a cap computed from float gauge storage must never leak a
+    fractional amount into the staged log or the applied delta.
     """
     current = _stored_trait_value(entity.traits.hp)
     if current <= 0:
         return 0
-    return min(amount, max(0, _max_hp(entity) - current))
+    return int(min(amount, max(0, _max_hp(entity) - current)))
 
 
 def _apply_heal(entity: Any, amount: int) -> None:
@@ -418,17 +424,19 @@ def _handle_heal(
     targets: list[Any],
     effect_id: str,
     event_context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Stage one HP-restoring pending effect per already-validated target.
 
     The magnitude is computed at staging time from caster stats, mirroring
-    ``damage``; the per-target restoration is clamped by that target's current
-    HP gap so the staged event log reports the real increase, and the
-    commit-time closure re-checks aliveness and the cap.
+    ``damage`` (and scaled by ``scale`` the same way); the per-target
+    restoration is clamped by that target's current HP gap so the staged event
+    log reports the real increase, and the commit-time closure re-checks
+    aliveness and the cap.
     """
     del event_context
     _parse_heal_effect(effect_id)
-    amount = _heal_magnitude(actor)
+    amount = scaled_magnitude(_heal_magnitude(actor), scale)
     pending: list[PendingEffect] = []
     for target in targets:
         key = str(target.key)
@@ -451,6 +459,7 @@ def _handle_self_heal(
     targets: list[Any],
     effect_id: str,
     event_context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Stage one HP-restoring pending effect bound to the caster.
 
@@ -461,7 +470,7 @@ def _handle_self_heal(
     del targets, event_context
     if effect_id != "self_heal":
         raise ValueError("self_heal effect takes no argument")
-    amount = _heal_magnitude(actor)
+    amount = scaled_magnitude(_heal_magnitude(actor), scale)
     restored = _restored_amount(actor, amount)
     return [
         PendingEffect(

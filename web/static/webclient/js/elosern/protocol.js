@@ -76,6 +76,9 @@
   var PARTICIPANT_STATES = ["active", "fled", "knocked_out", "defeated"];
   var TARGET_SPECS = ["none", "self", "single", "area"];
   var ALLOWED_SHORTHANDS = ["all-enemies", "all-allies", "all"];
+  var FREEFORM_SCALES_ALLOWED = [0.25, 0.5, 1, 2, 4];
+  var FREEFORM_SCALES_MAX = 5;
+  var FREEFORM_LABELS_ALLOWED = ["1/4", "1/2", "1", "2", "4"];
   var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
   var SECONDARY_ACTIONS = ["forfeit"];
   var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
@@ -703,12 +706,34 @@
     return value;
   }
 
+  function validateFreeformScales(value) {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new Error("freeform_scales must be a non-empty array when present");
+    }
+    if (value.length !== FREEFORM_SCALES_MAX) {
+      throw new Error("freeform_scales must cover exactly the allowed scale set");
+    }
+    value.forEach(function (entry, index) {
+      requireExactFields(entry, "freeform_scales entry", ["scale", "label", "mp_cost"], []);
+      var scale = entry.scale;
+      if (scale !== FREEFORM_SCALES_ALLOWED[index]) {
+        throw new Error("freeform_scales must be ascending over the allowed scale set");
+      }
+      var label = requireString(entry.label, "freeform_scales label", 8);
+      if (label !== FREEFORM_LABELS_ALLOWED[index]) {
+        throw new Error("freeform_scales label must be the canonical label of its scale");
+      }
+      requireInt(entry.mp_cost, "freeform_scales mp_cost", 1, MAX_SAFE_INTEGER);
+    });
+    return value;
+  }
+
   function validateSkill(value) {
     requireExactFields(
       value,
       "skill",
       ["key", "label", "description", "cost", "target_spec", "element", "enabled", "disabled_reason", "targets", "shorthands"],
-      []
+      ["freeform_scales"]
     );
     validateIdentifier(value.key, "skill key");
     var label = requireString(value.label, "skill label", MAX_LABEL);
@@ -771,6 +796,12 @@
     });
     if (value.target_spec !== "area" && shorthands.length > 0) {
       throw new Error("only area skills may carry shorthands");
+    }
+    if (value.freeform_scales !== undefined) {
+      if (typeof value.cost.mp !== "number" || !Number.isInteger(value.cost.mp) || value.cost.mp <= 0) {
+        throw new Error("a skill without an mp cost cannot carry freeform_scales");
+      }
+      validateFreeformScales(value.freeform_scales);
     }
     return value;
   }

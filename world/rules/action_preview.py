@@ -34,13 +34,19 @@ from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers_no_create,
 )
-from world.rules.progression import can_cast_skill
+from world.rules.progression import (
+    FREEFORM_SCALE_VALUES,
+    can_cast_skill,
+    freeform_scales_for,
+    scaled_mp_cost,
+)
 from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
     candidate_rejection,
     expand_target_shorthand,
 )
+from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
 
 
@@ -75,17 +81,42 @@ def _disabled(
     return ActionPreview(skill_key, False, reason, detail, (), ())
 
 
+def _freeform_gate_failure(
+    actor: Any,
+    skill: Any,
+    scale: float,
+) -> tuple[RejectReason, str] | None:
+    """Return the freeform-casting rejection ``(reason, detail)`` or ``None``.
+
+    Mirrors the resolver's step-1 gate with the same fixed crash-safe order:
+    scale membership in the closed table first, then eligibility, then direct
+    mastery ownership — so a non-elemental MP skill rejects cleanly instead of
+    dereferencing a missing element. ``scale == 1.0`` never fires the gate.
+    """
+    if scale == 1.0:
+        return None
+    if scale not in FREEFORM_SCALE_VALUES:
+        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
+    if not is_freeform_eligible(skill):
+        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
+    if not freeform_scales_for(actor, skill.element.key):
+        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
+    return None
+
+
 def _skill_wide_failure(
     actor: Any,
     skill_key: str,
     context: Any,
+    scale: float = 1.0,
 ) -> tuple[RejectReason, str] | None:
     """Return the first skill-wide rejection ``(reason, detail)`` or ``None``.
 
     Mirrors ``ActionResolver.preflight()``'s ordering: ownership and active
     kind, out-of-combat availability, elemental spell-tier eligibility through
     the shared cast-eligibility predicate (``progression.can_cast_skill``,
-    fail-closed), resources, capability (including ``actions_per_turn == 0``),
+    fail-closed), the freeform-casting gate, resources (checked against the
+    scaled ``mp`` cost), capability (including ``actions_per_turn == 0``),
     registered effect prefixes, and time metadata.
     """
     skill = SKILL_REGISTRY.get(skill_key)
@@ -104,9 +135,14 @@ def _skill_wide_failure(
         _step1_divine_arts_gate(actor, skill)
     except RejectedAction as rejection:
         return rejection.reason, rejection.detail
+    freeform_failure = _freeform_gate_failure(actor, skill, scale)
+    if freeform_failure is not None:
+        return freeform_failure
     bundle = evaluate_combat_modifiers_no_create(actor)
     for resource_key, amount in skill.cost.items():
         adjusted = apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
+        if resource_key == "mp" and adjusted > 0:
+            adjusted = scaled_mp_cost(adjusted, scale)
         if _stored_trait_value(getattr(actor.traits, resource_key)) < adjusted:
             return RejectReason.INSUFFICIENT_RESOURCE, resource_key
     active_keys = active_buff_keys_from_storage(actor)
@@ -205,14 +241,17 @@ def preview_skill(
     skill_key: str,
     context: Any,
     candidates: list[Any] | None = None,
+    scale: float = 1.0,
 ) -> ActionPreview:
     """Build a frozen availability preview for one owned skill.
 
     ``candidates`` is an optional pool of participant entities to validate as
     targets (for example the active session roster). When omitted, only the
-    skill-wide checks run and ``valid_targets`` stays empty.
+    skill-wide checks run and ``valid_targets`` stays empty. ``scale`` applies
+    the step-1 freeform gate and the scaled resource check, so the preview
+    reports the same availability the resolver will enforce.
     """
-    failure = _skill_wide_failure(actor, skill_key, context)
+    failure = _skill_wide_failure(actor, skill_key, context, scale)
     if failure is not None:
         return _disabled(skill_key, *failure)
     skill = SKILL_REGISTRY[skill_key]
@@ -240,15 +279,17 @@ def revalidate_submission(
     skill_key: str,
     context: Any,
     targets: list[Any] | str,
+    scale: float = 1.0,
 ) -> ActionPreview:
     """Revalidate one submitted target value against current canonical state.
 
     Used by adapters and the combat-session facade immediately before
     initiative. Applies the exact shape and candidate rules shared with final
     target resolution so a stale or tampered request rejects with a matching
-    stable reason before any round begins.
+    stable reason before any round begins. ``scale`` applies the same step-1
+    freeform gate and scaled resource check as ``preview_skill``.
     """
-    failure = _skill_wide_failure(actor, skill_key, context)
+    failure = _skill_wide_failure(actor, skill_key, context, scale)
     if failure is not None:
         return _disabled(skill_key, *failure)
     skill = SKILL_REGISTRY[skill_key]

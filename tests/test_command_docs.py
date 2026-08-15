@@ -74,7 +74,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},
     "cast": {
-        "syntax": "cast <skill_key>[=<target_key>]",
+        "syntax": "cast <skill_key>[@<scale>][=<target_key>]",
         "context": "一般（戰鬥內外皆可施放技能）",
     },
     "engage": {"syntax": "engage <target>", "context": "戰鬥（需有敵對魔物）"},
@@ -444,6 +444,23 @@ class CommandDocsContractTests(unittest.TestCase):
                 expected["context"],
                 f"context for {key!r} drifted from the curated manifest",
             )
+
+    @covers_requirement("game-command-docs::the-cast-command-reference-documents-the-optional-scale-token")
+    def test_cast_entry_documents_the_freeform_scale_token(self):
+        entry = self.entries["cast"]
+        self.assertEqual(
+            entry["語法"].replace("`", ""),
+            EXPECTED_COMMANDS["cast"]["syntax"],
+        )
+        self.assertEqual(
+            entry["語法"],
+            "cast <skill_key>[@<scale>][=<target_key>]",
+        )
+        for token in ("1/4", "1/2", "1", "2", "4"):
+            self.assertIn(token, entry["說明"])
+        self.assertIn("主宰", entry["說明"])
+        self.assertIn("威力", entry["說明"])
+        self.assertIn("MP", entry["說明"])
 
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_context_consistent_with_help_category(self):

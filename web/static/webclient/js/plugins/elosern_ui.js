@@ -429,6 +429,29 @@
       openCombatSkill(combat, item.payload.skillKey);
       return;
     }
+    if (item.actionId === "choose-scale" && item.payload && combat) {
+      // Freeform scale choice: keep the choice in the skill's client-local
+      // selection state, then open the target flow.
+      if (combat.focusSkillKey) {
+        var scaleSkill = combat.skillByKey[combat.focusSkillKey];
+        var chosen = window.Elosern.CombatMenu.chooseScale(
+          combat,
+          combat.focusSkillKey,
+          item.payload.scale
+        );
+        if (chosen && scaleSkill) {
+          var targetMenu = window.Elosern.CombatMenu.openSkillTargets(
+            combat,
+            combat.focusSkillKey
+          );
+          var router = getKeyboard();
+          if (router && targetMenu) {
+            router.pushMenu(targetMenu);
+          }
+        }
+      }
+      return;
+    }
     if (item.actionId === "toggle-target") {
       // AREA candidates are toggled with Space, not Enter.
       return;
@@ -472,17 +495,40 @@
         if (payload && actions) {
           // Compose the chosen shorthand (or none) into the display
           // descriptor so the echoed cast line names the actual target.
-          actions.submit("combat.cast", payload, {
+          var display = {
             skillLabel: skill.label,
             targetLabel: skill.shorthand || null,
-          });
+          };
+          var scaleLabel = window.Elosern.CombatMenu.scaleLabelFor(skill);
+          if (scaleLabel !== null) {
+            display.scaleLabel = scaleLabel;
+          }
+          actions.submit("combat.cast", payload, display);
         }
         return;
       }
     }
     if (item.actionId) {
       if (actions) {
-        actions.submit(item.actionId, item.payload || {}, item.commandDisplay || null);
+        var finalDisplay = item.commandDisplay || null;
+        if (
+          finalDisplay &&
+          finalDisplay.skillLabel &&
+          combat &&
+          combat.focusSkillKey
+        ) {
+          // Label the echoed cast line with the chosen freeform magnitude.
+          var finalSkill = combat.skillByKey[combat.focusSkillKey];
+          if (finalSkill) {
+            var finalScale = window.Elosern.CombatMenu.scaleLabelFor(finalSkill);
+            if (finalScale !== null) {
+              finalDisplay = Object.assign({}, finalDisplay, {
+                scaleLabel: finalScale,
+              });
+            }
+          }
+        }
+        actions.submit(item.actionId, item.payload || {}, finalDisplay);
       }
     }
   }
@@ -496,6 +542,10 @@
     var menu = window.Elosern.CombatMenu.openSkill(combat, skillKey);
     if (menu) {
       router.pushMenu(menu);
+      // The freeform scale step preselects 威力×1 (the default behavior).
+      if (menu.items.length > 0 && menu.items[0].scaleChoice) {
+        router.focusItemByKey("scale-1");
+      }
     }
   }
 

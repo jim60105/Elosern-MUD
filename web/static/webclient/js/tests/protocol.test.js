@@ -1026,6 +1026,50 @@ test("validates the available context_actions combat panel", () => {
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validRecoveryPanel()));
 });
 
+test("freeform_scales is optional and validated when present", () => {
+  const scales = [
+    { scale: 0.25, label: "1/4", mp_cost: 5 },
+    { scale: 0.5, label: "1/2", mp_cost: 10 },
+    { scale: 1, label: "1", mp_cost: 20 },
+    { scale: 2, label: "2", mp_cost: 40 },
+    { scale: 4, label: "4", mp_cost: 80 },
+  ];
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: scales })] })
+    )
+  );
+  const bad = (overrides) =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], overrides)] })] })
+    );
+  assert.throws(() => bad({ scale: 3 }));
+  assert.throws(() => bad({ label: "x" }));
+  assert.throws(() => bad({ mp_cost: 0 }));
+  assert.throws(() => Protocol.validateContextActionsPanel(
+    validCombatPanel({ skills: [validCombatSkill({ freeform_scales: [] })] })
+  ));
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: scales.slice(0, 3) })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        skills: [validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], { label: "4" }), ...scales.slice(1)] })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        skills: [Object.assign(validCombatSkill(), { cost: { sp: 30 }, freeform_scales: scales })],
+      })
+    )
+  );
+});
+
 test("rejects malformed context_actions panels atomically", () => {
   assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 2, available: false }));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ extra: 1 })));

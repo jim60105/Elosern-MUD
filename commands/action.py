@@ -18,6 +18,7 @@ from world.rules.player_messages import (
     session_reason_message,
     terminal_outcome_message,
 )
+from world.rules.progression import scale_for_label
 from world.rules.targeting import RoomActionContext
 
 
@@ -42,24 +43,42 @@ class CmdCast(Command):
             return None
 
     def func(self) -> None:
-        skill_key, separator, target_key = self.args.partition("=")
-        skill_key = skill_key.strip()
+        raw_skill, separator, target_key = self.args.partition("=")
+        skill_key, at, scale_token = raw_skill.strip().partition("@")
         if not skill_key:
-            self.caller.msg("用法：cast <skill_key>[=<target_key>]")
+            self.caller.msg("用法：cast <skill_key>[@<scale>][=<target_key>]")
             return
+        scale = 1.0
+        if at:
+            scale = scale_for_label(scale_token)
+            if scale is None:
+                # A non-label token is a usage-level rejection with the stable
+                # freeform message; nothing is cast and no clock advances.
+                self.caller.msg(
+                    rejection_message(RejectReason.SCALED_CAST_FORBIDDEN)
+                )
+                return
         session = self._active_session()
         if session is not None:
-            self._cast_in_session(session, skill_key, target_key)
+            self._cast_in_session(session, skill_key, target_key, scale)
             return
-        self._cast_out_of_combat(skill_key, target_key)
+        self._cast_out_of_combat(skill_key, target_key, scale)
 
-    def _cast_in_session(self, session, skill_key: str, target_key: str) -> None:
+    def _cast_in_session(
+        self,
+        session,
+        skill_key: str,
+        target_key: str,
+        scale: float = 1.0,
+    ) -> None:
         """Delegate an active-session cast to combat-session orchestration.
 
         Combat time accumulates in the session and settles exactly once at the
         terminal result; this command never advances command time. The target
         value is parsed into an explicit participant list or one approved AREA
-        shorthand, matching the combat-session facade contract.
+        shorthand, matching the combat-session facade contract. ``scale`` is
+        the optional freeform magnitude modifier; a scale the deterministic
+        gate forbids rejects before initiative with the stable message.
         """
         from world.rules.combat_session import (
             CombatSessionError,
@@ -77,7 +96,12 @@ class CmdCast(Command):
             self.caller.msg(session_reason_message(str(error.args[0])))
             return
         try:
-            result = submit_player_action(self.caller, skill_key, targets)
+            result = submit_player_action(
+                self.caller,
+                skill_key,
+                targets,
+                scale=scale,
+            )
         except CombatSessionError as error:
             reason = error.args[0]
             self.caller.msg(session_reason_message(str(reason)))
@@ -89,7 +113,12 @@ class CmdCast(Command):
             self.caller.msg(line)
         self.caller.msg(message)
 
-    def _cast_out_of_combat(self, skill_key: str, target_key: str) -> None:
+    def _cast_out_of_combat(
+        self,
+        skill_key: str,
+        target_key: str,
+        scale: float = 1.0,
+    ) -> None:
         targets = []
         if target_key.strip():
             target = self._resolve_target(target_key)
@@ -121,6 +150,7 @@ class CmdCast(Command):
                 skill_key=skill_key,
                 targets=targets,
                 context=context,
+                scale=scale,
             )
         )
         if settlement.result.outcome == "success":

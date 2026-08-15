@@ -38,6 +38,104 @@ NON_AFFINITY_ELEMENT_MULTIPLIER = float(
 )
 MAGIC_GROWTH_MULTIPLIER_PREFIX = "growth_rate:magic:"
 
+FREEFORM_CAST_SCALE_COUNT = 5
+
+# The fixed canonical freeform scale table (freeform-casting spec): exact
+# (scale, label) pairs in ascending order. A table that deviates in any value
+# or label pairing fails closed at load — no consumer may ever run a different
+# set.
+FREEFORM_CANONICAL_SCALES: tuple[tuple[float, str], ...] = (
+    (0.25, "1/4"),
+    (0.5, "1/2"),
+    (1.0, "1"),
+    (2.0, "2"),
+    (4.0, "4"),
+)
+
+
+def _load_freeform_cast_scales(
+    raw: Any,
+) -> tuple[tuple[float, str], ...]:
+    """Load and fail-closed validate the closed freeform scale table.
+
+    The table must carry exactly ``FREEFORM_CAST_SCALE_COUNT`` entries, each
+    an object with a finite positive ``scale`` and a non-empty string
+    ``label``; scales must be unique and strictly ascending, labels unique,
+    and exactly one entry must carry ``scale == 1.0``. The parsed table must
+    then equal the canonical ``FREEFORM_CANONICAL_SCALES`` set exactly — any
+    deviation in a scale value or its label pairing raises a named
+    ``ValueError`` before any consumer can read a partial or deviant set.
+    """
+    entries = raw.get("freeform_cast_scales")
+    if not isinstance(entries, list) or len(entries) != FREEFORM_CAST_SCALE_COUNT:
+        raise ValueError(
+            "freeform_cast_scales must be a list of exactly "
+            f"{FREEFORM_CAST_SCALE_COUNT} entries"
+        )
+    parsed: list[tuple[float, str]] = []
+    seen_scales: set[float] = set()
+    seen_labels: set[str] = set()
+    has_one = False
+    previous = 0.0
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or set(entry) != {"scale", "label"}:
+            raise ValueError(
+                f"freeform_cast_scales entry {index} must be {{scale, label}}"
+            )
+        scale = entry["scale"]
+        label = entry["label"]
+        if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+            raise ValueError(
+                f"freeform_cast_scales entry {index} scale must be numeric"
+            )
+        scale = float(scale)
+        if not isfinite(scale) or scale <= 0:
+            raise ValueError(
+                f"freeform_cast_scales entry {index} scale must be finite and positive"
+            )
+        if scale in seen_scales:
+            raise ValueError(
+                f"freeform_cast_scales entry {index} duplicates scale {scale:g}"
+            )
+        if scale <= previous:
+            raise ValueError(
+                "freeform_cast_scales must be strictly ascending, entry "
+                f"{index} has scale {scale:g}"
+            )
+        if not isinstance(label, str) or not label.strip():
+            raise ValueError(
+                f"freeform_cast_scales entry {index} label must be non-empty"
+            )
+        if label in seen_labels:
+            raise ValueError(
+                f"freeform_cast_scales entry {index} duplicates label {label!r}"
+            )
+        if scale == 1.0:
+            has_one = True
+        seen_scales.add(scale)
+        seen_labels.add(label)
+        parsed.append((scale, label))
+        previous = scale
+    if not has_one:
+        raise ValueError("freeform_cast_scales must contain exactly one 1.0 entry")
+    canonical = tuple(parsed)
+    if canonical != FREEFORM_CANONICAL_SCALES:
+        raise ValueError(
+            "freeform_cast_scales must equal the canonical set "
+            f"{FREEFORM_CANONICAL_SCALES!r}, got {canonical!r}"
+        )
+    return canonical
+
+
+# The closed freeform-casting scale set: ascending ``(scale, label)`` pairs
+# shared by the resolver gate, the preview, the wire validator, and the text
+# command. Never hard-code the set anywhere else.
+FREEFORM_CAST_SCALES: tuple[tuple[float, str], ...] = _load_freeform_cast_scales(
+    PROGRESSION_YAML
+)
+FREEFORM_SCALE_VALUES = tuple(scale for scale, _ in FREEFORM_CAST_SCALES)
+FREEFORM_SCALE_LABELS = frozenset(label for _, label in FREEFORM_CAST_SCALES)
+
 
 def _validate_nonnegative_multiplier(value: float, name: str) -> None:
     """Fail closed on a non-finite or negative balance constant (design D5)."""
@@ -189,6 +287,79 @@ def can_cast_skill(entity: Any, skill: Any) -> bool:
         return can_cast_spell_tier(entity, skill.element.key, tier)
     except ValueError:
         return False
+
+
+def _validate_scale_inputs(base: int, scale: float, name: str) -> None:
+    """Fail closed on a non-positive base or a non-finite/non-positive scale."""
+    if isinstance(base, bool) or not isinstance(base, int) or base <= 0:
+        raise ValueError(f"{name} base must be a positive integer, got {base!r}")
+    if (
+        isinstance(scale, bool)
+        or not isinstance(scale, (int, float))
+        or not isfinite(scale)
+        or scale <= 0
+    ):
+        raise ValueError(f"{name} scale must be finite and positive, got {scale!r}")
+
+
+def scaled_magnitude(base: int, scale: float) -> int:
+    """Return ``floor(base * scale + 0.5)`` — deterministic round-half-away.
+
+    The single magnitude-scaling helper shared by the damage, heal, and
+    self-heal handlers so cost and magnitude scale identically everywhere.
+    """
+    _validate_scale_inputs(base, scale, "scaled_magnitude")
+    return int(floor(float(base) * float(scale) + 0.5))
+
+
+def scaled_mp_cost(base: int, scale: float) -> int:
+    """Return the scaled MP cost, never below one.
+
+    The same deterministic rounding as :func:`scaled_magnitude`, clamped to a
+    minimum of ``1``: a scaled cost can never be zero, so no scale combination
+    can ever produce a free cast.
+    """
+    _validate_scale_inputs(base, scale, "scaled_mp_cost")
+    return max(1, scaled_magnitude(base, scale))
+
+
+def freeform_scales_for(entity: Any, element: str) -> tuple[float, ...]:
+    """Return the element's allowed freeform scale set, or ``()``.
+
+    Pure side-effect-free query: ``element`` is validated against
+    ``ELEMENT_REGISTRY`` first (an unrecognized element raises ``ValueError``
+    even when the entity owns a fabricated ``<element>_mastery``), then the
+    ascending ``freeform_cast_scales`` set is returned when
+    ``f"{element}_mastery"`` appears in ``entity.skills.owned_keys()`` (direct
+    ownership only, never ``conferred_grants()``), and an empty tuple
+    otherwise. The empty tuple is the entitlement signal consumed by the
+    freeform-casting gate. Never writes any entity state.
+    """
+    if element not in ELEMENT_REGISTRY:
+        raise ValueError(f"unknown element {element!r}")
+    if f"{element}_mastery" in entity.skills.owned_keys():
+        return FREEFORM_SCALE_VALUES
+    return ()
+
+
+def scale_label_for(scale: float) -> str | None:
+    """Return the canonical table label for one scale, or ``None``.
+
+    The label is display-only (e.g. ``"1/4"``); ``None`` means the value is
+    not a member of the closed set.
+    """
+    for member, label in FREEFORM_CAST_SCALES:
+        if scale == member:
+            return label
+    return None
+
+
+def scale_for_label(label: str) -> float | None:
+    """Return the scale for one canonical table label, or ``None``."""
+    for member, canonical in FREEFORM_CAST_SCALES:
+        if label == canonical:
+            return member
+    return None
 
 
 def _race_learning_multiplier(entity: Any) -> float:

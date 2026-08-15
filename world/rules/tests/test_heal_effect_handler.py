@@ -58,13 +58,13 @@ class HealEffectHandlerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _parse_heal_effect("heal:everyone")
         with self.assertRaises(ValueError):
-            _handle_heal(actor, [target], "heal:everyone", {})
+            _handle_heal(actor, [target], "heal:everyone", {}, 1.0)
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
     def test_heal_is_staged_before_apply_and_restores_hp(self):
         actor = FakeEntity("actor", magic_level=20)
         target = FakeEntity("target", hp=40, max_hp=100)
-        pending = _handle_heal(actor, [target], "heal:single", {})[0]
+        pending = _handle_heal(actor, [target], "heal:single", {}, 1.0)[0]
         self.assertEqual(target.traits.hp.value, 40)
         self.assertTrue(pending.description.startswith("heal|"))
         pending.apply()
@@ -74,14 +74,14 @@ class HealEffectHandlerTests(unittest.TestCase):
     def test_healing_a_target_already_at_max_hp_is_a_noop(self):
         actor = FakeEntity("actor", magic_level=20)
         target = FakeEntity("target", hp=100, max_hp=100)
-        _handle_heal(actor, [target], "heal:single", {})[0].apply()
+        _handle_heal(actor, [target], "heal:single", {}, 1.0)[0].apply()
         self.assertEqual(target.traits.hp.value, 100)
 
     @covers_requirement("heal-effect-handler::heal-effect-prefix-restores-hp-capped-at-max")
     def test_healing_a_near_death_target_is_capped_at_max_hp(self):
         actor = FakeEntity("actor", magic_level=200)
         target = FakeEntity("target", hp=1, max_hp=100)
-        _handle_heal(actor, [target], "heal:single", {})[0].apply()
+        _handle_heal(actor, [target], "heal:single", {}, 1.0)[0].apply()
         self.assertEqual(target.traits.hp.value, 100)
 
     @covers_requirement("heal-effect-handler::heal-area-targets-every-valid-target-in-the-action-s-target-set")
@@ -90,7 +90,7 @@ class HealEffectHandlerTests(unittest.TestCase):
         low = FakeEntity("low", hp=10, max_hp=100)
         mid = FakeEntity("mid", hp=60, max_hp=100)
         high = FakeEntity("high", hp=90, max_hp=100)
-        for effect in _handle_heal(actor, [low, mid, high], "heal:area", {}):
+        for effect in _handle_heal(actor, [low, mid, high], "heal:area", {}, 1.0):
             effect.apply()
         self.assertEqual(low.traits.hp.value, 40)
         self.assertEqual(mid.traits.hp.value, 90)
@@ -101,8 +101,8 @@ class HealEffectHandlerTests(unittest.TestCase):
         actor = FakeEntity("actor", hp=30, max_hp=100, magic_level=20)
         target = FakeEntity("target", hp=100, max_hp=100)
         with self.assertRaises(ValueError):
-            _handle_self_heal(actor, [target], "self_heal:single", {})
-        pending = _handle_self_heal(actor, [target], "self_heal", {})[0]
+            _handle_self_heal(actor, [target], "self_heal:single", {}, 1.0)
+        pending = _handle_self_heal(actor, [target], "self_heal", {}, 1.0)[0]
         self.assertTrue(pending.description.startswith("self_heal|actor|"))
         pending.apply()
         self.assertEqual(actor.traits.hp.value, 50)
@@ -111,7 +111,7 @@ class HealEffectHandlerTests(unittest.TestCase):
     def test_heal_entries_emit_a_heal_event_with_amount(self):
         actor = FakeEntity("actor")
         target = FakeEntity("target", hp=50, max_hp=100)
-        pending = _handle_heal(actor, [target], "heal:single", {})[0]
+        pending = _handle_heal(actor, [target], "heal:single", {}, 1.0)[0]
         entries = _entries_from_effect("actor", pending)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].kind, "heal")
@@ -119,7 +119,7 @@ class HealEffectHandlerTests(unittest.TestCase):
 
     def test_self_heal_entries_emit_a_self_heal_event_with_amount(self):
         actor = FakeEntity("actor", hp=50, max_hp=100, magic_level=20)
-        pending = _handle_self_heal(actor, [], "self_heal", {})[0]
+        pending = _handle_self_heal(actor, [], "self_heal", {}, 1.0)[0]
         entries = _entries_from_effect("actor", pending)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].kind, "self_heal")
@@ -129,7 +129,7 @@ class HealEffectHandlerTests(unittest.TestCase):
     def test_malformed_heal_description_is_rejected(self):
         actor = FakeEntity("actor")
         pending = _handle_heal(
-            actor, [FakeEntity("target")], "heal:single", {}
+            actor, [FakeEntity("target")], "heal:single", {}, 1.0
         )[0]
         malformed = PendingEffect(
             entity=pending.entity,

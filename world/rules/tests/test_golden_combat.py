@@ -30,7 +30,7 @@ class GoldenCombatTests(unittest.TestCase):
             return_value={},
         ):
             pending = [
-                _handle_damage(attacker, [defender], "damage:dark:physical", {})[0]
+                _handle_damage(attacker, [defender], "damage:dark:physical", {}, 1.0)[0]
                 for _ in range(3)
             ]
         self.assertEqual(

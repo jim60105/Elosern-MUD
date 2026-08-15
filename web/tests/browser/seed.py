@@ -572,9 +572,12 @@ def main() -> None:
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
     # start room so browser tests can ``engage`` one through the real server.
+    # wind_mastery additionally activates the freeform scale step for
+    # wind_blade (element-mastery-freeform-casting), exercised by the scaled
+    # cast acceptance test.
     character.db.skills = {
         "active": ["fire_ball", "wind_blade", "status_disguise", "concentration"],
-        "passive": ["defense_instinct"],
+        "passive": ["defense_instinct", "wind_mastery"],
     }
     # A persistent poisoned buff gives the status panel a deterministic
     # applied-modifier condition (agility -10%) for viewport assertions.

@@ -38,6 +38,10 @@ from world.rules.combat_view import (
     CombatViewError,
     build_combat_view,
 )
+from world.rules.progression import (
+    FREEFORM_CAST_SCALES,
+    scaled_mp_cost,
+)
 
 CONTEXT_ACTIONS_SCHEMA_VERSION = 2
 
@@ -175,6 +179,59 @@ def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
     return {"code": value["code"], "message": message}
 
 
+def _validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str, Any]]:
+    """Validate the optional ``freeform_scales`` array of one skill.
+
+    When absent (the server omits the field for every non-eligible skill and
+    every non-master) an empty list is returned. When present the array must
+    cover exactly the actor's allowed scale set in ascending order, one entry
+    per scale, each an exact object with the member numeric ``scale``, its
+    canonical ``label`` (the label MUST pair with its scale), and the
+    server-computed ``mp_cost`` equal to ``scaled_mp_cost(base_mp, scale)``.
+    A skill without an ``mp`` cost can never carry the field.
+    """
+    if value is None:
+        return []
+    if base_mp is None:
+        raise ProtocolValidationError(
+            "a skill without an mp cost cannot carry freeform_scales"
+        )
+    if not isinstance(value, list) or not value:
+        raise ProtocolValidationError(
+            "freeform_scales must be a non-empty array when present"
+        )
+    if len(value) != len(FREEFORM_CAST_SCALES):
+        raise ProtocolValidationError(
+            "freeform_scales must cover exactly the allowed scale set"
+        )
+    entries: list[dict[str, Any]] = []
+    for index, entry in enumerate(value):
+        _require_exact_fields(entry, "freeform_scales entry", {"scale", "label", "mp_cost"}, {})
+        scale = entry["scale"]
+        if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+            raise ProtocolValidationError("freeform_scales scale must be numeric")
+        scale = float(scale)
+        expected_scale, expected_label = FREEFORM_CAST_SCALES[index]
+        if scale != expected_scale:
+            raise ProtocolValidationError(
+                "freeform_scales must be strictly ascending over the allowed set"
+            )
+        label = _require_str(entry, "label", maximum=8)
+        if label != expected_label:
+            raise ProtocolValidationError(
+                "freeform_scales label must be the canonical label of its scale"
+            )
+        mp_cost = _require_int(
+            entry, "mp_cost", minimum=1, maximum=MAX_SAFE_INTEGER
+        )
+        if mp_cost != scaled_mp_cost(base_mp, scale):
+            raise ProtocolValidationError(
+                "freeform_scales mp_cost is inconsistent with the scaled base cost"
+            )
+        entries.append({"scale": scale, "label": label, "mp_cost": mp_cost})
+    return entries
+
+
 def _validate_skill(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
@@ -191,7 +248,7 @@ def _validate_skill(value: Any) -> dict[str, Any]:
             "targets",
             "shorthands",
         },
-        {},
+        {"freeform_scales": "optional"},
     )
     key = _validate_identifier(value["key"], "skill key")
     if len(key) > MAX_SKILL_KEY:
@@ -242,7 +299,7 @@ def _validate_skill(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("skill shorthands must be unique")
     if target_spec != "area" and shorthands:
         raise ProtocolValidationError("only area skills may carry shorthands")
-    return {
+    normalized = {
         "key": key,
         "label": label,
         "description": description,
@@ -254,6 +311,13 @@ def _validate_skill(value: Any) -> dict[str, Any]:
         "targets": list(targets),
         "shorthands": list(shorthands),
     }
+    scales = _validate_freeform_scales(
+        value.get("freeform_scales"),
+        cost.get("mp") if isinstance(cost.get("mp"), int) else None,
+    )
+    if scales:
+        normalized["freeform_scales"] = scales
+    return normalized
 
 
 def validate_context_actions(payload: Any) -> dict[str, Any]:
@@ -387,8 +451,9 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
         }
         for participant in view.participants
     ]
-    skills = [
-        {
+    skills = []
+    for skill in view.skills:
+        descriptor = {
             "key": skill.key,
             "label": skill.label,
             "description": skill.description,
@@ -404,8 +469,12 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
             "targets": list(skill.valid_target_ids),
             "shorthands": list(skill.shorthands),
         }
-        for skill in view.skills
-    ]
+        if skill.freeform_scales:
+            descriptor["freeform_scales"] = [
+                {"scale": scale, "label": label, "mp_cost": mp_cost}
+                for scale, label, mp_cost in skill.freeform_scales
+            ]
+        skills.append(descriptor)
     payload = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,

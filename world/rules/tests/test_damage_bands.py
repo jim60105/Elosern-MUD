@@ -32,11 +32,11 @@ class DamageBandTests(unittest.TestCase):
         ):
             with patch("world.rules.combat.roll_d100", return_value=51):
                 hit = _handle_damage(
-                    actor, [target], "damage:dark:physical", {}
+                    actor, [target], "damage:dark:physical", {}, 1.0
                 )[0]
             with patch("world.rules.combat.roll_d100", return_value=1):
                 miss = _handle_damage(
-                    actor, [target], "damage:dark:physical", {}
+                    actor, [target], "damage:dark:physical", {}, 1.0
                 )[0]
         self.assertTrue(hit.description.endswith("|1|1"))
         self.assertTrue(miss.description.endswith("|0|0"))

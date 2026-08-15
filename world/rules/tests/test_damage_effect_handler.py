@@ -49,7 +49,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
             ),
         ):
             pending = _handle_damage(
-                actor, [target], "damage:dark:physical", {}
+                actor, [target], "damage:dark:physical", {}, 1.0
             )[0]
         self.assertEqual(target.traits.hp.value, 100)
         entries = _entries_from_effect("actor", pending)
@@ -68,7 +68,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
             ),
         ):
             pending = _handle_damage(
-                actor, [target], "damage:fire:magic", {}
+                actor, [target], "damage:fire:magic", {}, 1.0
             )[0]
             self.assertEqual(roller.call_count, 1)
             pending.apply()
@@ -79,9 +79,9 @@ class DamageEffectHandlerTests(unittest.TestCase):
         actor = FakeEntity("actor")
         target = FakeEntity("target")
         with self.assertRaises(ValueError):
-            _handle_damage(actor, [target], "damage:nope:magic", {})
+            _handle_damage(actor, [target], "damage:nope:magic", {}, 1.0)
         with self.assertRaises(ValueError):
-            _handle_damage(actor, [target], "damage:fire:nope", {})
+            _handle_damage(actor, [target], "damage:fire:nope", {}, 1.0)
 
     @covers_requirement("damage-effect-handlers::combat-modifiers-apply-uniformly-regardless-of-origin")
     def test_modifier_bundle_changes_hit_math_without_origin_branch(self):
@@ -99,7 +99,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
             ),
         ):
             pending = _handle_damage(
-                actor, [target], "damage:fire:magic", {}
+                actor, [target], "damage:fire:magic", {}, 1.0
             )[0]
         self.assertTrue(pending.description.endswith("|0|0"))
 
@@ -113,7 +113,7 @@ def _staged_amount(actor, target, effect_id, modifiers):
             side_effect=modifiers,
         ),
     ):
-        pending = _handle_damage(actor, [target], effect_id, {})[0]
+        pending = _handle_damage(actor, [target], effect_id, {}, 1.0)[0]
     return int(pending.description.rsplit("|", 1)[1])
 
 

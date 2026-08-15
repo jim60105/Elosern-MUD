@@ -617,6 +617,7 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
                     "battlefield": field,
                     "nonlethal_keys": frozenset({"第一", "第二"}),
                 },
+                1.0,
             )
         for effect in pending:
             effect.apply()

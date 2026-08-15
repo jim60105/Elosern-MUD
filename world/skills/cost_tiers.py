@@ -33,6 +33,34 @@ MP_COST_TIERS: dict[str, CostTier] = {
 }
 
 
+# Effect prefixes whose magnitude is proportional to the cast's scale.
+_FREEFORM_SCALABLE_PREFIXES = frozenset({"damage", "heal", "self_heal"})
+
+
+def is_freeform_eligible(skill: SkillDef) -> bool:
+    """Return whether one skill is shape-eligible for freeform scaling.
+
+    ``True`` exactly when the skill is ACTIVE, carries an element, declares a
+    positive integer ``mp`` cost, has a non-empty ``effects`` list, and every
+    effect prefix is one of ``damage``, ``heal``, or ``self_heal``. Any other
+    shape — PASSIVE skills, non-elemental skills, skills without an ``mp``
+    cost, skills with an empty ``effects`` list, or skills carrying a buff,
+    status, cleanse, movement, or conferral effect — returns ``False``. The
+    predicate never reads entity state.
+    """
+    if skill.kind is not SkillKind.ACTIVE or skill.element is None:
+        return False
+    mp_cost = skill.cost.get("mp")
+    if isinstance(mp_cost, bool) or not isinstance(mp_cost, int) or mp_cost <= 0:
+        return False
+    if not skill.effects:
+        return False
+    return all(
+        effect_id.partition(":")[0] in _FREEFORM_SCALABLE_PREFIXES
+        for effect_id in skill.effects
+    )
+
+
 def _band_contains(band: tuple[int, int], cost: int) -> bool:
     lower, upper = band
     return lower <= cost <= upper

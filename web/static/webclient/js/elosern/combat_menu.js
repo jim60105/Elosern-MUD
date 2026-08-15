@@ -37,6 +37,13 @@
         return key.toUpperCase() + " " + skill.cost[key];
       })
       .join("、");
+    var freeformScales = (skill.freeform_scales || []).slice();
+    var defaultScale = 1;
+    freeformScales.forEach(function (entry) {
+      if (entry.scale === 1) {
+        defaultScale = entry.scale;
+      }
+    });
     return {
       key: skill.key,
       label: skill.label,
@@ -48,6 +55,8 @@
       disabledReason: skill.disabled_reason || null,
       targets: (skill.targets || []).slice(),
       shorthands: (skill.shorthands || []).slice(),
+      freeformScales: freeformScales,
+      scale: defaultScale, // chosen freeform scale (1 = the default behavior)
       selected: [], // selected participant identities for AREA
       shorthand: null, // chosen approved shorthand for AREA
       selfIdentity: skill.target_spec === "self" ? null : null,
@@ -134,8 +143,73 @@
   }
 
   // -------------------------------------------------------------------------
+  // Freeform scale-choice step (element-mastery-freeform-casting).
+  // -------------------------------------------------------------------------
+
+  // The 威力-choice items for a freeform-capable skill, or null when the
+  // skill carries no `freeform_scales` (a non-master skill skips the step
+  // entirely, so its flow and payload stay byte-identical to today).
+  function scaleItemsFor(skill) {
+    if (!skill.freeformScales || skill.freeformScales.length === 0) {
+      return null;
+    }
+    return skill.freeformScales.map(function (entry) {
+      return {
+        key: "scale-" + entry.label,
+        label: "威力×" + entry.label,
+        description: "MP " + entry.mp_cost,
+        enabled: true,
+        actionId: "choose-scale",
+        payload: { scale: entry.scale },
+        scaleChoice: true,
+      };
+    });
+  }
+
+  // The chosen freeform scale to embed in a cast payload. Only skills that
+  // advertise `freeformScales` carry the field; every other skill's payload
+  // stays byte-identical to today (no `scale` key at all).
+  function scaleForPayload(skill) {
+    if (!skill.freeformScales || skill.freeformScales.length === 0) {
+      return null;
+    }
+    return skill.scale;
+  }
+
+  // The display label for the chosen scale, or null (echo shows no 威力
+  // suffix for the default choice or for non-freeform skills).
+  function scaleLabelFor(skill) {
+    if (!skill.freeformScales || skill.freeformScales.length === 0) {
+      return null;
+    }
+    var chosen = skill.scale;
+    var found = null;
+    skill.freeformScales.forEach(function (entry) {
+      if (entry.scale === chosen) {
+        found = entry.label;
+      }
+    });
+    return found;
+  }
+
+  // -------------------------------------------------------------------------
   // Target selection flows.
   // -------------------------------------------------------------------------
+
+  // One combat.cast payload with the skill's chosen freeform scale embedded
+  // (only for skills that advertise `freeform_scales`; all other payloads stay
+  // byte-identical to today).
+  function castPayloadFor(skill, targetFields) {
+    var payload = { skill_key: skill.key };
+    var scale = scaleForPayload(skill);
+    if (scale !== null) {
+      payload.scale = scale;
+    }
+    Object.keys(targetFields).forEach(function (field) {
+      payload[field] = targetFields[field];
+    });
+    return payload;
+  }
 
   function targetItemsFor(skill, participants) {
     var items = [];
@@ -161,7 +235,7 @@
           label: "施展",
           enabled: true,
           actionId: "combat.cast",
-          payload: { skill_key: skill.key },
+          payload: castPayloadFor(skill, {}),
           commandDisplay: { skillLabel: skill.label },
         },
       ];
@@ -173,7 +247,7 @@
           label: "對自己施展",
           enabled: true,
           actionId: "combat.cast",
-          payload: { skill_key: skill.key },
+          payload: castPayloadFor(skill, {}),
           commandDisplay: { skillLabel: skill.label },
         },
       ];
@@ -193,7 +267,9 @@
           description: participant.state === "active" ? null : participant.state,
           enabled: true,
           actionId: "combat.cast",
-          payload: { skill_key: skill.key, target_ids: [participant.identity] },
+          payload: castPayloadFor(skill, {
+            target_ids: [participant.identity],
+          }),
           commandDisplay: {
             skillLabel: skill.label,
             targetLabel: participant.display_name,
@@ -300,9 +376,30 @@
     };
   }
 
-  // Open one skill's target menu. Returns a menu object or null for a skill
-  // that cannot open (e.g. disabled, or already terminal).
+  // Open one skill's menu. Returns a menu object or null for a skill
+  // that cannot open (e.g. disabled, or already terminal). A freeform-capable
+  // skill opens its 威力-choice menu first; the target flow opens only after
+  // a scale is confirmed (openSkillTargets).
   function openSkill(combat, skillKey) {
+    var skill = combat.skillByKey[skillKey];
+    if (!skill) {
+      return null;
+    }
+    var scales = scaleItemsFor(skill);
+    if (scales) {
+      return {
+        items: scales,
+        focusKey: null,
+        skillKey: skillKey,
+        grid: true,
+        gridCols: scales.length,
+      };
+    }
+    return openSkillTargets(combat, skillKey);
+  }
+
+  // Open one skill's target flow directly (after the scale step confirmed).
+  function openSkillTargets(combat, skillKey) {
     var skill = combat.skillByKey[skillKey];
     if (!skill) {
       return null;
@@ -314,6 +411,25 @@
       grid: true,
       gridCols: 2,
     };
+  }
+
+  // Apply one confirmed scale choice to the focused skill.
+  function chooseScale(combat, skillKey, scale) {
+    var skill = combat.skillByKey[skillKey];
+    if (!skill || !skill.freeformScales || skill.freeformScales.length === 0) {
+      return false;
+    }
+    var member = false;
+    skill.freeformScales.forEach(function (entry) {
+      if (entry.scale === scale) {
+        member = true;
+      }
+    });
+    if (!member) {
+      return false;
+    }
+    skill.scale = scale;
+    return true;
   }
 
   // Toggle one AREA candidate in the current skill's selection.
@@ -350,8 +466,14 @@
   // identities appear in ``skill.targets``), regardless of toggle order, so the
   // wire payload is deterministic and matches the panel presentation.
   function areaPayload(skill) {
+    var base = { skill_key: skill.key };
+    var scale = scaleForPayload(skill);
+    if (scale !== null) {
+      base.scale = scale;
+    }
     if (skill.shorthand) {
-      return { skill_key: skill.key, target_shorthand: skill.shorthand };
+      base.target_shorthand = skill.shorthand;
+      return base;
     }
     if (skill.selected.length === 0) {
       return null;
@@ -363,17 +485,37 @@
     var presenterOrder = skill.selected.slice().sort(function (a, b) {
       return order[a] - order[b];
     });
-    return { skill_key: skill.key, target_ids: presenterOrder };
+    base.target_ids = presenterOrder;
+    return base;
   }
 
   // After a panel replacement, rebuild the selection state deterministically:
-  // drop vanished selections and choose the nearest surviving focus.
+  // drop vanished selections and choose the nearest surviving focus. A
+  // still-valid freeform scale choice is preserved on the rebuilt skill;
+  // a vanished or invalidated choice resets deterministically to `1`.
   function rebuildForPanel(combat, panel, previous) {
     previous = previous || {};
     var next = buildMenus(panel, {
       skillKey: previous.skillKey || null,
       page: previous.page || 0,
     });
+    if (previous && previous.skillByKey) {
+      Object.keys(previous.skillByKey).forEach(function (key) {
+        var oldSkill = previous.skillByKey[key];
+        var newSkill = next.skillByKey[key];
+        if (!newSkill || !newSkill.freeformScales || !oldSkill.freeformScales) {
+          return;
+        }
+        var preserved = oldSkill.scale;
+        var stillValid = false;
+        newSkill.freeformScales.forEach(function (entry) {
+          if (entry.scale === preserved) {
+            stillValid = true;
+          }
+        });
+        newSkill.scale = stillValid ? preserved : 1;
+      });
+    }
     return next;
   }
 
@@ -386,6 +528,9 @@
     rootItems: rootItems,
     buildMenus: buildMenus,
     openSkill: openSkill,
+    openSkillTargets: openSkillTargets,
+    chooseScale: chooseScale,
+    scaleLabelFor: scaleLabelFor,
     toggleArea: toggleArea,
     chooseShorthand: chooseShorthand,
     areaPayload: areaPayload,

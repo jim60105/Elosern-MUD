@@ -151,6 +151,36 @@ test("combat.cast with an AREA shorthand resolves to cast <skill>=<shorthand>", 
   );
 });
 
+test("combat.cast echoes the chosen freeform magnitude label", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "combat.cast",
+      { skill_key: "wind_blade", scale: 2, target_ids: [2] },
+      { skillLabel: "風刃術", scaleLabel: "2", targetLabel: "哥布林" }
+    ),
+    "cast 風刃術（威力×2）=哥布林"
+  );
+  assert.strictEqual(
+    Echo.commandLine(
+      "combat.cast",
+      { skill_key: "wind_blade", scale: 0.5, target_shorthand: "all-enemies" },
+      { skillLabel: "風刃術", scaleLabel: "1/2" }
+    ),
+    "cast 風刃術（威力×1/2）=all-enemies"
+  );
+});
+
+test("combat.cast without a scale label stays byte-identical", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "combat.cast",
+      { skill_key: "wind_blade", target_shorthand: "all-enemies" },
+      { skillLabel: "風刃術" }
+    ),
+    "cast 風刃術=all-enemies"
+  );
+});
+
 test("combat.forfeit resolves to combat forfeit", () => {
   assert.strictEqual(Echo.commandLine("combat.forfeit", {}, {}), "combat forfeit");
 });

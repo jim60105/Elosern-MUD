@@ -22,9 +22,12 @@ from world.rules.buffs import (
 from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
+    FREEFORM_SCALE_VALUES,
     can_cast_skill,
+    freeform_scales_for,
     grant_combat_kill_xp,
     grant_skill_practice_xp,
+    scaled_mp_cost,
 )
 from world.rules.skill_effects import (
     apply_disguise_effect,
@@ -36,6 +39,7 @@ from world.rules.targeting import (
     expand_target_shorthand,
     resolve_targets,
 )
+from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 
@@ -55,6 +59,7 @@ class RejectReason(StrEnum):
     NO_VALID_TARGETS_IN_AREA = "no_valid_targets_in_area"
     ACTION_FORBIDDEN = "action_forbidden"
     DIVINE_ARTS_FORBIDDEN = "divine_arts_forbidden"
+    SCALED_CAST_FORBIDDEN = "scaled_cast_forbidden"
     UNKNOWN_EFFECT_ID = "unknown_effect_id"
     EFFECT_RESOLUTION_FAILED = "effect_resolution_failed"
     MISSING_EFFECT_CONTEXT = "missing_effect_context"
@@ -85,12 +90,18 @@ class CommitFailed(Exception):
 
 @dataclass(frozen=True)
 class ActionRequest:
-    """One caller-neutral request to invoke a skill."""
+    """One caller-neutral request to invoke a skill.
+
+    ``scale`` is the optional freeform magnitude modifier (element-mastery-
+    freeform-casting): ``1.0`` is the behavior-preserving default and is
+    always allowed; any other value must pass the step-1 freeform gate.
+    """
 
     actor: Any
     skill_key: str
     targets: list[Any] | Literal["all-enemies", "all-allies", "all"]
     context: ActionContext
+    scale: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -131,7 +142,7 @@ class UnsnapshottedSurfaceError(Exception):
 
 
 EffectHandler = Callable[
-    [Any, list[Any], str, dict[str, Any]],
+    [Any, list[Any], str, dict[str, Any], float],
     list[PendingEffect],
 ]
 SNAPSHOTTED_SURFACES = frozenset(
@@ -216,6 +227,27 @@ def _event_context(request: ActionRequest) -> dict[str, Any]:
     return getattr(request.context, "event_context", {})
 
 
+def _step1_freeform_gate(request: ActionRequest, skill: SkillDef) -> None:
+    """Reject a scaled cast that fails the freeform-casting entitlement.
+
+    Fires only when ``request.scale != 1.0`` (scale one is always permitted
+    and never rejected here). The check order is fixed and crash-safe: scale
+    membership in the closed table first, then ``is_freeform_eligible``
+    (which itself requires an element and an ``mp`` cost), and only then
+    ``freeform_scales_for(actor, skill.element.key)`` — so a non-elemental MP
+    skill like ``concentration`` rejects cleanly instead of dereferencing a
+    missing element.
+    """
+    if request.scale == 1.0:
+        return
+    if request.scale not in FREEFORM_SCALE_VALUES:
+        raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
+    if not is_freeform_eligible(skill):
+        raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
+    if not freeform_scales_for(request.actor, skill.element.key):
+        raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
+
+
 def _step1_ownership(request: ActionRequest) -> SkillDef:
     skill = SKILL_REGISTRY.get(request.skill_key)
     if skill is None or skill.key not in request.actor.skills.owned_keys():
@@ -237,27 +269,42 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     if not can_cast_skill(request.actor, skill):
         raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
     _step1_divine_arts_gate(request.actor, skill)
+    _step1_freeform_gate(request, skill)
     return skill
 
 
-def _adjusted_costs(actor: Any, skill: SkillDef) -> dict[str, int]:
-    """Return the skill's resource costs after the actor's bundle adjustments.
+def _adjusted_costs(
+    actor: Any,
+    skill: SkillDef,
+    scale: float = 1.0,
+) -> dict[str, int]:
+    """Return the skill's resource costs after bundle adjustments and scaling.
 
     One ``evaluate_combat_modifiers(actor)`` read maps every declared resource
     key through :func:`apply_cost_modifier` with the ``f"{resource_key}_cost"``
     bundle key, so the step-2 check, the step-6 recheck, and the staged
     ``resource_spend`` amount can never drift. A resource key with no matching
-    bundle entry keeps its declared cost unchanged.
+    bundle entry keeps its declared cost unchanged. Bundle adjustments apply
+    to the unscaled base amounts first, then a positive ``mp`` amount is
+    replaced with ``scaled_mp_cost(base, scale)`` (never below 1); a
+    bundle-adjusted ``mp`` amount of zero — a deliberate free-cast modifier
+    such as ``-100%`` — stays zero and is never scaled. Other resource keys
+    keep their unscaled amounts. Both step 2 and step 6 pass the request's
+    scale, so preflight and deduction always compare and deduct the same
+    scaled amount.
     """
     bundle = evaluate_combat_modifiers(actor)
-    return {
+    costs = {
         resource_key: apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
         for resource_key, amount in skill.cost.items()
     }
+    if costs.get("mp", 0) > 0:
+        costs["mp"] = scaled_mp_cost(costs["mp"], scale)
+    return costs
 
 
-def _step2_resource_check(actor: Any, skill: SkillDef) -> None:
-    for resource_key, amount in _adjusted_costs(actor, skill).items():
+def _step2_resource_check(actor: Any, skill: SkillDef, scale: float = 1.0) -> None:
+    for resource_key, amount in _adjusted_costs(actor, skill, scale).items():
         if _stored_trait_value(getattr(actor.traits, resource_key)) < amount:
             raise RejectedAction(
                 RejectReason.INSUFFICIENT_RESOURCE,
@@ -315,7 +362,9 @@ def _handle_confer_skill_partial(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
+    del scale
     values = _require_context(context, "confer_skill_partial")
     skill_key = values["confer_skill_key"]
     scale = values["confer_scale"]
@@ -342,7 +391,9 @@ def _handle_set_disguise(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
+    del scale
     values = _require_context(context, "set_disguise")
     overrides = values["disguise"]
     if not isinstance(overrides, dict):
@@ -366,7 +417,9 @@ def _handle_buff_apply(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
+    del scale
     try:
         key = effect_id.split(":", 1)[1]
     except IndexError as error:
@@ -406,6 +459,7 @@ def _handle_self_buff_apply(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Apply one definition-keyed buff to the caster without a target.
 
@@ -414,7 +468,7 @@ def _handle_self_buff_apply(
     skill meaningful (a concentration-style self effect) while still never
     accepting a caller-supplied target.
     """
-    del targets, context
+    del targets, context, scale
     try:
         key = effect_id.split(":", 1)[1]
     except IndexError as error:
@@ -437,7 +491,9 @@ def _handle_confer_growth_rate(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
+    del scale
     values = _require_context(context, "confer_growth_rate")
     scale = values["confer_scale"]
     target = targets[0]
@@ -461,6 +517,7 @@ def _handle_divine_mystery(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
     """Resolve one divine-mystery effect; unmechanized entries stay inert.
 
@@ -469,7 +526,7 @@ def _handle_divine_mystery(
     mechanized entry has no cast path yet and must reject rather than
     silently doing nothing.
     """
-    del actor, targets, context
+    del actor, targets, context, scale
     if parse_effect(effect_id).mechanized:
         raise RejectedAction(
             RejectReason.EFFECT_RESOLUTION_FAILED,
@@ -483,7 +540,9 @@ def _handle_sexual_event(
     targets: list[Any],
     effect_id: str,
     context: dict[str, Any],
+    scale: float,
 ) -> list[PendingEffect]:
+    del scale
     try:
         from world.rules.sexual_transitions import apply_event
     except ImportError as error:
@@ -580,7 +639,13 @@ def _step5_effect_resolution(
         if handler is None:
             raise RejectedAction(RejectReason.UNKNOWN_EFFECT_ID, effect_id)
         try:
-            effects = handler(request.actor, targets, effect_id, context)
+            effects = handler(
+                request.actor,
+                targets,
+                effect_id,
+                context,
+                request.scale,
+            )
             surfaces = _EFFECT_HANDLER_SURFACES[prefix]
             for effect in effects:
                 if not isinstance(effect, PendingEffect):
@@ -608,9 +673,10 @@ def _deduct_resource(trait: Any, amount: int) -> None:
 def _step6_resource_deduction(
     actor: Any,
     skill: SkillDef,
+    scale: float = 1.0,
 ) -> list[PendingEffect]:
     pending = []
-    for resource_key, amount in _adjusted_costs(actor, skill).items():
+    for resource_key, amount in _adjusted_costs(actor, skill, scale).items():
         trait = getattr(actor.traits, resource_key)
         if _stored_trait_value(trait) < amount:
             raise RejectedAction(
@@ -1144,7 +1210,7 @@ class ActionResolver:
         """
         try:
             skill = _step1_ownership(request)
-            _step2_resource_check(request.actor, skill)
+            _step2_resource_check(request.actor, skill, request.scale)
             _step3_targeting(request, skill)
             _step4_capability(request.actor)
             context = _event_context(request)
@@ -1170,11 +1236,11 @@ class ActionResolver:
     def resolve(request: ActionRequest) -> ActionResult:
         try:
             skill = _step1_ownership(request)
-            _step2_resource_check(request.actor, skill)
+            _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
             pending = _step5_effect_resolution(request, skill, targets)
-            pending += _step6_resource_deduction(request.actor, skill)
+            pending += _step6_resource_deduction(request.actor, skill, request.scale)
             pending.append(_step6_skill_practice(request.actor, skill))
             pending += _step6_combat_kill_xp(request, targets)
             event_log = _step7_build_event_log(request, skill, pending)

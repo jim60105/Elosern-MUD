@@ -12,3 +12,12 @@ skill_practice_xp_per_use: 1.0
 # Element-affinity effective-level multipliers (element-affinity-progression D5).
 affinity_element_multiplier: 1.1
 non_affinity_element_multiplier: 0.9
+# Closed freeform-casting scale set (element-mastery-freeform-casting D1):
+# ascending, unique, finite and positive, exactly one 1.0 entry, non-empty
+# labels. Every consumer reads this one table; no consumer hard-codes the set.
+freeform_cast_scales:
+  - { scale: 0.25, label: "1/4" }
+  - { scale: 0.5, label: "1/2" }
+  - { scale: 1.0, label: "1" }
+  - { scale: 2.0, label: "2" }
+  - { scale: 4.0, label: "4" }
