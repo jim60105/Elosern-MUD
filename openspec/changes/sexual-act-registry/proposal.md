@@ -35,20 +35,24 @@ direct dependent) and the six catalog proposals that follow it.
   (`getattr(entity, "sexual", None)`) so `world/skills/handler.py` gains no import from
   `world/rules/`. The split exists to break the recursion `unlocked_act_keys()`'s mastery check would
   otherwise cause.
-- Add seven registry-load-time or test-time structural invariants (design doc §2.5): every act
-  granting pleasure to a target grants non-zero pleasure to its own actor unless its `SkillDef`
-  declares `requires_divine_arts`; no act declares `GENERIC_BODY_PART`; no act categorised outside
-  this change's future 異種/神之秘法 lines declares a partless target; every part named is a
-  `BODY_PARTS` member; every counter and event an act names actually exists; `SEXUAL_ACT_REGISTRY`'s
-  keys and `SKILL_REGISTRY`'s `SEXUAL_ACT`-categorised keys agree exactly, modulo the three skills
-  `skill-category-registry` already recategorised (`divine_sexual_arts`, `divine_sexual_mastery`,
-  `reincarnation_boon_yuna`), which carry no `SexualActDef` and are excluded by name.
+- Add registry-load-time or test-time structural invariants (design doc §2.5): every act
+  granting pleasure to a target grants non-zero finite pleasure to its own actor unless its
+  `SkillDef` declares `requires_divine_arts`; no act declares `GENERIC_BODY_PART`; no act
+  categorised outside this change's future 異種/神之秘法 lines declares a partless target; every
+  part named is a `BODY_PARTS` member; every `unlock` threshold is a non-`bool` integer; every
+  counter and event an act names actually exists; `SEXUAL_ACT_REGISTRY`'s keys and
+  `SKILL_REGISTRY`'s `SEXUAL_ACT`-categorised keys agree exactly, and no catalogue row collides
+  with a pre-existing skill key, modulo the three skills `skill-category-registry` already
+  recategorised (`divine_sexual_arts`, `divine_sexual_mastery`, `reincarnation_boon_yuna`), which
+  carry no `SexualActDef` and are excluded by name.
 
 ## Capabilities
 
 ### New Capabilities
 - `sexual-act-registry`: `SexualActDef`, `SEXUAL_ACT_REGISTRY`, the six-module package with its
-  pre-declared stubs, `_act_family()`, and the seven structural invariants.
+  pre-declared stubs, `_act_family()`, the shared pure unlock query
+  `unlocked_act_keys_for(owned_keys, counter_values)` (the single implementation of the threshold
+  gate and the mastery blanket unlock), and the seven structural invariants.
 
 ### Modified Capabilities
 - `sexual-state-handler`: adds the `unlocked_act_keys()` query, including the `SexualMasteryEffect`
@@ -61,7 +65,10 @@ direct dependent) and the six catalog proposals that follow it.
 - New: `world/skills/sexual_acts/__init__.py`, `_builder.py`, `solo.py`, `shame.py`, `partner.py`,
   `combat.py`, `interspecies.py`, `divine.py`.
 - Modified: `world/rules/sexual_state.py` (new method only — no field or existing method changes),
-  `world/skills/handler.py`.
+  `world/skills/handler.py`. `owned_keys()` additionally keeps preview and no-create status reads
+  side-effect-free: it consults the unlocked-act query through the materialized handler only when
+  the handler already exists, and resolves unmaterialized entities from pure registry data (see the
+  change's design.md D-5).
 - No change to `world/rules/action.py`, `world/skills/registry.py`, or any `rulebook/*.yaml` — those
   are `sexual-act-effects`'s territory (dependent proposal).
 - No player-visible behaviour change: with zero acts registered, `unlocked_act_keys()` returns an

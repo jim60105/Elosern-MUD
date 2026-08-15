@@ -1,0 +1,465 @@
+"""Whole-registry structural invariants for the sexual act catalogue.
+
+The per-row checks run inside ``_act_family()`` at import time; the
+whole-registry checks below are test-time, mirroring ``sexual.yaml``'s own
+``test_every_rule_id_has_a_test()`` precedent, because they need the fully
+assembled ``SKILL_REGISTRY`` and a parsed rulebook that no single module is
+guaranteed to have while still importing.
+"""
+
+from tools.spec_traceability import covers_requirement
+
+import inspect
+from dataclasses import replace
+from pathlib import Path
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.characters import PlayerCharacter
+from world.lore.sexual_vocab import BODY_PARTS, GENERIC_BODY_PART
+from world.rules.rulebook.schema import load_rules
+from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
+from world.skills import handler
+from world.skills.handler import SkillHandler
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
+)
+import world.skills.registry as registry_module
+from world.skills import sexual_acts
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.sexual_acts._builder import SexualActDef, _act_family
+
+_SEXUAL_YAML_PATH = Path(__file__).parents[3] / "rules" / "rulebook" / "sexual.yaml"
+# The three pre-existing mastery/mystery skills categorised SEXUAL_ACT that
+# carry no SexualActDef by design (acquisition-path skills, not acts).
+_MASTERY_EXCLUSIONS = frozenset(
+    {"divine_sexual_arts", "divine_sexual_mastery", "reincarnation_boon_yuna"}
+)
+
+_KNOWN_EVENTS = frozenset(
+    rule.when["event"]
+    for rule in load_rules(_SEXUAL_YAML_PATH)
+    if "event" in rule.when
+)
+
+
+def check_names_resolve(act: SexualActDef) -> None:
+    """Assert every counter/event an act names actually exists.
+
+    Raises ``AssertionError`` naming the act's key and the unrecognized
+    string, so the failure points at the offending catalog row.
+    """
+    for name in (*act.unlock, *act.actor_counters, *act.participant_counters):
+        if name not in _LIFETIME_COUNTER_KEYS:
+            raise AssertionError(
+                f"act {act.key!r} names unknown counter {name!r}"
+            )
+    for name in act.sexual_events:
+        if name not in _KNOWN_EVENTS:
+            raise AssertionError(f"act {act.key!r} names unknown event {name!r}")
+
+
+def check_registries_agree(act_registry, skill_registry) -> None:
+    """Assert both registries carry exactly the same act keys.
+
+    ``SKILL_REGISTRY``'s ``SEXUAL_ACT``-categorised keys must equal
+    ``SEXUAL_ACT_REGISTRY``'s keys, modulo the named mastery/mystery
+    exclusions. Raises ``AssertionError`` naming any unmatched key.
+    """
+    skill_act_keys = {
+        key
+        for key, skill in skill_registry.items()
+        if skill.category is SkillCategory.SEXUAL_ACT
+    } - _MASTERY_EXCLUSIONS
+    unmatched = skill_act_keys ^ set(act_registry)
+    if unmatched:
+        raise AssertionError(
+            "SEXUAL_ACT_REGISTRY and SKILL_REGISTRY disagree on act keys: "
+            f"{sorted(unmatched)}"
+        )
+
+
+def _seed_act_row(
+    key: str = "test_act",
+    *,
+    line: str = "獨處線",
+    unlock: dict[str, int] | None = None,
+    base_pleasure: int = 10,
+    actor_part: str | None = "私處",
+    target_part: str | None = None,
+    actor_pleasure_ratio: float = 0.5,
+    resistible: bool = True,
+    requires_divine_arts: bool = False,
+) -> tuple[SkillDef, SexualActDef]:
+    """Build one synthetic act row for contract tests without catalog content."""
+    (skill, act), = _act_family(
+        line,
+        (
+            key,
+            "測試行為",
+            "僅存在於測試中的合成行為。",
+            TargetSpec.SELF,
+            {} if unlock is None else unlock,
+            base_pleasure,
+            actor_part,
+            target_part,
+            actor_pleasure_ratio,
+            ("restraint_count",),
+            (),
+            ("stimulus_applied",),
+            resistible,
+        ),
+        requires_divine_arts=requires_divine_arts,
+    )
+    return skill, act
+
+
+class SexualActDefContractTests(unittest.TestCase):
+    """The SexualActDef field contract (design D-1)."""
+
+    @covers_requirement("sexual-act-registry::sexualactdef-carries-exactly-the-metadata-a-sex-act-needs-beyond-skilldef")
+    def test_seed_act_accepts_an_empty_unlock_mapping(self):
+        act = SexualActDef(
+            key="seed",
+            unlock={},
+            base_pleasure=10,
+            actor_part="私處",
+            target_part=None,
+            actor_pleasure_ratio=0.5,
+            actor_counters=(),
+            participant_counters=(),
+            sexual_events=(),
+            resistible=True,
+        )
+        self.assertEqual(act.unlock, {})
+
+    @covers_requirement("sexual-act-registry::sexualactdef-carries-exactly-the-metadata-a-sex-act-needs-beyond-skilldef")
+    def test_unlock_mapping_is_immutable_and_detached_from_the_input(self):
+        raw = {"restraint_count": 1}
+        act = SexualActDef(
+            key="frozen_unlock",
+            unlock=raw,
+            base_pleasure=10,
+            actor_part="私處",
+            target_part=None,
+            actor_pleasure_ratio=0.5,
+            actor_counters=(),
+            participant_counters=(),
+            sexual_events=(),
+            resistible=True,
+        )
+        raw["restraint_count"] = 99
+        self.assertEqual(act.unlock, {"restraint_count": 1})
+        with self.assertRaises(TypeError):
+            act.unlock["restraint_count"] = 2
+
+    @covers_requirement("sexual-act-registry::sexualactdef-carries-exactly-the-metadata-a-sex-act-needs-beyond-skilldef")
+    def test_sexualactdef_declares_no_line_field(self):
+        fields = {field.name for field in SexualActDef.__dataclass_fields__.values()}
+        self.assertNotIn("line", fields)
+        skill, act = _seed_act_row()
+        self.assertEqual(skill.group, "獨處線")
+        self.assertFalse(hasattr(act, "line"))
+
+    @covers_requirement("sexual-act-registry::every-counter-and-event-an-act-names-actually-exists-checked-across-the-whole-assembled-registry")
+    def test_unrecognized_counter_name_fails_the_structural_check(self):
+        bad = SexualActDef(
+            key="bad_counter",
+            unlock={"自慰次數": 10},
+            base_pleasure=10,
+            actor_part="私處",
+            target_part=None,
+            actor_pleasure_ratio=0.5,
+            actor_counters=(),
+            participant_counters=(),
+            sexual_events=(),
+            resistible=True,
+        )
+        with self.assertRaises(AssertionError) as caught:
+            check_names_resolve(bad)
+        self.assertIn("bad_counter", str(caught.exception))
+        self.assertIn("自慰次數", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::every-counter-and-event-an-act-names-actually-exists-checked-across-the-whole-assembled-registry")
+    def test_unrecognized_event_name_fails_the_structural_check(self):
+        bad = SexualActDef(
+            key="bad_event",
+            unlock={},
+            base_pleasure=10,
+            actor_part="私處",
+            target_part=None,
+            actor_pleasure_ratio=0.5,
+            actor_counters=(),
+            participant_counters=(),
+            sexual_events=("a_fake_event",),
+            resistible=True,
+        )
+        with self.assertRaises(AssertionError) as caught:
+            check_names_resolve(bad)
+        self.assertIn("bad_event", str(caught.exception))
+        self.assertIn("a_fake_event", str(caught.exception))
+
+
+class ActFamilyTests(unittest.TestCase):
+    """The _act_family() pairing contract and its five per-row checks."""
+
+    @covers_requirement("sexual-act-registry::every-sexualactdef-is-paired-with-an-ordinary-skilldef-under-the-same-key-categorised-sexual-act")
+    def test_row_produces_a_matching_skilldef_and_sexualactdef(self):
+        skill, act = _seed_act_row("test_act")
+        self.assertIs(skill.category, SkillCategory.SEXUAL_ACT)
+        self.assertEqual(skill.key, "test_act")
+        self.assertEqual(act.key, "test_act")
+        self.assertEqual(act.unlock, {})
+
+    @covers_requirement("sexual-act-registry::every-sexualactdef-is-paired-with-an-ordinary-skilldef-under-the-same-key-categorised-sexual-act")
+    def test_sex_act_costs_no_resource_and_casts_out_of_combat(self):
+        skill, _ = _seed_act_row()
+        self.assertEqual(skill.cost, {})
+        self.assertTrue(skill.usable_out_of_combat)
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+
+    @covers_requirement("sexual-act-registry::every-act-applying-pleasure-to-another-participant-applies-non-zero-pleasure-to-its-own-actor-unless-it-requires-divine-arts")
+    def test_zero_actor_pleasure_ratio_is_rejected_for_a_non_divine_family(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row("bad_ratio", actor_pleasure_ratio=0.0)
+        self.assertIn("bad_ratio", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::every-act-applying-pleasure-to-another-participant-applies-non-zero-pleasure-to-its-own-actor-unless-it-requires-divine-arts")
+    def test_zero_actor_pleasure_ratio_is_accepted_for_a_divine_family(self):
+        skill, act = _seed_act_row(
+            "divine_row",
+            actor_pleasure_ratio=0.0,
+            requires_divine_arts=True,
+        )
+        self.assertTrue(skill.requires_divine_arts)
+        self.assertEqual(act.actor_pleasure_ratio, 0.0)
+
+    @covers_requirement("sexual-act-registry::every-act-applying-pleasure-to-another-participant-applies-non-zero-pleasure-to-its-own-actor-unless-it-requires-divine-arts")
+    def test_non_finite_actor_pleasure_ratio_is_rejected_for_every_family(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(ratio=bad):
+                with self.assertRaises(ValueError) as caught:
+                    _seed_act_row("bad_finite_ratio", actor_pleasure_ratio=bad)
+                self.assertIn("bad_finite_ratio", str(caught.exception))
+            with self.subTest(ratio=bad, divine=True):
+                with self.assertRaises(ValueError):
+                    _seed_act_row(
+                        "bad_finite_ratio_divine",
+                        actor_pleasure_ratio=bad,
+                        requires_divine_arts=True,
+                    )
+
+    def test_non_integer_unlock_threshold_is_rejected(self):
+        for bad in (True, 1.5, "1"):
+            with self.subTest(threshold=bad):
+                with self.assertRaises(ValueError) as caught:
+                    _seed_act_row("bad_threshold", unlock={"restraint_count": bad})
+                self.assertIn("bad_threshold", str(caught.exception))
+
+    def test_non_mapping_unlock_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row("bad_unlock_shape", unlock=("restraint_count", 1))
+        self.assertIn("bad_unlock_shape", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")
+    def test_declaring_the_generic_body_part_is_rejected(self):
+        for part_field in ("actor_part", "target_part"):
+            with self.subTest(part_field=part_field):
+                kwargs = {"actor_part": "私處", "target_part": None}
+                kwargs[part_field] = GENERIC_BODY_PART
+                with self.assertRaises(ValueError) as caught:
+                    _seed_act_row(f"bad_part_{part_field}", **kwargs)
+                self.assertIn(f"bad_part_{part_field}", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")
+    def test_interspecies_act_declaring_a_target_part_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row("bad_interspecies", line="異種", target_part="私處")
+        self.assertIn("bad_interspecies", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")
+    def test_divine_act_declaring_a_target_part_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row(
+                "bad_divine",
+                line="神之秘法",
+                target_part="私處",
+                requires_divine_arts=True,
+            )
+        self.assertIn("bad_divine", str(caught.exception))
+
+    @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")
+    def test_part_outside_body_parts_is_rejected_naming_key_and_part(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row("bad_body_part", actor_part="觸手")
+        message = str(caught.exception)
+        self.assertIn("bad_body_part", message)
+        self.assertIn("觸手", message)
+
+    def test_non_positive_base_pleasure_is_rejected(self):
+        for bad in (0, -5, 1.5):
+            with self.subTest(base_pleasure=bad):
+                with self.assertRaises(ValueError):
+                    _seed_act_row("bad_pleasure", base_pleasure=bad)
+
+    def test_non_bare_bool_resistible_is_rejected(self):
+        with self.assertRaises(ValueError):
+            _seed_act_row("bad_resistible", resistible=1)
+
+
+class LineModuleTests(unittest.TestCase):
+    """Every line module ships pre-declared and empty (design D-3)."""
+
+    @covers_requirement("sexual-act-registry::the-six-line-modules-ship-pre-declared-and-pre-imported-each-exporting-an-empty-tuple")
+    def test_every_line_module_is_importable_and_empty(self):
+        for module, constant in (
+            (sexual_acts.solo, "SOLO_ACTS"),
+            (sexual_acts.shame, "SHAME_ACTS"),
+            (sexual_acts.partner, "PARTNER_ACTS"),
+            (sexual_acts.combat, "COMBAT_ACTS"),
+            (sexual_acts.interspecies, "INTERSPECIES_ACTS"),
+            (sexual_acts.divine, "DIVINE_ACTS"),
+        ):
+            with self.subTest(module=module.__name__):
+                self.assertEqual(getattr(module, constant), ())
+
+
+class RegistryAssemblyTests(unittest.TestCase):
+    """Import-order and agreement invariants of the assembled registries."""
+
+    def test_registration_updates_the_shared_skill_registry_object(self):
+        self.assertIs(
+            sexual_acts.SKILL_REGISTRY,
+            registry_module.SKILL_REGISTRY,
+        )
+
+    def test_colliding_act_key_is_rejected_by_the_assembly(self):
+        skill, act = _seed_act_row("basic_attack")
+        with self.assertRaises(ValueError) as caught:
+            sexual_acts._register_rows(((skill, act),))
+        self.assertIn("basic_attack", str(caught.exception))
+
+    def test_duplicate_act_key_is_rejected_by_the_assembly(self):
+        skill, act = _seed_act_row("dup_act")
+        with patch.dict(SEXUAL_ACT_REGISTRY, {"dup_act": act}):
+            with self.assertRaises(ValueError) as caught:
+                sexual_acts._register_rows(((skill, act),))
+        self.assertIn("dup_act", str(caught.exception))
+
+    def test_key_disagreement_is_rejected_by_the_assembly(self):
+        skill, act = _seed_act_row("agree_key")
+        mismatched = replace(act, key="other_key")
+        with self.assertRaises(ValueError) as caught:
+            sexual_acts._register_rows(((skill, mismatched),))
+        message = str(caught.exception)
+        self.assertIn("agree_key", message)
+        self.assertIn("other_key", message)
+
+    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-three-named-mastery-mystery-exclusions")
+    def test_registries_agree_with_zero_acts_registered(self):
+        check_registries_agree(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
+
+    @covers_requirement("sexual-act-registry::sexual-act-registry-s-keys-and-skill-registry-s-sexual-act-categorised-keys-agree-exactly-modulo-the-three-named-mastery-mystery-exclusions")
+    def test_orphan_sexual_act_skill_fails_the_agreement_check(self):
+        orphan = SkillDef(
+            key="orphan_act",
+            label="孤兒行為",
+            description="直接注入測試中的 SEXUAL_ACT 技能，沒有配對的 SexualActDef。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SELF,
+            cost={},
+            usable_out_of_combat=True,
+            element=None,
+            effects=[],
+            category=SkillCategory.SEXUAL_ACT,
+            group="獨處線",
+        )
+        with patch.dict(SKILL_REGISTRY, {"orphan_act": orphan}):
+            with self.assertRaises(AssertionError) as caught:
+                check_registries_agree(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
+        self.assertIn("orphan_act", str(caught.exception))
+
+
+class WholeRegistryStructuralTests(unittest.TestCase):
+    """The whole-registry invariants against the assembled catalogue."""
+
+    def test_every_named_counter_and_event_resolves(self):
+        for act in SEXUAL_ACT_REGISTRY.values():
+            with self.subTest(act=act.key):
+                check_names_resolve(act)
+
+
+class OwnershipDriftGuardTests(EvenniaTest):
+    """owned_keys() equals base_owned_keys() with zero unlocked acts."""
+
+    def test_owned_keys_matches_base_owned_keys_when_nothing_is_unlocked(self):
+        entity = create_object(PlayerCharacter, key="drift guard")
+        entity.race = "human"
+        entity.apply_race_baseline()
+        entity.db.skills = {"active": ["fire_ball"], "passive": []}
+        self.assertEqual(entity.sexual.unlocked_act_keys(), frozenset())
+        self.assertEqual(entity.skills.owned_keys(), entity.skills.base_owned_keys())
+        self.assertEqual(
+            entity.skills.owned_keys(),
+            ["fire_ball", "flee", "basic_attack"],
+        )
+
+    @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")
+    def test_handler_imports_nothing_from_world_rules(self):
+        source = inspect.getsource(handler)
+        self.assertNotIn("world.rules", source)
+        self.assertIn("getattr(self.entity, \"sexual\", None)", source)
+
+    def test_handler_has_no_sexual_import_at_module_level(self):
+        source = inspect.getsource(handler)
+        self.assertNotIn("from world.rules", source)
+        self.assertNotIn("import sexual_state", source)
+
+    @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")
+    def test_owned_keys_resolves_without_a_sexual_attribute(self):
+        bare = SimpleNamespace(db=SimpleNamespace(skills=None))
+        self.assertEqual(
+            SkillHandler(bare).owned_keys(),
+            ["flee", "basic_attack"],
+        )
+
+    def test_owned_keys_reads_seed_acts_without_materializing_sexual_state(self):
+        entity = create_object(PlayerCharacter, key="no-create seed read")
+        entity.race = "human"
+        entity.apply_race_baseline()
+        entity.db.skills = {"active": [], "passive": []}
+        skill, act = _seed_act_row("seed_only_act", unlock={})
+        self.assertIsNone(
+            entity.attributes.get("sexual_traits", default=None, category="traits")
+        )
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            self.assertIn(act.key, entity.skills.owned_keys())
+        self.assertIsNone(
+            entity.attributes.get("sexual_traits", default=None, category="traits"),
+            "owned_keys() must not materialize the sexual handler",
+        )
+
+    def test_owned_keys_mastery_fallback_unlocks_without_materializing(self):
+        entity = create_object(PlayerCharacter, key="no-create mastery read")
+        entity.race = "human"
+        entity.apply_race_baseline()
+        entity.db.skills = {"active": ["divine_sexual_mastery"], "passive": []}
+        skill, act = _seed_act_row("mastery_only_act", unlock={"climax_count": 99})
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            self.assertIn(act.key, entity.skills.owned_keys())
+        self.assertIsNone(
+            entity.attributes.get("sexual_traits", default=None, category="traits"),
+            "owned_keys() must not materialize the sexual handler",
+        )
