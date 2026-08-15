@@ -18,9 +18,11 @@ from world.skills.effects import (
     GrowthRateEffect,
     HealEffect,
     MovementEffect,
+    PleasureEffect,
     RuleTableEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
+    SexualCounterEffect,
     SexualEventEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
@@ -126,6 +128,27 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("sexual_event:交合"),
             SexualEventEffect(event_name="交合"),
         )
+
+    @covers_requirement("skill-effect-model::pleasure-and-sexual-counter-parse-into-bare-key-carrying-typed-dataclasses")
+    def test_pleasure_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("pleasure:masturbation_seed"),
+            PleasureEffect(act_key="masturbation_seed"),
+        )
+
+    @covers_requirement("skill-effect-model::pleasure-and-sexual-counter-parse-into-bare-key-carrying-typed-dataclasses")
+    def test_sexual_counter_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("sexual_counter:masturbation_seed"),
+            SexualCounterEffect(act_key="masturbation_seed"),
+        )
+
+    @covers_requirement("skill-effect-model::pleasure-and-sexual-counter-parse-into-bare-key-carrying-typed-dataclasses")
+    def test_missing_act_key_raises_at_construction(self):
+        for effect in ("pleasure:", "sexual_counter:"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     def test_damage_parses_into_its_dataclass(self):
         self.assertEqual(

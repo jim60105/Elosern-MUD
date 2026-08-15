@@ -31,6 +31,21 @@ from world.skills.registry import (
 # arbitrarily shaped monsters and divine arts operate through divinity.
 _PARLESS_LINES = ("異種", "神之秘法")
 
+# Events an act's ``sexual_events`` tuple may never declare (design D-8):
+# the first three target the pleasure gauge directly and would double-count
+# against the act's own scaled ``pleasure:`` effect, and the last two are
+# owned exclusively by the climax-settlement mechanism (combat/clock upkeep
+# calls), never by an individual act's cast.
+_FORBIDDEN_SEXUAL_EVENTS = frozenset(
+    {
+        "stimulus_applied",
+        "sustained_stimulus_applied",
+        "extreme_stimulus_applied",
+        "climax_ends",
+        "climax_extended",
+    }
+)
+
 
 @dataclass(frozen=True)
 class SexualActDef:
@@ -83,13 +98,15 @@ def _act_family(
     actor_counters, participant_counters, sexual_events, resistible)`` in
     the exact order of the resolution design doc. The line is written once
     per family; every produced ``SkillDef`` is an ACTIVE, zero-cost,
-    out-of-combat-castable skill categorised ``SEXUAL_ACT`` with an empty
-    ``effects`` list until the dependent ``sexual-act-effects`` change adds
-    the ``pleasure:``/``sexual_counter:`` prefixes.
+    out-of-combat-castable skill categorised ``SEXUAL_ACT`` whose ``effects``
+    list carries the ``pleasure:<key>``/``sexual_counter:<key>`` prefixes for
+    its own key plus one ``sexual_event:<name>`` string per declared event,
+    resolving through the handlers ``sexual-act-effects`` registers.
 
-    Runs the five per-row structural checks (design D-6 items 1-5) before
-    returning, raising ``ValueError`` naming the offending key so a catalog
-    author's mistake fails at import time rather than at play time.
+    Runs the per-row structural checks (design D-6 items 1-5 plus the
+    forbidden-events check) before returning, raising ``ValueError`` naming
+    the offending key so a catalog author's mistake fails at import time
+    rather than at play time.
     """
     pairs: list[tuple[SkillDef, SexualActDef]] = []
     for row in rows:
@@ -108,6 +125,11 @@ def _act_family(
             sexual_events,
             resistible,
         ) = row
+        forbidden = _FORBIDDEN_SEXUAL_EVENTS & set(sexual_events)
+        if forbidden:
+            raise ValueError(
+                f"act {key!r}: forbidden sexual_event names {sorted(forbidden)}"
+            )
         if (
             isinstance(actor_pleasure_ratio, bool)
             or not isinstance(actor_pleasure_ratio, (int, float))
@@ -165,7 +187,11 @@ def _act_family(
             cost={},
             usable_out_of_combat=True,
             element=None,
-            effects=[],
+            effects=[
+                f"pleasure:{key}",
+                f"sexual_counter:{key}",
+                *(f"sexual_event:{name}" for name in sexual_events),
+            ],
             category=SkillCategory.SEXUAL_ACT,
             group=line,
             requires_divine_arts=requires_divine_arts,

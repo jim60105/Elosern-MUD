@@ -45,7 +45,7 @@ class AcceptanceProofTests(EvenniaTest):
                 0.5,
                 ("restraint_count",),
                 (),
-                ("stimulus_applied",),
+                (),
                 True,
             ),
         )
@@ -68,7 +68,7 @@ class AcceptanceProofTests(EvenniaTest):
             self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
     @covers_requirement("sexual-state-handler::sexualstate-unlocked-act-keys-gates-the-sexual-act-catalogue-by-counter-thresholds-or-unlocks-it-entirely-for-a-mastery-holder")
-    def test_act_unlocks_at_threshold_and_resolves_as_a_successful_noop(self):
+    def test_act_unlocks_at_threshold_and_resolves_through_the_full_pipeline(self):
         with self._install()[0], self._install()[1]:
             self.actor.sexual.record_restraint()
             self.assertIn(self.act.key, self.actor.skills.owned_keys())
@@ -77,5 +77,6 @@ class AcceptanceProofTests(EvenniaTest):
             self.assertEqual(result.event_log.skill_key, self.act.key)
             self.assertEqual(
                 [entry.kind for entry in result.event_log.entries],
-                ["skill_practice"],
+                ["pleasure_gain", "sexual_counter", "skill_practice"],
             )
+            self.assertEqual(self.actor.sexual.restraint_count, 2)

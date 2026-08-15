@@ -82,15 +82,24 @@ registry `sexual-act-registry` already validates.
 
 ```python
 def participants(actor: Any, targets: list[Any]) -> list[Any]:
-    return list(dict.fromkeys([actor, *targets]))
+    result = [actor]
+    seen: set[int] = {id(actor)}
+    for target in targets:
+        if id(target) in seen:
+            continue
+        seen.add(id(target))
+        result.append(target)
+    return result
 ```
 
 `ActionResolver._step3_targeting` already sets `candidates = [request.actor]` when a `SELF`-target
 skill is cast with no explicit targets, so a solo act's `targets` argument arriving at the handler is
 already `[actor]` — `participants()` just needs to de-duplicate, not special-case SELF. For a
 `SINGLE`/`AREA` act aimed at others, `targets` does not include the actor, so `participants()`
-prepends it. `dict.fromkeys` preserves actor-first order deterministically without importing a set
-(sets do not preserve insertion order in a way this codebase relies on elsewhere).
+prepends it. Deduplication is by object identity (`id()`), matching the spec's "identical to the
+actor" wording: two distinct entities that happen to compare equal are two different participants
+and both must receive the act's effects. (An earlier draft used `list(dict.fromkeys(...))`, whose
+hash/equality-based dedup would wrongly collapse equal-but-distinct entities.)
 
 ### D-3: The gain formula, and where the participant-count table lives
 
@@ -98,7 +107,7 @@ prepends it. `dict.fromkeys` preserves actor-first order deterministically witho
 def compute_pleasure_gain(
     participant: Any, part: str, base_pleasure: int, ratio: float, participant_count: int,
 ) -> int:
-    sensitivity = PLEASURE_CONFIG.sensitivity_multipliers[participant.sexual.sensitivity[part].level]
+    sensitivity = PLEASURE_CONFIG.sensitivity_multipliers[_sensitivity_level(participant, part)]
     shame = PLEASURE_CONFIG.shame_multipliers[participant.sexual.shame.level]
     crowd = _EFFECTS_CONFIG.participant_multiplier(participant_count)
     return round(base_pleasure * ratio * sensitivity * shame * crowd)
@@ -107,6 +116,14 @@ def compute_pleasure_gain(
 `ratio` is `1.0` for every recipient and `act.actor_pleasure_ratio` for the actor's own entry — the
 D-4/D-9 self-pleasure split lives entirely in how the handler calls this function, not in the
 function itself, so the formula has no special case for "am I the actor."
+
+The sensitivity multiplier is read through `_sensitivity_level()`, a side-effect-free lookup that
+returns `普通` for a body part whose sensitivity trait was never materialized. Reading
+`participant.sexual.sensitivity[part]` directly would lazily create that trait — a storage write at
+effect-**planning** time, before the commit snapshot exists — so a cast rejected after planning would
+leave the created trait behind, breaking the action workflow's all-or-nothing boundary. `items()` on
+the sensitivity proxy surfaces only existing traits; a missing trait's canonical default is `普通`,
+exactly what the lazy creation would have stored, so the two reads are semantically identical.
 
 The participant-count multiplier is **not** added to `sexual_pleasure.yaml`/`PLEASURE_CONFIG`
 (`pleasure-gauge`'s territory, already archived). It lives in a new, small, independently-validated
@@ -178,6 +195,7 @@ def _handle_pleasure_effect(actor, targets, effect_id, context, scale):
 def _apply_pleasure_gain(entity: Any, gain: int) -> None:
     pre_arousal_ordinal = entity.sexual.arousal.value
     was_at_critical_point = entity.sexual.climax_phase.level == "接近"
+    was_in_progress = entity.sexual.climax_phase.level == "進行中"
 
     entity.sexual.pleasure.base += gain
 
@@ -188,7 +206,7 @@ def _apply_pleasure_gain(entity: Any, gain: int) -> None:
     if was_at_critical_point:
         _apply_climax_phase_set(entity, "進行中")
 
-    if entity.sexual.climax_phase.level == "進行中" and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
+    if was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
         entity.sexual.stage_climax_extension()
 ```
 
@@ -198,6 +216,17 @@ def _apply_pleasure_gain(entity: Any, gain: int) -> None:
 clamped result, matching the pleasure model design's explicit requirement: an entity already in
 `進行中` sits at 85-100, so the *applied* delta is frequently near zero after clamping, and gating on
 the applied delta would make extension fire almost never.
+
+The extension trigger reads `was_in_progress`, the **pre-mutation** phase, not the post-transition
+phase: a participant this very call moves from `接近` into `進行中` has just *started* climaxing — the
+stimulus that pushed it over the edge is the climax trigger, not a qualifying extension stimulus
+(pleasure-model design §3.2's loop gates extension on "a qualifying extension stimulus landed this
+round" while already in `進行中`). Gating on the post-transition phase would make the first climax
+round auto-extend from the same stimulus that started it, and would contradict this change's own
+delta spec scenario ("a gain on a participant not currently in `進行中` never stages an extension,
+regardless of the computed gain's size"). The capture therefore joins
+`pre_arousal_ordinal`/`was_at_critical_point` as one of the three reads taken **before** any
+mutation.
 
 **Why climax-phase and wetness are replicated here instead of routed through `apply_event()`.** The
 rubber-duck review that preceded this revision correctly identified that mutating `pleasure` outside
@@ -280,6 +309,22 @@ cascade exactly as `divine_sexual_arts` already exercises for `stimulus_applied`
 
 A structural test (extending `sexual-act-registry`'s existing test module) asserts no act's
 `sexual_events` intersects `_FORBIDDEN_SEXUAL_EVENTS`.
+
+**The event-context part contract.** One currently-declared event is not free to resolve: the
+sensitivity rule `sensitivity_up_on_frequent_stimulation` reads the recipient's body part from the
+event context (`apply_event(..., part=...)`), and `_handle_sexual_event` forwards only what the
+caller supplied — it does not resolve parts itself, because its effect string (`sexual_event:<name>`)
+carries no act key to look up. The spec's reuse scenario therefore states the precondition
+explicitly: a cast of an act declaring a part-requiring event must arrive **with a resolved part in
+its event context**. This proposal's pleasure handler resolves per-participant parts for its own
+gain computation but does not publish them to the event handler — the spec pins the reuse as
+"add no new code path", and a single shared `part` value would be wrong for an AREA cast whose
+recipients resolve to different parts (a `Monster` collapses to `軀體` while a humanoid keeps the
+declared part). The cast-path plumbing that supplies per-recipient event context belongs to a later
+proposal that owns `cast_settlement.py`/`commands/action.py` (the same audit `sexual-resist-
+out-of-combat` deferred into); the catalog proposal that declares `frequent_stimulation` on an act
+must land that plumbing in the same change. With zero acts registered today, no shipped cast can
+reach this gap.
 
 ### D-6: The counter mutator table is explicit, not derived
 
@@ -368,6 +413,14 @@ actor" third category.
   **Mitigation**: this is disclosed, not silent; the 羞恥線 catalog proposal must add its own
   `sexual.yaml` row(s) and event(s) when it lands, which is normal for a proposal that both owns new
   content and needs a small rulebook addition to express it.
+- **[Risk]** An act declaring a part-requiring event (`frequent_stimulation`) cast through the
+  ordinary player command path fails at commit, because nothing in the shipped cast path supplies the
+  recipient's body part as event context — the event-handler contract requires it (see D-8's part
+  contract). → **Mitigation**: explicitly disclosed in D-8, not silently missing; the cast-path
+  plumbing is out of this proposal's file ownership and is the same audit the deferred
+  `sexual-resist-out-of-combat` proposal schedules against `cast_settlement.py`/`commands/action.py`.
+  A catalog proposal that declares such an event must land that plumbing in the same change; with
+  zero acts registered today the gap is unreachable.
 
 ## Migration Plan
 

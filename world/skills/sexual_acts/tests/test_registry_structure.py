@@ -87,15 +87,56 @@ def check_registries_agree(act_registry, skill_registry) -> None:
         )
 
 
+def check_solo_acts_declare_no_participant_counters(act_registry, skill_registry) -> None:
+    """Assert every SELF-target act declares ``participant_counters=()``.
+
+    A solo act has no other participant to credit, so a non-empty
+    participant counter list would silently mis-credit nobody.
+    """
+    for key, act in act_registry.items():
+        skill = skill_registry[key]
+        if skill.target_spec is TargetSpec.SELF and act.participant_counters:
+            raise AssertionError(
+                f"act {key!r} is SELF-targeted but declares "
+                f"participant_counters {act.participant_counters}"
+            )
+
+
+def check_external_acts_declare_a_target_part(act_registry, skill_registry) -> None:
+    """Assert every non-異種/神之秘法 act targeting others declares a target part.
+
+    The two parless lines may omit ``target_part`` by design (monsters are
+    arbitrarily shaped, divine arts operate through divinity); any other line
+    targeting a second entity must declare the part that entity's pleasure is
+    computed against, or ``resolve_part`` would silently fall back to the
+    generic channel (design risk mitigation).
+    """
+    for key, act in act_registry.items():
+        skill = skill_registry[key]
+        if skill.group in ("異種", "神之秘法"):
+            continue
+        if skill.target_spec in (TargetSpec.SELF, TargetSpec.NONE):
+            continue
+        if act.target_part is None:
+            raise AssertionError(
+                f"act {key!r} on line {skill.group!r} targets others "
+                "but declares no target_part"
+            )
+
+
 def _seed_act_row(
     key: str = "test_act",
     *,
     line: str = "獨處線",
+    target_spec: TargetSpec = TargetSpec.SELF,
     unlock: dict[str, int] | None = None,
     base_pleasure: int = 10,
     actor_part: str | None = "私處",
     target_part: str | None = None,
     actor_pleasure_ratio: float = 0.5,
+    actor_counters: tuple[str, ...] = ("restraint_count",),
+    participant_counters: tuple[str, ...] = (),
+    sexual_events: tuple[str, ...] = (),
     resistible: bool = True,
     requires_divine_arts: bool = False,
 ) -> tuple[SkillDef, SexualActDef]:
@@ -106,15 +147,15 @@ def _seed_act_row(
             key,
             "測試行為",
             "僅存在於測試中的合成行為。",
-            TargetSpec.SELF,
+            target_spec,
             {} if unlock is None else unlock,
             base_pleasure,
             actor_part,
             target_part,
             actor_pleasure_ratio,
-            ("restraint_count",),
-            (),
-            ("stimulus_applied",),
+            actor_counters,
+            participant_counters,
+            sexual_events,
             resistible,
         ),
         requires_divine_arts=requires_divine_arts,
@@ -314,6 +355,104 @@ class ActFamilyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _seed_act_row("bad_resistible", resistible=1)
 
+    @covers_requirement("sexual-act-registry::act-family-populates-every-row-s-effects-with-the-pleasure-and-sexual-counter-prefixes-for-that-row-s-own-key-plus-one-sexual-event-entry-per-declared-event")
+    def test_row_effects_carry_both_new_prefixes_keyed_to_its_own_act(self):
+        skill, _ = _seed_act_row("test_act")
+        self.assertEqual(
+            skill.effects,
+            ["pleasure:test_act", "sexual_counter:test_act"],
+        )
+
+    @covers_requirement("sexual-act-registry::act-family-populates-every-row-s-effects-with-the-pleasure-and-sexual-counter-prefixes-for-that-row-s-own-key-plus-one-sexual-event-entry-per-declared-event")
+    def test_declared_sexual_events_gain_one_entry_per_name_in_order(self):
+        skill, _ = _seed_act_row(
+            "test_act",
+            sexual_events=("frequent_stimulation", "watched_during_activity"),
+        )
+        self.assertEqual(
+            skill.effects,
+            [
+                "pleasure:test_act",
+                "sexual_counter:test_act",
+                "sexual_event:frequent_stimulation",
+                "sexual_event:watched_during_activity",
+            ],
+        )
+
+    @covers_requirement("sexual-act-registry::act-family-populates-every-row-s-effects-with-the-pleasure-and-sexual-counter-prefixes-for-that-row-s-own-key-plus-one-sexual-event-entry-per-declared-event")
+    def test_multiple_rows_each_name_only_their_own_key(self):
+        rows = (
+            (
+                "first_act",
+                "第一行為",
+                "測試用第一行為。",
+                TargetSpec.SELF,
+                {},
+                10,
+                "私處",
+                None,
+                0.5,
+                (),
+                (),
+                (),
+                True,
+            ),
+            (
+                "second_act",
+                "第二行為",
+                "測試用第二行為。",
+                TargetSpec.SELF,
+                {},
+                10,
+                "私處",
+                None,
+                0.5,
+                (),
+                (),
+                (),
+                True,
+            ),
+        )
+        pairs = _act_family("獨處線", *rows)
+        self.assertEqual(len(pairs), 2)
+        for skill, act in pairs:
+            for effect in skill.effects:
+                if effect.startswith("pleasure:") or effect.startswith("sexual_counter:"):
+                    self.assertEqual(
+                        effect.partition(":")[2],
+                        act.key,
+                        f"{skill.key!r} names another act's key in {effect!r}",
+                    )
+
+    @covers_requirement("sexual-act-registry::an-act-s-sexual-events-never-names-a-pleasure-wetness-or-climax-settlement-owned-event")
+    def test_forbidden_event_fails_at_construction_naming_key_and_event(self):
+        with self.assertRaises(ValueError) as caught:
+            _seed_act_row("bad_event_act", sexual_events=("stimulus_applied",))
+        message = str(caught.exception)
+        self.assertIn("bad_event_act", message)
+        self.assertIn("stimulus_applied", message)
+
+    @covers_requirement("sexual-act-registry::an-act-s-sexual-events-never-names-a-pleasure-wetness-or-climax-settlement-owned-event")
+    def test_direct_stimulus_applied_is_permitted(self):
+        skill, _ = _seed_act_row(
+            "ok_event_act",
+            sexual_events=("direct_stimulus_applied",),
+        )
+        self.assertIn("sexual_event:direct_stimulus_applied", skill.effects)
+
+    def test_every_forbidden_event_name_is_rejected(self):
+        for event in (
+            "stimulus_applied",
+            "sustained_stimulus_applied",
+            "extreme_stimulus_applied",
+            "climax_ends",
+            "climax_extended",
+        ):
+            with self.subTest(event=event):
+                with self.assertRaises(ValueError) as caught:
+                    _seed_act_row(f"bad_{event}", sexual_events=(event,))
+                self.assertIn(f"bad_{event}", str(caught.exception))
+
 
 class LineModuleTests(unittest.TestCase):
     """Every line module ships pre-declared and empty (design D-3)."""
@@ -395,6 +534,73 @@ class WholeRegistryStructuralTests(unittest.TestCase):
         for act in SEXUAL_ACT_REGISTRY.values():
             with self.subTest(act=act.key):
                 check_names_resolve(act)
+
+    @covers_requirement("sexual-act-registry::solo-acts-declare-no-participant-counters-structurally-enforced")
+    def test_solo_acts_declare_no_participant_counters(self):
+        check_solo_acts_declare_no_participant_counters(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
+
+    @covers_requirement("sexual-act-registry::every-act-outside-the-異種-and-神之秘法-lines-targeting-another-entity-declares-a-non-null-target-part")
+    def test_external_acts_declare_a_target_part(self):
+        check_external_acts_declare_a_target_part(SEXUAL_ACT_REGISTRY, SKILL_REGISTRY)
+
+
+class SexualActEffectsStructuralTests(unittest.TestCase):
+    """Scenario-level checks for the two sexual-act-effects structural rules."""
+
+    def test_self_target_act_with_participant_counters_fails_naming_the_key(self):
+        skill, act = _seed_act_row(
+            "bad_solo",
+            participant_counters=("duo_act_count",),
+        )
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            with self.assertRaises(AssertionError) as caught:
+                check_solo_acts_declare_no_participant_counters(
+                    SEXUAL_ACT_REGISTRY, SKILL_REGISTRY
+                )
+        self.assertIn("bad_solo", str(caught.exception))
+
+    def test_self_target_act_with_empty_participant_counters_passes(self):
+        skill, act = _seed_act_row("ok_solo", participant_counters=())
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            check_solo_acts_declare_no_participant_counters(
+                SEXUAL_ACT_REGISTRY, SKILL_REGISTRY
+            )
+
+    def test_external_act_without_target_part_fails_naming_the_key(self):
+        skill, act = _seed_act_row(
+            "bad_external",
+            line="關係",
+            target_spec=TargetSpec.SINGLE,
+            target_part=None,
+        )
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            with self.assertRaises(AssertionError) as caught:
+                check_external_acts_declare_a_target_part(
+                    SEXUAL_ACT_REGISTRY, SKILL_REGISTRY
+                )
+        message = str(caught.exception)
+        self.assertIn("bad_external", message)
+        self.assertIn("關係", message)
+
+    def test_interspecies_external_act_without_target_part_passes(self):
+        skill, act = _seed_act_row(
+            "ok_interspecies",
+            line="異種",
+            target_spec=TargetSpec.SINGLE,
+            target_part=None,
+        )
+        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
+            SKILL_REGISTRY, {skill.key: skill}
+        ):
+            check_external_acts_declare_a_target_part(
+                SEXUAL_ACT_REGISTRY, SKILL_REGISTRY
+            )
 
 
 class OwnershipDriftGuardTests(EvenniaTest):
