@@ -431,6 +431,7 @@ class OwnershipDriftGuardTests(EvenniaTest):
             ["flee", "basic_attack"],
         )
 
+    @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")
     def test_owned_keys_reads_seed_acts_without_materializing_sexual_state(self):
         entity = create_object(PlayerCharacter, key="no-create seed read")
         entity.race = "human"
@@ -449,6 +450,7 @@ class OwnershipDriftGuardTests(EvenniaTest):
             "owned_keys() must not materialize the sexual handler",
         )
 
+    @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")
     def test_owned_keys_mastery_fallback_unlocks_without_materializing(self):
         entity = create_object(PlayerCharacter, key="no-create mastery read")
         entity.race = "human"
