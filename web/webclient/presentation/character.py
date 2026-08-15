@@ -1,12 +1,16 @@
-"""Exact schema-version-2 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-3 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
 trait/equipment/disguise source the compact ``status`` panel builds from
 through ``world.rules.status_query`` so the two panels can never drift apart,
-and it never substitutes a disguised value for a true trait. Version 2 adds the
-display-only ``persona`` section carrying the character's own background flavor
-text; it is never used to infer any mechanical value.
+and it never substitutes a disguised value for a true trait. Version 2 added
+the display-only ``persona`` section carrying the character's own background
+flavor text; it is never used to infer any mechanical value. Version 3 adds
+the ``actives`` field and regroups both ``actives`` and ``passives`` by the
+skill-category taxonomy, reading owned skills through
+``SkillHandler.owned_keys()`` for the first time — which makes the innate
+``flee`` and ``basic_attack`` skills visible out of combat.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -34,14 +38,21 @@ from world.rules.status_query import (
     StatusQueryError,
     TRAIT_LABELS,
     build_character_read_model,
+    group_skill_keys,
 )
-from world.skills.registry import SKILL_REGISTRY
+from world.skills.registry import SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 2
+CHARACTER_SCHEMA_VERSION = 3
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
+MAX_ACTIVE_ROWS = 32
 MAX_PASSIVE_ROWS = 32
+# The category-group count bound equals the number of SkillCategory members
+# plus one: the extra slot is the presentation-only synthetic fallback group
+# (category ``"unknown"``) that holds keys absent from SKILL_REGISTRY. The
+# flattened skill-row bound is tracked independently (design D-6).
+MAX_CATEGORY_GROUPS = len(SkillCategory) + 1
 MAX_EQUIPMENT_ROWS = 32
 MAX_DISPLAYED_ROWS = 32
 MAX_KEY_CODE_POINTS = 64
@@ -91,6 +102,55 @@ def _validate_passive_row(value: Any) -> dict[str, Any]:
     if not label.strip():
         raise ProtocolValidationError("passive label must be non-empty")
     return {"key": key, "label": label}
+
+
+def _validate_character_skill_group(value: Any) -> dict[str, Any]:
+    """Validate one ``{group, label, skills}`` sub-group of a category group."""
+    _require_exact_fields(value, "skill group", {"group", "label", "skills"}, {})
+    group = value["group"]
+    if group is not None:
+        group = _require_str(value, "group", maximum=MAX_KEY_CODE_POINTS)
+        if not group.strip():
+            raise ProtocolValidationError("group must be non-empty when set")
+    label = value["label"]
+    if label is not None:
+        label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+        if not label.strip():
+            raise ProtocolValidationError("label must be non-empty when set")
+    if (group is None) != (label is None):
+        raise ProtocolValidationError(
+            "group and label must both be set or both be null"
+        )
+    skills = value["skills"]
+    if not isinstance(skills, list):
+        raise ProtocolValidationError("skills must be a list")
+    skills = [_validate_passive_row(row) for row in skills]
+    return {"group": group, "label": label, "skills": skills}
+
+
+def _validate_character_category_group(value: Any) -> dict[str, Any]:
+    """Validate one ``{category, label, groups}`` category-group entry."""
+    _require_exact_fields(value, "category group", {"category", "label", "groups"}, {})
+    category = _validate_key(value["category"], "category key")
+    label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise ProtocolValidationError("category label must be non-empty")
+    groups = value["groups"]
+    if not isinstance(groups, list) or not groups:
+        raise ProtocolValidationError(
+            "a category group must carry a non-empty groups list"
+        )
+    groups = [_validate_character_skill_group(group) for group in groups]
+    return {"category": category, "label": label, "groups": groups}
+
+
+def _flattened_skill_count(category_groups: list[dict[str, Any]]) -> int:
+    """Count every skill row across all category groups of one payload field."""
+    return sum(
+        len(group["skills"])
+        for category in category_groups
+        for group in category["groups"]
+    )
 
 
 def _validate_equipment_row(value: Any) -> dict[str, Any]:
@@ -180,6 +240,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
             "available",
             "kind",
             "traits",
+            "actives",
             "passives",
             "equipment",
             "disguise",
@@ -206,10 +267,27 @@ def validate_character(payload: Any) -> dict[str, Any]:
     if len(set(trait_keys)) != len(trait_keys):
         raise CharacterPanelError("trait keys must be unique")
 
+    actives = payload["actives"]
+    if not isinstance(actives, list) or len(actives) > MAX_CATEGORY_GROUPS:
+        raise CharacterPanelError(
+            f"actives must be a list of at most {MAX_CATEGORY_GROUPS} category groups"
+        )
+    actives = [_validate_character_category_group(row) for row in actives]
+    if _flattened_skill_count(actives) > MAX_ACTIVE_ROWS:
+        raise CharacterPanelError(
+            f"actives must contain at most {MAX_ACTIVE_ROWS} skill rows in total"
+        )
+
     passives = payload["passives"]
-    if not isinstance(passives, list) or len(passives) > MAX_PASSIVE_ROWS:
-        raise CharacterPanelError(f"passives must be a list of at most {MAX_PASSIVE_ROWS} rows")
-    passives = [_validate_passive_row(row) for row in passives]
+    if not isinstance(passives, list) or len(passives) > MAX_CATEGORY_GROUPS:
+        raise CharacterPanelError(
+            f"passives must be a list of at most {MAX_CATEGORY_GROUPS} category groups"
+        )
+    passives = [_validate_character_category_group(row) for row in passives]
+    if _flattened_skill_count(passives) > MAX_PASSIVE_ROWS:
+        raise CharacterPanelError(
+            f"passives must contain at most {MAX_PASSIVE_ROWS} skill rows in total"
+        )
 
     equipment = payload["equipment"]
     if not isinstance(equipment, list) or len(equipment) > MAX_EQUIPMENT_ROWS:
@@ -228,6 +306,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
         "available": True,
         "kind": "character",
         "traits": traits,
+        "actives": actives,
         "passives": passives,
         "equipment": equipment,
         "disguise": disguise,
@@ -268,6 +347,28 @@ def _in_exploration_mode(actor: Any) -> bool:
     return True
 
 
+def _serialize_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    """Serialize grouped skill keys into the payload's ``{category, groups}`` shape."""
+    return [
+        {
+            "category": category.category,
+            "label": category.label,
+            "groups": [
+                {
+                    "group": group.group,
+                    "label": group.label,
+                    "skills": [
+                        {"key": row.key, "label": row.label}
+                        for row in group.skills
+                    ],
+                }
+                for group in category.groups
+            ],
+        }
+        for category in group_skill_keys(keys)
+    ]
+
+
 def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, Any]:
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
     return {
@@ -278,10 +379,8 @@ def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, A
             {"key": view.key, "label": _trait_label(view.key), "current": view.current, "max": view.maximum}
             for view in model.traits
         ],
-        "passives": [
-            {"key": key, "label": _skill_label(key)}
-            for key in model.passive_keys
-        ],
+        "actives": _serialize_skill_groups(model.active_keys),
+        "passives": _serialize_skill_groups(model.passive_keys),
         "equipment": [
             {
                 "slot": view.slot,
@@ -304,13 +403,6 @@ def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, A
     }
 
 
-def _skill_label(key: str) -> str:
-    skill = SKILL_REGISTRY.get(key)
-    if skill is None:
-        return key
-    return skill.label
-
-
 def character_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``character`` panel for the authenticated puppet."""
     actor = context.actor
@@ -331,6 +423,8 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "CHARACTER_SCHEMA_VERSION",
     "CharacterPanelError",
+    "MAX_ACTIVE_ROWS",
+    "MAX_CATEGORY_GROUPS",
     "MAX_DISPLAYED_ROWS",
     "MAX_EQUIPMENT_ROWS",
     "MAX_LABEL_CODE_POINTS",

@@ -7,16 +7,19 @@ record, and interprets them in memory. It never constructs ``entity.traits``,
 ``entity.buffs``, or ``entity.sexual`` and never writes to storage.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.sexual_vocab import EXPOSURE_LEVELS
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import matched_combat_modifiers
 from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, PLEASURE_CONFIG
 from world.rules.status_display import display_for
 from world.skills.equipment import dual_wielding_from_storage
+from world.skills.handler import INNATE_SKILL_KEYS
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
 
 # Stable Traditional Chinese labels for the canonical trait keys, shared by
 # every presentation surface: the WebClient character panel and the
@@ -40,6 +43,28 @@ _EQUIPMENT_SLOTS = ("weapon_main", "weapon_off", "armor")
 _BUFF_CACHE_KEY = "buffs"
 _SEXUAL_TRAITS_KEY = "sexual_traits"
 _SEXUAL_TRAITS_CATEGORY = "traits"
+
+# Stable Traditional Chinese labels for the skill-category taxonomy, shared by
+# the out-of-combat character listing. The combat panel's equivalent mapping
+# lives in combat_view.py; both iterate ``SkillCategory``'s declaration order,
+# so the label text is the only deliberately duplicated part (see the
+# skill-category-status-listing design D-2).
+_CATEGORY_LABELS = {
+    SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
+    SkillCategory.MARTIAL_ARTS: "武技",
+    SkillCategory.ENHANCEMENT: "強化",
+    SkillCategory.INNATE_GIFT: "天賦",
+    SkillCategory.MOVEMENT: "移動",
+    SkillCategory.DIVINE_MYSTERY: "神之秘法",
+    SkillCategory.UTILITY: "特殊",
+    SkillCategory.SEXUAL_ACT: "性愛行為",
+}
+# Presentation-only fallback bucket for keys absent from ``SKILL_REGISTRY``.
+# ``"unknown"`` is a plain string sentinel, never a ``SkillCategory`` member:
+# it has no position in that enum's declaration order and is appended after
+# every real category.
+_UNKNOWN_CATEGORY = "unknown"
+_UNKNOWN_CATEGORY_LABEL = "未知技能"
 
 
 class StatusQueryError(ValueError):
@@ -125,8 +150,39 @@ class CharacterEquipmentView:
 
 
 @dataclass(frozen=True)
+class CharacterSkillRow:
+    """One read-only skill row: registry key plus display label."""
+
+    key: str
+    label: str
+
+
+@dataclass(frozen=True)
+class CharacterSkillGroupView:
+    """One read-only sub-group of skill rows inside a character-panel category.
+
+    ``group``/``label`` are both ``None`` for the single ungrouped sub-group a
+    category with no second level emits; otherwise the pair carries the group
+    key and its display label.
+    """
+
+    group: str | None
+    label: str | None
+    skills: tuple[CharacterSkillRow, ...]
+
+
+@dataclass(frozen=True)
+class CharacterCategoryGroupView:
+    """One read-only category group of owned skill rows."""
+
+    category: str
+    label: str
+    groups: tuple[CharacterSkillGroupView, ...]
+
+
+@dataclass(frozen=True)
 class CharacterReadModel:
-    """The complete read-only inputs of the version-1 ``character`` panel.
+    """The complete read-only inputs of the version-3 ``character`` panel.
 
     Shares the same canonical trait storage the compact ``status`` panel reads,
     so the two panels cannot drift apart: gauges go through the same strict
@@ -136,6 +192,7 @@ class CharacterReadModel:
     """
 
     traits: tuple[CharacterTraitView, ...]
+    active_keys: tuple[str, ...]
     passive_keys: tuple[str, ...]
     equipment: tuple[CharacterEquipmentView, ...]
     disguise_active: bool
@@ -371,14 +428,52 @@ def _read_guild_merit(traits_data: dict[str, Any]) -> int:
     return merit
 
 
-def _read_passive_keys(entity: Any) -> tuple[str, ...]:
+def _split_active_passive_keys(entity: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split the entity's owned skill keys into active and passive buckets.
+
+    Iterates ``SkillHandler.owned_keys()`` — the single source of truth for
+    owned skills, including handler-contributed keys that are never written
+    into ``entity.db.skills`` (the innate grants today, and the future
+    unlocked sexual acts) — with a ``seen`` guard because ``owned_keys()``
+    itself does not de-duplicate. Each key is routed by its registry
+    ``SkillKind``; a key absent from ``SKILL_REGISTRY`` stays in whichever
+    stored bucket it was actually recorded in (defaulting to passive),
+    matching the pre-change raw-list semantics so unknown keys degrade rather
+    than raise. A key that is neither registry-known, nor stored, nor innate
+    is dropped: it can only come from a malformed stored list being splatted
+    by ``owned_keys()`` (for example ``"passive": "none"``), and must never
+    surface as junk rows.
+    """
     raw = entity.db.skills
     if not isinstance(raw, Mapping):
-        return ()
-    passive = raw.get("passive")
-    if not _is_list_like(passive):
-        return ()
-    return tuple(str(key) for key in passive if isinstance(key, str) and key)
+        raw = {}
+    raw_active = raw.get("active")
+    raw_passive = raw.get("passive")
+    if not _is_list_like(raw_active):
+        raw_active = ()
+    if not _is_list_like(raw_passive):
+        raw_passive = ()
+    stored_keys = {
+        key for key in (*raw_active, *raw_passive) if isinstance(key, str) and key
+    }
+    raw_active_keys = {key for key in raw_active if isinstance(key, str) and key}
+    seen: set[str] = set()
+    active: list[str] = []
+    passive: list[str] = []
+    for key in entity.skills.owned_keys():
+        if not isinstance(key, str) or not key or key in seen:
+            continue
+        skill = SKILL_REGISTRY.get(key)
+        if skill is None and key not in stored_keys and key not in INNATE_SKILL_KEYS:
+            continue
+        seen.add(key)
+        if skill is not None:
+            (active if skill.kind is SkillKind.ACTIVE else passive).append(key)
+        elif key in raw_active_keys:
+            active.append(key)
+        else:
+            passive.append(key)
+    return tuple(active), tuple(passive)
 
 
 def _is_list_like(value: Any) -> bool:
@@ -391,6 +486,86 @@ def _is_list_like(value: Any) -> bool:
     from collections.abc import Sequence
 
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, ...]:
+    """Group plain skill keys into the character panel's category structure.
+
+    Category order follows ``SkillCategory``'s declaration order; sub-group
+    order within ``elemental_magic`` follows ``ELEMENT_REGISTRY``'s declaration
+    order and ``sexual_act`` follows first-seen ``group`` order among the given
+    keys. Every other category emits exactly one ``group=None`` sub-group, and
+    each row's ``label`` is the registry label. Categories and sub-groups with
+    zero matching keys are omitted. Keys absent from ``SKILL_REGISTRY`` land in
+    one synthetic ``unknown`` category appended after every real category, with
+    each row's ``label`` equal to its own key — never raising, mirroring the
+    presenter's existing unknown-key degradation.
+    """
+    buckets: dict[str, dict[str | None, list[SkillDef]]] = {}
+    unregistered: list[str] = []
+    for key in keys:
+        skill = SKILL_REGISTRY.get(key)
+        if skill is None:
+            unregistered.append(key)
+            continue
+        buckets.setdefault(skill.category.value, {}).setdefault(skill.group, []).append(skill)
+
+    views: list[CharacterCategoryGroupView] = []
+    for category in SkillCategory:
+        category_buckets = buckets.get(category.value)
+        if not category_buckets:
+            continue
+        if category is SkillCategory.ELEMENTAL_MAGIC:
+            ordered_groups = [group for group in ELEMENT_REGISTRY if group in category_buckets]
+        elif category is SkillCategory.SEXUAL_ACT:
+            ordered_groups = list(category_buckets)
+        else:
+            ordered_groups = [None]
+        views.append(
+            CharacterCategoryGroupView(
+                category=category.value,
+                label=_CATEGORY_LABELS[category],
+                groups=tuple(
+                    CharacterSkillGroupView(
+                        group=group_key,
+                        label=_group_label(category, group_key),
+                        skills=tuple(
+                            CharacterSkillRow(key=skill.key, label=skill.label)
+                            for skill in category_buckets[group_key]
+                        ),
+                    )
+                    for group_key in ordered_groups
+                ),
+            )
+        )
+    if unregistered:
+        views.append(
+            CharacterCategoryGroupView(
+                category=_UNKNOWN_CATEGORY,
+                label=_UNKNOWN_CATEGORY_LABEL,
+                groups=(
+                    CharacterSkillGroupView(
+                        group=None,
+                        label=None,
+                        skills=tuple(
+                            CharacterSkillRow(key=key, label=key) for key in unregistered
+                        ),
+                    ),
+                ),
+            )
+        )
+    return tuple(views)
+
+
+def _group_label(category: SkillCategory, group: str | None) -> str | None:
+    """Return the display label for one sub-group key, if any."""
+    if group is None:
+        return None
+    if category is SkillCategory.ELEMENTAL_MAGIC:
+        element = ELEMENT_REGISTRY.get(group)
+        if element is not None:
+            return element.display_name_zh
+    return group
 
 
 def _read_equipment(entity: Any) -> tuple[CharacterEquipmentView, ...]:
@@ -457,9 +632,11 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         traits.append(CharacterTraitView(key, _require_static_trait(traits_data, key), None))
 
     disguise_active, disguise_displayed = _read_disguise(entity)
+    active_keys, passive_keys = _split_active_passive_keys(entity)
     return CharacterReadModel(
         traits=tuple(traits),
-        passive_keys=_read_passive_keys(entity),
+        active_keys=active_keys,
+        passive_keys=passive_keys,
         equipment=_read_equipment(entity),
         disguise_active=disguise_active,
         disguise_displayed=disguise_displayed,

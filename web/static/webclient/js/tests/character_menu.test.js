@@ -16,14 +16,36 @@ const CharacterMenu = require("../elosern/character_menu.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "character",
       traits: [
         { key: "hp", label: "生命", current: 10, max: 10 },
         { key: "atk_phys", label: "攻擊", current: 5, max: null },
       ],
-      passives: [{ key: "defense_instinct", label: "防禦直覺" }],
+      actives: [
+        {
+          category: "elemental_magic",
+          label: "元素魔法",
+          groups: [
+            { group: "fire", label: "火", skills: [{ key: "fire_ball", label: "火球術" }] },
+            { group: "water", label: "水", skills: [{ key: "water_bolt", label: "水箭術" }] },
+          ],
+        },
+      ],
+      passives: [
+        {
+          category: "enhancement",
+          label: "強化",
+          groups: [
+            {
+              group: null,
+              label: null,
+              skills: [{ key: "defense_instinct", label: "防禦直覺" }],
+            },
+          ],
+        },
+      ],
       equipment: [
         { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" },
       ],
@@ -41,12 +63,55 @@ test("character menu lists true trait rows with gauges and statics", () => {
   const labels = menu.items.map((item) => item.label);
   assert.ok(labels.includes("生命：10 / 10"));
   assert.ok(labels.includes("攻擊：5"));
+  assert.ok(labels.includes("主動技能"));
+  assert.ok(labels.includes("火球術"));
+  assert.ok(labels.includes("水箭術"));
   assert.ok(labels.includes("被動技能"));
   assert.ok(labels.includes("防禦直覺"));
   assert.ok(labels.includes("weapon_main：鐵劍"));
   assert.ok(labels.includes("階級：未加入公會"));
   assert.ok(labels.includes("功績：0"));
   assert.ok(labels.includes("錢包：100 銅"));
+});
+
+test("active and passive skill sections flatten the category-grouped payload", () => {
+  const menu = CharacterMenu.buildMenu(
+    validPanel({
+      actives: [
+        {
+          category: "movement",
+          label: "移動",
+          groups: [
+            {
+              group: null,
+              label: null,
+              skills: [
+                { key: "flee", label: "逃跑" },
+                { key: "flash_step", label: "瞬步" },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  );
+  const labels = menu.items.map((item) => item.label);
+  assert.ok(labels.includes("主動技能"));
+  assert.ok(labels.includes("逃跑"));
+  assert.ok(labels.includes("瞬步"));
+  // The category/group taxonomy stays wire-only; the menu flattens it.
+  assert.ok(!labels.includes("移動"));
+  assert.ok(!labels.includes("元素魔法"));
+  assert.ok(!labels.includes("火"));
+});
+
+test("an empty actives or passives list renders no skill section", () => {
+  const menu = CharacterMenu.buildMenu(
+    validPanel({ actives: [], passives: [] })
+  );
+  const labels = menu.items.map((item) => item.label);
+  assert.ok(!labels.includes("主動技能"));
+  assert.ok(!labels.includes("被動技能"));
 });
 
 test("every character row is display-only and never submits", () => {

@@ -194,7 +194,7 @@
     services: 1,
     creation: 1,
     exploration: 1,
-    character: 2,
+    character: 3,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -2507,9 +2507,14 @@
   // ---------------------------------------------------------------------------
 
   var CHARACTER_MAX_TRAIT_ROWS = 32;
+  var CHARACTER_MAX_ACTIVE_ROWS = 32;
   var CHARACTER_MAX_PASSIVE_ROWS = 32;
   var CHARACTER_MAX_EQUIPMENT_ROWS = 32;
   var CHARACTER_MAX_DISPLAYED_ROWS = 32;
+  // The category-group count bound equals len(SkillCategory) plus one on the
+  // server: the extra slot is the synthetic "unknown" fallback group that
+  // holds keys absent from SKILL_REGISTRY.
+  var CHARACTER_MAX_CATEGORY_GROUPS = 9;
   var CHARACTER_MAX_KEY = 64;
   var CHARACTER_MAX_LABEL = 128;
   var CHARACTER_MAX_DESCRIPTION = 256;
@@ -2548,6 +2553,54 @@
       throw new Error("passive label must be non-empty");
     }
     return value;
+  }
+
+  function validateCharacterSkillGroup(value) {
+    requireExactFields(value, "skill group", ["group", "label", "skills"], []);
+    if (value.group !== null) {
+      var group = requireString(value.group, "group", CHARACTER_MAX_KEY);
+      if (!group.trim()) {
+        throw new Error("group must be non-empty when set");
+      }
+    }
+    if (value.label !== null) {
+      var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+      if (!label.trim()) {
+        throw new Error("label must be non-empty when set");
+      }
+    }
+    if ((value.group === null) !== (value.label === null)) {
+      throw new Error("group and label must both be set or both be null");
+    }
+    if (!Array.isArray(value.skills)) {
+      throw new Error("skills must be a list");
+    }
+    value.skills.forEach(validateCharacterPassiveRow);
+    return value;
+  }
+
+  function validateCharacterCategoryGroup(value) {
+    requireExactFields(value, "category group", ["category", "label", "groups"], []);
+    validateCharacterKey(value.category, "category key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("category label must be non-empty");
+    }
+    if (!Array.isArray(value.groups) || value.groups.length === 0) {
+      throw new Error("a category group must carry a non-empty groups list");
+    }
+    value.groups.forEach(validateCharacterSkillGroup);
+    return value;
+  }
+
+  function characterFlattenedSkillCount(categoryGroups) {
+    var count = 0;
+    categoryGroups.forEach(function (category) {
+      category.groups.forEach(function (group) {
+        count += group.skills.length;
+      });
+    });
+    return count;
   }
 
   function validateCharacterEquipmentRow(value) {
@@ -2618,7 +2671,8 @@
     return { background: background.trim() };
   }
 
-  // Exact available character panel v2 schema (design D10).
+  // Exact available character panel v3 schema (design D10 + skill category
+  // grouping). Shared bounds are guarded by a dual-direction parity test.
   function validateCharacterPanel(payload) {
     if (payload.available === false) {
       // The common unavailable discriminator; validateStatusPanel handles it.
@@ -2629,10 +2683,10 @@
     requireExactFields(
       payload,
       "character panel",
-      ["schema_version", "available", "kind", "traits", "passives", "equipment", "disguise", "guild", "wallet", "persona"],
+      ["schema_version", "available", "kind", "traits", "actives", "passives", "equipment", "disguise", "guild", "wallet", "persona"],
       []
     );
-    if (payload.schema_version !== 2) {
+    if (payload.schema_version !== 3) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
@@ -2649,10 +2703,28 @@
       }
       traitKeys[row.key] = true;
     });
-    if (!Array.isArray(payload.passives) || payload.passives.length > CHARACTER_MAX_PASSIVE_ROWS) {
-      throw new Error("passives must be a list of at most " + CHARACTER_MAX_PASSIVE_ROWS + " rows");
+    if (!Array.isArray(payload.actives) || payload.actives.length > CHARACTER_MAX_CATEGORY_GROUPS) {
+      throw new Error(
+        "actives must be a list of at most " + CHARACTER_MAX_CATEGORY_GROUPS + " category groups"
+      );
     }
-    payload.passives.forEach(validateCharacterPassiveRow);
+    payload.actives.forEach(validateCharacterCategoryGroup);
+    if (characterFlattenedSkillCount(payload.actives) > CHARACTER_MAX_ACTIVE_ROWS) {
+      throw new Error(
+        "actives must contain at most " + CHARACTER_MAX_ACTIVE_ROWS + " skill rows in total"
+      );
+    }
+    if (!Array.isArray(payload.passives) || payload.passives.length > CHARACTER_MAX_CATEGORY_GROUPS) {
+      throw new Error(
+        "passives must be a list of at most " + CHARACTER_MAX_CATEGORY_GROUPS + " category groups"
+      );
+    }
+    payload.passives.forEach(validateCharacterCategoryGroup);
+    if (characterFlattenedSkillCount(payload.passives) > CHARACTER_MAX_PASSIVE_ROWS) {
+      throw new Error(
+        "passives must contain at most " + CHARACTER_MAX_PASSIVE_ROWS + " skill rows in total"
+      );
+    }
     if (!Array.isArray(payload.equipment) || payload.equipment.length > CHARACTER_MAX_EQUIPMENT_ROWS) {
       throw new Error("equipment must be a list of at most " + CHARACTER_MAX_EQUIPMENT_ROWS + " rows");
     }
@@ -2663,10 +2735,11 @@
     var persona = validateCharacterPersona(payload.persona);
 
     var result = {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "character",
       traits: payload.traits,
+      actives: payload.actives,
       passives: payload.passives,
       equipment: payload.equipment,
       disguise: payload.disguise,
@@ -3133,7 +3206,9 @@
     EXPLORATION_SURFACES: EXPLORATION_SURFACES.slice(),
     EXPLORATION_ENTITY_KINDS: EXPLORATION_ENTITY_KINDS.slice(),
     CHARACTER_MAX_TRAIT_ROWS: CHARACTER_MAX_TRAIT_ROWS,
+    CHARACTER_MAX_ACTIVE_ROWS: CHARACTER_MAX_ACTIVE_ROWS,
     CHARACTER_MAX_PASSIVE_ROWS: CHARACTER_MAX_PASSIVE_ROWS,
+    CHARACTER_MAX_CATEGORY_GROUPS: CHARACTER_MAX_CATEGORY_GROUPS,
     CHARACTER_MAX_EQUIPMENT_ROWS: CHARACTER_MAX_EQUIPMENT_ROWS,
     CHARACTER_MAX_DISPLAYED_ROWS: CHARACTER_MAX_DISPLAYED_ROWS,
     CHARACTER_MAX_KEY: CHARACTER_MAX_KEY,

@@ -1,6 +1,7 @@
 """Frozen no-create status read model tests (foundation section 3.3)."""
 
 import unittest
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -14,7 +15,14 @@ from world.rules.status_query import (
     StatusQueryError,
     build_character_read_model,
     build_status_read_model,
+    group_skill_keys,
 )
+
+# ``flee`` is injected into ``SKILL_REGISTRY`` at import time by
+# ``world.rules.disengage`` (the ``universal-action-ownership`` dependency
+# direction), so the grouping and split tests import it explicitly to keep
+# ``flee`` in scope.
+import world.rules.disengage  # noqa: F401  (registers flee)
 
 
 def _actor(testcase):
@@ -447,6 +455,173 @@ class CharacterReadModelTests(EvenniaTest):
             self.actor.db.wallet = value
             with self.assertRaises(StatusQueryError):
                 self._model()
+
+    def test_fresh_character_active_keys_include_innate_skills(self):
+        # Regression for the shipped defect: ``flee`` and ``basic_attack`` are
+        # contributed by ``owned_keys()`` and never written into
+        # ``entity.db.skills``, so they must surface from the corrected
+        # owned-keys read instead of disappearing from the panel.
+        model = self._model()
+        self.assertEqual(model.active_keys, ("flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ())
+
+    def test_split_reads_keys_contributed_by_the_handler_beyond_storage(self):
+        # Regression guard for the owned_keys() contract: a key contributed by
+        # the handler without being written into db.skills (as the future
+        # unlocked sexual acts will be) must still surface. The patched list
+        # simulates such a handler extension.
+        self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
+        from world.skills.handler import SkillHandler
+
+        with patch.object(
+            SkillHandler,
+            "owned_keys",
+            return_value=["fire_ball", "flash_step", "flee", "basic_attack"],
+        ):
+            model = self._model()
+        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ("flash_step",))
+
+    def test_split_unknown_key_degrades_to_its_stored_bucket(self):
+        self.actor.db.skills = {"active": [], "passive": ["no_such_skill"]}
+        model = self._model()
+        self.assertEqual(model.active_keys, ("flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ("no_such_skill",))
+        self.actor.db.skills = {"active": ["also_missing"], "passive": []}
+        model = self._model()
+        self.assertEqual(model.active_keys, ("also_missing", "flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ())
+
+    def test_split_ignores_non_string_entries_in_stored_lists(self):
+        self.actor.db.skills = {
+            "active": [5, "fire_ball"],
+            "passive": [None, "defense_instinct"],
+        }
+        model = self._model()
+        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ("defense_instinct",))
+
+    def test_split_routes_known_keys_by_registry_kind(self):
+        # ``flight`` is PASSIVE-kind despite being stored in the active list;
+        # registry kind wins over the stored bucket for known keys.
+        self.actor.db.skills = {"active": ["flight"], "passive": ["fire_ball"]}
+        model = self._model()
+        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
+        self.assertEqual(model.passive_keys, ("flight",))
+
+    def test_split_de_duplicates_keys_across_both_stored_lists(self):
+        # ``owned_keys()`` is a plain concatenation that does not de-duplicate;
+        # the split must not render (or count) a repeated key twice.
+        self.actor.db.skills = {
+            "active": ["fire_ball", "fire_ball"],
+            "passive": ["fire_ball", "defense_instinct"],
+        }
+        model = self._model()
+        self.assertEqual(
+            model.active_keys, ("fire_ball", "flee", "basic_attack")
+        )
+        self.assertEqual(model.passive_keys, ("defense_instinct",))
+
+
+class GroupSkillKeysTests(unittest.TestCase):
+    """Pure grouping tests for the out-of-combat skill taxonomy.
+
+    ``group_skill_keys`` reads only the module-level registries, so these
+    tests run without an entity or database.
+    """
+
+    def _flatten(self, views):
+        return [
+            (category.label, [(group.label, [row.key for row in group.skills])
+                              for group in category.groups])
+            for category in views
+        ]
+
+    def test_category_order_follows_skillcategory_declaration_order(self):
+        views = group_skill_keys(["fire_ball", "basic_attack", "flight"])
+        self.assertEqual(
+            [view.category for view in views],
+            ["elemental_magic", "martial_arts", "movement"],
+        )
+
+    def test_elemental_sub_groups_follow_element_registry_order(self):
+        views = group_skill_keys(["ice_shard", "water_bolt", "fire_ball"])
+        self.assertEqual(
+            [[group.group for group in view.groups] for view in views],
+            [["fire", "water", "ice"]],
+        )
+        self.assertEqual(
+            [group.label for group in views[0].groups],
+            ["火", "水", "冰"],
+        )
+
+    def test_empty_category_is_omitted(self):
+        views = group_skill_keys(["fire_ball"])
+        self.assertEqual(
+            [view.category for view in views], ["elemental_magic"]
+        )
+        self.assertNotIn(
+            "sexual_act",
+            [view.category for view in views],
+            "an entity owning no sexual-act skill must see no sexual_act category",
+        )
+
+    def test_ungrouped_category_emits_exactly_one_null_keyed_sub_group(self):
+        views = group_skill_keys(["basic_attack", "shadow_slash"])
+        self.assertEqual([view.category for view in views], ["martial_arts"])
+        self.assertEqual(len(views[0].groups), 1)
+        group = views[0].groups[0]
+        self.assertIsNone(group.group)
+        self.assertIsNone(group.label)
+        self.assertEqual(
+            [row.key for row in group.skills], ["basic_attack", "shadow_slash"]
+        )
+
+    def test_row_order_matches_owned_keys_order_without_alphabetizing(self):
+        views = group_skill_keys(["firestorm", "fire_ball", "hellfire"])
+        self.assertEqual(
+            [row.key for row in views[0].groups[0].skills],
+            ["firestorm", "fire_ball", "hellfire"],
+        )
+
+    def test_sexual_act_sub_groups_follow_first_seen_group_order(self):
+        views = group_skill_keys(
+            ["divine_sexual_mastery", "divine_sexual_arts", "reincarnation_boon_yuna"]
+        )
+        self.assertEqual([view.category for view in views], ["sexual_act"])
+        self.assertEqual(
+            [group.group for group in views[0].groups],
+            ["精通", "神之秘法"],
+        )
+
+    def test_unknown_key_lands_in_a_synthetic_bucket_after_every_real_category(self):
+        views = group_skill_keys(["fire_ball", "no_such_skill", "also_missing"])
+        self.assertEqual(
+            [view.category for view in views],
+            ["elemental_magic", "unknown"],
+        )
+        fallback = views[-1]
+        self.assertEqual(fallback.label, "未知技能")
+        self.assertEqual(len(fallback.groups), 1)
+        self.assertIsNone(fallback.groups[0].group)
+        self.assertEqual(
+            [(row.key, row.label) for row in fallback.groups[0].skills],
+            [("no_such_skill", "no_such_skill"), ("also_missing", "also_missing")],
+        )
+
+    def test_category_labels_are_the_canonical_traditional_chinese_forms(self):
+        views = group_skill_keys(
+            ["fire_ball", "basic_attack", "body_enhancement", "elf_longevity",
+             "flight", "divine_time_dilation", "status_disguise",
+             "divine_sexual_arts"]
+        )
+        self.assertEqual(
+            [view.label for view in views],
+            ["元素魔法", "武技", "強化", "天賦", "移動", "神之秘法", "特殊", "性愛行為"],
+        )
+
+    def test_group_skill_keys_is_empty_for_no_keys(self):
+        self.assertEqual(group_skill_keys([]), ())
 
 
 class LevelRefComparisonTests(unittest.TestCase):

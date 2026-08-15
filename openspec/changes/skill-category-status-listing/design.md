@@ -117,7 +117,7 @@ def _split_active_passive_keys(entity) -> tuple[tuple[str, ...], tuple[str, ...]
 ```
 This replaces the existing `_read_passive_keys()` body entirely (adjusted to source from
 `owned_keys()` rather than the raw `passive` list directly) and adds the new `active_keys` field via
-the same helper. Two corrections made during review, both verified against real code before being
+the same helper. Three corrections made during review, each verified against real code before being
 accepted:
 
 1. **`owned_keys()` does not de-duplicate** — it is a plain `[*active, *passive, *INNATE_SKILL_ORDER]`
@@ -139,6 +139,14 @@ accepted:
    fallback pattern already established by `character.py`'s existing `_skill_label()` for the label
    text, and buckets an unregistered key into a synthetic, non-`SkillCategory` fallback group (see
    D-2) rather than raising.
+3. **A malformed stored list must not splat junk characters.** `owned_keys()` concatenates the raw
+   stored lists with splat operators, so a non-sequence value such as `"passive": "none"` (the exact
+   fixture the pre-existing `test_non_sequence_passive_and_junk_accessories_are_skipped` uses)
+   expands into its characters inside `owned_keys()`. The helper therefore drops any key that is
+   neither registry-known, nor present in a well-formed stored bucket, nor innate — such a key can
+   only be splat junk — while still iterating `owned_keys()` itself, so handler-contributed keys that
+   are never written into `db.skills` (the innate grants today, the future unlocked sexual acts)
+   flow through unchanged.
 
 **D-4: Grouping is applied at serialization time in `character.py`, not stored pre-grouped on
 `CharacterReadModel`.** `CharacterReadModel` keeps `active_keys`/`passive_keys` as flat key tuples —
@@ -169,11 +177,16 @@ stated purpose. `buildMenu()` is updated to flatten both `actives` and
 **D-6: `MAX_PASSIVE_ROWS`/`MAX_ACTIVE_ROWS` are re-asserted as explicit flattened-total checks, not
 inherited implicitly from the v2 flat-array length check.** Applying `len(passives) >
 MAX_PASSIVE_ROWS` unchanged to the new top-level `passives` array would bound the *category-group*
-count instead (at most `len(SkillCategory)`), silently weakening the bound — the identical class of
-gap `skill-category-combat-panel` identified and fixed for its own `MAX_SKILLS` check (that
-proposal's design.md D-5). `validate_character()` computes the flattened row count across every
-category and sub-group for each of `actives`/`passives` independently and rejects when either exceeds
-its bound.
+count instead (at most `len(SkillCategory)`, currently 8), silently weakening the bound — the
+identical class of gap `skill-category-combat-panel` identified and fixed for its own `MAX_SKILLS`
+check (that proposal's design.md D-5). `validate_character()` computes the flattened row count across
+every category and sub-group for each of `actives`/`passives` independently and rejects when either
+exceeds its bound. The top-level category-group count itself is bounded separately at
+`len(SkillCategory) + 1` (`MAX_CATEGORY_GROUPS`): the extra slot is the presentation-only synthetic
+fallback group (category `"unknown"`) that holds keys absent from `SKILL_REGISTRY`, which is appended
+after every real category (D-2) — without the `+1`, an entity owning skills in all eight real
+categories plus one unregistered key would serialize nine groups and fail its own validation,
+rendering the panel unavailable despite the unknown-key degradation scenario requiring it to render.
 
 ## Risks / Trade-offs
 

@@ -37,6 +37,7 @@ _EXPLORATION_CONSTANTS = (
 
 _CHARACTER_CONSTANTS = (
     ("MAX_TRAIT_ROWS", "CHARACTER_MAX_TRAIT_ROWS"),
+    ("MAX_ACTIVE_ROWS", "CHARACTER_MAX_ACTIVE_ROWS"),
     ("MAX_PASSIVE_ROWS", "CHARACTER_MAX_PASSIVE_ROWS"),
     ("MAX_EQUIPMENT_ROWS", "CHARACTER_MAX_EQUIPMENT_ROWS"),
     ("MAX_DISPLAYED_ROWS", "CHARACTER_MAX_DISPLAYED_ROWS"),
@@ -99,6 +100,24 @@ class ExplorationValidatorParityContract(unittest.TestCase):
         for fragment in _EXPLORATION_FRAGMENTS:
             self.assertIn(fragment, py_source, f"Python exploration missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
+
+    def test_character_category_group_bound_matches_the_skillcategory_enum(self):
+        from world.skills.registry import SkillCategory
+
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_match = re.search(
+            r"var CHARACTER_MAX_CATEGORY_GROUPS\s*=\s*([0-9]+)", js_source
+        )
+        self.assertIsNotNone(
+            js_match, "JS protocol missing CHARACTER_MAX_CATEGORY_GROUPS"
+        )
+        # One extra slot beyond the member count carries the presentation-only
+        # synthetic fallback group for keys absent from SKILL_REGISTRY.
+        self.assertEqual(
+            int(js_match.group(1)),
+            len(SkillCategory) + 1,
+            "CHARACTER_MAX_CATEGORY_GROUPS must equal len(SkillCategory) + 1",
+        )
 
 
 if __name__ == "__main__":
