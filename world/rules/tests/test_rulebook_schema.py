@@ -91,7 +91,7 @@ class RulebookSchemaTests(TestCase):
         with self.assertRaisesRegex(ValueError, "unknown"):
             evaluate_condition({"unknown": "x"}, {})
 
-    @covers_requirement("rulebook-schema::schema-py-documents-itself-as-the-shared-engine-for-every-rulebook-table-not-a", "sexual-vocabulary::the-module-documents-itself-as-the-single-canonical-source-for-this-vocabulary")
+    @covers_requirement("rulebook-schema::schema-py-documents-itself-as-the-shared-engine-for-every-rulebook-table-not-a")
     @covers_requirement("sexual-transition-rulebook::the-stamina-action-efficiency-threshold-has-no-row-in-sexual-yaml-and-is-named-for-change-6")
     def test_docstring_names_future_sexual_table(self):
         from world.rules.rulebook import schema
