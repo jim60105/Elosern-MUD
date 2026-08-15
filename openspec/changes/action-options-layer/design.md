@@ -32,20 +32,24 @@ compatibility: the project has zero released users.
 
 **Goals:**
 
-- `generate_action_options(context, client) -> defer.Deferred` resolving to a frozen `OptionSet`
-  (`status: "ready"` only) or `None` under every failure mode (disabled profile, transport
-  failure, retry exhaustion, internal error), with no partial success.
+- `generate_action_options(context, client, *, fingerprint) -> defer.Deferred` resolving to a
+  frozen `OptionSet` (`status: "ready"` only) or `None` under every failure mode (disabled
+  profile, transport failure, retry exhaustion, internal error), with no partial success.
 - `build_options_context(...)` — deterministic, public-only, bounded context serialization with
   the fixed truncation policy (narrative tail → persona digest → NPC count; `affordances`,
-  `room_name`, `room_summary` never truncated) and a `LEAK_BLOCKLIST` consumed by validation only.
-- Prompt assembly through `render_prompt("action_options.system", ...)` with placeholder-allowlist
-  parity asserted by a contract test; the user message serializes the bounded context including
-  the affordance list (canonical ids + params) and stable `npc_index` references.
-- Validation-retry-degrade semantics per the pipeline design: validation/ladder rejections retry
-  within `1 + max_retries` with the round's errors appended; transport failures resolve `None`
-  immediately (no retry loop — the trigger service memoizes); exhaustion resolves `None`.
-- Idempotent, atomic, boot-tolerant guardrail registration (fallback + semantic validators +
-  output schema) wired at server startup.
+  `room_name`, `room_summary` never truncated), named input errors for over-budget
+  non-truncatable values, and a `LEAK_BLOCKLIST` consumed by validation only.
+- Prompt assembly through the prompt library's two `action_options` keys
+  (`render_prompt("action_options.system" | "action_options.user", ...)`) with placeholder-
+  allowlist parity asserted by a contract test; the user message carries exactly the seven
+  context fields, including the affordance list (canonical ids + params) and stable `npc_index`
+  references.
+- Validation-retry-degrade semantics per the pipeline design: validation/ladder rejections —
+  including the 3–5 generation floor (D-4a) — retry within `1 + max_retries` with the round's
+  errors appended; transport failures resolve `None` immediately (no retry loop — the trigger
+  service memoizes); exhaustion resolves `None`.
+- Idempotent, atomic, boot-tolerant guardrail registration (degrade fallback + raw-shape output
+  schema only, skippable pre-prerequisite) wired at server startup.
 
 **Non-Goals:**
 
@@ -73,45 +77,60 @@ duplicate the budget semantics, the transport-vs-validation distinction, and the
 appending — three behaviors the repository already pins down in `world/ai/guardrail.py` and its
 main spec.
 
-### D-2: Two-tier validator placement (registered + per-call)
+### D-2: Validation lives in a single per-call closure; the layer registers no text gates
 
-- **Layer-registered semantic validators** — context-free text gates reused from the narrator:
-  CJK presence, template-placeholder absence, and the no-digit gate, applied to labels and hints.
-  These are stateless, so they belong in the registered set.
-- **Per-call semantic validators** — carried on the request descriptor's
-  `semantic_validators` (the guardrail already runs these after the registered ones): one
-  closure bound to the call's `fingerprint`, `affordances`, and NPC bindings, which runs the
-  enrichment + full ladder (canonical match replacing model-typed params, freeform binding,
-  count bounds, leak gates) and returns the aggregated error messages for the retry loop.
+The ladder (schema change) already owns every text gate — stages 6–8 (CJK, generic `{...}`
+placeholder, ASCII-digit) are implemented inside the schema module with *generic* patterns; the
+narrator's placeholder regex is token-specific (`{actor}|{target}|{data[...]}`) and narrator has
+no digit gate, so those helpers are **not** reusable (schema change spec, stage 6–8 amendment).
+The layer therefore registers **no semantic validators**: the sole per-call validator carried on
+the request descriptor's `semantic_validators` is one closure bound to the call's `fingerprint`,
+`affordances`, `npc_bindings`, and `leak_blocklist`, which runs enrichment + the full ladder and
+returns aggregated error messages for the retry loop.
 
-*Alternative rejected:* registering context-dependent validators at the layer level. Registered
-validators cannot see per-call state, so the canonical-match and binding checks would be
-impossible there. *Alternative rejected:* validating only after `guarded_call` resolves, with no
-in-loop ladder checks — that would make ladder failures undetectable inside the retry budget,
-contradicting the pipeline design's retry semantics.
+*Alternative rejected:* layer-registered semantic validators duplicating the ladder's gates. They
+would run before the ladder closure on the raw model shape, double-enforce gates the ladder owns,
+and diverge from the schema module's gate definitions. *Alternative rejected:* validating only
+after `guarded_call` resolves — that would make ladder failures invisible to the retry budget.
 
-### D-3: One shared enrichment-and-ladder helper for both paths
+### D-3: One total enrichment-and-ladder helper for both paths
 
-A single private `_evaluate_enriched(parsed, *, fingerprint, affordances, npc_bindings) ->
-(tuple[OptionSet | None, list[str]])` is used by (a) the per-call validator to produce retry
-messages and (b) the final resolution step, which parses the accepted text again and demands the
-strict `OptionSet`. Because both paths run the identical helper on the same input, an accepted
-text cannot fail the final strict path; if it ever does (a non-deterministic state change between
-trips), the layer logs a bounded diagnostic and resolves `None`.
+A single private `_evaluate_enriched(parsed, *, fingerprint, affordances, npc_bindings,
+leak_blocklist) -> (OptionSet | None, list[str])` is used by (a) the per-call validator to
+produce retry messages and (b) the final resolution step, which parses the accepted text again
+and demands the strict `OptionSet`. The helper is a **total function** (review round three): every
+parsing, enrichment, binding, and ladder exception is converted into a named error message
+(`"stage N: <code>"` for ladder rejections — the schema ladder raises one named error per stage)
+and returned in the error list; it never raises into `guarded_call`, which would errback the
+Deferred instead of retrying. Because both paths run the identical helper on the same input, an
+accepted text cannot fail the final strict path; if it ever does (a defensive internal-error
+guard, not a client-side drift scenario — `guarded_call` pins the accepted text), the layer logs
+a bounded diagnostic and resolves `None`.
 
 ### D-4: Caller-side enrichment contract with the schema change
 
 The ladder's stage 0 requires the caller to inject `fingerprint` and `status: "ready"`; the
 schema's LLM contract requires freeform `{npc_index}` resolution before validation. The schema
 change's enrichment helper injects the caller-scoped fields and the freeform `action_code`
-default (its tasks 3.2); this change owns the **binding resolution**: it resolves each freeform
-card's `npc_index` against the prompt's bound NPC list (the positional order fixed by the
-context builder) into `params: {"npc_id": int}` and passes the enriched card set through the
-ladder; an out-of-range index or a target bound twice rejects the card with a binding error that
-enters the retry loop. The schema change owns the ladder entry point; this change consumes
-whichever form it ships — a message-collecting variant preferred for the retry loop, with a
-fallback of mapping the named per-stage errors to messages (pinned by an integration test in
-this change's suite, see Risks).
+default (its spec: "the `{npc_index}` → `{npc_id}` binding resolution is owned by
+`action-options-layer`"); this change owns the **binding resolution**: it resolves each freeform
+card's `npc_index` against the prompt's bound NPC list (the positional order fixed by the context
+builder) into `params: {"npc_id": int}`; an out-of-range index or a target bound twice rejects
+the card with a binding error that enters the retry loop. **Data flow (review round three):**
+`fingerprint` is an explicit call argument of `generate_action_options(context, client, *,
+fingerprint)` (the trigger service computes it); `leak_blocklist` is composed by
+`build_options_context` and travels on the context into `_evaluate_enriched`; both reach the
+ladder entry point `validate_optionset(raw, *, fingerprint, affordances, leak_blocklist)`.
+Neither value is ever rendered into the prompt, and the per-call closure captures only that
+call's immutable copies.
+
+### D-4a: The generation rule — a 3–5 floor the ladder does not enforce
+
+The schema ladder's stage 4 accepts 0–5 cards and its spec explicitly delegates the 3–5 minimum
+to this change ("the 3–5 minimum is a *generation* rule owned by `action-options-layer`"). The
+layer therefore enforces the floor **after** ladder success: a set with fewer than `MIN_CARDS`
+(3) is a generation failure entering the same retry loop with a named message; exhaustion
+resolves `None` (rule cards). The 6-card rejection stays the ladder's (stage 4).
 
 ### D-5: Pure context-builder input contract
 
@@ -120,52 +139,68 @@ this change's suite, see Risks).
 entries (identity, display name, dialogue key, persona digest, public tier), monster entries,
 the public objective line, the canonical affordance tuple, and the caller-collected secret
 tokens (numeric literals + hidden trait keys of its view). The builder composes the
-`ActionOptionsContext` frozen struct and the `LEAK_BLOCKLIST`; the blocklist is an output for
-validation consumption and is never serialized into the prompt. The builder cannot read traits
-itself — it must stay Evennia-import-free.
+`ActionOptionsContext` frozen struct (carrying the `LEAK_BLOCKLIST`) and the stable positional
+NPC order; the blocklist is an output for validation consumption and is never serialized into
+the prompt. The builder cannot read traits itself — it must stay Evennia-import-free. **Over-budget
+non-truncatable inputs (review round three):** because `affordances`, `room_name`, and
+`room_summary` are both hard-capped and never truncated, a call-site value exceeding a cap is a
+named input error raised by the builder (`ActionOptionsInputError`), which the entry point
+catches, logs, and resolves `None` — the contract never silently emits out-of-bounds data.
 
-### D-6: Prompt shape
+### D-6: Prompt shape — both keys render through the prompt library
 
-- System message: `render_prompt("action_options.system", ...)` with exactly the allowlisted
-  placeholders registered for the key by the prompts change. No prompt text as a Python
-  constant.
-- User message: the canonical serialization of the bounded context — room, entities with their
-  positional `npc_index`, the objective line, the narrative tail, and the affordance list with
-  each entry's canonical `action_id` and typed params (the same list the ladder's stage 9
-  matches against). The model selects and curates; the ladder verifies.
+- System message: `render_prompt("action_options.system", ...)` — the prompts change registers
+  this key with an **empty** allowlist (static role/hard-rule direction, no context tokens).
+- User message: `render_prompt("action_options.user", ...)` — the prompts change registers its
+  allowlist as exactly the seven `ActionOptionsContext` fields (`room_name`, `room_summary`,
+  `npc_entries`, `monster_entries`, `objective`, `narrative_tail`, `affordances`). The builder
+  pre-serializes the structured fields (NPC entries, monster entries, affordance list) into
+  deterministic JSON strings and supplies the substitution dict; the hard rules live in the YAML
+  text, never in Python. No prompt text as a Python constant, and the parity contract test covers
+  both keys.
 
 ### D-7: Registration wiring
 
 `register_action_options()` mirrors `register_npc_dialogue()`: idempotent (second call no-op),
 atomic (partial failure uninstalls only this module's own hooks), installing the degrade
-fallback (`None`), the context-free semantic validators (D-2), and registering the
-`action_options` output schema in `world/ai/schemas/registry.py`. `server/conf/at_server_startstop.py`
-gains `_register_action_options_layer()` following the boot-tolerant pattern of the other
-layers (a foreign leftover registration logs a warning instead of aborting startup).
+fallback (`None`) and registering the `action_options` output schema in
+`world/ai/schemas/registry.py` (no semantic validators — D-2; the registered schema validates the
+**raw model wire shape**: `known_action` cards with optional `params`, `freeform` cards carrying
+`npc_index` — never the caller-injected `fingerprint`/`status`/`action_code`/`params`, per the
+schema change's exact-field parsing contract). `server/conf/at_server_startstop.py` gains
+`_register_action_options_layer()` following the boot-tolerant pattern of the other layers,
+with one addition (review round three): it also catches `UnknownLayerError` and logs
+"skipped — action_options slot pending" — the `LAYER_NAMES` slot arrives with the prompts change,
+and a branch that lands this change's wiring first must never abort startup; the same warning-
+and-skip applies to `GuardrailRegistrationError`/`DuplicateSchemaError` as with the other
+layers. The prompts and schema changes are landing prerequisites for this change's regression
+suite.
 
 ## Risks / Trade-offs
 
-- **[R1] The schema change ships only the raise-on-first-error ladder entry.** → The retry loop
-  needs aggregated messages. Mitigation: the integration contract is pinned here — consume the
-  message-collecting variant if present; otherwise wrap the named per-stage errors
-  (`"stage N: <code>"`) into the retry text. Either way only the message producer differs; the
-  retry/degrade behavior in this change's specs is unchanged.
+- **[R1] The schema ladder raises one named error per stage, not message lists.** → The
+  per-call closure maps each caught rejection to `"stage N: <code>"` (D-3); the retry/degrade
+  behavior in this change's specs is unaffected.
 - **[R2] Wording overlap with the schema change's "enrichment".** → Scope ruling (D-4): the
-  ladder entry point and stage-0 validation are schema-owned; the caller-side injection
-  (fingerprint/status, `npc_index` → `action_code`/`params`) is layer-owned. The integration
-  test exercises both halves together.
-- **[R3] The model may repeat the same binding/ladder failure across retries.** → The bounded
-  budget terminates; exhaustion resolves `None`; the service memoizes transport failures but
-  validation exhaustion simply degrades to rule cards (correct product behavior — never show
-  unvalidated output).
-- **[R4] Accepted text re-validated after `guarded_call` must not drift.** → Single shared
+  ladder entry point, enrichment helper, and stage-0 validation are schema-owned; the caller-side
+  `npc_index` → `npc_id` binding resolution is layer-owned. The schema spec states the same
+  boundary, and the integration test exercises both halves together.
+- **[R3] The model may repeat the same binding/ladder/count failure across retries.** → The
+  bounded budget terminates; exhaustion resolves `None`; validation exhaustion degrades to rule
+  cards (correct product behavior — never show unvalidated output).
+- **[R4] Accepted text re-validated after `guarded_call` must not drift.** → Single total
   `_evaluate_enriched` (D-3); the strict path is the same helper, so drift is structurally
-  impossible. Remaining risk is state mutation between trips → bounded diagnostic + `None`.
-- **[R5] Startup registration conflicts with other layers.** → Boot-tolerant registration per
-  the existing pattern; correctness preserved because the layer gate (profile
-  enabled/disables + degrade-fallback identity) still fails loudly on a foreign registration.
+  impossible; the residual branch is a defensive bounded-log + `None`.
+- **[R5] Startup ordering: the `LAYER_NAMES` slot lands with the prompts change.** → The startup
+  wrapper catches `UnknownLayerError` with warning-and-skip (D-7); the branch-safe behavior is
+  itself wired before any deployment order is assumed.
 - **[R6] Truncation hides content from the model.** → Fixed, tested order guarantees the most
-  decision-relevant inputs (affordances, room identity) survive any budget pressure.
+  decision-relevant inputs (affordances, room identity) survive any budget pressure; over-budget
+  non-truncatable inputs fail named and degrade instead of silently overflowing (D-5).
+- **[R7] A raw wire shape that accidentally requires caller-injected fields would make every
+  accepted response unenrichable.** → Pinned cross-change contract (D-7): the registered output
+  schema validates the model's raw shape only (`params` optional on known-action cards, `npc_index`
+  on freeform); the integration test proves an accepted raw payload enriches and validates.
 
 ## Migration Plan
 
@@ -179,8 +214,9 @@ values. Rollback is a revert of this change plus its dependency changes; nothing
 
 ## Open Questions
 
-- The exact entry-point name/shape the schema change exposes for "ladder validation with error
-  messages" — this change's integration test pins whatever ships (R1).
 - Whether the trigger service passes the secret-token set explicitly or derives it inside
   `build_options_context` — resolved at the trigger-service design (change 5); the pure builder
   contract (D-5) supports both.
+- Whether the trigger service binds `fingerprint` per situation or per transition-in — the
+  service memoizes transport failures, so it chooses the scope; the layer treats it as an opaque
+  value it carries through (D-3/D-4).

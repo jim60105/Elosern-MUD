@@ -15,33 +15,46 @@ guarded pipeline, and returns `OptionSet | None`.
 - New `world/ai/action_options.py` module (proposal-only, no state writes) containing:
   - `build_options_context(...)`: frozen bounded-context serializer with the fixed truncation
     policy (narrative tail first, then persona digest characters, then NPC count; `affordances`,
-    `room_name`, `room_summary` never truncated) and `LEAK_BLOCKLIST` composition (numeric
-    literals + hidden trait keys of the deterministic view).
-  - `build_action_options_prompt(context)`: prompt assembly through
-    `world/prompts/loader.render_prompt` with the `action_options` placeholder allowlist.
-  - `generate_action_options(context, client) -> defer.Deferred`: guarded generation
-    (`OptionSet | None`) under the `action_options` profile — profile gate first (disabled →
-    `None`, no transport), `schema_id="action_options"` + registered output schema, enriched
-    binding of `{npc_index}` to `(action_code, params)`, ladder validation via the schema change's
-    entry point, rejection → retry up to `1 + max_retries` with errors appended, transport
-    failure → immediate `None` (no retry loop; the trigger service memoizes), exhaustion → `None`.
+    `room_name`, `room_summary` never truncated — an over-budget non-truncatable value is a named
+    input error, never silently emitted) and `LEAK_BLOCKLIST` composition (numeric literals +
+    hidden trait keys of the deterministic view).
+  - `build_action_options_prompt(context)`: prompt assembly through the prompt library's two
+    `action_options` keys (`system` with an empty allowlist, `user` substituting exactly the
+    seven context fields).
+  - `generate_action_options(context, client, *, fingerprint) -> defer.Deferred`: guarded
+    generation (`OptionSet | None`) under the `action_options` profile — profile gate first
+    (disabled → `None`, no transport), `schema_id="action_options"` + registered output schema
+    (raw wire shape only), enriched binding of `{npc_index}` to `(action_code, params)` with the
+    caller-supplied `fingerprint` carried through, ladder validation via the schema change's
+    entry point receiving `fingerprint` + `leak_blocklist`, the layer's 3–5 generation floor
+    (sets below 3 retry), rejection → retry up to `1 + max_retries` with errors appended,
+    transport failure → immediate `None` (no retry loop; the trigger service memoizes),
+    exhaustion → `None`.
   - `register_action_options()`: idempotent, atomic guardrail-hook installation (degrade fallback
-    + semantic validators + output schema) mirroring `register_npc_dialogue`; wired into
-    `server/conf/at_server_startstop.py` beside the other layer registrations.
+    + raw-shape output schema only — the ladder owns every text gate) mirroring
+    `register_npc_dialogue`; wired into `server/conf/at_server_startstop.py` beside the other
+    layer registrations, warning-and-skipping when the `action_options` profile slot or schema
+    entry point has not landed yet (never aborts startup).
 - Import discipline matches the existing layers: no Evennia imports at module import time, no
   module-level logger binding; `None` in, `suggestions=degraded` out — no partial success.
-- Test suite on `FakeLLMClient`: success path, per-stage rejection fixtures with retry
-  consumption, transport failures → `None` without retries, offline profile → stub never called,
-  context-builder truncation/blocklist/public-only assertions, placeholder-allowlist parity.
+- Test suite on `FakeLLMClient` (callable message-count matchers for retries): success path,
+  3–5 generation floor (0/2-card sets retry, 3/5 resolve, 6 rejected by the ladder), binding and
+  leak-blocklist rejection fixtures with retry consumption, transport failures → `None` without
+  retries, offline profile → stub never called, context-builder truncation/blocklist/public-only
+  assertions, placeholder-allowlist parity on both prompt keys.
+- **Landing prerequisites:** the `action-options-prompts` change (prompt file + profile slot +
+  `LAYER_NAMES` entry) and `action-options-schema` (ladder + enrichment + output schema) must
+  land before startup wiring is exercised in production; until then the startup wrapper skips
+  with a bounded warning and tests use thin local stand-ins.
 
 ## Capabilities
 
 ### New Capabilities
 
 - `action-options-layer`: The generative proposal layer contract — bounded-context serialization
-  with fixed truncation policy, prompt assembly, guarded generation with enrichment and the
-  retry/degrade ladder, atomically installed guardrail hooks, and strictly proposal-only behavior
-  (`OptionSet | None` in, degraded rules out).
+  with fixed truncation policy, prompt assembly, guarded generation with enrichment, the 3–5
+  generation floor, and the retry/degrade ladder, atomically installed guardrail hooks, and
+  strictly proposal-only behavior (`OptionSet | None` in, degraded rules out).
 
 ### Modified Capabilities
 
@@ -53,7 +66,9 @@ guarded pipeline, and returns `OptionSet | None`.
 
 - **New module:** `world/ai/action_options.py` (pure functions + frozen structs, no writes).
 - **Registration:** `server/conf/at_server_startstop.py` gains the `action_options` layer
-  registration call (idempotent, beside existing layer registrations).
+  registration call (idempotent, beside existing layer registrations; warning-and-skips when
+  the profile slot or schema entry point is not yet available, so partial-branch landings never
+  abort startup).
 - **Consumed contracts (unchanged):** `world/ai/guardrail.py` (guarded call, pluggable
   validators, degrade fallback), `world/ai/profiles.py`/`LLM_PROFILES` (`action_options` slot
   arrives with `action-options-prompts`), `world/ai/schemas/registry.py` (`action_options` output
