@@ -64,10 +64,8 @@ change).
   removal, degraded exclusion, click envelope parity with the dock) and one browser test file
   that boots a shared server (no combat sessions — the combat-browser-server rule does not
   apply), following the repo's serial-owner and shard conventions.
-- **Downstream**: depends on the roadmap change `context-actions-v3` (which lands the
-  `suggestions` section as `context_actions` wire schema **v5** — the affordance-contract change
-  already lifted the panel from v3 to v4; the old design set's "v3 validator" wording is
-  superseded by that v4→v5 amendment) and on `webclient-options-surface` (shared card-group
-  factory + dock section); consumed by nobody else. `docs/game/commands.md` and
-  `docs/game/command-reference.md` are unaffected (no player command changes). New main-spec
-  requirements receive `covers_requirement` annotations per the spec-traceability workflow.
+- **Downstream**: depends on `context-actions-v3` (suggestions payload) and
+  `webclient-options-surface` (shared card renderer + dock section); consumed by nobody else.
+  `docs/game/commands.md` and `docs/game/command-reference.md` are unaffected (no player command
+  changes). New main-spec requirements receive `covers_requirement` annotations per the
+  spec-traceability workflow.
