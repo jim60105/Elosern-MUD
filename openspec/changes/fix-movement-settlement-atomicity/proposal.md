@@ -24,6 +24,7 @@ Evennia persists a successful location change before `Exit.at_post_traverse` run
 
 - `world/rules/movement_settlement.py` (new): settlement snapshot (locations, companions, wilderness bookkeeping, quest-observation and advance surfaces), outer transaction, falsy-return trigger, compensation, cache reconciliation.
 - `typeclasses/exits.py`: `MovementCostMixin.at_traverse` wrapper; `WildernessGateExit`/`WildernessReturnExit` bodies routed through the boundary; docstring fixes.
+- `world/rules/npc_schedules.py`: `_first_traversable_exit` admits the mixin's delegating `at_traverse` alongside the stock implementation for the schedule-route qualification check (the mixin honors the requested destination; redirecting exits stay excluded).
 - `world/rules/clock.py`: consumed read-only via the `build_advance_snapshot_registry` seam (lands with the parallel `fix-clock-rollback-cache-sync` change; forward-declared with a guarded test until then) — no production change in this change.
 - `world/rules/map_knowledge.py`, `world/rules/party.py`, `world/rules/onboarding.py`: unchanged; their functions are the steps the boundary wraps.
 - `world/quests/transitions.py`: read-only reuse of the existing `snapshot_quest_log`/`restore_quest_log`/`snapshot_pin_reasons`/`restore_pin_reasons` helpers — no production change.

@@ -117,6 +117,18 @@ class MovementCostMixinSourceTests(EvenniaTest):
         self.assertIn("record_arrival(traversing_object)", helper)
         self.assertNotIn("get_world_clock().advance", helper)
 
+    @covers_requirement("movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value")
+    def test_mixin_at_traverse_delegates_to_the_settlement_boundary(self):
+        import inspect
+
+        from typeclasses.exits import MovementCostMixin
+
+        source = inspect.getsource(MovementCostMixin.at_traverse)
+        self.assertIn("settle_movement(", source)
+        self.assertIn("super().at_traverse", source)
+        self.assertNotIn("get_world_clock().advance", source)
+        self.assertNotIn("after_successful_movement(", source)
+
 
 class FlightRequiredExitTests(EvenniaTest):
     """Flight-required exits gate on ``flight``/``flash_step`` ownership."""
