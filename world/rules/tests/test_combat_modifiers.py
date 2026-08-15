@@ -74,6 +74,60 @@ class CombatModifierTests(EvenniaTest):
         entity.sexual.climax_phase.value = "進行中"
         self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
 
+    @covers_requirement(
+        "combat-modifier-table::high-exposure-defense-penalty-prices-raised-exposure-as-a-combat-cost",
+        "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module",
+    )
+    def test_rule_high_exposure_defense_penalty(self):
+        entity = self._entity()
+        entity.sexual.exposure.value = "高"
+        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": -15})
+        rule = RULES["high_exposure_defense_penalty"]
+        entity.sexual.exposure.value = "中等"
+        self.assertFalse(evaluate_condition(rule.when, {"exposure": entity.sexual.exposure}))
+        entity.sexual.exposure.value = "極高"
+        self.assertTrue(evaluate_condition(rule.when, {"exposure": entity.sexual.exposure}))
+        self.assertEqual(rule.then, {"defense": -15})
+
+    def test_rule_high_exposure_defense_penalty_below_threshold(self):
+        entity = self._entity()
+        for level in ("極低", "低"):
+            with self.subTest(level=level):
+                entity.sexual.exposure.value = level
+                self.assertEqual(evaluate_combat_modifiers(entity), {})
+
+    def test_rule_high_exposure_defense_penalty_merges_with_other_origins(self):
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        _add_buff(entity, "poisoned")
+        entity.sexual.exposure.value = "高"
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            {"agility": "-10%", "defense": -10},
+        )
+
+    def test_high_exposure_defense_penalty_applies_through_real_damage_resolution(self):
+        from world.rules.combat import _adjusted_defense
+
+        entity = self._entity()
+        entity.sexual.exposure.value = "高"
+        self.assertEqual(
+            _adjusted_defense(entity),
+            float(entity.skills.effective_value("defense")) - 15,
+        )
+        entity.sexual.exposure.value = "低"
+        self.assertEqual(
+            _adjusted_defense(entity),
+            float(entity.skills.effective_value("defense")),
+        )
+
+    def test_high_exposure_defense_penalty_no_create_parity(self):
+        entity = self._entity()
+        entity.sexual.exposure.value = "高"
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"defense": -15})
+        entity.sexual.exposure.value = "低"
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
+
     def test_rule_defense_instinct_defense_bonus(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}

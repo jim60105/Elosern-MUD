@@ -37,3 +37,12 @@ position on `AROUSAL_LEVELS`.
   `_merge_adjustments`'s numeric-addition path — both being flat integers is what makes this
   genuine merge possible; see design.md D-2), with no row excluded or handled differently because of
   its condition origin
+
+#### Scenario: The matched condition is player-visible through the status read model
+- **WHEN** `build_status_read_model(entity)` is called on an entity whose `exposure` is at or above
+  `高`
+- **THEN** the read model's conditions include the `high_exposure_defense_penalty` code carrying
+  `{"defense": -15}` as its modifiers with its `status_display.yaml` Traditional Chinese label and
+  warning severity, and the entry is absent when `exposure` is below `高` — the row surfaces through
+  the same `webclient-status-presentation` matched-condition surface as every other
+  `combat_modifiers.yaml` rule

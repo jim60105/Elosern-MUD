@@ -105,6 +105,29 @@ class StatusReadModelTests(EvenniaTest):
         self.assertEqual(entry.severity, "warning")
 
     @covers_requirement(
+        "combat-modifier-table::high-exposure-defense-penalty-prices-raised-exposure-as-a-combat-cost",
+        "webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers",
+    )
+    def test_high_exposure_defense_penalty_appears_only_while_matched(self):
+        model = build_status_read_model(self.actor)
+        self.assertFalse(
+            any(c.code == "high_exposure_defense_penalty" for c in model.conditions)
+        )
+        self.actor.sexual.exposure.value = "高"
+        model = build_status_read_model(self.actor)
+        entry = next(
+            c for c in model.conditions if c.code == "high_exposure_defense_penalty"
+        )
+        self.assertEqual(entry.modifiers, {"defense": -15})
+        self.assertEqual(entry.severity, "warning")
+        self.assertEqual(entry.label, "高露出防禦減損")
+        self.actor.sexual.exposure.value = "低"
+        model = build_status_read_model(self.actor)
+        self.assertFalse(
+            any(c.code == "high_exposure_defense_penalty" for c in model.conditions)
+        )
+
+    @covers_requirement(
         "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
     )
     def test_owned_skill_adjustment_appears_in_status_conditions(self):

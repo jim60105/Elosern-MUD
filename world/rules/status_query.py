@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from world.lore.sexual_vocab import EXPOSURE_LEVELS
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import matched_combat_modifiers
 from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, PLEASURE_CONFIG
@@ -260,7 +261,11 @@ def _ordinal_of(levels: tuple[str, ...], label: str) -> int:
 def _sexual_condition_context(entity: Any) -> dict[str, Any]:
     """Build the combat-modifier condition context from read-only state."""
     context: dict[str, Any] = {"active_buffs": {key for key, _ in _active_buff_entries(entity)}}
-    for field, levels in (("arousal", AROUSAL_LEVELS), ("climax_phase", CLIMAX_PHASE_LEVELS)):
+    for field, levels in (
+        ("arousal", AROUSAL_LEVELS),
+        ("climax_phase", CLIMAX_PHASE_LEVELS),
+        ("exposure", EXPOSURE_LEVELS),
+    ):
         value = _sexual_level(entity, field)
         if isinstance(value, str) and value in levels:
             context[field] = _LevelRef(_ordinal_of(levels, value), levels)

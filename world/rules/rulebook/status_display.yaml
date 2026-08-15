@@ -98,6 +98,9 @@
 - code: climax_in_progress_locks_actions
   label: 高潮進行中鎖定行動
   severity: warning
+- code: high_exposure_defense_penalty
+  label: 高露出防禦減損
+  severity: warning
 - code: defense_instinct_defense_bonus
   label: 防禦直覺防禦提升
   severity: beneficial
