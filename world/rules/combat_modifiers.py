@@ -8,6 +8,7 @@ from typing import Any
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
 from world.rules.rulebook.schema import evaluate_condition, load_rules
+from world.rules.sexual_state import PLEASURE_CONFIG
 from world.skills.equipment import dual_wielding_from_storage
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
@@ -53,7 +54,20 @@ def _stored_sexual_level(entity: Any, field: str) -> Any:
     from collections.abc import Mapping
 
     traits = entity.attributes.get("sexual_traits", default=None, category="traits")
-    if isinstance(traits, Mapping) and field in traits:
+    if field == "arousal":
+        if isinstance(traits, Mapping) and "pleasure" in traits:
+            raw = traits["pleasure"]
+            base = raw.get("base") if isinstance(raw, Mapping) else None
+            if isinstance(base, int) and not isinstance(base, bool):
+                # Defensive: CounterTrait.base's own setter clamps writes into
+                # [0, 100], so an out-of-range stored value implies corrupted
+                # storage; clamp it so the ordinal lookup still resolves.
+                base = min(100, max(0, base))
+                return _StoredLevel(
+                    PLEASURE_CONFIG.ordinal_for(base), AROUSAL_LEVELS
+                )
+            return None
+    elif isinstance(traits, Mapping) and field in traits:
         raw = traits[field]
         if isinstance(raw, Mapping):
             value = raw.get("value")

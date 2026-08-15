@@ -58,14 +58,14 @@ class CombatModifierTests(EvenniaTest):
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no", "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module")
     def test_rule_high_arousal_agility_accuracy_penalty(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         self.assertEqual(
             evaluate_combat_modifiers(entity), {"agility": "-20%", "accuracy": -15}
         )
         rule = RULES["high_arousal_agility_accuracy_penalty"]
-        entity.sexual.arousal.value = "中等"
+        entity.sexual.pleasure.base = 35
         self.assertFalse(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
-        entity.sexual.arousal.value = "極限"
+        entity.sexual.pleasure.base = 85
         self.assertTrue(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
         self.assertEqual(rule.then, {"agility": "-20%", "accuracy": -15})
 
@@ -272,7 +272,7 @@ class CombatModifierTests(EvenniaTest):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["defense_instinct"]}
         _add_buff(entity, "poisoned")
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         self.assertEqual(
             evaluate_combat_modifiers(entity),
             {"agility": "-30%", "accuracy": -15, "defense": 5},
@@ -313,6 +313,63 @@ class CombatModifierTests(EvenniaTest):
     @covers_requirement("buff-handler-integration::entity-buffs-is-mounted-as-the-real-buffhandler-replacing-the-change-3-placeholder")
     def test_no_state_returns_empty_and_sexual_rules_are_inert(self):
         self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
+
+    @covers_requirement("combat-modifier-table::the-no-create-preview-path-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_no_create_preview_reflects_live_pleasure_on_materialized_entity(self):
+        entity = self._entity()
+        entity.sexual.pleasure.base = 61
+        live = evaluate_combat_modifiers(entity)
+        preview = evaluate_combat_modifiers_no_create(entity)
+        self.assertEqual(live, {"agility": "-20%", "accuracy": -15})
+        self.assertEqual(preview, live)
+
+    @covers_requirement("combat-modifier-table::the-no-create-preview-path-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_no_create_preview_falls_back_to_baseline_without_materializing(self):
+        entity = self._entity()
+        entity.db.sexual = {
+            "arousal": "極限",
+            "wetness": "乾燥",
+            "shame": "無",
+            "exposure": "極低",
+            "climax_phase": "未達",
+            "sensitivity": {},
+            "climax_today": 0,
+            "virgin": True,
+            "experience_types": [],
+        }
+        self.assertIsNone(entity.attributes.get("sexual_traits", category="traits"))
+        self.assertEqual(
+            evaluate_combat_modifiers_no_create(entity),
+            {"agility": "-20%", "accuracy": -15},
+        )
+        self.assertIsNone(
+            entity.attributes.get("sexual_traits", category="traits"),
+            "no-create preview must not materialize the sexual handler",
+        )
+
+    @covers_requirement("combat-modifier-table::the-no-create-preview-path-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_no_create_preview_tracks_a_ceilinged_stored_base(self):
+        # CounterTrait.base's setter clamps writes into [0, 100]; the
+        # no-create reader must resolve the stored base exactly as the live
+        # trait.value read does, including at the ceiling.
+        entity = self._entity()
+        entity.sexual.pleasure.base = 95
+        entity.sexual.pleasure.base += 14
+        self.assertEqual(entity.sexual.pleasure.value, 100)
+        self.assertEqual(
+            evaluate_combat_modifiers_no_create(entity),
+            evaluate_combat_modifiers(entity),
+        )
+
+    @covers_requirement("combat-modifier-table::the-no-create-preview-path-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_no_create_preview_rejects_a_boolean_stored_base(self):
+        entity = self._entity()
+        entity.sexual.pleasure.base = 60
+        raw = dict(entity.attributes.get("sexual_traits", category="traits"))
+        raw["pleasure"] = dict(raw["pleasure"])
+        raw["pleasure"]["base"] = True
+        entity.attributes.add("sexual_traits", raw, category="traits")
+        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
 
 class ApplyCostModifierTests(unittest.TestCase):

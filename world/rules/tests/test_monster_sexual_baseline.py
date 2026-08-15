@@ -27,7 +27,7 @@ class MonsterSexualBaselineTests(EvenniaTest):
         self.assertEqual(state.sensitivity["尾巴"].level, "普通")
         state.shame.value = "強烈"
         self.assertEqual(state.shame.level, "無")
-        state.arousal.value = "高度"
+        state.pleasure.base = 60
         self.assertEqual(state.arousal.level, "高度")
 
     def test_monster_shame_clamp_survives_handler_reconstruction(self):

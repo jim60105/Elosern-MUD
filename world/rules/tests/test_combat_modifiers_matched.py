@@ -39,7 +39,7 @@ class MatchedCombatModifiersTests(EvenniaTest):
 
     def test_sexual_rule_matches_are_exposed(self):
         entity = self._entity()
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         matches = dict(matched_combat_modifiers(entity))
         self.assertEqual(
             matches["high_arousal_agility_accuracy_penalty"],
@@ -50,7 +50,7 @@ class MatchedCombatModifiersTests(EvenniaTest):
         entity = self._entity()
         _add_buff(entity, "poisoned")
         _add_buff(entity, "fear")
-        entity.sexual.arousal.value = "高度"
+        entity.sexual.pleasure.base = 60
         matches = matched_combat_modifiers(entity)
         ids = [rule_id for rule_id, _ in matches]
         self.assertEqual(

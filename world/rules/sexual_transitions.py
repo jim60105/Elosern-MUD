@@ -11,15 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
-from world.rules.sexual_state import _apply_climax_phase_set
+from world.rules.sexual_state import PLEASURE_CONFIG, _apply_climax_phase_set
 
 
 FIELD_KINDS = {
-    "arousal": "ordered_level",
     "wetness": "ordered_level",
     "shame": "ordered_level",
     "exposure": "ordered_level",
     "climax_phase": "ordered_level_cyclic",
+    "pleasure": "bounded_counter",
     "sensitivity": "ordered_level_dict",
     "climax_today": "counter",
     "virgin": "flag_one_way",
@@ -116,6 +116,8 @@ def _validate_rule_effect(rule: Rule) -> None:
         allowed = {"field", "delta"}
     elif kind in {"ordered_level_dict", "counter"}:
         allowed = {"field", "delta"}
+    elif kind == "bounded_counter":
+        allowed = {"field", "delta"} if "delta" in then else {"field", "set"}
     elif kind in {"ordered_level_cyclic", "flag_one_way"}:
         allowed = {"field", "set"}
         if kind == "ordered_level_cyclic":
@@ -133,6 +135,13 @@ def _validate_rule_effect(rule: Rule) -> None:
             raise ValueError(f"rule {rule.id!r} vital-gauge delta must be negative")
     if kind == "counter" and then["delta"] != "+1":
         raise ValueError(f"rule {rule.id!r} counter delta must be '+1'")
+    if kind == "bounded_counter" and "set" in then:
+        value = then["set"]
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
+            raise ValueError(
+                f"rule {rule.id!r} bounded-counter set must be an int "
+                f"in [0, 100], got {value!r}"
+            )
     if kind == "flag_one_way" and then["set"] is not False:
         raise ValueError(f"rule {rule.id!r} may only clear its one-way flag")
 
@@ -165,6 +174,16 @@ def _apply_then(
         else:
             trait.value = trait.levels.index(then["set"])
         direction = _direction(before, trait.value)
+    elif kind == "bounded_counter":
+        trait = entity.sexual.pleasure
+        before_ordinal = PLEASURE_CONFIG.ordinal_for(trait.value)
+        if "delta" in then:
+            trait.base += _resolve_delta(then["delta"], rng)
+        else:
+            trait.base = then["set"]
+        after_ordinal = PLEASURE_CONFIG.ordinal_for(trait.value)
+        direction = _direction(before_ordinal, after_ordinal)
+        field = "arousal"
     elif kind == "ordered_level_cyclic":
         if "from" in then and entity.sexual.climax_phase.level != then["from"]:
             return None, None

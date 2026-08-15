@@ -29,7 +29,7 @@ class SexualEventSelfArmingTests(EvenniaTest):
             effects=["sexual_event:stimulus_applied"],
         )
         try:
-            before = actor.sexual.arousal.value
+            before = actor.sexual.pleasure.value
             result = ActionResolver.resolve(
                 ActionRequest(
                     actor,
@@ -44,4 +44,4 @@ class SexualEventSelfArmingTests(EvenniaTest):
         finally:
             SKILL_REGISTRY["status_disguise"] = original
         self.assertEqual(result.outcome, "success")
-        self.assertGreater(actor.sexual.arousal.value, before)
+        self.assertGreater(actor.sexual.pleasure.value, before)

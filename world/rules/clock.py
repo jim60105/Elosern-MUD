@@ -14,7 +14,12 @@ from evennia.utils.create import create_script
 from evennia.utils.search import search_script
 
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
-from world.rules.sexual_state import DECAY_CONFIG, decay_tick, reset_daily_counters
+from world.rules.sexual_state import (
+    DECAY_CONFIG,
+    PLEASURE_CONFIG,
+    decay_tick,
+    reset_daily_counters,
+)
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import GAUGE_KEYS
 
@@ -195,12 +200,21 @@ def _has_settlement_work(entity: Any) -> bool:
     sexual = getattr(entity, "sexual", None)
     if sexual is None:
         return False
-    return any(
-        getattr(sexual, field).level != config["floor"]
-        for field, config in DECAY_CONFIG.items()
-        if config.get("only_from") is None
-        or getattr(sexual, field).level == config["only_from"]
-    )
+    for field, config in DECAY_CONFIG.items():
+        if config.get("only_from") is not None and getattr(
+            sexual, field
+        ).level != config["only_from"]:
+            continue
+        trait = getattr(sexual, field)
+        level = getattr(trait, "level", None)
+        if level is not None:
+            if level != config["floor"]:
+                return True
+        elif trait.value != PLEASURE_CONFIG.floor_for_level(config["floor"]):
+            # Counter fields (pleasure) have no level vocabulary; the band
+            # table's floor is their resting point.
+            return True
+    return False
 
 
 def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> None:

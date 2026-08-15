@@ -65,7 +65,7 @@ class MutationBoundaryTests(EvenniaTest):
         self.actor.location = self.room1
         self.actor.db.disguised_stats = {"hp": 999}
         _add_buff(self.actor, "poisoned")
-        self.actor.sexual.arousal.value = "高度"
+        self.actor.sexual.pleasure.base = 60
 
     def _snapshot(self):
         from web.webclient.presentation.registry import build_production_registry

@@ -96,7 +96,7 @@ class StatusReadModelTests(EvenniaTest):
         self.assertFalse(
             any(c.code == "high_arousal_agility_accuracy_penalty" for c in model.conditions)
         )
-        self.actor.sexual.arousal.value = "極限"
+        self.actor.sexual.pleasure.base = 85
         model = build_status_read_model(self.actor)
         entry = next(
             c for c in model.conditions if c.code == "high_arousal_agility_accuracy_penalty"
@@ -210,6 +210,90 @@ class StatusReadModelTests(EvenniaTest):
         self.assertIsNone(
             self.actor.attributes.get("sexual_traits", category="traits"),
             "reading status must not materialize the sexual handler",
+        )
+
+    @covers_requirement("webclient-status-presentation::the-no-create-status-read-model-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_status_panel_reflects_live_pleasure_on_materialized_entity(self):
+        self.actor.sexual.pleasure.base = 61
+        model = build_status_read_model(self.actor)
+        entry = next(
+            c for c in model.conditions if c.code == "high_arousal_agility_accuracy_penalty"
+        )
+        self.assertEqual(entry.label, "高度興奮敏捷與準度減損")
+        self.assertEqual(entry.modifiers, {"agility": "-20%", "accuracy": -15})
+
+    @covers_requirement("webclient-status-presentation::the-no-create-status-read-model-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_status_panel_entry_disappears_when_pleasure_drops_below_the_band(self):
+        self.actor.sexual.pleasure.base = 61
+        first = build_status_read_model(self.actor)
+        self.assertTrue(
+            any(
+                c.code == "high_arousal_agility_accuracy_penalty"
+                for c in first.conditions
+            )
+        )
+        self.actor.sexual.pleasure.base = 59
+        second = build_status_read_model(self.actor)
+        self.assertFalse(
+            any(
+                c.code == "high_arousal_agility_accuracy_penalty"
+                for c in second.conditions
+            )
+        )
+
+    @covers_requirement("webclient-status-presentation::the-no-create-status-read-model-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_status_of_unmaterialized_entity_resolves_from_baseline_without_materializing(self):
+        self.actor.db.sexual = {
+            "arousal": "極限",
+            "wetness": "乾燥",
+            "shame": "無",
+            "exposure": "極低",
+            "climax_phase": "未達",
+            "sensitivity": {},
+            "climax_today": 0,
+            "virgin": True,
+            "experience_types": [],
+        }
+        self.assertIsNone(self.actor.attributes.get("sexual_traits", category="traits"))
+        model = build_status_read_model(self.actor)
+        entry = next(
+            c for c in model.conditions if c.code == "high_arousal_agility_accuracy_penalty"
+        )
+        self.assertEqual(entry.modifiers, {"agility": "-20%", "accuracy": -15})
+        self.assertIsNone(
+            self.actor.attributes.get("sexual_traits", category="traits"),
+            "status reads must not materialize the sexual handler",
+        )
+
+    @covers_requirement("webclient-status-presentation::the-no-create-status-read-model-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_status_panel_tracks_a_ceilinged_stored_base(self):
+        # CounterTrait.base's setter clamps writes into [0, 100]; the status
+        # reader must resolve the stored base exactly as the live trait.value
+        # read does, including at the ceiling.
+        self.actor.sexual.pleasure.base = 95
+        self.actor.sexual.pleasure.base += 14
+        self.assertEqual(self.actor.sexual.pleasure.value, 100)
+        model = build_status_read_model(self.actor)
+        self.assertTrue(
+            any(
+                c.code == "high_arousal_agility_accuracy_penalty"
+                for c in model.conditions
+            )
+        )
+
+    @covers_requirement("webclient-status-presentation::the-no-create-status-read-model-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
+    def test_status_panel_rejects_a_boolean_stored_base(self):
+        self.actor.sexual.pleasure.base = 60
+        raw = dict(self.actor.attributes.get("sexual_traits", category="traits"))
+        raw["pleasure"] = dict(raw["pleasure"])
+        raw["pleasure"]["base"] = True
+        self.actor.attributes.add("sexual_traits", raw, category="traits")
+        model = build_status_read_model(self.actor)
+        self.assertFalse(
+            any(
+                c.code == "high_arousal_agility_accuracy_penalty"
+                for c in model.conditions
+            )
         )
 
     def test_malformed_buff_cache_and_entries_fail_closed(self):

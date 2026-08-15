@@ -1,0 +1,19 @@
+pleasure_bands:
+  - {level: 平靜, floor: 0, ceiling: 14}
+  - {level: 微興奮, floor: 15, ceiling: 34}
+  - {level: 中等, floor: 35, ceiling: 59}
+  - {level: 高度, floor: 60, ceiling: 84}
+  - {level: 極限, floor: 85, ceiling: 100}
+
+sensitivity_multipliers:
+  普通: 1.0
+  高: 1.4
+  極高: 1.8
+  敏感異常: 2.5
+
+shame_multipliers:
+  無: 1.0
+  輕微: 0.9
+  中等: 0.8
+  強烈: 0.65
+  成癮: 1.6

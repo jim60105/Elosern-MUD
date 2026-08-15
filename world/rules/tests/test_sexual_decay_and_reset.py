@@ -15,7 +15,7 @@ from world.rules.sexual_state import decay_tick, reset_daily_counters
 class SexualDecayAndResetTests(EvenniaTest):
     def test_decay_accumulates_and_moves_at_most_one_level(self):
         entity = create_object(PlayerCharacter, key="decay")
-        entity.sexual.arousal.value = "極限"
+        entity.sexual.pleasure.base = 85
         decay_tick(entity, 1799)
         self.assertEqual(entity.sexual.arousal.level, "極限")
         decay_tick(entity, 1)
@@ -52,12 +52,35 @@ class SexualDecayAndResetTests(EvenniaTest):
 
     def test_daily_reset_changes_only_counter(self):
         entity = create_object(PlayerCharacter, key="daily reset")
-        entity.sexual.arousal.value = "中等"
+        entity.sexual.pleasure.base = 35
         entity.sexual.record_climax()
         before = entity.sexual.arousal.level
         reset_daily_counters(entity)
         self.assertEqual(entity.sexual.climax_today, 0)
         self.assertEqual(entity.sexual.arousal.level, before)
+
+    @covers_requirement("sexual-state-handler::decay-tick-decays-pleasure-by-crossing-exactly-one-band-per-configured-interval")
+    def test_decay_from_the_middle_of_a_band_crosses_to_the_band_below(self):
+        entity = create_object(PlayerCharacter, key="mid-band decay")
+        entity.sexual.pleasure.base = 72
+        decay_tick(entity, 1800)
+        self.assertEqual(entity.sexual.pleasure.value, 59)
+        self.assertEqual(entity.sexual.arousal.level, "中等")
+
+    @covers_requirement("sexual-state-handler::decay-tick-decays-pleasure-by-crossing-exactly-one-band-per-configured-interval")
+    def test_decay_at_the_floor_band_clamps_at_pleasure_zero(self):
+        entity = create_object(PlayerCharacter, key="floor-band decay")
+        entity.sexual.pleasure.base = 5
+        decay_tick(entity, 1800)
+        self.assertEqual(entity.sexual.pleasure.value, 0)
+
+    @covers_requirement("sexual-state-handler::decay-tick-decays-pleasure-by-crossing-exactly-one-band-per-configured-interval")
+    def test_decay_never_crosses_more_than_one_band_per_interval(self):
+        entity = create_object(PlayerCharacter, key="single-band decay")
+        entity.sexual.pleasure.base = 85
+        decay_tick(entity, 1800)
+        self.assertEqual(entity.sexual.pleasure.value, 84)
+        self.assertEqual(entity.sexual.arousal.level, "高度")
 
     @covers_requirement("sexual-state-handler::decay-tick-and-reset-daily-counters-are-exposed-as-plain-callables-with-no-settlement-order-invented")
     def test_module_has_no_clock_or_settlement_policy(self):
