@@ -11,7 +11,7 @@ Three pieces of shipped state this proposal reads without modifying:
 - `world/rules/disengage.py::_attempt_flee` — the existing agility-contest idiom
   (`roll_d100() + actor_agility >= COMBAT_YAML["to_hit"]["defender_constant"] + pursuer_agility`,
   `defender_constant` is `51`), and `_adjusted_agility`, which reads
-  `entity.skills.effective_value("agility")` through `evaluate_combat_modifiers()`.
+  `entity.skills.effective_value("agility")` through `evaluate_combat_modifiers_no_create()`.
 - `world/rules/affinity_config.py` — `AffinityStage` (`id`, `floor`, `name`, `look_flavor`) and
   `get_config().stage_for_value(value) -> AffinityStage`, the seven shipped stages (`初識` floor 0
   through `絕對羈絆` floor 100), and `RelationHandler.stage_for(player) -> AffinityStage` mounted at
@@ -38,7 +38,7 @@ turn". This proposal's scope stops at a correct, fully tested, callable verdict.
 - The two `auto_comply` conditions (affinity stage, climax-turn short circuit) are checked before any
   roll, so a guaranteed outcome never depends on `rng`.
 - The ordinary contest reuses the shipped `to_hit` formula shape and constant exactly, and reads
-  through `evaluate_combat_modifiers()` so combat-state effects (arousal, poison, buffs) apply to it
+  through `evaluate_combat_modifiers_no_create()` so combat-state effects (arousal, poison, buffs) apply to it
   automatically, with no new rule authored in `combat_modifiers.yaml`.
 - Fully deterministic under an injected RNG, matching the `apply_event(rng=...)` and
   `_attempt_flee`/`roll_d100()` precedent.
@@ -82,7 +82,7 @@ free. `sexual_resist.yaml` declares `agility_weight` and `atk_phys_weight` (non-
 `1.0`, validated at load); each participant's score is
 `effective_value("agility") * agility_weight + effective_value("atk_phys") * atk_phys_weight`.
 
-**The two stats are read through `evaluate_combat_modifiers()` with two different, stat-specific
+**The two stats are read through `evaluate_combat_modifiers_no_create()` with two different, stat-specific
 treatments — this is not a single shared "percentage/flat adjustment path".** Every existing
 `agility`-producing row in `combat_modifiers.yaml` (`high_arousal_agility_accuracy_penalty`,
 `fear_agility_and_accuracy_penalty`, `poison_agility_penalty`, `reincarnation_boon_yuka_agility_
@@ -129,7 +129,11 @@ reluctance to fight back, not literal weakness). `beloved` (`至愛`, floor 90) 
 the seven stage `id`s from `get_config().stages` must appear exactly once, each value is either a
 finite number or the single-key `{auto_comply: true}` mapping, and no extra key is present — this
 mirrors the fail-closed validation style `world/rules/rulebook/schema.py` and `affinity_config.py`
-already use.
+already use. The table is consumed through a module-level singleton loaded on first access
+(`get_resist_config()`, mirroring `get_config()`'s own lazy-cache pattern) rather than an
+import-time eager load: `get_config()` itself requires the quest definition registry (its
+`cap_breaks` validation), which only server startup or test setup populates, so an import-time load
+would crash every non-bootstrapped import (e.g. test collection).
 
 **Why a flag instead of a very large number for the top two stages:** a numeric bonus cannot
 guarantee anything in this engine — `body_enhancement_extreme` (an existing skill) multiplies
@@ -169,23 +173,29 @@ resister would incorrectly receive `初識`'s bonus.
 so this would silently grant monsters the `初識` stat bonus described above. The explicit type check
 is the only correct gate.
 
-### Decision 5 — The climax-turn short circuit reads `climax_turns` directly; no new counter
+### Decision 5 — The climax-turn short circuit reads stored state; no new counter
 
-`resist_verdict()` short-circuits to compliance whenever
-`resister.sexual.climax_phase.level == "進行中" and resister.sexual.climax_turns <=
-climax_turn_auto_comply_limit` (`5`, from `sexual_resist.yaml`). Both fields are read via
-`getattr(resister, "sexual", None)`; an entity with no `sexual` handler (should not occur for any
-`LivingEntity`, but matches the defensive style `world/rules/clock.py::_has_settlement_work` already
-uses for the same handler) skips this branch entirely and falls through to the ordinary contest.
+`resist_verdict()` short-circuits to compliance whenever the resister's stored climax state reads
+as `climax_phase` level `進行中` with `climax_turns <= climax_turn_auto_comply_limit` (`5`, from
+`sexual_resist.yaml`). Both facts are read from persistent storage without materializing the
+`sexual` handler — the phase level through `combat_modifiers.build_no_create_condition_context`
+(the same stored-state context the preview and no-create paths use; an entity whose sexual state
+has never been touched reads as not-in-進行中 and falls through to the ordinary contest) and
+`climax_turns` directly from the `sexual_state` attribute category. Materializing the handler is a
+state write, not a read: `SexualState.__init__` creates the stored traits on first access, which
+would break `resist_verdict()`'s no-mutation contract. (Rubber-duck review finding: the first
+implementation draft read `getattr(resister, "sexual", None)` and would have persisted traits on
+the first verdict against a fresh entity; the shipped tests pin the fix with a
+"never materializes sexual state" integration test.)
 
 This composes for free with Decision 2 in the common case: entry into `進行中` requires having passed
 through `接近`, which itself requires `pleasure` to have reached the `極限` band (`climax_gate`'s
 condition). Whenever the resister's `pleasure` is *still* in `極限` at contest time — the case the
 climax-turn short circuit is actually built for, since it directly resolves the auto-comply — the
 shipped `high_arousal_agility_accuracy_penalty` rule (`agility: "-20%"`) is already applied to that
-entity's `agility` term by `evaluate_combat_modifiers()`, with no new rule authored for it. Nothing
+entity's `agility` term by `evaluate_combat_modifiers_no_create()`, with no new rule authored for it. Nothing
 in this proposal *requires* that condition to hold for correctness — `resist_verdict()` always reads
-live modifiers regardless — so a resister whose `pleasure` has since decayed below `極限` while still
+the live stored-state bundle regardless — so a resister whose `pleasure` has since decayed below `極限` while still
 technically in `進行中` (a narrow window `sexual.yaml`'s rule cascade does not obviously rule out)
 simply loses this particular bonus without breaking anything.
 
