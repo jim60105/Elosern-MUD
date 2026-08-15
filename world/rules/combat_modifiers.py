@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS
+from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, EXPOSURE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
 from world.rules.rulebook.schema import evaluate_condition, load_rules
 from world.rules.sexual_state import PLEASURE_CONFIG
@@ -102,7 +102,11 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     ``entity.skills.owned_keys()`` (a pure stored-data read).
     """
     context: dict[str, Any] = {"active_buffs": active_buff_keys_from_storage(entity)}
-    for field, levels in (("arousal", AROUSAL_LEVELS), ("climax_phase", CLIMAX_PHASE_LEVELS)):
+    for field, levels in (
+        ("arousal", AROUSAL_LEVELS),
+        ("climax_phase", CLIMAX_PHASE_LEVELS),
+        ("exposure", EXPOSURE_LEVELS),
+    ):
         value = _stored_sexual_level(entity, field)
         if isinstance(value, str) and value in levels:
             context[field] = _StoredLevel(levels.index(value), levels)
@@ -129,6 +133,7 @@ def _build_context(entity) -> dict[str, Any]:
     if sexual is not None:
         context["arousal"] = sexual.arousal
         context["climax_phase"] = sexual.climax_phase
+        context["exposure"] = sexual.exposure
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context

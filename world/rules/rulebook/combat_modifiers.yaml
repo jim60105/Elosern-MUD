@@ -16,6 +16,12 @@
 - id: climax_in_progress_locks_actions
   when: {field: climax_phase, equals: 進行中}
   then: {actions_per_turn: 0}
+- id: high_exposure_defense_penalty
+  # 露出 (exposure) at the second-highest level — raised exposure is a felt
+  # defense cost in combat; the flat integer matches every other `defense`
+  # row (defense has no percentage-aware consumer in this codebase).
+  when: {field: exposure, gte: 高}
+  then: {defense: -15}
 - id: defense_instinct_defense_bonus
   # 防禦直覺 (defense_instinct, passive_buff:defense_small) — "被動強化自身的
   # 防禦能力" reads as a small flat `defense` bonus; the value enters damage

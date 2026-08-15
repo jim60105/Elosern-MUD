@@ -22,18 +22,20 @@ no other proposal in the set changes.
 
 **Goals:**
 - Give `exposure` a combat cost, matching the treatment `arousal` and `climax_phase` already receive.
-- Keep the change to a single table row plus its structurally-required test, touching no production
-  Python.
+- Keep the change to one table row, the minimal context-builder extension that makes the row
+  reachable, and the tests those two steps structurally require — no new mechanism anywhere.
 
 **Non-Goals:**
 - An offensive payoff for `exposure`. That is delivered by 羞恥線 act effects (distraction debuffs
   applied to the entities who can see the exposed actor) in a later proposal in the set, not by a
   modifier on the exposed entity itself. One defensive row is the complete modifier-table surface
   this proposal adds.
-- Any change to `world/rules/combat_modifiers.py`, `evaluate_condition()`, or the adjustment-bundle
-  vocabulary. `defense` is already a consumed bundle key (see `guardian_instinct_defense_bonus` and
-  `defense_instinct_defense_bonus`), and `field`/`gte` is already a supported condition shape (see
-  `high_arousal_agility_accuracy_penalty`). Nothing new is introduced at the mechanism level.
+- Any change to `world/rules/combat_modifiers.py`'s condition evaluator, `_merge_adjustments()`,
+  or the adjustment-bundle vocabulary. `defense` is already a consumed bundle key (see
+  `guardian_instinct_defense_bonus` and `defense_instinct_defense_bonus`), and `field`/`gte` is
+  already a supported condition shape (see `high_arousal_agility_accuracy_penalty`). The three
+  condition-context builders (combat_modifiers.py's two and status_query.py's one) gain `exposure`
+  (D-4) — nothing else in either module changes.
 - Any interaction with `pleasure-gauge` (B1). `arousal` becomes a derived-but-still-comparable view
   in that later proposal; `exposure` is untouched by it, so this proposal has no ordering dependency
   on B1 landing first or after.
@@ -100,15 +102,71 @@ accuracy_penalty` fires at the second-highest level (`高度`, index 3 of `平�
 the sibling row's threshold position keeps the two sexual-field combat rows readable as a pair rather
 than requiring a reader to learn two different intensity conventions.
 
+**D-4: The condition context is an explicit allowlist — `exposure` must be added to all three
+combat-modifier context builders. This was wrong in the planning drafts; corrected after review of
+the actual code.** `evaluate_condition()` resolves a `field` condition purely from the context
+dictionary handed to it, and a field absent from the context evaluates as not-satisfied. There are
+three context builders that feed `matched_combat_modifiers()` — `_build_context` in
+`world/rules/combat_modifiers.py` (used by `evaluate_combat_modifiers()`, i.e. live combat math),
+`build_no_create_condition_context()` (used by `evaluate_combat_modifiers_no_create()` for preview
+and revalidation), and `_sexual_condition_context()` in `world/rules/status_query.py` (used by
+`build_status_read_model()`'s player-visible matched-condition list) — and all three originally
+exposed exactly `arousal` and `climax_phase` and nothing else. The original drafts of this proposal
+asserted the row needed no production code at all on the strength of "`field`/`gte` is already a
+supported condition shape" — true but insufficient: the shape is supported, but the field was not in
+the contexts it evaluates against, so the row could never have matched. D-4's correction adds
+`exposure` to all three builders, and the two bullets below record why the first two and the third
+are each individually non-optional:
+
+- The combat_modifiers.py pair (`_build_context`, `build_no_create_condition_context()`) must move
+  together: the no-create path feeds the action preview, and a preview that silently omitted the
+  penalty while resolution applies it would violate the preview/preflight/resolve agreement the
+  `combat-modifier-table` capability already pins for cost adjustments — the same divergence class
+  this proposal's damage-resolution regression test exists to catch.
+- The status_query.py builder was initially left out, and the first review round (independent
+  rubber-duck review after implementation) blocked that: `build_status_read_model()` presents every
+  condition that `matched_combat_modifiers()` matches, and the shipped `webclient-status-presentation`
+  requirement ("Status conditions use deterministic matched modifiers") mandates that sexual-state
+  entries appear while their canonical combat predicates match. Leaving `exposure` out would have
+  sentenced players to a live, unexplained `defense: -15` with a `status_display.yaml` label that
+  could never render. Restoring it also aligns with the sexual `high_arousal_agility_accuracy_penalty`
+  row, whose matched condition the status panel already shows. Scope note: `status_query.py` is also
+  scheduled for edits by later proposals in the set (pleasure-gauge's no-create pleasure remap, and
+  the skill-category status listing); both changes edit different code regions (the pleasure remap
+  replaces this same field/levels loop, the listing reads `owned_keys()`), so the single-function
+  conflict is textual and trivial to merge when the branches land sequentially.
+- No change to `evaluate_condition()` itself: it already handles every condition shape this row
+  uses. The "no special-casing by condition origin" invariant of the main spec is preserved —
+  `exposure` rides the same `field`/`gte` path as `arousal`.
+
+**D-5: The row requires an entry in `status_display.yaml`, enforced at import time — this file is
+in scope.** `world/rules/status_display.py::_build_display_metadata()` fails closed unless the
+display table covers exactly the buff keys and the current `combat_modifiers.yaml` rule IDs, and it
+runs at module import — the new row cannot land without a matching display entry. The entry uses the
+same severity as the two sibling sexual-field rows (`warning`, where `high_arousal_agility_accuracy_
+penalty` and `climax_in_progress_locks_actions` both sit) and a Traditional Chinese label in the
+established `<level><trait>減損` shape (`高露出防禦減損`). Because D-4 extends the status read
+model's context, the entry is reachable: the matched condition renders with this label, exactly as
+`high_arousal_agility_accuracy_penalty`'s entry does.
+
 ## Risks / Trade-offs
 
 [Risk] The percentage-vs-flat mistake in D-2's original draft was a real crash, caught only by an
 independent review reading `combat.py::_adjusted_defense` directly rather than trusting this
 document's own initial reasoning by analogy. → Mitigation: the fix (flat `-15`) removes the risk at
-its root — the row can no longer reach a code path that does not know how to parse it. Task 2.2 below
+its root — the row can no longer reach a code path that does not know how to parse it. Task 2.6 below
 adds a regression test that exercises the row through `_adjusted_defense`/real damage resolution, not
 only through `evaluate_combat_modifiers()` in isolation, specifically so this class of mismatch
 cannot recur silently for a future row added to this table by a later proposal.
+
+[Risk] The condition-context allowlist (D-4) was a silent never-match bug in this proposal's own
+planning drafts: the row as originally scoped would have matched nowhere, because neither
+combat_modifiers.py context builder exposes `exposure`. It was caught by reading the actual context
+builders during implementation review, not by any test failure. → Mitigation: D-4 scopes the two-line
+production change explicitly, both builders move together, and the new test set pins the row through
+every evaluation surface it promises (the `evaluate_combat_modifiers()` bundle, the boundary
+conditions, the merged bundle, the no-create preview path, and real damage resolution) so a future
+row added to this table by a later proposal inherits a test-shape that exercises its real consumers.
 
 [Risk] A future proposal (the 羞恥線 act catalog) could tune `exposure`'s rate of increase without
 revisiting this row's threshold, producing an unintended pacing mismatch (e.g. `高` becoming trivial
