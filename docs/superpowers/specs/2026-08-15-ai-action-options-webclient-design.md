@@ -130,10 +130,13 @@ inserted into the narrative stream.
 
 ## 5. Dismiss (`options.dismiss`)
 
-- New action code `options.dismiss` in `web/webclient/actions/` (payload `{}`): adapter calls
-  `evict()` (trigger-service doc §4), which invalidates any in-flight generation, clears cache and
-  memo, and publishes `suggestions.status="unavailable"` — the section disappears in both dock and
-  narrative stream.
+- New action code `options.dismiss` in `web/webclient/actions/` (payload `{}`): the adapter calls
+  `evict(session, actor)` with the session the dispatcher injects (trigger-service doc §4), which
+  invalidates that session's in-flight generation, clears the global cache/memo for the displayed
+  fingerprint, and publishes `suggestions.status="unavailable"` — the section disappears in both
+  dock and narrative stream.
+- `ActionSpec.adapter` gains an optional third parameter `session` (injected by
+  `handle_ui_action`; `None` default for all existing adapters, which ignore it).
 - The action is registered in `build_production_action_registry()` with
   `affected_panels=("context_actions",)` — no full-snapshot fallback needed.
 - The same dismiss control belongs to both the dock section and the narrative choice-point group.

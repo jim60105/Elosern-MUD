@@ -152,28 +152,28 @@ until eviction or LRU pressure.
 
 ## 4. Eviction (dismiss)
 
-`evict(actor, *, session=None)` — called by the `options.dismiss` adapter (webclient doc §5), which
-has only `(actor, payload)` by ActionSpec contract. Session targeting (review R15):
+`evict(session, actor)` — called by the `options.dismiss` adapter (webclient doc §5). Session
+targeting (review R15) is resolved **by the dispatcher, not by guessing Evennia account APIs**:
+`ActionSpec.adapter` gains an optional third parameter `session`, injected by
+`handle_ui_action` (no codebase precedent for `actor.sessions` exists; the dispatcher already holds
+the session object, so this is the one source of truth). Existing adapters ignore the argument;
 
-- `session=None` (the adapter path): the adapter acts on **the actor's live sessions** as returned
-  by the puppet (single-player tolerates two windows; each window keeps its own
-  `options_state`/token).
-- For each targeted session, in order:
-  1. Read its `options_state.fingerprint` (the **displayed** situation — dismissing always acts
-     on what the player sees, even if the player moved away since).
-  2. Evict the cache entry and negative memo for that fingerprint from the global stores.
-  3. Invalidate that session's in-flight generation: decrement/void its subscriber entry in
-     `pending[fingerprint]` and **increment its `options_state.generation_token`** — the racing
-     completion finds the token stale for that session and publishes nothing.
-  4. Set `options_state = {fingerprint: None, status: unavailable, token+1}` and publish
-     `suggestions.status="unavailable"` (section hidden in dock and narrative stream) to that
-     session.
-- Other sessions are untouched: their subscriber entries, tokens, states, and cached publications
-  survive an unrelated dismiss (review R15).
+per-session eviction, in order:
 
-A later trigger for the same situation regenerates — the user-confirmed "clear this cache"
-semantics. Eviction never races generation: the token guard makes the outcome deterministic per
-session.
+1. Read the session's `options_state.fingerprint` (the **displayed** situation — dismissing always
+   acts on what the player sees, even if the player moved away since).
+2. Evict the cache entry and negative memo for that fingerprint from the global stores.
+3. Invalidate that session's in-flight generation: remove its subscriber entry in
+   `pending[fingerprint]` and **increment its `options_state.generation_token`** — the racing
+   completion finds the token stale for that session and publishes nothing.
+4. Set `options_state = {fingerprint: None, status: unavailable, token+1}` and publish
+   `suggestions.status="unavailable"` (section hidden in dock and narrative stream) to that
+   session.
+
+Other sessions are untouched: their subscriber entries, tokens, states, and cached publications
+survive an unrelated dismiss (review R15). A later trigger for the same situation regenerates —
+the user-confirmed "clear this cache" semantics. Eviction never races generation: the token guard
+makes the outcome deterministic per session.
 
 ---
 
