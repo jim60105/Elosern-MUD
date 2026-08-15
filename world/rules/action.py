@@ -29,6 +29,14 @@ from world.rules.progression import (
     grant_skill_practice_xp,
     scaled_mp_cost,
 )
+from world.rules.sexual_act_effects import (
+    _COUNTER_MUTATORS,
+    _EFFECTS_CONFIG,
+    compute_pleasure_gain,
+    participants,
+    resolve_part,
+)
+from world.rules.sexual_state import _apply_climax_phase_set
 from world.rules.skill_effects import (
     apply_disguise_effect,
     record_conferred_grant,
@@ -42,6 +50,7 @@ from world.rules.targeting import (
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 class RejectReason(StrEnum):
@@ -572,6 +581,153 @@ def _handle_sexual_event(
     ]
 
 
+def _resolve_act(effect_id: str) -> Any:
+    """Return the registered ``SexualActDef`` an effect string names.
+
+    Defensive lookup only: ``_act_family()`` is the sole producer of
+    ``pleasure:``/``sexual_counter:`` strings and always pairs the effect with
+    a registered act, but a hand-written ``SkillDef`` could name an absent
+    key, which must reject the action rather than silently doing nothing.
+    """
+    act_key = effect_id.partition(":")[2]
+    act = SEXUAL_ACT_REGISTRY.get(act_key)
+    if act is None:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            f"{effect_id} names an act absent from SEXUAL_ACT_REGISTRY",
+        )
+    return act
+
+
+def _handle_pleasure_effect(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Stage one pleasure gain per participant of a sexual act's cast.
+
+    The acting entity uses ``actor_part``/``actor_pleasure_ratio`` and every
+    other participant uses ``target_part``/``1.0`` (design D-5); the
+    participant count is computed once per cast and reused for every
+    participant's gain. Each staged ``PendingEffect`` applies that
+    participant's own computed gain through :func:`_apply_pleasure_gain`.
+    """
+    del context, scale
+    act = _resolve_act(effect_id)
+    everyone = participants(actor, targets)
+    count = len(everyone)
+    pending: list[PendingEffect] = []
+    for participant in everyone:
+        is_actor = participant is actor
+        part = resolve_part(
+            participant,
+            act.actor_part if is_actor else act.target_part,
+        )
+        ratio = act.actor_pleasure_ratio if is_actor else 1.0
+        gain = compute_pleasure_gain(participant, part, act.base_pleasure, ratio, count)
+        pending.append(
+            PendingEffect(
+                participant,
+                f"pleasure_gain|{_entity_key(participant)}|{gain}",
+                frozenset(),
+                lambda participant=participant, gain=gain: _apply_pleasure_gain(
+                    participant, gain
+                ),
+            )
+        )
+    return pending
+
+
+def _apply_pleasure_gain(entity: Any, gain: int) -> None:
+    """Apply one participant's pleasure gain and the arousal-coupled cascade.
+
+    Replicates two ``sexual.yaml`` rules directly — ``wetness_follows_arousal``
+    and the ``climax_gate``/``climax_phase_critical_point_to_in_progress``
+    pair — because both are conditioned on a change ``apply_event()``'s own
+    snapshot must observe within its own call, which a pleasure gain applied
+    outside ``apply_event()`` cannot produce. The captures below must stay the
+    first statements: the wetness bump compares the arousal ordinal before and
+    after the mutation, the two-step 未達→接近→進行中 semantic depends on
+    reading the pre-mutation climax phase before either transition runs, and
+    the extension trigger fires only for a participant already in 進行中 when
+    the effect applies — a participant this very call pushes from 接近 into
+    進行中 has just started climaxing, it has not received a qualifying
+    extension stimulus (pleasure-model design §3.2/§3.4).
+
+    The extension trigger compares against ``gain``, the uncapped computed
+    value, not the clamped applied delta: ``pleasure`` self-clamps at 100, so
+    an entity already in 進行中 would almost never stage an extension if the
+    post-clamp delta were the gate. ``_apply_climax_phase_set`` no-ops on any
+    edge outside ``_VALID_CLIMAX_TRANSITIONS``, so both transition calls are
+    unconditionally safe to attempt.
+    """
+    pre_arousal_ordinal = entity.sexual.arousal.value
+    was_at_critical_point = entity.sexual.climax_phase.level == "接近"
+    was_in_progress = entity.sexual.climax_phase.level == "進行中"
+
+    entity.sexual.pleasure.base += gain
+
+    if entity.sexual.arousal.value > pre_arousal_ordinal:
+        entity.sexual.wetness.value += 1
+    if entity.sexual.arousal.level == "極限":
+        _apply_climax_phase_set(entity, "接近")
+    if was_at_critical_point:
+        _apply_climax_phase_set(entity, "進行中")
+
+    if was_in_progress and gain >= _EFFECTS_CONFIG.climax_extension_threshold:
+        entity.sexual.stage_climax_extension()
+
+
+def _counter_pending_effect(entity: Any, counter_name: str) -> PendingEffect:
+    """Stage one sanctioned counter increment on one participant.
+
+    The mutator name is looked up through the explicit
+    ``_COUNTER_MUTATORS`` table — never a derived string transform — and an
+    unrecognized counter name rejects the action at resolution time.
+    """
+    mutator = _COUNTER_MUTATORS.get(counter_name)
+    if mutator is None:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            f"unknown lifetime counter {counter_name!r}",
+        )
+    return PendingEffect(
+        entity,
+        f"sexual_counter|{_entity_key(entity)}|{counter_name}",
+        frozenset(),
+        lambda entity=entity, mutator=mutator: getattr(entity.sexual, mutator)(),
+    )
+
+
+def _handle_sexual_counter_effect(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Stage one counter increment per declared name, per applicable role.
+
+    ``actor_counters`` land on the acting entity; ``participant_counters``
+    land on every other participant. A counter name present in both tuples is
+    applied once per side through two independent grants — the schema's way of
+    crediting both parties of a symmetric two-person act.
+    """
+    del context, scale
+    act = _resolve_act(effect_id)
+    all_participants = participants(actor, targets)
+    others = [participant for participant in all_participants if participant is not actor]
+    pending: list[PendingEffect] = []
+    for name in act.actor_counters:
+        pending.append(_counter_pending_effect(actor, name))
+    for other in others:
+        for name in act.participant_counters:
+            pending.append(_counter_pending_effect(other, name))
+    return pending
+
+
 register_effect_handler(
     "confer_skill_partial",
     _handle_confer_skill_partial,
@@ -606,6 +762,18 @@ register_effect_handler(
     "sexual_event",
     _handle_sexual_event,
     frozenset({"sexual", "traits"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "pleasure",
+    _handle_pleasure_effect,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "sexual_counter",
+    _handle_sexual_counter_effect,
+    frozenset({"sexual"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
@@ -745,6 +913,8 @@ _ENTRY_TEMPLATES = {
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
     "sexual_transition": "{target} 的狀態發生了變化。",
+    "pleasure_gain": "{target} 的快感提升了。",
+    "sexual_counter": "{target} 的性行為計數提升了。",
     "trait_delta": "{target} 的能力值發生了變化。",
     "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
     "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
@@ -789,6 +959,18 @@ def _entries_from_effect(
         data = {"count": int(values[0])}
     elif kind == "sexual_transition":
         data = {"event": values[0]}
+    elif kind == "pleasure_gain":
+        if len(values) != 1:
+            raise ValueError(
+                f"malformed pleasure_gain pending effect {effect.description!r}"
+            )
+        data = {"amount": int(values[0])}
+    elif kind == "sexual_counter":
+        if len(values) != 1:
+            raise ValueError(
+                f"malformed sexual_counter pending effect {effect.description!r}"
+            )
+        data = {"counter": values[0]}
     elif kind == "damage":
         if len(values) != 3:
             raise ValueError(

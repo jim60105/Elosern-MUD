@@ -139,6 +139,31 @@ class SexualEventEffect:
 
 
 @dataclass(frozen=True)
+class PleasureEffect:
+    """Apply one sexual act's pleasure to every participant of its cast.
+
+    The parsed segment is the acting ``SexualActDef``'s own key; every other
+    parameter (base magnitude, body parts, actor ratio, participant count)
+    is read from ``SEXUAL_ACT_REGISTRY[act_key]`` at cast time so no value is
+    duplicated between the registry and the effect string.
+    """
+
+    act_key: str
+
+
+@dataclass(frozen=True)
+class SexualCounterEffect:
+    """Increment the counters one sexual act declares on its participants.
+
+    ``actor_counters`` land on the acting entity and
+    ``participant_counters`` on every other participant; the counter names
+    themselves are read from ``SEXUAL_ACT_REGISTRY[act_key]`` at cast time.
+    """
+
+    act_key: str
+
+
+@dataclass(frozen=True)
 class DamageEffect:
     """Deal damage of one element and school (``physical``/``magic``)."""
 
@@ -268,6 +293,10 @@ def parse_effect(effect_id: str) -> object:
         return ConferGrowthRateEffect()
     if prefix == "sexual_event":
         return SexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
+    if prefix == "pleasure":
+        return PleasureEffect(act_key=_parse_single_arg(effect_id, prefix))
+    if prefix == "sexual_counter":
+        return SexualCounterEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "damage":
         _, _, rest = effect_id.partition(":")
         element, _, school = rest.partition(":")

@@ -26,7 +26,7 @@ from world.skills.sexual_acts._builder import _act_family
 _MISSING = object()
 
 
-def _synthetic_act(key: str, unlock: dict[str, int], *, events=("stimulus_applied",)):
+def _synthetic_act(key: str, unlock: dict[str, int], *, events=()):
     """Build one test-local act row without touching any line module."""
     (skill, act), = _act_family(
         "獨處線",
