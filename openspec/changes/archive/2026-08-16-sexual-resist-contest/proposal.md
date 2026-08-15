@@ -25,7 +25,8 @@ will call it.
   caster, one resisting participant), so — unlike `_attempt_flee`, which searches a whole battlefield
   for the fastest pursuer — it takes no `battlefield` argument. It reuses `disengage.py`'s contest
   shape (`roll_d100() + resist_score >= COMBAT_YAML["to_hit"]["defender_constant"] + actor_score`,
-  both scores read through `evaluate_combat_modifiers()`) rather than inventing a second contest
+  both scores read through `evaluate_combat_modifiers_no_create()`, the no-create query that never
+  materializes the `sexual` handler) rather than inventing a second contest
   idiom, with each score itself a weighted blend of effective `agility` and `atk_phys` (new weights
   in `sexual_resist.yaml` — resisting a hold is a strength-and-speed contest, unlike fleeing, which
   is agility alone).
@@ -41,7 +42,7 @@ will call it.
     on `SexualState`).
 - From the resister's sixth consecutive settlement point in `進行中` (`climax_turns > 5`), or for
   any resister the affinity table does not grant `auto_comply`, the ordinary d100 contest applies —
-  reading through `evaluate_combat_modifiers()` means an entity at `pleasure`'s `極限` band
+  reading through `evaluate_combat_modifiers_no_create()` means an entity at `pleasure`'s `極限` band
   automatically resists worse via the already-shipped `high_arousal_agility_accuracy_penalty`
   (`agility: -20%`), with no new rule authored for that effect.
 - A `Monster` resister has no affinity record (`RelationHandler` requires an `NPC` owner) and always
@@ -69,7 +70,7 @@ requirements)
   their test module.
 - **Reads (no changes) from:** `world/rules/disengage.py` (contest shape reference only — not
   imported, to avoid a real dependency on the flee-specific skill machinery),
-  `world/rules/combat_modifiers.py::evaluate_combat_modifiers`, `world/rules/combat.py::COMBAT_YAML`,
+  `world/rules/combat_modifiers.py::evaluate_combat_modifiers_no_create`, `world/rules/combat.py::COMBAT_YAML`,
   `world/rules/affinity_config.py` (`AffinityStage`, `get_config().stage_for_value`),
   `typeclasses/entities.py` (`LivingEntity.relations`), `typeclasses/npcs.py` (`NPC`),
   `typeclasses/monsters.py` (`Monster`), `typeclasses/characters.py` (`PlayerCharacter`),

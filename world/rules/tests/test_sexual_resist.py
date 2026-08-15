@@ -6,6 +6,7 @@ exercise the affinity paths, the real combat-modifier query, or the real
 ``SexualState`` use database-backed ``EvenniaTest`` entities.
 """
 
+from tools.spec_traceability import covers_requirement
 
 import copy
 from pathlib import Path
@@ -106,6 +107,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.modifiers.start()
         self.addCleanup(self.modifiers.stop)
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-a-pure-two-party-contest-function")
     def test_requires_no_battlefield(self):
         verdict = resist_verdict(
             _entity("actor"), _entity("resister"), rng=lambda: 1
@@ -116,6 +118,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertIsInstance(verdict.actor_score, float)
         self.assertIsInstance(verdict.resister_score, float)
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-a-pure-two-party-contest-function")
     def test_roll_is_none_exactly_when_auto_comply(self):
         auto = resist_verdict(
             _entity("actor"),
@@ -127,6 +130,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
             with self.subTest(verdict=verdict):
                 self.assertEqual(verdict.roll is None, verdict.auto_comply)
 
+    @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_higher_blended_stats_resist_more_often(self):
         actor = _entity("actor")
         low = _entity("low")
@@ -136,6 +140,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertFalse(low_verdict.resisted)
         self.assertTrue(high_verdict.resisted)
 
+    @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_blended_score_mirrors_stat_specific_treatments(self):
         entity = _entity("participant")
         with patch(
@@ -144,6 +149,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         ):
             self.assertAlmostEqual(_blended_score(entity), 0.6 * 8 + 0.4 * 15)
 
+    @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_formula_reads_the_shipped_defender_constant(self):
         source = (Path(__file__).parents[1] / "sexual_resist.py").read_text(
             encoding="utf-8"
@@ -156,6 +162,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         )
         self.assertNotIn("51", contest_line)
 
+    @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
     def test_climax_turn_one_auto_complies_without_rolling(self):
         roller = MagicMock()
         verdict = resist_verdict(
@@ -168,6 +175,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertIsNone(verdict.roll)
         roller.assert_not_called()
 
+    @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
     def test_climax_turn_five_auto_complies(self):
         verdict = resist_verdict(
             _entity("actor"),
@@ -178,6 +186,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertTrue(verdict.auto_comply)
         self.assertIsNone(verdict.roll)
 
+    @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
     def test_climax_turn_six_rolls_the_ordinary_contest(self):
         actor = _entity("actor")
         resister = _entity("resister", sexual_state=_mid_climax(6))
@@ -189,6 +198,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertEqual(resist_succeeds.roll, 60)
         self.assertFalse(resist_succeeds.auto_comply)
 
+    @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
     def test_not_in_progress_never_triggers_the_short_circuit(self):
         for level, turns in (("未達", 1), ("接近", 5), ("餘韻", 6)):
             with self.subTest(level=level, turns=turns):
@@ -202,6 +212,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
                 self.assertFalse(verdict.auto_comply)
                 self.assertEqual(verdict.roll, 42)
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-deterministic-under-an-injected-rng")
     def test_fixed_rng_produces_identical_verdicts(self):
         actor = _entity("actor")
         resister = _entity("resister")
@@ -209,6 +220,7 @@ class ResistContestFormulaTests(RegistryIsolationMixin, unittest.TestCase):
         second = resist_verdict(actor, resister, rng=lambda: 42)
         self.assertEqual(first, second)
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-deterministic-under-an-injected-rng")
     def test_default_rng_is_the_shipped_dice_roller(self):
         source = (Path(__file__).parents[1] / "sexual_resist.py").read_text(
             encoding="utf-8"
@@ -233,6 +245,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
         self.addCleanup(Path(handle.name).unlink, missing_ok=True)
         return Path(handle.name)
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_weights_sum_to_one(self):
         config = get_resist_config()
         self.assertEqual(
@@ -240,6 +253,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             1.0,
         )
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_affinity_table_covers_exactly_the_seven_stages(self):
         config = get_resist_config()
         stage_ids = {stage.id for stage in get_config().stages}
@@ -256,6 +270,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             ["absolute_bond", "beloved"],
         )
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_malformed_weight_pair_fails_closed(self):
         with self.assertRaises(ValueError) as caught:
             load_sexual_resist_config(
@@ -263,6 +278,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             )
         self.assertIn("sum", str(caught.exception))
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_negative_weight_fails_closed_even_when_sum_is_one(self):
         with self.assertRaises(ValueError) as caught:
             load_sexual_resist_config(
@@ -270,6 +286,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             )
         self.assertIn("non-negative", str(caught.exception))
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_missing_stage_key_fails_closed_naming_the_key(self):
         modifiers = dict(self.canonical["affinity_resist_modifier"])
         del modifiers["trusted"]
@@ -279,6 +296,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             )
         self.assertIn("trusted", str(caught.exception))
 
+    @covers_requirement("sexual-resist-contest::sexual-resist-yaml-validates-its-shape-at-load-time")
     def test_extra_stage_key_fails_closed_naming_the_key(self):
         modifiers = dict(self.canonical["affinity_resist_modifier"])
         modifiers["mystery"] = 0
@@ -347,6 +365,7 @@ class SexualResistAffinityTests(EvenniaTest):
             }
         }
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-a-pure-two-party-contest-function")
     def test_verdict_performs_no_state_mutation(self):
         self._set_affinity(self.npc, self.player, 40)
 
@@ -365,6 +384,7 @@ class SexualResistAffinityTests(EvenniaTest):
             resist_verdict(self.player, self.npc, rng=lambda: 42)
         self.assertEqual(snapshot(), before)
 
+    @covers_requirement("sexual-resist-contest::resist-verdict-is-a-pure-two-party-contest-function")
     def test_verdict_never_materializes_sexual_state(self):
         fresh = self._character("fresh-npc", cls=NPC)
         self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
@@ -376,12 +396,14 @@ class SexualResistAffinityTests(EvenniaTest):
         )
         self.assertIsNone(fresh.attributes.get("virgin", category="sexual_state"))
 
+    @covers_requirement("sexual-resist-contest::an-npc-resister-s-affinity-stage-can-grant-a-resist-modifier-or-auto-comply")
     def test_stranger_stage_npc_receives_positive_modifier(self):
         verdict = resist_verdict(self.player, self.npc, rng=lambda: 1)
         self.assertAlmostEqual(
             verdict.resister_score, _blended_score(self.npc) + 15
         )
 
+    @covers_requirement("sexual-resist-contest::an-npc-resister-s-affinity-stage-can-grant-a-resist-modifier-or-auto-comply")
     def test_beloved_auto_complies_without_rolling(self):
         self._set_affinity(self.npc, self.player, 90)
         roller = MagicMock()
@@ -391,6 +413,7 @@ class SexualResistAffinityTests(EvenniaTest):
         self.assertIsNone(verdict.roll)
         roller.assert_not_called()
 
+    @covers_requirement("sexual-resist-contest::an-npc-resister-s-affinity-stage-can-grant-a-resist-modifier-or-auto-comply")
     def test_absolute_bond_auto_complies(self):
         self._set_affinity(self.npc, self.player, 100)
         verdict = resist_verdict(self.player, self.npc, rng=lambda: 1)
@@ -398,6 +421,7 @@ class SexualResistAffinityTests(EvenniaTest):
         self.assertTrue(verdict.auto_comply)
         self.assertIsNone(verdict.roll)
 
+    @covers_requirement("sexual-resist-contest::an-npc-resister-s-affinity-stage-can-grant-a-resist-modifier-or-auto-comply")
     def test_numeric_stage_modifiers_are_monotonic(self):
         previous = None
         for floor in (0, 10, 30, 50, 70):
@@ -411,18 +435,21 @@ class SexualResistAffinityTests(EvenniaTest):
             verdict.resister_score, _blended_score(self.npc) - 10
         )
 
+    @covers_requirement("sexual-resist-contest::a-monster-resister-never-receives-an-affinity-term-and-never-auto-complies-from-affinity")
     def test_monster_resister_score_has_no_affinity_term(self):
         verdict = resist_verdict(self.player, self.monster, rng=lambda: 1)
         self.assertAlmostEqual(
             verdict.resister_score, _blended_score(self.monster)
         )
 
+    @covers_requirement("sexual-resist-contest::a-monster-resister-never-receives-an-affinity-term-and-never-auto-complies-from-affinity")
     def test_monster_resister_never_auto_complies_via_affinity(self):
         self._set_affinity(self.monster, self.player, 90)
         verdict = resist_verdict(self.player, self.monster, rng=lambda: 1)
         self.assertFalse(verdict.auto_comply)
         self.assertEqual(verdict.roll, 1)
 
+    @covers_requirement("sexual-resist-contest::a-monster-resister-never-receives-an-affinity-term-and-never-auto-complies-from-affinity")
     def test_monster_resister_never_reads_relations(self):
         spy = _SpyRelations()
         with patch.object(Monster, "relations", spy):
@@ -430,6 +457,7 @@ class SexualResistAffinityTests(EvenniaTest):
         self.assertEqual(term, (0.0, False))
         self.assertFalse(spy.touched)
 
+    @covers_requirement("sexual-resist-contest::a-monster-resister-never-receives-an-affinity-term-and-never-auto-complies-from-affinity")
     def test_npc_resister_ignores_non_player_actor(self):
         actor_npc = self._character("actor-npc", cls=NPC)
         self._set_affinity(self.npc, self.player, 90)
@@ -446,6 +474,7 @@ class SexualResistAffinityTests(EvenniaTest):
                     verdict.resister_score, _blended_score(self.npc)
                 )
 
+    @covers_requirement("sexual-resist-contest::an-npc-resister-s-affinity-stage-can-grant-a-resist-modifier-or-auto-comply")
     def test_swapping_actor_and_resister_flips_the_short_circuit(self):
         self._set_affinity(self.npc, self.player, 90)
         original = resist_verdict(self.player, self.npc, rng=lambda: 1)
@@ -455,6 +484,7 @@ class SexualResistAffinityTests(EvenniaTest):
         self.assertFalse(swapped.auto_comply)
         self.assertEqual(swapped.roll, 1)
 
+    @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_extreme_pleasure_band_resists_worse_via_existing_modifier(self):
         agility = float(self.player.skills.effective_value("agility"))
         atk_phys = float(self.player.skills.effective_value("atk_phys"))
@@ -466,6 +496,7 @@ class SexualResistAffinityTests(EvenniaTest):
             peak, 0.6 * (agility * 0.8) + 0.4 * atk_phys
         )
 
+    @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_flat_atk_phys_bonus_applies_additively(self):
         self.player.db.skills = {
             "active": [],
@@ -478,6 +509,7 @@ class SexualResistAffinityTests(EvenniaTest):
             0.6 * agility + 0.4 * (atk_phys + 5),
         )
 
+    @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
     def test_real_climax_state_short_circuits_then_expires(self):
         self._set_affinity(self.npc, self.player, 70)
         self.npc.sexual.climax_phase.value = "進行中"

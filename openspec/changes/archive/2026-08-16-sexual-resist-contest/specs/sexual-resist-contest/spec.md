@@ -29,11 +29,14 @@ atk_phys_weight`, with `agility_weight` and `atk_phys_weight` read from
 `world/rules/rulebook/sexual_resist.yaml`. The two components use different, stat-specific
 adjustment treatments, matching each stat's sole existing production consumer exactly:
 `agility_component` is `effective_value("agility")` adjusted via `combat._apply_percent_mod`
-against `evaluate_combat_modifiers()`'s `"agility"` key, exactly as
+against `evaluate_combat_modifiers_no_create()`'s `"agility"` key, exactly as
 `world.rules.disengage._adjusted_agility` computes it; `atk_phys_component` is
-`effective_value("atk_phys")` plus `evaluate_combat_modifiers()`'s `"atk_phys"` key added as a flat
-integer, exactly as `world.rules.combat._adjusted_attack` computes it. Neither stat's adjustment is
-routed through the other stat's treatment.
+`effective_value("atk_phys")` plus `evaluate_combat_modifiers_no_create()`'s `"atk_phys"` key added
+as a flat integer, exactly as `world.rules.combat._adjusted_attack` computes it. Neither stat's
+adjustment is routed through the other stat's treatment. The no-create query is load-bearing:
+the live variant materializes the `sexual` handler, which persists traits on first access and
+would break Requirement 1's no-mutation contract, so every contest read SHALL use
+`evaluate_combat_modifiers_no_create()` and never the live `evaluate_combat_modifiers()`.
 
 #### Scenario: A resister with higher blended stats resists more often
 - **WHEN** `resist_verdict()` is computed for a resister whose blended `agility`/`atk_phys` score
@@ -44,8 +47,9 @@ routed through the other stat's treatment.
 #### Scenario: An entity in the 極限 pleasure band resists worse via the existing arousal modifier
 - **WHEN** `resist_verdict()` is computed for a resister whose `pleasure` is in the `極限` band
   (triggering the shipped `high_arousal_agility_accuracy_penalty` combat-modifier row)
-- **THEN** `resister_score` reflects the `-20%` agility adjustment from `evaluate_combat_modifiers()`,
-  with no new rule authored in `combat_modifiers.yaml` for this proposal
+- **THEN** `resister_score` reflects the `-20%` agility adjustment from
+  `evaluate_combat_modifiers_no_create()`, with no new rule authored in `combat_modifiers.yaml`
+  for this proposal
 
 #### Scenario: The formula uses the shipped defender_constant unchanged
 - **WHEN** `resist_verdict()`'s implementation is inspected
@@ -114,8 +118,12 @@ exactly `0`, and `auto_comply` from the affinity path SHALL never be `True` for 
 
 ### Requirement: A resister mid-climax auto-complies for the first five settlement points, then resists normally
 `resist_verdict()` SHALL short-circuit to `resisted=False, auto_comply=True, roll=None` (without
-calling `rng()`) whenever `resister.sexual.climax_phase.level == "進行中"` and
-`resister.sexual.climax_turns <= climax_turn_auto_comply_limit` (`5`, from `sexual_resist.yaml`).
+calling `rng()`) whenever the resister's stored climax state reads as `climax_phase` level `進行中`
+with `climax_turns <= climax_turn_auto_comply_limit` (`5`, from `sexual_resist.yaml`). Both facts
+SHALL be read from persistent storage without materializing the `sexual` handler — materializing
+it persists traits on first access and would break Requirement 1's no-mutation contract; an entity
+whose sexual state has never been touched reads as not-in-進行中 and falls through to the ordinary
+contest.
 From the resister's sixth consecutive settlement point in `進行中`
 (`climax_turns > climax_turn_auto_comply_limit`), the ordinary contest (including any affinity
 modifier) SHALL apply.
@@ -148,7 +156,9 @@ a non-negative float, summing to exactly `1.0`, `climax_turn_auto_comply_limit` 
 and `affinity_resist_modifier`, a mapping whose key set SHALL equal exactly the seven stage `id`s
 `world.rules.affinity_config.get_config().stages` declares, with no extra or missing key. Each
 value SHALL be either a finite number or the single-key mapping `{auto_comply: true}`; any other
-shape SHALL raise at load time, before any `resist_verdict()` call.
+shape SHALL raise at load time. The rulebook SHALL be loaded and validated exactly once through a
+module-level singleton on first access — never per call — so a malformed table can never produce a
+contest outcome.
 
 #### Scenario: The weights sum to 1.0
 - **WHEN** `world/rules/rulebook/sexual_resist.yaml` is loaded
