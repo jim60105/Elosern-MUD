@@ -139,6 +139,51 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertIn("e1＝actions goblin", joined)
         self.assertIn("a1＝", joined)
 
+    @covers_requirement("webclient-combat-menu::telnet-combat-actions-renders-identical-category-and-group-structure")
+    def test_combat_actions_renders_category_headings_and_element_sub_headings(self):
+        # Owning skills across two elements (fire before wind in
+        # ELEMENT_REGISTRY order) plus a no-group martial-arts skill.
+        self.char1.db.skills = {
+            "active": ["fire_ball", "wind_blade", "shadow_slash"],
+            "passive": [],
+        }
+        engage(self.char1, self.monster)
+        messages = self._run(CmdCombatActions, "")
+        joined = "\n".join(messages)
+        # Category headings in SkillCategory declaration order: elemental
+        # magic, then martial arts (innate basic_attack), then movement
+        # (innate flee).
+        self.assertIn("◆ 元素魔法", joined)
+        self.assertIn("◆ 武技", joined)
+        self.assertIn("◆ 移動", joined)
+        self.assertLess(joined.index("◆ 元素魔法"), joined.index("◆ 武技"))
+        self.assertLess(joined.index("◆ 武技"), joined.index("◆ 移動"))
+        # Element sub-headings in ELEMENT_REGISTRY order (fire before wind).
+        self.assertIn("  火", joined)
+        self.assertIn("  風", joined)
+        self.assertLess(joined.index("  火"), joined.index("  風"))
+        # Skills stay under their element sub-heading in owned_keys order.
+        self.assertLess(joined.index("  火"), joined.index("fire_ball（火球術）"))
+        self.assertLess(joined.index("  風"), joined.index("wind_blade（風刃術）"))
+        # The no-group martial-arts category renders no sub-heading: the
+        # skill lines follow the heading directly.
+        martial = joined[joined.index("◆ 武技") + len("◆ 武技"):joined.index("◆ 移動")]
+        self.assertNotIn("◆", martial)
+        self.assertIn("shadow_slash（影斬）", martial)
+        self.assertIn("basic_attack（基本攻擊）", martial)
+
+    @covers_requirement("webclient-combat-menu::telnet-combat-actions-renders-identical-category-and-group-structure")
+    def test_combat_actions_no_group_category_renders_no_sub_heading(self):
+        self.char1.db.skills = {"active": ["shadow_slash"], "passive": []}
+        engage(self.char1, self.monster)
+        messages = self._run(CmdCombatActions, "")
+        joined = "\n".join(messages)
+        martial = joined[joined.index("◆ 武技"):joined.index("◆ 移動")]
+        # The martial-arts heading is followed directly by skill lines; no
+        # indented sub-heading line sits between them.
+        self.assertIn("◆ 武技\n", joined)
+        self.assertIn("shadow_slash（影斬）", martial)
+
     def test_combat_actions_requires_active_session(self):
         self.call(CmdCombatActions(), "", "目前沒有進行中的戰鬥。")
 

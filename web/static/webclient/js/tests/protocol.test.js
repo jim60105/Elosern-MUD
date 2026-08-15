@@ -395,9 +395,10 @@ test("enforces global JSON-safety bounds", () => {
   const store = Protocol.createStore();
   store.beginTransport(1);
 
-  // Excessive depth.
+  // Excessive depth: the bound is 12 (raised for the nested context_actions
+  // v3 shape); 13 nested wrappers must still be rejected.
   let deep = { panels: { status: validStatusPanel() } };
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     deep = { nest: deep };
   }
   assert.throws(() => Protocol.checkEnvelope(deep));
@@ -961,6 +962,28 @@ function validCombatSkill(overrides) {
   );
 }
 
+function validSkillGroup(overrides) {
+  return deepMerge(
+    {
+      group: "fire",
+      label: "火",
+      skills: [validCombatSkill()],
+    },
+    overrides
+  );
+}
+
+function validCategoryGroup(overrides) {
+  return deepMerge(
+    {
+      category: "elemental_magic",
+      label: "元素魔法",
+      groups: [validSkillGroup()],
+    },
+    overrides
+  );
+}
+
 function validCombatParticipant(overrides) {
   return deepMerge(
     {
@@ -980,7 +1003,7 @@ function validCombatParticipant(overrides) {
 function validCombatPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "combat",
       session: {
@@ -993,7 +1016,7 @@ function validCombatPanel(overrides) {
       participants: [validCombatParticipant()],
       root_actions: ["attack", "skills", "items", "defend", "flee"],
       secondary_actions: ["forfeit"],
-      skills: [validCombatSkill()],
+      skills: [validCategoryGroup()],
     },
     overrides
   );
@@ -1002,7 +1025,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "combat",
       session: {
@@ -1021,9 +1044,17 @@ function validRecoveryPanel(overrides) {
   );
 }
 
+// Wrap a flat skill list into one nested category group for payload tests.
+function nestedSkills(...skills) {
+  return [validCategoryGroup({ groups: [validSkillGroup({ skills: skills })] })];
+}
+
 test("validates the available context_actions combat panel", () => {
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validCombatPanel()));
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validRecoveryPanel()));
+  // The registered production allowlist must advertise the same version the
+  // server ships (mirror of web.webclient.presentation.registry).
+  assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 3);
 });
 
 test("freeform_scales is optional and validated when present", () => {
@@ -1036,42 +1067,42 @@ test("freeform_scales is optional and validated when present", () => {
   ];
   assert.doesNotThrow(() =>
     Protocol.validateContextActionsPanel(
-      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: scales })] })
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: scales })) })
     )
   );
   const bad = (overrides) =>
     Protocol.validateContextActionsPanel(
-      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], overrides)] })] })
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], overrides)] })) })
     );
   assert.throws(() => bad({ scale: 3 }));
   assert.throws(() => bad({ label: "x" }));
   assert.throws(() => bad({ mp_cost: 0 }));
   assert.throws(() => Protocol.validateContextActionsPanel(
-    validCombatPanel({ skills: [validCombatSkill({ freeform_scales: [] })] })
+    validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: [] })) })
   ));
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
-      validCombatPanel({ skills: [validCombatSkill({ freeform_scales: scales.slice(0, 3) })] })
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: scales.slice(0, 3) })) })
     )
   );
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({
-        skills: [validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], { label: "4" }), ...scales.slice(1)] })],
+        skills: nestedSkills(validCombatSkill({ freeform_scales: [Object.assign({}, scales[0], { label: "4" }), ...scales.slice(1)] })),
       })
     )
   );
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({
-        skills: [Object.assign(validCombatSkill(), { cost: { sp: 30 }, freeform_scales: scales })],
+        skills: nestedSkills(Object.assign(validCombatSkill(), { cost: { sp: 30 }, freeform_scales: scales })),
       })
     )
   );
 });
 
 test("rejects malformed context_actions panels atomically", () => {
-  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 2, available: false }));
+  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 3, available: false }));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ kind: "exploration" })));
   assert.throws(() =>
@@ -1082,16 +1113,16 @@ test("rejects malformed context_actions panels atomically", () => {
   // A disabled skill must carry a disabled_reason.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
-      validCombatPanel({ skills: [validCombatSkill({ enabled: false, disabled_reason: null })] })
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ enabled: false, disabled_reason: null })) })
     )
   );
   // Only AREA skills may carry shorthands.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
-      validCombatPanel({ skills: [validCombatSkill({ shorthands: ["all-enemies"] })] })
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ shorthands: ["all-enemies"] })) })
     )
   );
-  // portrait_ref must be an opaque decimal catalog key or null in version 2.
+  // portrait_ref must be an opaque decimal catalog key or null in version 3.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({
@@ -1113,9 +1144,15 @@ test("rejects malformed context_actions panels atomically", () => {
       })
     )
   );
+  // A flat v2 skill array is not a valid v3 payload.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCombatSkill()] })
+    )
+  );
   // Skill targets must reference a presented participant.
   assert.throws(() =>
-    Protocol.validateContextActionsPanel({ skills: [validCombatSkill({ targets: [99] })] })
+    Protocol.validateContextActionsPanel({ skills: nestedSkills(validCombatSkill({ targets: [99] })) })
   );
   // A recovery session must not expose cast/flee root actions.
   assert.throws(() => Protocol.validateContextActionsPanel(validRecoveryPanel({ root_actions: ["attack"] })));
@@ -1133,6 +1170,100 @@ test("rejects malformed context_actions panels atomically", () => {
       })
     )
   );
+});
+
+test("rejects malformed category and skill groups", () => {
+  // Unregistered category key.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCategoryGroup({ category: "bogus" })] })
+    )
+  );
+  // Co-nullability of group and label.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        skills: [validCategoryGroup({ groups: [validSkillGroup({ group: null, label: "火" })] })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        skills: [validCategoryGroup({ groups: [validSkillGroup({ group: "fire", label: null })] })],
+      })
+    )
+  );
+  // Empty groups array: empty categories are omitted, not emitted empty.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: [validCategoryGroup({ groups: [] })] })
+    )
+  );
+  // An empty skill group is rejected.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({
+        skills: [validCategoryGroup({ groups: [validSkillGroup({ skills: [] })] })],
+      })
+    )
+  );
+  // The top-level array is bounded by the SkillCategory count.
+  const tooMany = [];
+  for (let index = 0; index < 9; index++) {
+    tooMany.push(validCategoryGroup());
+  }
+  assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ skills: tooMany })));
+});
+
+test("the flattened skill-count bound rejects a small-category payload", () => {
+  // Design D-5: MAX_SKILLS applies to the flattened descriptor total, not to
+  // the top-level category-group count. One category with 33 skills must be
+  // rejected even though its category-group count is far below the bound.
+  const skills = [];
+  for (let index = 1; index <= 33; index++) {
+    skills.push(validCombatSkill({ key: "skill_" + index, label: "技能名稱" + index }));
+  }
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(...skills) }))
+  );
+  // 32 skills across the same shape still passes.
+  skills.pop();
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(...skills) }))
+  );
+});
+
+test("a category without a group carries exactly one null-keyed sub-group", () => {
+  // The single-null-group case must be accepted: a martial_arts category
+  // whose members never declare a group emits exactly one { group: null,
+  // label: null } sub-group listing every owned skill.
+  const panel = validCombatPanel({
+    skills: [
+      validCategoryGroup({
+        category: "martial_arts",
+        label: "武技",
+        groups: [
+          validSkillGroup({ group: null, label: null, skills: [validCombatSkill()] }),
+        ],
+      }),
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
+});
+
+test("duplicate skill keys across categories are rejected", () => {
+  const panel = validCombatPanel({
+    skills: [
+      validCategoryGroup(),
+      validCategoryGroup({
+        category: "martial_arts",
+        label: "武技",
+        groups: [validSkillGroup({ group: null, label: null })],
+      }),
+    ],
+  });
+  assert.throws(() => Protocol.validateContextActionsPanel(panel));
 });
 
 test("a combat snapshot with a malformed context_actions panel is rejected atomically", () => {

@@ -29,7 +29,11 @@
   var PROTOCOL_VERSION = 1;
   var MAX_SAFE_INTEGER = 9007199254740991;
   var MAX_CANONICAL_JSON_BYTES = 65536;
-  var MAX_DEPTH = 8;
+  // Depth 12 accommodates the nested `context_actions` v3 shape (envelope ->
+  // panels -> panel -> skills -> category -> groups -> skill group -> skills ->
+  // descriptor -> cost/freeform_scales), whose deepest legitimate leaf sits at
+  // depth 11; must match web.webclient.presentation.protocol.MAX_DEPTH.
+  var MAX_DEPTH = 12;
   var MAX_FIELDS = 64;
   var MAX_LIST_ITEMS = 128;
   var MAX_STRING_CODE_POINTS = 2048;
@@ -82,6 +86,18 @@
   var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
   var SECONDARY_ACTIONS = ["forfeit"];
   var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
+  // SkillCategory enum values, in the registry's fixed declaration order
+  // (mirror of world.skills.registry.SkillCategory).
+  var SKILL_CATEGORY_KEYS = [
+    "elemental_magic",
+    "martial_arts",
+    "enhancement",
+    "innate_gift",
+    "movement",
+    "divine_mystery",
+    "utility",
+    "sexual_act",
+  ];
 
   // local_map panel bounds (mirror of web.webclient.presentation.local_map,
   // design D10a).
@@ -189,7 +205,7 @@
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 1,
-    context_actions: 2,
+    context_actions: 3,
     local_map: 1,
     services: 1,
     creation: 1,
@@ -821,12 +837,12 @@
     return value;
   }
 
-  // Exact available context_actions combat panel v2 schema.
+  // Exact available context_actions combat panel v3 schema.
   function validateContextActionsPanel(payload) {
     if (payload.available === false) {
       requireExactFields(payload, "context_actions panel", ["schema_version", "available", "reason"], []);
       requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-      if (payload.schema_version !== 2) {
+      if (payload.schema_version !== 3) {
         throw new Error("unsupported context_actions panel schema_version");
       }
       var reason = payload.reason;
@@ -852,7 +868,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 2) {
+    if (payload.schema_version !== 3) {
       throw new Error("unsupported context_actions panel schema_version");
     }
     if (payload.available !== true || payload.kind !== "combat") {
@@ -896,16 +912,63 @@
     }
 
     var skills = payload.skills;
-    if (!Array.isArray(skills) || skills.length > MAX_SKILLS) {
-      throw new Error("skills exceed their bound");
+    if (!Array.isArray(skills) || skills.length > SKILL_CATEGORY_KEYS.length) {
+      throw new Error("category groups exceed their bound");
     }
-    skills.forEach(validateSkill);
+    var skillViews = [];
+    skills.forEach(function (category) {
+      requireExactFields(
+        category,
+        "category group",
+        ["category", "label", "groups"],
+        []
+      );
+      validateIdentifier(category.category, "category key");
+      if (SKILL_CATEGORY_KEYS.indexOf(category.category) === -1) {
+        throw new Error("category key is not a registered category");
+      }
+      var label = requireString(category.label, "category label", MAX_LABEL);
+      if (!label.trim()) {
+        throw new Error("category label must be non-empty");
+      }
+      if (!Array.isArray(category.groups) || category.groups.length === 0) {
+        throw new Error("category groups must be non-empty");
+      }
+      category.groups.forEach(function (subGroup) {
+        requireExactFields(
+          subGroup,
+          "skill group",
+          ["group", "label", "skills"],
+          []
+        );
+        if (subGroup.group === null) {
+          if (subGroup.label !== null) {
+            throw new Error("a null group key requires a null label");
+          }
+        } else {
+          validateIdentifier(subGroup.group, "skill group key");
+          if (typeof subGroup.label !== "string" || !subGroup.label.trim()) {
+            throw new Error("a non-null group key requires a non-empty label");
+          }
+        }
+        if (!Array.isArray(subGroup.skills) || subGroup.skills.length === 0) {
+          throw new Error("skill group skills must be non-empty");
+        }
+        subGroup.skills.forEach(function (skill) {
+          validateSkill(skill);
+          skillViews.push(skill);
+        });
+      });
+    });
+    if (skillViews.length > MAX_SKILLS) {
+      throw new Error("flattened skill count exceeds their bound");
+    }
 
     var identitySet = {};
     participants.forEach(function (participant) {
       identitySet[participant.identity] = true;
     });
-    skills.forEach(function (skill) {
+    skillViews.forEach(function (skill) {
       skill.targets.forEach(function (target) {
         if (!identitySet[target]) {
           throw new Error("skill targets must reference a presented participant");
@@ -913,7 +976,7 @@
       });
     });
     var skillKeys = {};
-    skills.forEach(function (skill) {
+    skillViews.forEach(function (skill) {
       if (skillKeys[skill.key]) {
         throw new Error("skill keys must be unique");
       }

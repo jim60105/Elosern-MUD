@@ -28,9 +28,12 @@ UI_PROTOCOL_ERROR = "ui_protocol_error"
 PROTOCOL_VERSION = 1
 
 # Global JSON-safety and bound table (design D1). Field-specific limits must be
-# equal or smaller than these ceilings.
+# equal or smaller than these ceilings. Depth 12 accommodates the nested
+# ``context_actions`` v3 shape (envelope → panels → panel → skills → category
+# → groups → skill group → skills → descriptor → cost/freeform_scales), whose
+# deepest legitimate leaf sits at depth 11.
 MAX_CANONICAL_JSON_BYTES = 65_536
-MAX_DEPTH = 8
+MAX_DEPTH = 12
 MAX_FIELDS = 64
 MAX_LIST_ITEMS = 128
 MAX_STRING_CODE_POINTS = 2_048

@@ -50,10 +50,27 @@ function validParticipant(overrides) {
   );
 }
 
+// Wrap one or more flat skill descriptors into the v3 nested payload shape.
+function nestedSkills(...skills) {
+  return [
+    {
+      category: "elemental_magic",
+      label: "元素魔法",
+      groups: [
+        {
+          group: "fire",
+          label: "火",
+          skills: skills,
+        },
+      ],
+    },
+  ];
+}
+
 function readyPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "combat",
       session: {
@@ -66,7 +83,7 @@ function readyPanel(overrides) {
       participants: [validParticipant()],
       root_actions: ["attack", "skills", "items", "defend", "flee"],
       secondary_actions: ["forfeit"],
-      skills: [
+      skills: nestedSkills(
         validSkill(),
         validSkill({
           key: "wind_blade",
@@ -74,8 +91,8 @@ function readyPanel(overrides) {
           target_spec: "area",
           targets: [2],
           shorthands: ["all-enemies", "all"],
-        }),
-      ],
+        })
+      ),
     },
     overrides
   );
@@ -146,10 +163,10 @@ test("recovery root exposes only a confirmed Forfeit path", () => {
 
 test("skill list follows panel order and excludes passives already", () => {
   const panel = readyPanel();
-  panel.skills = [
+  panel.skills = nestedSkills(
     validSkill({ key: "wind_blade" }),
-    validSkill({ key: "fire_ball" }),
-  ];
+    validSkill({ key: "fire_ball" })
+  );
   const combat = CombatMenu.buildMenus(panel, {});
   assert.deepEqual(
     combat.skills.map((skill) => skill.key),
@@ -159,13 +176,13 @@ test("skill list follows panel order and excludes passives already", () => {
 
 test("disabled skill stays focusable but never sends a packet", () => {
   const panel = readyPanel();
-  panel.skills = [
+  panel.skills = nestedSkills(
     validSkill({
       key: "fire_ball",
       enabled: false,
       disabled_reason: { code: "insufficient_resource", message: "你的資源不足。" },
-    }),
-  ];
+    })
+  );
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, "fire_ball");
   assert.equal(menu.items[0].enabled, false);
@@ -181,7 +198,7 @@ test("disabled skill stays focusable but never sends a packet", () => {
 
 test("NONE skill submits skill_key only", () => {
   const panel = readyPanel();
-  panel.skills = [validSkill({ key: "concentration", target_spec: "none", targets: [], enabled: true })];
+  panel.skills = nestedSkills(validSkill({ key: "concentration", target_spec: "none", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, "concentration");
   assert.equal(menu.items.length, 1);
@@ -191,7 +208,7 @@ test("NONE skill submits skill_key only", () => {
 
 test("SELF skill submits skill_key only without an actor field", () => {
   const panel = readyPanel();
-  panel.skills = [validSkill({ key: "body_enhancement", target_spec: "self", targets: [], enabled: true })];
+  panel.skills = nestedSkills(validSkill({ key: "body_enhancement", target_spec: "self", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, "body_enhancement");
   assert.equal(menu.items[0].actionId, "combat.cast");
@@ -212,15 +229,15 @@ test("AREA supports Space toggle, explicit list, and mutually exclusive shorthan
     validParticipant(),
     validParticipant({ identity: 3, display_name: "野狼" }),
   ];
-  panel.skills = [
+  panel.skills = nestedSkills(
     validSkill({
       key: "wind_blade",
       label: "風刃術",
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
-    }),
-  ];
+    })
+  );
   const combat = CombatMenu.buildMenus(panel, {});
   assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 2), true);
   assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 3), true);
@@ -242,15 +259,15 @@ test("AREA payload preserves presenter order regardless of toggle order", () => 
     validParticipant(),
     validParticipant({ identity: 3, display_name: "野狼" }),
   ];
-  panel.skills = [
+  panel.skills = nestedSkills(
     validSkill({
       key: "wind_blade",
       label: "風刃術",
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
-    }),
-  ];
+    })
+  );
   const combat = CombatMenu.buildMenus(panel, {});
   // Toggle the later-presented candidate first, then the earlier one; the
   // payload must still carry the two identities in presenter order [2, 3].
@@ -336,7 +353,7 @@ function freeformSkill(overrides) {
 }
 
 test("a master skill opens the 威力 scale step before the target flow", () => {
-  const panel = readyPanel({ skills: [freeformSkill()] });
+  const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, "wind_blade");
   assert.deepEqual(
@@ -361,7 +378,7 @@ test("a master skill opens the 威力 scale step before the target flow", () => 
 });
 
 test("choose-scale records the member choice and opens the target flow", () => {
-  const panel = readyPanel({ skills: [freeformSkill()] });
+  const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
   assert.equal(CombatMenu.chooseScale(combat, "wind_blade", 2), true);
   assert.equal(combat.skillByKey.wind_blade.scale, 2);
@@ -373,7 +390,7 @@ test("choose-scale records the member choice and opens the target flow", () => {
 });
 
 test("every target form carries the chosen scale for a master skill", () => {
-  const panel = readyPanel({ skills: [freeformSkill()] });
+  const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
   const skill = combat.skillByKey.wind_blade;
   CombatMenu.chooseScale(combat, "wind_blade", 2);
@@ -396,7 +413,7 @@ test("every target form carries the chosen scale for a master skill", () => {
 
   // SINGLE target flow
   const singlePanel = readyPanel({
-    skills: [freeformSkill({ key: "tornado_blade", target_spec: "single", targets: [2], shorthands: [] })],
+    skills: nestedSkills(freeformSkill({ key: "tornado_blade", target_spec: "single", targets: [2], shorthands: [] })),
   });
   const singleCombat = CombatMenu.buildMenus(singlePanel, {});
   CombatMenu.chooseScale(singleCombat, "tornado_blade", 0.5);
@@ -410,7 +427,7 @@ test("every target form carries the chosen scale for a master skill", () => {
   // NONE and SELF flows
   for (const spec of ["none", "self"]) {
     const p = readyPanel({
-      skills: [freeformSkill({ key: "probe", target_spec: spec, targets: [], shorthands: [] })],
+      skills: nestedSkills(freeformSkill({ key: "probe", target_spec: spec, targets: [], shorthands: [] })),
     });
     const c = CombatMenu.buildMenus(p, {});
     CombatMenu.chooseScale(c, "probe", 4);
@@ -431,7 +448,7 @@ test("non-master skills keep today's exact flow and payloads", () => {
 
   // The AREA path without freeform scales stays byte-identical.
   const areaCombat = CombatMenu.buildMenus(
-    readyPanel({ skills: [validSkill({ key: "wind_blade", target_spec: "area", targets: [2], shorthands: ["all"] })] }),
+    readyPanel({ skills: nestedSkills(validSkill({ key: "wind_blade", target_spec: "area", targets: [2], shorthands: ["all"] })) }),
     {}
   );
   CombatMenu.toggleArea(areaCombat, "wind_blade", 2);
@@ -443,7 +460,7 @@ test("non-master skills keep today's exact flow and payloads", () => {
 });
 
 test("rebuildForPanel preserves a still-valid scale choice and resets invalid", () => {
-  const panel = readyPanel({ skills: [freeformSkill()] });
+  const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
   CombatMenu.chooseScale(combat, "wind_blade", 2);
   const rebuilt = CombatMenu.rebuildForPanel(combat, panel, {
@@ -453,7 +470,7 @@ test("rebuildForPanel preserves a still-valid scale choice and resets invalid", 
   assert.equal(rebuilt.skillByKey.wind_blade.scale, 2);
 
   const narrowed = readyPanel({
-    skills: [freeformSkill({ freeform_scales: [{ scale: 1, label: "1", mp_cost: 14 }] })],
+    skills: nestedSkills(freeformSkill({ freeform_scales: [{ scale: 1, label: "1", mp_cost: 14 }] })),
   });
   const rebuiltNarrow = CombatMenu.rebuildForPanel(combat, narrowed, {
     skillKey: "wind_blade",

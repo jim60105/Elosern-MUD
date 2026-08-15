@@ -1,5 +1,7 @@
 """Frozen combat-session view model tests (tasks 1.4)."""
 
+import unittest
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
@@ -10,12 +12,42 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.combat_session import engage
 from world.rules.combat_view import (
+    CATEGORY_LABELS,
     CombatViewError,
     ROOT_ACTIONS,
     SECONDARY_ACTIONS,
+    SkillCategory,
+    SkillDescriptorView,
     build_combat_view,
+    group_skill_views,
 )
-from .combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.skills.registry import SKILL_REGISTRY
+
+
+def _descriptor(key: str) -> SkillDescriptorView:
+    """Build one minimal frozen skill descriptor from the registry metadata."""
+    skill = SKILL_REGISTRY[key]
+    return SkillDescriptorView(
+        key=key,
+        label=skill.label,
+        description=skill.description,
+        cost=dict(skill.cost),
+        target_spec=skill.target_spec.value,
+        element=skill.element.key if skill.element is not None else None,
+        category=skill.category.value,
+        group=skill.group,
+        enabled=True,
+        reason_code=None,
+        reason_message=None,
+        valid_target_ids=(),
+        shorthands=(),
+        freeform_scales=(),
+    )
+
+
+def _skills(*keys: str) -> tuple[SkillDescriptorView, ...]:
+    return tuple(_descriptor(key) for key in keys)
 
 
 def _player(key="view player"):
@@ -299,6 +331,130 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
             p for p in view.participants if p.identity == self.monster.pk
         )
         self.assertGreaterEqual(monster_view.hp_maximum, 1)
+
+
+class GroupSkillViewsTests(unittest.TestCase):
+    """Pure ``group_skill_views()`` grouping and ordering tests (task 5.1)."""
+
+    def _categories(self, *keys: str):
+        return group_skill_views(_skills(*keys))
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_category_order_follows_enum_declaration_not_ownership(self):
+        # The movement skill is granted before the elemental one, but the
+        # enum declares elemental_magic before movement.
+        groups = self._categories("flash_step", "fire_ball")
+        self.assertEqual(
+            [category.category for category in groups],
+            ["elemental_magic", "movement"],
+        )
+        self.assertEqual(
+            [category.label for category in groups],
+            [CATEGORY_LABELS[SkillCategory.ELEMENTAL_MAGIC],
+             CATEGORY_LABELS[SkillCategory.MOVEMENT]],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_elemental_sub_groups_follow_registry_order(self):
+        # shadow_bolt (dark) precedes fire_ball in ownership order, but
+        # ELEMENT_REGISTRY declares fire before dark, so the fire sub-group
+        # must come first.
+        groups = self._categories("shadow_bolt", "fire_ball")
+        elemental = next(
+            category for category in groups if category.category == "elemental_magic"
+        )
+        self.assertEqual(
+            [sub_group.group for sub_group in elemental.groups],
+            ["fire", "dark"],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_category_with_zero_owned_skills_is_omitted(self):
+        groups = self._categories("fire_ball")
+        self.assertNotIn(
+            "sexual_act", [category.category for category in groups]
+        )
+        self.assertNotIn(
+            "innate_gift", [category.category for category in groups]
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_no_group_category_emits_one_null_keyed_sub_group(self):
+        groups = self._categories("dual_blade_mastery")
+        martial = next(
+            category for category in groups if category.category == "martial_arts"
+        )
+        self.assertEqual(len(martial.groups), 1)
+        self.assertIsNone(martial.groups[0].group)
+        self.assertIsNone(martial.groups[0].label)
+        self.assertEqual(
+            [skill.key for skill in martial.groups[0].skills],
+            ["dual_blade_mastery"],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_owned_keys_order_is_preserved_within_each_sub_group(self):
+        groups = self._categories("fire_ball", "firestorm", "shadow_bolt")
+        elemental = next(
+            category for category in groups if category.category == "elemental_magic"
+        )
+        fire = next(
+            sub_group for sub_group in elemental.groups if sub_group.group == "fire"
+        )
+        self.assertEqual(
+            [skill.key for skill in fire.skills],
+            ["fire_ball", "firestorm"],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_sexual_act_sub_groups_follow_first_seen_order(self):
+        # divine_sexual_arts (神之秘法) is granted before the 精通 masteries,
+        # so 神之秘法 must lead even though 精通 precedes it alphabetically.
+        groups = self._categories(
+            "divine_sexual_arts", "divine_sexual_mastery", "reincarnation_boon_yuna"
+        )
+        sexual = next(
+            category for category in groups if category.category == "sexual_act"
+        )
+        self.assertEqual(
+            [sub_group.label for sub_group in sexual.groups],
+            ["神之秘法", "精通"],
+        )
+
+    def test_sexual_act_null_group_skill_is_not_dropped(self):
+        # A sexual_act skill without a group still gets presented in its own
+        # null-keyed sub-group instead of being silently omitted.
+        bare = _descriptor("divine_sexual_arts")
+        descriptor = SkillDescriptorView(
+            key=bare.key,
+            label=bare.label,
+            description=bare.description,
+            cost=bare.cost,
+            target_spec=bare.target_spec,
+            element=bare.element,
+            category=bare.category,
+            group=None,
+            enabled=True,
+            reason_code=None,
+            reason_message=None,
+            valid_target_ids=(),
+            shorthands=(),
+            freeform_scales=(),
+        )
+        groups = group_skill_views((descriptor,))
+        sexual = next(
+            category for category in groups if category.category == "sexual_act"
+        )
+        self.assertEqual(len(sexual.groups), 1)
+        self.assertIsNone(sexual.groups[0].group)
+        self.assertIsNone(sexual.groups[0].label)
+        self.assertEqual(
+            [skill.key for skill in sexual.groups[0].skills],
+            ["divine_sexual_arts"],
+        )
+
+    def test_empty_skills_yield_no_categories(self):
+        self.assertEqual(group_skill_views(()), ())
 
 
 if __name__ == "__main__":

@@ -186,7 +186,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="context_actions",
-            schema_version=2,
+            schema_version=3,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=context_actions_presenter,
         )

@@ -296,19 +296,31 @@
         return participant.identity + ":" + participant.hp_current;
       })
       .join("|");
-    var skillKeys = (panel.skills || [])
-      .map(function (skill) {
-        return (
-          skill.key +
-          ":" +
-          (skill.enabled ? "1" : "0") +
-          ":" +
-          (skill.targets || []).join("+")
-        );
-      })
-      .join("|");
+    // The v3 `skills` payload nests category -> groups -> skills; flatten it
+    // to the same key/enabled/targets information content as before so the
+    // change-detection signature is unaffected by the schema change.
+    var skillKeys = [];
+    (panel.skills || []).forEach(function (category) {
+      (category.groups || []).forEach(function (subGroup) {
+        (subGroup.skills || []).forEach(function (skill) {
+          skillKeys.push(
+            skill.key +
+              ":" +
+              (skill.enabled ? "1" : "0") +
+              ":" +
+              (skill.targets || []).join("+")
+          );
+        });
+      });
+    });
     return (
-      session.session_id + ":" + session.round + ":" + participantIds + ":" + skillKeys
+      session.session_id +
+      ":" +
+      session.round +
+      ":" +
+      participantIds +
+      ":" +
+      skillKeys.join("|")
     );
   }
 

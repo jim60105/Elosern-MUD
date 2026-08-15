@@ -1,4 +1,4 @@
-"""Exact schema-version-2 ``context_actions`` combat panel and presenter.
+"""Exact schema-version-3 ``context_actions`` combat panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
@@ -10,6 +10,10 @@ actions.
 The panel is read-only: it reconstructs the active session, reads participants
 and active-skill previews, and never mutates traits, resources, buffs, sexual
 state, battlefield, session, quest, location, or world time.
+
+The ``skills`` field is an ordered array of category groups (each optionally
+containing element/line sub-groups); the individual skill descriptor object is
+byte-identical to schema version 2.
 """
 
 from typing import Any
@@ -37,13 +41,15 @@ from world.rules.combat_view import (
     SECONDARY_ACTIONS,
     CombatViewError,
     build_combat_view,
+    group_skill_views,
 )
 from world.rules.progression import (
     FREEFORM_CAST_SCALES,
     scaled_mp_cost,
 )
+from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 2
+CONTEXT_ACTIONS_SCHEMA_VERSION = 3
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_SKILL_KEY = 64
@@ -320,6 +326,63 @@ def _validate_skill(value: Any) -> dict[str, Any]:
     return normalized
 
 
+# Stable presentation values the panel emits (mirror of the registry enum).
+CATEGORY_KEYS = frozenset(category.value for category in SkillCategory)
+
+
+def _validate_skill_group(value: Any) -> dict[str, Any]:
+    """Validate one ``{group, label, skills}`` object of one category.
+
+    ``group`` and ``label`` are co-nullable: a null group key requires a null
+    label and vice versa. The ``skills`` array reuses the unchanged
+    per-descriptor ``_validate_skill()`` validator, so every version-2
+    descriptor check survives the envelope change verbatim.
+    """
+    _require_exact_fields(value, "skill group", {"group", "label", "skills"}, {})
+    group = value["group"]
+    label = value["label"]
+    if group is None:
+        if label is not None:
+            raise ProtocolValidationError(
+                "a null group key requires a null label"
+            )
+    else:
+        _validate_identifier(group, "skill group key")
+        if not isinstance(label, str) or not label.strip():
+            raise ProtocolValidationError(
+                "a non-null group key requires a non-empty label"
+            )
+    skills = value["skills"]
+    if not isinstance(skills, list) or not skills:
+        raise ProtocolValidationError("skill group skills must be non-empty")
+    return {
+        "group": group,
+        "label": label,
+        "skills": [_validate_skill(item) for item in skills],
+    }
+
+
+def _validate_category_group(value: Any) -> dict[str, Any]:
+    """Validate one ``{category, label, groups}`` category-group object."""
+    _require_exact_fields(
+        value, "category group", {"category", "label", "groups"}, {}
+    )
+    category = _validate_identifier(value["category"], "category key")
+    if category not in CATEGORY_KEYS:
+        raise ProtocolValidationError("category key is not a registered category")
+    label = _require_str(value, "label", maximum=MAX_LABEL)
+    if not label.strip():
+        raise ProtocolValidationError("category label must be non-empty")
+    groups = value["groups"]
+    if not isinstance(groups, list) or not groups:
+        raise ProtocolValidationError("category groups must be non-empty")
+    return {
+        "category": category,
+        "label": label,
+        "groups": [_validate_skill_group(item) for item in groups],
+    }
+
+
 def validate_context_actions(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``context_actions`` payload.
 
@@ -382,9 +445,17 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
             raise ContextActionsError("recovery session must retain confirmed Forfeit")
 
     skills = payload["skills"]
-    if not isinstance(skills, list) or len(skills) > MAX_SKILLS:
-        raise ContextActionsError("skills exceed their bound")
-    skill_views = [_validate_skill(item) for item in skills]
+    if not isinstance(skills, list) or len(skills) > len(SkillCategory):
+        raise ContextActionsError("category groups exceed their bound")
+    category_views = [_validate_category_group(item) for item in skills]
+    skill_views = [
+        skill
+        for category in category_views
+        for sub_group in category["groups"]
+        for skill in sub_group["skills"]
+    ]
+    if len(skill_views) > MAX_SKILLS:
+        raise ContextActionsError("flattened skill count exceeds their bound")
     identity_set = {participant["identity"] for participant in participant_views}
     for skill in skill_views:
         for target in skill["targets"]:
@@ -403,8 +474,58 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
         "participants": participant_views,
         "root_actions": root_actions,
         "secondary_actions": secondary_actions,
-        "skills": skill_views,
+        "skills": category_views,
     }
+
+
+def _serialize_skill(skill: Any) -> dict[str, Any]:
+    """Serialize one frozen skill descriptor into its exact JSON object."""
+    descriptor = {
+        "key": skill.key,
+        "label": skill.label,
+        "description": skill.description,
+        "cost": dict(skill.cost),
+        "target_spec": skill.target_spec,
+        "element": skill.element,
+        "enabled": skill.enabled,
+        "disabled_reason": (
+            None
+            if skill.reason_code is None
+            else {"code": skill.reason_code, "message": skill.reason_message}
+        ),
+        "targets": list(skill.valid_target_ids),
+        "shorthands": list(skill.shorthands),
+    }
+    if skill.freeform_scales:
+        descriptor["freeform_scales"] = [
+            {"scale": scale, "label": label, "mp_cost": mp_cost}
+            for scale, label, mp_cost in skill.freeform_scales
+        ]
+    return descriptor
+
+
+def _serialize_skills(skills: tuple[Any, ...]) -> list[dict[str, Any]]:
+    """Serialize the grouped category views into the nested JSON envelope."""
+    categories: list[dict[str, Any]] = []
+    for category in group_skill_views(skills):
+        categories.append(
+            {
+                "category": category.category,
+                "label": category.label,
+                "groups": [
+                    {
+                        "group": sub_group.group,
+                        "label": sub_group.label,
+                        "skills": [
+                            _serialize_skill(skill)
+                            for skill in sub_group.skills
+                        ],
+                    }
+                    for sub_group in category.groups
+                ],
+            }
+        )
+    return categories
 
 
 def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -451,30 +572,6 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
         }
         for participant in view.participants
     ]
-    skills = []
-    for skill in view.skills:
-        descriptor = {
-            "key": skill.key,
-            "label": skill.label,
-            "description": skill.description,
-            "cost": dict(skill.cost),
-            "target_spec": skill.target_spec,
-            "element": skill.element,
-            "enabled": skill.enabled,
-            "disabled_reason": (
-                None
-                if skill.reason_code is None
-                else {"code": skill.reason_code, "message": skill.reason_message}
-            ),
-            "targets": list(skill.valid_target_ids),
-            "shorthands": list(skill.shorthands),
-        }
-        if skill.freeform_scales:
-            descriptor["freeform_scales"] = [
-                {"scale": scale, "label": label, "mp_cost": mp_cost}
-                for scale, label, mp_cost in skill.freeform_scales
-            ]
-        skills.append(descriptor)
     payload = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
@@ -489,6 +586,6 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
         "participants": participants,
         "root_actions": list(ROOT_ACTIONS),
         "secondary_actions": list(SECONDARY_ACTIONS),
-        "skills": skills,
+        "skills": _serialize_skills(view.skills),
     }
     return validate_context_actions(payload)

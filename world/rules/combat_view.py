@@ -18,6 +18,7 @@ caller rather than being repaired here.
 from dataclasses import dataclass
 from typing import Any
 
+from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action_preview import preview_skill
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import (
@@ -32,7 +33,7 @@ from world.rules.progression import (
     scaled_mp_cost,
 )
 from world.skills.cost_tiers import is_freeform_eligible
-from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 
 # Presentation bounds owned by the combat view (equal or below protocol limits).
 MAX_PARTICIPANTS = 16
@@ -46,6 +47,20 @@ ROOT_ACTIONS = ("attack", "skills", "items", "defend", "flee")
 SECONDARY_ACTIONS = ("forfeit",)
 RECOVERY_SECONDARY_ACTIONS = ("forfeit",)
 BASIC_ATTACK_KEY = "basic_attack"
+
+# Display labels for every presentation category, in the registry's fixed
+# declaration order. Kept beside the category enum so both presenters share
+# exactly one heading vocabulary.
+CATEGORY_LABELS: dict[SkillCategory, str] = {
+    SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
+    SkillCategory.MARTIAL_ARTS: "武技",
+    SkillCategory.ENHANCEMENT: "強化",
+    SkillCategory.INNATE_GIFT: "天賦",
+    SkillCategory.MOVEMENT: "移動",
+    SkillCategory.DIVINE_MYSTERY: "神之秘法",
+    SkillCategory.UTILITY: "特殊",
+    SkillCategory.SEXUAL_ACT: "性愛行為",
+}
 
 
 class CombatViewError(ValueError):
@@ -90,6 +105,9 @@ class SkillDescriptorView:
         cost: The exact resource cost mapping.
         target_spec: The ``TargetSpec`` value.
         element: The nullable element key.
+        category: The ``SkillCategory`` value.
+        group: The optional second-level group key (an element key for
+            ``elemental_magic``, a line name for ``sexual_act``).
         enabled: Whether the skill is currently usable.
         reason_code: Stable disabled reason code, or ``None`` when enabled.
         reason_message: Safe Traditional Chinese disabled explanation.
@@ -103,12 +121,46 @@ class SkillDescriptorView:
     cost: dict[str, int]
     target_spec: str
     element: str | None
+    category: str
+    group: str | None
     enabled: bool
     reason_code: str | None
     reason_message: str | None
     valid_target_ids: tuple[int, ...]
     shorthands: tuple[str, ...]
     freeform_scales: tuple[tuple[float, str, int], ...]
+
+
+@dataclass(frozen=True)
+class SkillGroupView:
+    """One ordered sub-group of skill descriptors within a category.
+
+    Attributes:
+        group: The sub-group key (an element key or sexual-act line name),
+            or ``None`` for categories that never carry a second level.
+        label: The display label; ``None`` exactly when ``group`` is ``None``.
+        skills: The ordered skill descriptors of this sub-group.
+    """
+
+    group: str | None
+    label: str | None
+    skills: tuple[SkillDescriptorView, ...]
+
+
+@dataclass(frozen=True)
+class CategoryGroupView:
+    """One ordered category of skill sub-groups for presentation.
+
+    Attributes:
+        category: The ``SkillCategory`` value.
+        label: The display label.
+        groups: The ordered sub-groups; exactly one ``group=None`` sub-group
+            for categories that never carry a second level.
+    """
+
+    category: str
+    label: str
+    groups: tuple[SkillGroupView, ...]
 
 
 @dataclass(frozen=True)
@@ -364,6 +416,8 @@ def _build_skills(
                 cost=dict(skill.cost),
                 target_spec=skill.target_spec.value,
                 element=element,
+                category=skill.category.value,
+                group=skill.group,
                 enabled=preview.enabled,
                 reason_code=reason_code,
                 reason_message=reason_message,
@@ -375,6 +429,77 @@ def _build_skills(
     return tuple(descriptors)
 
 
+def _element_label(element_key: str) -> str | None:
+    """Return the display label for one element sub-group key."""
+    element = ELEMENT_REGISTRY.get(element_key)
+    return element.display_name_zh if element is not None else element_key
+
+
+def group_skill_views(
+    skills: tuple[SkillDescriptorView, ...],
+) -> tuple[CategoryGroupView, ...]:
+    """Group ordered skill descriptors into the categorized panel structure.
+
+    Iterates ``SkillCategory`` in declaration order, so category order never
+    depends on what the entity happens to own. Within ``elemental_magic``
+    sub-groups follow ``ELEMENT_REGISTRY`` declaration order; within
+    ``sexual_act`` sub-groups follow first-seen ``group`` order among the
+    entity's owned skills; every other category emits exactly one
+    ``group=None`` sub-group. A category or sub-group with zero owned skills
+    is omitted entirely, not emitted empty. Skills keep their ``owned_keys()``
+    order within every sub-group.
+    """
+    categories: list[CategoryGroupView] = []
+    for category in SkillCategory:
+        owned = tuple(
+            skill for skill in skills if skill.category == category.value
+        )
+        if not owned:
+            continue
+        if category is SkillCategory.ELEMENTAL_MAGIC:
+            sub_groups: list[SkillGroupView] = []
+            for element_key in ELEMENT_REGISTRY:
+                members = tuple(
+                    skill for skill in owned if skill.group == element_key
+                )
+                if not members:
+                    continue
+                sub_groups.append(
+                    SkillGroupView(
+                        group=element_key,
+                        label=_element_label(element_key),
+                        skills=members,
+                    )
+                )
+        elif category is SkillCategory.SEXUAL_ACT:
+            # First-seen ``group`` order among the owned skills. A ``None``
+            # group is its own bucket (``group=None``/``label=None``), so a
+            # line-less act is still presented rather than silently dropped.
+            sub_groups = []
+            seen: set[str | None] = set()
+            for skill in owned:
+                group = skill.group
+                if group in seen:
+                    continue
+                seen.add(group)
+                members = tuple(
+                    member for member in owned if member.group == group
+                )
+                sub_groups.append(
+                    SkillGroupView(group=group, label=group, skills=members)
+                )
+        else:
+            sub_groups = [SkillGroupView(group=None, label=None, skills=owned)]
+        categories.append(
+            CategoryGroupView(
+                category=category.value,
+                label=CATEGORY_LABELS[category],
+                groups=tuple(sub_groups),
+            )
+        )
+    return tuple(categories)
+
+
 def rejection_message_from_session(reason_code: str) -> str:
     """Return a safe Traditional Chinese message for a session reason code."""
     from world.rules.player_messages import session_reason_message
@@ -384,6 +509,8 @@ def rejection_message_from_session(reason_code: str) -> str:
 
 __all__ = [
     "BASIC_ATTACK_KEY",
+    "CATEGORY_LABELS",
+    "CategoryGroupView",
     "CombatView",
     "CombatViewError",
     "MAX_DISPLAY_NAME_CODE_POINTS",
@@ -397,7 +524,9 @@ __all__ = [
     "SECONDARY_ACTIONS",
     "SessionView",
     "SkillDescriptorView",
+    "SkillGroupView",
     "build_combat_view",
     "combat_participants",
+    "group_skill_views",
     "rejection_message_from_session",
 ]

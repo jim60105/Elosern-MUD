@@ -41,6 +41,26 @@ def _valid_skill(**overrides):
     return value
 
 
+def _valid_skill_group(**overrides):
+    value = {
+        "group": "fire",
+        "label": "火",
+        "skills": [_valid_skill()],
+    }
+    value.update(overrides)
+    return value
+
+
+def _valid_category_group(**overrides):
+    value = {
+        "category": "elemental_magic",
+        "label": "元素魔法",
+        "groups": [_valid_skill_group()],
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_participant(**overrides):
     value = {
         "identity": 2,
@@ -58,7 +78,7 @@ def _valid_participant(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "kind": "combat",
         "session": {
@@ -71,7 +91,7 @@ def _valid_panel(**overrides):
         "participants": [_valid_participant()],
         "root_actions": ["attack", "skills", "items", "defend", "flee"],
         "secondary_actions": ["forfeit"],
-        "skills": [_valid_skill()],
+        "skills": [_valid_category_group()],
     }
     value.update(overrides)
     return value
@@ -79,7 +99,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "kind": "combat",
         "session": {
@@ -99,6 +119,10 @@ def _recovery_panel(**overrides):
 
 
 class ContextActionsSchemaTests(unittest.TestCase):
+    def _nested_skills(self, *skills):
+        """Wrap a flat skill list into one nested category group."""
+        return [_valid_category_group(groups=[_valid_skill_group(skills=list(skills))])]
+
     def test_valid_ready_panel_passes(self):
         payload = _valid_panel()
         normalized = validate_context_actions(payload)
@@ -167,27 +191,32 @@ class ContextActionsSchemaTests(unittest.TestCase):
                 validate_context_actions(panel)
 
     def test_rejects_skill_shorthand_on_single(self):
-        panel = _valid_panel()
-        panel["skills"][0]["shorthands"] = ["all-enemies"]
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(shorthands=["all-enemies"]))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
     def test_rejects_disabled_skill_without_reason(self):
-        panel = _valid_panel()
-        panel["skills"][0]["enabled"] = False
-        panel["skills"][0]["disabled_reason"] = None
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(enabled=False, disabled_reason=None))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
     def test_rejects_enabled_skill_with_reason(self):
-        panel = _valid_panel()
-        panel["skills"][0]["disabled_reason"] = {"code": "x", "message": "說明"}
+        panel = _valid_panel(
+            skills=self._nested_skills(
+                _valid_skill(disabled_reason={"code": "x", "message": "說明"})
+            )
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
     def test_rejects_target_not_in_participants(self):
-        panel = _valid_panel()
-        panel["skills"][0]["targets"] = [99]
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(targets=[99]))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -220,18 +249,39 @@ class ContextActionsSchemaTests(unittest.TestCase):
                     shorthands=["all-enemies", "all-allies", "all"],
                 )
             )
-        panel = _valid_panel(participants=participants, skills=skills)
+        panel = _valid_panel(
+            participants=participants, skills=self._nested_skills(*skills)
+        )
         normalized = validate_context_actions(panel)
         self.assertLessEqual(json_byte_size(normalized), 65536)
 
     def test_duplicate_skill_and_target_are_rejected(self):
-        panel = _valid_panel()
-        panel["skills"].append(_valid_skill())
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(), _valid_skill())
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
-        panel = _valid_panel()
-        panel["skills"][0]["targets"] = [2, 2]
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(targets=[2, 2]))
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+
+    def test_duplicate_skill_across_categories_is_rejected(self):
+        # The whole-payload unique-key check runs against the flattened set,
+        # so a duplicate key hidden in two different categories is still
+        # caught.
+        panel = _valid_panel(
+            skills=[
+                _valid_category_group(),
+                _valid_category_group(
+                    category="martial_arts",
+                    label="武技",
+                    groups=[_valid_skill_group(group=None, label=None)],
+                ),
+            ]
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -290,42 +340,110 @@ class ContextActionsSchemaTests(unittest.TestCase):
             validate_context_actions(panel)
 
     def test_skill_field_bounds_reject(self):
-        panel = _valid_panel()
-        panel["skills"][0]["label"] = ""
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(label=""))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["description"] = "  "
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(description="  "))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(cost={"mp": -1}))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["cost"] = {"mp": -1}
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(cost={"mp": True}))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["cost"] = {"mp": True}
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(element=42))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["element"] = 42
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(target_spec="cone"))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["target_spec"] = "cone"
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(targets=[0]))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["targets"] = [0]
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(shorthands=["all", "all"]))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["shorthands"] = ["all", "all"]
+        panel = _valid_panel(
+            skills=self._nested_skills(_valid_skill(shorthands=["bogus"]))
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
-        panel = _valid_panel()
-        panel["skills"][0]["shorthands"] = ["bogus"]
+
+    def test_category_group_field_bounds_reject(self):
+        # An unregistered category key is rejected.
+        panel = _valid_panel(
+            skills=[_valid_category_group(category="bogus")]
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+        # A null group key must pair with a null label and vice versa.
+        panel = _valid_panel(
+            skills=[
+                _valid_category_group(
+                    groups=[_valid_skill_group(group=None, label="火")]
+                )
+            ]
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+        panel = _valid_panel(
+            skills=[
+                _valid_category_group(
+                    groups=[_valid_skill_group(group="fire", label=None)]
+                )
+            ]
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+        # The top-level array is bounded by the number of SkillCategory
+        # members, not by MAX_SKILLS.
+        panel = _valid_panel(
+            skills=[_valid_category_group() for _ in range(9)]
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+        # An empty groups array is rejected: empty categories are omitted,
+        # not emitted empty.
+        panel = _valid_panel(
+            skills=[_valid_category_group(groups=[])]
+        )
+        with self.assertRaises(Exception):
+            validate_context_actions(panel)
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_flattened_skill_count_bound_rejects_small_category_payload(self):
+        # Design.md D-5: MAX_SKILLS applies to the flattened descriptor
+        # total, not to the number of top-level category-group entries. A
+        # hand-built payload with one category group carrying 33 skills must
+        # be rejected even though its top-level count is far below
+        # len(SkillCategory).
+        skills = []
+        for index in range(1, 34):
+            skills.append(
+                _valid_skill(
+                    key=f"skill_{index}",
+                    label=f"技能名稱{index}",
+                    targets=[2],
+                )
+            )
+        panel = _valid_panel(skills=self._nested_skills(*skills))
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -348,19 +466,26 @@ class ContextActionsSchemaTests(unittest.TestCase):
         # Absent field is accepted (the server omits it for non-masters).
         payload = _valid_panel()
         normalized = validate_context_actions(payload)
-        self.assertNotIn("freeform_scales", normalized["skills"][0])
+        normalized_skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        self.assertNotIn("freeform_scales", normalized_skill)
 
-        payload = _valid_panel()
-        payload["skills"][0]["freeform_scales"] = [
-            {"scale": 0.25, "label": "1/4", "mp_cost": 5},
-            {"scale": 0.5, "label": "1/2", "mp_cost": 10},
-            {"scale": 1.0, "label": "1", "mp_cost": 20},
-            {"scale": 2.0, "label": "2", "mp_cost": 40},
-            {"scale": 4.0, "label": "4", "mp_cost": 80},
-        ]
+        payload = _valid_panel(
+            skills=self._nested_skills(
+                _valid_skill(
+                    freeform_scales=[
+                        {"scale": 0.25, "label": "1/4", "mp_cost": 5},
+                        {"scale": 0.5, "label": "1/2", "mp_cost": 10},
+                        {"scale": 1.0, "label": "1", "mp_cost": 20},
+                        {"scale": 2.0, "label": "2", "mp_cost": 40},
+                        {"scale": 4.0, "label": "4", "mp_cost": 80},
+                    ]
+                )
+            )
+        )
         normalized = validate_context_actions(payload)
+        normalized_skill = normalized["skills"][0]["groups"][0]["skills"][0]
         self.assertEqual(
-            normalized["skills"][0]["freeform_scales"][0]["mp_cost"],
+            normalized_skill["freeform_scales"][0]["mp_cost"],
             5,
         )
 
@@ -397,14 +522,19 @@ class ContextActionsSchemaTests(unittest.TestCase):
         }
         for name, entries in cases.items():
             with self.subTest(case=name):
-                panel = _valid_panel()
-                panel["skills"][0]["freeform_scales"] = entries
+                panel = _valid_panel(
+                    skills=self._nested_skills(
+                        _valid_skill(freeform_scales=entries)
+                    )
+                )
                 with self.assertRaises(Exception):
                     validate_context_actions(panel)
         # A skill without an mp cost can never carry the field.
-        panel = _valid_panel()
-        panel["skills"][0]["cost"] = {}
-        panel["skills"][0]["freeform_scales"] = valid_entries
+        panel = _valid_panel(
+            skills=self._nested_skills(
+                _valid_skill(cost={}, freeform_scales=valid_entries)
+            )
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -436,6 +566,15 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.monster.location = self.room
         self.registry = build_production_registry()
 
+    def _flatten_skills(self, payload):
+        """Flatten the nested category groups back into one skill list."""
+        return [
+            skill
+            for category in payload["skills"]
+            for sub_group in category["groups"]
+            for skill in sub_group["skills"]
+        ]
+
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
     def test_ready_session_presents_canonical_combat_choices(self):
         engage(self.player, self.monster)
@@ -458,7 +597,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
             [p["token"] for p in payload["participants"]],
             ["a1", "e1"],
         )
-        keys = [skill["key"] for skill in payload["skills"]]
+        keys = [skill["key"] for skill in self._flatten_skills(payload)]
         self.assertIn("fire_ball", keys)
         self.assertIn("basic_attack", keys)
         self.assertIn("flee", keys)
@@ -470,6 +609,50 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             [p["portrait_ref"] for p in payload["participants"]],
             [str(p["identity"]) for p in payload["participants"]],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_ready_session_groups_skills_by_category(self):
+        self.player.db.skills = {
+            "active": ["wind_blade", "fire_ball", "shadow_slash"],
+            "passive": [],
+        }
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertEqual(
+            [category["category"] for category in payload["skills"]],
+            ["elemental_magic", "martial_arts", "movement"],
+        )
+        self.assertEqual(payload["skills"][0]["label"], "元素魔法")
+        elemental = payload["skills"][0]
+        self.assertEqual(
+            [sub_group["group"] for sub_group in elemental["groups"]],
+            ["fire", "wind"],
+        )
+        wind = elemental["groups"][1]
+        self.assertEqual(wind["label"], "風")
+        self.assertEqual(
+            [skill["key"] for skill in wind["skills"]],
+            ["wind_blade"],
+        )
+        martial = payload["skills"][1]
+        self.assertEqual(martial["label"], "武技")
+        self.assertEqual(len(martial["groups"]), 1)
+        self.assertIsNone(martial["groups"][0]["group"])
+        self.assertIsNone(martial["groups"][0]["label"])
+        # shadow_slash is stored before the innate basic_attack.
+        self.assertEqual(
+            [skill["key"] for skill in martial["groups"][0]["skills"]],
+            ["shadow_slash", "basic_attack"],
+        )
+        movement = payload["skills"][2]
+        self.assertEqual(movement["label"], "移動")
+        self.assertEqual(
+            [skill["key"] for skill in movement["groups"][0]["skills"]],
+            ["flee"],
         )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
@@ -509,7 +692,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        fire = next(skill for skill in payload["skills"] if skill["key"] == "fire_ball")
+        fire = next(
+            skill
+            for skill in self._flatten_skills(payload)
+            if skill["key"] == "fire_ball"
+        )
         self.assertFalse(fire["enabled"])
         self.assertEqual(fire["disabled_reason"]["code"], "insufficient_resource")
         self.assertTrue(fire["disabled_reason"]["message"].strip())
@@ -525,7 +712,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        by_key = {skill["key"]: skill for skill in payload["skills"]}
+        by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
         for skill_key in ("status_disguise", "dominion_art"):
             with self.subTest(skill_key=skill_key):
                 skill = by_key[skill_key]
@@ -547,7 +734,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        by_key = {skill["key"]: skill for skill in payload["skills"]}
+        by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
         wind = by_key["wind_blade"]
         self.assertEqual(
             wind["freeform_scales"],
@@ -572,7 +759,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        for skill in payload["skills"]:
+        for skill in self._flatten_skills(payload):
             self.assertNotIn("freeform_scales", skill)
         self.assertNotIn("威力", repr(payload["skills"]))
 
