@@ -2,6 +2,8 @@
 
 from tools.spec_traceability import covers_requirement
 
+import inspect
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -202,6 +204,34 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertTrue(
             any("無法確認當前戰鬥。" in m for m in messages), messages
         )
+
+
+class CastCommandSettlementSurfaceTests(unittest.TestCase):
+    """Source-inspection: the out-of-combat cast boundary is the settlement API.
+
+    The settlement call returns only after the outer transaction commits, so
+    the command's success rendering is post-commit by construction; the
+    in-combat session path must never touch the settlement or the clock.
+    """
+
+    @covers_requirement("world-clock::cmdcast-advances-command-time-only-outside-a-persistent-combat-session")
+    def test_out_of_combat_cast_delegates_to_the_settlement(self):
+        import inspect
+
+        source = inspect.getsource(CmdCast._cast_out_of_combat)
+        self.assertIn("settle_out_of_combat_cast", source)
+        self.assertNotIn("get_world_clock", source)
+        self.assertNotIn("ActionResolver.resolve", source)
+        self.assertNotIn("AdvanceSource", source)
+
+    def test_in_combat_session_cast_path_is_unchanged(self):
+        import inspect
+
+        source = inspect.getsource(CmdCast._cast_in_session)
+        self.assertIn("submit_player_action", source)
+        self.assertNotIn("settle_out_of_combat_cast", source)
+        self.assertNotIn("get_world_clock", source)
+        self.assertNotIn("AdvanceSource", source)
 
 
 if __name__ == "__main__":

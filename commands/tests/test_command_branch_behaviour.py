@@ -483,9 +483,9 @@ class ActionCommandBranchTests(TestCase):
         command = _command(CmdCast, "skill=missing")
         command._active_session = Mock(return_value=None)
         command.caller.search.return_value = None
-        with patch("commands.action.ActionResolver.resolve") as resolve:
+        with patch("commands.action.settle_out_of_combat_cast") as settle:
             command.func()
-        resolve.assert_not_called()
+        settle.assert_not_called()
 
     def test_session_cast_maps_errors_rejection_logs_and_terminal_outcome(self):
         command = _command(CmdCast)
@@ -524,25 +524,27 @@ class ActionCommandBranchTests(TestCase):
             ["rendered", "戰鬥結束，你取得了勝利。"],
         )
 
-    def test_out_of_combat_success_advances_clock_and_failure_reports_reason(self):
+    def test_out_of_combat_success_renders_from_the_settlement_and_failure_reports_reason(self):
+        from world.rules.cast_settlement import CastSettlement
+
         command = _command(CmdCast)
         command.caller.ndb.action_context = object()
         success = SimpleNamespace(
             outcome="success", time_cost_seconds=5, event_log="log", reason=None
         )
-        with patch("commands.action.ActionResolver.resolve", return_value=success), patch(
-            "commands.action.get_world_clock"
-        ) as clock, patch("commands.action.render_plain_text", return_value="done"):
+        with patch(
+            "commands.action.settle_out_of_combat_cast",
+            return_value=CastSettlement(success, ()),
+        ), patch("commands.action.render_plain_text", return_value="done"):
             command._cast_out_of_combat("skill", "")
-        clock.return_value.advance.assert_called_once()
-        clock.return_value.advance.assert_called_once_with(
-            5, AdvanceSource.COMMAND, [command.caller]
-        )
         command.caller.msg.assert_called_with("done")
 
         command.caller.msg.reset_mock()
         failed = SimpleNamespace(outcome="rejected", reason=object())
-        with patch("commands.action.ActionResolver.resolve", return_value=failed):
+        with patch(
+            "commands.action.settle_out_of_combat_cast",
+            return_value=CastSettlement(failed, ()),
+        ):
             command._cast_out_of_combat("skill", "")
         command.caller.msg.assert_called_with("這項行動無法完成。")
 
