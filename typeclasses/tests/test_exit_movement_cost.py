@@ -28,6 +28,7 @@ class MovementCostExitTests(EvenniaTest):
         self.room1.save()
         self.room2.save()
 
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_player_traversing_plain_exit_advances_clock_by_move(self):
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
         before = get_world_clock().tick

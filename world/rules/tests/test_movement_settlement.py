@@ -12,6 +12,8 @@ tests).
 
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -68,6 +70,7 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         join_party(npc, self.char1)
         return npc
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_charge_failure_returns_player_and_companion_to_source(self):
         npc = self._companion()
         destination = create_object(InstanceRoom, key="目的地")
@@ -95,6 +98,7 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertFalse(destination.db.interacted)
         self.assertEqual(destination.db.pin_reasons, ["quest:1:q1:stage:0"])
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_failure_after_companions_move_returns_every_companion(self):
         npc = self._companion()
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
@@ -111,6 +115,7 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertNotIn(self.char1, self.room2.contents)
         self.assertNotIn(npc, self.room2.contents)
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_direct_compensation_reconciles_divergent_in_process_state(self):
         from world.rules.movement_settlement import _compensate, _snapshot_movement_state
 
@@ -157,6 +162,7 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertIsNone(self.room2.attributes.get("pin_reasons"))
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_npc_traversal_passes_through_the_boundary_without_surfaces(self):
         npc = create_object(NPC, key="npc", location=self.room1)
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
@@ -201,6 +207,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         for coordinates, room in self._script().db.rooms.items():
             self.assertEqual(room.ndb.active_coordinates, coordinates)
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_returns_player_to_the_grid_room(self):
         self.char1.location = self.north_gate
         before_bookkeeping = self._bookkeeping()
@@ -216,6 +223,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual(self._bookkeeping(), before_bookkeeping)
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_with_fresh_room_keeps_no_zombie_rooms(self):
         self.char1.location = self.north_gate
         # The first entry creates a fresh wilderness room; after the failure
@@ -228,6 +236,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual((itemcoordinates, rooms, unused_rooms), ({}, {}, []))
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_failure_after_follow_returns_the_wilderness_companion(self):
         self.char1.location = self.north_gate
         npc = create_object(NPC, key="同伴", location=self.north_gate)
@@ -251,6 +260,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual(self._bookkeeping(), before_bookkeeping)
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_step_charge_failure_returns_player_to_the_source_coordinates(self):
         script = self._script()
         real_advance = WorldClock.advance
@@ -267,6 +277,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual(self._bookkeeping(), before_bookkeeping)
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_return_charge_failure_re_registers_the_player_at_the_entry(self):
         script = self._script()
         real_advance = WorldClock.advance
@@ -290,6 +301,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual(self._bookkeeping(), before_bookkeeping)
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_falsy_return_after_relocation_is_compensated(self):
         script = self._script()
         self.gate.at_traverse(self.char1, self.north_gate)

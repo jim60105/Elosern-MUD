@@ -329,6 +329,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         visited = {visit.node_id for visit in parse_knowledge(self.player)}
         self.assertIn(f"room:{int(self.destination.pk)}", visited)
 
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-reports-failure-truthfully-on-every-client-path")
     def test_failed_charge_reports_move_failed_with_player_still_at_source(self):
         before = get_world_clock().tick
         with patch.object(WorldClock, "advance", _failing_advance):

@@ -43,6 +43,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         return get_world_clock().tick
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_gate_exit_places_traverser_at_entry_coordinate_and_advances_clock(self):
         before = self._tick()
         self.gate.at_traverse(self.char1, self.north_gate)
@@ -73,6 +74,7 @@ class WildernessGatewayExitTests(EvenniaTest):
             self.assertIsInstance(exit_obj, WildernessReturnExit)
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-exactly-one-registered-coordinate-and-direction-pair-back-to-the-grid")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_south_from_entry_returns_to_exact_grid_room(self):
         from typeclasses.rooms import TerrainRoom
 
@@ -83,6 +85,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, self.north_gate)
         self.assertEqual(self._tick(), before + 9000)
 
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_intermediate_steps_each_advance_clock_by_one_wilderness_move(self):
         from typeclasses.rooms import TerrainRoom
 

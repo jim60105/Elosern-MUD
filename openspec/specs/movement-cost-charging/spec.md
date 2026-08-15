@@ -61,8 +61,13 @@ onboarding-skip-coverage change's shared boundary) — which SHALL call
 `world.rules.map_knowledge.record_arrival(traversing_object)`. Recording map knowledge happens only
 after the movement transaction has already succeeded, because this hook fires exclusively from the
 stock `DefaultExit.at_traverse` success branch — the same structural guarantee that already makes the
-charge correct. It SHALL NOT override `at_traverse` or inspect any return value from it. Recording map
-knowledge SHALL NOT change the movement-charge behavior in any way.
+charge correct. The mixin SHALL additionally override `at_traverse(traversing_object,
+target_location, **kwargs)` only to open the movement-settlement boundary (the
+movement-settlement-atomicity capability): it SHALL delegate the traversal itself to
+`super().at_traverse(...)` inside that boundary and SHALL NOT inspect or reinterpret any return value
+from it — `at_traverse`'s return value remains `None` in both branches, and success detection stays
+with `at_post_traverse` and the callers' location checks. Recording map knowledge SHALL NOT change
+the movement-charge behavior in any way.
 
 #### Scenario: A successful traversal through a MovementCostMixin exit charges exactly once and records arrival
 - **WHEN** a `PlayerCharacter` successfully traverses an exit whose class includes
@@ -103,6 +108,12 @@ knowledge SHALL NOT change the movement-charge behavior in any way.
   shared helper (not the mixin) calls `world.rules.movement.charge_movement(traversing_object,
   cost_key)` and `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the mixin
   nor the helper calls `world.rules.clock.get_world_clock().advance()` directly
+
+#### Scenario: The MovementCostMixin at_traverse opens the settlement boundary and delegates the traversal
+- **WHEN** `typeclasses/exits.py::MovementCostMixin.at_traverse` is inspected
+- **THEN** it invokes the movement-settlement boundary (the movement-settlement-atomicity entry point)
+  around a call to `super().at_traverse(...)`, contains no inline
+  `world.rules.clock.get_world_clock().advance()` call, and its `at_post_traverse` is unchanged
 
 ### Requirement: typeclasses.exits.Exit and CostedXYZExit both carry MovementCostMixin with
 movement_cost_key "move"
