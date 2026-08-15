@@ -28,6 +28,7 @@ class MovementCostExitTests(EvenniaTest):
         self.room1.save()
         self.room2.save()
 
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_player_traversing_plain_exit_advances_clock_by_move(self):
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
         before = get_world_clock().tick
@@ -116,6 +117,18 @@ class MovementCostMixinSourceTests(EvenniaTest):
         self.assertIn("charge_movement(traversing_object, cost_key)", helper)
         self.assertIn("record_arrival(traversing_object)", helper)
         self.assertNotIn("get_world_clock().advance", helper)
+
+    @covers_requirement("movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value")
+    def test_mixin_at_traverse_delegates_to_the_settlement_boundary(self):
+        import inspect
+
+        from typeclasses.exits import MovementCostMixin
+
+        source = inspect.getsource(MovementCostMixin.at_traverse)
+        self.assertIn("settle_movement(", source)
+        self.assertIn("super().at_traverse", source)
+        self.assertNotIn("get_world_clock().advance", source)
+        self.assertNotIn("after_successful_movement(", source)
 
 
 class FlightRequiredExitTests(EvenniaTest):

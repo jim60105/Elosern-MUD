@@ -16,6 +16,7 @@ from evennia.objects.objects import DefaultExit
 from .objects import ObjectParent
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules.movement_settlement import settle_movement
 
 
 def after_successful_movement(
@@ -37,9 +38,12 @@ def after_successful_movement(
     corridor — plain ``Room``, ``GridRoom``, ``TerrainRoom``, or
     ``InstanceRoom`` — marks the guide skipped. ``charge_movement``,
     ``record_arrival``, and ``follow_companions`` are internally no-ops for
-    anything that is not a ``PlayerCharacter`` and never raise from a traversal
-    hook; the onboarding observer is player-gated and idempotent, so the helper
-    is safe to call on any successful traversal from any path.
+    anything that is not a ``PlayerCharacter``; ``charge_movement`` can raise
+    when ``WorldClock.advance`` fails — the movement-settlement boundary
+    (movement-settlement-atomicity design D1) compensates that failure — and
+    ``record_arrival``/``follow_companions`` are exception-isolated. The
+    onboarding observer is player-gated and idempotent, so the helper is safe
+    to call on any successful traversal from any path.
     """
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement import charge_movement
@@ -73,6 +77,15 @@ class MovementCostMixin:
     record_arrival`` (map-knowledge-minimap design D3), moving companions, and
     running the onboarding room-entry observer (onboarding-skip coverage design
     D1) — all no-ops for anything that is not a ``PlayerCharacter``.
+
+    ``at_traverse`` is overridden ONLY to open the movement-settlement boundary
+    (movement-settlement-atomicity design D5): the stock traversal, relocation,
+    and every success-path step above run inside one outer settlement
+    transaction, and a failure is compensated before it surfaces, so a failing
+    charge can never leave the traverser relocated. The traversal itself is
+    delegated to ``super().at_traverse`` and its return value is not inspected
+    or reinterpreted — it stays ``None`` on both branches, and success detection
+    remains with ``at_post_traverse`` and the callers' location checks.
     """
 
     movement_cost_key: str = "move"
@@ -149,6 +162,29 @@ class MovementCostMixin:
             destination=traversing_object.location,
         )
 
+    def at_traverse(self, traversing_object, target_location, **kwargs):
+        """Open the movement-settlement boundary around the stock traversal.
+
+        Covers the plain ``Exit`` and ``CostedXYZExit`` lineages (neither
+        ``DefaultExit`` nor ``XYZExit`` overrides ``at_traverse``, so the MRO
+        reaches this mixin). The boundary (``settle_movement``) wraps the
+        relocation, the clock charge, map-knowledge recording, companion
+        following, and the onboarding observer in one outer database
+        transaction and compensates every Evennia cache surface when any step
+        fails (movement-settlement-atomicity design D5).
+        """
+        stock_traversal = super().at_traverse
+
+        def traverse_stock():
+            return stock_traversal(traversing_object, target_location, **kwargs)
+
+        return settle_movement(
+            traversing_object,
+            traversing_object.location,
+            destination=target_location,
+            traverse=traverse_stock,
+        )
+
 
 class Exit(MovementCostMixin, ObjectParent, DefaultExit):
     """
@@ -197,41 +233,54 @@ class WildernessGateExit(Exit):
     entry charges wilderness_move, records the destination ``wild:`` node
     (map-knowledge-minimap design D3), and completes through the shared
     ``after_successful_movement`` boundary (onboarding-skip coverage design D1).
+    The whole entry body runs inside the movement-settlement boundary
+    (movement-settlement-atomicity design D5), so a failing charge returns the
+    traverser to the grid room with every cache surface reconciled.
     """
 
     def at_traverse(self, traversing_object, target_location, **kwargs):
-        # Honor the same at_pre_move veto every other exit in the game honors,
-        # so entering the wilderness never silently bypasses a future
-        # movement-blocking convention (combat lock, restraint, quest gating).
-        if not traversing_object.at_pre_move(None):
-            return False
-
         entry = WILDERNESS_ENTRY_REGISTRY[self.db.anchor_key]
         source_location = traversing_object.location
-        ok = enter_wilderness(
-            traversing_object, coordinates=entry.wilderness_xy, name=WILDERNESS_NAME
-        )
-        if not ok:
-            return False
 
-        if source_location:
-            source_location.msg_contents(
-                f"{traversing_object.key} leaves into the wilderness.",
+        def gate_traversal():
+            # Honor the same at_pre_move veto every other exit in the game
+            # honors, so entering the wilderness never silently bypasses a
+            # future movement-blocking convention (combat lock, restraint,
+            # quest gating).
+            if not traversing_object.at_pre_move(None):
+                return False
+
+            ok = enter_wilderness(
+                traversing_object, coordinates=entry.wilderness_xy, name=WILDERNESS_NAME
+            )
+            if not ok:
+                return False
+
+            if source_location:
+                source_location.msg_contents(
+                    f"{traversing_object.key} leaves into the wilderness.",
+                    exclude=[traversing_object],
+                )
+            traversing_object.location.msg_contents(
+                f"{traversing_object.key} arrives from {source_location}.",
                 exclude=[traversing_object],
             )
-        traversing_object.location.msg_contents(
-            f"{traversing_object.key} arrives from {source_location}.",
-            exclude=[traversing_object],
-        )
-        traversing_object.at_post_move(None)
-        after_successful_movement(
+            traversing_object.at_post_move(None)
+            after_successful_movement(
+                traversing_object,
+                source_location,
+                cost_key="wilderness_move",
+                wilderness_coordinates=entry.wilderness_xy,
+                wilderness_name=WILDERNESS_NAME,
+            )
+            return True
+
+        return settle_movement(
             traversing_object,
             source_location,
-            cost_key="wilderness_move",
             wilderness_coordinates=entry.wilderness_xy,
-            wilderness_name=WILDERNESS_NAME,
+            traverse=gate_traversal,
         )
-        return True
 
 
 class WildernessReturnExit(WildernessExit):
@@ -244,7 +293,10 @@ class WildernessReturnExit(WildernessExit):
     successful step also records its destination node through
     ``record_arrival`` (map-knowledge-minimap design D3); both branches
     complete through the shared ``after_successful_movement`` boundary
-    (onboarding-skip coverage design D1).
+    (onboarding-skip coverage design D1). Both branches run inside the
+    movement-settlement boundary (movement-settlement-atomicity design D5), and
+    the return-branch falsy-return-with-relocation case (a ``move_to`` hook
+    raising after relocation) is compensated as a failure.
     """
 
     def at_traverse(self, traversing_object, target_location):
@@ -259,26 +311,47 @@ class WildernessReturnExit(WildernessExit):
                     # cannot happen -- the spec's "failed traversal does not
                     # advance the clock" applies here too.
                     return False
-                if not traversing_object.move_to(grid_room, quiet=False):
-                    return False
+
+                def return_traversal():
+                    if not traversing_object.move_to(grid_room, quiet=False):
+                        return False
+                    after_successful_movement(
+                        traversing_object,
+                        self.location,
+                        cost_key="wilderness_move",
+                        destination=grid_room,
+                        wilderness_source_coordinates=current,
+                    )
+                    return True
+
+                return settle_movement(
+                    traversing_object,
+                    self.location,
+                    destination=grid_room,
+                    wilderness_source_coordinates=current,
+                    traverse=return_traversal,
+                )
+        # ORDINARY wilderness movement -- every coordinate/direction that is not
+        # a registered gateway. Not free: a successful step still pays
+        # wilderness_move; only the routing decision is gated.
+        stock_step = super().at_traverse
+
+        def step_traversal():
+            result = stock_step(traversing_object, target_location)
+            if result:
                 after_successful_movement(
                     traversing_object,
                     self.location,
                     cost_key="wilderness_move",
-                    destination=grid_room,
+                    wilderness_coordinates=traversing_object.location.coordinates,
                     wilderness_source_coordinates=current,
                 )
-                return True
-        # ORDINARY wilderness movement -- every coordinate/direction that is not
-        # a registered gateway. Not free: a successful step still pays
-        # wilderness_move; only the routing decision is gated.
-        result = super().at_traverse(traversing_object, target_location)
-        if result:
-            after_successful_movement(
-                traversing_object,
-                self.location,
-                cost_key="wilderness_move",
-                wilderness_coordinates=traversing_object.location.coordinates,
-                wilderness_source_coordinates=current,
-            )
-        return result
+            return result
+
+        return settle_movement(
+            traversing_object,
+            self.location,
+            wilderness_coordinates=traversing_object.location.coordinates,
+            wilderness_source_coordinates=current,
+            traverse=step_traversal,
+        )

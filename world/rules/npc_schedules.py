@@ -674,14 +674,18 @@ def _first_traversable_exit(npc: Any, destination: Any) -> Any | None:
     tried in stable key order; the first one whose ``traverse`` access check
     passes wins (the design's "first traversable exit in stable order"
     deterministic resolution for multiple exits to one destination). Only
-    exits with the stock ``DefaultExit.at_traverse`` implementation qualify:
-    the contrib wilderness exits override ``at_traverse`` to ignore the
-    requested destination (moving by coordinates instead), so traversing one
-    could relocate the NPC to a room the schedule never named -- a
-    redirecting exit is never a valid schedule route. A locked or missing
-    exit yields ``None`` and the entry is skipped.
+    exits that honor the requested destination qualify: the stock
+    ``DefaultExit.at_traverse`` implementation and the project's
+    ``MovementCostMixin.at_traverse``, which delegates to it inside the
+    movement-settlement boundary (movement-settlement-atomicity design D5). A
+    redirecting exit — one overriding ``at_traverse`` to move somewhere else,
+    like the contrib wilderness exits, which move by coordinates instead —
+    could relocate the NPC to a room the schedule never named, so it is never
+    a valid schedule route. A locked or missing exit yields ``None`` and the
+    entry is skipped.
     """
     from evennia.objects.objects import DefaultExit
+    from typeclasses.exits import MovementCostMixin
 
     if npc.location is None:
         return None
@@ -689,7 +693,8 @@ def _first_traversable_exit(npc: Any, destination: Any) -> Any | None:
         exit_obj
         for exit_obj in npc.location.exits
         if exit_obj.destination is destination
-        and type(exit_obj).at_traverse is DefaultExit.at_traverse
+        and type(exit_obj).at_traverse
+        in (DefaultExit.at_traverse, MovementCostMixin.at_traverse)
     ]
     candidates.sort(key=lambda exit_obj: exit_obj.key or "")
     for exit_obj in candidates:

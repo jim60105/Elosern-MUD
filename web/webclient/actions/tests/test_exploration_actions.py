@@ -59,14 +59,19 @@ from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.onboarding.guide_dialogue import GUARD_DIALOGUE_KEY
 from world.onboarding.scenes import GUIDANCE_BEAT_ID, LOOK_BEAT_ID
-from world.rules.clock import CLOCK_YAML, get_world_clock
+from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.combat_session import (
     CombatSessionError,
     SessionReason,
     engage,
     is_in_active_session,
 )
-from world.rules.map_knowledge import encode_grid, encode_wild, parse_knowledge
+from world.rules.map_knowledge import (
+    KnowledgeError,
+    encode_grid,
+    encode_wild,
+    parse_knowledge,
+)
 from world.rules.time_skip import MAX_WEB_SKIP_SECONDS
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
@@ -76,6 +81,11 @@ def _raw(**overrides):
     for layer, values in overrides.items():
         raw[layer].update(values)
     return raw
+
+
+def _failing_advance(*args, **kwargs):
+    """A clock advance that always fails (patched onto ``WorldClock``)."""
+    raise RuntimeError("clock advance failed")
 
 
 def _reset_guardrail():
@@ -318,6 +328,23 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIs(self.player.location, self.destination)
         visited = {visit.node_id for visit in parse_knowledge(self.player)}
         self.assertIn(f"room:{int(self.destination.pk)}", visited)
+
+    @covers_requirement("movement-settlement-atomicity::a-failed-movement-reports-failure-truthfully-on-every-client-path")
+    def test_failed_charge_reports_move_failed_with_player_still_at_source(self):
+        before = get_world_clock().tick
+        with patch.object(WorldClock, "advance", _failing_advance):
+            result = self._move(
+                {
+                    "exit_ref": str(int(self.exit_obj.id)),
+                    "current_node": f"room:{int(self.room1.pk)}",
+                }
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "move_failed")
+        self.assertIs(self.player.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.player)
 
     def test_stale_current_node_guard_performs_no_traversal(self):
         before = get_world_clock().tick
