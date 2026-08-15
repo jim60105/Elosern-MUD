@@ -1,12 +1,12 @@
 """Frozen side-effect-free action preview shared by presentation and adapters.
 
 This module factors the resolver's pure ownership, resource, target,
-capability, effect-prefix, and time-metadata checks into a read-only preview
-query. It reports enabled state, the exact stable rejection reason and resource
-detail when disabled, and the valid targets or applicable AREA shorthands for a
-menu. Modifier evaluation reads a no-create context from stored buff and
-sexual-state data and never materializes ``entity.buffs``, ``entity.sexual``, or
-any other lazy handler.
+capability, elemental spell-tier, effect-prefix, and time-metadata checks into
+a read-only preview query. It reports enabled state, the exact stable rejection
+reason and resource detail when disabled, and the valid targets or applicable
+AREA shorthands for a menu. Modifier evaluation reads a no-create context from
+stored buff and sexual-state data and never materializes ``entity.buffs``,
+``entity.sexual``, or any other lazy handler.
 
 The preview never rolls randomness, stages or applies effects, constructs
 EventLogs, invokes event-effect planners, mutates any persistent or
@@ -34,6 +34,7 @@ from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers_no_create,
 )
+from world.rules.progression import can_cast_skill
 from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
@@ -82,7 +83,9 @@ def _skill_wide_failure(
     """Return the first skill-wide rejection ``(reason, detail)`` or ``None``.
 
     Mirrors ``ActionResolver.preflight()``'s ordering: ownership and active
-    kind, resources, capability (including ``actions_per_turn == 0``),
+    kind, out-of-combat availability, elemental spell-tier eligibility through
+    the shared cast-eligibility predicate (``progression.can_cast_skill``,
+    fail-closed), resources, capability (including ``actions_per_turn == 0``),
     registered effect prefixes, and time metadata.
     """
     skill = SKILL_REGISTRY.get(skill_key)
@@ -92,6 +95,11 @@ def _skill_wide_failure(
         return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not skill.usable_out_of_combat and context.battlefield is None:
         return RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT, skill_key
+    # Elemental spells are gated by the caster's magic tier exactly like the
+    # resolver's step-1 check; an unmet gate — or a malformed elemental spell
+    # the predicate fails closed on — rejects like an unowned-skill cast.
+    if not can_cast_skill(actor, skill):
+        return RejectReason.UNKNOWN_SKILL, skill_key
     try:
         _step1_divine_arts_gate(actor, skill)
     except RejectedAction as rejection:
