@@ -884,6 +884,71 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
+class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTest):
+    """fix-dot-kill-credit: upkeep-settled tick kills commit with the round."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="upkeep tick arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        self.monster = _monster("upkeep tick goblin", hp=100)
+        self.monster.location = self.room
+        from world.rules.buffs import _add_buff
+
+        _add_buff(self.monster, "fire_scorch", source_pk=int(self.player.pk))
+        self.monster.traits.hp.base = 3
+        self.monster.traits.hp.current = 3
+        # The 10-second rate tick fires on the first upkeep accumulation
+        # (round seconds are 6; pre-arming the tick elapsed makes the first
+        # upkeep's 6 seconds cross the interval).
+        self.monster.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_dot_tick_kill_of_final_foe_commits_victory_and_one_xp(self):
+        from world.rules.progression import COMBAT_KILL_XP_TABLE
+
+        engage(self.player, self.monster)
+        with patch("world.rules.combat.roll_d100", return_value=1):
+            result = submit_player_action(self.player, "basic_attack", [self.monster])
+        self.assertEqual(result["outcome"], "victory")
+        upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
+        self.assertTrue(upkeep_logs)
+        kinds = [entry.kind for log in upkeep_logs for entry in log.entries]
+        self.assertIn("damage", kinds)
+        self.assertEqual(kinds.count("target_defeated"), 1)
+        self.assertEqual(self.player.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        self.assertEqual(result["rounds_elapsed"], 1)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_upkeep_settlement_failure_rolls_back_the_whole_round(self):
+        from world.rules.action import _EVENT_EFFECT_PLANNERS
+
+        engage(self.player, self.monster)
+
+        def boom(request, log):
+            raise RuntimeError("injected upkeep planner failure")
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch.dict(_EVENT_EFFECT_PLANNERS, {"boom": boom}),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_action(self.player, "basic_attack", [self.monster])
+        # Tick HP, round count, and session metadata all rolled back.
+        self.assertEqual(self.monster.traits.hp.current, 3)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertIsNotNone(self.player.db.active_combat)
+        self.assertIsNone(self.player.db.magic_xp)
+        # The retry without the failing planner settles normally.
+        with patch("world.rules.combat.roll_d100", return_value=1):
+            result = submit_player_action(self.player, "basic_attack", [self.monster])
+        self.assertEqual(result["outcome"], "victory")
+        self.assertIsNone(self.player.db.active_combat)
+
+
 class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTest):
     """fix-combat-session-roster-and-overwhelm D2: player-direction compression.
 

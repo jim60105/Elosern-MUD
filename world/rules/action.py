@@ -11,8 +11,10 @@ from typeclasses.monsters import Monster
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import (
+    BUFF_DEFINITIONS,
     _add_buff,
     _handle_cleanse,
+    _is_damaging_rate,
     blocks_action,
     entity_active_buffs,
     grant_conferred_growth_rate,
@@ -373,6 +375,21 @@ def _handle_buff_apply(
             effect_id,
         ) from error
     kwargs = dict(context.get("buff_kwargs", {}))
+    definition = BUFF_DEFINITIONS.get(key)
+    rate = definition.modifiers.get("rate") if definition is not None else None
+    if _is_damaging_rate(rate):
+        # Attribution is authoritative-actor-derived and cannot be spoofed: a
+        # caller-supplied ``source_pk`` is popped and replaced by the actor's
+        # dbref, and an actor without a resolvable positive-int dbref rejects
+        # the action before commit (fix-dot-kill-credit D1).
+        kwargs.pop("source_pk", None)
+        pk = getattr(actor, "pk", None)
+        if isinstance(pk, bool) or not isinstance(pk, int) or pk <= 0:
+            raise RejectedAction(
+                RejectReason.EFFECT_RESOLUTION_FAILED,
+                f"buff {key!r} requires a caster with a positive-int dbref",
+            )
+        kwargs["source_pk"] = int(pk)
     return [
         PendingEffect(
             target,

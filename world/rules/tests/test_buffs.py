@@ -457,6 +457,46 @@ class BuffIntegrationTests(EvenniaTest):
         self.assertEqual(stored["current"], stored["base"] - 5)
         self.assertIsInstance(stored["current"], int)
 
+    @covers_requirement("buff-handler-integration::buff-tick-is-exposed-as-a-plain-callable-with-no-settlement-order-invented")
+    def test_damaging_ticks_return_ordered_records(self):
+        entity = self._entity()
+        _add_buff(entity, "poisoned")
+        _add_buff(entity, "fire_scorch")
+        before = entity.traits.hp.current
+        records = tick_buffs(entity, 10)
+        self.assertEqual(
+            [record.definition_key for record in records],
+            ["poisoned", "fire_scorch"],
+        )
+        self.assertEqual(records[0].delta, -5)
+        self.assertEqual(records[0].hp_before, float(before))
+        self.assertEqual(records[1].hp_before, float(before - 5))
+        self.assertEqual(entity.traits.hp.current, before - 10)
+
+    @covers_requirement("buff-handler-integration::buff-tick-is-exposed-as-a-plain-callable-with-no-settlement-order-invented")
+    def test_non_damaging_ticks_return_no_records(self):
+        entity = self._entity()
+        _add_buff(entity, "paralysis")
+        _add_buff(entity, "fear")
+        grant_conferred_growth_rate(entity, "elosia", 0.5)
+        records = tick_buffs(entity, 10)
+        self.assertEqual(records, ())
+
+    @covers_requirement("buff-handler-integration::damaging-rate-buffs-persist-a-validated-effect-source-identity-in-the-buff-cache")
+    def test_damaging_tick_record_carries_cached_source_pk(self):
+        entity = self._entity()
+        _add_buff(entity, "poisoned", source_pk=42)
+        (record,) = tick_buffs(entity)
+        self.assertEqual(record.source_pk, 42)
+
+    @covers_requirement("buff-handler-integration::buff-tick-is-exposed-as-a-plain-callable-with-no-settlement-order-invented")
+    def test_ignoring_tick_records_keeps_hp_behavior_unchanged(self):
+        entity = self._entity()
+        _add_buff(entity, "poisoned")
+        before = entity.traits.hp.current
+        tick_buffs(entity)
+        self.assertEqual(entity.traits.hp.current, before - 5)
+
     @covers_requirement("buff-handler-integration::a-declared-unbuilt-seam-exists-for-buff-forbidden-actions")
     def test_buff_paralysis(self):
         entity = self._entity()

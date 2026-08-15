@@ -16,13 +16,14 @@ from world.rules.action import (
     _stored_trait_value,
     register_effect_handler,
 )
-from world.rules.buffs import tick_buffs
+from world.rules.buffs import TickRecord, tick_buffs
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import can_cast_skill
 from world.rules.sexual_state import decay_tick
 from world.rules.targeting import Relation
+from world.rules.upkeep import settle_upkeep
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -566,20 +567,41 @@ def _action_skipped_event_log(entity: Any) -> EventLog:
     return EventLog(key, "", (), (entry,), 0)
 
 
-def _end_of_round_upkeep(battlefield: Battlefield) -> None:
+def _end_of_round_upkeep(
+    battlefield: Battlefield,
+) -> dict[str, tuple[TickRecord, ...]]:
+    """Run per-round upkeep and return the damaging tick records per entity.
+
+    ``tick_buffs`` always returns a tuple; a patched non-tuple return (a
+    test seam or an out-of-combat caller) is treated as no ticks so existing
+    ``world.rules.combat.tick_buffs`` patches stay green.
+    """
     seconds = int(COMBAT_YAML["round"]["seconds"])
+    records_by_key: dict[str, tuple[TickRecord, ...]] = {}
     for key, entity in battlefield.roster.items():
         if key in battlefield.fled or _stored_hp(entity) <= 0:
             continue
-        tick_buffs(entity, seconds)
+        records = tick_buffs(entity, seconds)
+        records_by_key[key] = records if isinstance(records, tuple) else ()
         decay_tick(entity, seconds)
+    return records_by_key
 
 
 def run_round(
     battlefield: Battlefield,
     action_provider: ActionProvider,
+    *,
+    simulated: bool = False,
+    nonlethal_keys: frozenset[str] = frozenset(),
 ) -> list[EventLog]:
-    """Resolve one action per capable combatant, then perform upkeep."""
+    """Resolve one action per capable combatant, then perform upkeep.
+
+    The round's upkeep settlement (fix-dot-kill-credit D3) turns the damaging
+    tick records into defeat crossings, kill XP, and quest effects inside the
+    same round; the keyword-only policy flags mirror the session's
+    ``simulated`` (guild examination) and companion ``nonlethal_keys``
+    policies, and default to the plain combat behavior.
+    """
     logs: list[EventLog] = []
     for key in roll_initiative(battlefield):
         entity = battlefield.roster[key]
@@ -599,7 +621,15 @@ def run_round(
         result = ActionResolver.resolve(request)
         if result.outcome == "success" and result.event_log is not None:
             logs.append(result.event_log)
-    _end_of_round_upkeep(battlefield)
+    records_by_key = _end_of_round_upkeep(battlefield)
+    logs.extend(
+        settle_upkeep(
+            battlefield,
+            records_by_key,
+            simulated=simulated,
+            nonlethal_keys=nonlethal_keys,
+        )
+    )
     return logs
 
 

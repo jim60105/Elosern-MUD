@@ -210,6 +210,122 @@ class LandedEffectHandlerTests(EvenniaTest):
         )
 
 
+class DamagingBuffSourceIdentityTests(EvenniaTest):
+    """fix-dot-kill-credit: damaging rate buffs carry authoritative source identity."""
+
+    def setUp(self):
+        super().setUp()
+        self.caster = create_object(PlayerCharacter, key="source-caster")
+        self.caster.race = "human"
+        self.caster.apply_race_baseline()
+        self.target = create_object(PlayerCharacter, key="source-target")
+        self.target.race = "human"
+        self.target.apply_race_baseline()
+
+    def _stage_and_commit(self, effects):
+        effects = [
+            replace(effect, surfaces=frozenset({"buffs"}))
+            for effect in effects
+        ]
+        _commit(effects)
+        return effects
+
+    @covers_requirement("buff-handler-integration::damaging-rate-buffs-persist-a-validated-effect-source-identity-in-the-buff-cache")
+    def test_damaging_buff_apply_stores_the_caster_dbref(self):
+        self._stage_and_commit(
+            _handle_buff_apply(
+                self.caster,
+                [self.target],
+                "buff_apply:fire_scorch",
+                {},
+            )
+        )
+        buff = self.target.buffs.all["fire_scorch"]
+        self.assertEqual(buff.source_pk, int(self.caster.pk))
+
+    def test_caller_supplied_source_pk_cannot_override_attribution(self):
+        self._stage_and_commit(
+            _handle_buff_apply(
+                self.caster,
+                [self.target],
+                "buff_apply:fire_scorch",
+                {"buff_kwargs": {"source_pk": int(self.target.pk)}},
+            )
+        )
+        buff = self.target.buffs.all["fire_scorch"]
+        self.assertEqual(buff.source_pk, int(self.caster.pk))
+
+    def test_actor_without_positive_int_pk_rejects_before_commit(self):
+        class Actor:
+            key = "no-dbref"
+
+        with self.assertRaises(Exception) as caught:
+            _handle_buff_apply(
+                Actor(),
+                [self.target],
+                "buff_apply:fire_scorch",
+                {},
+            )
+        self.assertEqual(
+            caught.exception.reason,
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+        )
+        self.assertNotIn("fire_scorch", self.target.buffs.all)
+
+    def test_direct_add_buff_omits_source_pk_for_unattributed_ticks(self):
+        _add_buff(self.target, "poisoned")
+        buff = self.target.buffs.all["poisoned"]
+        self.assertIsNone(getattr(buff, "source_pk", None))
+
+    def test_reapplication_replaces_source_with_the_new_caster(self):
+        self._stage_and_commit(
+            _handle_buff_apply(
+                self.caster,
+                [self.target],
+                "buff_apply:fire_scorch",
+                {},
+            )
+        )
+        other = create_object(PlayerCharacter, key="other-caster")
+        other.race = "human"
+        other.apply_race_baseline()
+        self._stage_and_commit(
+            _handle_buff_apply(
+                other,
+                [self.target],
+                "buff_apply:fire_scorch",
+                {},
+            )
+        )
+        buff = self.target.buffs.all["fire_scorch"]
+        self.assertEqual(buff.source_pk, int(other.pk))
+
+    def test_refresh_without_source_keeps_prior_attribution(self):
+        self._stage_and_commit(
+            _handle_buff_apply(
+                self.caster,
+                [self.target],
+                "buff_apply:fire_scorch",
+                {},
+            )
+        )
+        _add_buff(self.target, "fire_scorch")
+        buff = self.target.buffs.all["fire_scorch"]
+        self.assertEqual(buff.source_pk, int(self.caster.pk))
+
+    def test_non_damaging_buff_apply_stores_no_source_pk(self):
+        self._stage_and_commit(
+            _handle_buff_apply(
+                self.caster,
+                [self.target],
+                "buff_apply:paralysis",
+                {},
+            )
+        )
+        buff = self.target.buffs.all["paralysis"]
+        self.assertIsNone(getattr(buff, "source_pk", None))
+
+
 class CleanseHandlerTests(EvenniaTest):
     def setUp(self):
         super().setUp()
