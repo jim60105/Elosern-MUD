@@ -10,6 +10,7 @@ from evennia.objects.objects import DefaultCharacter
 from evennia.typeclasses.attributes import AttributeProperty
 from evennia.utils import lazy_property
 
+from world.lore.sex import DEFAULT_SEX
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
 from world.rules.affinity import RelationHandler
@@ -24,6 +25,7 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
 
     race: str | None = AttributeProperty(default=None)
     subrace: str | None = AttributeProperty(default=None)
+    sex: str = AttributeProperty(default=DEFAULT_SEX)
 
     @lazy_property
     def traits(self) -> TraitHandler:
