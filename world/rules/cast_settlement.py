@@ -38,13 +38,17 @@ from world.rules.surfaces import attribute_snapshot
 # The action- and clock-touched attribute surfaces of one actor or target: the
 # ``_ADVANCE_ENTITY_SURFACES`` declaration minus the sexual-decay accumulators,
 # which only ``advance()`` ever writes on its own caller entities (the actor)
-# and which the registry's actor entry already covers through the seam.
+# and which the registry's actor entry already covers through the seam. The
+# climax-settlement bookkeeping attributes are included: an action may stage
+# or consume them on any target, so the outer rollback must restore them.
 _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("traits", "traits"),
     ("disguised_stats", None),
     ("sexual_traits", "traits"),
     ("virgin", "sexual_state"),
     ("experience_types", "sexual_state"),
+    ("climax_turns", "sexual_state"),
+    ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
     ("magic_xp", None),

@@ -17,9 +17,11 @@ from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
 from world.rules.sexual_state import (
     DECAY_CONFIG,
     PLEASURE_CONFIG,
+    climax_settlement_action,
     decay_tick,
     reset_daily_counters,
 )
+from world.rules.sexual_transitions import apply_event
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import GAUGE_KEYS
 
@@ -200,6 +202,8 @@ def _has_settlement_work(entity: Any) -> bool:
     sexual = getattr(entity, "sexual", None)
     if sexual is None:
         return False
+    if sexual.climax_phase.level == "進行中":
+        return True
     for field, config in DECAY_CONFIG.items():
         if config.get("only_from") is not None and getattr(
             sexual, field
@@ -225,10 +229,20 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
         for entity in entities:
             tick_buffs(entity, SETTLEMENT_QUANTUM_SECONDS)
             decay_tick(entity, SETTLEMENT_QUANTUM_SECONDS)
+            action = climax_settlement_action(entity)
+            if action == "extend":
+                apply_event(entity, "climax_extended")
+            elif action == "end":
+                apply_event(entity, "climax_ends")
     if remainder and any(_has_settlement_work(entity) for entity in entities):
         for entity in entities:
             tick_buffs(entity, remainder)
             decay_tick(entity, remainder)
+            action = climax_settlement_action(entity)
+            if action == "extend":
+                apply_event(entity, "climax_extended")
+            elif action == "end":
+                apply_event(entity, "climax_ends")
 
 
 def _try_accrue_magic_study(entities: tuple[Any, ...], seconds: int, source: AdvanceSource) -> None:
@@ -289,6 +303,8 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("sexual_traits", "traits"),
     ("virgin", "sexual_state"),
     ("experience_types", "sexual_state"),
+    ("climax_turns", "sexual_state"),
+    ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
     ("magic_xp", None),

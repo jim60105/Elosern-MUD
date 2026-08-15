@@ -1034,6 +1034,12 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
             "experience_types",
             "sexual_state",
         ),
+        "climax_turns": _attribute_snapshot(entity, "climax_turns", "sexual_state"),
+        "pending_climax_extension": _attribute_snapshot(
+            entity,
+            "pending_climax_extension",
+            "sexual_state",
+        ),
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
         "magic_xp": _attribute_snapshot(entity, "magic_xp"),
@@ -1068,6 +1074,18 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
         entity,
         "experience_types",
         snapshot["experience_types"],
+        "sexual_state",
+    )
+    _restore_attribute(
+        entity,
+        "climax_turns",
+        snapshot["climax_turns"],
+        "sexual_state",
+    )
+    _restore_attribute(
+        entity,
+        "pending_climax_extension",
+        snapshot["pending_climax_extension"],
         "sexual_state",
     )
     _restore_attribute(entity, "buffs", snapshot["buffs"])

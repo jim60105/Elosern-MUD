@@ -124,7 +124,10 @@ floor `sp_cost_on_climax` already respects. No rule triggered by `climax_extende
 The entity's lifetime climax counter (`高潮次數`) SHALL increment by exactly one each time
 `climax_settlement_action()` returns `"end"`. The entity's lifetime climax-extension counter
 (`連續高潮次數`) SHALL increment by exactly one each time it returns `"extend"`. Neither counter
-SHALL be incremented by any other call.
+SHALL be incremented by any other call. The decision binding and the event names coincide in
+production — the settlement decision is the sole emitter of `climax_ends`/`climax_extended` — so
+the title's "per `climax_ends`/`climax_extended`" and the body's "each time
+`climax_settlement_action()` returns" describe the same contract.
 
 #### Scenario: An unstaged resolution increments only the climax counter
 - **WHEN** `climax_settlement_action(entity)` returns `"end"`

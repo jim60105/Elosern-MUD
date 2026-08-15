@@ -21,7 +21,8 @@ from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import can_cast_skill, scaled_magnitude
-from world.rules.sexual_state import decay_tick
+from world.rules.sexual_state import climax_settlement_action, decay_tick
+from world.rules.sexual_transitions import apply_event
 from world.rules.targeting import Relation
 from world.rules.upkeep import settle_upkeep
 from world.skills.registry import SKILL_REGISTRY, SkillKind
@@ -593,6 +594,11 @@ def _end_of_round_upkeep(
         records = tick_buffs(entity, seconds)
         records_by_key[key] = records if isinstance(records, tuple) else ()
         decay_tick(entity, seconds)
+        action = climax_settlement_action(entity)
+        if action == "extend":
+            apply_event(entity, "climax_extended")
+        elif action == "end":
+            apply_event(entity, "climax_ends")
     return records_by_key
 
 
