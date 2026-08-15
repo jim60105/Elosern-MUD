@@ -537,6 +537,9 @@ class GroupSkillKeysTests(unittest.TestCase):
             for category in views
         ]
 
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
     def test_category_order_follows_skillcategory_declaration_order(self):
         views = group_skill_keys(["fire_ball", "basic_attack", "flight"])
         self.assertEqual(
@@ -544,6 +547,9 @@ class GroupSkillKeysTests(unittest.TestCase):
             ["elemental_magic", "martial_arts", "movement"],
         )
 
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
     def test_elemental_sub_groups_follow_element_registry_order(self):
         views = group_skill_keys(["ice_shard", "water_bolt", "fire_ball"])
         self.assertEqual(
@@ -566,6 +572,9 @@ class GroupSkillKeysTests(unittest.TestCase):
             "an entity owning no sexual-act skill must see no sexual_act category",
         )
 
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
     def test_ungrouped_category_emits_exactly_one_null_keyed_sub_group(self):
         views = group_skill_keys(["basic_attack", "shadow_slash"])
         self.assertEqual([view.category for view in views], ["martial_arts"])
@@ -594,6 +603,9 @@ class GroupSkillKeysTests(unittest.TestCase):
             ["精通", "神之秘法"],
         )
 
+    @covers_requirement(
+        "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
+    )
     def test_unknown_key_lands_in_a_synthetic_bucket_after_every_real_category(self):
         views = group_skill_keys(["fire_ball", "no_such_skill", "also_missing"])
         self.assertEqual(
