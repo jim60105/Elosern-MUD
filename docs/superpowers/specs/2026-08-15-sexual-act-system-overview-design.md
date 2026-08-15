@@ -123,7 +123,9 @@ already atomic.
 
 ## 4. Implementation Sequence
 
-Twenty-two proposals, each sized for one working day. The organising principle is **disjoint file
+Twenty-two proposals, plus one follow-up (`sexual-resist-out-of-combat`, discovered and deferred
+during `B6b`'s own design — see §4.2's table), each sized for one working day. The organising
+principle is **disjoint file
 ownership**: no two proposals in the same batch touch the same file. That is the only real lever on
 rebase cost.
 
@@ -155,9 +157,10 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | B2 | `sexual-counters` | Eleven counter traits plus one sole mutator each | B1 | `sexual_state.py` |
 | B3 | `climax-settlement` | Emit `climax_ends` from both existing decay call sites, `climax_extended`, extension threshold, the `penetrative_sex_with_male` rule row (D-12 symmetry), **fixes the `進行中` dead end** | B1, B2 | `sexual_state.py`, `sexual.yaml`, `combat.py`, `clock.py` |
 | B4 | `sexual-act-registry` | `SexualActDef`, `_act_family()`, `unlocked_act_keys()` incl. mastery blanket unlock, `owned_keys()` integration, **six empty line-module stubs** | A1, B2 | `world/skills/sexual_acts/`, `handler.py` |
-| B5 | `sexual-act-effects` | `pleasure:` / `sexual_counter:` prefixes and handlers, bidirectional participant application, part resolution | C1, B1, B4 | `effects.py`, `action.py`, `world/rules/sexual_acts.py` |
+| B5 | `sexual-act-effects` | `pleasure:` / `sexual_counter:` prefixes and handlers, bidirectional participant application, part resolution; **emits the `EventEntry(kind="sexual_resist", ...)` contract `B6b`'s scan consumes, per source design §3.4 — fixed in the shared source design so this obligation applies regardless of `B5`/`B6b` batch order** | C1, B1, B4 | `effects.py`, `action.py`, `world/rules/sexual_acts.py` |
 | B6a | `sexual-resist-contest` | Contest as a pure function, affinity modifier table, `auto_comply`, the first-five-climax-turns short circuit | B3, B4 | `world/rules/sexual_resist.py`, `sexual_resist.yaml` |
-| B6b | `sexual-resist-turn-cost` | Both-turn consumption, wasted actor turn on refusal, affinity penalty on a forced act | B5, B6a | `combat_session.py`, `affinity.py` |
+| B6b | `sexual-resist-turn-cost` | The in-combat affinity consequence of a resisted or forced act: a new `AffinitySource`, a `_scan_sexual_coercion` post-round scan mirroring `_scan_friendly_fire`, and the documented `EventEntry` contract `sexual-act-effects` must emit for it to react to. **File ownership widened during `B6b`'s own design** (see that proposal's design.md Decision 4) to include the penalty's rulebook field | B5, B6a | `combat_session.py`, `affinity.py`, `affinity_config.py`, `rulebook/affinity.yaml` |
+| — | `sexual-resist-out-of-combat` | The symmetric affinity consequence at the out-of-combat cast path, deferred out of `B6b`'s scope (see that proposal's design.md Decision 5) because neither `cast_settlement.py` nor `commands/action.py` was in any proposal's ownership and auditing them was not achievable within `B6b`'s one-day sizing | B6b | `cast_settlement.py` or `commands/action.py` (exact call site TBD by that proposal) |
 | B8 | `sexual-act-seeds` | Seven seeds plus one representative upper-tier act per line (~14) | B5, B6b | the six line modules |
 | C2 | `sexual-catalog-solo` | 獨處線, 17 acts | B8 | `sexual_acts/solo.py` |
 | C3 | `sexual-catalog-shame` | 羞恥線, 10 acts | B8 | `sexual_acts/shame.py` |
@@ -179,9 +182,11 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | 5 | `B6b` ∥ `B8` | |
 | 6 | `C2` ∥ `C3` ∥ `C4` ∥ `C5` ∥ `C6` ∥ `C7a` ∥ `docs` | Seven fully parallel tracks, zero conflict — pure data rows in disjoint modules. |
 | 7 | `C7b` | Runs alone; it re-enters `sexual_state.py`. |
+| 8 (unscheduled) | `sexual-resist-out-of-combat` | Not part of the original sequence; ready to schedule once `B6b` lands and its `_scan_sexual_coercion` pattern exists to mirror at the out-of-combat cast path. |
 
-Seven batches. With the parallel tracks actually staffed, the critical path is **seven working
-days**; implemented serially it is twenty-one.
+Seven batches for the original twenty-two proposals. With the parallel tracks actually staffed, the
+critical path is **seven working days**; implemented serially it is twenty-one. The deferred
+follow-up adds at most one more day once scheduled.
 
 ### 4.4 Serialization constraints
 

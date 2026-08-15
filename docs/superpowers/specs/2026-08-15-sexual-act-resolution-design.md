@@ -213,6 +213,35 @@ most of the time: `stimulus_applied`, `sustained_stimulus_applied`, `direct_stim
 Twenty of the twenty-five shipped rules currently have no emitter. This system is largely their
 first consumer, not a new rule surface.
 
+### 3.4 Resist outcome contract (for `B6b`)
+
+For every participant the resist contest at §4 applies to, the effect handler must emit exactly one
+`EventEntry` recording the outcome, so `sexual-resist-turn-cost` (`B6b`) can react to it without a
+direct call into this module:
+
+```python
+EventEntry(
+    kind="sexual_resist",
+    actor=<caster's entity key>,
+    target=<participant's entity key>,
+    data={"resisted": bool, "auto_comply": bool, "roll": int | None},
+    text_template=<a narrative line appropriate to the outcome>,
+)
+```
+
+emitted once per resistible participant regardless of outcome — so a downstream scan can distinguish
+"no entry because this participant was never resistible" (for example, the actor, or a participant an
+act does not resist against) from "an entry recording compliance." The three `data` field names and
+types match `resist_verdict()`'s own `ResistVerdict` fields (§4.1) exactly, so this module and
+`world/rules/sexual_resist.py` share one vocabulary with nothing to translate between them.
+
+This contract exists so `B6b`'s post-round affinity scan (§5) has a durable, replayable record to
+react to without importing this module's effect-handler code directly — the same reason
+`_scan_friendly_fire` reacts to `damage`-kind `EventEntry` records rather than being called directly
+by the damage handler. Whichever of `B5`/`B6a`/`B6b` lands last in the approved batch sequence, this
+contract is fixed here, in the shared source design, rather than in only one sibling proposal's own
+design.md — `B5`'s own implementer must honor it regardless of batch order relative to `B6b`.
+
 ---
 
 ## 4. The Resist Contest (proposal `B6a`)
@@ -272,6 +301,10 @@ Rationale and consequences are in the
 ---
 
 ## 5. Turn Cost and Affinity Consequence (proposal `B6b`)
+
+The effect handler documented in §3.4 emits one `EventEntry(kind="sexual_resist", ...)` per
+resistible participant; this section's post-round scan reacts to that record rather than calling
+`resist_verdict()` (§4.1) directly.
 
 | Outcome | Actor's turn | Target's turn | Affinity |
 |---|---|---|---|
