@@ -14,6 +14,7 @@
 | `display_name` | 非空白顯示名稱。此版本要求它存在；目前載入器仍以 `key` 建立 Evennia 物件。 |
 | `age`、`apparent_age` | 皆為整數且至少 `18`。 |
 | `race`、`subrace` | 必須分別存在於種族與亞種登錄表，亞種須屬於指定種族。 |
+| `sex` | 必須是 `female`、`male` 或 `other` 其中之一。 |
 | `stats` | 基礎數值。數值不得預先乘上技能倍率。 |
 | `disguised_stats` | 可為空物件；其中每個鍵都必須同時出現在 `stats`。 |
 | `skills`、`passives` | 技能鍵陣列，鍵值必須存在於技能登錄表。 |
@@ -32,6 +33,7 @@
   "age": 24,
   "apparent_age": 24,
   "race": "human",
+  "sex": "female",
   "stats": {"hp": 100, "mp": 30, "sp": 80, "atk_phys": 8},
   "disguised_stats": {},
   "skills": ["basic_attack"],

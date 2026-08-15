@@ -7,6 +7,7 @@ from world.art.subjects import (
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
     MAX_SUBJECT_KEY_LENGTH,
 )
+from world.lore.sex import SEX_VALUES
 from world.lore.sexual_vocab import (
     AROUSAL_LEVELS,
     CLIMAX_PHASE_LEVELS,
@@ -59,6 +60,7 @@ CHARACTER_SCHEMA_V1 = {
         "apparent_age",
         "race",
         "subrace",
+        "sex",
         "stats",
         "disguised_stats",
         "skills",
@@ -97,6 +99,7 @@ CHARACTER_SCHEMA_V1 = {
         },
         "race": {"type": "string", "minLength": 1},
         "subrace": {"type": "string", "minLength": 1},
+        "sex": {"enum": list(SEX_VALUES)},
         "stats": {
             "type": "object",
             "description": (

@@ -39,6 +39,21 @@ class LoaderTraitTests(EvenniaTest):
         self.assertEqual(entity.db.inventory, record["inventory"])
         self.assertEqual(entity.db.disguised_stats, record["disguised_stats"])
 
+    @covers_requirement("import-loader::the-loader-assigns-sex-from-the-validated-record-mirroring-race-and-subrace")
+    def test_loaded_sex_is_assigned_verbatim(self):
+        record = example_record()
+        record["sex"] = "male"
+        entity = instantiate_character(record)
+        self.assertEqual(entity.sex, "male")
+
+    @covers_requirement("import-loader::the-loader-assigns-sex-from-the-validated-record-mirroring-race-and-subrace")
+    def test_loader_assigns_sex_directly_never_through_the_db_seam(self):
+        from world.imports import loader
+
+        source = loader.__loader__.get_source(loader.__name__)
+        self.assertIn('entity.sex = record["sex"]', source)
+        self.assertNotIn("entity.db.sex =", source)
+
     def test_explicit_nonzero_guild_merit_is_stored_literally(self):
         record = example_record()
         record["stats"]["guild_merit"] = 37

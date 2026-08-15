@@ -39,6 +39,25 @@ class LivingEntityTests(EvenniaTest):
                 self.assertEqual(entity.traits.all(), [])
                 self.assertIsNone(entity.db.disguised_stats)
 
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_sex_defaults_to_other_on_a_fresh_entity(self):
+        for typeclass in (LivingEntity, PlayerCharacter, NPC, Monster):
+            with self.subTest(typeclass=typeclass.__name__):
+                entity = create_object(typeclass, key=typeclass.__name__)
+                self.assertEqual(entity.sex, "other")
+
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_monster_reads_the_default_with_no_specific_override(self):
+        monster = create_object(Monster, key="generic monster")
+        self.assertEqual(monster.sex, "other")
+        self.assertNotIn("sex", Monster.__dict__)
+
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_sex_declared_type_is_str_not_optional(self):
+        from typing import get_type_hints
+
+        self.assertIs(get_type_hints(LivingEntity)["sex"], str)
+
     @covers_requirement("persona-store::livingentity-persona-mounts-the-personastore-handler")
     @covers_requirement("living-entity-hierarchy::livingentity-non-trait-handlers-are-working-implementations-including-persona")
     def test_persona_mount_is_a_readonly_handler_over_the_db_record(self):

@@ -76,6 +76,31 @@ class SchemaTests(TestCase):
             lambda r: r["sexual_baseline"].update(sensitivity={"skin": "invalid"})
         )
 
+    @covers_requirement("import-schema::character-schema-v1-requires-an-explicit-sex-value-constrained-to-the-canonical-vocabulary")
+    def test_sex_is_required_and_constrained_to_the_vocabulary(self):
+        for value in ("female", "male", "other"):
+            with self.subTest(value=value):
+                record = example_record()
+                record["sex"] = value
+                self.assertFalse(
+                    list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+                )
+
+    @covers_requirement("import-schema::character-schema-v1-requires-an-explicit-sex-value-constrained-to-the-canonical-vocabulary")
+    def test_sex_omission_fails_on_the_required_property_check(self):
+        record = example_record()
+        del record["sex"]
+        errors = list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        self.assertTrue(any("required" in error.message for error in errors))
+        self.assertTrue(any("sex" in error.message for error in errors))
+
+    @covers_requirement("import-schema::character-schema-v1-requires-an-explicit-sex-value-constrained-to-the-canonical-vocabulary")
+    def test_out_of_vocabulary_sex_fails_on_the_enum_constraint(self):
+        record = example_record()
+        record["sex"] = "nonbinary"
+        errors = list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        self.assertTrue(any(error.validator == "enum" for error in errors))
+
     def test_discriminators_are_const_constrained(self):
         self.assertEqual(
             CHARACTER_SCHEMA_V1["properties"]["record_type"]["const"], "character"
