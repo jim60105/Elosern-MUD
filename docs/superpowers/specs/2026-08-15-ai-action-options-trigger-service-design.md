@@ -16,8 +16,11 @@ The generated content itself is specified in
 
 ## 1. Scheduling Contract
 
-`schedule_action_options(puppet, *, client=None) -> defer.Deferred | None` — the mirror of
-`schedule_scene_flavor` in `server/scene_flavor_service.py`:
+`schedule_action_options(actor, *, watchers: tuple[Watcher, ...], client=None) -> defer.Deferred | None`
+— the mirror of `schedule_scene_flavor` in `server/scene_flavor_service.py`, where
+`Watcher = (session, captured_epoch)` and `captured_epoch` is `coordinator.epoch` at trigger time
+(round-three review R3-2: the service never guesses live sessions — every hook passes them
+explicitly; the epoch guard makes pushes to retired sequences inert, §5):
 
 - Never raises: fingerprint derivation, context assembly, client construction, and Deferred
   acquisition are wrapped; any synchronous failure logs a bounded diagnostic and resolves to
@@ -49,7 +52,25 @@ a live negative memo. A `ready` state whose fingerprint matches the current situ
 schedules — the render already assembles from `options_state`, and the cache needs no refresh.
 
 Hook code is three tiny deterministic call sites — no module under `world/ai/` touches them. Each
-hook resolves the puppet's live session(s) once and passes them to the service.
+hook supplies **explicit watchers** (round-three review R3-2):
+
+- Room entry: `PlayerCharacter.at_object_location_change` (puppeted player only). The hook mounts
+  with a function-local deferred import of the service (the `commands/scene.py` precedent; if the
+  typeclasses → server import turns cyclic, the call site moves to the command-settlement channel
+  — pinned during change 6). It resolves watchers through
+  `web/webclient/presentation/watchers.py::watchers_for(actor)`: an ephemeral registry the OOB
+  ingress maintains — it registers each live webclient session on `ui_sync`/command settlement and
+  prunes disconnected sessions at every registration. `captured_epoch` comes from
+  `attach_coordinator(session, registry)` at trigger time. Stale watcher entries are harmless: the
+  epoch guard silently drops their pushes (§5).
+- Dialogue reply: **after the completion publication** of `explore.talk_scripted` /
+  `explore.talk_freeform` (`web/webclient/actions/dispatcher.py` `_publish_completion` success
+  path) — passes exactly the dispatcher-held `(session, coordinator.epoch)`; no session resolution
+  happens at the hook site (round-three review R3-2). Ordering guarantee: the reply text and
+  action result are already on the wire before the trigger fires (review R3); never on rejection
+  paths.
+- Reconnect / initial: `ui_sync` happy path, after the full snapshot publishes — the requesting
+  session itself is the sole watcher.
 
 ---
 
@@ -76,10 +97,16 @@ not — NPC schedule gates flipping, an exit locking, a monster dying, an object
 changes the digest and therefore the fingerprint, so a cached proposal can never point at an action
 that stopped being current (the exact-match promise holds by construction). Identical eligibility
 (e.g. walking back and forth through the same room) replays as before: one call, cached answer.
+The digest serialization is one shared canonical JSON function (keys sorted, deterministic type
+coercion) used by the fingerprint, the validation stage-9 comparison, and the test fixtures, so
+builder- and validator-side representations cannot drift (round-three review suggestion).
 `public_state_digest` covers the remaining **discrete, public** state that changes what one should
-*do*: the current quest-objective id and the set of public relationship **tiers** (好感層級 labels)
-toward present NPCs. Deliberately excluded: narrative tail, look commands, time of day, and **all
-raw affinity numbers** — an affinity increase within one tier must not churn the cache.
+*do*: the **currently displayed quest-objective identity** (the objective id/label the objective
+panel already renders to this player — round-three review R3-2: hidden stages, internal counters,
+and uncompleted thresholds are excluded; partial progress toward an objective never changes the
+fingerprint) and the set of public relationship **tiers** (好感層級 labels) toward present NPCs.
+Deliberately excluded: narrative tail, look commands, time of day, and **all raw affinity
+numbers** — an affinity increase within one tier must not churn the cache.
 
 Anti-oracle rule (review R4): the cache must never be used as an affinity oracle. Because
 `public_state_digest` turns over only on tier boundaries, an observer watching cache misses learns
@@ -91,12 +118,13 @@ to the prompt. Asserted by the fingerprint tests (§6).
 - Cache: key = fingerprint; value = the ready `OptionSet` (schema doc §1.1 — transport states never
   cached). Cap: `MAX_OPTIONSET_CACHE_ENTRIES` (16). Single-player memory cache; a reload empties it
   and the next trigger regenerates (degraded rule list shows meanwhile).
-- Pending registry (review R4): `pending[fingerprint] → list[PendingSubscriber]` where
-  `PendingSubscriber = (session, generation_token)` — one entry **per watching session**, because
-  the presentation state is per-session while the service is global (review R15). A trigger whose
-  fingerprint is pending **attaches a new subscriber** to the in-flight Deferred; the eventual
-  result is delivered to each subscriber independently, guarded by its own token — **one LLM call
-  per fingerprint per service lifetime is true even while the first call is in flight.**
+- Pending registry (review R4, extended round three): `pending[fingerprint] → list[PendingSubscriber]`
+  where `PendingSubscriber = (session, generation_token, captured_epoch)` — one entry **per
+  watching session**, because the presentation state is per-session while the service is global
+  (review R15). A trigger whose fingerprint is pending **attaches a new subscriber** to the
+  in-flight Deferred; the eventual result is delivered to each subscriber independently, guarded by
+  its own token and epoch — **one LLM call per fingerprint per service lifetime is true even while
+  the first call is in flight.**
 - Replay rule (user-confirmed): **one LLM call per fingerprint, period.** Any later trigger for a
   cached fingerprint re-publishes the cached `OptionSet` without touching the LLM (each watching
   session gets its own publish, guarded by its own token).
@@ -116,9 +144,17 @@ options_state {
 ```
 
 Every `context_actions` render — full snapshots, `ui_update` from any action, `ui_sync` — reads
-`options_state` through the presenter (webclient doc §1.3), so an async `ready` result can no
-longer be clobbered by the next snapshot, and dismiss state survives re-renders. State updates are
-atomic-by-assignment and never leak outside the session.
+`options_state` **through an immutable snapshot on `PresentationContext`** (round-three review
+R3-2: presenters never receive the raw session, so they cannot read `session.ndb` directly;
+`PresentationContext` gains a frozen field `options_state: OptionsSnapshot | None = None`, built by
+the coordinator/ingress from `session.ndb.options_state` at context-construction time —
+dispatcher publication paths, `ui_sync`, and the service's own push each build it; a `None` default
+keeps every existing presenter and test unchanged). `OptionsSnapshot` is an immutable copy of
+`{fingerprint, status, generation_token, displayed}` — so an async `ready` result can no longer be
+clobbered by the next snapshot, and dismiss state survives re-renders. State updates are
+atomic-by-assignment and never leak outside the session. On transport or puppet retire the
+`session.ndb` state disappears with the transport; the epoch guard makes any later push for that
+session a silent drop, so no explicit unregister is required (bounded structures only).
 
 ### 3.4 Generation flow
 
@@ -132,14 +168,17 @@ atomic-by-assignment and never leak outside the session.
    replaced in place by `ready` moments later; review R14).
 3. If `pending[fingerprint]` exists → append a subscriber; else register a new pending list with
    one subscriber and start the generation (one LLM call).
-4. Completion (the token captured at subscription is per-session):
+4. Completion (the token and epoch captured at subscription are per-session; **a subscriber whose
+   session's `coordinator.epoch` no longer matches its `captured_epoch` is dropped silently —
+   retired transport/puppet, round-three review R3-2**):
    - Success → validate-and-inject (pipeline doc §4); cache; for each subscriber whose
-     `generation_token` is still its session's current token: update `displayed`, publish `ready`;
-   - `None` (layer degrade) → publish `degraded` (rule cards) under the same per-session token
-     guard;
+     `generation_token` is still its session's current token **and whose epoch still matches**:
+     update `displayed`, publish `ready`;
+   - `None` (layer degrade) → publish `degraded` (rule cards) under the same per-session token and
+     epoch guards;
    - Transport failure → record negative memo (30 s TTL); publish `degraded` per subscriber.
-5. A completion whose subscriber token is stale (a newer trigger took over, or the session was
-   dismissed) publishes nothing to that subscriber.
+5. A completion whose subscriber token or epoch is stale (a newer trigger took over, the session
+   was dismissed, or the transport was retired) publishes nothing to that subscriber.
 
 ### 3.5 Negative memo
 
@@ -153,10 +192,13 @@ until eviction or LRU pressure.
 ## 4. Eviction (dismiss)
 
 `evict(session, actor)` — called by the `options.dismiss` adapter (webclient doc §5). Session
-targeting (review R15) is resolved **by the dispatcher, not by guessing Evennia account APIs**:
-`ActionSpec.adapter` gains an optional third parameter `session`, injected by
-`handle_ui_action` (no codebase precedent for `actor.sessions` exists; the dispatcher already holds
-the session object, so this is the one source of truth). Existing adapters ignore the argument;
+targeting (review R15) is resolved **by the dispatcher, not by guessing Evennia account APIs**: the
+dispatcher already holds the session object and injects it into adapters through the **unified
+adapter ABI** — `adapter(actor, payload, session=None)` for *every* registered adapter (round-three
+review R3-2: no runtime signature introspection; the change that introduces `options.dismiss`
+(overview slicing change 8) updates all production adapters and the `ActionSpec` type to the
+three-parameter ABI in the same unit, and `_invoke_adapter` passes the session positionally —
+existing direct two-argument adapter tests keep working through the default);
 
 per-session eviction, in order:
 
@@ -179,12 +221,18 @@ makes the outcome deterministic per session.
 
 ## 5. Coordinator Push Seam
 
-A new public helper `publish_panel_update(session, actor, panels)` in
+A new public helper `publish_panel_update(session, actor, panels, *, context, expected_epoch)` in
 `web/webclient/presentation/coordinator.py` reuses the existing epoch/revision discipline and
-`_publish_presentation` semantics from `web/webclient/actions/dispatcher.py`. It accepts the
-already-validated session/actor pair and is called by the service with the token guard in place;
-when the sequence is retired (transport or puppet change) it publishes nothing — the helper cannot
-be used to bypass the coordinator's retirement guard.
+`_publish_presentation` semantics from `web/webclient/actions/dispatcher.py`:
+
+- `context` is built by the service with the session's current `OptionsSnapshot` (trigger-service
+  doc §3.3) — the presenter reads it through `PresentationContext`, never the raw session
+  (round-three review R3-2).
+- `expected_epoch` is the subscriber's `captured_epoch`; the helper compares it with the live
+  `attach_coordinator(...).epoch` and **silently publishes nothing on mismatch** (retired
+  transport or puppet change) — the same guard `_settle_internal_error` already uses, so the helper
+  cannot bypass the coordinator's retirement guard.
+- Called by the service with the per-session token guard in place; it never writes game state.
 
 ---
 
@@ -192,15 +240,17 @@ be used to bypass the coordinator's retirement guard.
 
 | Area | Method |
 |---|---|
-| Fingerprint | Same room+people+eligibility+digest → same; member change → new; **schedule gate flip / exit lock / monster death → new (eligibility digest)**; raw-affinity change within a tier → **same**; tier boundary → new |
+| Fingerprint | Same room+people+eligibility+digest → same; member change → new; **schedule gate flip / exit lock / monster death → new (eligibility digest)**; raw-affinity change within a tier → **same**; tier boundary → new; **partial objective progress (hidden counter) → same; displayed objective identity change → new** |
 | Anti-oracle | Cache-miss pattern cannot expose sub-tier affinity movement (asserted over tier-step fixtures) |
 | Replay | 3 triggers, 1 LLM call; 3 rapid triggers while pending → 1 call, all subscribers receive the result |
 | Pending | In-flight trigger attaches a new subscriber; completion updates every subscriber whose token is current |
 | Token | Stale completion publishes nothing; dismiss during flight → that session's completion inert, other sessions unaffected |
+| Epoch | Subscriber whose session's coordinator epoch moved (retire/puppet change) receives nothing; `publish_panel_update` mismatch → silent no-op (round-three review) |
+| Watchers | `watchers_for(actor)` registration/pruning; room-entry hook resolves the same sessions the ingress serves; dialogue hook passes the dispatcher-held session without re-resolution (round-three review) |
 | Multi-session | Two sessions on one puppet: dismiss in A leaves B's state, token, and future publications intact |
 | LRU | Cap eviction order; pending entry never evicted by a plugin trigger |
 | Negative memo | Timeout → recycled `degraded` within TTL; fresh attempt after TTL (injected clock) |
-| State | `ui_sync` re-render preserves ready cards and dismiss state; every render reads `options_state` |
+| State | `ui_sync` re-render preserves ready cards and dismiss state; every render reads `options_state` through the `PresentationContext` snapshot |
 | Stale predicate | Empty state / fingerprint change / cache-miss+non-ready → schedules; ready+same fingerprint → never |
 | Synchronous guard | Malformed context / vanished room → logged no-op, no exception to caller |
 | Offline | Disabled profile → stub never called; every trigger `degraded` |

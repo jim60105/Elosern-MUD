@@ -27,22 +27,28 @@ OptionSet {
 
 SuggestionCard {
   kind: "known_action" | "freeform"
+  action_code: str              # real dispatcher action id ("explore.move", "explore.talk_freeform", ...)
   label: str                    # player-facing Traditional Chinese, 1..24 chars, must contain CJK
-  params: Mapping[str, str | int]  # see §1.2 “one wire shape” — always the dispatcher payload
+  params: Mapping[str, str | int]  # see §1.2 “one wire shape” — the dispatcher payload
   hint: str | None              # optional, ≤ 60 chars, CJK optional (may include ASCII names)
 }
 ```
 
-Revision two (rubber-duck R2/rubber-duck R9): the card carries **one wire shape** — `params` is
-always exactly what the dispatcher needs, with no hidden side structure:
+Revision two (rubber-duck R2/R9) plus round-three (R3-1): the card carries **one wire shape** —
+`params` is always exactly what the dispatcher needs, with no hidden side structure, and
+`action_code` is the real registry action id so the client has everything to dispatch:
 
-- `known_action`: `params` is the canonical payload of one current affordance (schema doc §3.1),
-  produced by the affordance's own registered validator (deterministic-actions doc §1.1). A card
-  is executable by construction: a `malformed_payload` rejection on a validated card is a bug.
-- `freeform`: `params` is exactly `{"npc_id": int}` — the bound target resolved from the model's
-  `{npc_index}` during enrichment. The client dispatches `explore.talk_freeform` with
-  `payload = {"npc_id": params.npc_id, "speech": label}`: `speech` is *always the label text*, by
-  contract. There is no separate `target` field.
+- `known_action`: `action_code` is the registry action id; `params` is the canonical payload of one
+  current affordance (schema doc §3.1), produced by the affordance's own registered validator
+  (deterministic-actions doc §1.1). A card is executable by construction: a `malformed_payload`
+  rejection on a validated card is a bug.
+- `freeform`: `action_code` is exactly `"explore.talk_freeform"` (injected at enrichment, §5) and
+  `params` is exactly `{"npc_id": int}` — the bound target resolved from the model's `{npc_index}`
+  during enrichment. **This is the single exception to the validator-normalized rule
+  (round-three review R3-1):** `validate_talk_freeform_payload` requires a non-empty `speech`, so
+  no validator can produce `{"npc_id"}`; the card's params are *binding-only*, and the full
+  validator runs only on the client-composed dispatch payload `{"npc_id": params.npc_id,
+  "speech": label}` (webclient doc §3). There is no separate `target` field.
 
 Frozen semantics (mirrors `QuestBlueprint` in `world/ai/scenario_director.py`): construction rejects
 mutable containers everywhere (`_reject_mutable_containers`), so a proposal is safe to hand across
@@ -57,10 +63,17 @@ transport state in the cached `OptionSet` would let a stale cache entry poison a
 
 ### 1.2 Card-count contract by status
 
-`ready` cards: 3–5 (layer-enforced at generation: a set failing the minimum degrades). `degraded`
-cards: 0–5 (deterministic-actions doc §3 — a room with truly nothing actionable yields 0). The
-validation ladder accepts 0–5 in both mirrors; the 3–5 minimum is a *generation* rule, not a
-validation rule (rubber-duck R14).
+Three distinct layers, so an implementer can never read two different bounds (round-three review
+R3-1):
+
+| Layer | Bound | Why |
+|---|---|---|
+| Raw generation ladder (stage 4) | accepts 0–5 | a sub-minimum or empty set degrades instead of failing |
+| Generation rule (AI `ready`) | 3–5; a set below the minimum degrades | the curated-variety product decision |
+| Emitted v3 payload | `ready` 3–5; `degraded` 1–5 in v1 | the idle baseline (deterministic-actions doc §2) is always eligible while a puppeted player is inside a location, so a v1 degraded set is never empty; the mirror still accepts 0–5 so a future room without a baseline cannot crash it |
+
+The 3–5 minimum is a *generation* rule, not a validation rule (rubber-duck R14); the mirrors
+accept `ready` 3–5 and `degraded` 0–5 (webclient doc §1.1).
 
 ---
 
@@ -97,11 +110,11 @@ degrade. Ladder order is fixed:
 | 2 | Fingerprint | Opaque string 8..64 chars, no whitespace | `schema_violation` |
 | 3 | Kind | `context_kind == "exploration"` (v1 closed enum) | `schema_violation` |
 | 4 | Card count | 0 ≤ N ≤ 5 (the 3–5 minimum is a generation rule, §1.2) | `card_count_out_of_range` |
-| 5 | Card kind | `known_action` / `freeform`, exact keys (`kind`, `label`, `params`, optional `hint`) | `schema_violation` |
+| 5 | Card kind | `known_action` / `freeform`, exact keys (`kind`, `action_code`, `label`, `params`, optional `hint`) | `schema_violation` |
 | 6 | Label | Non-empty, ≤ 24 chars, **contains at least one CJK codepoint** | `empty_label` / `label_too_long` / `non_cjk_label` |
 | 7 | Placeholder gate | No `{...}` template placeholder pattern in any label/hint | `placeholder_label` |
 | 8 | Digit gate | No ASCII digit in any label (aligns with the narrator's mechanical no-digit gate) | `digit_in_label` |
-| 9 | Canonical match | `known_action`: `(action_code, params)` must **exactly match one entry of `affordances`**; the canonical payload replaces whatever the model typed; `freeform`: `params == {"npc_id": <int>}` and that `npc_id` equals a freeform affordance's bound target | `unknown_action_code` / `no_such_affordance` / `unknown_target` |
+| 9 | Canonical match | `known_action`: `(action_code, params)` must **exactly match one entry of `affordances`** (`action_code == affordance.action_id` and the params compare equal); the canonical payload replaces whatever the model typed; `freeform`: `action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` where that `npc_id` equals a freeform affordance's bound target | `unknown_action_code` / `no_such_affordance` / `unknown_target` |
 | 10 | Hint gate | Hint ≤ 60 chars; placeholder gate (stage 7) applies; numeric gate (§4) applies to labels and hints only — never to `params` | `hint_too_long` / `placeholder_label` / `leak_detected` |
 | 11 | Normalization | Sort nothing; keep LLM order (it is the curatorial intent) | — |
 
@@ -118,19 +131,22 @@ one currently executable affordance**, so the player can never see a card the ru
 right now (rubber-duck R2). The LLM prompt carries the same list (pipeline doc §3); the model
 selects and curates, the ladder verifies.
 
-The wire-shape guarantee (rubber-duck R13): each affordance entry's `params` is produced *by the
-action's own registered validator* (`validate_move_payload` etc.), so a card shipped to the client
-is byte-for-byte the payload the dispatcher accepts — no mediation layer, no shape drift between
-"affordance shape" and "adapter shape".
+The wire-shape guarantee (rubber-duck R13, refined round three): each `known_action` affordance
+entry's `params` is produced *by the action's own registered validator* (`validate_move_payload`
+etc.), so a card shipped to the client is byte-for-byte the payload the dispatcher accepts — no
+mediation layer, no shape drift between "affordance shape" and "adapter shape". The **single
+exception is the `freeform` card**, whose `{npc_id}` binding shape is not producible by any
+validator (talk_freeform requires `speech`); its dispatcher payload is completed client-side by
+appending `speech: label` (§1, webclient doc §3) before the full validator runs.
 
 ---
 
 ## 4. Leak Gates
 
-The anti-leak predicate applies to **model-visible text only**: `label` and `hint`. `params` and
-`target` are never leak-checked against numeric blocklists — after stage 9 they are canonical
-payload copies from trusted builders, and a numeric blocklist would only misfire on legitimate
-opaque IDs (rubber-duck R5).
+The anti-leak predicate applies to **model-visible text only**: `label` and `hint`. `params` is
+never leak-checked against numeric blocklists — after stage 9 it is a canonical payload copy from
+trusted builders (or the freeform binding exception), and a numeric blocklist would only misfire
+on legitimate opaque IDs (rubber-duck R5).
 
 | Category | Token source | Effect |
 |---|---|---|
@@ -148,8 +164,12 @@ and hidden trait keys of the deterministic view); the validator applies it to la
 
 - The generative layer requests `response_format` inline JSON schema (schema_id `action_options`,
   registered in `world/ai/schemas/registry.py`), matching the card dicts **without** `fingerprint`
-  and `status` (caller-side); freeform cards emit `{"npc_index": <int>}` which enrichment resolves
-  to `params: {"npc_id": int}` against the prompt's bound NPC list before validation.
+  and `status` (caller-side). `known_action` cards emit `{"action_code", "label", "params"?,
+  "hint"?}` — `params` is optional because stage 9 discards model-typed values and replaces them
+  with the canonical copy; unknown `action_code` values reject at stage 9. `freeform` cards emit
+  `{"npc_index": <int>, "label", "hint"?}` — enrichment resolves `npc_index` to
+  `{"action_code": "explore.talk_freeform", "params": {"npc_id": int}}` against the prompt's bound
+  NPC list before validation (stage 0).
 - `supports_response_format: true` is enforced at profile construction time.
 - Parsing uses the exact-field parser pattern of `web/webclient/presentation/protocol.py`: unknown
   keys on a card are rejected.
@@ -161,10 +181,10 @@ and hidden trait keys of the deterministic view); the validator applies it to la
 | Area | Method |
 |---|---|
 | Ladder | One `unittest` per rejection stage with minimal hostile fixtures |
-| Stage 9 | A valid-for-now card passes; a globally-allowed but not-current affordance fails; model-typed params are replaced by the canonical copy |
-| Bounds | Each cap at boundary and one-past-boundary |
+| Stage 9 | A valid-for-now card passes; a globally-allowed but not-current affordance fails; model-typed params are replaced by the canonical copy; `action_code` mismatch rejects |
+| Bounds | Each cap at boundary and one-past-boundary; per-status counts: ladder 0–5, ready 3–5 generated, degraded ≥ 1 by the baseline (v1) |
 | Leak gates | True-trait number, affinity number, disguised value, fabricated token in labels/hints; params exempt by construction |
-| Freeform binding | `{npc_index}` resolution, single/multiple LLM NPC fixtures, unknown index rejection |
+| Freeform binding | `{npc_index}` resolution, single/multiple LLM NPC fixtures, unknown index rejection; `action_code` injection to `explore.talk_freeform`; the binding-only params exception is asserted (no `{"npc_id"}` is ever fed to `validate_talk_freeform_payload` unchanged) |
 | JSON contract | Parsed sample payloads; unknown-key rejection; absent caller-side fields handled at enrichment |
 | Parity later | Client mirror (webclient doc §5) guarded by the dual-direction parity test |
 

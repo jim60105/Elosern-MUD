@@ -77,9 +77,11 @@ What is missing is a proactive suggestions surface:
 | `world/ai/action_options.py` (new) | Frozen schema, validation ladder, context builder, generation, degrade | none (proposals only) |
 | `prompts/action_options.yaml` (new) + `world/prompts/registry.py` | Prompt + placeholder allowlist | none |
 | `world/ai/profiles.py` | New `action_options` layer slot (`LAYER_NAMES`) + startup validation | none |
-| `server/option_proposal_service.py` (new) | Fingerprint, pending registry, LRU + negative memo, session options state, fire-and-forget scheduling, push seam | ephemeral cache + presentation state only |
+| `server/option_proposal_service.py` (new) | Fingerprint, pending registry (+tokens/epochs), LRU + negative memo, session options state, fire-and-forget scheduling, epoch-guarded push | ephemeral cache + presentation state only |
+| `web/webclient/presentation/watchers.py` (new) | Ingress-maintained puppet → live-session watcher registry (`watchers_for`) for the room-entry hook | ephemeral registry only |
 | `web/webclient/presentation/affordances.py` (new) | Canonical affordance builders, `default_cards()`, vocabulary source | presentation only |
-| `web/webclient/presentation/` | `context_actions` v3 validator + presenter reading `options_state`; `publish_panel_update` helper | presentation only |
+| `web/webclient/presentation/` | `context_actions` v3 validator + presenter reading `context.options_state`; `publish_panel_update` helper (epoch guard) | presentation only |
+| `web/webclient/actions/node_ids.py` (new) | Shared `node_id_for_location` encoder (adapter + affordance builders) | none (pure) |
 | `web/webclient/actions/options.py` (new) | `options.dismiss` adapter; freeform bridge (reuses `explore.talk_freeform`) | none beyond normal action flow |
 | `web/static/webclient/js/` | `protocol.js` v3 mirror + allowlist; dock section; narrative choice-points; card renderer | presentation only |
 
@@ -87,22 +89,24 @@ What is missing is a proactive suggestions surface:
 
 ## 4. OpenSpec Slicing — Daily Changes
 
-Redesigned after the rubber-duck review into **nine 1-workday changes**, each landing
-independently (specs, code, tests, `spec_traceability`, archive) and each small enough to finish
-in one day. The dependency graph fixes the review's R7 findings: the shared canonical affordance
-contract is a root change (everything vocabulary-shaped depends on it), and the v3 panel seam lands
-before the trigger service publishes through it.
+Redesigned after the rubber-duck review into **ten 1-workday changes**, each landing independently
+(specs, code, tests, `spec_traceability`, archive) and each small enough to finish in one day. The
+dependency graph fixes the review's R7 findings: the shared canonical affordance contract is a root
+change (everything vocabulary-shaped depends on it), the v3 panel seam (change 7) lands **before**
+the trigger service (change 5) so the push path is end-to-end verifiable against the v3 contract
+(round-three review: no parallel integration risk on the coordinator/presentation seam), and the
+unified adapter ABI lands with the dismiss action (change 8).
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
 | 1 | `action-options-affordance-contract` | — | Extract `presentation/affordances.py` from exploration builders (panel v1 byte-stable), exploration-kind context_actions producer, `default_cards()`, vocabulary union, read-only + subset tests |
-| 2 | `action-options-schema` | 1 | Frozen `OptionSet`/`SuggestionCard` (typed canonical params, freeform `target` binding), enrichment, ladder stages 0–11, leak gates on labels/hints, JSON contract, pure tests |
+| 2 | `action-options-schema` | 1 | Frozen `OptionSet`/`SuggestionCard` (typed canonical params + `action_code`, freeform binding-only params exception), enrichment, ladder stages 0–11, leak gates on labels/hints, JSON contract, pure tests |
 | 3 | `action-options-prompts` | 1 | `action_options.yaml` + registry allowlist, `LAYER_NAMES` slot, `LLM_PROFILES` setting, startup validation tests |
-| 4 | `action-options-layer` | 2, 3 | `world/ai/action_options.py`: context builder, prompt, `{npc_index}` binding resolution, retry/degrade, enrichment; FakeLLM suite |
-| 5 | `action-options-trigger-service` | 4 | Fingerprint (public state digest), pending registry + tokens, LRU + negative memo, `session.ndb.options_state`, `publish_panel_update` helper, `evict()` |
-| 6 | `action-options-trigger-hooks` | 5 | Three hook call sites (location change; talk completion publication; `ui_sync`) + integration tests |
-| 7 | `context-actions-v3` | 1 | Server v3 validator (combat fields preserved, available + unavailable forms), `PANEL_ALLOWLIST` → 3, `protocol.js` mirror, presenter reading `options_state`, parity test |
-| 8 | `dismiss-options-action` | 5, 7 | `options.dismiss` action + adapter + `evict()` wiring + `unavailable` publish + tests |
+| 4 | `action-options-layer` | 2, 3 | `world/ai/action_options.py`: context builder, prompt, `{npc_index}` binding resolution (injects `action_code` for freeform), retry/degrade, enrichment; FakeLLM suite |
+| 5 | `action-options-trigger-service` | 4, 7 | Watcher registry seam (`watchers_for` + ingress registration), fingerprint (public-state + eligibility digests), pending registry + tokens + captured epochs, LRU + negative memo, `session.ndb.options_state` + `PresentationContext` snapshot, `publish_panel_update` with epoch guard, `evict()` |
+| 6 | `action-options-trigger-hooks` | 5 | Three hook call sites (location change; talk completion publication with dispatcher-held session; `ui_sync`) + integration tests |
+| 7 | `context-actions-v3` | 1 | Server v3 validator (combat fields preserved, available + unavailable forms), `PANEL_ALLOWLIST` → 3, `protocol.js` mirror, presenter reading `context.options_state` snapshot, parity test |
+| 8 | `dismiss-options-action` | 5, 7 | `options.dismiss` action + adapter + `evict()` wiring + `unavailable` publish + tests; **unified three-parameter adapter ABI (`adapter(actor, payload, session=None)`) applied to every registered adapter and `ActionSpec` in the same change** (round-three review: no introspection) |
 | 9 | `webclient-options-surface` | 5, 7, 8 | Dock section (four status renders) + card component + execution paths + dismiss control; Node/browser tests |
 | 10 | `webclient-options-choicepoints` | 7, 9 | Narrative stream movable end-block: generating line, ready replacement, text-after-update ordering; Node/browser tests |
 
@@ -110,14 +114,14 @@ before the trigger service publishes through it.
 
 ```
         ┌── 2 ──┐
- 1 ────│        ├── 4 ── 5 ── 6
-        └── 3 ──┘          │
-                            └── 8 ── 9 ── 10
- 1 ──── 7 ── (9)
+ 1 ─────│        ├── 4 ── 5 ──┬── 6
+        └── 3 ──┘     │       └── 8 ── 9 ── 10
+ 1 ───── 7 ───────────┘
 ```
 
-(9 depends on the panel from 7, the eviction path from 5, and the dismiss action from 8; 10
-depends on 7 and 9 for the shared card component.)
+(5 depends on 7 so the trigger service publishes through the v3 seam it verifies end-to-end; 8 is
+bundled with the unified adapter ABI; 9 depends on the panel from 7, the eviction path from 5, and
+the dismiss action from 8; 10 depends on 7 and 9 for the shared card component.)
 
 ### 4.2 Parallel implementation batches
 
@@ -129,13 +133,14 @@ database or the retained Evennia test server — see isolation note below):
 | B1 | 1 | 1 (alone) | The affordance contract is the shared root everyone else builds against |
 | B2 | 2 | 2 + 3 | Pure schema (world/ai) vs prompts/profile (world/prompts + settings) — disjoint packages |
 | B3 | 3 | 4 (alone) | The generative layer is the deepest single unit |
-| B4 | 4 | 5 + 7 | Trigger service (server/) vs v3 protocol (presentation + protocol.js) |
-| B5 | 5 | 6 + 8 | Hook call sites (world/actions) vs dismiss action (web/actions) — both depend on 5 but touch disjoint files |
-| B6 | 6 | 9 (alone) | Dock surface; choice-points depend on it |
-| B7 | 7 | 10 (alone) | Narrative choice-points on top of the dock surface |
+| B4 | 4 | 7 (alone) | The v3 protocol seam lands before the trigger service so push is verifiable (round-three review) |
+| B5 | 5 | 5 (alone) | Trigger service builds on the v3 seam; single owner of the coordinator/presentation integration |
+| B6 | 6 | 6 + 8 | Hook call sites (world/actions + typeclasses) vs dismiss action (web/actions, incl. the unified ABI) — both depend on 5, disjoint files |
+| B7 | 7 | 9 (alone) | Dock surface; choice-points depend on it |
+| B8 | 8 | 10 (alone) | Narrative choice-points on top of the dock surface |
 
-Two-agent parallelism on days 2, 4, 5; single-agent days 1, 3, 6, 7. Total ≈ 7 working days of
-wall clock with two agents, 9 serial days with one.
+Two-agent parallelism on days 2 and 6; single-agent days 1, 3, 4, 5, 7, 8. Total ≈ 8 working days
+of wall clock with two agents, 10 serial days with one.
 
 **Isolation note (rubber-duck R8):** parallel agents must each run Evennia tests in their own `git
 worktree` (separate `server/db/evennia-test.sqlite3`) or serialize Evennia/browser test execution;

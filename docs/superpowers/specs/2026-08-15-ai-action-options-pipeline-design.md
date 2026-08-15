@@ -91,9 +91,11 @@ rejects anything outside the list — a deterministic gate, not LLM discretion (
    stub client never opens a socket).
 2. Build prompt; call `client.get_response(descriptor)` with `schema_id="action_options"` and the
    inline JSON schema (schema doc §5).
-3. Enrichment: inject the caller-supplied `fingerprint` and `status: "ready"`, and resolve freeform
-   `{npc_index}` into `params: {"npc_id": int}` against the prompt's bound NPC list before
-   validation (schema doc stage 0; unknown index or duplicate target → card rejection).
+3. Enrichment: inject the caller-supplied `fingerprint` and `status: "ready"`; for `freeform` cards
+   resolve `{npc_index}` into `action_code: "explore.talk_freeform"` and
+   `params: {"npc_id": int}` against the prompt's bound NPC list (schema doc stage 0; unknown index
+   or duplicate target → card rejection). `known_action` cards pass through with their
+   `action_code` intact and any model-typed `params` replaced at stage 9.
 4. On success: `validate_optionset(...)` (schema doc §3). On any rejection, append the rejection
    message to the prompt and retry up to `max_retries` (profile); exhaustion → `None` (bounded log).
 5. On `LLMTransportError` / timeout: resolve `None` immediately — retries for transport failures are
