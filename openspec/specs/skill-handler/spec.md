@@ -180,3 +180,44 @@ persistent attributes or import mutators from `world.rules/`.
 - **WHEN** production modules under `world/skills/` are inspected
 - **THEN** they contain no persistent entity-state assignment and do not import
   `world.rules` mutators
+
+### Requirement: owned_keys() includes every unlocked sexual act, and base_owned_keys() exposes the pre-extension set
+`SkillHandler` SHALL expose `base_owned_keys()`, returning exactly the entity's imported active and
+passive keys plus `INNATE_SKILL_ORDER` — the same list `owned_keys()` returned before this
+requirement. `owned_keys()` SHALL return `base_owned_keys()` extended with every key in
+`entity.sexual.unlocked_act_keys()` (when the entity has a `sexual` attribute), sorted, appended
+after the base list. `world/skills/handler.py` SHALL read the entity's sexual state through a
+duck-typed `getattr(entity, "sexual", None)` and SHALL import nothing from `world.rules`, preserving
+`universal-action-ownership`'s existing "world/skills/ does not depend on world/rules/" requirement.
+
+#### Scenario: base_owned_keys() matches owned_keys()'s pre-extension behaviour exactly
+- **WHEN** `base_owned_keys()` is called on any entity
+- **THEN** it returns the entity's imported active and passive keys followed by `INNATE_SKILL_ORDER`,
+  with no unlocked act key present
+
+#### Scenario: owned_keys() includes unlocked sexual acts
+- **WHEN** `owned_keys()` is called on an entity whose `entity.sexual.unlocked_act_keys()` returns a
+  non-empty set
+- **THEN** every key in that set is present in the returned list, in addition to every key
+  `base_owned_keys()` would return
+
+#### Scenario: owned_keys() equals base_owned_keys() when no act is unlocked
+- **WHEN** `owned_keys()` is called on an entity whose `entity.sexual.unlocked_act_keys()` returns an
+  empty set
+- **THEN** the returned list equals `base_owned_keys()`'s return value exactly
+
+#### Scenario: An entity with no sexual attribute still resolves owned_keys()
+- **WHEN** `owned_keys()` is called on an entity with no `sexual` attribute at all
+- **THEN** it returns `base_owned_keys()`'s value without raising
+
+#### Scenario: An unmaterialized entity's owned_keys() stays side-effect-free
+- **WHEN** `owned_keys()` is called on an entity whose sexual handler was never mounted, while the
+  catalogue contains a seed act (an act with an empty `unlock` mapping)
+- **THEN** the seed act's key is present in the returned list, the act's key is absent when it has a
+  nonzero counter threshold instead, and the sexual handler is still not materialized afterwards
+  (no `sexual_traits` attribute created) — preview and no-create status reads stay side-effect-free
+
+#### Scenario: world/skills/handler.py imports nothing from world.rules
+- **WHEN** `world/skills/handler.py`'s import statements are inspected
+- **THEN** none of them reference any `world.rules.*` module, and the sexual-state read is a
+  duck-typed attribute access, not an import

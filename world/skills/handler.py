@@ -36,13 +36,65 @@ class SkillHandler:
         raw = self.entity.db.skills
         return raw or {"active": [], "passive": []}
 
-    def owned_keys(self) -> list[str]:
-        """Return active and passive owned skill keys in stored order."""
+    def base_owned_keys(self) -> list[str]:
+        """Return active and passive owned skill keys in stored order.
+
+        Exactly what ``owned_keys()`` returned before sexual acts existed;
+        the sexual-state mastery check reads this pre-extension set so it
+        can never recurse back into ``owned_keys()``.
+        """
         return [
             *self._raw.get("active", []),
             *self._raw.get("passive", []),
             *INNATE_SKILL_ORDER,
         ]
+
+    def owned_keys(self) -> list[str]:
+        """Return base owned keys plus the entity's unlocked sexual acts.
+
+        Unlocked act keys are appended sorted for deterministic iteration.
+        The sexual state is read through a duck-typed attribute so this
+        module keeps importing nothing from outside ``world.skills`` — and
+        only when the handler is already materialized, so preview and
+        no-create status reads stay free of side effects. An unmaterialized
+        entity's counters are all at their zero baseline, so its unlocked
+        set is computed from the catalogue registry alone (seed acts, or the
+        whole catalogue for a directly owned mastery skill).
+        """
+        base = self.base_owned_keys()
+        if not self._sexual_state_materialized():
+            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
+        sexual = getattr(self.entity, "sexual", None)
+        if sexual is None:
+            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
+        return [*base, *sorted(sexual.unlocked_act_keys())]
+
+    def _sexual_state_materialized(self) -> bool:
+        """Return whether the entity's sexual handler was already mounted.
+
+        The handler's trait storage is created on first mount, so its
+        presence is the canonical materialization marker — the same
+        attribute the no-create read paths check.
+        """
+        attributes = getattr(self.entity, "attributes", None)
+        if attributes is None:
+            return False
+        return (
+            attributes.get("sexual_traits", default=None, category="traits")
+            is not None
+        )
+
+    def _unlocked_act_keys_without_sexual(self) -> tuple[str, ...]:
+        """Return the unlocked act keys of an unmaterialized entity.
+
+        Pure registry data only: an unmaterialized sexual state means every
+        lifetime counter is at zero, which ``unlocked_act_keys_for`` reads
+        as the seed acts (or the whole catalogue for a directly owned
+        mastery skill) without creating any persistent state.
+        """
+        from world.skills.sexual_acts import unlocked_act_keys_for
+
+        return tuple(sorted(unlocked_act_keys_for(self.base_owned_keys(), {})))
 
     def effective_value(self, trait_key: str) -> int:
         """Return a derived multiplied value without mutating stored traits."""

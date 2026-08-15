@@ -1,0 +1,125 @@
+# sexual-act-registry Specification
+
+## Purpose
+
+Define the `SexualActDef` sidecar metadata that lets an ordinary `SkillDef` be a counter-gated sex
+act, the six-module catalogue package with pre-declared empty stubs, and the structural invariants
+that keep the paired registries honest. The catalogue content itself (the 62 acts and the divine
+line) ships in later proposals; this capability only makes that content possible.
+
+## Requirements
+
+### Requirement: SexualActDef carries exactly the metadata a sex act needs beyond SkillDef
+`world/skills/sexual_acts/_builder.py` SHALL define `SexualActDef` as a frozen dataclass with exactly
+these fields: `key`, `unlock` (a mapping of `SexualState` counter attribute names to integer
+thresholds, all of which SHALL be met for the act to unlock), `base_pleasure` (a positive integer),
+`actor_part` and `target_part` (each `None` or a member of `world.lore.sexual_vocab.BODY_PARTS`),
+`actor_pleasure_ratio` (a float), `actor_counters` and `participant_counters` (each a tuple of
+`SexualState` counter attribute names), `sexual_events` (a tuple of event-name strings in emission
+order), and `resistible` (a bool). `SexualActDef` SHALL declare no `line` field; an act's line is read
+from the paired `SkillDef.group`.
+
+#### Scenario: A seed act declares an empty unlock mapping
+- **WHEN** a `SexualActDef` is constructed with `unlock={}`
+- **THEN** construction succeeds and the act is always available regardless of any counter's value
+
+#### Scenario: SexualActDef declares no line field
+- **WHEN** `SexualActDef`'s field set is inspected
+- **THEN** it contains no field named `line`, and an act's line is obtained by reading
+  `SKILL_REGISTRY[act.key].group` instead
+
+### Requirement: Every SexualActDef is paired with an ordinary SkillDef under the same key, categorised SEXUAL_ACT
+`_act_family()` SHALL construct, for each row it is given, one `SkillDef` (with `category=
+SkillCategory.SEXUAL_ACT`, `group` set to the family's line, `kind=SkillKind.ACTIVE`, `cost={}`, and
+`usable_out_of_combat=True`) and one `SexualActDef` sharing that `SkillDef`'s `key`, and SHALL
+register both under the same key in `SKILL_REGISTRY` and `SEXUAL_ACT_REGISTRY` respectively.
+
+#### Scenario: A family row produces a matching SkillDef and SexualActDef
+- **WHEN** `_act_family()` is called with one row naming key `"test_act"`
+- **THEN** `SKILL_REGISTRY["test_act"]` exists with `category is SkillCategory.SEXUAL_ACT` and
+  `SEXUAL_ACT_REGISTRY["test_act"]` exists, and both share the key `"test_act"`
+
+#### Scenario: A sex act costs no resource
+- **WHEN** any `SkillDef` built by `_act_family()` is inspected
+- **THEN** its `cost` is an empty mapping and `usable_out_of_combat` is `True`
+
+### Requirement: The six line modules ship pre-declared and pre-imported, each exporting an empty tuple
+`world/skills/sexual_acts/` SHALL contain `solo.py`, `shame.py`, `partner.py`, `combat.py`,
+`interspecies.py`, and `divine.py`, each exporting one module-level tuple constant
+(`SOLO_ACTS`, `SHAME_ACTS`, `PARTNER_ACTS`, `COMBAT_ACTS`, `INTERSPECIES_ACTS`, `DIVINE_ACTS`
+respectively) equal to `()` in this change. `world/skills/sexual_acts/__init__.py` SHALL import all
+six and merge their contents into `SEXUAL_ACT_REGISTRY` and `SKILL_REGISTRY`.
+
+#### Scenario: Every line module is importable and empty
+- **WHEN** each of the six line modules is imported
+- **THEN** its declared tuple constant exists and equals `()`
+
+#### Scenario: A later proposal fills exactly one module with no other file touched
+- **WHEN** a hypothetical catalog proposal changes `solo.py`'s `SOLO_ACTS` tuple to a non-empty tuple
+  of rows and changes no other file
+- **THEN** `SEXUAL_ACT_REGISTRY` and `SKILL_REGISTRY` both reflect the new acts after re-import, with
+  no edit required to `__init__.py`, `_builder.py`, or any other line module
+
+### Requirement: Every act applying pleasure to another participant applies non-zero pleasure to its own actor, unless it requires divine arts
+`_act_family()` SHALL raise `ValueError`, naming the offending key, for any row whose
+`actor_pleasure_ratio` is not strictly greater than zero, unless the family's `requires_divine_arts`
+keyword argument is `True`.
+
+#### Scenario: A zero actor-pleasure-ratio row is rejected for a non-divine family
+- **WHEN** `_act_family()` is called with `requires_divine_arts=False` and a row declaring
+  `actor_pleasure_ratio=0.0`
+- **THEN** it raises `ValueError` naming that row's key
+
+#### Scenario: A zero actor-pleasure-ratio row is accepted for a divine family
+- **WHEN** `_act_family()` is called with `requires_divine_arts=True` and a row declaring
+  `actor_pleasure_ratio=0.0`
+- **THEN** construction succeeds
+
+### Requirement: No act declares the generic body-part channel; only 異種 and 神之秘法 acts may omit a target part
+`_act_family()` SHALL raise `ValueError` for any row whose `actor_part` or `target_part` equals
+`world.lore.sexual_vocab.GENERIC_BODY_PART`. `_act_family()` SHALL raise `ValueError` for any row
+declaring a non-`None` `target_part` when the family's line is `"異種"` or `"神之秘法"`. Every
+non-`None` part on any row SHALL be a member of `world.lore.sexual_vocab.BODY_PARTS`.
+
+#### Scenario: Declaring the generic body part is rejected
+- **WHEN** `_act_family()` is called with a row whose `actor_part` equals `GENERIC_BODY_PART`
+- **THEN** it raises `ValueError` naming that row's key
+
+#### Scenario: An 異種 act declaring a target part is rejected
+- **WHEN** `_act_family()` is called with line `"異種"` and a row whose `target_part` is not `None`
+- **THEN** it raises `ValueError` naming that row's key
+
+#### Scenario: A part outside BODY_PARTS is rejected
+- **WHEN** `_act_family()` is called with a row whose `actor_part` is a string not present in
+  `BODY_PARTS`
+- **THEN** it raises `ValueError` naming that row's key and the invalid part
+
+### Requirement: Every counter and event an act names actually exists, checked across the whole assembled registry
+A structural test SHALL assert that every string appearing in any act's `unlock` keys,
+`actor_counters`, or `participant_counters` is one of `SexualState`'s eleven documented lifetime
+counter attribute names, and that every string in any act's `sexual_events` is a value some rule in
+`world/rules/rulebook/sexual.yaml` carries as `when["event"]`.
+
+#### Scenario: An unrecognized counter name fails the structural test
+- **WHEN** a hypothetical act declares `unlock={"自慰次數": 10}` (the Chinese label, not the
+  attribute name `masturbation_count`)
+- **THEN** the structural test fails, naming the act's key and the unrecognized string
+
+#### Scenario: An unrecognized event name fails the structural test
+- **WHEN** a hypothetical act declares `sexual_events=("a_fake_event",)`
+- **THEN** the structural test fails, naming the act's key and the unrecognized event
+
+### Requirement: SEXUAL_ACT_REGISTRY's keys and SKILL_REGISTRY's SEXUAL_ACT-categorised keys agree exactly, modulo the three named mastery/mystery exclusions
+A structural test SHALL assert that `set(SEXUAL_ACT_REGISTRY)` equals the set of `SKILL_REGISTRY` keys
+whose `category` is `SkillCategory.SEXUAL_ACT`, with `{"divine_sexual_arts", "divine_sexual_mastery",
+"reincarnation_boon_yuna"}` excluded from that comparison on both sides.
+
+#### Scenario: The two registries agree with zero acts registered
+- **WHEN** the structural test runs against this change alone (no catalog content yet)
+- **THEN** it passes, because both sides of the comparison are empty after the three named exclusions
+
+#### Scenario: A SkillDef categorised SEXUAL_ACT with no paired SexualActDef fails the structural test
+- **WHEN** a hypothetical skill is added to `SKILL_REGISTRY` directly (not through `_act_family()`)
+  with `category=SkillCategory.SEXUAL_ACT` and a key not in `SEXUAL_ACT_REGISTRY` and not one of the
+  three named exclusions
+- **THEN** the structural test fails, naming the unmatched key

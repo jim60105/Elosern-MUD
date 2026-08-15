@@ -67,6 +67,11 @@ class SexualActDef:
 Storing the line twice would create two sources of truth for the same fact; any consumer that needs
 an act's line reads `SKILL_REGISTRY[key].group`.
 
+`unlock` is frozen at construction (`__post_init__` copies it into a `MappingProxyType`): the
+dataclass's `frozen=True` only blocks field reassignment, so without the proxy a consumer holding
+the caller's original mapping (or the field itself) could rewrite a registered act's unlock
+thresholds at runtime — the exact immutability the registry convention demands.
+
 `unlock` and the two counter tuples name **`SexualState` attribute names**
 (`masturbation_count`, not `自慰次數`). The design-document catalog tables use the Traditional
 Chinese counter names as human-readable labels; the canonical mapping from those labels to attribute
@@ -129,7 +134,7 @@ For each row it constructs the paired `SkillDef` (category `SEXUAL_ACT`, `group=
 `kind=SkillKind.ACTIVE`, `cost={}` — sex acts are the one confirmed zero-resource-consumption action
 class per the system's own premise, `usable_out_of_combat=True`, `effects=[]` until
 `sexual-act-effects` adds the `pleasure:`/`sexual_counter:` prefixes) and the `SexualActDef`, then
-runs the five per-row structural checks (D-6) before returning the pair. A catalog module calls
+runs the six per-row structural checks (D-6) before returning the pair. A catalog module calls
 `_act_family()` once per line and exports the flattened result; `__init__.py` merges every module's
 export into `SKILL_REGISTRY` and `SEXUAL_ACT_REGISTRY`.
 
@@ -166,60 +171,86 @@ its one module's tuple, nothing else. `combat.py` here is the 戰鬥線 act modu
 `world/rules/combat.py`; the two are unambiguous by full path but the name collision is flagged here
 so no future reader mistakes one import for the other.
 
+Assembly (`__init__.py`) goes through the `_register_rows()` helper, which fails closed on three
+shapes of row defect before writing anything: the `SkillDef` key disagrees with the `SexualActDef`
+key, the key is already registered in `SEXUAL_ACT_REGISTRY` (duplicate), or the key collides with an
+existing `SKILL_REGISTRY` entry — a catalogue row must never silently overwrite a pre-existing
+skill definition like `basic_attack`.
+
 ### D-4: `unlocked_act_keys()` and the mastery blanket unlock
 
-```python
-# world/rules/sexual_state.py, added to SexualState
-def unlocked_act_keys(self) -> frozenset[str]:
-    if self._has_sexual_mastery():
-        return frozenset(SEXUAL_ACT_REGISTRY)
-    return frozenset(
-        key for key, act in SEXUAL_ACT_REGISTRY.items()
-        if all(getattr(self, counter) >= threshold
-               for counter, threshold in act.unlock.items())
-    )
+The unlock rules live in ONE implementation, the pure function
+`unlocked_act_keys_for(owned_keys, counter_values)` in
+`world/skills/sexual_acts/__init__.py`, so the materialized `SexualState`
+query and the no-create `owned_keys()` read (D-5) can never drift:
 
-def _has_sexual_mastery(self) -> bool:
-    from world.skills.effects import SexualMasteryEffect
-    from world.skills.registry import SKILL_REGISTRY
-    return any(
+```python
+# world/skills/sexual_acts/__init__.py
+def unlocked_act_keys_for(
+    owned_keys: Iterable[str],
+    counter_values: Mapping[str, int],
+) -> frozenset[str]:
+    mastery = any(
         isinstance(effect, SexualMasteryEffect)
-        for key in self._entity.skills.base_owned_keys()
+        for key in owned_keys
         if key in SKILL_REGISTRY
         for effect in SKILL_REGISTRY[key].parsed_effects
     )
+    if mastery:
+        return frozenset(SEXUAL_ACT_REGISTRY)
+    return frozenset(
+        key
+        for key, act in SEXUAL_ACT_REGISTRY.items()
+        if all(
+            counter_values.get(counter, 0) >= threshold
+            for counter, threshold in act.unlock.items()
+        )
+    )
+
+# world/rules/sexual_state.py, added to SexualState
+def unlocked_act_keys(self) -> frozenset[str]:
+    from world.skills.sexual_acts import unlocked_act_keys_for
+    return unlocked_act_keys_for(
+        self._entity.skills.base_owned_keys(),
+        {name: getattr(self, name) for name in _LIFETIME_COUNTER_KEYS},
+    )
 ```
 
-The `if key in SKILL_REGISTRY` clause **must** appear immediately after the first `for`, before the
-second `for` dereferences `SKILL_REGISTRY[key]` — generator-expression clauses execute in the order
-written, so placing the guard last (as an earlier draft of this document did) evaluates
-`SKILL_REGISTRY[key]` before the guard has run, raising `KeyError` for any key absent from
-`SKILL_REGISTRY`. This is not a hypothetical: `base_owned_keys()` always appends
+`counter_values` may omit names: an omitted counter reads as zero, which is
+exactly an unmaterialized entity's state (D-5).
+
+The `if key in SKILL_REGISTRY` clause **must** appear immediately after the first
+`for`, before the second `for` dereferences `SKILL_REGISTRY[key]` — generator-expression
+clauses execute in the order written, so placing the guard last (as an earlier draft of this
+document did) evaluates `SKILL_REGISTRY[key]` before the guard has run, raising `KeyError` for any
+key absent from `SKILL_REGISTRY`. This is not a hypothetical: `base_owned_keys()` always appends
 `INNATE_SKILL_ORDER`, which includes `"flee"`, and `"flee"` is registered into `SKILL_REGISTRY` only
 as an import-time side effect of `world/rules/disengage.py` — a module `unlocked_act_keys()`'s own
 call sites do not necessarily import first. The guard is therefore load-bearing, not defensive
-decoration; a test asserting `_has_sexual_mastery()` does not raise for an entity whose
+decoration; a test asserting `unlocked_act_keys()` does not raise for an entity whose
 `base_owned_keys()` includes a key absent from `SKILL_REGISTRY` (see tasks.md) exists specifically to
 pin this.
 
-`SEXUAL_ACT_REGISTRY` is imported inside the method body, not at module top level. Neither
+`unlocked_act_keys_for` imports `SexualMasteryEffect` and `SKILL_REGISTRY` from `world.skills` only
+— the catalogue package already depends on both, so no new dependency edge exists. Neither
 `world/skills/sexual_acts/_builder.py` nor `__init__.py` imports `world.rules.sexual_state` at
 production import time — D-6's counter/event cross-check runs in `tests/test_registry_structure.py`,
-not in either production module — so a top-level import here would not, in fact, cycle today. The
-import is deferred anyway, defensively: it keeps `sexual_state.py`'s existing top-level imports
-untouched, keeps this the only method in the module reaching outside its own package, and mirrors the
-precedent `SexualState.__init__` already sets by deferring `from typeclasses.monsters import
-Monster` — a habit worth keeping even where no cycle is currently provable, since it costs nothing
-and remains correct if a future change ever does introduce one.
+not in either production module — so a top-level import there would not, in fact, cycle today. The
+`SexualState` method defers its import of the catalogue package anyway, defensively: it keeps
+`sexual_state.py`'s existing top-level imports untouched, keeps this the only method in the module
+reaching outside its own package, and mirrors the precedent `SexualState.__init__` already sets by
+deferring `from typeclasses.monsters import Monster` — a habit worth keeping even where no cycle is
+currently provable, since it costs nothing and remains correct if a future change ever does
+introduce one.
 
-`_has_sexual_mastery()` reads `entity.skills.base_owned_keys()` — the **pre-extension** set (D-5) —
+The ownership read passes `entity.skills.base_owned_keys()` — the **pre-extension** set (D-5) —
 never `owned_keys()`, matching `can_cast_spell_tier`'s existing, load-bearing discipline: "conferred
 grants never satisfy the mastery override... only `entity.skills.owned_keys()` counts, never
 `conferred_grants()`" (progression.py docstring). Reading the extended `owned_keys()` here would
-recurse; reading `conferred_grants()` would let `dominion_art` (統御術) unlock the whole catalogue
+recurse; passing `conferred_grants()` would let `dominion_art` (統御術) unlock the whole catalogue
 for a recipient of a fractional 性魔法主宰 grant, which the resolution design doc explicitly forbids.
 
-### D-5: `base_owned_keys()` and the recursion it prevents
+### D-5: `base_owned_keys()`, `owned_keys()`, and the no-create gate
 
 ```python
 # world/skills/handler.py
@@ -233,17 +264,34 @@ class SkillHandler:
         ]
 
     def owned_keys(self) -> list[str]:
+        base = self.base_owned_keys()
+        if not self._sexual_state_materialized():
+            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
         sexual = getattr(self.entity, "sexual", None)
-        unlocked = () if sexual is None else sorted(sexual.unlocked_act_keys())
-        return [*self.base_owned_keys(), *unlocked]
+        if sexual is None:
+            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
+        return [*base, *sorted(sexual.unlocked_act_keys())]
 ```
 
 `getattr(self.entity, "sexual", None)` — never `from world.rules.sexual_state import SexualState` —
 is what keeps `world/skills/handler.py` free of any `world.rules` import, preserving
 `universal-action-ownership`'s existing "world/skills/ does not depend on world/rules/" requirement
-and its own scenario, which inspects this file's import statements directly. A `Monster` or any other
-`LivingEntity` always has `.sexual` mounted, so the `None` branch is defensive only (relevant for a
-bare test double with no `sexual` attribute at all).
+and its own scenario, which inspects this file's import statements directly.
+
+**The no-create gate is an amendment over the earlier draft of this document**, which had
+`owned_keys()` call `getattr(self.entity, "sexual", None)` unconditionally. `entity.sexual` is a
+lazily mounting property: the first read creates the handler's persistent `sexual_traits`
+attribute. `owned_keys()` is invoked by `action_preview._skill_wide_failure()` and by the
+`skill_owned` rule condition in `evaluate_condition()` — both of which run inside
+`action-resolution-pipeline`'s side-effect-free preview and `webclient-status-presentation`'s
+no-create status reads, whose live main-spec requirements forbid materializing the handler.
+`_sexual_state_materialized()` therefore probes the storage marker
+(`entity.attributes.get("sexual_traits", ..., category="traits")` — the same attribute the
+no-create read paths check) before touching the property, and `_unlocked_act_keys_without_sexual()`
+computes the unlocked set purely from registry data: an unmaterialized entity's counters are all at
+their zero baseline, so the query sees the seed acts (empty `unlock`) — or the whole catalogue for a
+directly owned mastery skill — through `unlocked_act_keys_for()` (D-4) without creating state. The
+`None` branch stays for a bare test double with no `sexual` attribute at all.
 
 `unlocked` is sorted for determinism: `frozenset` iteration order is not guaranteed, and
 `owned_keys()`'s ordering feeds the combat panel and `_step1_ownership`'s membership test — the
@@ -258,21 +306,26 @@ changing the contract.
 Per-row (checked inside `_act_family()`, at import time, using both the `SkillDef` and
 `SexualActDef` it just built — raises `ValueError` naming the offending key):
 
-1. `actor_pleasure_ratio > 0`, unless `requires_divine_arts` is `True` for the family.
+1. `actor_pleasure_ratio > 0`, unless `requires_divine_arts` is `True` for the family. The ratio
+   must additionally be finite for every family — `NaN` and infinity are not "strictly positive",
+   and a non-finite ratio would poison every later pleasure computation that multiplies by it.
 2. `actor_part != GENERIC_BODY_PART and target_part != GENERIC_BODY_PART`.
 3. If `line` is `"異種"` or `"神之秘法"`, `target_part is None`.
 4. Every non-`None` part is a `BODY_PARTS` member.
 5. `base_pleasure > 0`; `resistible` is a bare `bool`.
+6. `unlock` is a mapping of string counter-attribute names to non-`bool` integer thresholds — a
+   threshold written as a float, string, or `bool` would misbehave inside the unlock query, so it
+   fails closed at construction rather than at play time.
 
 Whole-registry (checked in `tests/test_registry_structure.py`, which runs
 `world.skills.sexual_acts.SEXUAL_ACT_REGISTRY` and `world.skills.registry.SKILL_REGISTRY` against
 each other, and against `world.rules.rulebook.schema.load_rules` on `sexual.yaml`):
 
-6. Every name in `unlock`, `actor_counters`, and `participant_counters` is one of the eleven
+7. Every name in `unlock`, `actor_counters`, and `participant_counters` is one of the eleven
    `SexualState` counter attributes (D-1's table, right-hand column).
-7. Every string in `sexual_events` is a value some `sexual.yaml` rule's `when["event"]` carries
+8. Every string in `sexual_events` is a value some `sexual.yaml` rule's `when["event"]` carries
    (`{rule.when["event"] for rule in load_rules(SEXUAL_YAML_PATH) if "event" in rule.when}`).
-8. `set(SEXUAL_ACT_REGISTRY)` equals `{k for k, v in SKILL_REGISTRY.items() if v.category is
+9. `set(SEXUAL_ACT_REGISTRY)` equals `{k for k, v in SKILL_REGISTRY.items() if v.category is
    SkillCategory.SEXUAL_ACT} - {"divine_sexual_arts", "divine_sexual_mastery",
    "reincarnation_boon_yuna"}` — the three named exclusions are the pre-existing mastery/mystery
    skills that carry no `SexualActDef` by design (they are acquisition-path skills, not acts).

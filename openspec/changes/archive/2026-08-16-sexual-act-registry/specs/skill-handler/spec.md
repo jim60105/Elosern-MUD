@@ -29,6 +29,13 @@ duck-typed `getattr(entity, "sexual", None)` and SHALL import nothing from `worl
 - **WHEN** `owned_keys()` is called on an entity with no `sexual` attribute at all
 - **THEN** it returns `base_owned_keys()`'s value without raising
 
+#### Scenario: An unmaterialized entity's owned_keys() stays side-effect-free
+- **WHEN** `owned_keys()` is called on an entity whose sexual handler was never mounted, while the
+  catalogue contains a seed act (an act with an empty `unlock` mapping)
+- **THEN** the seed act's key is present in the returned list, the act's key is absent when it has a
+  nonzero counter threshold instead, and the sexual handler is still not materialized afterwards
+  (no `sexual_traits` attribute created) — preview and no-create status reads stay side-effect-free
+
 #### Scenario: world/skills/handler.py imports nothing from world.rules
 - **WHEN** `world/skills/handler.py`'s import statements are inspected
 - **THEN** none of them reference any `world.rules.*` module, and the sexual-state read is a
