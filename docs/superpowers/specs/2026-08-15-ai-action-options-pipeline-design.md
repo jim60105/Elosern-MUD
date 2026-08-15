@@ -52,11 +52,13 @@ are never truncated (a summary of what you *can't* do is useless).
 | `monster_entries` | present monsters | ≤ 4 entries, ≤ 80 chars each |
 | `objective` | quest progress public view | ≤ 120 chars |
 | `narrative_tail` | capped tail of the presentation event log | ≤ 600 chars |
-| `affordances` | union of deterministic builders (§3) | ≤ 16 entries |
+| `affordances` | the canonical affordance list (deterministic-actions doc §1; never truncated) | ≤ 16 entries |
 | `leak_blocklist` | numeric literals + hidden trait keys of the deterministic view | internal |
 
-Public-tier relationship data uses the tier label (e.g. 好感層級), never the numeric affinity —
-the same boundary `npc_dialogue` already observes.
+Public-tier relationship data uses the tier label (e.g. 好感層級), never the numeric affinity — the
+same boundary `npc_dialogue` already observes. `affordances` carries each entry's canonical
+payload (`action_id` + typed params + bound target) so the schema ladder's stage-9 exact match and
+canonical replacement operate on the same data the prompt shows (schema doc §3.1).
 
 ---
 
@@ -69,13 +71,15 @@ allowlist exactly matching the `ActionOptionsContext` fields:
   3–5 actions the protagonist *could* take next, in Traditional Chinese, always choosing from the
   provided affordance codes for `known_action` cards and only using `freeform` for speech the
   protagonist could plausibly say to a present person.
-- `user`: the serialized context block.
+- `user`: the serialized context block, including the affordance list with each entry's canonical
+  payload; NPC entries carry a stable `{npc_index}` so freeform cards reference a present person
+  without the model typing an id.
 - Hard rules repeated in the system prompt: no numbers, no hidden values, no fabricated targets,
   cards must reference only present people/places/things, exactly the JSON schema output.
 
-The vocabulary lock (overview D-1): the prompt carries the affordance list, and validation
-(schema doc §3.1) additionally rejects any `action_code` outside it — a deterministic gate, not
-LLM discretion.
+The vocabulary lock (overview D-1) is enforced twice: the prompt shows only current affordances,
+and the schema ladder stage 9 replaces model-typed params with the matching canonical payload and
+rejects anything outside the list — a deterministic gate, not LLM discretion (schema doc §3).
 
 ---
 
@@ -87,10 +91,13 @@ LLM discretion.
    stub client never opens a socket).
 2. Build prompt; call `client.get_response(descriptor)` with `schema_id="action_options"` and the
    inline JSON schema (schema doc §5).
-3. On success: `validate_optionset` (schema doc §3). On any rejection, append the rejection message
-   to the prompt and retry up to `max_retries` (profile); exhaustion → `None` (bounded log).
-4. On `LLMTransportError` / timeout: resolve `None` immediately — retries for transport failures are
-   the *service's* negative-memo job (trigger-service doc §3.4), not a hot-loop in the layer.
+3. Enrichment: inject the caller-supplied `fingerprint`, `status: "ready"`, and resolve freeform
+   `{npc_index}` bindings against the prompt's bound NPC list before validation (schema doc
+   stage 0; unknown index → card rejection).
+4. On success: `validate_optionset(...)` (schema doc §3). On any rejection, append the rejection
+   message to the prompt and retry up to `max_retries` (profile); exhaustion → `None` (bounded log).
+5. On `LLMTransportError` / timeout: resolve `None` immediately — retries for transport failures are
+   the *service's* negative-memo job (trigger-service doc §3.5), not a hot-loop in the layer.
 
 Degrade semantics are strict: `None` in, `suggestions=degraded` out. There is no partial success.
 
