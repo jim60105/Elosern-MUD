@@ -344,6 +344,9 @@ def _resolve_overwhelm_raw(
     battlefield: Battlefield,
     action_provider: combat.ActionProvider,
     max_rounds: int,
+    *,
+    simulated: bool = False,
+    nonlethal_keys: frozenset[str] = frozenset(),
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
     """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
@@ -356,7 +359,15 @@ def _resolve_overwhelm_raw(
     verdict_after = initial
     round1_window: tuple[EventLog, ...] = ()
     while rounds < max_rounds and not combat.is_battle_over(battlefield):
-        round_logs = combat.run_round(battlefield, action_provider)
+        if simulated or nonlethal_keys:
+            round_logs = combat.run_round(
+                battlefield,
+                action_provider,
+                simulated=simulated,
+                nonlethal_keys=nonlethal_keys,
+            )
+        else:
+            round_logs = combat.run_round(battlefield, action_provider)
         if rounds == 0:
             round1_window = tuple(round_logs)
         raw_logs.extend(round_logs)
@@ -373,6 +384,9 @@ def resolve_overwhelm(
     max_rounds: int = 12,
     commanded_actor: str | None = None,
     commanded_skill: str | None = None,
+    *,
+    simulated: bool = False,
+    nonlethal_keys: frozenset[str] = frozenset(),
 ) -> OverwhelmResult:
     """Resolve a currently overwhelming encounter through the normal loop.
 
@@ -380,13 +394,18 @@ def resolve_overwhelm(
     forwarded to compression (with the round-1 log slice) so the player's
     commanded action can be marked in the compressed record; it never
     affects combat math, and callers that omit it receive identical
-    resolution without the marker.
+    resolution without the marker. The keyword-only ``simulated`` and
+    ``nonlethal_keys`` policy flags are forwarded to every compressed round
+    only when they differ from the defaults, so default-mode callers observe
+    the pre-change call signature byte-identically (fix-dot-kill-credit D4).
     """
     initial, verdict_after, raw_logs, rounds, round1_window = (
         _resolve_overwhelm_raw(
             battlefield,
             action_provider,
             max_rounds,
+            simulated=simulated,
+            nonlethal_keys=nonlethal_keys,
         )
     )
     event_logs = (

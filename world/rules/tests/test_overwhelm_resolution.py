@@ -83,7 +83,7 @@ class ResolutionTests(unittest.TestCase):
     def test_single_round_completion_and_time(self):
         field = battlefield()
 
-        def run_round(current, provider):
+        def run_round(current, provider, **kwargs):
             current.roster["human"].traits.hp.value = 0
             return [damage_log(120)]
 
@@ -108,7 +108,7 @@ class ResolutionTests(unittest.TestCase):
     def test_reclassification_stops_resolution(self):
         field = battlefield()
 
-        def run_round(current, provider):
+        def run_round(current, provider, **kwargs):
             current.roster["elf"].skills.values["agility"] = 10
             current.roster["elf"].skills.values["atk_phys"] = 1
             current.roster["elf"].skills.values["defense"] = 1

@@ -75,7 +75,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
     def test_overwhelm_accepts_policy_without_special_case(self):
         observed = []
 
-        def run_one_round(field, provider):
+        def run_one_round(field, provider, **kwargs):
             observed.append(provider(self.monster, field))
             self.monster.skills.values.update(
                 atk_phys=1,

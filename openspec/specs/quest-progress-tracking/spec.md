@@ -7,16 +7,19 @@ with stable dbref identity, one transition per event, and instance-pin release o
 ## Requirements
 ### Requirement: DEFEAT progress is planned automatically from committed player action events
 The quest event-effect planner SHALL inspect `target_defeated` entries produced by an
-`ActionResolver` request. It SHALL advance only active DEFEAT stages owned by the request actor when the
-actor is a `PlayerCharacter`, and SHALL additionally advance the owner's matching stage when the request
-actor is a bound companion of the owner (per the party binding) and is not knocked out; a companion's
-entries SHALL follow the same aggregation, cap, and one-transition rules as the owner's own. A
+`ActionResolver` request or by the combat upkeep settlement. It SHALL advance only active DEFEAT
+stages owned by the acting entity when that entity is a `PlayerCharacter`, and SHALL additionally
+advance the owner's matching stage when the acting entity is a bound companion of the owner (per the
+party binding) and is not knocked out; a companion's entries SHALL follow the same aggregation, cap,
+and one-transition rules as the owner's own. A
 bound-target objective SHALL match `data["target_id"]` against the record's `objective_target_ids`; an
 unbound objective SHALL match its declared `monster_tier`. Display
-keys SHALL NOT be used as entity identity. The resulting quest mutation SHALL commit in the same action
-transaction as lethal damage. The planner SHALL aggregate every matching defeat entry in one EventLog
-per quest, cap progress at the current objective quantity, perform at most one stage transition, and
-discard surplus kills rather than applying them to the next stage.
+keys SHALL NOT be used as entity identity. The resulting quest mutation SHALL commit in the same
+action or combat-round transaction as the lethal damage. The planner SHALL aggregate every matching
+defeat entry in one EventLog per quest, cap progress at the current objective quantity, perform at
+most one stage transition, and discard surplus kills rather than applying them to the next stage.
+Simulated defeats (guild examinations) and unattributed upkeep ticks SHALL advance no quest and SHALL
+not fail a protected entity.
 
 #### Scenario: Player defeat advances a matching tier objective automatically
 - **WHEN** a player action lethally damages a monster whose tier matches the player's active DEFEAT stage
@@ -50,6 +53,14 @@ discard surplus kills rather than applying them to the next stage.
 - **WHEN** one AREA action defeats three matching targets while the current objective needs two
 - **THEN** progress reaches two, the current stage transitions exactly once, and the surplus kill is not
   applied to the next stage
+
+#### Scenario: An attributed upkeep kill advances the matching objective
+- **WHEN** the player's damaging rate tick causes the lethal HP crossing of a monster matching the player's active DEFEAT stage
+- **THEN** the quest log advances in the same combat-round transaction with the same cap and one-transition rules
+
+#### Scenario: A simulated or unattributed upkeep kill grants no quest progress
+- **WHEN** a lethal rate tick fires inside a guild examination, or an upkeep tick has no resolvable source
+- **THEN** no quest DEFEAT stage advances and no protected-entity failure occurs
 
 ### Requirement: Room arrival drives REACH and ESCORT through supported persistent room hooks
 `QuestObservableRoomMixin.at_object_receive()` SHALL call its parent hook and then

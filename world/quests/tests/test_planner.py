@@ -516,5 +516,207 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["stage_progress"], 0)
 
 
+class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTest):
+    """fix-dot-kill-credit: the quest planner consumes upkeep-built defeat logs.
+
+    The combat upkeep settlement emits ``EventLog`` values shaped exactly
+    like action logs (actor = source key, ``skill_key="combat_upkeep"``,
+    ``target_defeated`` entries with ``target_id``/``monster_tier`` data).
+    These tests drive the registered quest planner directly with that log
+    shape to pin the same aggregation, cap, and one-transition rules the
+    action path uses, and the simulated/unattributed skips.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_event_effect_planner("quest", quest_event_effect_planner)
+        self.player = create_object(PlayerCharacter, key="upkeep-quest-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.tier_hunt = register(
+            quest("upkeep_tier_hunt", stages=(QuestStage(0, defeat(quantity=2)),))
+        )
+        self.two_stage = register(
+            quest(
+                "upkeep_two_stage",
+                stages=(
+                    QuestStage(0, defeat(quantity=1)),
+                    QuestStage(1, defeat(quantity=1)),
+                ),
+            )
+        )
+        self.escort_quest = register(
+            quest(
+                "upkeep_escort_anchor",
+                quest_type=QuestType.ESCORT,
+                stages=(QuestStage(0, escort(anchor_locator())),),
+            )
+        )
+
+    def tearDown(self):
+        from world.rules.action import _EVENT_EFFECT_PLANNERS
+
+        _EVENT_EFFECT_PLANNERS.pop("quest", None)
+        super().tearDown()
+
+    def _monster(self, key: str, tier: str = "low") -> Monster:
+        monster = create_object(Monster, key=key)
+        monster.threat_tier = tier
+        monster.apply_monster_tier("floor")
+        monster.traits.hp._data["current"] = 1
+        return monster
+
+    def _npc(self, key: str) -> NPC:
+        npc = create_object(NPC, key=key)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        npc.traits.hp._data["current"] = 1
+        return npc
+
+    def _upkeep_log(self, actor, entries):
+        from world.rules.event_log import EventLog
+
+        targets = tuple(
+            entry.target for entry in entries if entry.target is not None
+        )
+        return EventLog(
+            actor=str(actor.key),
+            skill_key="combat_upkeep",
+            targets=targets,
+            entries=tuple(entries),
+            time_cost_seconds=0,
+        )
+
+    def _defeat_entry(self, actor, target, *, simulated=False):
+        from world.rules.event_log import EventEntry
+
+        data: dict = {
+            "target_id": int(target.pk),
+            "monster_tier": getattr(target, "threat_tier", None),
+        }
+        if simulated:
+            data["simulated"] = True
+        return EventEntry(
+            kind="target_defeated",
+            actor=str(actor.key),
+            target=str(target.key),
+            data=data,
+            text_template="{actor} 擊敗了 {target}。",
+        )
+
+    def _plan(self, actor, entries, battlefield=None):
+        from types import SimpleNamespace
+
+        request = SimpleNamespace(
+            actor=actor,
+            context=SimpleNamespace(battlefield=battlefield),
+        )
+        return quest_event_effect_planner(request, self._upkeep_log(actor, entries))
+
+    def _records(self):
+        return [to_storage(record) for record in read_records(self.player)]
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_upkeep_defeat_advances_and_caps_at_the_objective(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        first = self._monster("u-a")
+        second = self._monster("u-b")
+        third = self._monster("u-c")
+        # The planner is read-only: it returns staged effects and never
+        # mutates the record itself (the settlement commits them).
+        effects = self._plan(
+            self.player,
+            [self._defeat_entry(self.player, first)],
+        )
+        self.assertTrue(effects)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+        effects = self._plan(
+            self.player,
+            [
+                self._defeat_entry(self.player, first),
+                self._defeat_entry(self.player, second),
+                self._defeat_entry(self.player, third),
+            ],
+        )
+        # Three kills against a quantity-2 objective stage a fulfillment
+        # (progress capped at 2 with the surplus kill discarded), and the
+        # planner still never writes by itself.
+        self.assertTrue(effects)
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_upkeep_defeat_transitions_a_stage_exactly_once(self):
+        accept_quest(self.player, self.two_stage.key)
+        monster = self._monster("u-stage")
+        effects = self._plan(self.player, [self._defeat_entry(self.player, monster)])
+        self.assertTrue(effects)
+        self.assertEqual(self._records()[0]["stage_index"], 0)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_simulated_upkeep_defeat_grants_no_progress(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        monster = self._monster("u-sim")
+        effects = self._plan(
+            self.player,
+            [self._defeat_entry(self.player, monster, simulated=True)],
+        )
+        self.assertEqual(effects, [])
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_unattributed_upkeep_defeat_grants_no_progress(self):
+        accept_quest(self.player, self.tier_hunt.key)
+        monster = self._monster("u-anon")
+        # An unattributed upkeep tick emits no defeat entries at all; the
+        # planner sees an empty event set and plans nothing.
+        effects = self._plan(self.player, [])
+        self.assertEqual(effects, [])
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_simulated_upkeep_defeat_never_fails_a_protected_entity(self):
+        record = accept_quest(self.player, self.escort_quest.key)
+        guard = self._npc("u-guard")
+        room = create_object(InstanceRoom, key="u-escort-room")
+        bind_stage_runtime(
+            self.player,
+            record.quest_id,
+            room=room,
+            protected_entities=(guard,),
+        )
+        monster = self._monster("u-guard-killer")
+        effects = self._plan(
+            monster,
+            [self._defeat_entry(monster, guard, simulated=True)],
+        )
+        self.assertEqual(effects, [])
+        self.assertEqual(self._records()[0]["state"], QuestState.IN_PROGRESS.value)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_attributed_upkeep_defeat_fails_a_protected_entity(self):
+        record = accept_quest(self.player, self.escort_quest.key)
+        guard = self._npc("u-guard-2")
+        room = create_object(InstanceRoom, key="u-escort-room-2")
+        bind_stage_runtime(
+            self.player,
+            record.quest_id,
+            room=room,
+            protected_entities=(guard,),
+        )
+        monster = self._monster("u-guard-killer-2")
+        effects = self._plan(
+            monster,
+            [self._defeat_entry(monster, guard)],
+        )
+        # The planner stages the protected-entity failure transition (the
+        # settlement commits it); the record itself stays untouched here.
+        self.assertTrue(effects)
+        self.assertEqual(self._records()[0]["state"], QuestState.IN_PROGRESS.value)
+        self.assertEqual(
+            self._records()[0]["protected_entity_ids"],
+            [int(guard.pk)],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

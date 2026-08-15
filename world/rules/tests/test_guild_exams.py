@@ -526,6 +526,36 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.db.magic_xp, magic_before)
         self.assertEqual(self.player.db.quest_log, [])
 
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_exam_tick_kill_of_examiner_settles_simulated(self):
+        # The candidate's damaging rate tick kills the examiner during
+        # upkeep: the round settles the exam normally, tags the upkeep defeat
+        # entry simulated, and grants no kill XP or quest credit.
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        from world.rules.buffs import _add_buff
+
+        _add_buff(opponent, "fire_scorch", source_pk=int(self.player.pk))
+        opponent.traits.hp.base = 3
+        opponent.traits.hp.current = 3
+        opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
+        self.assertEqual(self.player.db.quest_log, [])
+        magic_before = self.player.db.magic_xp
+        with patch("world.rules.combat.roll_d100", return_value=1):
+            result = submit_player_action(self.player, "basic_attack", [opponent])
+        self.assertEqual(result["outcome"], "exam_passed")
+        upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
+        defeated = [
+            entry
+            for log in upkeep_logs
+            for entry in log.entries
+            if entry.kind == "target_defeated"
+        ]
+        self.assertEqual(len(defeated), 1)
+        self.assertTrue(defeated[0].data["simulated"])
+        self.assertEqual(self.player.db.magic_xp, magic_before)
+        self.assertEqual(self.player.db.quest_log, [])
+
     def test_failed_exam_start_restores_nothing(self):
         # A rejected start rolls the pre-restore back: the candidate keeps the
         # wounded/spent state it brought in, and no opponent survives.

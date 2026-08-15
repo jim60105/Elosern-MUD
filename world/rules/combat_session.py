@@ -429,6 +429,30 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
     return battlefield
 
 
+def _session_policy(
+    battlefield: Battlefield,
+    record: CombatSessionRecord,
+) -> tuple[bool, frozenset[str]]:
+    """Return the session's ``(simulated, nonlethal_keys)`` combat policy.
+
+    Guild examinations run as simulated combat (no companion protection);
+    hostile sessions with companions carry the per-entity ``nonlethal_keys``
+    set naming the allied companions (party-combat D-3). ``_context_for``
+    and the round/overwhelm entry points derive the same policy from this
+    one helper (fix-dot-kill-credit D4).
+    """
+    if record.mode == "guild_exam":
+        return True, frozenset()
+    if len(record.player_ids) > 1:
+        companion_pks = set(record.player_ids[1:])
+        return False, frozenset(
+            key
+            for key, entity in battlefield.roster.items()
+            if int(entity.pk) in companion_pks
+        )
+    return False, frozenset()
+
+
 def _context_for(battlefield: Battlefield, record: CombatSessionRecord) -> BattlefieldActionContext:
     """Build the session's action context with its damage and reward policy.
 
@@ -439,16 +463,12 @@ def _context_for(battlefield: Battlefield, record: CombatSessionRecord) -> Battl
     policy: defeats are real HP crossings, but kill-credit consumers treat
     them as simulation outcomes (exam-simulated-battle-redesign D1/D4).
     """
+    simulated, nonlethal_keys = _session_policy(battlefield, record)
     event_context: dict[str, Any] = {"battlefield": battlefield}
-    if record.mode == "guild_exam":
+    if simulated:
         event_context["simulated"] = True
-    elif len(record.player_ids) > 1:
-        companion_pks = set(record.player_ids[1:])
-        event_context["nonlethal_keys"] = frozenset(
-            key
-            for key, entity in battlefield.roster.items()
-            if int(entity.pk) in companion_pks
-        )
+    elif nonlethal_keys:
+        event_context["nonlethal_keys"] = nonlethal_keys
     return BattlefieldActionContext(battlefield, event_context=event_context)
 
 
@@ -897,6 +917,7 @@ def submit_player_action(
     from django.db import transaction
 
     notifications: tuple[str, ...] = ()
+    simulated, nonlethal_keys = _session_policy(battlefield, record)
     try:
         with transaction.atomic():
             # Shared outer transaction (fix-combat-settlement-recovery D1):
@@ -913,7 +934,10 @@ def submit_player_action(
             # so the player keeps full per-round agency (skill choice and
             # flee) and is never forced into an unavoidable compressed defeat;
             # the informational ``overwhelming_team`` output value is
-            # unchanged.
+            # unchanged. The session's simulated/nonlethal policy threads
+            # into the round and overwhelm compression so upkeep-settled
+            # ticks honor the same credit rules as direct damage
+            # (fix-dot-kill-credit D4).
             if overwhelming == player_team:
                 provider = _overwhelm_provider(actor, request, battlefield, record)
                 result = resolve_overwhelm(
@@ -922,13 +946,20 @@ def submit_player_action(
                     max_rounds=12,
                     commanded_actor=str(actor.key),
                     commanded_skill=skill_key,
+                    simulated=simulated,
+                    nonlethal_keys=nonlethal_keys,
                 )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:
                 # Foe-overwhelming and contested verdicts: one ordinary round.
                 provider = _round_provider(actor, request, battlefield, record)
-                logs = run_round(battlefield, provider)
+                logs = run_round(
+                    battlefield,
+                    provider,
+                    simulated=simulated,
+                    nonlethal_keys=nonlethal_keys,
+                )
                 gained = 1
 
             notifications = _scan_friendly_fire(actor, battlefield, logs)
