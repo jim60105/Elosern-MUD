@@ -1320,7 +1320,7 @@ class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaC
         self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
         engage(self.char1, self.monster)
         clock = WorldClock()
-        with patch("commands.action.get_world_clock", return_value=clock):
+        with patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
             self.call(CmdCast(), "fire_ball=cmd goblin", None)
         self.assertEqual(clock.tick, 0)
 

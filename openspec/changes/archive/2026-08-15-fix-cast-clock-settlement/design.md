@@ -36,21 +36,27 @@ class CastSettlement:
     events: tuple[ScheduledEvent, ...]
 
 def settle_out_of_combat_cast(request: ActionRequest, *, clock=None) -> CastSettlement:
-    clock = clock or get_world_clock()
+    if not isinstance(request.targets, list):
+        raise ValueError(...)              # shorthand belongs to the session path
+    supplied = clock is not None
+    if clock is None:
+        clock = read_world_clock() or WorldClock()   # never creates the singleton
     snapshot = _snapshot_settlement_state(request, clock)   # before the outer transaction
     try:
         with transaction.atomic():
             result = ActionResolver.resolve(request)
             if result.outcome != "success":
                 return CastSettlement(result, ())
+            if not supplied and getattr(clock, "_script", None) is None:
+                clock = get_world_clock()  # created only after resolution succeeds
             events = tuple(clock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, (request.actor,)))
     except Exception:
-        _restore_settlement_state(snapshot)                 # after rollback, before re-raise
+        _restore_settlement_state(snapshot, clock)      # after rollback, before re-raise
         raise
     return CastSettlement(result, events)
 ```
 
-The module lives in `world/rules` because it is canonical game-state machinery; `commands/action.py` remains the presentation seam that builds the request (including the `status_disguise` context payload) and renders the returned result — the same split as `charge_movement` and the parallel change's `settle_movement`. *Alternatives considered: wrapping the two calls in `transaction.atomic()` inside the command — rejected: Django rollback does not reconcile Evennia in-process caches, and `advance`'s own snapshots are post-action (see D2/D3), so the outer owner must snapshot pre-action itself; and adding the boundary inside `resolve` — rejected: `resolve` is also called by combat orchestration, which owns its own settlement.*
+The module lives in `world/rules` because it is canonical game-state machinery; `commands/action.py` remains the presentation seam that builds the request (including the `status_disguise` context payload) and renders the returned result — the same split as `charge_movement` and the parallel change's `settle_movement`. The entry validates its input contract first: only explicit target lists are accepted — the `"all-enemies"`/`"all-allies"`/`"all"` shorthands belong to the combat-session path and would expand inside `resolve` step 3, after the snapshot, so they are rejected with `ValueError` before any clock access (rubber-duck review). The world-clock singleton is never created by this entry: `read_world_clock` reads without creating (a missing singleton falls back to a synthetic tick-0 clock for the snapshot), and the real singleton is obtained only after resolution succeeds — a rejected cast persists nothing, matching the old command's behavior where `get_world_clock` was reached only on success (rubber-duck review). *Alternatives considered: wrapping the two calls in `transaction.atomic()` inside the command — rejected: Django rollback does not reconcile Evennia in-process caches, and `advance`'s own snapshots are post-action (see D2/D3), so the outer owner must snapshot pre-action itself; and adding the boundary inside `resolve` — rejected: `resolve` is also called by combat orchestration, which owns its own settlement.*
 
 **D2 — Pre-resolution snapshot superset, merged by object identity, built before the outer transaction.** `_snapshot_settlement_state` records, in one mapping keyed by `id(obj)`:
 
@@ -70,10 +76,10 @@ Merging by identity is mandatory: the registry's actor entry and the settlement'
 
 `_restore_settlement_state` runs in fixed order, best-effort per step with `log_warn` (a failing step degrades to the next; a restore failure never masks the original exception):
 1. Clock tick via `_restore_clock_tick` (world/rules/clock.py:263-272).
-2. Per-object surfaces via `restore_attribute_best_effort` (world/rules/surfaces.py:41-55), with `quest_log` surfaces via the quest module's `restore_quest_log` (world/quests/transitions.py:88-90) to avoid drift; registry entries with a recorded `location` re-fetch the target by stored primary key after the rollback and assign through the location setter so Evennia's contents caches are reconciled, exactly per the sibling's D3.
+2. Per-object surfaces with `quest_log` via the quest module's `restore_quest_log` (world/quests/transitions.py:88-90) to avoid drift; all other attributes are written directly through the sibling's restore shape (`attributes.add`/`remove` without a second `deepcopy`, degrading to `reset_cache()` + `log_warn` on failure) instead of `restore_attribute_best_effort`'s deepcopy path, because a registry surface may embed live database objects (the instance contract's `owned_entities`) that plain `deepcopy` cannot copy — the sibling's `_restore_registry_attribute` semantics (rubber-duck review); registry entries with a recorded `location` re-fetch the target by stored primary key after the rollback and assign through the location setter so Evennia's contents caches are reconciled, exactly per the sibling's D3.
 3. Per-object cache refresh: reload `traits.trait_data`, clear `traits._cache`, and drop the cached `sexual` property — the same `_refresh_advance_entity_caches` semantics (world/rules/clock.py:289-303).
 
-**D4 — Callback-owned surface coverage through the sibling seam.** The settlement consumes `build_advance_snapshot_registry` plus `_snapshot_clock_tick`/`_restore_clock_tick` as mandated by `fix-clock-rollback-cache-sync` D6. Until that change lands, the settlement falls back to the existing `_ADVANCE_ENTITY_SURFACES` + `_snapshot_advance_entities` (world/rules/clock.py:241-251) for the actor's advance surfaces and keeps a guarded (deliberately skipped) integration test asserting callback-owned coverage once the seam exists — forward-declared, never faked. The `status_disguise` clock-callback regression test (task 3.2) is written against the fallback path and stays green either way.
+**D4 — Callback-owned surface coverage through the sibling seam.** The settlement consumes `build_advance_snapshot_registry` plus `_snapshot_clock_tick`/`_restore_clock_tick` as mandated by `fix-clock-rollback-cache-sync` D6. That change landed before this one, so the seam is the production path (no fallback to `_ADVANCE_ENTITY_SURFACES` + `_snapshot_advance_entities` is implemented) and the callback-owned coverage integration test (task 1.5) is a real test, not a guarded skip. The `status_disguise` clock-callback regression test (task 3.2) stays green because the settlement restores the superset either way.
 
 **D5 — Command delegation and post-commit rendering.** `_cast_out_of_combat` keeps constructing the request (target search, `status_disguise` disguise payload, battlefield-context promotion for `FLEE_SKILL_KEY`) but replaces the `resolve` + `advance` sequence with one `settle_out_of_combat_cast(request)` call; on success it renders `settlement.result.event_log`, on rejection `rejection_message(...)`, and exceptions propagate exactly as today. Because the API returns only after the outer commit, success rendering is post-commit by construction. `_cast_in_session` is untouched. Source-inspection test: the command contains no direct `get_world_clock().advance` call after the change.
 
@@ -95,4 +101,4 @@ Unreleased project with no users; no data migration. The settlement runs on ever
 
 ## Open Questions
 
-- None blocking: the `fix-clock-rollback-cache-sync` design (D6) has settled the advance-surface seam (`build_advance_snapshot_registry` plus tick snapshot/restore) this change consumes; integration verifies the merged registry covers the cast case once that change lands.
+- None blocking: the `fix-clock-rollback-cache-sync` design (D6) has settled the advance-surface seam (`build_advance_snapshot_registry` plus tick snapshot/restore) this change consumes; that change landed before this one, and the callback-owned integration test (task 1.5) verifies the merged registry covers the cast case.

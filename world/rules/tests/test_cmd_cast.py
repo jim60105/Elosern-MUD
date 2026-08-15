@@ -29,14 +29,18 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
         }
         self.char1.db.disguised_stats = {"atk_phys": 1}
         clock = WorldClock()
-        with patch("commands.action.get_world_clock", return_value=clock):
+        with patch(
+            "world.rules.cast_settlement.read_world_clock", return_value=clock
+        ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
             self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
         self.assertEqual(clock.tick, 6)
 
     def test_unknown_skill_renders_named_rejection(self):
         self.char1.db.skills = {"active": [], "passive": []}
         clock = WorldClock()
-        with patch("commands.action.get_world_clock", return_value=clock):
+        with patch(
+            "world.rules.cast_settlement.read_world_clock", return_value=clock
+        ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
             self.call(
                 CmdCast(),
                 "definitely_missing",

@@ -6,11 +6,10 @@ from evennia import Command
 
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     RejectReason,
 )
+from world.rules.cast_settlement import settle_out_of_combat_cast
 from world.rules.combat import BattlefieldActionContext
-from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import render_plain_text
 from world.rules.player_messages import (
@@ -116,7 +115,7 @@ class CmdCast(Command):
             and isinstance(context, BattlefieldActionContext)
         ):
             context = BattlefieldActionContext(context.battlefield)
-        result = ActionResolver.resolve(
+        settlement = settle_out_of_combat_cast(
             ActionRequest(
                 actor=self.caller,
                 skill_key=skill_key,
@@ -124,12 +123,7 @@ class CmdCast(Command):
                 context=context,
             )
         )
-        if result.outcome == "success":
-            get_world_clock().advance(
-                result.time_cost_seconds,
-                AdvanceSource.COMMAND,
-                [self.caller],
-            )
-            self.caller.msg(render_plain_text(result.event_log))
+        if settlement.result.outcome == "success":
+            self.caller.msg(render_plain_text(settlement.result.event_log))
         else:
-            self.caller.msg(rejection_message(result.reason))
+            self.caller.msg(rejection_message(settlement.result.reason))

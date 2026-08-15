@@ -146,7 +146,9 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         from world.rules.clock import WorldClock
 
         clock = WorldClock()
-        with patch("commands.action.get_world_clock", return_value=clock):
+        with patch(
+            "world.rules.cast_settlement.read_world_clock", return_value=clock
+        ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
             self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
         self.assertEqual(self.calls.count("quest"), 1)
 
