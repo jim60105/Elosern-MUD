@@ -430,6 +430,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   race: 'human',
                   subrace: "human_commoner",
                   background: null,
+                  affinity_elements: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -483,6 +484,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   race: 'human',
                   subrace: "human_commoner",
                   background: null,
+                  affinity_elements: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -708,6 +710,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   race: 'human',
                   subrace: "human_commoner",
                   background: null,
+                  affinity_elements: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
@@ -743,6 +746,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   race: 'human',
                   subrace: 'human_commoner',
                   background: null,
+                  affinity_elements: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                     },
                   }], {});
@@ -803,6 +807,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   race: 'human',
                   subrace: "human_commoner",
                   background: null,
+                  affinity_elements: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
                 },
               }], {});
