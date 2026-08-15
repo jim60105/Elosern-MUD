@@ -313,7 +313,7 @@ SHALL NOT need a separate quest observer call, and SHALL NOT bypass planner exec
 - **THEN** registered planners run exactly as they do for command and combat callers
 
 ### Requirement: ActionResolver exposes shared side-effect-free action preview
-The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands. It SHALL cover ownership and active kind, current resources, exact target shape, presence, alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect prefixes, and time metadata. Modifier evaluation SHALL read a no-create context from existing stored buff and sexual-state data and SHALL NOT materialize a lazy handler or default. Preview SHALL NOT roll randomness, stage or apply effects, construct EventLogs, invoke event-effect planners, mutate any persistent or nonpersistent game state, or advance world time. `preflight()` and final `resolve()` SHALL remain authoritative and SHALL rerun their required checks.
+The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands. It SHALL cover ownership and active kind, current resources, exact target shape, presence, alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect prefixes, time metadata, and elemental spell-tier eligibility. The spell-tier check SHALL use the single shared side-effect-free predicate `world.rules.progression.can_cast_skill(entity, skill)` — the same predicate consumed by `ActionResolver` and the deterministic AI policies — so preview, submission revalidation, and authoritative preflight agree on the same eligibility; an over-tier spell SHALL report `RejectReason.UNKNOWN_SKILL` with the skill key, and a malformed elemental spell SHALL fail closed (disabled, never raising). The same checks SHALL apply to the combat-session submission revalidation path, so a rejected submission stops before initiative. Modifier evaluation SHALL read a no-create context from existing stored buff and sexual-state data and SHALL NOT materialize a lazy handler or default. Preview SHALL NOT roll randomness, stage or apply effects, construct EventLogs, invoke event-effect planners, mutate any persistent or nonpersistent game state, or advance world time. `preflight()` and final `resolve()` SHALL remain authoritative and SHALL rerun their required checks.
 
 #### Scenario: Preview has no side effects
 - **WHEN** previews are built for every owned active skill and every current combat participant
@@ -322,6 +322,26 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 #### Scenario: Preview reuses a named resolver rejection
 - **WHEN** an active skill costs more MP than the actor currently has
 - **THEN** preview reports disabled with `RejectReason.INSUFFICIENT_RESOURCE` and MP detail, matching preflight without executing an effect
+
+#### Scenario: An over-tier owned spell is disabled in preview and revalidation
+- **WHEN** an actor owns and can afford `firestorm` (術師 tier, 30 MP) at `magic_level == 15` with no declared affinities and no owned `fire_mastery`, so `floor(15 × 1.0) == 15` is below the 16 threshold
+- **THEN** preview reports disabled with `RejectReason.UNKNOWN_SKILL` naming the skill key, submission revalidation reports the same, and `ActionResolver.preflight()` rejects with the same reason — the three agree
+
+#### Scenario: The affinity boundary passes the preview gate
+- **WHEN** the same actor additionally declares `affinity_elements == ["fire"]`, so `floor(15 × 1.1) == 16` meets the 術師 threshold — or holds `magic_level == 16` with no affinities, so `floor(16 × 1.0) == 16` meets it on the pure numeric path
+- **THEN** preview and submission revalidation report the spell enabled (when other checks pass), exactly as preflight succeeds
+
+#### Scenario: The mastery override enables a tier-blocked spell in preview
+- **WHEN** the actor's `owned_keys()` contains `fire_mastery` regardless of magic level
+- **THEN** preview and submission revalidation report the spell enabled, exactly as preflight succeeds
+
+#### Scenario: A conferred mastery grant does not override the preview gate
+- **WHEN** the actor's `db.skill_grants` contains a conferred `fire_mastery` grant but `owned_keys()` does not
+- **THEN** the spell remains disabled with `RejectReason.UNKNOWN_SKILL`, because the shared predicate honors direct ownership only
+
+#### Scenario: A malformed elemental spell fails closed in preview
+- **WHEN** the underlying tier lookup raises `ValueError` (malformed MP cost or unknown element) for an otherwise owned active spell
+- **THEN** preview and submission revalidation report the spell disabled with `RejectReason.UNKNOWN_SKILL` and never raise, matching the resolver's fail-closed rejection
 
 #### Scenario: Zero-action state is authoritative before initiative
 - **WHEN** deterministic combat modifiers set the player actor's `actions_per_turn` to zero
@@ -334,6 +354,10 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 #### Scenario: Target previews use ordinary ordered validation
 - **WHEN** candidate previews are requested for a SINGLE or AREA skill
 - **THEN** candidate acceptance and rejection use the same presence, alive, range, and faction functions and ordering as final target resolution
+
+#### Scenario: The shared combat view marks a tier-blocked spell disabled
+- **WHEN** the combat view (`build_combat_view`) is built for an actor who owns an affordable over-tier spell
+- **THEN** the spell's descriptor carries `enabled == False` and the `unknown_skill` reason code, so both the Telnet `combat actions` command and the WebClient combat panel render it unavailable
 
 ### Requirement: Preflight rejects missing handler context before any round cost
 `ActionResolver.preflight()` and the combat-session revalidation SHALL verify that every effect handler's declared context keys are present in the submitted `event_context`; a missing key SHALL reject the action before initiative, round count, upkeep, or world time changes.

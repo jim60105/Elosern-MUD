@@ -112,6 +112,32 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(fire.label.strip())
         self.assertTrue(fire.description.strip())
 
+    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
+    def test_tier_blocked_spell_descriptor_is_disabled(self):
+        self.player.db.skills = {
+            "active": ["firestorm"],
+            "passive": [],
+        }
+        self.player.traits.mp.base = 50
+        self.player.traits.mp.current = 50
+        engage(self.player, self.monster)
+
+        # magic level 15 with no affinities and no mastery: floor(15 * 1.0)
+        # == 15 is below the 術師 threshold (16), so the descriptor is
+        # disabled with the unknown-skill reason code.
+        self.player.traits.magic_level.base = 15
+        view = build_combat_view(self.player)
+        fire = next(skill for skill in view.skills if skill.key == "firestorm")
+        self.assertFalse(fire.enabled)
+        self.assertEqual(fire.reason_code, "unknown_skill")
+
+        # The same actor at magic level 30 passes the gate: the descriptor
+        # stays enabled, proving the assertion is about the tier gate alone.
+        self.player.traits.magic_level.base = 30
+        view = build_combat_view(self.player)
+        fire = next(skill for skill in view.skills if skill.key == "firestorm")
+        self.assertTrue(fire.enabled)
+
     @covers_requirement("webclient-combat-menu::menu-target-shorthands-are-convenience-ui")
     def test_any_skill_offers_companion_as_explicit_target_alongside_shorthands(self):
         from typeclasses.npcs import NPC
