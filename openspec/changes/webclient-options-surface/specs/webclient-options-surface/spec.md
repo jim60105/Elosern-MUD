@@ -31,6 +31,12 @@ never through an HTML/markup pipeline.
   dismiss control, then the degraded rule cards with the muted note and dismiss control, and
   finally no section at all
 
+#### Scenario: A suggestions-only update re-renders without a dock rebuild
+- **WHEN** the exploration panel is unchanged but `suggestions.status` flips `generating` →
+  `ready` in a `ui_update`
+- **THEN** the section is replaced in place with the ready cards while the exploration menu rows
+  and the keyboard router focus remain untouched
+
 #### Scenario: The section never appears in combat or creation mode
 - **WHEN** the active mode is combat or character creation while the same `context_actions`
   panel streams `suggestions`
@@ -56,9 +62,9 @@ from a card may ever enter a markup allowlist pipeline.
 ### Requirement: Suggestion cards execute exact envelopes through the action client
 
 Activating a suggestion card or its dismiss control SHALL dispatch through the existing action
-client (`window.Elosern.actions.submit`) via direct click handlers on the native buttons (the
-delegated pointer bridge drives only `[data-item-key]` router rows and ignores
-keyboard-synthesized clicks, so it never carries cards), with no new OOB message type and no
+client (`window.Elosern.actions.submit`) via direct click handlers on native buttons (the
+delegated pointer bridge drives only `[data-item-key]` router rows and ignores keyboard-
+synthesized clicks, so it SHALL NOT be the card path), with no new OOB message type and no
 KeyboardRouter involvement:
 
 - `known_action` card → `submit(action_code, params)` with the card's validator-normalized
@@ -84,16 +90,26 @@ pointer-activatable.
 #### Scenario: The dismiss control hides the section
 - **WHEN** the player clicks "✕ 清除建議" while the section shows `ready` or `degraded` cards
 - **THEN** the client submits `options.dismiss` with an empty payload, and once the published
-  `unavailable` state arrives, the section disappears from the dock
+  `unavailable` state arrives, the section disappears from the dock (the narrative-stream
+  choice-point removal is specified and tested by the later choice-point slice)
 
 ### Requirement: A degraded payload with zero cards renders the defined empty-state
 
 A `degraded` payload carrying an empty card list SHALL render the muted line
 "現在沒有什麼值得做的動作" as the section body (never an empty container and never a failure).
 The v1 exploration derivation always yields at least one rule card, so this state is unreachable
-in v1 and exists purely as a safe fallback for future kinds without an idle baseline.
+in v1 and exists purely as a safe fallback for future kinds without an idle baseline. A `v5`
+payload with a **missing** `suggestions` field is never a valid case (the v5 contract requires
+the field in every payload); the view treating it as `unavailable` is only a defensive
+compatibility guard for pre-v5 panels or a not-yet-landed mirror, never a normal render path.
 
 #### Scenario: Zero-card degraded renders the empty-state line
 - **WHEN** the store presents a `degraded` suggestions payload with an empty `cards` array
 - **THEN** the section body shows "現在沒有什麼值得做的動作" together with the "AI 建議目前
   不可用" note and the dismiss control, and no crash or empty box is rendered
+
+#### Scenario: A missing suggestions field degrades silently as a compatibility guard
+- **WHEN** a pre-v5 `context_actions` panel (no `suggestions` field) reaches the dock through the
+  store
+- **THEN** the section renders nothing and the dock's other content is unaffected, and the
+  guard's presence is documented as compatibility-only rather than a normal v5 case
