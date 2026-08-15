@@ -40,7 +40,9 @@ returns them, without alphabetical reordering. The total count of skill rows acr
 and sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`,
 tracked as independent bounds; these bounds apply to the flattened totals, not to the count of
 top-level category-group entries in either array, which is separately bounded by the number of
-`SkillCategory` members.
+`SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic
+fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning
+skills in every real category plus one unregistered key still renders.
 
 #### Scenario: Innate active skills are visible for the first time
 - **WHEN** the character panel is built for a freshly created character with no imported skill data

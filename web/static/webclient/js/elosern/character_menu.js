@@ -2,10 +2,10 @@
  * Elosern DOM-independent character-menu model.
  *
  * Reduces a validated `character` panel into a flat list of read-only display
- * rows (traits, passives, equipment, disguise, guild, wallet). Every value is
- * true state; the disguise section describes the outwardly displayed values
- * without ever substituting them for true traits. Rows are focusable for
- * scrolling but never submit (the panel is read-only).
+ * rows (traits, actives, passives, equipment, disguise, guild, wallet). Every
+ * value is true state; the disguise section describes the outwardly displayed
+ * values without ever substituting them for true traits. Rows are focusable
+ * for scrolling but never submit (the panel is read-only).
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout character dock binds it to the keyboard router.
@@ -52,6 +52,22 @@
     return row.label + "：" + value;
   }
 
+  // Flatten one v3 category-grouped skill field (category -> groups -> skills)
+  // back into one unheaded display list, matching how traits and equipment are
+  // already flattened. The wire payload carries the full category taxonomy;
+  // visible heading rendering is deliberately deferred.
+  function skillRows(categories) {
+    var rows = [];
+    (categories || []).forEach(function (category) {
+      (category.groups || []).forEach(function (group) {
+        (group.skills || []).forEach(function (row) {
+          rows.push(row);
+        });
+      });
+    });
+    return rows;
+  }
+
   function buildMenu(panel) {
     var items = [];
     var traits = (panel && panel.traits) || [];
@@ -61,10 +77,19 @@
         items.push(displayItem("trait-" + index, traitLabel(row), null));
       });
     }
+    var actives = (panel && panel.actives) || [];
+    var activeRows = skillRows(actives);
+    if (activeRows.length > 0) {
+      items.push(sectionItem("section-actives", "主動技能"));
+      activeRows.forEach(function (row, index) {
+        items.push(displayItem("active-" + index, row.label, null));
+      });
+    }
     var passives = (panel && panel.passives) || [];
-    if (passives.length > 0) {
+    var passiveRows = skillRows(passives);
+    if (passiveRows.length > 0) {
       items.push(sectionItem("section-passives", "被動技能"));
-      passives.forEach(function (row, index) {
+      passiveRows.forEach(function (row, index) {
         items.push(displayItem("passive-" + index, row.label, null));
       });
     }

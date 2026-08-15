@@ -2744,7 +2744,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 3);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -2762,20 +2762,41 @@ test("exploration and character are in the production panel allowlist", () => {
 });
 
 // ---------------------------------------------------------------------------
-// character panel v1 (design D10)
+// character panel v3 (design D10 + skill category grouping)
 // ---------------------------------------------------------------------------
 
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "character",
       traits: [
         { key: "hp", label: "生命", current: 10, max: 10 },
         { key: "atk_phys", label: "攻擊", current: 5, max: null },
       ],
-      passives: [{ key: "defense_instinct", label: "防禦直覺" }],
+      actives: [
+        {
+          category: "elemental_magic",
+          label: "元素魔法",
+          groups: [
+            { group: "fire", label: "火", skills: [{ key: "fire_ball", label: "火球術" }] },
+          ],
+        },
+      ],
+      passives: [
+        {
+          category: "enhancement",
+          label: "強化",
+          groups: [
+            {
+              group: null,
+              label: null,
+              skills: [{ key: "defense_instinct", label: "防禦直覺" }],
+            },
+          ],
+        },
+      ],
       equipment: [
         { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" },
       ],
@@ -2788,6 +2809,22 @@ function validCharacterPanel(overrides) {
   );
 }
 
+function characterCategoryGroup(keys) {
+  return {
+    category: "elemental_magic",
+    label: "元素魔法",
+    groups: [
+      {
+        group: null,
+        label: null,
+        skills: keys.map(function (key) {
+          return { key: key, label: key };
+        }),
+      },
+    ],
+  };
+}
+
 test("validates the character panel available/unavailable discriminator", () => {
   assert.deepEqual(
     Protocol.validateCharacterPanel(unavailableStatusPanel()),
@@ -2797,7 +2834,11 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 1 })));
-  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
+  const missing = validCharacterPanel();
+  delete missing.actives;
+  assert.throws(() => Protocol.validateCharacterPanel(missing));
 });
 
 test("enforces character D10 bounds and disguise honesty", () => {
@@ -2846,7 +2887,93 @@ test("enforces character D10 bounds and disguise honesty", () => {
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ wallet: -1 })));
 });
 
-test("character panel v2 persona.background round-trips bounded text", () => {
+test("character panel v3 validates the category-grouped skill shape", () => {
+  // The null group/label pair must be consistent.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        passives: [
+          {
+            category: "enhancement",
+            label: "強化",
+            groups: [
+              { group: "g", label: null, skills: [] },
+            ],
+          },
+        ],
+      })
+    )
+  );
+  // A category group must carry a non-empty groups list.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        passives: [{ category: "enhancement", label: "強化", groups: [] }],
+      })
+    )
+  );
+  // Category-group count is bounded by the SkillCategory member count plus
+  // the synthetic fallback slot; nine groups (eight real categories plus the
+  // "unknown" fallback) must stay acceptable, ten must not.
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        actives: Array(Protocol.CHARACTER_MAX_CATEGORY_GROUPS).fill(
+          characterCategoryGroup([])
+        ),
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        actives: Array(Protocol.CHARACTER_MAX_CATEGORY_GROUPS + 1).fill(
+          characterCategoryGroup([])
+        ),
+      })
+    )
+  );
+  // The flattened row bound applies, not the category-group count.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        passives: [
+          characterCategoryGroup(
+            Array(Protocol.CHARACTER_MAX_PASSIVE_ROWS + 1).fill("skill")
+          ),
+        ],
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        passives: [
+          characterCategoryGroup(
+            Array(Protocol.CHARACTER_MAX_PASSIVE_ROWS / 2).fill("skill")
+          ),
+          {
+            category: "enhancement",
+            label: "強化",
+            groups: [
+              {
+                group: null,
+                label: null,
+                skills: Array(Protocol.CHARACTER_MAX_PASSIVE_ROWS / 2)
+                  .fill("skill")
+                  .map(function (key, index) {
+                    return { key: "skill_" + index, label: "技能" };
+                  }),
+              },
+            ],
+          },
+        ],
+      })
+    )
+  );
+});
+
+test("character panel v3 persona.background round-trips bounded text", () => {
   const withBackground = Protocol.validateCharacterPanel(
     validCharacterPanel({ persona: { background: "  在公會登記的新人冒險者  " } })
   );
