@@ -23,20 +23,40 @@ rule-reading code path serves both the exploration panel v1 and the new layer):
 
 ```
 Affordance {
-  action_id: str               # real dispatcher id: explore.move / explore.look / explore.talk_scripted / ...
+  action_id: str               # real dispatcher id (see the exact table below)
   label: str                   # player-facing label (the same text the dock shows)
-  params: Mapping[str, str | int]   # the EXACT payload the registered adapter accepts (typed per action)
-  kind: "known_action" | "freeform"
-  target: FrozenThing | None   # freeform only: the bound npc_id
+  params: Mapping[str, str | int]   # produced by the action's OWN validator (wire-shape guarantee)
+  freeform: bool               # true for the talk opener entry (bound next to params)
   navigation: bool             # surfaces (map/guild/shop) — never eligible for suggestions
 }
 ```
 
 `ACTION_CODE_ALLOWLIST` (schema doc stage-9 vocabulary) is the emitted `action_id` union of this
 module, asserted by one pure parity test. Navigation affordances carry `navigation: true` and are
-*excluded from suggestions* by construction (rubber-duck R6): they have no dispatcher action code,
-so a suggestion card could never execute them; they remain in the full `context_actions` kind list
-that the dock renders as surface-openers.
+*excluded from suggestions* by construction (review R6): they have no dispatcher action code, so a
+suggestion card could never execute them; they remain in the full `context_actions` kind list that
+the dock renders as surface-openers.
+
+### 1.1 Exact action shapes (wire-shape guarantee)
+
+Every params dict below is produced by calling the registered validator itself on a candid dict —
+the affordance builder returns the **normalized validator output**, so the card shipped to the
+client is byte-for-byte the payload the dispatcher accepts (review R13). This replaces any
+"presentation-shaped" guesswork: there is exactly one payload contract per action, the validator's.
+
+| action_id | params (validator-normalized) | Validator |
+|---|---|---|
+| `explore.move` | `{"exit_ref": str, "current_node": str}` | `validate_move_payload` |
+| `explore.look` | `{"room": true}` (room survey) or `{"target_id": int}` (targeted) | `validate_look_payload` |
+| `explore.talk_scripted` | `{"npc_id": int, "keyword_id": str}` | `validate_talk_scripted_payload` |
+| `explore.talk_freeform` | `{"npc_id": int}` on the card; client appends `speech: label` at dispatch | `validate_talk_freeform_payload` |
+| `explore.engage` | `{"monster_id": int}` | `validate_engage_payload` |
+| `explore.wait` | `{"daypart": str}` (fixed form) | `validate_wait_payload` |
+
+There is **no `explore.interact` action** in the production registry — the exploration panel's
+`interact` group is a label over per-target affordances, not an action. Suggestions therefore
+never carry `interact`; interacting with a room object is a targeted `explore.look` card
+(schema doc stage-9 canonical match keeps the two consistent).
 
 Extraction rule: the exploration panel v1 presenter keeps emitting byte-identical payloads while
 delegating to the shared builders. No behavior change outside the new feature.
@@ -49,12 +69,12 @@ Derived per room visit; each rule reads registries/components only:
 
 | Situation | Emitted affordances | Source |
 |---|---|---|
-| Exits present | `explore.move` per exit (bounded, `exit_ref` param) | room exit registry |
-| Present room objects | `explore.look` + per-object `interact` (bounded, `target_id`) | room contents view |
-| Present NPC | `explore.talk_scripted` (keyword from host table) / `explore.talk_freeform` (LLM NPC, bound `npc_id`) / `explore.engage` for reachable NPCs | dialogue key lookup (`world/rules/dialogue.py`) + `interaction_reason(npc, "talk")` gate |
-| Present monster | `explore.engage` (`monster_id`), skipped when a persistent combat session owns the room | monster presence view |
+| Exits present | `explore.move` per exit, params `{exit_ref, current_node}` | room exit registry + `_current_node` |
+| Present room objects | `explore.look` per object, params `{target_id}` (the panel's `interact` group is a label, not an action — §1.1) | room contents view |
+| Present NPC | `explore.talk_scripted` (`{npc_id, keyword_id}` per host table keyword) / `explore.talk_freeform` (`{npc_id}`, the conversation opener) / `explore.engage` for reachable NPCs | dialogue key lookup (`world/rules/dialogue.py`) + `interaction_reason(npc, "talk")` gate |
+| Present monster | `explore.engage` (`{monster_id}`), skipped when a persistent combat session owns the room | monster presence view |
 | Quest objective NPC present | Objective-relevant affordances ranked first (§4) | quest progress public view |
-| Idle baseline | `explore.look`, `explore.wait` | stable baseline, always emitted |
+| Idle baseline | `explore.look` (`{room: true}`), `explore.wait` (`{daypart}`) | stable baseline, always emitted |
 | Navigation | `map` / `guild` / `shop` surfaces (kind-list only, never suggestions) | surface availability |
 
 The `interaction_reason` schedule gate is applied identically to the adapters: a schedule-blocked

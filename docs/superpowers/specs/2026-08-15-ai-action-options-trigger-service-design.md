@@ -39,11 +39,17 @@ transport and deterministic-path contract tests.
 | Hook | Where | When |
 |---|---|---|
 | Room entry | `PlayerCharacter.at_object_location_change` (puppeted player only) | After the move settles atomically |
-| Dialogue reply | **After the completion publication** of `explore.talk_scripted` / `explore.talk_freeform` (`web/webclient/actions/dispatcher.py` `_publish_completion` success path) | Ordering guarantee: the reply text and action result are already on the wire before the trigger fires (rubber-duck R3); never on rejection paths |
-| Reconnect / initial | `ui_sync` happy path, after the full snapshot publishes | Renders from the existing session state; schedules only on fingerprint change or stale state |
+| Dialogue reply | **After the completion publication** of `explore.talk_scripted` / `explore.talk_freeform` (`web/webclient/actions/dispatcher.py` `_publish_completion` success path) | Ordering guarantee: the reply text and action result are already on the wire before the trigger fires (review R3); never on rejection paths |
+| Reconnect / initial | `ui_sync` happy path, after the full snapshot publishes | See the stale predicate below |
+
+**Reconnect stale predicate (review R16):** the `ui_sync` hook schedules a generation iff the
+session's `options_state` is absent, or its `fingerprint` differs from the current one, or its
+status is `generating`/`degraded`/`unavailable` **and** the fingerprint is not cached and not under
+a live negative memo. A `ready` state whose fingerprint matches the current situation never
+schedules — the render already assembles from `options_state`, and the cache needs no refresh.
 
 Hook code is three tiny deterministic call sites — no module under `world/ai/` touches them. Each
-hook dedupes through the pending/cache floors (§3).
+hook resolves the puppet's live session(s) once and passes them to the service.
 
 ---
 
@@ -51,46 +57,60 @@ hook dedupes through the pending/cache floors (§3).
 
 ### 3.1 Fingerprint
 
-`fingerprint(room, npcs, monsters, public_state_digest) -> str` — a stable hash over the
-*situation*, not the *moment*:
+`fingerprint(room, npcs, monsters, eligible_affordance_digest, public_state_digest) -> str` — a
+stable hash over the *situation*, not the *moment*:
 
 ```
-sha256(room_key | sorted(npc identities) | sorted(monster identities) | public_state_digest)
+sha256(
+  room_key
+  | sorted(npc identities) | sorted(monster identities)
+  | eligible_affordance_digest      # review R4 fix
+  | public_state_digest
+)
 ```
 
-`public_state_digest` covers **discrete, public** state that changes what one should do: the
-current quest-objective id, and the set of public relationship **tiers** (好感層級 labels) toward
-present NPCs. Deliberately excluded: narrative tail, look commands, time of day, and **all raw
-affinity numbers** — an affinity increase within one tier must not churn the cache (rubber-duck R4).
+`eligible_affordance_digest` is the digest of the canonical eligible-affordance list (as the
+schema ladder's stage-9 argument would receive it): `sha256(sorted((action_id, params) pairs,
+params serialized key-sorted))`, labels excluded. Any change that makes an action executable or
+not — NPC schedule gates flipping, an exit locking, a monster dying, an object vanishing —
+changes the digest and therefore the fingerprint, so a cached proposal can never point at an action
+that stopped being current (the exact-match promise holds by construction). Identical eligibility
+(e.g. walking back and forth through the same room) replays as before: one call, cached answer.
+`public_state_digest` covers the remaining **discrete, public** state that changes what one should
+*do*: the current quest-objective id and the set of public relationship **tiers** (好感層級 labels)
+toward present NPCs. Deliberately excluded: narrative tail, look commands, time of day, and **all
+raw affinity numbers** — an affinity increase within one tier must not churn the cache.
 
-Anti-oracle rule (rubber-duck R4): the cache must never be used as an affinity oracle. Because the
-digest turns over only on tier boundaries, an observer watching cache misses learns at most the
-tier, never the numeric value; the pipeline doc further forbids feeding hidden numbers to the
-prompt. This rule is stated here and asserted by the fingerprint tests (§5).
+Anti-oracle rule (review R4): the cache must never be used as an affinity oracle. Because
+`public_state_digest` turns over only on tier boundaries, an observer watching cache misses learns
+at most the tier, never the numeric value; the pipeline doc further forbids feeding hidden numbers
+to the prompt. Asserted by the fingerprint tests (§6).
 
 ### 3.2 LRU cache + in-flight pending registry
 
 - Cache: key = fingerprint; value = the ready `OptionSet` (schema doc §1.1 — transport states never
   cached). Cap: `MAX_OPTIONSET_CACHE_ENTRIES` (16). Single-player memory cache; a reload empties it
   and the next trigger regenerates (degraded rule list shows meanwhile).
-- Pending registry (rubber-duck R4): `pending[fingerprint] → Deferred`. A trigger with a pending
-  fingerprint attaches to the existing Deferred (replays the eventual result) instead of starting a
-  second generation — **one LLM call per fingerprint is now true even while the first call is in
-  flight.** `pending` participates in the LRU cap: a pending fingerprint being evicted is a bug
-  (the trigger guard prevents it); eviction while pending only happens via dismiss (§4).
+- Pending registry (review R4): `pending[fingerprint] → list[PendingSubscriber]` where
+  `PendingSubscriber = (session, generation_token)` — one entry **per watching session**, because
+  the presentation state is per-session while the service is global (review R15). A trigger whose
+  fingerprint is pending **attaches a new subscriber** to the in-flight Deferred; the eventual
+  result is delivered to each subscriber independently, guarded by its own token — **one LLM call
+  per fingerprint per service lifetime is true even while the first call is in flight.**
 - Replay rule (user-confirmed): **one LLM call per fingerprint, period.** Any later trigger for a
-  cached fingerprint re-publishes the cached `OptionSet` without touching the LLM.
+  cached fingerprint re-publishes the cached `OptionSet` without touching the LLM (each watching
+  session gets its own publish, guarded by its own token).
 
 ### 3.3 Session-scoped options presentation state
 
 The trigger service is the single owner of a transport-scoped presentation state on
-`session.ndb.options_state` (rubber-duck R3):
+`session.ndb.options_state` (review R3):
 
 ```
 options_state {
   fingerprint: str | None      # what situation the current suggestions describe
   status: generating|ready|degraded|unavailable
-  generation_token: int        # monotonic per service lifetime
+  generation_token: int        # monotonic per session lifetime
   displayed: OptionSet | None  # the last validated set shown as ready
 }
 ```
@@ -98,21 +118,28 @@ options_state {
 Every `context_actions` render — full snapshots, `ui_update` from any action, `ui_sync` — reads
 `options_state` through the presenter (webclient doc §1.3), so an async `ready` result can no
 longer be clobbered by the next snapshot, and dismiss state survives re-renders. State updates are
-atomic-by-assignment and never leak outside the transport.
+atomic-by-assignment and never leak outside the session.
 
 ### 3.4 Generation flow
 
-1. Trigger → fingerprint floor: if `options_state.fingerprint == fingerprint` and status is
-   `ready`/`degraded` → re-publish the displayed/cached set (`degraded` re-derives from
+1. Trigger (puppet + its live session(s), determined at each hook) → fingerprint floor: if a
+   session's `options_state.fingerprint == fingerprint` and status is `ready`/`degraded` →
+   re-publish the displayed/cached set for that session (`degraded` re-derives from
    `default_cards()`, deterministic-actions doc §4); no LLM activity.
-2. Else set `options_state = {fingerprint, generating, token+1}`; publish `generating` once.
-3. If `pending[fingerprint]` exists → attach; else register the Deferred (one LLM call).
-4. Completion (token captured at registration):
-   - Success → validate-and-inject (pipeline doc §4); cache; update `displayed`; publish `ready`
-     **only if** the captured token is still `options_state.generation_token`;
-   - `None` (layer degrade) → publish `degraded` (rule cards) under the same token guard;
-   - Transport failure → record negative memo (30 s TTL); publish `degraded`.
-5. A completion whose token is stale (newer trigger took over) publishes nothing (rubber-duck R4).
+2. Else set `options_state = {fingerprint, generating, token+1}` for each watching session;
+   publish `generating` **only to sessions whose previous status was not `generating`** (a
+   generating → generating transition publishes nothing — the card line, if still visible, is
+   replaced in place by `ready` moments later; review R14).
+3. If `pending[fingerprint]` exists → append a subscriber; else register a new pending list with
+   one subscriber and start the generation (one LLM call).
+4. Completion (the token captured at subscription is per-session):
+   - Success → validate-and-inject (pipeline doc §4); cache; for each subscriber whose
+     `generation_token` is still its session's current token: update `displayed`, publish `ready`;
+   - `None` (layer degrade) → publish `degraded` (rule cards) under the same per-session token
+     guard;
+   - Transport failure → record negative memo (30 s TTL); publish `degraded` per subscriber.
+5. A completion whose subscriber token is stale (a newer trigger took over, or the session was
+   dismissed) publishes nothing to that subscriber.
 
 ### 3.5 Negative memo
 
@@ -125,17 +152,28 @@ until eviction or LRU pressure.
 
 ## 4. Eviction (dismiss)
 
-`evict(puppet)` — called by the `options.dismiss` adapter (webclient doc §5):
+`evict(actor, *, session=None)` — called by the `options.dismiss` adapter (webclient doc §5), which
+has only `(actor, payload)` by ActionSpec contract. Session targeting (review R15):
 
-1. Determine the current fingerprint from `options_state`; drop its cache entry and negative memo.
-2. Invalidate any in-flight generation: `pending.pop(fingerprint, None)` and **increment
-   `options_state.generation_token`** — the racing Deferred's completion finds the token stale and
-   publishes nothing (rubber-duck R4).
-3. Set `options_state = {fingerprint: None, status: unavailable, token+1}` and publish
-   `suggestions.status="unavailable"` (section hidden in both dock and narrative stream).
+- `session=None` (the adapter path): the adapter acts on **the actor's live sessions** as returned
+  by the puppet (single-player tolerates two windows; each window keeps its own
+  `options_state`/token).
+- For each targeted session, in order:
+  1. Read its `options_state.fingerprint` (the **displayed** situation — dismissing always acts
+     on what the player sees, even if the player moved away since).
+  2. Evict the cache entry and negative memo for that fingerprint from the global stores.
+  3. Invalidate that session's in-flight generation: decrement/void its subscriber entry in
+     `pending[fingerprint]` and **increment its `options_state.generation_token`** — the racing
+     completion finds the token stale for that session and publishes nothing.
+  4. Set `options_state = {fingerprint: None, status: unavailable, token+1}` and publish
+     `suggestions.status="unavailable"` (section hidden in dock and narrative stream) to that
+     session.
+- Other sessions are untouched: their subscriber entries, tokens, states, and cached publications
+  survive an unrelated dismiss (review R15).
 
 A later trigger for the same situation regenerates — the user-confirmed "clear this cache"
-semantics. Eviction never races generation: the token guard makes the outcome deterministic.
+semantics. Eviction never races generation: the token guard makes the outcome deterministic per
+session.
 
 ---
 
@@ -154,14 +192,16 @@ be used to bypass the coordinator's retirement guard.
 
 | Area | Method |
 |---|---|
-| Fingerprint | Same room+people+digest → same; member change → new; raw-affinity change within a tier → **same**; tier boundary → new |
+| Fingerprint | Same room+people+eligibility+digest → same; member change → new; **schedule gate flip / exit lock / monster death → new (eligibility digest)**; raw-affinity change within a tier → **same**; tier boundary → new |
 | Anti-oracle | Cache-miss pattern cannot expose sub-tier affinity movement (asserted over tier-step fixtures) |
-| Replay | 3 triggers, 1 LLM call; 3 rapid triggers while pending → 1 call, all receive the result |
-| Pending | In-flight trigger attaches; completion updates every attached waiter once |
-| Token | Stale completion publishes nothing; dismiss during flight → completion inert |
+| Replay | 3 triggers, 1 LLM call; 3 rapid triggers while pending → 1 call, all subscribers receive the result |
+| Pending | In-flight trigger attaches a new subscriber; completion updates every subscriber whose token is current |
+| Token | Stale completion publishes nothing; dismiss during flight → that session's completion inert, other sessions unaffected |
+| Multi-session | Two sessions on one puppet: dismiss in A leaves B's state, token, and future publications intact |
 | LRU | Cap eviction order; pending entry never evicted by a plugin trigger |
 | Negative memo | Timeout → recycled `degraded` within TTL; fresh attempt after TTL (injected clock) |
 | State | `ui_sync` re-render preserves ready cards and dismiss state; every render reads `options_state` |
+| Stale predicate | Empty state / fingerprint change / cache-miss+non-ready → schedules; ready+same fingerprint → never |
 | Synchronous guard | Malformed context / vanished room → logged no-op, no exception to caller |
 | Offline | Disabled profile → stub never called; every trigger `degraded` |
 

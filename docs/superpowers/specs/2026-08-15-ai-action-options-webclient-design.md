@@ -49,7 +49,7 @@ context_actions v3 {
 `validate_context_actions` in `web/webclient/presentation/combat_panel.py` (or a shared
 `context_actions_schema.py` module extracted from it) enforces v3 exactly: `suggestions` present in
 every v3 payload, `cards` validated by the optionschema ladder (schema doc §3) with the
-`degraded`-allowed rule-card shape (`default_cards()` entries carry the same fields), and the
+**status-dependent count bounds: `ready` 3–5, `degraded` 0–5** (schema doc §1.2), and the
 kind-specific sections left to their existing validators. Unknown keys reject — the closed schema
 contract from the OOB foundation.
 
@@ -84,9 +84,9 @@ suggestions section:
 
 | `suggestions.status` | Rendering |
 |---|---|
-| `generating` | One muted line: "AI 正在構思建議…" (no skeleton cards) |
+| `generating` | One muted line: "AI 正在構思建議…" (no skeleton cards). A generating → generating transition renders nothing new — the line, if present, stands until `ready` replaces it (trigger-service doc §3.4) |
 | `ready` | 3–5 labelled card buttons (label + optional hint), each with its `action_code`; a dismiss control ("✕ 清除建議") at the section corner |
-| `degraded` | Same card buttons (rule cards) + one muted "AI 建議目前不可用" note; same dismiss control |
+| `degraded` | 0–5 rule cards + one muted "AI 建議目前不可用" note; **0 cards render an empty-state line "現在沒有什麼值得做的動作"** (the section body, not the section frame); same dismiss control |
 | `unavailable` | Section hidden entirely |
 
 Cards render from validated data only — the dock never builds an action from unmirrored fields.
@@ -97,8 +97,8 @@ Cards render from validated data only — the dock never builds an action from u
 
 | Card kind | Dispatch | Rejection surface |
 |---|---|---|
-| `known_action` | `ui_action` with `action_code` + `params` through the existing action client (`elosern_actions.js`), normal request-id/revision semantics | Existing `ui_action_result` toast (rejection / stale / busy), unchanged |
-| `freeform` | `ui_action` `explore.talk_freeform` with `{npc_id, speech: <label text>}` — the AI-suggested phrase is treated exactly like a typed sentence, down to `npc.at_talked_to` | Same toast surface; schedule-blocked guard re-checks at the adapter |
+| `known_action` | `ui_action` with the card's `action_code` + `params` through the existing action client (`elosern_actions.js`), normal request-id/revision semantics; params are the validator-normalized payload by contract (§1.1 of the deterministic-actions doc) | Existing `ui_action_result` toast (rejection / stale / busy), unchanged |
+| `freeform` | `ui_action` `explore.talk_freeform` with `payload = {npc_id: params.npc_id, speech: label}` — the speech is **always the label text** (schema doc §1 wire shape) | Same toast surface; schedule-blocked guard re-checks at the adapter |
 
 The freeform bridge is the whole point of the hybrid vocabulary: clicking an AI-suggested line is
 indistinguishable, server-side, from typing it.
