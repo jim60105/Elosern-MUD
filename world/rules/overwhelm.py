@@ -157,17 +157,23 @@ def hit_rate_verdict(
 
 
 def _expected_damage_per_attack(attacker: Any, defender: Any) -> float:
-    """Conservatively estimate one physical attack's expected damage."""
+    """Conservatively estimate one physical attack's expected damage.
+
+    The attack and defense terms go through the same adjusted-stat path as
+    live damage resolution (``combat._adjusted_attack`` /
+    ``combat._adjusted_defense``) so the estimator cannot diverge from the
+    live magnitude; only the conservative base multiplier differs.
+    """
     required = math.ceil(_required_roll(attacker, defender))
     successful_rolls = max(0, 101 - max(1, required))
     hit_probability = min(successful_rolls, 100) / 100
     damage = combat.COMBAT_YAML["damage"]
     base_damage = max(
         round(
-            attacker.skills.effective_value("atk_phys")
+            combat._adjusted_attack(attacker, "atk_phys")
             * float(damage["base_multiplier"])
         )
-        - defender.skills.effective_value("defense"),
+        - combat._adjusted_defense(defender),
         int(damage["floor"]),
     )
     return hit_probability * base_damage

@@ -38,6 +38,9 @@ class FakeSkills:
     def owned_keys(self) -> list[str]:
         return list(self._owned)
 
+    def conferred_grants(self) -> list:
+        return []
+
 
 class FakeGauge:
     trait_type = "gauge"
@@ -96,3 +99,8 @@ class FakeEntity:
         )
         self.traits = SimpleNamespace(hp=FakeGauge(hp, max_hp or hp))
         self.traits.magic_level = FakeGauge(magic_level, magic_level)
+        # Minimal buff/equipment storage so the pure combat-modifier query
+        # (used by the shared adjusted-stat helpers) evaluates a fake to the
+        # empty bundle without materializing any handler.
+        self.buffs = SimpleNamespace(all={})
+        self.db = SimpleNamespace(equipment=None)

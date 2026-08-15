@@ -30,7 +30,10 @@ from world.rules.action import (
     _stored_trait_value,
 )
 from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage
-from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+from world.rules.combat_modifiers import (
+    apply_cost_modifier,
+    evaluate_combat_modifiers_no_create,
+)
 from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
@@ -93,13 +96,15 @@ def _skill_wide_failure(
         _step1_divine_arts_gate(actor, skill)
     except RejectedAction as rejection:
         return rejection.reason, rejection.detail
+    bundle = evaluate_combat_modifiers_no_create(actor)
     for resource_key, amount in skill.cost.items():
-        if _stored_trait_value(getattr(actor.traits, resource_key)) < amount:
+        adjusted = apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
+        if _stored_trait_value(getattr(actor.traits, resource_key)) < adjusted:
             return RejectReason.INSUFFICIENT_RESOURCE, resource_key
     active_keys = active_buff_keys_from_storage(actor)
     if active_keys & BLOCKING_BUFF_KEYS:
         return RejectReason.ACTION_FORBIDDEN, str(getattr(actor, "key", "?"))
-    if evaluate_combat_modifiers_no_create(actor).get("actions_per_turn", 1) == 0:
+    if bundle.get("actions_per_turn", 1) == 0:
         return RejectReason.ACTION_FORBIDDEN, str(getattr(actor, "key", "?"))
     for effect_id in skill.effects:
         if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:

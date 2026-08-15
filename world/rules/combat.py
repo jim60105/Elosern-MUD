@@ -200,6 +200,26 @@ def effective_power(entity: Any) -> float:
     return float(stat_sum) * _max_hp(entity)
 
 
+def _adjusted_attack(entity: Any, attack_key: str) -> float:
+    """Return effective attack plus the flat ``atk_phys`` bundle bonus.
+
+    The bonus enters only physical attacks (``attack_key == "atk_phys"``),
+    matching the stat's role in the damage formula: magic-school damage reads
+    ``magic_level`` and never receives the physical-attack adjustment.
+    """
+    attack = entity.skills.effective_value(attack_key)
+    if attack_key != "atk_phys":
+        return float(attack)
+    return float(attack) + evaluate_combat_modifiers(entity).get("atk_phys", 0)
+
+
+def _adjusted_defense(entity: Any) -> float:
+    """Return effective defense plus the flat ``defense`` bundle bonus."""
+    return float(entity.skills.effective_value("defense")) + evaluate_combat_modifiers(
+        entity
+    ).get("defense", 0)
+
+
 def _parse_damage_effect(effect_id: str) -> tuple[str, str]:
     parts = effect_id.split(":")
     if len(parts) != 3 or parts[0] != "damage":
@@ -272,12 +292,13 @@ def _handle_damage(
         amount = 0
         if hit:
             multiplier = _roll_multiplier(raw_roll, margin)
-            attack = actor.skills.effective_value(attack_key)
-            defense = target.skills.effective_value("defense")
+            attack = _adjusted_attack(actor, attack_key)
+            defense = _adjusted_defense(target)
             amount = max(
                 round(attack * multiplier) - defense,
                 int(COMBAT_YAML["damage"]["floor"]),
             )
+            amount = int(amount)
         key = str(target.key)
         protected = session_nonlethal or key in nonlethal_keys
         marked: list[str] = []

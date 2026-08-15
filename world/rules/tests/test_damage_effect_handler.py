@@ -104,6 +104,112 @@ class DamageEffectHandlerTests(unittest.TestCase):
         self.assertTrue(pending.description.endswith("|0|0"))
 
 
+def _staged_amount(actor, target, effect_id, modifiers):
+    """Resolve one hit and return the staged damage amount."""
+    with (
+        patch("world.rules.combat.roll_d100", return_value=100),
+        patch(
+            "world.rules.combat.evaluate_combat_modifiers",
+            side_effect=modifiers,
+        ),
+    ):
+        pending = _handle_damage(actor, [target], effect_id, {})[0]
+    return int(pending.description.rsplit("|", 1)[1])
+
+
+class AdjustedStatDamageTests(unittest.TestCase):
+    """Flat atk_phys/defense bundle values enter the damage magnitude."""
+
+    @covers_requirement(
+        "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
+    )
+    def test_physical_attack_gains_the_flat_atk_phys_bonus(self):
+        actor = FakeEntity("actor", atk_phys=20, agility=10)
+        target = FakeEntity("target", defense=5, agility=10)
+        self.assertEqual(
+            _staged_amount(
+                actor,
+                target,
+                "damage:dark:physical",
+                lambda entity: {"atk_phys": 5} if entity is actor else {},
+            ),
+            round((20 + 5) * 2.0) - 5,
+        )
+
+    def test_physical_attack_without_the_bonus_is_unchanged(self):
+        actor = FakeEntity("actor", atk_phys=20, agility=10)
+        target = FakeEntity("target", defense=5, agility=10)
+        self.assertEqual(
+            _staged_amount(
+                actor,
+                target,
+                "damage:dark:physical",
+                lambda entity: {},
+            ),
+            round(20 * 2.0) - 5,
+        )
+
+    @covers_requirement(
+        "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
+    )
+    def test_magic_school_damage_ignores_the_atk_phys_bonus(self):
+        actor = FakeEntity("actor", magic_level=20, agility=10)
+        target = FakeEntity("target", defense=5, agility=10)
+        self.assertEqual(
+            _staged_amount(
+                actor,
+                target,
+                "damage:fire:magic",
+                lambda entity: {"atk_phys": 5} if entity is actor else {},
+            ),
+            round(20 * 2.0) - 5,
+        )
+
+    @covers_requirement(
+        "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
+    )
+    def test_defense_bonus_mitigates_physical_and_magic_damage(self):
+        actor = FakeEntity("actor", atk_phys=20, magic_level=20, agility=10)
+        target = FakeEntity("target", defense=5, agility=10)
+        for effect_id in ("damage:dark:physical", "damage:fire:magic"):
+            with self.subTest(effect_id=effect_id):
+                self.assertEqual(
+                    _staged_amount(
+                        actor,
+                        target,
+                        effect_id,
+                        lambda entity: {"defense": 5} if entity is target else {},
+                    ),
+                    round(20 * 2.0) - 10,
+                )
+
+    def test_damage_floor_still_clamps_after_adjustments(self):
+        actor = FakeEntity("actor", atk_phys=1, agility=10)
+        target = FakeEntity("target", defense=999, agility=10)
+        self.assertEqual(
+            _staged_amount(
+                actor,
+                target,
+                "damage:dark:physical",
+                lambda entity: {"atk_phys": 5, "defense": 5},
+            ),
+            1,
+        )
+
+    def test_fractional_grant_bonus_stays_integer_in_the_staged_amount(self):
+        actor = FakeEntity("actor", atk_phys=20, agility=10)
+        target = FakeEntity("target", defense=5, agility=10)
+        self.assertEqual(
+            _staged_amount(
+                actor,
+                target,
+                "damage:dark:physical",
+                lambda entity: {"defense": 2.5} if entity is target else {},
+            ),
+            int(round(20 * 2.0) - (5 + 2.5)),
+        )
+
+
 class DamageResolverIntegrationTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -175,6 +281,25 @@ class DamageResolverIntegrationTests(EvenniaTest):
         before = deepcopy(hp_data)
         self.assertEqual(_stored_hp(self.target), before["current"])
         self.assertEqual(hp_data, before)
+
+    def test_conferred_granted_defense_reduces_live_damage(self):
+        from world.skills.handler import ConferredSkillGrant
+
+        self.target.traits.hp.current = 100
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            ActionResolver.resolve(self.request)
+        base_damage = 100 - self.target.traits.hp.value
+        self.target.traits.hp.current = 100
+        self.target.db.skill_grants = [
+            ConferredSkillGrant("elosia", "guardian_instinct", 0.5)
+        ]
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            ActionResolver.resolve(self.request)
+        granted_damage = 100 - self.target.traits.hp.value
+        self.assertGreater(base_damage, 0)
+        # scale 0.5 of the flat +5 defense adds 2.5 to the subtracted term;
+        # the truncated magnitude costs exactly 3 more HP.
+        self.assertEqual(granted_damage, base_damage - 3)
 
     def test_imported_npc_with_a_valid_key_takes_damage_normally(self):
         from world.imports.loader import instantiate_character

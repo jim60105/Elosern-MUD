@@ -52,7 +52,11 @@ game state; all new consumers read via the pure `evaluate_combat_modifiers()` /
   school is physical, i.e. `attack_key == "atk_phys"`) and one adjusted-defense helper (applies to
   both schools, since defense currently mitigates all damage). The `atk_phys` bonus is therefore
   amplified by crit/solid-hit multipliers while `defense` stays flat — mirroring the stats'
-  existing roles in the formula (attack is multiplicative, defense is flat-subtracted). Alternative
+  existing roles in the formula (attack is multiplicative, defense is flat-subtracted). The final
+  magnitude is coerced to an integer (truncation toward zero) so the event-log `int()` parse and
+  the HP trait stay integer-only; for the seeded integer adjustments this is a no-op, and only a
+  fractional conferred-grant bonus can produce a fractional term, which truncation resolves
+  deterministically. Alternative
   rejected: adding the bonus post-rounding (constant flat damage) — `atk_phys` is literally the
   physical attack stat, so it must enter where the stat enters, exactly as the flat `accuracy`
   bonus enters the to-hit score (`combat.py:184`).

@@ -17,6 +17,7 @@ from world.rules.buffs import (
     entity_active_buffs,
     grant_conferred_growth_rate,
 )
+from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
     can_cast_skill,
@@ -237,8 +238,24 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     return skill
 
 
+def _adjusted_costs(actor: Any, skill: SkillDef) -> dict[str, int]:
+    """Return the skill's resource costs after the actor's bundle adjustments.
+
+    One ``evaluate_combat_modifiers(actor)`` read maps every declared resource
+    key through :func:`apply_cost_modifier` with the ``f"{resource_key}_cost"``
+    bundle key, so the step-2 check, the step-6 recheck, and the staged
+    ``resource_spend`` amount can never drift. A resource key with no matching
+    bundle entry keeps its declared cost unchanged.
+    """
+    bundle = evaluate_combat_modifiers(actor)
+    return {
+        resource_key: apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
+        for resource_key, amount in skill.cost.items()
+    }
+
+
 def _step2_resource_check(actor: Any, skill: SkillDef) -> None:
-    for resource_key, amount in skill.cost.items():
+    for resource_key, amount in _adjusted_costs(actor, skill).items():
         if _stored_trait_value(getattr(actor.traits, resource_key)) < amount:
             raise RejectedAction(
                 RejectReason.INSUFFICIENT_RESOURCE,
@@ -576,7 +593,7 @@ def _step6_resource_deduction(
     skill: SkillDef,
 ) -> list[PendingEffect]:
     pending = []
-    for resource_key, amount in skill.cost.items():
+    for resource_key, amount in _adjusted_costs(actor, skill).items():
         trait = getattr(actor.traits, resource_key)
         if _stored_trait_value(trait) < amount:
             raise RejectedAction(

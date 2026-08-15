@@ -253,6 +253,9 @@ def _choose_skill(
         return candidates[0]
     if strategy != "highest_expected_damage":
         raise ValueError(f"unknown skill_choice: {strategy!r}")
+    defender_defense = (
+        combat._adjusted_defense(target) if target is not None else 0.0
+    )
 
     def expected_damage(skill: SkillDef) -> float:
         attack_key = (
@@ -260,10 +263,7 @@ def _choose_skill(
             if _damage_school(skill) == "physical"
             else "magic_level"
         )
-        expected = float(entity.skills.effective_value(attack_key))
-        if target is not None:
-            expected -= float(target.skills.effective_value("defense"))
-        return expected
+        return combat._adjusted_attack(entity, attack_key) - defender_defense
 
     best = max(expected_damage(skill) for skill in candidates)
     tied = [
