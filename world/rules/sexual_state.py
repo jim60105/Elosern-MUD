@@ -31,6 +31,19 @@ _ORDERED_FIELDS = {
     "exposure": EXPOSURE_LEVELS,
     "climax_phase": CLIMAX_PHASE_LEVELS,
 }
+_LIFETIME_COUNTER_KEYS = (
+    "masturbation_count",
+    "toy_use_count",
+    "exposure_act_count",
+    "watched_count",
+    "duo_act_count",
+    "group_act_count",
+    "hostile_act_count",
+    "restraint_count",
+    "interspecies_act_count",
+    "climax_count",
+    "climax_extension_count",
+)
 _PLEASURE_RULEBOOK = Path(__file__).with_name("rulebook") / "sexual_pleasure.yaml"
 
 
@@ -471,6 +484,13 @@ class SexualState:
             base=int(baseline.get("climax_today", 0)),
             min=0,
         )
+        for key in _LIFETIME_COUNTER_KEYS:
+            self._traits.add(
+                key,
+                trait_type="counter",
+                base=0,
+                min=0,
+            )
         for part, level in baseline.get("sensitivity", {}).items():
             self.sensitivity[part] = level
         self._entity.attributes.add(
@@ -517,6 +537,105 @@ class SexualState:
     def record_climax(self) -> None:
         """Increment the daily climax counter."""
         self._traits.climax_today.base += 1
+
+    @property
+    def masturbation_count(self) -> int:
+        """Return the lifetime masturbation occurrence counter."""
+        return int(self._traits.masturbation_count.value)
+
+    @property
+    def toy_use_count(self) -> int:
+        """Return the lifetime toy-use occurrence counter."""
+        return int(self._traits.toy_use_count.value)
+
+    @property
+    def exposure_act_count(self) -> int:
+        """Return the lifetime exposure-act occurrence counter."""
+        return int(self._traits.exposure_act_count.value)
+
+    @property
+    def watched_count(self) -> int:
+        """Return the lifetime watched-while-active occurrence counter."""
+        return int(self._traits.watched_count.value)
+
+    @property
+    def duo_act_count(self) -> int:
+        """Return the lifetime two-person act occurrence counter."""
+        return int(self._traits.duo_act_count.value)
+
+    @property
+    def group_act_count(self) -> int:
+        """Return the lifetime group act occurrence counter."""
+        return int(self._traits.group_act_count.value)
+
+    @property
+    def hostile_act_count(self) -> int:
+        """Return the lifetime act-against-opponent occurrence counter."""
+        return int(self._traits.hostile_act_count.value)
+
+    @property
+    def restraint_count(self) -> int:
+        """Return the lifetime restraint-endurance occurrence counter."""
+        return int(self._traits.restraint_count.value)
+
+    @property
+    def interspecies_act_count(self) -> int:
+        """Return the lifetime interspecies act occurrence counter."""
+        return int(self._traits.interspecies_act_count.value)
+
+    @property
+    def climax_count(self) -> int:
+        """Return the lifetime climax occurrence counter."""
+        return int(self._traits.climax_count.value)
+
+    @property
+    def climax_extension_count(self) -> int:
+        """Return the lifetime climax-extension occurrence counter."""
+        return int(self._traits.climax_extension_count.value)
+
+    def record_masturbation(self) -> None:
+        """Increment the lifetime masturbation counter by exactly one."""
+        self._traits.masturbation_count.base += 1
+
+    def record_toy_use(self) -> None:
+        """Increment the lifetime toy-use counter by exactly one."""
+        self._traits.toy_use_count.base += 1
+
+    def record_exposure_act(self) -> None:
+        """Increment the lifetime exposure-act counter by exactly one."""
+        self._traits.exposure_act_count.base += 1
+
+    def record_watched(self) -> None:
+        """Increment the lifetime watched-while-active counter by exactly one."""
+        self._traits.watched_count.base += 1
+
+    def record_duo_act(self) -> None:
+        """Increment the lifetime two-person act counter by exactly one."""
+        self._traits.duo_act_count.base += 1
+
+    def record_group_act(self) -> None:
+        """Increment the lifetime group act counter by exactly one."""
+        self._traits.group_act_count.base += 1
+
+    def record_hostile_act(self) -> None:
+        """Increment the lifetime act-against-opponent counter by exactly one."""
+        self._traits.hostile_act_count.base += 1
+
+    def record_restraint(self) -> None:
+        """Increment the lifetime restraint-endurance counter by exactly one."""
+        self._traits.restraint_count.base += 1
+
+    def record_interspecies_act(self) -> None:
+        """Increment the lifetime interspecies act counter by exactly one."""
+        self._traits.interspecies_act_count.base += 1
+
+    def record_climax_count(self) -> None:
+        """Increment the lifetime climax counter by exactly one."""
+        self._traits.climax_count.base += 1
+
+    def record_climax_extension(self) -> None:
+        """Increment the lifetime climax-extension counter by exactly one."""
+        self._traits.climax_extension_count.base += 1
 
     @property
     def sensitivity(self) -> _SensitivityProxy:

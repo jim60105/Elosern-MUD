@@ -36,9 +36,9 @@ This is proposal `B2` in the
 
 ### Modified Capabilities
 
-- `sexual-state-handler`: `ADDED` — eleven new requirements (one per counter, grouped in the delta
-  spec by shared shape rather than one requirement per counter, to avoid eleven near-identical
-  requirement blocks). No existing requirement's text changes.
+- `sexual-state-handler`: `ADDED` — one new requirement covering all eleven counters (grouped by
+  shared shape rather than one requirement per counter, to avoid eleven near-identical requirement
+  blocks). No existing requirement's text changes.
 
 ## Impact
 

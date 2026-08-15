@@ -17,7 +17,9 @@ from world.rules.sexual_state import (
     PLEASURE_CONFIG,
     PleasureConfigError,
     SexualState,
+    _LIFETIME_COUNTER_KEYS,
     load_pleasure_config,
+    reset_daily_counters,
 )
 
 
@@ -288,3 +290,163 @@ class DerivedArousalTests(EvenniaTest):
         entity = create_object(PlayerCharacter, key="read-only")
         with self.assertRaises(AttributeError):
             entity.sexual.arousal.value = 3
+
+
+# The delta spec's eleven (field, mutator) pairs, pinned literally so the
+# implementation cannot drift from the documented table without a test failing.
+LIFETIME_COUNTER_PAIRS = (
+    ("masturbation_count", "record_masturbation"),
+    ("toy_use_count", "record_toy_use"),
+    ("exposure_act_count", "record_exposure_act"),
+    ("watched_count", "record_watched"),
+    ("duo_act_count", "record_duo_act"),
+    ("group_act_count", "record_group_act"),
+    ("hostile_act_count", "record_hostile_act"),
+    ("restraint_count", "record_restraint"),
+    ("interspecies_act_count", "record_interspecies_act"),
+    ("climax_count", "record_climax_count"),
+    ("climax_extension_count", "record_climax_extension"),
+)
+
+LIFETIME_COUNTER_FIELDS = tuple(field for field, _ in LIFETIME_COUNTER_PAIRS)
+
+
+class LifetimeCounterTests(EvenniaTest):
+    """The eleven lifetime behaviour counters per the delta spec scenarios."""
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_every_counter_starts_at_zero_regardless_of_baseline(self):
+        fresh = create_object(PlayerCharacter, key="fresh counters")
+        imported = create_object(PlayerCharacter, key="imported counters")
+        imported.db.sexual = {"arousal": "微興奮", "virgin": True, "sensitivity": {}}
+        monster = create_object(Monster, key="monster counters")
+        for label, entity in (
+            ("fresh", fresh),
+            ("imported", imported),
+            ("monster", monster),
+        ):
+            for field in LIFETIME_COUNTER_FIELDS:
+                with self.subTest(entity=label, field=field):
+                    self.assertEqual(getattr(entity.sexual, field), 0)
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_mutator_increments_only_its_own_counter_by_exactly_one(self):
+        state = create_object(PlayerCharacter, key="single mutator").sexual
+        state.record_masturbation()
+        self.assertEqual(state.masturbation_count, 1)
+        for field in LIFETIME_COUNTER_FIELDS:
+            if field != "masturbation_count":
+                self.assertEqual(getattr(state, field), 0)
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_repeated_calls_accumulate_linearly(self):
+        state = create_object(PlayerCharacter, key="linear accumulation").sexual
+        for _ in range(5):
+            state.record_hostile_act()
+        self.assertEqual(state.hostile_act_count, 5)
+        for field in LIFETIME_COUNTER_FIELDS:
+            if field != "hostile_act_count":
+                self.assertEqual(getattr(state, field), 0)
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_no_counter_is_reset_by_daily_reset(self):
+        entity = create_object(PlayerCharacter, key="daily reset keeps lifetime")
+        for field, mutator in LIFETIME_COUNTER_PAIRS:
+            getattr(entity.sexual, mutator)()
+        for _ in range(2):
+            entity.sexual.record_climax_count()
+        for _ in range(6):
+            entity.sexual.record_restraint()
+        entity.sexual.record_climax()
+        before = {
+            field: getattr(entity.sexual, field) for field in LIFETIME_COUNTER_FIELDS
+        }
+        reset_daily_counters(entity)
+        self.assertEqual(entity.sexual.climax_today, 0)
+        self.assertEqual(entity.sexual.climax_count, 3)
+        self.assertEqual(entity.sexual.restraint_count, 7)
+        for field in LIFETIME_COUNTER_FIELDS:
+            self.assertEqual(getattr(entity.sexual, field), before[field])
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_every_counter_is_unbounded_with_floor_zero(self):
+        entity = create_object(PlayerCharacter, key="unbounded counters")
+        entity.sexual
+        stored = entity.attributes.get("sexual_traits", category="traits")
+        for field in LIFETIME_COUNTER_FIELDS:
+            with self.subTest(field=field):
+                config = stored[field]
+                self.assertEqual(config["min"], 0)
+                self.assertIsNone(config["max"])
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_climax_count_is_independent_of_climax_today(self):
+        state = create_object(PlayerCharacter, key="independent climax counters").sexual
+        state.record_climax()
+        state.record_climax()
+        self.assertEqual(state.climax_today, 2)
+        self.assertEqual(state.climax_count, 0)
+        state.record_climax_count()
+        self.assertEqual(state.climax_today, 2)
+        self.assertEqual(state.climax_count, 1)
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_each_mutator_moves_only_its_own_counter(self):
+        self.assertEqual(
+            _LIFETIME_COUNTER_KEYS,
+            LIFETIME_COUNTER_FIELDS,
+            "the module constant must match the delta spec table exactly",
+        )
+        state = create_object(PlayerCharacter, key="table driven counters").sexual
+        for field, mutator in LIFETIME_COUNTER_PAIRS:
+            with self.subTest(field=field, mutator=mutator):
+                before = {
+                    other_field: getattr(state, other_field)
+                    for other_field in LIFETIME_COUNTER_FIELDS
+                }
+                getattr(state, mutator)()
+                for other_field in LIFETIME_COUNTER_FIELDS:
+                    if other_field == field:
+                        self.assertEqual(
+                            getattr(state, other_field), before[other_field] + 1
+                        )
+                    else:
+                        self.assertEqual(
+                            getattr(state, other_field), before[other_field]
+                        )
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_reconstruction_preserves_lifetime_counters(self):
+        entity = create_object(PlayerCharacter, key="persistent lifetime counters")
+        entity.sexual.record_climax_count()
+        rebuilt = SexualState(entity)
+        self.assertEqual(rebuilt.climax_count, 1)
+        self.assertEqual(rebuilt.climax_today, 0)
+
+
+class LifetimeCounterStructureTests(unittest.TestCase):
+    """Counters are reachable only through their named property or mutator."""
+
+    @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")
+    def test_no_module_reaches_the_counters_through_private_traits(self):
+        root = Path(__file__).parents[3]
+        offenders = []
+        for directory in (
+            root / "world",
+            root / "commands",
+            root / "typeclasses",
+            root / "web",
+            root / "server",
+            root / "tools",
+        ):
+            for path in sorted(directory.rglob("*.py")):
+                relative = path.relative_to(root).as_posix()
+                if "/tests/" in relative or path.name.startswith("test_"):
+                    continue
+                if relative == "world/rules/sexual_state.py":
+                    continue
+                source = path.read_text(encoding="utf-8")
+                for field in LIFETIME_COUNTER_FIELDS:
+                    if f"._traits.{field}" in source:
+                        offenders.append(f"{relative} references ._traits.{field}")
+        self.assertEqual([], offenders)
