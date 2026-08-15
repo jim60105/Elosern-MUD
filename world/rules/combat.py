@@ -20,6 +20,7 @@ from world.rules.buffs import tick_buffs
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.progression import can_cast_skill
 from world.rules.sexual_state import decay_tick
 from world.rules.targeting import Relation
 from world.skills.registry import SKILL_REGISTRY, SkillKind
@@ -514,6 +515,7 @@ def default_attack_policy(
                 _stored_trait_value(getattr(entity.traits, resource)) >= amount
                 for resource, amount in SKILL_REGISTRY[key].cost.items()
             )
+            and can_cast_skill(entity, SKILL_REGISTRY[key])
         ),
         None,
     )

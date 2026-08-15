@@ -1,5 +1,6 @@
 """Regression tests for deterministic character progression."""
 
+from dataclasses import replace
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
@@ -9,6 +10,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from world.lore.elements import Element
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -28,6 +30,7 @@ from world.rules.progression import (
     MAGIC_XP_PER_LEVEL,
     SKILL_PRACTICE_XP_PER_USE,
     accrue_magic_study,
+    can_cast_skill,
     can_cast_spell_tier,
     effective_magic_growth_multiplier,
     element_affinity_multiplier,
@@ -361,6 +364,78 @@ class ProgressionTests(EvenniaTest):
         )
 
 
+class NpcPolicyCastGateIntegrationTests(EvenniaTest):
+    """The generic NPC policy never wastes a turn on a tier-blocked spell.
+
+    Drives ``run_round`` with ``monster_behaviour_policy`` — the exact
+    delegation path combat sessions use — so a companion whose only damage
+    spell is over-tier falls back to the innate attack and acts every round
+    instead of silently losing turns to a rejected request.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.companion = create_object(PlayerCharacter, key="companion")
+        self.companion.race = "human"
+        self.companion.apply_race_baseline()
+        # Below the 術師 threshold for firestorm (floor(15 * 1.0) == 15) with
+        # no declared affinity and no fire_mastery, but with enough MP.
+        self.companion.traits.magic_level.current = 15
+        self.companion.traits.mp.current = 30
+        self.companion.db.skills = {"active": ["firestorm"], "passive": []}
+        self.goblin = create_object(Monster, key="goblin")
+        self.goblin.threat_tier = "low"
+        self.goblin.apply_monster_tier()
+        self.goblin.traits.hp.base = 200
+        self.goblin.traits.hp.current = 200
+
+    def _battlefield(self):
+        return Battlefield(
+            {
+                "party": frozenset({str(self.companion.key)}),
+                "foes": frozenset({str(self.goblin.key)}),
+            },
+            {str(self.companion.key): self.companion, str(self.goblin.key): self.goblin},
+        )
+
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-is-never-proposed-a-tier-blocked-elemental-spell")
+    def test_companion_acts_every_round_with_resolved_basic_attack(self):
+        from world.rules.combat import default_attack_policy
+        from world.rules.monster_behaviour import monster_behaviour_policy
+
+        with patch(
+            "world.rules.combat.default_attack_policy",
+            wraps=default_attack_policy,
+        ) as delegated:
+            for round_index in range(1, 4):
+                with self.subTest(round=round_index):
+                    logs = run_round(self._battlefield(), monster_behaviour_policy)
+                    companion_logs = [
+                        log
+                        for log in logs
+                        if log.actor == str(self.companion.key)
+                    ]
+                    self.assertEqual(len(companion_logs), 1)
+                    self.assertEqual(companion_logs[0].skill_key, "basic_attack")
+                self.assertNotIn(
+                    "action_skipped",
+                    [
+                        entry.kind
+                        for log in logs
+                        for entry in log.entries
+                        if entry.actor == str(self.companion.key)
+                    ],
+                )
+        # The wraps-spy proves the companion's turn actually flowed through
+        # the generic policy (monster_behaviour_policy delegates threat_tier-less
+        # entities to it), not a bespoke or patched-out path.
+        self.assertIn(
+            str(self.companion.key),
+            {call.args[0].key for call in delegated.call_args_list},
+        )
+        self.assertEqual(self.companion.traits.mp.value, 30)
+
+
 class ElementMasteryGateTests(EvenniaTest):
     """element-mastery: rank-title and cast-gate pure functions."""
 
@@ -460,6 +535,39 @@ class ElementMasteryGateTests(EvenniaTest):
     def test_gate_rejects_unknown_tier(self):
         with self.assertRaises(ValueError):
             can_cast_spell_tier(self._caster("unknown-tier", 50), "fire", "不存在")
+
+    def test_can_cast_skill_passes_non_elemental_skills(self):
+        # basic_attack carries an element but no MP cost, so it has no tier;
+        # shadow_slash is a physical skill. Both must pass at any level.
+        entity = self._caster("plain-attacks", 90)
+        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["basic_attack"]))
+        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["shadow_slash"]))
+
+    @covers_requirement("element-mastery::can-cast-skill-is-the-shared-side-effect-free-cast-eligibility-predicate")
+    def test_can_cast_skill_rejects_an_over_tier_spell_without_mastery(self):
+        entity = self._caster("over-tier", 15)
+        self.assertFalse(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
+
+    def test_can_cast_skill_honors_the_mastery_override(self):
+        entity = self._caster("master", 1)
+        entity.db.skills = {"active": [], "passive": ["fire_mastery"]}
+        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
+
+    def test_can_cast_skill_honors_the_favored_affinity_boundary(self):
+        entity = self._caster("affinity", 15)
+        entity.db.affinity_elements = ["fire"]
+        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
+
+    @covers_requirement("element-mastery::can-cast-skill-is-the-shared-side-effect-free-cast-eligibility-predicate")
+    def test_can_cast_skill_fails_closed_on_malformed_spells(self):
+        entity = self._caster("malformed", 90)
+        out_of_band = replace(SKILL_REGISTRY["firestorm"], cost={"mp": 5})
+        unknown_element = replace(
+            SKILL_REGISTRY["firestorm"],
+            element=Element("not_an_element", "不存在", "test"),
+        )
+        self.assertFalse(can_cast_skill(entity, out_of_band))
+        self.assertFalse(can_cast_skill(entity, unknown_element))
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
     def test_fire_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
