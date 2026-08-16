@@ -12,12 +12,18 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
-from world.lore.sexual_vocab import AROUSAL_LEVELS
+from world.lore.sexual_vocab import (
+    AROUSAL_LEVELS,
+    BODY_PARTS,
+    GENERIC_BODY_PART,
+    SHAME_LEVELS,
+)
 from world.rules.sexual_state import (
     PLEASURE_CONFIG,
     PleasureConfigError,
     SexualState,
     _LIFETIME_COUNTER_KEYS,
+    decay_tick,
     load_pleasure_config,
     reset_daily_counters,
 )
@@ -100,6 +106,136 @@ class SexualStateTests(EvenniaTestCase):
         rebuilt = SexualState(entity)
         self.assertEqual(rebuilt.arousal.level, "高度")
         self.assertEqual(rebuilt.climax_today, 1)
+
+
+class SexualStateMutatorTests(EvenniaTestCase):
+    """The four C7b mutators: saturate_sensitivity, clamp_shame_to,
+    mark_submission, restore_purity."""
+
+    @covers_requirement("sexual-state-handler::saturate-sensitivity-pins-every-resolvable-body-part-to-the-top-sensitivity-level")
+    def test_saturate_sensitivity_pins_every_named_body_part(self):
+        state = create_object(PlayerCharacter, key="saturate target").sexual
+        self.assertEqual(len(state.sensitivity.items()), 0)
+        state.saturate_sensitivity()
+        for part in BODY_PARTS:
+            with self.subTest(part=part):
+                self.assertEqual(state.sensitivity[part].level, "敏感異常")
+        self.assertEqual(len(state.sensitivity.items()), len(BODY_PARTS))
+
+    @covers_requirement("sexual-state-handler::saturate-sensitivity-pins-every-resolvable-body-part-to-the-top-sensitivity-level")
+    def test_saturate_sensitivity_on_monster_seeds_only_the_generic_channel(self):
+        monster = create_object(Monster, key="saturate monster")
+        monster.threat_tier = "low"
+        monster.apply_monster_tier()
+        state = monster.sexual
+        state.saturate_sensitivity()
+        self.assertEqual(state.sensitivity[GENERIC_BODY_PART].level, "敏感異常")
+        present_parts = {part for part, _ in state.sensitivity.items()}
+        self.assertEqual(present_parts, {GENERIC_BODY_PART})
+        for part in BODY_PARTS:
+            self.assertNotIn(part, present_parts)
+
+    @covers_requirement("sexual-state-handler::clamp-shame-to-level-permanently-pins-shame-s-bounds-and-current-value-to-one-level-rejecting-a-monster-target")
+    def test_clamp_shame_pins_at_the_target_level_and_cannot_move(self):
+        entity = create_object(PlayerCharacter, key="clamp target")
+        state = entity.sexual
+        state.clamp_shame_to("成癮")
+        self.assertEqual(state.shame.level, "成癮")
+        state.shame.value = 0
+        self.assertEqual(state.shame.level, "成癮")
+        entity.attributes.add(
+            "decay_elapsed__shame",
+            1800,
+            category="sexual_state",
+        )
+        decay_tick(entity, 1)
+        self.assertEqual(state.shame.level, "成癮")
+        self.assertEqual(state.shame.value, 4)
+
+    @covers_requirement("sexual-state-handler::clamp-shame-to-level-permanently-pins-shame-s-bounds-and-current-value-to-one-level-rejecting-a-monster-target")
+    def test_clamp_shame_on_monster_raises_without_mutating(self):
+        monster = create_object(Monster, key="clamp monster")
+        monster.threat_tier = "low"
+        monster.apply_monster_tier()
+        state = monster.sexual
+        self.assertEqual((state.shame.min, state.shame.max), (0, 0))
+        with self.assertRaises(ValueError):
+            state.clamp_shame_to("成癮")
+        self.assertEqual((state.shame.min, state.shame.max), (0, 0))
+        self.assertEqual(state.shame.level, "無")
+
+    @covers_requirement("sexual-state-handler::clamp-shame-to-level-permanently-pins-shame-s-bounds-and-current-value-to-one-level-rejecting-a-monster-target")
+    def test_clamp_shame_to_any_level_under_any_prior_bounds(self):
+        # The mutator's contract is general over level: every SHAME_LEVELS
+        # member must pin min/max/value to its ordinal regardless of the
+        # prior bound state, including clamping down from a ceiling-pinned
+        # state (min=max=4) and up from a floor-pinned one (min=max=0).
+        prior_setups = {
+            "fresh": lambda state: None,
+            "floor-pinned": lambda state: (setattr(state.shame, "min", 0), setattr(state.shame, "max", 0)),
+            "ceiling-pinned": lambda state: (setattr(state.shame, "max", 4), setattr(state.shame, "min", 4)),
+            "mid-range": lambda state: (setattr(state.shame, "min", 1), setattr(state.shame, "max", 3)),
+        }
+        for prior_name, setup in prior_setups.items():
+            for level in SHAME_LEVELS:
+                with self.subTest(prior=prior_name, level=level):
+                    state = create_object(PlayerCharacter, key=f"clamp {prior_name} {level}").sexual
+                    setup(state)
+                    state.clamp_shame_to(level)
+                    ordinal = SHAME_LEVELS.index(level)
+                    self.assertEqual((state.shame.min, state.shame.max), (ordinal, ordinal))
+                    self.assertEqual(state.shame.value, ordinal)
+                    self.assertEqual(state.shame.level, level)
+
+    @covers_requirement("sexual-state-handler::mark-submission-caster-key-grows-an-append-only-submission-marks-set-defaulting-to-empty")
+    def test_mark_submission_grows_without_removing_any_other(self):
+        state = create_object(PlayerCharacter, key="marked entity").sexual
+        state.mark_submission("alice")
+        state.mark_submission("bob")
+        state.mark_submission("alice")
+        self.assertEqual(state.submission_marks, frozenset({"alice", "bob"}))
+
+    @covers_requirement("sexual-state-handler::mark-submission-caster-key-grows-an-append-only-submission-marks-set-defaulting-to-empty")
+    def test_unmarked_entity_reads_an_empty_set(self):
+        state = create_object(PlayerCharacter, key="unmarked entity").sexual
+        self.assertEqual(state.submission_marks, frozenset())
+
+    @covers_requirement("sexual-state-handler::restore-purity-bypasses-the-public-virgin-setter-without-weakening-its-one-way-contract")
+    def test_restore_purity_reverses_a_false_virgin_flag(self):
+        state = create_object(PlayerCharacter, key="restored entity").sexual
+        state.virgin = False
+        self.assertFalse(state.virgin)
+        state.restore_purity()
+        self.assertTrue(state.virgin)
+
+    @covers_requirement("sexual-state-handler::restore-purity-bypasses-the-public-virgin-setter-without-weakening-its-one-way-contract")
+    def test_restore_purity_leaves_experience_types_untouched(self):
+        state = create_object(PlayerCharacter, key="restored experience").sexual
+        state.add_experience_type("陰道性交")
+        state.virgin = False
+        state.restore_purity()
+        self.assertEqual(state.experience_types, frozenset({"陰道性交"}))
+
+    @covers_requirement("sexual-state-handler::restore-purity-bypasses-the-public-virgin-setter-without-weakening-its-one-way-contract")
+    def test_public_setter_one_way_guarantee_still_holds_after_restore_purity(self):
+        # The shipped requirement's own scenario stays green: once the public
+        # setter itself sets virgin to False, no later mutation through that
+        # same setter can set it back to True — restore_purity() is a separate
+        # path and does not change this.
+        state = create_object(PlayerCharacter, key="one-way entity").sexual
+        state.virgin = False
+        state.restore_purity()
+        self.assertTrue(state.virgin)
+        state.virgin = False
+        state.virgin = True
+        self.assertFalse(state.virgin)
+
+    @covers_requirement("sexual-state-handler::restore-purity-bypasses-the-public-virgin-setter-without-weakening-its-one-way-contract")
+    def test_restore_purity_on_already_virgin_entity_is_a_no_op(self):
+        state = create_object(PlayerCharacter, key="already virgin").sexual
+        self.assertTrue(state.virgin)
+        state.restore_purity()
+        self.assertTrue(state.virgin)
 
 
 # The documented pleasure→arousal band table (design D-1). The test pins the

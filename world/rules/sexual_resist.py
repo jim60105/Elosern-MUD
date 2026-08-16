@@ -20,9 +20,11 @@ and ``atk_phys`` as a flat addend (as ``combat._adjusted_attack`` does).
 Before any roll, ``resist_verdict()`` short-circuits to compliance when the
 resister's affinity stage toward the actor carries ``auto_comply: true``
 (``至愛``/``絕對羈絆``, only for an ``NPC`` resister facing a
-``PlayerCharacter`` actor) or when the resister is mid-climax within the
+``PlayerCharacter`` actor), when the resister's stored ``submission_marks``
+names the actor (the 絕對從屬 mark, keyed by the actor's unique database id),
+or when the resister is mid-climax within the
 ``climax_turn_auto_comply_limit`` (first five settlement points in 進行中).
-Every read is no-create: the scores and the climax-turn short circuit read
+Every read is no-create: the scores and both state short circuits read
 persistent storage without ever materializing the ``sexual`` handler
 (materializing it would create persistent traits on first access and break
 the function's no-mutation contract). The rulebook is loaded and validated
@@ -281,6 +283,26 @@ def _climax_turn_short_circuit(resister: Any) -> bool:
     return turns <= get_resist_config().climax_turn_auto_comply_limit
 
 
+def _submission_term(actor: Any, resister: Any) -> bool:
+    """Whether the resister is permanently marked submissive to this actor.
+
+    ``True`` when the resister's stored ``submission_marks`` set contains
+    ``str(actor.id)`` — the guaranteed-unique per-instance database key, never
+    ``actor.key``/``_entity_key(actor)``, which is shared across same-species
+    ``Monster`` spawns and would misattribute the permanent, unremovable mark
+    (divine-sexual-arts-mutators D-5).
+
+    The read goes through ``resister.attributes.get(...)`` directly, never
+    ``resister.sexual`` — materializing the ``sexual`` handler persists traits
+    on first access and would break ``resist_verdict()``'s no-create contract,
+    exactly like ``_climax_turn_short_circuit``'s ``climax_turns`` read.
+    """
+    marks = resister.attributes.get(
+        "submission_marks", default=frozenset(), category="sexual_state"
+    )
+    return str(actor.id) in marks
+
+
 def resist_verdict(
     actor: Any,
     resister: Any,
@@ -294,16 +316,21 @@ def resist_verdict(
     two-party, so no ``Battlefield`` is consulted. ``rng`` is injectable for
     determinism; the default is the shipped ``world.rules.dice.roll_d100``.
 
-    Auto-comply short circuits (affinity stage ``auto_comply``, or the
-    climax-turn limit) return before ``rng()`` is ever called; otherwise the
-    ordinary contest formula applies with both scores read from the no-create
-    stored-state bundle.
+    Auto-comply short circuits (affinity stage ``auto_comply``, a
+    ``submission_marks`` entry naming the actor, or the climax-turn limit)
+    return before ``rng()`` is ever called; otherwise the ordinary contest
+    formula applies with both scores read from the no-create stored-state
+    bundle.
     """
     actor_score = _blended_score(actor)
     resister_score = _blended_score(resister)
     affinity_modifier, affinity_auto_comply = _affinity_term(actor, resister)
     resister_score += affinity_modifier
-    if affinity_auto_comply or _climax_turn_short_circuit(resister):
+    if (
+        affinity_auto_comply
+        or _submission_term(actor, resister)
+        or _climax_turn_short_circuit(resister)
+    ):
         return ResistVerdict(
             resisted=False,
             auto_comply=True,

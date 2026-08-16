@@ -15,10 +15,13 @@ counter-gated catalogue but none of the three.
 ## Requirements
 
 ### Requirement: Three hand-built acts are registered, gated exclusively by requires_divine_arts, with no counter unlock
-`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain exactly three
+`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain the three
 `(SkillDef, SexualActDef)` pairs — `絕頂律令`, `時姦`, `神域搾取` — each declaring
 `requires_divine_arts=True`, `unlock={}`, `target_part=None`, `resistible=True`,
 `actor_counters=()`, `participant_counters=()`. None SHALL be constructed via `_act_family()`.
+`sexual-catalog-divine-mutators` extends the same tuple to seven entries; this requirement pins
+the identity and fields of these three pairs and SHALL NOT be read as limiting the tuple size —
+none of the three pairs SHALL be modified or removed.
 
 #### Scenario: A non-divine race cannot cast any of the three acts regardless of counters
 - **WHEN** an actor whose race's `can_use_divine_arts` is `False` attempts to cast `絕頂律令`, `時姦`,

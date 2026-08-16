@@ -39,6 +39,8 @@ from .combat_fixtures import FakeEntity
 
 _RULEBOOK = Path(__file__).parents[1] / "rulebook" / "sexual_resist.yaml"
 
+_FAKE_ID_COUNTER = iter(range(1, 1_000_000))
+
 
 class _FakeAttributes:
     """Minimal attributes stub for the no-create stored-state reads.
@@ -63,6 +65,8 @@ def _entity(
 ) -> FakeEntity:
     entity = FakeEntity(key, agility=agility, atk_phys=atk_phys)
     entity.attributes = _FakeAttributes(sexual_state)
+    # The submission-mark term keys on str(actor.id); a bare fake needs an id.
+    entity.id = next(_FAKE_ID_COUNTER)
     return entity
 
 
@@ -527,6 +531,88 @@ class SexualResistAffinityTests(EvenniaTestCase):
         self.assertAlmostEqual(
             verdict.resister_score, _blended_score(self.npc) - 10
         )
+
+
+class SexualResistSubmissionTests(EvenniaTestCase):
+    """The submission_marks short circuit (divine-sexual-arts-mutators)."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.player = self._character("submission-player")
+        self.npc = self._character("submission-npc", cls=NPC)
+
+    @staticmethod
+    def _character(key: str, cls=PlayerCharacter):
+        entity = create_object(cls, key=key)
+        entity.race = "human"
+        entity.apply_race_baseline()
+        return entity
+
+    def _mark(self, resister: NPC, caster_id: int) -> None:
+        resister.attributes.add(
+            "submission_marks",
+            frozenset({str(caster_id)}),
+            category="sexual_state",
+        )
+
+    @covers_requirement("sexual-resist-contest::a-resister-marked-as-submissive-to-a-specific-caster-auto-complies-against-that-caster-only")
+    def test_marked_caster_auto_complies_without_rolling(self):
+        self._mark(self.npc, self.player.id)
+        roller = MagicMock()
+        verdict = resist_verdict(self.player, self.npc, rng=roller)
+        self.assertFalse(verdict.resisted)
+        self.assertTrue(verdict.auto_comply)
+        self.assertIsNone(verdict.roll)
+        roller.assert_not_called()
+
+    @covers_requirement("sexual-resist-contest::a-resister-marked-as-submissive-to-a-specific-caster-auto-complies-against-that-caster-only")
+    def test_mark_naming_a_different_caster_does_not_short_circuit(self):
+        other = self._character("unrelated-submission-player")
+        self._mark(self.npc, other.id)
+        verdict = resist_verdict(self.player, self.npc, rng=lambda: 1)
+        self.assertFalse(verdict.auto_comply)
+        self.assertEqual(verdict.roll, 1)
+
+    @covers_requirement("sexual-resist-contest::a-resister-marked-as-submissive-to-a-specific-caster-auto-complies-against-that-caster-only")
+    def test_entity_sharing_the_marked_caster_key_does_not_short_circuit(self):
+        # Two distinct entities with an identical .key (the wilderness monster
+        # spawn shape): the stored mark names str(self.player.id), and the
+        # impostor's distinct id never matches it.
+        impostor = self._character("duplicate-name-player")
+        impostor.key = self.player.key
+        self.assertNotEqual(impostor.id, self.player.id)
+        self._mark(self.npc, self.player.id)
+        verdict = resist_verdict(impostor, self.npc, rng=lambda: 1)
+        self.assertFalse(verdict.auto_comply)
+        self.assertEqual(verdict.roll, 1)
+
+    @covers_requirement("sexual-resist-contest::a-resister-marked-as-submissive-to-a-specific-caster-auto-complies-against-that-caster-only")
+    def test_submission_read_never_materializes_sexual_state(self):
+        fresh = self._character("fresh-submission-npc", cls=NPC)
+        fresh.attributes.add(
+            "submission_marks",
+            frozenset({str(self.player.id)}),
+            category="sexual_state",
+        )
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+        verdict = resist_verdict(self.player, fresh, rng=MagicMock())
+        self.assertTrue(verdict.auto_comply)
+        self.assertIsNone(verdict.roll)
+        self.assertIsNone(fresh.attributes.get("sexual_traits", category="traits"))
+        self.assertIsNone(
+            fresh.attributes.get("climax_turns", category="sexual_state")
+        )
+
+    def test_mark_and_climax_terms_are_independent_short_circuits(self):
+        # A marked resister mid-climax past the limit still auto-complies via
+        # the mark alone — the third term does not disturb the existing two.
+        self._mark(self.npc, self.player.id)
+        self.npc.sexual.climax_phase.value = "進行中"
+        self.npc.attributes.add("climax_turns", 6, category="sexual_state")
+        verdict = resist_verdict(self.player, self.npc, rng=lambda: 1)
+        self.assertTrue(verdict.auto_comply)
+        self.assertIsNone(verdict.roll)
 
 
 if __name__ == "__main__":

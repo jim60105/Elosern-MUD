@@ -747,6 +747,10 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "interspecies_mating",
                 "interspecies_domination",
                 "interspecies_resonance",
+                "divine_sensitivity_creation",
+                "divine_shame_deprivation",
+                "divine_absolute_submission",
+                "divine_purity_restoration",
             },
         }
         pinned = set().union(*expected.values())

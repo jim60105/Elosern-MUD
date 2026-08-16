@@ -62,14 +62,23 @@ def _entity(key="divine catalog owner", race="human"):
 
 
 class DivineActRegistrationTests(unittest.TestCase):
-    """The three rows are hand-built pairs with the delta spec's shared fields."""
+    """The three C7a rows are hand-built pairs with the delta spec's shared fields.
+
+    Scoped to the three C7a keys: `sexual-catalog-divine-mutators` extends the
+    same tuple to seven entries (asserted in that change's own catalog test
+    module) and must not alter these three pairs.
+    """
+
+    def _c7a_pairs(self) -> dict[str, tuple]:
+        return {skill.key: (skill, act) for skill, act in DIVINE_ACTS if skill.key in _DIVINE_KEYS}
 
     @covers_requirement("sexual-catalog-divine-core::three-hand-built-acts-are-registered-gated-exclusively-by-requires-divine-arts-with-no-counter-unlock")
     def test_three_acts_registered_with_shared_field_values(self):
-        self.assertEqual(len(DIVINE_ACTS), 3)
-        for skill, act in DIVINE_ACTS:
-            with self.subTest(key=skill.key):
-                self.assertIn(skill.key, _DIVINE_KEYS)
+        pairs = self._c7a_pairs()
+        self.assertEqual(set(pairs), set(_DIVINE_KEYS))
+        for key in _DIVINE_KEYS:
+            skill, act = pairs[key]
+            with self.subTest(key=key):
                 self.assertEqual(skill.key, act.key)
                 self.assertTrue(skill.requires_divine_arts)
                 self.assertEqual(act.unlock, {})
@@ -94,13 +103,14 @@ class DivineActRegistrationTests(unittest.TestCase):
             "divine_timed_copulation": ["divine_climax_extension_stage:3"],
             "divine_realm_drain": ["divine_drain:神域搾取"],
         }
-        for skill, act in DIVINE_ACTS:
-            with self.subTest(key=skill.key):
-                self.assertEqual(skill.effects, effects_by_key[skill.key])
+        for key in _DIVINE_KEYS:
+            skill, act = self._c7a_pairs()[key]
+            with self.subTest(key=key):
+                self.assertEqual(skill.effects, effects_by_key[key])
                 self.assertEqual(act.sexual_events, ())
 
     def test_placeholder_pleasure_fields_are_documented_not_read(self):
-        for skill, act in DIVINE_ACTS:
+        for skill, act in self._c7a_pairs().values():
             with self.subTest(key=skill.key):
                 self.assertEqual(act.base_pleasure, 1)
                 self.assertEqual(act.actor_pleasure_ratio, 0.0)
