@@ -114,9 +114,9 @@ profiling and parallel-evaluation commands.
 The full Evennia suite (`evennia test ... commands server typeclasses web
 world`) is now **4,263 tests**: ~45 s with `--parallel 16` on the 24-core
 development machine, and ~152 s with `--parallel 4` including coverage
-instrumentation (the CI worker profile). Serial remains canonical for final
-handoff evidence, but `--parallel 16 --noinput` is the default full-suite
-command during development. The managed browser suite is the slowest thing in the repo
+instrumentation (the CI worker profile). `--parallel 16 --noinput` is the
+full-suite command during development; never run the full suite in serial
+locally (it takes more than 20 minutes). The managed browser suite is the slowest thing in the repo
 and dominates total runtime (measured 3,465 s locally for the full 148-test
 run):
 
@@ -150,6 +150,27 @@ suite only (a) after a large cross-cutting change, or (b) once, as part of the
 final pre-handoff check. When a browser test needs to be re-run, prefer a single
 test class or file over the whole suite, and reuse a still-running managed
 server rather than booting another.
+
+### Test run discipline (hard rules)
+
+- Never run the full Evennia test suite in serial: the measured serial run
+  exceeds 20 minutes. If the full suite is genuinely needed, use
+  `--parallel 16 --noinput` or let CI shards run it.
+- Avoid any test command estimated to take more than 10 minutes. If a run would
+  cross that threshold, it is too broad — narrow it before launching.
+- If a single test file would take more than 5 minutes in CI, the file is too
+  big: slice it into smaller, focused test files before it lands.
+- Always run specific tests instead of whole suites: target the exact package,
+  module, class, or test method your change touches (a dotted Evennia label, one
+  Node test file, or a single browser test class/file). Never start a broad
+  suite as a shortcut.
+
+For guidance on why tests get slow and how to keep them fast — fixture
+selection (`unittest.TestCase` / `EvenniaTestCase` / `EvenniaTest` /
+`EvenniaCommandTest`), `setUpTestData()` and `subTest()` reuse, `--keepdb` and
+`--parallel`, mocking external I/O, and isolation debugging — read
+`docs/development/evennia-testing-guide.md` before adding or restructuring
+tests.
 
 Use `uv add <package>` and `uv remove <package>` for dependency changes so
 `pyproject.toml` and `uv.lock` remain synchronized. Never edit `uv.lock`
