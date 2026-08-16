@@ -3,9 +3,10 @@
 Covers the occupant prototype whitelist, the requirements->prototype->spawn
 rules (anti-hallucination by construction), atomic and idempotent instance
 materialization, permanent-layer located-only behavior, DEFEAT/ESCORT binding
-sets, rollback and re-entry, the lore-backed stat derivation, the offline
-end-to-end loop through the two new commands, and the repository boundary
-invariants (offline tests only, no live client, no startup re-sync).
+sets, rollback and re-entry, and the lore-backed stat derivation. The shared
+base and mixin (``SceneBuilderTestBase``, ``SceneBuilderIsolation``) and the
+module-level payload helpers live here; the offline loop, flavor, and
+boundary classes moved to sibling modules that import them from this file.
 """
 
 from pathlib import Path
@@ -13,17 +14,14 @@ import tempfile
 from unittest.mock import patch
 import unittest
 
-from django.db import transaction
 from django.test import override_settings
 
-from evennia.objects.models import ObjectDB
 from evennia.prototypes import prototypes as prototypes_module
 from evennia.prototypes import spawner as spawner_module
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildStaff
 from typeclasses.exits import Exit
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
@@ -35,7 +33,6 @@ from world.art.worker import drain_synchronous
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.maps.bootstrap import sync_grid
-from world.quests.catalog import register_catalog
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
     QuestCompileError,
@@ -45,7 +42,7 @@ from world.quests.compile import (
     register_generated_quest,
 )
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import accept_quest, read_records
 from world.quests.scene_builder import (
     SCENE_OCCUPANT_PROTOTYPE_WHITELIST,
     SceneBuilderLocationError,
@@ -53,18 +50,13 @@ from world.quests.scene_builder import (
     SceneBuilderNotActive,
     SceneBuilderSpawnError,
     _validate_occupant_parent,
-    apply_scene_flavor,
     materialize_stage,
 )
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.traits import build_initial_traits, trait_config_for_values
 
-from commands.guild import CmdGuildAccept, CmdGuildRequest, CmdGuildTurnIn
-from commands.scene import CmdEnterScene
-
 from tools.spec_traceability import covers_requirement
-
 
 def _raw(**overrides):
     raw = default_profiles()
@@ -237,7 +229,6 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
     def _fresh(self, quest_id):
         return next(r for r in read_records(self.player) if r.quest_id == quest_id)
 
-
 class SceneOccupantPrototypeTests(EvenniaTest):
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_module_prototypes_resolve_with_whitelisted_keys_and_typeclasses(self):
@@ -267,7 +258,6 @@ class SceneOccupantPrototypeTests(EvenniaTest):
                     "typeclass": "typeclasses.rooms.Room",
                 }
             )
-
 
 class SceneBuilderMaterializationTests(SceneBuilderTestBase):
     @covers_requirement("scene-builder::materializing-a-stage-spawns-the-destination-sets-scene-metadata-and-binds-one-stage-atomically-and-idempotently")
@@ -565,7 +555,6 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
 
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
-
 class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
     def _characterized(self, **overrides):
         payload = _instance_bound_payload()
@@ -793,7 +782,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                     )
                 self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
 
-
 class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
     """End-to-end spawn -> on_commit -> gate -> fake worker coverage."""
 
@@ -886,373 +874,6 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         self.assertTrue(
             (Path(self.tempdir.name) / "portrait" / "character" / "forest_bandit_chief.png").is_file()
         )
-
-
-class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixin, EvenniaTest):
-    def setUp(self):
-        super().setUp()
-        # Register the quest catalog in this class's own setup: guild
-        # registration reaches the affinity rulebook load, which resolves
-        # ``introductory_hunt`` from the definition registry.
-        register_catalog()
-        create_object(Room, key="虛境", location=None)
-        sync_grid()
-        self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
-        self.player = create_object(PlayerCharacter, key="offline-scene-player")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
-        self.player.location = self.anchor
-        self.staff = create_object(NPC, key="scene staff", location=self.anchor)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
-            )
-        )
-        from world.rules.guild import register_adventurer
-
-        register_adventurer(self.player, self.staff)
-        from world.quests.bootstrap import sync_quest_runtime
-
-        sync_quest_runtime()
-        _install_scenario_director()
-
-    def _resolve_lethal(self, target):
-        from world.rules.action import ActionRequest, ActionResolver
-        from world.rules.combat import Battlefield, BattlefieldActionContext
-
-        field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({target.key})},
-            {self.player.key: self.player, target.key: target},
-        )
-        request = ActionRequest(
-            self.player,
-            "fire_ball",
-            [target],
-            BattlefieldActionContext(field),
-        )
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
-
-    def _accept(self, payload):
-        compiled = compile_quest_blueprint(payload)
-        register_generated_quest(compiled)
-        return accept_quest(self.player, compiled.definition.key), compiled
-
-    def _fresh(self, quest_id):
-        return next(r for r in read_records(self.player) if r.quest_id == quest_id)
-
-    def _generated_definition_key(self, display_name):
-        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
-
-        matches = [
-            key
-            for key, definition in QUEST_DEFINITION_REGISTRY.items()
-            if definition.display_name == display_name
-        ]
-        self.assertEqual(len(matches), 1, matches)
-        return matches[0]
-
-    @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
-    def test_offline_loop_materializes_an_instance_scene_without_an_llm(self):
-        disabled = {
-            layer: {"enabled": False}
-            for layer in ("narrator", "npc_dialogue", "scenario_director", "scene_builder")
-        }
-        with override_settings(LLM_PROFILES=_raw(**disabled)):
-            output = self.call(CmdGuildRequest(), "", "你張貼了一份委託", caller=self.player)
-        self.assertIn("討伐林間盜匪", output)
-        definition_key = self._generated_definition_key("討伐林間盜匪")
-        self.assertIn(definition_key, output)
-
-        self.call(CmdGuildAccept(), definition_key, "你接取了任務", caller=self.player)
-        records = [
-            r for r in read_records(self.player) if r.definition_key == definition_key
-        ]
-        self.assertEqual(len(records), 1)
-        self.assertIs(records[0].state, QuestState.IN_PROGRESS)
-
-        # Entering spawns the scene and moves the player; the room's look text
-        # is prepended, so invoke the command directly and assert the movement.
-        enter = CmdEnterScene()
-        enter.caller = self.player
-        enter.cmdstring = "進入"
-        enter.args = ""
-        with patch.object(self.player, "msg") as player_msg:
-            enter.parse()
-            enter.func()
-        self.assertIsInstance(self.player.location, InstanceRoom)
-        sent = " ".join(
-            str(call.args[0]) for call in player_msg.call_args_list if call.args
-        )
-        self.assertIn("走入", sent)
-
-        bandit = next(
-            obj for obj in self.player.location.contents if isinstance(obj, NPC)
-        )
-        bandit.traits.hp._data["current"] = 1
-        result = self._resolve_lethal(bandit)
-        self.assertEqual(result.outcome, "success")
-
-        completed = [
-            r
-            for r in read_records(self.player)
-            if r.definition_key == definition_key and r.state is QuestState.COMPLETED
-        ]
-        self.assertTrue(completed, "bound DEFEAT did not auto-complete offline")
-
-        self.player.move_to(self.anchor, quiet=True)
-        output = self.call(CmdGuildTurnIn(), completed[0].quest_id, "你回報了任務", caller=self.player)
-        self.assertIn("50 銅", output)
-        self.assertEqual(self.player.db.wallet, 50)
-
-    @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
-    def test_enter_without_an_instance_stage_is_side_effect_free(self):
-        self.player.move_to(self.room1, quiet=True)
-        rooms_before = InstanceRoom.objects.all().count()
-        self.call(CmdEnterScene(), "", "你目前沒有需要進入的任務場景", caller=self.player)
-        self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
-
-    @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
-    def test_enter_from_inside_the_bound_room_is_side_effect_free(self):
-        record, _ = self._accept(_instance_bound_payload())
-        materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.player.move_to(
-            next(
-                e.destination
-                for e in self.anchor.exits
-                if isinstance(e.destination, InstanceRoom)
-            ),
-            quiet=True,
-        )
-        rooms_before = InstanceRoom.objects.all().count()
-        self.call(CmdEnterScene(), "", "你已經在任務場景裡了", caller=self.player)
-        self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
-
-    @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
-    def test_enter_selects_the_enterable_instance_stage(self):
-        # Quest A anchors near capital_altoria and is not enterable from a
-        # plain room; quest B declares no anchor and is enterable from anywhere.
-        # The command must skip A and select B rather than failing on A.
-        anchored_payload = _instance_bound_payload(name="先在王都的委託")
-        unanchored = _instance_bound_payload(name="無錨點的委託")
-        unanchored["stages"][0]["location_req"]["anchor_near"] = None
-        self._accept(anchored_payload)
-        _, compiled_b = self._accept(unanchored)
-        self.player.move_to(self.room1, quiet=True)
-        rooms_before = InstanceRoom.objects.all().count()
-        enter = CmdEnterScene()
-        enter.caller = self.player
-        enter.cmdstring = "進入"
-        enter.args = ""
-        enter.parse()
-        enter.func()
-        self.assertIsInstance(self.player.location, InstanceRoom)
-        self.assertEqual(InstanceRoom.objects.all().count(), rooms_before + 1)
-        entered = self._fresh(next(
-            r.quest_id for r in read_records(self.player)
-            if r.definition_key == compiled_b.definition.key
-        ))
-        self.assertEqual(entered.stage_room_id, self.player.location.pk)
-
-    @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
-    def test_enter_from_a_mismatched_origin_is_a_named_side_effect_free_rejection(self):
-        self._accept(_instance_bound_payload())
-        self.player.move_to(self.room1, quiet=True)
-        rooms_before = InstanceRoom.objects.all().count()
-        # The only instance quest anchors near capital_altoria, which the
-        # caller's plain room does not match, so the command reports no
-        # enterable scene and creates nothing.
-        self.call(CmdEnterScene(), "", "你目前沒有需要進入的任務場景", caller=self.player)
-        self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
-
-
-class SceneFlavorContextAndApplyTests(SceneBuilderTestBase):
-    """The deterministic flavor-context seam and the idempotent sole-writer apply."""
-
-    def _materialize_first(self, payload):
-        record, _ = self._accept(payload)
-        return record, materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_fresh_instance_scene_carries_the_four_key_flavor_context(self):
-        record, result = self._materialize_first(_instance_bound_payload())
-        self.assertIsInstance(result.room, InstanceRoom)
-        self.assertEqual(
-            result.flavor_context,
-            {
-                "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
-                "quest_context": "討伐林間盜匪（討伐任務）",
-                "room_name": "林間小徑",
-                "region": "聖潔王都",
-            },
-        )
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_fresh_scene_without_anchor_has_empty_region(self):
-        payload = _instance_bound_payload()
-        payload["stages"][0]["location_req"]["anchor_near"] = None
-        _, result = self._materialize_first(payload)
-        self.assertEqual(result.flavor_context["region"], "")
-        self.assertEqual(
-            set(result.flavor_context),
-            {"scene_sentence", "quest_context", "room_name", "region"},
-        )
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_requirement_sentence_falls_back_to_the_archetype_registry(self):
-        payload = _instance_bound_payload()
-        payload["stages"][0]["location_req"]["scene_sentence"] = None
-        _, result = self._materialize_first(payload)
-        from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-
-        self.assertEqual(
-            result.flavor_context["scene_sentence"],
-            SCENE_ARCHETYPE_REGISTRY["forest_path"].scene_sentence,
-        )
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_sentence_less_scene_carries_no_flavor_context(self):
-        payload = _instance_bound_payload()
-        payload["stages"][0]["location_req"]["scene_sentence"] = None
-        payload["stages"][0]["location_req"]["archetype"] = None
-        _, result = self._materialize_first(payload)
-        self.assertIsNone(result.flavor_context)
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_reentered_bound_stage_carries_no_flavor_context(self):
-        record, first = self._materialize_first(_instance_bound_payload())
-        self.assertIsNotNone(first.flavor_context)
-        second = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.assertIs(second.room, first.room)
-        self.assertIsNone(second.flavor_context)
-
-    @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")
-    def test_permanent_layer_scene_carries_no_flavor_context(self):
-        _, result = self._materialize_first(_reach_anchor_payload())
-        self.assertIs(result.room, self.anchor)
-        self.assertIsNone(result.flavor_context)
-
-    @covers_requirement("scene-builder::the-scene-flavor-write-is-deterministic-and-never-affects-materialization", "scene-flavor::the-flavor-write-is-deterministic-idempotent-and-sole-writer")
-    def test_apply_scene_flavor_writes_once_and_never_touches_desc(self):
-        _, result = self._materialize_first(_instance_bound_payload())
-        room = result.room
-        desc_before = room.db.desc
-        self.assertTrue(apply_scene_flavor(room, "苔石在幽暗中泛著微光。"))
-        self.assertEqual(room.db.scene_flavor, "苔石在幽暗中泛著微光。")
-        self.assertEqual(room.db.desc, desc_before)
-        self.assertFalse(apply_scene_flavor(room, "另一段氛圍。"))
-        self.assertEqual(room.db.scene_flavor, "苔石在幽暗中泛著微光。")
-        self.assertEqual(room.db.desc, desc_before)
-
-    @covers_requirement("scene-builder::the-scene-flavor-write-is-deterministic-and-never-affects-materialization", "scene-flavor::the-flavor-write-is-deterministic-idempotent-and-sole-writer")
-    def test_apply_scene_flavor_rejects_non_string_text(self):
-        room = create_object(InstanceRoom, key="reject", location=None)
-        self.assertFalse(apply_scene_flavor(room, None))
-        self.assertFalse(apply_scene_flavor(room, "   "))
-        self.assertIsNone(room.db.scene_flavor)
-
-    @covers_requirement("scene-builder::the-scene-flavor-write-is-deterministic-and-never-affects-materialization", "scene-flavor::the-flavor-write-is-deterministic-idempotent-and-sole-writer")
-    def test_apply_scene_flavor_skips_a_vanished_room_without_raising(self):
-        _, result = self._materialize_first(_instance_bound_payload())
-        room = result.room
-        stale = room
-        ObjectDB.objects.filter(pk=room.pk).delete()
-        self.assertFalse(InstanceRoom.objects.filter(pk=room.pk).exists())
-        self.assertFalse(apply_scene_flavor(stale, "殘影般的氛圍。"))
-        self.assertEqual(InstanceRoom.objects.filter(pk=room.pk).count(), 0)
-
-    @covers_requirement("scene-builder::the-scene-flavor-write-is-deterministic-and-never-affects-materialization", "scene-flavor::the-flavor-write-is-deterministic-idempotent-and-sole-writer")
-    def test_apply_scene_flavor_swallows_a_simulated_lookup_failure(self):
-        _, result = self._materialize_first(_instance_bound_payload())
-        room = result.room
-        with patch(
-            "world.quests.scene_builder.ObjectDB.objects.filter",
-            side_effect=RuntimeError("injected lookup failure"),
-        ):
-            self.assertFalse(apply_scene_flavor(room, "失敗的氛圍。"))
-        self.assertIsNone(room.db.scene_flavor)
-
-    def test_flavor_context_helper_is_ban_clean_and_returns_plain_data(self):
-        from world.quests import scene_builder
-        import inspect
-
-        source = inspect.getsource(scene_builder.build_flavor_context).lower()
-        for fragment in ("world.ai", "ollama", "llm_client"):
-            self.assertNotIn(fragment, source)
-        _, result = self._materialize_first(_instance_bound_payload())
-        for key, value in result.flavor_context.items():
-            self.assertIsInstance(value, str)
-
-
-class SceneBuilderBoundaryTests(unittest.TestCase):
-    @covers_requirement("scene-builder::scenebuilder-is-the-deterministic-requirements-to-spawn-materialization-layer")
-    def test_scene_builder_module_stays_inside_the_deterministic_path_ban(self):
-        import pathlib
-
-        from world.quests import scene_builder
-
-        source = pathlib.Path(scene_builder.__file__).read_text(encoding="utf-8").lower()
-        for fragment in ("world.ai", "ollama", "llm_client"):
-            self.assertNotIn(fragment, source)
-
-    @covers_requirement("scene-builder::scenebuilder-is-the-deterministic-requirements-to-spawn-materialization-layer")
-    def test_no_generative_module_imports_the_scene_builder(self):
-        import ast
-        from pathlib import Path
-
-        ai_root = Path(__file__).resolve().parents[3] / "world" / "ai"
-        for module_path in sorted(ai_root.rglob("*.py")):
-            if "tests" in module_path.parts or "__init__.py" in module_path.parts:
-                continue
-            tree = ast.parse(module_path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module and "scene_builder" in node.module:
-                    self.fail(f"{module_path} imports {node.module}")
-
-    @covers_requirement("scene-builder::every-scene-builder-test-runs-offline-and-the-boundary-invariants-stay-green")
-    def test_requirements_registry_is_written_only_by_the_compile_boundary(self):
-        import pathlib
-
-        repo = pathlib.Path(__file__).resolve().parents[3]
-        writers = []
-        for path in sorted((repo / "world").rglob("*.py")):
-            if "tests" in path.parts:
-                continue
-            if "SCENE_REQUIREMENT_REGISTRY" in path.read_text(encoding="utf-8"):
-                writers.append(path.relative_to(repo).as_posix())
-        self.assertEqual(writers, ["world/quests/compile.py"])
-
-    @covers_requirement("scene-builder::every-scene-builder-test-runs-offline-and-the-boundary-invariants-stay-green")
-    def test_no_startup_resync_populates_generated_requirements(self):
-        import pathlib
-
-        repo = pathlib.Path(__file__).resolve().parents[3]
-        source = (repo / "server" / "conf" / "at_server_startstop.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("SCENE_REQUIREMENT_REGISTRY", source)
-        self.assertNotIn("scene_builder", source)
-
-    @covers_requirement("scene-builder::every-scene-builder-test-runs-offline-and-the-boundary-invariants-stay-green")
-    def test_scene_builder_and_service_tests_never_construct_the_live_client(self):
-        import pathlib
-
-        repo = pathlib.Path(__file__).resolve().parents[3]
-        for relative in (
-            "world/quests/tests/test_scene_builder.py",
-            "server/conf/tests/test_ai_director_service.py",
-        ):
-            source = (repo / relative).read_text(encoding="utf-8")
-            client_constructor = "OpenAICompatClient" + "("
-            socket_import = "import so" + "cket"
-            socket_from = "from so" + "cket"
-            self.assertNotIn(client_constructor, source, relative)
-            self.assertNotIn(socket_import, source, relative)
-            self.assertNotIn(socket_from, source, relative)
-
 
 if __name__ == "__main__":
     unittest.main()

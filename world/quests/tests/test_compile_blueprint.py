@@ -1,182 +1,36 @@
-"""Tests for the deterministic quest compile boundary (scenario-director).
+"""Deterministic quest-compile tests (CompileQuestBlueprintTests family).
 
-Covers ``compile_quest_blueprint`` (re-validation against the lore registries,
-the pinned per-stage mapping contract, content-digest keys, raw-dict rejection),
-``register_generated_quest`` (all-or-nothing publication with preflight and
-rollback), the shared payload contract with the ``scenario_director`` guardrail,
-and an offline end-to-end loop through the full deterministic quest lifecycle
-with no LLM and no generative state mutation.
+Covers ``compile_quest_blueprint`` re-validation, the pinned per-stage mapping
+contract, content-digest keys, raw-dict rejection, scene-bound proposal stage
+validation, and characterization payload handling. Shared isolation and
+payload helpers come from ``_compile_helpers``.
 """
 
 import json
-from unittest.mock import patch
 import unittest
 
-from django.test import override_settings
-
-from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
-
-from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildStaff
-from typeclasses.monsters import Monster
-from typeclasses.npcs import NPC
-from typeclasses.rooms import Room
-from world.ai.fake_client import FakeLLMClient
-from world.ai.scenario_director import (
-    BlueprintLocation,
-    BlueprintObjective,
-    BlueprintPortrait,
-    BlueprintStage,
-    QuestBlueprint,
-    generate_quest_blueprint,
-    register_scenario_director,
-)
-from world.ai.profiles import default_profiles
 from world.quests.compile import (
     CompiledQuest,
     QuestCompileError,
-    SCENE_REQUIREMENT_REGISTRY,
     compile_quest_blueprint,
-    register_generated_quest,
-    scene_requirements_for,
 )
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
     DestinationKind,
     ObjectiveKind,
-    QuestDefinition,
     QuestDefinitionError,
-    QuestStage,
     RoomLocator,
     register_quest_definition,
     validate_definition,
 )
-from world.quests.runtime import QuestState, accept_quest, read_records
-from world.quests.tests._fixtures import QuestRegistryIsolation
-from world.rules.action import (
-    ActionRequest,
-    ActionResolver,
+from world.quests.tests._compile_helpers import (
+    CompileRegistryIsolation,
+    _acquire_payload,
+    _characterized_payload,
+    _defeat_payload,
 )
-from world.rules.combat import (
-    Battlefield,
-    BattlefieldActionContext,
-)
-from world.rules.guild import register_adventurer, turn_in_quest
-from world.rules.guild_offers import (
-    GUILD_OFFER_REGISTRY,
-    GuildQuestOffer,
-    QuestReward,
-)
-from world.rules.surfaces import read_counter_trait
 
 from tools.spec_traceability import covers_requirement
-
-
-def _raw(**overrides):
-    raw = default_profiles()
-    for layer, values in overrides.items():
-        raw[layer].update(values)
-    return raw
-
-
-def _quest_type(quest_type="討伐"):
-    return quest_type
-
-
-def _defeat_payload(**overrides):
-    payload = {
-        "name": "討伐低階魔物",
-        "quest_type": "討伐",
-        "rank": "F",
-        "issuer": "guild_branch_altoria",
-        "stages": [
-            {
-                "index": 0,
-                "objective": {"kind": "defeat", "quantity": 1, "monster_tier": "low"},
-                "location_req": {
-                    "layer": "anchor",
-                    "archetype": "forest_path",
-                    "anchor_key": "capital_altoria",
-                    "anchor_near": None,
-                    "xyz": None,
-                    "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
-                },
-                "npc_req": [],
-            }
-        ],
-        "reward": {"copper": 50, "items": [{"item_key": "healing_potion", "quantity": 1}], "merit": 25},
-        "failure": {"deadline_hours": None, "conditions": []},
-    }
-    payload.update(overrides)
-    return payload
-
-
-def _acquire_payload(**overrides):
-    payload = {
-        "name": "採集治療藥水",
-        "quest_type": "採集",
-        "rank": "F",
-        "issuer": "guild_branch_altoria",
-        "stages": [
-            {
-                "index": 0,
-                "objective": {
-                    "kind": "acquire",
-                    "quantity": 1,
-                    "item_key": "healing_potion",
-                },
-                "location_req": None,
-                "npc_req": [],
-            }
-        ],
-        "reward": {"copper": 50, "items": [], "merit": 25},
-        "failure": {"deadline_hours": 72, "conditions": []},
-    }
-    payload.update(overrides)
-    return payload
-
-
-def _characterized_payload(**overrides):
-    payload = _defeat_payload()
-    payload["stages"][0]["objective"] = {
-        "kind": "defeat",
-        "quantity": 1,
-        "monster_tier": None,
-    }
-    payload["stages"][0]["location_req"] = {
-        "layer": "instance",
-        "archetype": "forest_path",
-        "anchor_key": None,
-        "anchor_near": "capital_altoria",
-        "xyz": None,
-        "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
-    }
-    payload["stages"][0]["npc_req"] = [
-        {
-            "role": "bandit",
-            "tier": "bandit",
-            "disposition": None,
-            "display_name": "黑鬍",
-            "age": 35,
-            "apparent_age": 35,
-            "portrait": {"stable_key": "forest_bandit_chief"},
-        }
-    ]
-    payload.update(overrides)
-    return payload
-
-
-class CompileRegistryIsolation(QuestRegistryIsolation):
-    def setUp(self):
-        super().setUp()
-        self._offer_items = list(GUILD_OFFER_REGISTRY.items())
-
-    def tearDown(self):
-        GUILD_OFFER_REGISTRY.clear()
-        GUILD_OFFER_REGISTRY.update(self._offer_items)
-        super().tearDown()
-
 
 class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime")
@@ -524,113 +378,6 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
             register_quest_definition(_defeat_payload())
         self.assertEqual(QUEST_DEFINITION_REGISTRY, dict(self._registry_items))
 
-
-class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
-    def setUp(self):
-        super().setUp()
-        # Pure-unit class: the durable store is a database Script, so the
-        # store boundary is patched to keep every test here DB-free.
-        patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def _compiled(self):
-        return compile_quest_blueprint(_defeat_payload())
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_double_registration_is_idempotent(self):
-        compiled = self._compiled()
-        register_generated_quest(compiled)
-        register_generated_quest(compiled)
-        self.assertEqual(
-            len(QUEST_DEFINITION_REGISTRY),
-            len(self._registry_items) + 1,
-        )
-        self.assertEqual(
-            len(GUILD_OFFER_REGISTRY),
-            len(self._offer_items) + 1,
-        )
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_conflicting_offer_rolls_back_the_definition_write(self):
-        first = compile_quest_blueprint(
-            {
-                **_defeat_payload(),
-                "reward": {"copper": 50, "items": [], "merit": 25},
-            }
-        )
-        register_generated_quest(first)
-        before_definition = dict(QUEST_DEFINITION_REGISTRY)
-        before_offer = dict(GUILD_OFFER_REGISTRY)
-
-        conflicting = compile_quest_blueprint(
-            {
-                **_defeat_payload(),
-                "reward": {"copper": 60, "items": [], "merit": 25},
-            }
-        )
-        with self.assertRaises(QuestCompileError):
-            register_generated_quest(conflicting)
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
-        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_definition_new_plus_offer_conflicting_leaves_both_registries_unchanged(self):
-        # A conflicting offer already exists for the identity of a definition
-        # that is not yet registered (possible through direct registry writes).
-        # The preflight must reject before writing the definition, so neither
-        # registry changes.
-        compiled = self._compiled()
-        existing_offer = GuildQuestOffer(
-            definition_key=compiled.definition.key,
-            issuer_branch_key="guild_branch_altoria",
-            reward=QuestReward(
-                copper=60,
-                items=(),
-                merit=25,
-            ),
-        )
-        GUILD_OFFER_REGISTRY[(compiled.definition.key, "guild_branch_altoria")] = (
-            existing_offer
-        )
-        before_definition = dict(QUEST_DEFINITION_REGISTRY)
-        before_offer = dict(GUILD_OFFER_REGISTRY)
-        with self.assertRaises(QuestCompileError):
-            register_generated_quest(compiled)
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
-        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_register_generated_quest_refuses_escort_stages(self):
-        from ._fixtures import anchor_locator, escort, quest
-        from world.quests.definitions import QuestType
-
-        definition = quest(
-            "escort_publication_guard",
-            quest_type=QuestType.ESCORT,
-            stages=(QuestStage(0, escort(anchor_locator())),),
-        )
-        compiled = CompiledQuest(
-            definition=definition,
-            reward=QuestReward(copper=50, items=(), merit=25),
-            issuer_branch_key="guild_branch_altoria",
-            stage_requirements=(),
-        )
-        with self.assertRaisesRegex(
-            QuestCompileError,
-            "ESCORT stages cannot be published until a protected-entity "
-            "binding flow exists",
-        ):
-            register_generated_quest(compiled)
-        self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
-        self.assertNotIn(
-            (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
-        )
-
-
 class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     def test_occupant_stage_at_anchor_is_rejected_by_the_compiler(self):
@@ -757,115 +504,6 @@ class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(payload)
 
-
-class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase):
-    def setUp(self):
-        super().setUp()
-        self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
-        # Pure-unit class: the durable store is a database Script, so the
-        # store boundary is patched to keep every test here DB-free.
-        patcher = patch(
-            "world.quests.compile.append_generated_quest_payload", return_value=True
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def tearDown(self):
-        SCENE_REQUIREMENT_REGISTRY.clear()
-        SCENE_REQUIREMENT_REGISTRY.update(self._requirements_items)
-        super().tearDown()
-
-    def _bound_compiled(self):
-        payload = _defeat_payload()
-        payload["stages"][0]["objective"] = {
-            "kind": "defeat",
-            "quantity": 1,
-            "monster_tier": None,
-        }
-        payload["stages"][0]["location_req"] = {
-            "layer": "instance",
-            "archetype": "forest_path",
-            "anchor_key": None,
-            "anchor_near": "capital_altoria",
-            "xyz": None,
-            "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
-        }
-        payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
-        ]
-        return compile_quest_blueprint(payload)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_scene_requirements_are_registered_with_the_publication(self):
-        compiled = self._bound_compiled()
-        register_generated_quest(compiled)
-        requirements = scene_requirements_for(compiled.definition.key)
-        self.assertEqual(len(requirements), 1)
-        self.assertEqual(requirements[0].index, 0)
-        self.assertEqual(requirements[0].npc_reqs, (("bandit", "bandit", None),))
-        self.assertEqual(compiled.stage_requirements, requirements)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_double_registration_keeps_one_requirement_entry(self):
-        compiled = self._bound_compiled()
-        register_generated_quest(compiled)
-        before = scene_requirements_for(compiled.definition.key)
-        register_generated_quest(compiled)
-        after = scene_requirements_for(compiled.definition.key)
-        self.assertEqual(len(before), 1)
-        self.assertEqual(after, before)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_two_blueprints_differing_only_in_scenes_compile_to_different_keys(self):
-        first = self._bound_compiled()
-        second_payload = _defeat_payload()
-        second_payload["stages"][0]["objective"] = {
-            "kind": "defeat",
-            "quantity": 1,
-            "monster_tier": None,
-        }
-        second_payload["stages"][0]["location_req"] = {
-            "layer": "instance",
-            "archetype": "forest_path",
-            "anchor_key": None,
-            "anchor_near": "capital_altoria",
-            "xyz": None,
-            "scene_sentence": "另一段不同的場景描述。",
-        }
-        second_payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
-        ]
-        second = compile_quest_blueprint(second_payload)
-        self.assertNotEqual(first.definition.key, second.definition.key)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_conflicting_offer_rollback_leaves_no_requirement_entry(self):
-        compiled = self._bound_compiled()
-        existing_offer = GuildQuestOffer(
-            definition_key=compiled.definition.key,
-            issuer_branch_key="guild_branch_altoria",
-            reward=QuestReward(copper=60, items=(), merit=25),
-        )
-        GUILD_OFFER_REGISTRY[(compiled.definition.key, "guild_branch_altoria")] = (
-            existing_offer
-        )
-        before_definition = dict(QUEST_DEFINITION_REGISTRY)
-        before_offer = dict(GUILD_OFFER_REGISTRY)
-        with self.assertRaises(QuestCompileError):
-            register_generated_quest(compiled)
-        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
-        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
-        self.assertNotIn(compiled.definition.key, SCENE_REQUIREMENT_REGISTRY)
-
-    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_hand_written_definition_reads_back_empty_requirements(self):
-        from world.quests.catalog import INTRODUCTORY_HUNT
-
-        register_quest_definition(INTRODUCTORY_HUNT)
-        self.assertEqual(scene_requirements_for(INTRODUCTORY_HUNT.key), ())
-        self.assertNotIn(INTRODUCTORY_HUNT.key, SCENE_REQUIREMENT_REGISTRY)
-
-
 class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
@@ -990,141 +628,5 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
             npc_reqs=(("bandit", "bandit", None),),
             characterizations=(StageNpcCharacterization(),),
         )
-
-
-class SharedPayloadContractTests(CompileRegistryIsolation, unittest.TestCase):
-    @covers_requirement("scenario-director::the-canonical-payload-contract-is-versioned-and-shared-by-both-boundaries")
-    def test_guardrail_valid_payload_compiles_without_contract_rejection(self):
-        from jsonschema import Draft7Validator
-
-        from world.ai.director_templates import QUEST_TEMPLATE_POOL
-        from world.ai.scenario_director import (
-            SCENARIO_DIRECTOR_OUTPUT_SCHEMA,
-            _VALIDATORS,
-        )
-
-        for entry in QUEST_TEMPLATE_POOL:
-            with self.subTest(entry=entry.name):
-                payload = entry.to_payload()
-                validator = Draft7Validator(SCENARIO_DIRECTOR_OUTPUT_SCHEMA)
-                self.assertEqual(
-                    [error.message for error in validator.iter_errors(payload)], []
-                )
-                for validator_fn in _VALIDATORS.values():
-                    self.assertEqual(validator_fn(payload), [])
-                compiled = compile_quest_blueprint(payload)
-                validate_definition(compiled.definition)
-
-
-class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTest):
-    """Offline loop through the template draw, compile, register, accept,
-    fight, and turn-in with no LLM call and no generative state mutation."""
-
-    def setUp(self):
-        super().setUp()
-        from world.quests.bootstrap import sync_quest_runtime
-
-        sync_quest_runtime()
-        register_scenario_director()
-        self.hall = create_object(Room, key="offline-hall")
-        self.staff = create_object(NPC, key="offline staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(
-                self.staff,
-                service_id="staff",
-                branch_key="guild_branch_altoria",
-            )
-        )
-        self.player = create_object(PlayerCharacter, key="offline-director-player")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
-        self.player.location = self.hall
-        register_adventurer(self.player, self.staff)
-
-    def _monster(self, key: str, hp: int = 1) -> Monster:
-        monster = create_object(Monster, key=key, location=self.player.location)
-        monster.threat_tier = "low"
-        monster.apply_monster_tier("floor")
-        monster.traits.hp._data["current"] = hp
-        return monster
-
-    def _resolve_lethal(self, monster: Monster):
-        field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({monster.key})},
-            {self.player.key: self.player, monster.key: monster},
-        )
-        request = ActionRequest(
-            self.player,
-            "fire_ball",
-            [monster],
-            BattlefieldActionContext(field),
-        )
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
-
-    @covers_requirement("quest-progress-tracking::change-15-exposes-a-deterministic-no-ai-completion-seam-for-phase-4")
-    @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
-    def test_offline_loop_completes_with_no_llm_and_no_generative_mutation(self):
-        disabled = {layer: {"enabled": False} for layer in ("narrator", "npc_dialogue", "scenario_director", "scene_builder")}
-        client = FakeLLMClient()
-        context = {
-            "requested_type": "討伐",
-            "allowed_rank": "F",
-            "issuer_branch": "guild_branch_altoria",
-            "anchor": "capital_altoria",
-        }
-        with override_settings(LLM_PROFILES=_raw(**disabled)):
-            d = generate_quest_blueprint(client, context=context)
-            blueprint = await_result(d)
-        self.assertIsInstance(blueprint, QuestBlueprint)
-        self.assertEqual(len(client.calls), 0)
-
-        compiled = compile_quest_blueprint(blueprint.to_payload())
-        register_generated_quest(compiled)
-        self.assertTrue(scene_requirements_for(compiled.definition.key))
-
-        record = accept_quest(self.player, compiled.definition.key)
-        self.assertIs(record.state, QuestState.IN_PROGRESS)
-        from world.quests.binding import bind_stage_runtime
-
-        from typeclasses.rooms import InstanceRoom
-
-        room = create_object(InstanceRoom, key="offline-director-instance")
-        monster = self._monster("offline-director-goblin")
-        bind_stage_runtime(
-            self.player,
-            record.quest_id,
-            room=room,
-            objective_targets=(monster,),
-        )
-        result = self._resolve_lethal(monster)
-        self.assertEqual(result.outcome, "success")
-
-        completed = [
-            r
-            for r in read_records(self.player)
-            if r.definition_key == compiled.definition.key
-            and r.state is QuestState.COMPLETED
-        ]
-        self.assertTrue(completed, "quest did not auto-complete offline")
-
-        turn_in = turn_in_quest(self.player, self.staff, completed[0].quest_id)
-        self.assertEqual(turn_in["copper"], compiled.reward.copper)
-        self.assertEqual(turn_in["merit"], compiled.reward.merit)
-        self.assertEqual(self.player.db.wallet, compiled.reward.copper)
-        self.assertEqual(read_counter_trait(self.player, "guild_merit"), compiled.reward.merit)
-        for item in compiled.reward.items:
-            self.assertIn(item.item_key, self.player.db.inventory)
-
-
-def await_result(d):
-    result = d.result
-    d.addErrback(lambda f: None)
-    return result
-
-
 if __name__ == "__main__":
     unittest.main()
