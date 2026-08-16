@@ -101,10 +101,17 @@ class UnlockQueryTests(EvenniaTestCase):
             SKILL_REGISTRY, {skill.key: skill}
         ):
             entity.db.skills = {"active": ["divine_sexual_mastery"], "passive": []}
-            self.assertEqual(
-                entity.sexual.unlocked_act_keys(),
-                frozenset(SEXUAL_ACT_REGISTRY),
+            # The mastery blanket covers the counter-gated catalogue only:
+            # requires_divine_arts acts (the shipped divine line) are excluded
+            # (divine-sexual-arts-reuse design D-8). The patched gated act
+            # declares no such requirement, so it stays unlocked.
+            expected = frozenset(
+                key
+                for key in SEXUAL_ACT_REGISTRY
+                if not SKILL_REGISTRY[key].requires_divine_arts
             )
+            self.assertEqual(entity.sexual.unlocked_act_keys(), expected)
+            self.assertIn(act.key, entity.sexual.unlocked_act_keys())
 
     @covers_requirement("sexual-state-handler::sexualstate-unlocked-act-keys-gates-the-sexual-act-catalogue-by-counter-thresholds-or-unlocks-it-entirely-for-a-mastery-holder")
     def test_conferred_mastery_grant_does_not_unlock_the_catalogue(self):

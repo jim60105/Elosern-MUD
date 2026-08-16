@@ -455,20 +455,20 @@ class ActFamilyTests(unittest.TestCase):
 
 
 class LineModuleTests(unittest.TestCase):
-    """The five content modules carry act rows; 神之秘法 stays empty (design D-3)."""
+    """Every content module carries act rows once its catalog proposal lands."""
 
-    @covers_requirement("sexual-act-registry::the-six-line-modules-ship-pre-declared-and-pre-imported-異種-and-神之秘法-remain-empty")
-    def test_every_line_module_is_importable_with_only_divine_empty(self):
+    @covers_requirement("sexual-act-registry::the-six-line-modules-ship-pre-declared-and-pre-imported")
+    def test_every_line_module_is_importable_and_non_empty(self):
         for module, constant in (
             (sexual_acts.solo, "SOLO_ACTS"),
             (sexual_acts.shame, "SHAME_ACTS"),
             (sexual_acts.partner, "PARTNER_ACTS"),
             (sexual_acts.combat, "COMBAT_ACTS"),
             (sexual_acts.interspecies, "INTERSPECIES_ACTS"),
+            (sexual_acts.divine, "DIVINE_ACTS"),
         ):
             with self.subTest(module=module.__name__):
                 self.assertTrue(getattr(module, constant))
-        self.assertEqual(sexual_acts.divine.DIVINE_ACTS, ())
 
 
 class RegistryAssemblyTests(unittest.TestCase):

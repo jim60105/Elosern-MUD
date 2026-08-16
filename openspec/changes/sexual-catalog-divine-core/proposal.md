@@ -65,11 +65,15 @@ design.md D-1 through D-4.
 - **Registers three new effect prefixes in `action.py`'s `_EFFECT_HANDLERS` table**:
   `divine_pleasure_max:`, `divine_climax_extension_stage:`, and `divine_drain:`, plus their typed
   `effects.py` dataclasses (`DivinePleasureMaxEffect`, `ClimaxExtensionStageEffect`,
-  `SexualDrainEffect`). Each is a general dispatch-table entry usable by any future `SkillDef` that
+  `SexualDrainEffect`) and three new `_ENTRY_TEMPLATES` kinds (`divine_pleasure_max`,
+  `divine_climax_extension`, `divine_drain`) for the handlers' `PendingEffect` descriptions
+  (`_entries_from_effect` requires every description's first part to name a registered template kind).
+  Each is a general dispatch-table entry usable by any future `SkillDef` that
   names it, matching how every other prefix in that table is already line-agnostic — nothing about
   the handler implementations reads `requires_divine_arts` or checks the caller's line.
 - **Amends the design doc's stated Scope** (`divine.py`, `sexual_state.py`, `sexual.yaml`) to add
-  `world/rules/action.py` and `world/skills/effects.py`. Neither `_builder.py` nor `sexual.yaml` needs
+  `world/rules/action.py`, `world/skills/effects.py`, and `world/skills/sexual_acts/__init__.py` (the
+  mastery-branch exclusion — see design.md D-8). Neither `_builder.py` nor `sexual.yaml` needs
   a change: see design.md D-1 for why the three-effect-prefix approach needed no `_act_family()`
   relaxation, once 絕頂律令 was redesigned in D-2 to not go through `sexual_events` at all. The design
   doc itself authorizes such amendments: "the design document wins unless a change amends it
@@ -99,16 +103,31 @@ design.md D-1 through D-4.
   named lines and updates it.) Every other requirement this capability defines (the `_PARLESS_LINES`
   rule, the forbidden-`sexual_events` rule, ...) is exercised, not changed — this proposal's three acts
   comply with all of them despite bypassing `_act_family()` itself.
+- `sexual-state-handler`: the mastery blanket-unlock requirement's "or unlocks it entirely for a
+  mastery holder" clause is amended to carve out `requires_divine_arts=True` acts — the shipped
+  `unlocked_act_keys_for` mastery branch returns the entire registry, and the design doc §1.1 ("The
+  性魔法主宰 blanket unlock does not reach them") plus this change's "SexualMasteryEffect ownership
+  alone does not unlock any of the three" scenario require the exclusion (design.md D-8).
 
 ## Impact
 
 - Code: `world/skills/sexual_acts/divine.py` (fills `DIVINE_ACTS`); `world/skills/effects.py` (three
   new frozen dataclasses); `world/rules/action.py` (three new handler functions plus their
-  `_EFFECT_HANDLERS` registrations); a new test module,
-  `world/skills/sexual_acts/tests/test_divine_core_catalog.py`; one existing test updated,
+  `_EFFECT_HANDLERS` registrations and three new `_ENTRY_TEMPLATES` kinds for their `PendingEffect`
+  descriptions); **`world/skills/sexual_acts/__init__.py` (`unlocked_act_keys_for`'s mastery branch
+  excludes `requires_divine_arts=True` acts — see design.md D-8; the shipped blanket grants the
+  entire registry, and the delta spec's "SexualMasteryEffect ownership alone does not unlock any of
+  the three" scenario requires the carve-out)**; a new test module,
+  `world/skills/sexual_acts/tests/test_divine_core_catalog.py`; four existing tests updated:
   `world/skills/sexual_acts/tests/test_registry_structure.py::test_every_line_module_is_importable_
   with_only_divine_empty` (its `DIVINE_ACTS == ()` assertion becomes false by design — see design.md's
-  Migration Plan).
+  Migration Plan), `world/skills/sexual_acts/tests/test_seed_acts.py::test_interspecies_and_divine_
+  gain_no_seed` (same `DIVINE_ACTS == ()` pin), `world/rules/tests/test_sexual_unlock.py::
+  test_direct_mastery_ownership_unlocks_the_entire_catalogue` (its whole-registry equality assertion
+  becomes false once the mastery branch excludes divine acts), and
+  `world/skills/tests/test_skill_registry.py::test_per_category_key_sets_match_the_d4_classification_
+  table` (the pinned `SEXUAL_ACT` key set gains the three new act keys — the same file the
+  `sexual-catalog-interspecies` change extended for its seven acts).
 - No change to `world/skills/sexual_acts/_builder.py`, `world/rules/sexual_state.py`, or
   `world/rules/rulebook/sexual.yaml` — every `SexualState` mutator and every rulebook row already
   exists; this proposal only adds callers, and 絕頂律令 specifically does not call into
