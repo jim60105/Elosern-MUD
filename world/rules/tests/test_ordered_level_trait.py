@@ -4,14 +4,14 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.contrib.rpg.traits import TraitHandler
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import AROUSAL_LEVELS
 from world.rules.rulebook.schema import evaluate_condition
 
 
-class OrderedLevelTraitTests(EvenniaTest):
+class OrderedLevelTraitTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         entity = create_object(PlayerCharacter, key="ordered levels")

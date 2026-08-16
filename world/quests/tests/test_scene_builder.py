@@ -19,7 +19,7 @@ from django.test import override_settings
 from evennia.prototypes import prototypes as prototypes_module
 from evennia.prototypes import spawner as spawner_module
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
@@ -229,7 +229,7 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
     def _fresh(self, quest_id):
         return next(r for r in read_records(self.player) if r.quest_id == quest_id)
 
-class SceneOccupantPrototypeTests(EvenniaTest):
+class SceneOccupantPrototypeTests(EvenniaTestCase):
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_module_prototypes_resolve_with_whitelisted_keys_and_typeclasses(self):
         prototypes_module.load_module_prototypes("world.prototypes")

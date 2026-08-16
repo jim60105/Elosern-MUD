@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
 from world.imports.loader import ImportRejected, load_batch
@@ -13,7 +13,7 @@ from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from world.imports.validate import main, validate_batch
 
 
-class BatchTests(EvenniaTest):
+class BatchTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()

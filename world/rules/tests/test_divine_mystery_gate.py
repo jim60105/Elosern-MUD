@@ -7,7 +7,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
@@ -40,7 +40,7 @@ DIVINE_SKILL_KEYS = (
 UNMECHANIZED_KEYS = DIVINE_SKILL_KEYS[2:]
 
 
-class DivineMysteryGateTests(EvenniaTest):
+class DivineMysteryGateTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="divine-room")

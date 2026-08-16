@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.combat import (
@@ -78,7 +78,7 @@ class GoldenCombatTests(unittest.TestCase):
         self.assertEqual(result.total_seconds, 18)
 
 
-class GoldenResolverBattleTests(EvenniaTest):
+class GoldenResolverBattleTests(EvenniaTestCase):
     def _battlefield(self, suffix: str) -> Battlefield:
         first = create_object(PlayerCharacter, key=f"first-{suffix}")
         second = create_object(PlayerCharacter, key=f"second-{suffix}")

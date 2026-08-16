@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import (
@@ -111,7 +111,7 @@ class BuffDefinitionValidationTests(unittest.TestCase):
         self.assertEqual(active_buff_keys_from_storage(entity), set())
 
 
-class BuffIntegrationTests(EvenniaTest):
+class BuffIntegrationTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="buff target")
         entity.race = "human"

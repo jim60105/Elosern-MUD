@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS, GENERIC_BODY_PART
@@ -603,7 +603,7 @@ class SexualActEffectsStructuralTests(unittest.TestCase):
             )
 
 
-class OwnershipDriftGuardTests(EvenniaTest):
+class OwnershipDriftGuardTests(EvenniaTestCase):
     """owned_keys() equals base_owned_keys() plus the unconditionally-unlocked seed acts."""
 
     # Only the acts with an empty unlock mapping are owned by a fresh entity;

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.action import CmdCast
 from commands.combat import CmdCombatActions
@@ -43,7 +43,7 @@ def _monster(key="token goblin", hp=100):
     return monster
 
 
-class TokenParsingTests(BattlefieldIsolation, EvenniaTest):
+class TokenParsingTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="token arena")

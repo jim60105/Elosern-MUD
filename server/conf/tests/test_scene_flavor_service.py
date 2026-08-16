@@ -17,7 +17,7 @@ from django.db import transaction
 from django.test import override_settings
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom, InstanceRoom
@@ -81,7 +81,7 @@ def _install_scene_flavor():
     scene_flavor.register_scene_flavor()
 
 
-class SceneFlavorServiceTests(EvenniaTest):
+class SceneFlavorServiceTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         _install_scene_flavor()
@@ -296,7 +296,7 @@ def _instance_bound_payload(**overrides):
     return payload
 
 
-class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTest):
+class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase):
     """CmdEnterScene schedules exactly one generation on commit (design D2)."""
 
     def setUp(self):

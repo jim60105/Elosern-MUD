@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS
@@ -197,7 +197,7 @@ class ShameActRegistrationTests(unittest.TestCase):
                 self.assertIn(part, BODY_PARTS)
 
 
-class ShameUnlockTests(EvenniaTest):
+class ShameUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
     @covers_requirement("sexual-catalog-shame::nine-tier-1-4-shame-acts-are-registered-gated-by-exposure-act-count-and-or-watched-count-thresholds")

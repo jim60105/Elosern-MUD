@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff
@@ -26,7 +26,7 @@ RULES = {
 }
 
 
-class CombatModifierTests(EvenniaTest):
+class CombatModifierTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="modifier target")
         entity.race = "human"

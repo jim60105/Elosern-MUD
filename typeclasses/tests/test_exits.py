@@ -6,7 +6,7 @@ import inspect
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.exits import (
     WildernessGateExit,
@@ -219,7 +219,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, self.north_gate)
 
 
-class WildernessClockChargeSourceTests(EvenniaTest):
+class WildernessClockChargeSourceTests(EvenniaTestCase):
     """Source-inspection: the wilderness wiring routes through the shared
     ``after_successful_movement`` completion helper (onboarding-skip coverage
     design D1), never an inline get_world_clock().advance."""

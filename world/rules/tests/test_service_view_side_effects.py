@@ -11,7 +11,7 @@ create the world-clock singleton, or read ``disguised_stats``.
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
@@ -27,7 +27,7 @@ from world.rules.service_view import build_services_view
 from world.rules.surfaces import write_counter_trait
 
 
-class ServicesViewSideEffectTests(EvenniaTest):
+class ServicesViewSideEffectTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())

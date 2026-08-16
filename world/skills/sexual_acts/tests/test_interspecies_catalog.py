@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -211,7 +211,7 @@ class InterspeciesActRegistrationTests(unittest.TestCase):
                         self.assertGreater(mating_gain, receive_gain)
 
 
-class InterspeciesUnlockTests(EvenniaTest):
+class InterspeciesUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
     @covers_requirement("sexual-catalog-interspecies::seven-tier-1-4-interspecies-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-interspecies-act-count-thresholds")

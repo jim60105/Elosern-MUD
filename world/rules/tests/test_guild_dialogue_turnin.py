@@ -11,7 +11,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
@@ -89,7 +89,7 @@ class DialogueTurnInRegistryIsolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTest):
+class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="hall")
@@ -209,7 +209,7 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTest):
         )
 
 
-class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTest):
+class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="hall")

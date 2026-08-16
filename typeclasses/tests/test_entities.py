@@ -4,7 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.utils import lazy_property
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 from evennia.contrib.rpg.buffs import BuffHandler
 
 from typeclasses.characters import PlayerCharacter
@@ -19,7 +19,7 @@ from world.skills.handler import SkillHandler
 from world.rules.sexual_state import SexualState
 
 
-class LivingEntityTests(EvenniaTest):
+class LivingEntityTests(EvenniaTestCase):
     @covers_requirement("living-entity-hierarchy::livingentity-is-the-shared-base-for-characters-npcs-and-monsters", "living-entity-hierarchy::livingentity-non-trait-handlers-are-working-implementations-including-persona")
     def test_every_subclass_instantiates_and_exposes_handlers(self):
         for typeclass in (LivingEntity, PlayerCharacter, NPC, Monster):

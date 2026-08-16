@@ -1,9 +1,7 @@
 ## Purpose
 
 Measured, isolated, and coverage-preserving execution profiles for the Evennia test suite.
-
 ## Requirements
-
 ### Requirement: Optimization is based on reproducible measurements
 The project SHALL capture a pre-change and post-change Evennia test performance report using a recorded baseline commit SHA and optimized revision identity on the same reference machine, with the same Python and Evennia versions, dependency lock, target ownership, migrations, fixtures, warm-up protocol, and coverage state. Before a commit exists, the optimized identity SHALL name the worktree branch, base SHA, and dirty state; its eventual commit SHA supersedes that provisional identity. Each side SHALL use a warm-up followed by at least three measured serial runs and report raw wall times, median wall time, test count, result status, database setup timing, storage and reuse state, coverage state, environment versions, and the slowest tests. Database storage and cross-process reuse MAY differ when they are explicit optimization variables and MUST be disclosed. Performance acceptance SHALL require at least a 20% median wall-time reduction for the full non-browser Evennia profile and SHALL NOT use a hardware-independent seconds threshold.
 
@@ -46,7 +44,7 @@ The project SHALL document uv-locked focused, full local, profiling, canonical q
 - **THEN** the documentation directs removal or rebuilding of only the dedicated test database before rerunning the clean profile
 
 ### Requirement: Fixture optimization preserves the tested boundary
-The project SHALL optimize only measured or inventoried test hot spots. Pure logic SHALL use standard `unittest.TestCase`; tests needing Django or Evennia setup without default game objects SHALL use `EvenniaTestCase` with minimal fixtures; command tests SHALL retain the command-test lifecycle; and tests asserting default world, typeclass persistence, account, session, room, exit, object, or script integration SHALL retain an integration-capable base. Fixture conversions MUST preserve substantive assertions and requirement annotations.
+The project SHALL optimize only measured or inventoried test hot spots. Pure logic SHALL use standard `unittest.TestCase`; tests needing Django or Evennia setup without default game objects SHALL use `EvenniaTestCase` with minimal fixtures; command tests SHALL retain the command-test lifecycle; and tests asserting default world, typeclass persistence, account, session, room, exit, object, or script integration SHALL retain an integration-capable base. A test class that never references the `EvenniaTestMixin` fixtures (any of `char1`, `char2`, `room1`, `room2`, `account`, `session`, `obj1`, `obj2`, `exit`, `script1`) and needs no command lifecycle SHALL inherit `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`), preserving transaction isolation and cache flushing. Fixture conversions MUST preserve substantive assertions and requirement annotations.
 
 #### Scenario: Pure logic avoids default-world creation
 - **WHEN** a measured hot test exercises deterministic calculation, parsing, or formatting without persistence behavior
@@ -209,3 +207,23 @@ The `world/quests/tests/test_scene_builder.py` and `world/quests/tests/test_comp
 #### Scenario: Package-level manifest ownership stays complete
 - **WHEN** the split creates new test modules under `world.quests`
 - **THEN** the ownership contract test still partitions every discovered module exactly once without a manifest edit
+
+### Requirement: Fixture-free test classes use the lightest base
+A test class that, after a dependency review covering its base classes, isolation mixins, the code under test, and any `SESSION_HANDLER` or default-session dependence, never references the `EvenniaTestMixin` fixtures and needs no command lifecycle SHALL inherit `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`) rather than `EvenniaTest`, so per-method setup and teardown cost is not paid for a world the test never uses. The conversion SHALL preserve method bodies, names, substantive assertions, and requirement annotations; a class that fails after conversion SHALL be reverted to its prior base and reported, never repaired by adding fixture usage or weakening assertions. The excluded classes and their exclusion reasons SHALL be recorded with the change for reproducibility, and conversion SHALL be verified per package during the change and by the full suite afterward.
+
+#### Scenario: Stateless-entity tests skip the default world
+- **WHEN** a reviewed test class creates its own entities (`create_object`) and never touches the mixin fixtures, its bases, or session-dependent code
+- **THEN** its base is `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`) and the full suite passes with the same discovered test count
+
+#### Scenario: A failing conversion is reverted, not patched
+- **WHEN** a downgraded class fails under `EvenniaTestCase`
+- **THEN** the class is reverted to `EvenniaTest`, the failure is reported, and no test is weakened or given fake fixtures to make the downgrade stick
+
+#### Scenario: Exclusions are recorded and reproducible
+- **WHEN** a candidate class is excluded from the downgrade (contract-pinned, mixin-dependent, session-dependent, or otherwise)
+- **THEN** the class and its exclusion reason are recorded with the change, and a re-run of the conversion can reproduce the same candidate and exclusion sets
+
+#### Scenario: Contract pins the new boundary
+- **WHEN** the fixture-boundary contract test runs
+- **THEN** a representative sample of the newly downgraded classes is asserted to inherit exactly `EvenniaTestCase` (plus any isolation mixin), and the previously pinned classes keep their documented bases
+

@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
@@ -45,7 +45,7 @@ def _player(key="climax player"):
     return player
 
 
-class ClimaxSettlementActionTests(EvenniaTest):
+class ClimaxSettlementActionTests(EvenniaTestCase):
     """Unit tests for ``climax_settlement_action()`` in isolation."""
 
     def _entity_at(self, level: str):
@@ -120,7 +120,7 @@ class ClimaxSettlementActionTests(EvenniaTest):
                 self.assertEqual(entity.sexual.pending_climax_extension, 0)
 
 
-class CombatClimaxSettlementTests(EvenniaTest):
+class CombatClimaxSettlementTests(EvenniaTestCase):
     """Integration tests on ``_end_of_round_upkeep``."""
 
     def _field(self, *entities):
@@ -216,7 +216,7 @@ class CombatClimaxSettlementTests(EvenniaTest):
         self.assertEqual(entity.sexual.climax_turns, 1)
 
 
-class ClockClimaxSettlementTests(EvenniaTest):
+class ClockClimaxSettlementTests(EvenniaTestCase):
     """Integration tests on ``WorldClock.advance`` and the early-exit fix."""
 
     def _entity_at_floor_in_progress(self, key="clock climaxer"):
@@ -244,7 +244,7 @@ class ClockClimaxSettlementTests(EvenniaTest):
         self.assertEqual(entity.sexual.climax_count, 1)
 
 
-class ClimaxDeadEndRegressionTests(EvenniaTest):
+class ClimaxDeadEndRegressionTests(EvenniaTestCase):
     """The original dead end: 進行中 driven by rules resolves back to 未達."""
 
     @covers_requirement("climax-settlement::an-entity-whose-climax-phase-reaches-進行中-always-resolves-within-finite-settlement-time")

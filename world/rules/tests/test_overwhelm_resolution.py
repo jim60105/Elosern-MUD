@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.combat import (
@@ -229,7 +229,7 @@ class ResolutionTests(unittest.TestCase):
             )
 
 
-class RealCombatEquivalenceTests(EvenniaTest):
+class RealCombatEquivalenceTests(EvenniaTestCase):
     def _entity(self, key: str, *, strong: bool) -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = "human"

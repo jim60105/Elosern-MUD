@@ -15,7 +15,7 @@ from unittest.mock import patch
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff
@@ -76,7 +76,7 @@ def _exam_intent(target_rank="E"):
     return {"kind": "request_guild_exam", "target_rank": target_rank}
 
 
-class ExamIntentTests(ExamRegistryIsolation, EvenniaTest):
+class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="exam hall")
@@ -213,7 +213,7 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNone(read_session(self.player))
 
 
-class ItemIntentTests(EvenniaTest):
+class ItemIntentTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="transfer room")
@@ -326,7 +326,7 @@ class ItemIntentTests(EvenniaTest):
         self.assertFalse(outcome.applied)
 
 
-class AdjustRelationIntentTests(EvenniaTest):
+class AdjustRelationIntentTests(EvenniaTestCase):
     """The adjust_relation intent routes through the sole affinity writer."""
 
     def setUp(self):
@@ -428,7 +428,7 @@ class AdjustRelationIntentTests(EvenniaTest):
         self.assertFalse(self.npc.relations.has_record(self.player))
 
 
-class PartyInviteIntentTests(EvenniaTest):
+class PartyInviteIntentTests(EvenniaTestCase):
     """The party_invite intent routes through the party membership module."""
 
     def setUp(self):
@@ -521,7 +521,7 @@ class PartyInviteIntentTests(EvenniaTest):
         self.assertEqual(outcome.reason, "not_npc")
 
 
-class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTest):
+class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
     """The offer_quest intent routes through the registered guild-offer surface."""
 
     ALTORIA_BRANCH = "guild_branch_altoria"
@@ -728,7 +728,7 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTest):
                 self.assertEqual(self._affinity().value, 1)
 
 
-class RevealLoreIntentTests(EvenniaTest):
+class RevealLoreIntentTests(EvenniaTestCase):
     """The reveal_lore intent records discoveries through the codex writer."""
 
     def setUp(self):
@@ -820,7 +820,7 @@ class RevealLoreIntentTests(EvenniaTest):
         self.assertIsNone(self.player.db.lore_discovered)
 
 
-class CompletionGateTests(EvenniaTest):
+class CompletionGateTests(EvenniaTestCase):
     """The completion gate drops intents after separation or busy transitions.
 
     The gate is the canonical ``intent_context_ok`` predicate -- co-location
@@ -927,7 +927,7 @@ class CompletionGateTests(EvenniaTest):
         self.assertIsNone(self.npc.db.party_member)
 
 
-class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTest):
+class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
     """A second-side ACQUIRE failure restores both entities' quest surfaces too."""
 
     def setUp(self):

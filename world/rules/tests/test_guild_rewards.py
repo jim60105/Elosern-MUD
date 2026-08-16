@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
@@ -80,7 +80,7 @@ class OfferRegistryIsolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class OfferValidationTests(OfferRegistryIsolation, EvenniaTest):
+class OfferValidationTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.test_definition = register(
@@ -181,7 +181,7 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTest):
         self.assertIn((s_definition.key, ALTORIA_BRANCH), GUILD_OFFER_REGISTRY)
 
 
-class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
+class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         from world.rules.guild_config import load_guild_catalog, register_catalog_offers
@@ -281,7 +281,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTest):
         self.assertEqual(self.staff.db.relations_data, relations_before)
 
 
-class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
+class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="hall")
@@ -532,7 +532,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTest):
         self.assertEqual(companion.relations.affinity_for(self.player), 0)
 
 
-class RewardClaimsParsingTests(QuestRegistryIsolation, EvenniaTest):
+class RewardClaimsParsingTests(QuestRegistryIsolation, EvenniaTestCase):
     def _player(self):
         player = create_object(PlayerCharacter, key="claims player")
         return player

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from evennia.prototypes import prototypes as prototypes_module
 from evennia.prototypes import spawner as spawner_module
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.exits import Exit
 from typeclasses.rooms import InstanceRoom, Room
@@ -33,7 +33,7 @@ NON_WHITELISTED_PROTOTYPE = {
 }
 
 
-class InstancePrototypeWhitelistTests(EvenniaTest):
+class InstancePrototypeWhitelistTests(EvenniaTestCase):
     def test_module_prototype_registers_with_whitelisted_key_and_typeclass(self):
         prototypes_module.load_module_prototypes("world.prototypes")
         prototype = spawner_module.search_prototype("instance_room", require_single=True)[0]

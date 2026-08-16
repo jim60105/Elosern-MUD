@@ -6,7 +6,7 @@ import ast
 import inspect
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -27,7 +27,7 @@ def _fresh_entity_act_keys():
     )
 
 
-class SkillHandlerTests(EvenniaTest):
+class SkillHandlerTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="skill tester")
         entity.race = "human"

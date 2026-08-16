@@ -6,7 +6,7 @@ cover the pure gate contract against real ``PlayerCharacter`` attributes.
 """
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.art.adult import ADULT_MINIMUM, PortraitRejected, portrait_eligibility
@@ -14,7 +14,7 @@ from world.art.adult import ADULT_MINIMUM, PortraitRejected, portrait_eligibilit
 from tools.spec_traceability import covers_requirement
 
 
-class AdultGateTests(EvenniaTest):
+class AdultGateTests(EvenniaTestCase):
     character_typeclass = PlayerCharacter
 
     def setUp(self):

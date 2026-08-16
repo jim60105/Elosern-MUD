@@ -19,7 +19,7 @@ import unittest
 from django.db import transaction
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -83,7 +83,7 @@ class MembershipOwnershipContractTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
 
-class PartyMembershipTests(EvenniaTest):
+class PartyMembershipTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         register_catalog()
@@ -263,7 +263,7 @@ class PartyMembershipTests(EvenniaTest):
         self.assertEqual(int(self.npc.db.party_member), int(other_player.pk))
 
 
-class AutoLeaveIntegrationTests(EvenniaTest):
+class AutoLeaveIntegrationTests(EvenniaTestCase):
     """The wired auto-leave rule run from the affinity writer (party-core D-5)."""
 
     def setUp(self):

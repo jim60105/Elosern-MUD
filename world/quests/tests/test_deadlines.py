@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import InstanceRoom, Room
@@ -34,7 +34,7 @@ from ._fixtures import (
 )
 
 
-class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTest):
+class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.player = create_object(PlayerCharacter, key="deadline-player")
@@ -215,7 +215,7 @@ class StartupRecoveryDeadlineTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(get_world_clock().tick, self.hours)
 
 
-class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
+class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
@@ -258,7 +258,7 @@ class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTest):
         self.assertFalse(InstanceRoom.objects.filter(id=room.id).exists())
 
 
-class DeadlineRollbackCacheTests(QuestRegistryIsolation, EvenniaTest):
+class DeadlineRollbackCacheTests(QuestRegistryIsolation, EvenniaTestCase):
     """A rolled-back advance restores quest logs and room pins (F5).
 
     ``WorldClock.advance`` snapshots every durable surface the

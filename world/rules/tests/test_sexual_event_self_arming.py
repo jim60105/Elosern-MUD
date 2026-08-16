@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, ActionResolver
@@ -17,7 +17,7 @@ class _FixedRng:
         return lower
 
 
-class SexualEventSelfArmingTests(EvenniaTest):
+class SexualEventSelfArmingTests(EvenniaTestCase):
     def test_landed_transition_module_resolves_and_mutates(self):
         actor = create_object(PlayerCharacter, key="sexual-caster")
         actor.race = "human"

@@ -4,7 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
 from typeclasses.npcs import NPC
@@ -51,7 +51,7 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         super().tearDown()
 
 
-class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTest):
+class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def _guild_host(self):
         return NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first()
 
@@ -145,7 +145,7 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTest):
         )
 
 
-class ServiceContentWithoutInteriorsTests(EvenniaTest):
+class ServiceContentWithoutInteriorsTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())

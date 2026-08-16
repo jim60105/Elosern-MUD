@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art.queue import ensure, settle
 from world.art.store import ArtAssetStatus
@@ -20,7 +20,7 @@ def _scene(key="forest_path"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
-class ArtMediaViewTests(EvenniaTest):
+class ArtMediaViewTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()

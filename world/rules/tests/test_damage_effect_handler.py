@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
@@ -210,7 +210,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
         )
 
 
-class DamageResolverIntegrationTests(EvenniaTest):
+class DamageResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")

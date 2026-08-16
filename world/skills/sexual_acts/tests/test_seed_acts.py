@@ -11,7 +11,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.quests.catalog import register_catalog
@@ -173,7 +173,7 @@ class SeedActCastingTests(EvenniaTest):
                 self.assertEqual(self.target.sexual.hostile_act_count, 0, key)
 
 
-class ShameSeedExposureTests(EvenniaTest):
+class ShameSeedExposureTests(EvenniaTestCase):
     """shame_hem_lift raises the actor's exposure and cascades into shame."""
 
     def _entity(self):

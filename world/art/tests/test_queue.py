@@ -3,7 +3,7 @@
 from unittest.mock import patch
 import unittest
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art.queue import (
     claim,
@@ -26,7 +26,7 @@ def _scene(key="forest_path"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
-class ArtQueueTests(EvenniaTest):
+class ArtQueueTests(EvenniaTestCase):
     @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
     def test_reensuring_pending_in_progress_or_done_is_a_noop(self):
         subject = _scene()

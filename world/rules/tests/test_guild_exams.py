@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff
@@ -322,7 +322,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(orphans.count(), 0)
 
 
-class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
+class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="exam hall")
@@ -579,7 +579,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTest):
         )
 
 
-class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTest):
+class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
     """fix-combat-settlement-recovery: exam time settles exactly once.
 
     The old ordering (exam write and clear before the clock advance) lost the
@@ -783,7 +783,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
 
 
-class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTest):
+class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.hall = create_object(Room, key="profile hall")

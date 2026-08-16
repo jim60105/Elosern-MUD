@@ -6,7 +6,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -45,7 +45,7 @@ from world.skills.registry import SKILL_REGISTRY
 import world.rules.progression as progression
 
 
-class ProgressionTests(EvenniaTest):
+class ProgressionTests(EvenniaTestCase):
     def _character(self, key: str, race: str = "human") -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = race
@@ -364,7 +364,7 @@ class ProgressionTests(EvenniaTest):
         )
 
 
-class NpcPolicyCastGateIntegrationTests(EvenniaTest):
+class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
     """The generic NPC policy never wastes a turn on a tier-blocked spell.
 
     Drives ``run_round`` with ``monster_behaviour_policy`` — the exact
@@ -436,7 +436,7 @@ class NpcPolicyCastGateIntegrationTests(EvenniaTest):
         self.assertEqual(self.companion.traits.mp.value, 30)
 
 
-class ElementMasteryGateTests(EvenniaTest):
+class ElementMasteryGateTests(EvenniaTestCase):
     """element-mastery: rank-title and cast-gate pure functions."""
 
     def _caster(
@@ -788,7 +788,7 @@ class ElementMasteryGateTests(EvenniaTest):
         self.assertTrue(can_cast_spell_tier(entity, "fire", "術師"))
 
 
-class ElementAffinityProgressionTests(EvenniaTest):
+class ElementAffinityProgressionTests(EvenniaTestCase):
     """element-affinity: multiplicative effective-level derivation and gate."""
 
     def _caster(

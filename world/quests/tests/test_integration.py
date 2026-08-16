@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -41,7 +41,7 @@ from ._fixtures import QuestRegistryIsolation, defeat, quest, register
 QUESTS_ROOT = Path(__file__).resolve().parents[2]
 
 
-class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTest):
+class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         sync_quest_runtime()
@@ -186,7 +186,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.assertGreaterEqual(self.calls.count("quest"), 1)
 
 
-class Change16ReadContractTests(QuestRegistryIsolation, EvenniaTest):
+class Change16ReadContractTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         register_catalog()
@@ -212,7 +212,7 @@ class Change16ReadContractTests(QuestRegistryIsolation, EvenniaTest):
         self.assertNotIn("grant_guild_merit", exported)
 
 
-class Change21BindContractTests(QuestRegistryIsolation, EvenniaTest):
+class Change21BindContractTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.player = create_object(PlayerCharacter, key="contract21")

@@ -4,12 +4,12 @@ from importlib import import_module
 from pathlib import Path
 
 from django.conf import settings
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from commands.default_cmdsets import CharacterCmdSet
 
 
-class XyzGridCmdSetTests(EvenniaTest):
+class XyzGridCmdSetTests(EvenniaTestCase):
     def test_character_cmdset_contains_xyzgrid_commands(self):
         cmdset = CharacterCmdSet()
         cmdset.at_cmdset_creation()

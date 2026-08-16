@@ -3,14 +3,14 @@
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 
 
-class SubclassTests(EvenniaTest):
+class SubclassTests(EvenniaTestCase):
     @covers_requirement("living-entity-hierarchy::playercharacter-npc-and-monster-subclass-livingentity-with-their-documented-extra-fields", "living-entity-hierarchy::quest-logs-dialogue-memory-loot-tables-and-behaviour-trees-are-not-built")
     def test_player_fields_have_safe_defaults(self):
         first = create_object(PlayerCharacter, key="first")

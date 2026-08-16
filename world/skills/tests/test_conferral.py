@@ -6,7 +6,7 @@ import inspect
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import RejectReason, RejectedAction
@@ -14,7 +14,7 @@ from world.rules.skill_effects import record_conferred_grant
 from world.skills.handler import SkillHandler
 
 
-class ConferredSkillTests(EvenniaTest):
+class ConferredSkillTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="grant recipient")
         entity.race = "human"

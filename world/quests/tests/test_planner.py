@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -74,7 +74,7 @@ STRIKE_SKILL = SkillDef(
 )
 
 
-class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
+class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         register_event_effect_planner("quest", quest_event_effect_planner)
@@ -364,7 +364,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["protected_entity_ids"], [int(guard.pk)])
 
 
-class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTest):
+class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     """Companion DEFEAT credit for the quest owner (party-quest task 1.3)."""
 
     def setUp(self):
@@ -524,7 +524,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["stage_progress"], 0)
 
 
-class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTest):
+class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     """fix-dot-kill-credit: the quest planner consumes upkeep-built defeat logs.
 
     The combat upkeep settlement emits ``EventLog`` values shaped exactly

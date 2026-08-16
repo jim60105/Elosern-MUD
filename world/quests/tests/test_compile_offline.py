@@ -11,7 +11,7 @@ import unittest
 from django.test import override_settings
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
@@ -42,7 +42,7 @@ from world.rules.surfaces import read_counter_trait
 
 from tools.spec_traceability import covers_requirement
 
-class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTest):
+class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
     """Offline loop through the template draw, compile, register, accept,
     fight, and turn-in with no LLM call and no generative state mutation."""
 

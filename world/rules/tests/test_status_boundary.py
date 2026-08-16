@@ -5,7 +5,7 @@ import unittest
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object, create_script
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff
@@ -22,7 +22,7 @@ from web.webclient.presentation.coordinator import (
 )
 
 
-class ClockReadTests(EvenniaTest):
+class ClockReadTests(EvenniaTestCase):
     @covers_requirement("world-clock::world-clock-presentation-reads-never-create-the-singleton")
     def test_read_world_clock_reports_absence_without_creating(self):
         before = len(WorldClockScript.objects.all())

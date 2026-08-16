@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -41,7 +41,7 @@ def fire_field(actor, target) -> Battlefield:
     )
 
 
-class TargetDefeatedEventTests(EvenniaTest):
+class TargetDefeatedEventTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")
@@ -143,7 +143,7 @@ class TargetDefeatedEventTests(EvenniaTest):
         self.assertEqual(defeated[0].data["target_id"], monster_b.pk)
 
 
-class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTest):
+class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.player = create_object(PlayerCharacter, key="planner-player")
@@ -264,7 +264,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored[0]["quest_id"], record.quest_id)
 
 
-class CrossRequestSurfaceRestoreTests(EvenniaTest):
+class CrossRequestSurfaceRestoreTests(EvenniaTestCase):
     def test_commit_restores_out_of_request_player_and_room_surfaces(self):
         from world.rules.action import _commit
 

@@ -6,7 +6,7 @@ import unittest
 from django.db import transaction
 from django.test import override_settings
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -29,7 +29,7 @@ def _scene(key):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
-class ArtServiceTests(EvenniaTest):
+class ArtServiceTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.player = create_object(PlayerCharacter, key="service-player")

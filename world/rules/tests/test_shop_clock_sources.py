@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
@@ -90,7 +90,7 @@ class ShopHoursArithmeticTests(unittest.TestCase):
         )
 
 
-class ShopHoursSettlementTests(ClockRegistryIsolation, EvenniaTest):
+class ShopHoursSettlementTests(ClockRegistryIsolation, EvenniaTestCase):
     def test_settlement_emits_json_safe_events(self):
         events = settle_shop_hours(7 * 3600, 21 * 3600)
         self.assertTrue(any(event.kind == "shop_hours" for event in events))
@@ -99,7 +99,7 @@ class ShopHoursSettlementTests(ClockRegistryIsolation, EvenniaTest):
             self.assertIn(event.payload["kind"], ("open", "close"))
 
 
-class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTest):
+class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         load_catalog_into_cache()
@@ -172,7 +172,7 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTest):
         self.assertGreaterEqual(self.merchant.merchant_stock["meal"], 5)
 
 
-class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTest):
+class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTestCase):
     """A rolled-back advance restores merchant stock caches (F5)."""
 
     def setUp(self):
@@ -244,7 +244,7 @@ class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTest):
         self.assertEqual(self._raw_attribute(self.merchant_npc, day_key), before_day)
 
 
-class StageOrderAndRegistrationTests(ClockRegistryIsolation, EvenniaTest):
+class StageOrderAndRegistrationTests(ClockRegistryIsolation, EvenniaTestCase):
     @covers_requirement("settlement-stage-order::caravan-arrivals-shop-hours-quest-deadlines-and-npc-schedules-are-declared")
     def test_caravan_precedes_shop_hours_in_stage_order(self):
         self.assertLess(

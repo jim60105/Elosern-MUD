@@ -7,7 +7,7 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY
@@ -25,7 +25,7 @@ from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
-class ActionPipelineRejectionTests(EvenniaTest):
+class ActionPipelineRejectionTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")
@@ -147,7 +147,7 @@ class ActionPipelineRejectionTests(EvenniaTest):
         self.assertEqual(dict(self.actor.traits.trait_data), before)
 
 
-class ElementTierCastGateTests(EvenniaTest):
+class ElementTierCastGateTests(EvenniaTestCase):
     """element-mastery cast gate wired into the action pipeline.
 
     ``status_disguise`` is re-registered as a 賢者-tier fire spell (SELF
@@ -239,7 +239,7 @@ class ElementTierCastGateTests(EvenniaTest):
         self.assertEqual(self.actor.db.disguised_stats, {"atk_phys": 1})
 
 
-class AdjustedCostResolverTests(EvenniaTest):
+class AdjustedCostResolverTests(EvenniaTestCase):
     """mp_cost/sp_cost bundle sinks in the step-2 check, step-6 deduction, and log."""
 
     def setUp(self):

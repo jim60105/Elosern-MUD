@@ -3,12 +3,12 @@
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC, ensure_npc_adult_identity
 
 
-class EnsureNpcAdultIdentityTests(EvenniaTest):
+class EnsureNpcAdultIdentityTests(EvenniaTestCase):
     def _fresh_npc(self):
         return create_object(NPC, key="identity-npc")
 

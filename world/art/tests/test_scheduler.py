@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art.queue import ensure
 from world.art.scheduler import ArtDrainScript
@@ -18,7 +18,7 @@ def _scene(key):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
-class ArtSchedulerTests(EvenniaTest):
+class ArtSchedulerTests(EvenniaTestCase):
     def _seed(self, *keys):
         for key in keys:
             ensure(_scene(key), f"desc-{key}")
