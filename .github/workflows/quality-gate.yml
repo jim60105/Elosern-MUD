@@ -65,7 +65,18 @@ jobs:
                   print(f"{name}: shard indices must be unique and sorted")
                   sys.exit(1)
               for shard in shards:
-                  items = shard.get("labels") or shard.get("files")
+                  if name == "browser-shards":
+                      files_a = shard.get("files_a") or []
+                      files_b = shard.get("files_b") or []
+                      if not files_a or not files_b:
+                          print(
+                              f"{name}: shard {shard.get('index')} must declare "
+                              "non-empty files_a and files_b"
+                          )
+                          sys.exit(1)
+                      items = [*files_a, *files_b]
+                  else:
+                      items = shard.get("labels") or shard.get("files")
                   if not items or not all(
                       isinstance(item, str) and item for item in items
                   ):
@@ -144,8 +155,15 @@ jobs:
         include: ${{ fromJSON(needs.preflight.outputs.browser-shards) }}
 
     steps:
-      - name: Check out repository
+      - name: Check out repository workspace A
         uses: actions/checkout@v7
+        with:
+          path: w-a
+
+      - name: Check out repository workspace B
+        uses: actions/checkout@v7
+        with:
+          path: w-b
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.0
@@ -155,22 +173,48 @@ jobs:
           prune-cache: true
 
       - name: Install pinned Python
-        run: uv python install "$(<.python-version)"
+        run: uv python install "$(<w-a/.python-version)"
 
-      - name: Sync locked environment
+      - name: Sync locked environment in workspace A
         run: uv sync --locked
+        working-directory: w-a
+
+      - name: Sync locked environment in workspace B
+        run: uv sync --locked
+        working-directory: w-b
 
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
+        working-directory: w-a
 
       - name: Prepare Evennia runtime directories
-        run: mkdir -p server/db server/logs
+        run: |
+          mkdir -p w-a/server/db w-a/server/logs
+          mkdir -p w-b/server/db w-b/server/logs
 
       - name: Run browser shard ${{ matrix.index }}
         env:
-          COVERAGE_FILE: coverage-browser-shard-${{ matrix.index }}
-          OPENSPEC_TEST_EVIDENCE: evidence.browser-shard-${{ matrix.index }}.jsonl
-        run: uv run --locked coverage run -m unittest ${{ join(matrix.files, ' ') }}
+          COVERAGE_FILE: coverage-browser-shard-${{ matrix.index }}-p1
+          OPENSPEC_TEST_EVIDENCE: evidence.browser-shard-${{ matrix.index }}-p1.jsonl
+        run: |
+          status1=0
+          status2=0
+          (cd w-a
+          && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p1"
+          OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p1.jsonl"
+          uv run --locked coverage run -m unittest ${{ join(matrix.files_a, ' ') }}) &
+          pid1=$!
+          (cd w-b
+          && COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p2"
+          OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p2.jsonl"
+          uv run --locked coverage run -m unittest ${{ join(matrix.files_b, ' ') }}) &
+          pid2=$!
+          wait "$pid1" || status1=$?
+          wait "$pid2" || status2=$?
+          cp w-a/coverage-browser-shard-${{ matrix.index }}-p1* .
+          cp w-b/coverage-browser-shard-${{ matrix.index }}-p2* .
+          cat w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl > evidence.browser-shard-${{ matrix.index }}.jsonl
+          test "$status1" -eq 0 && test "$status2" -eq 0
 
       - name: Upload coverage and evidence artifacts
         uses: actions/upload-artifact@v7
@@ -178,7 +222,8 @@ jobs:
           name: browser-shard-${{ matrix.index }}-artifacts
           if-no-files-found: error
           path: |
-            coverage-browser-shard-${{ matrix.index }}*
+            coverage-browser-shard-${{ matrix.index }}-p1*
+            coverage-browser-shard-${{ matrix.index }}-p2*
             evidence.browser-shard-${{ matrix.index }}.jsonl
 
   top-level:

@@ -53,12 +53,20 @@ class BrowserVerificationContractTests(unittest.TestCase):
         )
 
         browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
+        browser_steps = browser_jobs[0]["steps"]
+        checkout_paths = [
+            step.get("with", {}).get("path")
+            for step in browser_steps
+            if step["name"].startswith("Check out repository")
+        ]
+        self.assertEqual(checkout_paths, ["w-a", "w-b"])
         browser_run = next(
-            step for step in browser_jobs[0]["steps"]
+            step for step in browser_steps
             if step["name"].startswith("Run browser shard")
         )["run"]
         self.assertIn("coverage run", browser_run)
-        self.assertIn("matrix.files", browser_run)
+        self.assertIn("matrix.files_a", browser_run)
+        self.assertIn("matrix.files_b", browser_run)
 
         gate_names = [step["name"] for step in jobs["gate"]["steps"]]
         self.assertLess(
@@ -86,7 +94,37 @@ class BrowserVerificationContractTests(unittest.TestCase):
             browser_step["env"].get("OPENSPEC_TEST_EVIDENCE", ""),
         )
         self.assertIn("COVERAGE_FILE", browser_step["env"])
-        self.assertNotIn("--parallel", browser_step["run"])
+        browser_run = browser_step["run"]
+        self.assertNotIn("--parallel", browser_run)
+        self.assertNotIn("discover -s web/tests/browser", browser_run)
+        self.assertIn(
+            'COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p1"',
+            browser_run,
+        )
+        self.assertIn(
+            'OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p1.jsonl"',
+            browser_run,
+        )
+        self.assertIn(
+            'COVERAGE_FILE="coverage-browser-shard-${{ matrix.index }}-p2"',
+            browser_run,
+        )
+        self.assertIn(
+            'OPENSPEC_TEST_EVIDENCE="evidence.browser-shard-${{ matrix.index }}-p2.jsonl"',
+            browser_run,
+        )
+        self.assertIn('wait "$pid1" || status1=$?', browser_run)
+        self.assertIn('wait "$pid2" || status2=$?', browser_run)
+        self.assertIn(
+            "cat w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl "
+            "w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl "
+            "> evidence.browser-shard-${{ matrix.index }}.jsonl",
+            browser_run,
+        )
+        self.assertIn(
+            'test "$status1" -eq 0 && test "$status2" -eq 0',
+            browser_run,
+        )
 
     @covers_requirement(
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"

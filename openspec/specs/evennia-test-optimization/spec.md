@@ -140,6 +140,21 @@ The committed non-browser Evennia shard manifest SHALL partition every discovera
 - **WHEN** a CI run reports one evennia shard dominating the others by a wide margin
 - **THEN** rebalancing is a manifest edit followed by the contract tests, and the measured per-shard durations are recorded in the performance report
 
+### Requirement: Browser method labels preserve exact ownership
+The committed browser shard manifest SHALL partition every test method of every `test_*.py` file under `web/tests/browser/` exactly once across its process lists: a top-level contract test SHALL parse each browser test file with `ast` without importing it, collect every `test_*` method per class, resolve each manifest label (module, class, or method) to its (file, class, method) set, and assert that the resolved set equals the discovered set with no overlap. Shard indices SHALL be unique and sorted. Every shard SHALL contain exactly two process lists, each with at least one label, and every label SHALL resolve to at least one test method.
+
+#### Scenario: Every browser test method is owned exactly once
+- **WHEN** the browser shard manifest is inspected by the method-level ownership contract test
+- **THEN** each discovered test method appears in exactly one process list, labels resolve without importing test modules, indices are unique and sorted, and no method is orphaned or duplicated
+
+#### Scenario: Unresolvable browser label fails the contract
+- **WHEN** a manifest label does not correspond to an existing browser test module, class, or method
+- **THEN** the ownership contract test fails with a diagnostic naming the unresolvable label
+
+#### Scenario: Two isolated processes per shard stay serial per process
+- **WHEN** a browser shard's two process lists run on the same runner from separate checkouts
+- **THEN** each process executes its own labels serially with its own coverage and evidence files, and the per-shard evidence is the concatenation of both processes' files
+
 ### Requirement: Registry-content assertions use the registry's key domain
 Any test asserting membership or contents of a process-global registry covered
 by the isolation contract SHALL use that registry's documented key domain, not

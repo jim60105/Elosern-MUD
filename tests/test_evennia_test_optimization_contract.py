@@ -36,6 +36,59 @@ def _resolve_evennia_label(repo_root: Path, label: str) -> set[str]:
     return set()
 
 
+def _discover_browser_methods(repo_root: Path) -> set[tuple[str, str, str]]:
+    """Collect every ``test_*`` method per class from the browser test files."""
+    discovered: set[tuple[str, str, str]] = set()
+    for path in sorted((repo_root / "web/tests/browser").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test_"):
+                    discovered.add((path.stem, node.name, child.name))
+    return discovered
+
+
+def _resolve_browser_label(
+    repo_root: Path, label: str
+) -> set[tuple[str, str, str]]:
+    """Resolve a browser manifest label to (file, class, method) triples.
+
+    A label names a browser test module, a class within it, or a single test
+    method. Resolution is AST-based and import-free so the contract can be
+    verified without loading any Playwright machinery.
+    """
+    parts = label.split(".")
+    module_index = next(
+        (i for i, part in enumerate(parts) if part.startswith("test_")),
+        None,
+    )
+    if module_index is None:
+        return set()
+    if len(parts) > module_index + 3:
+        return set()
+    module_name = ".".join(parts[: module_index + 1])
+    module_file = repo_root / (module_name.replace(".", "/") + ".py")
+    if not module_file.is_file():
+        return set()
+    class_name = parts[module_index + 1] if len(parts) > module_index + 1 else None
+    method_name = parts[module_index + 2] if len(parts) > module_index + 2 else None
+    resolved: set[tuple[str, str, str]] = set()
+    tree = ast.parse(module_file.read_text(encoding="utf-8"), filename=str(module_file))
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if class_name is not None and node.name != class_name:
+            continue
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test_"):
+                if method_name is not None and child.name != method_name:
+                    continue
+                resolved.add((module_file.stem, node.name, child.name))
+    return resolved
+
+
 class TestSettingsContractTests(unittest.TestCase):
     def _load_settings(
         self, *, enabled: bool, arguments: list[str]
@@ -138,6 +191,14 @@ class TestOwnershipContractTests(unittest.TestCase):
         )
         self.assertIn("['shards']", shards_step["run"])
 
+        browser_steps = browser_jobs[0]["steps"]
+        browser_checkout_paths = [
+            step.get("with", {}).get("path")
+            for step in browser_steps
+            if step["name"].startswith("Check out repository")
+        ]
+        self.assertEqual(browser_checkout_paths, ["w-a", "w-b"])
+
         evennia_job = jobs["evennia"]
         evennia_strategy = evennia_job["strategy"]
         self.assertFalse(evennia_strategy.get("fail-fast", False))
@@ -174,7 +235,9 @@ class TestOwnershipContractTests(unittest.TestCase):
             for step in browser_jobs[0]["steps"]
             if step["name"].startswith("Run browser shard")
         )["run"]
-        self.assertIn("matrix.files", browser_run)
+        self.assertIn("matrix.files_a", browser_run)
+        self.assertIn("matrix.files_b", browser_run)
+        self.assertIn("coverage run", browser_run)
         self.assertNotIn("--parallel", browser_run)
         self.assertNotIn("discover -s web/tests/browser", browser_run)
 
@@ -199,9 +262,9 @@ class TestOwnershipContractTests(unittest.TestCase):
         self.assertEqual(sum(command.count(browser_discovery) for command in all_commands), 0)
 
     @covers_requirement(
-        "evennia-test-optimization::existing-quality-gates-remain-authoritative"
+        "evennia-test-optimization::browser-method-labels-preserve-exact-ownership"
     )
-    def test_browser_shard_manifest_owns_every_browser_test_file_exactly_once(self):
+    def test_browser_method_labels_preserve_exact_ownership(self):
         import json
 
         manifest = json.loads(
@@ -213,20 +276,36 @@ class TestOwnershipContractTests(unittest.TestCase):
         self.assertEqual(indices, sorted(indices))
         self.assertEqual(len(indices), len(set(indices)), "shard indices must be unique")
 
-        browser_dir = REPO_ROOT / "web/tests/browser"
-        discovered = {path.stem for path in browser_dir.glob("test_*.py")}
+        discovered = _discover_browser_methods(REPO_ROOT)
         self.assertTrue(discovered)
-        owned: set[str] = set()
+        owned: set[tuple[str, str, str]] = set()
         for shard in shards:
-            for dotted in shard["files"]:
-                module = dotted.rsplit(".", 1)[-1]
-                self.assertIn(module, discovered, f"{dotted} is not a discovered file")
-                self.assertNotIn(
-                    module, owned, f"{module} is assigned to more than one shard"
+            for key in ("files_a", "files_b"):
+                labels = shard.get(key)
+                self.assertTrue(
+                    labels, f"shard {shard['index']} {key} has no labels"
                 )
-                owned.add(module)
+                shard_owned: set[tuple[str, str, str]] = set()
+                for label in labels:
+                    resolved = _resolve_browser_label(REPO_ROOT, label)
+                    self.assertTrue(
+                        resolved,
+                        f"label {label!r} in shard {shard['index']} resolves to nothing",
+                    )
+                    self.assertFalse(
+                        resolved & shard_owned,
+                        f"label {label!r} overlaps another label in shard {shard['index']}",
+                    )
+                    self.assertFalse(
+                        resolved & owned,
+                        f"label {label!r} is owned by more than one shard",
+                    )
+                    shard_owned |= resolved
+                owned |= shard_owned
         self.assertEqual(
-            owned, discovered, "every discovered browser test file must be in a shard"
+            owned,
+            discovered,
+            "every discovered browser test method must be in exactly one process list",
         )
 
         workflow = yaml.safe_load(

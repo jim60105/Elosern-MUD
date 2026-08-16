@@ -16,12 +16,15 @@ across many shards. Together with the evennia machine sharding
 
 ## What Changes
 
-- `.github/browser-shards.json` is rewritten: 11 shards, each with two label
-  lists `files_a`/`files_b` (module, class, or method dotted labels). Every
+- `.github/browser-shards.json` is rewritten: 11 shards, each with two label lists
+  `files_a`/`files_b` (module, class, or method dotted labels). Every
   test method of every `web/tests/browser/test_*.py` file is owned by exactly
   one of the 22 process lists; combat methods are split at method level and
-  spread across ~5 lists of 4–5 tests; non-combat files stay whole within one
-  process list (they share one per-process server).
+  spread across ~5 lists of 4–5 tests; single-class files
+  (`test_browser_exploration.py`, `test_browser_art.py`) split at method level,
+  multi-class files (`test_browser_creation.py`, `test_browser_services.py`)
+  split at class level, and the cheap shell-family files pack whole into one or
+  two lists; every process list targets ≤ 240 s estimated runtime.
 - The `browser` job checks out the repository **twice** (`path: w-a`,
   `path: w-b`), syncs both, installs Chromium once (shared
   `~/.cache/ms-playwright`), and runs the two `unittest` invocations in
