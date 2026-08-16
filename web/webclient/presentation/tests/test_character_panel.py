@@ -522,7 +522,16 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(atk["max"])
         self.assertEqual(
             _flattened_keys(payload["actives"]),
-            ["fire_ball", "basic_attack", "flee", *sorted(SEXUAL_ACT_REGISTRY)],
+            [
+                "fire_ball",
+                "basic_attack",
+                "flee",
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
+            ],
         )
         self.assertEqual(
             _flattened_keys(payload["passives"]),
@@ -547,11 +556,19 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.skills = {"active": [], "passive": []}
         payload = self._render()
         # Category order follows SkillCategory declaration order, so
-        # martial_arts (basic_attack) precedes movement (flee); the seven
-        # unconditionally-owned seed acts follow as the sexual_act category.
+        # martial_arts (basic_attack) precedes movement (flee); the
+        # unconditionally-owned acts follow as the sexual_act category.
         self.assertEqual(
             _flattened_keys(payload["actives"]),
-            ["basic_attack", "flee", *sorted(SEXUAL_ACT_REGISTRY)],
+            [
+                "basic_attack",
+                "flee",
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
+            ],
         )
         martial = next(
             category for category in payload["actives"]

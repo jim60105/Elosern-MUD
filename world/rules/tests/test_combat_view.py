@@ -116,7 +116,11 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
                 "fire_ball",
                 "flee",
                 "basic_attack",
-                *sorted(SEXUAL_ACT_REGISTRY),
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
             ],
         )
         self.assertNotIn("defense_instinct", keys)

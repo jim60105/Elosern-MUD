@@ -19,6 +19,14 @@ from world.skills.registry import SKILL_REGISTRY
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
+# A fresh entity owns only the unconditionally-unlocked acts; counter-gated
+# catalogue rows stay absent until their thresholds are met.
+def _fresh_entity_act_keys():
+    return sorted(
+        key for key, act in SEXUAL_ACT_REGISTRY.items() if not act.unlock
+    )
+
+
 class SkillHandlerTests(EvenniaTest):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="skill tester")
@@ -32,7 +40,7 @@ class SkillHandlerTests(EvenniaTest):
         entity.db.skills = None
         self.assertEqual(
             entity.skills.owned_keys(),
-            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
+            ["flee", "basic_attack", *_fresh_entity_act_keys()],
         )
         with self.assertRaises(AttributeError):
             entity.skills = {"active": [], "passive": []}
@@ -48,7 +56,7 @@ class SkillHandlerTests(EvenniaTest):
                 "defense_instinct",
                 "flee",
                 "basic_attack",
-                *sorted(SEXUAL_ACT_REGISTRY),
+                *_fresh_entity_act_keys(),
             ],
         )
 
@@ -59,7 +67,9 @@ class SkillHandlerTests(EvenniaTest):
         before = monster.skills.owned_keys()
         monster.db.current_battlefield = object()
         after = monster.skills.owned_keys()
-        self.assertEqual(before, ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)])
+        self.assertEqual(
+            before, ["flee", "basic_attack", *_fresh_entity_act_keys()]
+        )
         self.assertEqual(after, before)
 
     @covers_requirement("universal-action-ownership::world-skills-does-not-depend-on-world-rules-to-define-innate-ownership")

@@ -610,7 +610,11 @@ class SexualActEffectsStructuralTests(unittest.TestCase):
 class OwnershipDriftGuardTests(EvenniaTest):
     """owned_keys() equals base_owned_keys() plus the unconditionally-unlocked seed acts."""
 
-    _SEED_KEYS = sorted(SEXUAL_ACT_REGISTRY)
+    # Only the acts with an empty unlock mapping are owned by a fresh entity;
+    # counter-gated catalogue rows stay absent until their thresholds are met.
+    _SEED_KEYS = sorted(
+        key for key, act in SEXUAL_ACT_REGISTRY.items() if not act.unlock
+    )
 
     def test_owned_keys_appends_the_unconditionally_unlocked_seed_acts(self):
         entity = create_object(PlayerCharacter, key="drift guard")
@@ -643,7 +647,15 @@ class OwnershipDriftGuardTests(EvenniaTest):
         bare = SimpleNamespace(db=SimpleNamespace(skills=None))
         self.assertEqual(
             SkillHandler(bare).owned_keys(),
-            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
+            [
+                "flee",
+                "basic_attack",
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
+            ],
         )
 
     @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")

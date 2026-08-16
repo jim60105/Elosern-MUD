@@ -75,7 +75,15 @@ class InnateSkillTests(EvenniaTest):
         player.db.skills = None
         self.assertEqual(
             player.skills.owned_keys(),
-            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
+            [
+                "flee",
+                "basic_attack",
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
+            ],
         )
         self.assertIn("basic_attack", INNATE_SKILL_KEYS)
 
@@ -89,7 +97,11 @@ class InnateSkillTests(EvenniaTest):
                 "defense_instinct",
                 "flee",
                 "basic_attack",
-                *sorted(SEXUAL_ACT_REGISTRY),
+                *sorted(
+                    key
+                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    if not act.unlock
+                ),
             ],
         )
 
