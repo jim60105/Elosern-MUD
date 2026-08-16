@@ -1,4 +1,15 @@
-## ADDED Requirements
+# sexual-catalog-shame Specification
+
+## Purpose
+
+Register the nine counter-gated 羞恥線 acts across four tiers, filling the shame line from its one
+seed act to ten. Tier 1 opens at `exposure_act_count >= 5`, Tier 2 at `exposure_act_count >= 20`
+(公開自慰 compound-gated on `masturbation_count`), Tier 3 at `watched_count >= 10` (公開表演
+compound-gated on `exposure_act_count`), and Tier 4 at `exposure_act_count >= 50` (無恥宣言
+compound-gated on `watched_count`). Every act except the battlefield taunt 挑釁凝視 reuses the
+`self_exposure` event shipped with the seed; this change adds no rulebook row.
+
+## Requirements
 
 <!-- Three source-document secondary effects (挑釁凝視's dedicated accuracy debuff, 獻身姿態's
      self-defense penalty, 無恥宣言's temporary shame-multiplier buff) are intentionally not covered
@@ -57,6 +68,12 @@ gain no rule row from this change.
 #### Scenario: shame_provocative_gaze does not raise the actor's own exposure
 - **WHEN** an entity whose `exposure` is at its vocabulary floor casts `shame_provocative_gaze`
 - **THEN** the actor's `exposure` ordinal is unchanged afterward
+
+#### Scenario: An AREA shame act's self_exposure lands on its targets, not the actor
+- **WHEN** an entity whose `exposure` is at its vocabulary floor casts `shame_public_performance`
+  targeting one other entity
+- **THEN** the target's `exposure` ordinal increases by exactly `1` and the actor's `exposure`
+  ordinal is unchanged afterward
 
 ### Requirement: shame_public_masturbation credits three counters and emits two events
 `shame_public_masturbation` SHALL declare `actor_counters=("exposure_act_count",

@@ -33,10 +33,13 @@ def _actor(testcase):
     return actor
 
 
-# The seven unconditionally-owned seed acts are ACTIVE-kind, so they surface
-# in ``active_keys`` right after the innate skills, in ``owned_keys()``'s
-# sorted-append order.
-_SEED_KEYS = tuple(sorted(SEXUAL_ACT_REGISTRY))
+# The unconditionally-owned acts (empty unlock mapping) are ACTIVE-kind, so
+# they surface in ``active_keys`` right after the innate skills, in
+# ``owned_keys()``'s sorted-append order. Counter-gated catalogue rows stay
+# absent until their thresholds are met.
+_SEED_KEYS = tuple(
+    sorted(key for key, act in SEXUAL_ACT_REGISTRY.items() if not act.unlock)
+)
 
 
 class StatusReadModelTests(EvenniaTest):

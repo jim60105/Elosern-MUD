@@ -52,6 +52,13 @@ machinery.
 
 - Code: `world/skills/sexual_acts/solo.py` only, plus a new test module,
   `world/skills/sexual_acts/tests/test_solo_catalog.py`.
+- Collateral test updates (same class as `sexual-act-seeds`'s): eight pre-existing test files assert a
+  fresh entity's unlocked set as `sorted(SEXUAL_ACT_REGISTRY)` or pin the SEXUAL_ACT category's key
+  set, and break the moment any counter-gated act registers. They are updated to read the
+  unconditionally-unlocked (empty-`unlock`) subset: `test_registry_structure.py`, `test_handler.py`,
+  `test_inventory.py`, `test_registry.py`, `test_status_query.py`, `test_combat_view.py`,
+  `test_combat_session.py`, and `web/webclient/presentation/tests/test_character_panel.py`. See
+  tasks.md section 6.
 - No change to `_builder.py`, `__init__.py`, any other line module, or `world/rules/rulebook/
   sexual.yaml` — every act this proposal adds resolves through already-landed, already-tested
   machinery with no rulebook addition needed (unlike `sexual-act-seeds`, which needed one new

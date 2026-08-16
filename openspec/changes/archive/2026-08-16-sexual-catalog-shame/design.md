@@ -113,6 +113,28 @@ was performed in a manner framed as public," not "a third party was verifiably p
 Building the latter would need a new room-occupancy read inside the counter-effect handler —
 `sexual-act-effects`'s territory, out of scope here, and not attempted as a partial workaround.
 
+### D-6: An AREA act's `self_exposure` event fires on its targets, not on the actor
+
+`sexual-act-effects`'s landed `_handle_sexual_event` iterates the cast's **targets** — for a
+`SELF`-target act that is the actor itself, which is why every SELF shame act raises the actor's own
+`exposure` exactly as the seed established; for an `AREA` act the targets are the resolved audience,
+and the actor is not among them (`participants()` includes the actor only in the pleasure handler).
+`公開表演` and `獻身姿態` therefore deliver their declared `self_exposure` event to each resolved
+target — the audience's `exposure` rises by one (and cascades their `shame`), while the performer's
+own `exposure` stays put.
+
+This is a disclosed engine-boundary consequence, not the source document's framing (whose shame-line
+prose casts every exposure raise as the actor's own self-cost): the performer never accumulates the
+`high_exposure_defense_penalty` cost from these two acts, and a target repeatedly performed at (three
+casts of a Tier 3/4 AREA act) crosses `exposure >= 高` and starts taking the shipped
+`high_exposure_defense_penalty` (defense `-15`) — a mechanical side effect the source design never
+claimed. It is accepted rather than engineered around: routing an act's events to the actor as well
+would be a change to `world/rules/action.py`'s event handler (`sexual-act-effects`'s territory, out
+of scope for a content proposal), and dropping the declaration would contradict the delta spec's
+SHALL list. The actual destination is pinned by a test and a delta-spec scenario so it is a
+verifiable contract, not an accident; a future engine proposal giving acts an actor-side event
+channel should revisit this note.
+
 ### D-5: Tier 3/4 gates need no compound-gate hardening beyond what the source document already specifies
 
 `sexual-catalog-solo`'s rubber-duck review flagged an emergent (not structural) safety margin around
