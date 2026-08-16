@@ -182,12 +182,50 @@ where that stricter guarantee does apply and is deliberately not attempted.
 (口唇, Tier 1, base 12) and `partner_oral_service` (口唇, Tier 2, base 19) share a body part, and once
 `duo_act_count >= 15` unlocks the latter, the former is a strict downgrade on every axis (same ratio,
 same counters, lower `base_pleasure`, no event). The same is true of `partner_breast_play`
-(乳房, Tier 1) versus `partner_breast_sex` (乳房, Tier 2), and of the three Tier 4 AREA acts, all on
-腰腹. This is deliberate, ordinary tiered-skill progression — a higher-tier act on the same part
-superseding a lower-tier one, the same pattern any levelled skill line uses — not the
-zero-downside-sibling problem D-4 exists to avoid. It is called out explicitly here so the omission
-reads as a decision, not an oversight: `sexual-catalog-solo`'s dominance concern applies to acts that
-share both a body part *and* an unlock tier (true rivals), not to acts a character simply outgrows.
+(乳房, Tier 1) versus `partner_breast_sex` (乳房, Tier 2). This is deliberate, ordinary tiered-skill
+progression — a higher-tier act on the same part superseding a lower-tier one, the same pattern any
+levelled skill line uses — not the zero-downside-sibling problem D-4 exists to avoid. It is called
+out explicitly here so the omission reads as a decision, not an oversight: `sexual-catalog-solo`'s
+dominance concern applies to acts that share both a body part *and* an unlock tier (true rivals), not
+to acts a character simply outgrows.
+
+The three Tier 4 AREA acts are a stricter case of the same progression, and it is deliberate too:
+all three sit on 腰腹, so once `partner_group_orgy` (base 20) unlocks at `group_act_count >= 15` it
+strictly dominates `partner_group_caress` (base 18) for every character that owns both — and
+`partner_group_service` (base 22, `group_act_count >= 30`) dominates both. But the trio is not a
+rival choice set, it is a sequential unlock chain: `partner_group_caress` is the duo-gated entry
+point (its casts feed `group_act_count` toward `partner_group_orgy`), and `partner_group_orgy`'s own
+casts feed the `group_act_count >= 30` gate of `partner_group_service`. Each act is the unlock path
+for the next, so the within-tier strict dominance *is* the progression, exactly as D-1's note
+describes ("its own credit feeds the next two acts' `group_act_count` gates"). A `group_act_count`
+reading can never arise without first owning the weaker act (`group_act_count` is credited only by
+these three acts, and `partner_group_caress`'s `duo_act_count >= 30` gate is monotone once met), so
+the chain has no skipped links.
+
+### D-7: `resolve_targets`'s AREA branch accepts a self-cast, letting a solo player grind `group_act_count` — disclosed, not fixed here
+
+`world/rules/targeting.py`'s `resolve_targets()` carries a sexual-act self-cast exclusion for
+`TargetSpec.SINGLE` only (`targeting.py:187-198`: a SINGLE-target sex act whose sole candidate is the
+actor is rejected as `target_spec_mismatch`). The `TargetSpec.AREA` branch (`targeting.py:199-210`)
+validates cardinality, uniqueness, and candidate quality but never excludes the actor — and
+`RoomActionContext.is_present()` explicitly accepts `target is actor`, so a self-only AREA cast is
+valid. Consequence: a player at `duo_act_count >= 30` can cast `partner_group_caress` targeting
+only themselves — through the normal `cast` command by naming their own character, or through the
+combat `all-allies` shorthand, which includes the `SELF` relation — and the act still credits
+`group_act_count` on the actor, because `_handle_sexual_counter_effect` credits `actor_counters`
+unconditionally. The same cast also opens the other two Tier 4 acts once their `group_act_count`
+gates are solo-fed. That directly undermines D-1's "casting it is itself a group encounter" intent.
+
+This proposal does **not** fix it: the exclusion is shared engine code in `world/rules/targeting.py`,
+out of this proposal's file boundary (partner.py plus its own test module, per the Goals section),
+and the same gap already shipped with `sexual-catalog-shame`'s three AREA acts — a fix belongs in a
+single shared-engine follow-up that extends the SINGLE-branch exclusion to the AREA branch for
+`SkillCategory.SEXUAL_ACT` skills, benefiting every line at once. This proposal's tests deliberately
+do not pin the self-cast behavior (it is not intended behavior; pinning it in a delta-spec scenario
+would codify the exploit as a contract); all cast tests here target explicit non-self partners. The
+follow-up proposal owns both the engine change and the rejection tests. Until then the solo grind is
+live but self-contained: it is the player's own progression cost only, and the divine line is not
+involved.
 
 ### D-5: The three Tier 4 AREA acts reuse the `target_part="腰腹"` compromise
 
@@ -214,6 +252,15 @@ rationale for the same structural constraint.
 - `world/rules/rulebook/sexual.yaml`'s `experience_titfuck_added` row (`breast_sex_performed` →
   add `乳交` to `experience_types`) is unchanged and already shipped; this proposal adds no new
   rulebook row.
+- `sexual-resist-cast-wiring` (merged while this proposal was in flight) wired
+  `resist_verdict()` into `ActionResolver.resolve()`: every `resistible=True` act now runs one
+  d100 contest per non-actor target, and a resisting target is excluded from the act's
+  pleasure/counter/event effects. This proposal's cast tests force a compliant roll
+  (`patch("world.rules.action.roll_d100", return_value=1)`) so the target-side credits the delta
+  spec pins stay deterministic, and call `register_catalog()` in setUp because the resist gate's
+  affinity-config read requires the quest definition registry. The actor-side effects the cast
+  tests assert are unconditional on resist outcome by that change's design, so the actor
+  assertions need no fixture.
 
 ## Risks / Trade-offs
 
@@ -232,6 +279,16 @@ rationale for the same structural constraint.
   §1.1 of the source catalog document describes — different `key`s, independent per-part
   `sensitivity` training, no registry collision (`_register_rows` only fails closed on duplicate
   `key`s, never duplicate labels).
+- **[Risk]** `resolve_targets`'s AREA branch accepts the actor as a candidate, so a player at
+  `duo_act_count >= 30` can self-cast `partner_group_caress` with no partner and still credit
+  `group_act_count` on themselves — a solo grind that bypasses D-1's "casting it is itself a group
+  encounter" intent, and it is player-reachable through the normal `cast` command (targeting your
+  own character by name). → **Mitigation:** disclosed in D-7 with the exact engine site
+  (`targeting.py:199-210`); the fix — extending the SINGLE-branch sexual-act self-cast exclusion
+  (`targeting.py:187-198`) to the AREA branch — is a shared-engine change out of this proposal's
+  file boundary, and the same gap already ships in `sexual-catalog-shame`'s AREA acts, so it belongs
+  to one engine follow-up benefiting every line. This proposal's tests intentionally do not pin the
+  self-cast behavior.
 
 ## Migration Plan
 

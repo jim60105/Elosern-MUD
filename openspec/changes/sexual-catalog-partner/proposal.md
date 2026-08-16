@@ -46,6 +46,13 @@ what a follow-up proposal needs to deliver them correctly.
   `sex` field at cast time — but `SexualActDef.sexual_events` is a single tuple fixed at registry-load
   time, with no mechanism to select among alternatives based on runtime participant state. Building
   that selection is out of a pure-data catalog proposal's reach; see design.md D-2.
+- **Discloses an engine-level self-cast gap on the Tier 4 AREA acts**: `resolve_targets`'s AREA
+  branch accepts the actor as a candidate, so a solo player can self-cast `partner_group_caress` and
+  credit `group_act_count` with no partner present, bypassing the "casting it is itself a group
+  encounter" intent. This proposal does not fix it — the exclusion lives in `world/rules/targeting.py`
+  (shared engine, out of a content proposal's file boundary) and the gap already shipped with
+  `sexual-catalog-shame`'s AREA acts — but names the exact site for a shared-engine follow-up; see
+  design.md D-7.
 - **Ships 乳交 with a disclosed, non-blocking event-recipient gap**: `_handle_sexual_event`
   (`world/rules/action.py`, owned by the already-merged `sexual-act-effects`) applies a declared
   `sexual_events` entry to the resolver's raw `targets` list only, never to the actor — unlike
@@ -71,6 +78,12 @@ what a follow-up proposal needs to deliver them correctly.
 
 - Code: `world/skills/sexual_acts/partner.py` only, plus a new test module,
   `world/skills/sexual_acts/tests/test_partner_catalog.py`.
+- Collateral test update (same class as `sexual-catalog-solo`'s): `world/skills/tests/
+  test_registry.py` pins the `SkillCategory.SEXUAL_ACT` key set in
+  `test_per_category_key_sets_match_the_d4_classification_table`, and breaks the moment any new act
+  registers. Its SEXUAL_ACT entry gains this change's fourteen keys; no other collateral file needs
+  an edit (the empty-`unlock`-filter collateral `sexual-catalog-solo`/`sexual-catalog-shame`
+  already shipped). See tasks.md section 6.
 - No change to `_builder.py`, `__init__.py`, any other line module, `world/rules/action.py`, or
   `world/rules/rulebook/sexual.yaml` — every event this proposal's acts declare (`breast_sex_performed`
   only) is already wired by the shipped transition rulebook.
