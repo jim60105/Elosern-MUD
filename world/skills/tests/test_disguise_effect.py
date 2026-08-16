@@ -5,13 +5,13 @@ from tools.spec_traceability import covers_requirement
 import inspect
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.skill_effects import apply_disguise_effect
 
 
-class DisguiseEffectTests(EvenniaTest):
+class DisguiseEffectTests(EvenniaTestCase):
     def test_effect_changes_only_disguise_storage(self):
         entity = create_object(PlayerCharacter, key="disguised")
         entity.race = "elf"

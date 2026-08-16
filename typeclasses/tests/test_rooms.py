@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from evennia.contrib.grid.wilderness.wilderness import WildernessRoom
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.rooms import (
     AnchorRoom,
@@ -16,7 +16,7 @@ from typeclasses.rooms import (
 )
 
 
-class GridRoomTypeclassTests(EvenniaTest):
+class GridRoomTypeclassTests(EvenniaTestCase):
     def test_grid_room_create_exposes_xyz_and_default_scene_archetype(self):
         room, errors = GridRoom.create(key="test", xyz=(9, 9, "test_map"))
         self.assertEqual(errors, [])
@@ -50,7 +50,7 @@ class GridRoomTypeclassTests(EvenniaTest):
         self.assertFalse(hasattr(room, "anchor_key"))
 
 
-class SceneArchetypeTests(EvenniaTest):
+class SceneArchetypeTests(EvenniaTestCase):
     def test_mixin_is_in_both_room_mros(self):
         self.assertIn(SceneArchetypeMixin, GridRoom.__mro__)
         self.assertIn(SceneArchetypeMixin, TerrainRoom.__mro__)

@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
@@ -15,7 +15,7 @@ from world.rules.action import (
 )
 
 
-class ActionPipelineAtomicityTests(EvenniaTest):
+class ActionPipelineAtomicityTests(EvenniaTestCase):
     def test_failed_second_effect_restores_first(self):
         entity = create_object(PlayerCharacter, key="atomic")
         entity.race = "human"

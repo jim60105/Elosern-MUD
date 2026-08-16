@@ -18,7 +18,7 @@ from tools.spec_traceability import covers_requirement
 
 from django.test import override_settings
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
@@ -78,7 +78,7 @@ def _fake_calendar():
     return FakeCalendar()
 
 
-class ArtPushBoundaryTests(EvenniaTest):
+class ArtPushBoundaryTests(EvenniaTestCase):
     """The subscriber stays decoupled from world/art/ and the worker thread."""
 
     def test_world_art_never_imports_web(self):
@@ -153,7 +153,7 @@ class ArtPushBoundaryTests(EvenniaTest):
         self.assertEqual(received_thread_names, [main_thread])
 
 
-class ArtPushPresenterTests(EvenniaTest):
+class ArtPushPresenterTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()

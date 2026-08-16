@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff, _handle_cleanse, growth_rate_multiplier
@@ -216,7 +216,7 @@ class LandedEffectHandlerTests(EvenniaTest):
         )
 
 
-class DamagingBuffSourceIdentityTests(EvenniaTest):
+class DamagingBuffSourceIdentityTests(EvenniaTestCase):
     """fix-dot-kill-credit: damaging rate buffs carry authoritative source identity."""
 
     def setUp(self):

@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.localized import CmdDrop, CmdGet, CmdGive
 from typeclasses.characters import PlayerCharacter
@@ -283,7 +283,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.assertEqual(self._contained("healing_potion"), [])
 
 
-class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTest):
+class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTestCase):
     @covers_requirement("shop-economy::merchant-stock-is-finite-persistent-repeated-item-quantity-state")
     def test_malformed_stock_fails_closed(self):
         from typeclasses.components import Merchant as MerchantComponent

@@ -15,7 +15,7 @@ from unittest.mock import patch
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS
@@ -147,7 +147,7 @@ class PartnerActRegistrationTests(unittest.TestCase):
                 self.assertIn(part, BODY_PARTS)
 
 
-class PartnerUnlockTests(EvenniaTest):
+class PartnerUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
     @covers_requirement("sexual-catalog-partner::fourteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
@@ -175,7 +175,7 @@ class PartnerUnlockTests(EvenniaTest):
         self.assertIn("partner_group_orgy", entity.skills.owned_keys())
 
 
-class PartnerPleasureTradeOffTests(EvenniaTest):
+class PartnerPleasureTradeOffTests(EvenniaTestCase):
     """D-4's baseline trade-off between the two Tier 3 acts, pinned numerically."""
 
     def setUp(self):

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -127,7 +127,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
         self.assertEqual(logs[0].entries[0].kind, "action_skipped")
 
 
-class MonsterBehaviourResolverIntegrationTests(EvenniaTest):
+class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
     def test_depleted_resource_falls_back_and_resolves(self):
         monster = create_object(Monster, key="resource-monster")
         monster.threat_tier = "mid"
@@ -168,7 +168,7 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
 
 
-class MonsterFleeResolverIntegrationTests(EvenniaTest):
+class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.monster = create_object(Monster, key="flee-monster")

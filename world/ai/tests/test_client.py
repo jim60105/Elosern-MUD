@@ -9,7 +9,7 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.ai.client import OpenAICompatClient
 from world.ai.errors import LLMTransportError
@@ -170,7 +170,7 @@ class RequestBodyTests(unittest.TestCase):
             _OUTPUT_SCHEMAS.clear()
 
 
-class ClientResponseTests(EvenniaTest):
+class ClientResponseTests(EvenniaTestCase):
     @covers_requirement("llm-client::openai-compatible-chat-completions-client")
     def test_successful_chat_completion_returns_message_content(self):
         client = make_client(reactor=Clock())
@@ -221,7 +221,7 @@ class ClientResponseTests(EvenniaTest):
         self.assertTrue(failure.check(LLMTransportError))
 
 
-class ClientTimeoutTests(EvenniaTest):
+class ClientTimeoutTests(EvenniaTestCase):
     @covers_requirement("llm-client::asynchronous-calls-with-bounded-request-timeouts")
     def test_slow_endpoint_abandoned_at_timeout_bound(self):
         clock = Clock()

@@ -13,7 +13,7 @@ from unittest.mock import patch
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -195,7 +195,7 @@ class FreeformEligibilityTests(unittest.TestCase):
         self.assertFalse(is_freeform_eligible(skill))
 
 
-class FreeformScalesForTests(EvenniaTest):
+class FreeformScalesForTests(EvenniaTestCase):
     """Mastery ownership entitles scaling of the element's spells."""
 
     def setUp(self):
@@ -225,7 +225,7 @@ class FreeformScalesForTests(EvenniaTest):
             freeform_scales_for(self.entity, "not_an_element")
 
 
-class FreeformResolverGateTests(EvenniaTest):
+class FreeformResolverGateTests(EvenniaTestCase):
     """The resolver gates scaled casts at the ownership step."""
 
     def setUp(self):
@@ -334,7 +334,7 @@ class FreeformResolverGateTests(EvenniaTest):
                 )
 
 
-class ActionRequestScaleContractTests(EvenniaTest):
+class ActionRequestScaleContractTests(EvenniaTestCase):
     """ActionRequest carries an optional scale modifier and a new rejection category."""
 
     def setUp(self):
@@ -422,7 +422,7 @@ class ActionRequestScaleContractTests(EvenniaTest):
         self.assertIsNone(result.time_cost_seconds)
 
 
-class FreeformScaledResolutionTests(EvenniaTest, BattlefieldIsolation):
+class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
     """A scaled cast deducts scaled MP and applies scaled magnitudes."""
 
     def setUp(self):
@@ -596,7 +596,7 @@ class FreeformScaledResolutionTests(EvenniaTest, BattlefieldIsolation):
         self.assertEqual(self.actor.traits.hp.value, 100)
 
 
-class FreeformPreviewTests(EvenniaTest):
+class FreeformPreviewTests(EvenniaTestCase):
     """Preview and the combat facade accept and revalidate scale."""
 
     def setUp(self):

@@ -6,14 +6,14 @@ from dataclasses import asdict, replace
 
 from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.lore.sync import _ALL_REGISTRIES, _db_safe, sync_all, sync_one
 
 
-class LoreSyncTests(EvenniaTest):
+class LoreSyncTests(EvenniaTestCase):
     def _lore_records(self):
         records = []
         for category, registry in _ALL_REGISTRIES.items():

@@ -11,7 +11,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, ActionResolver
@@ -117,7 +117,7 @@ class SoloActRegistrationTests(unittest.TestCase):
                 self.assertEqual(SEXUAL_ACT_REGISTRY[key].sexual_events, expected)
 
 
-class SoloUnlockTests(EvenniaTest):
+class SoloUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")

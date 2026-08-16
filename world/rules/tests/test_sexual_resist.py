@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import yaml
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -335,7 +335,7 @@ class SexualResistConfigTests(RegistryIsolationMixin, unittest.TestCase):
             load_sexual_resist_config(Path(handle.name))
 
 
-class SexualResistAffinityTests(EvenniaTest):
+class SexualResistAffinityTests(EvenniaTestCase):
     """Database-backed tests for the affinity and real-state paths."""
 
     def setUp(self):

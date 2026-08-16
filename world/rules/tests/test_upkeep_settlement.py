@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -73,7 +73,7 @@ def _tick_records(entity, seconds=10) -> dict[str, tuple[TickRecord, ...]]:
     return {entity.key: tick_buffs(entity, seconds)}
 
 
-class UpkeepSettlementTests(EvenniaTest):
+class UpkeepSettlementTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = _player()
@@ -276,7 +276,7 @@ class UpkeepSettlementTests(EvenniaTest):
         self.assertEqual(entity.traits.hp.current, before - 5)
 
 
-class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
+class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     """Upkeep-settled defeats drive the quest planner like action defeats."""
 
     def setUp(self):
@@ -357,7 +357,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIsNone(self.actor.db.magic_xp)
 
 
-class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTest):
+class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
     """A knocked-out companion's tick mirrors the action path's credit rules."""
 
     def setUp(self):
@@ -411,7 +411,7 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["stage_progress"], 0)
 
 
-class UpkeepCommitFailureTests(EvenniaTest):
+class UpkeepCommitFailureTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = _player()

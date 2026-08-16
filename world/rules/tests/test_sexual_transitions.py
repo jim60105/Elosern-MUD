@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.rulebook.schema import Rule, load_rules
@@ -42,7 +42,7 @@ class FixedRng:
         return self.value
 
 
-class SexualTransitionTests(EvenniaTest):
+class SexualTransitionTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="transition target")
         entity.race = "human"

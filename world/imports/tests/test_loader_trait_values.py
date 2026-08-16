@@ -1,6 +1,6 @@
 from tools.spec_traceability import covers_requirement
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -10,7 +10,7 @@ from world.lore.races import RACE_REGISTRY
 from world.rules.traits import race_floor
 
 
-class LoaderTraitTests(EvenniaTest):
+class LoaderTraitTests(EvenniaTestCase):
     @covers_requirement("import-loader::loaded-trait-values-are-the-literal-imported-stats-merged-onto-the-race-floor-for-omitted-keys-never-re-derived-or-multiplied")
     def test_literal_values_win_and_omissions_use_race_floor(self):
         record = example_record()

@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
@@ -154,7 +154,7 @@ class HealEffectHandlerTests(unittest.TestCase):
         )
 
 
-class HealResolverIntegrationTests(EvenniaTest):
+class HealResolverIntegrationTests(EvenniaTestCase):
     """End-to-end heal resolution through the eight-step action pipeline."""
 
     _TEST_SKILL_KEY = "heal_effect_handler_test"

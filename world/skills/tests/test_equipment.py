@@ -4,7 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.equipment import equip_item, unequip_item
@@ -15,7 +15,7 @@ from world.skills.equipment import (
 )
 
 
-class EquipmentHandlerTests(EvenniaTest):
+class EquipmentHandlerTests(EvenniaTestCase):
     def _entity(self):
         return create_object(PlayerCharacter, key="equipment tester")
 

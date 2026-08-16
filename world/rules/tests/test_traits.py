@@ -4,14 +4,14 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.contrib.rpg.traits import CounterTrait, GaugeTrait, StaticTrait
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.races import RACE_REGISTRY
 from world.rules.traits import STATIC_KEYS, build_initial_traits
 
 
-class TraitIntegrationTests(EvenniaTest):
+class TraitIntegrationTests(EvenniaTestCase):
     def _entity(self, race_key):
         entity = create_object(PlayerCharacter, key=race_key)
         entity.race = race_key

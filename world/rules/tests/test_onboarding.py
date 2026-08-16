@@ -9,7 +9,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import OnboardingGuide
@@ -209,7 +209,7 @@ class OnboardingStateServiceTests(OnboardingGridMixin, EvenniaTest):
         self.assertTrue(guard.relations.has_record(self.player))
 
 
-class SharedMovementBoundarySkipTests(OnboardingGridMixin, EvenniaTest):
+class SharedMovementBoundarySkipTests(OnboardingGridMixin, EvenniaTestCase):
     """Task 3.1: the shared movement-completion boundary (onboarding-skip
     coverage design D1) marks the guide skipped for every room type — plain
     ``Room`` and ``InstanceRoom`` here, wilderness covered by the typeclass

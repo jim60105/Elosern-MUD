@@ -6,7 +6,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import _add_buff
@@ -379,7 +379,7 @@ class StatusReadModelTests(EvenniaTest):
             build_status_read_model(self.actor)
 
 
-class CharacterReadModelTests(EvenniaTest):
+class CharacterReadModelTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = _actor(self)

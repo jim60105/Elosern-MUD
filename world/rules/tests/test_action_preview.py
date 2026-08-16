@@ -6,7 +6,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -51,7 +51,7 @@ def _monster(key="preview goblin", hp=100):
     return monster
 
 
-class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
+class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="preview arena")
@@ -353,7 +353,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(preflight.outcome, "success")
 
 
-class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTest):
+class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
     """Preview/preflight/resolve parity for adjusted resource costs."""
 
     def setUp(self):
@@ -473,7 +473,7 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(spend.data, {"resource_key": "mp", "amount": 9})
 
 
-class SpellTierPreviewGateTests(BattlefieldIsolation, EvenniaTest):
+class SpellTierPreviewGateTests(BattlefieldIsolation, EvenniaTestCase):
     """Preview/revalidation/preflight parity for the elemental spell-tier gate.
 
     ``firestorm`` is a 術師-tier spell (30 MP, AREA) whose threshold (16)

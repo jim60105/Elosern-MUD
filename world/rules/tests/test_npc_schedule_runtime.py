@@ -17,7 +17,7 @@ from typing import Any
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
@@ -269,7 +269,7 @@ class SettlementMoveEntryTests(EvenniaTest):
         self.assertIs(self.npc.location, self.barracks)
 
 
-class SettlementFailureIsolationTests(EvenniaTest):
+class SettlementFailureIsolationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.north_gate = AnchorRoom.create(key="北門", xyz=(9, 9, "test_map"))[0]
@@ -418,7 +418,7 @@ class SettlementFailureIsolationTests(EvenniaTest):
         self.assertIsNone(self.locked_npc.db.schedule_state)
 
 
-class MultiDaySettlementTests(EvenniaTest):
+class MultiDaySettlementTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.north_gate = AnchorRoom.create(key="北門", xyz=(9, 9, "test_map"))[0]
@@ -652,7 +652,7 @@ class SourceRegistrationTests(EvenniaTest):
         self.assertLess(stage_positions["npc_schedules"], stage_positions["instance_reclamation"])
 
 
-class ScheduleRollbackCacheTests(EvenniaTest):
+class ScheduleRollbackCacheTests(EvenniaTestCase):
     """A rolled-back advance restores schedule state and location (F5)."""
 
     def setUp(self):

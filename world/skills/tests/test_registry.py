@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY, Element
@@ -464,7 +464,7 @@ class SkillContentCompletionTests(unittest.TestCase):
         self.assertEqual(style.effects, ["weapon_style:dual_wield"])
 
 
-class DualBladeMasteryCastTests(EvenniaTest):
+class DualBladeMasteryCastTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="dual blade actor")
@@ -517,7 +517,7 @@ class DualBladeMasteryCastTests(EvenniaTest):
         self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
 
 
-class LightSwordStyleCastTests(EvenniaTest):
+class LightSwordStyleCastTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="light sword actor")
@@ -824,7 +824,7 @@ class EarthSpellCatalogTests(unittest.TestCase):
         )
 
 
-class EarthHardenedSkinCastTests(EvenniaTest):
+class EarthHardenedSkinCastTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="hardened skin actor")

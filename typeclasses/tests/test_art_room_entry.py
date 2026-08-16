@@ -3,7 +3,7 @@
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom, InstanceRoom
@@ -12,7 +12,7 @@ from world.art.store import ArtAssetRecord
 from tools.spec_traceability import covers_requirement
 
 
-class ArtRoomEntryTests(EvenniaTest):
+class ArtRoomEntryTests(EvenniaTestCase):
     character_typeclass = PlayerCharacter
 
     def setUp(self):

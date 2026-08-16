@@ -11,7 +11,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
@@ -21,7 +21,7 @@ from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 from world.skills.sexual_acts._builder import _act_family
 
 
-class AcceptanceProofTests(EvenniaTest):
+class AcceptanceProofTests(EvenniaTestCase):
     """One synthetic act proves the ownership/unlock/cast round trip."""
 
     def setUp(self):

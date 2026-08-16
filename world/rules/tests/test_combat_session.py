@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -207,7 +207,7 @@ class CombatSessionIdTests(EvenniaTest):
             self.assertEqual(session_id_for(player, "hostile"), f"hostile:{player.pk}:42")
 
 
-class EngageTests(BattlefieldIsolation, EvenniaTest):
+class EngageTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="forest")
@@ -255,7 +255,7 @@ class EngageTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(get_world_clock().tick, 0)
 
 
-class PlayerRoundTests(BattlefieldIsolation, EvenniaTest):
+class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="arena")
@@ -339,7 +339,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTest):
+class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
     """overwhelm-log-attribution: the compressed log of a player-overwhelming
     session marks the player's commanded action and keeps every attack's own
     roll line, so a self-commanded basic attack can never be misread as the
@@ -407,7 +407,7 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):
+class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
     """Regression tests for the explicit-list facade contract (tasks 2.2-2.3)."""
 
     def setUp(self):
@@ -519,7 +519,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class SessionPersistenceTests(BattlefieldIsolation, EvenniaTest):
+class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="battlefield room")
@@ -564,7 +564,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTest):
         self.assertFalse(is_in_active_session(self.player))
 
 
-class MalformedSessionNormalizationTests(BattlefieldIsolation, EvenniaTest):
+class MalformedSessionNormalizationTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-malformed-combat-recovery: raw-conversion failures fail closed.
 
     ``read_session`` normalizes every raw-conversion or strict-parsing
@@ -614,7 +614,7 @@ class MalformedSessionNormalizationTests(BattlefieldIsolation, EvenniaTest):
             )
 
 
-class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTest):
+class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-malformed-combat-recovery: startup clears unparseable records.
 
     An unparseable persisted record is cleared with a diagnostic, never
@@ -688,7 +688,7 @@ class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(is_in_active_session(self.player))
 
 
-class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
+class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-combat-settlement-recovery: settled marker and atomic round chain."""
 
     def setUp(self):
@@ -904,7 +904,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTest):
+class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-dot-kill-credit: upkeep-settled tick kills commit with the round."""
 
     def setUp(self):
@@ -969,7 +969,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTest):
+class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-combat-session-roster-and-overwhelm D2: player-direction compression.
 
     A foe-overwhelming verdict is informational only: each player submission
@@ -1073,7 +1073,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(self.player.db.active_combat)
 
 
-class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTest):
+class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="preflight room")
@@ -1160,7 +1160,7 @@ _EVENT_LOGS_SENTINEL = ()
 SEAM_AREA_KEY = "wind_blade"
 
 
-class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTest):
+class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
     """Cross-cutting regression tests for the shared round seam (task 3.2).
 
     One session flow exercises every seam phase in order -- a preflight

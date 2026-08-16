@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS
@@ -205,7 +205,7 @@ class CombatActRegistrationTests(unittest.TestCase):
         self.assertEqual(row.then, {"agility": "-20%", "accuracy": -15})
 
 
-class CombatUnlockTests(EvenniaTest):
+class CombatUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")

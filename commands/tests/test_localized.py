@@ -7,7 +7,7 @@ from unittest.mock import patch
 from evennia import default_cmds
 from evennia.objects.objects import DefaultObject
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
 from commands.localized import (
@@ -43,7 +43,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 
 
-class LocalizedCommandSurfaceTests(EvenniaTest):
+class LocalizedCommandSurfaceTests(EvenniaTestCase):
     """The merged player cmdsets never expose a stock localized default."""
 
     def test_merged_cmdsets_expose_no_stock_localized_defaults(self):

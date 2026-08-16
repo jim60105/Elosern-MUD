@@ -5,14 +5,14 @@ from tools.spec_traceability import covers_requirement
 import inspect
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules import sexual_state
 from world.rules.sexual_state import decay_tick, reset_daily_counters
 
 
-class SexualDecayAndResetTests(EvenniaTest):
+class SexualDecayAndResetTests(EvenniaTestCase):
     def test_decay_accumulates_and_moves_at_most_one_level(self):
         entity = create_object(PlayerCharacter, key="decay")
         entity.sexual.pleasure.base = 85

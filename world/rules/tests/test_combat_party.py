@@ -19,7 +19,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -99,7 +99,7 @@ def _damage_entries(logs):
     ]
 
 
-class EngagePartyTests(BattlefieldIsolation, EvenniaTest):
+class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
     """Task 1.4: allied-team collection on engage."""
 
     def setUp(self):
@@ -280,7 +280,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotIn(str(companion.key), battlefield.fled)
 
 
-class KnockoutStateTests(BattlefieldIsolation, EvenniaTest):
+class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
     """Tasks 2.7 and 3.3: per-entity nonlethal knockout as battlefield state."""
 
     def setUp(self):
@@ -476,7 +476,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTest):
+class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
     """Task 4.3: player-centric terminal rules and participant cleanup."""
 
     def setUp(self):
@@ -626,7 +626,7 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
         self.assertEqual(field.knocked_out, {"第一", "第二"})
 
 
-class BattlefieldCommitSurfaceTests(EvenniaTest):
+class BattlefieldCommitSurfaceTests(EvenniaTestCase):
     """battlefield-commit-surface: ``fled`` AND ``knocked_out`` snapshot/restore."""
 
     def _field(self, entity):

@@ -31,7 +31,7 @@ from world.rules.clock import (
     seconds_until_daypart,
 )
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 
 
@@ -280,7 +280,7 @@ class ClockTests(unittest.TestCase):
             sexual_state.DECAY_CONFIG.update(original)
 
 
-class WorldClockPersistenceTests(EvenniaTest):
+class WorldClockPersistenceTests(EvenniaTestCase):
     @covers_requirement("settlement-stage-order::scheduledevent-is-a-plain-json-compatible-record-with-no-live-entity-references", "world-clock::tick-is-persisted-via-a-non-repeating-script-used-purely-as-an-attribute-container")
     def test_singleton_persists_only_tick(self):
         from world.rules.clock import get_world_clock
@@ -623,7 +623,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
         self.assertEqual(called, [])
 
 
-class OuterOwnerSeamTests(EvenniaTest):
+class OuterOwnerSeamTests(EvenniaTestCase):
     """The outer-owner seam: registry plus tick snapshot/restore around an
     outer transaction (D6, consumed by the movement/cast settlement changes)."""
 

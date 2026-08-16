@@ -5,7 +5,7 @@ import unittest
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -67,7 +67,7 @@ def _monster(key="view goblin", hp=100):
     return monster
 
 
-class CombatViewTests(BattlefieldIsolation, EvenniaTest):
+class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="view arena")

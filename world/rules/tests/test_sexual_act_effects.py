@@ -22,7 +22,7 @@ from unittest.mock import patch
 import yaml
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -149,7 +149,7 @@ class EffectsConfigTests(unittest.TestCase):
                     config.participant_multiplier(bad)
 
 
-class ResolvePartTests(EvenniaTest):
+class ResolvePartTests(EvenniaTestCase):
     """resolve_part collapses None and Monster entities to the generic channel."""
 
     def setUp(self):
@@ -281,7 +281,7 @@ class CounterMutatorTableTests(unittest.TestCase):
         self.assertEqual(set(_COUNTER_MUTATORS), set(_LIFETIME_COUNTER_KEYS))
 
 
-class ApplyPleasureGainTests(EvenniaTest):
+class ApplyPleasureGainTests(EvenniaTestCase):
     """The wetness/climax-phase cascade replication (design D-5)."""
 
     def setUp(self):
@@ -340,7 +340,7 @@ class ApplyPleasureGainTests(EvenniaTest):
         self.assertTrue(ast.unparse(second).startswith("was_at_critical_point ="))
 
 
-class ClimaxExtensionTests(EvenniaTest):
+class ClimaxExtensionTests(EvenniaTestCase):
     """The extension trigger compares the pre-clamp gain, not the applied delta."""
 
     def setUp(self):

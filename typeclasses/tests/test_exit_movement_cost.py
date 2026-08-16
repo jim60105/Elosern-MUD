@@ -4,7 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.npcs import NPC
@@ -98,7 +98,7 @@ class MovementCostExitTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before)
 
 
-class MovementCostMixinSourceTests(EvenniaTest):
+class MovementCostMixinSourceTests(EvenniaTestCase):
     """Source-inspection: at_post_traverse delegates to the shared
     after_successful_movement completion helper (onboarding-skip coverage
     design D1), never an inline get_world_clock().advance."""

@@ -3,7 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.imports.loader import instantiate_character
@@ -16,7 +16,7 @@ from world.skills.equipment import (
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
-class InventoryTests(EvenniaTest):
+class InventoryTests(EvenniaTestCase):
     @covers_requirement("equipment-inventory::inventory-remains-a-flat-list-of-item-key-strings-behind-one-deterministic-planning-boundary")
     def test_helpers_tolerate_none_and_remove_one_match(self):
         entity = create_object(PlayerCharacter, key="inventory tester")

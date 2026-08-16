@@ -4,7 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
@@ -21,7 +21,7 @@ from world.maps.bootstrap import (
 SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
 
 
-class ServiceInteriorTests(EvenniaTest):
+class ServiceInteriorTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)

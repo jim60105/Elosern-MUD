@@ -6,7 +6,7 @@ import importlib
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.combat_modifiers import evaluate_combat_modifiers
@@ -19,7 +19,7 @@ except ModuleNotFoundError as error:
     SEXUAL_STATE_MODULE = None
 
 
-class SexualStateLandingTests(EvenniaTest):
+class SexualStateLandingTests(EvenniaTestCase):
     @unittest.skipUnless(
         SEXUAL_STATE_MODULE is not None,
         "world.rules.sexual_state has not landed yet",

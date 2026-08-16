@@ -5,7 +5,7 @@ quest_deadlines-before-instance_reclamation existence-differs proof
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from server.conf.at_server_startstop import at_server_start
 from typeclasses.rooms import InstanceRoom
@@ -35,7 +35,7 @@ EXPECTED_STAGE_ORDER = (
 BLOCKING_PIN = "quest:1:stage:0"
 
 
-class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         clock_module._EVENT_SOURCES.pop("instance_reclamation", None)
@@ -78,7 +78,7 @@ class InstanceStageWiringTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertIsNotNone(registration.surfaces)
 
 
-class QuestDeadlinesOrderProofTests(EvenniaTest):
+class QuestDeadlinesOrderProofTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         clock_module._EVENT_SOURCES.pop("instance_reclamation", None)

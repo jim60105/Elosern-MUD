@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -23,7 +23,7 @@ from world.rules.sexual_state import (
 )
 
 
-class SexualStateTests(EvenniaTest):
+class SexualStateTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::entity-sexual-is-mounted-as-the-real-sexualstate-handler-replacing-the-change-3-placeholder", "sexual-state-handler::sexualstate-is-constructed-from-entity-db-sexual-when-a-raw-baseline-is-present")
     def test_handler_mounts_and_preserves_complete_raw_baseline(self):
         entity = create_object(PlayerCharacter, key="baseline")
@@ -229,7 +229,7 @@ class PleasureConfigValidationTests(unittest.TestCase):
             load_pleasure_config(path=self._write(data))
 
 
-class PleasureConstructionTests(EvenniaTest):
+class PleasureConstructionTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::pleasure-is-constructed-from-an-imported-baseline-s-arousal-level-at-that-level-s-band-floor")
     def test_imported_arousal_level_resolves_to_its_band_floor(self):
         entity = create_object(PlayerCharacter, key="imported arousal")
@@ -250,7 +250,7 @@ class PleasureConstructionTests(EvenniaTest):
         self.assertEqual(state.arousal.level, "平靜")
 
 
-class PleasureBoundsTests(EvenniaTest):
+class PleasureBoundsTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::pleasure-is-bounded-0-to-100-and-every-mutation-clamps-at-those-bounds")
     def test_delta_exceeding_100_clamps_at_100(self):
         entity = create_object(PlayerCharacter, key="clamp high")
@@ -266,7 +266,7 @@ class PleasureBoundsTests(EvenniaTest):
         self.assertEqual(entity.sexual.pleasure.value, 0)
 
 
-class DerivedArousalTests(EvenniaTest):
+class DerivedArousalTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::arousal-is-a-derived-read-only-view-over-pleasure-comparable-exactly-as-before")
     def test_mid_band_pleasure_reads_the_covering_level(self):
         entity = create_object(PlayerCharacter, key="mid band")
@@ -311,7 +311,7 @@ LIFETIME_COUNTER_PAIRS = (
 LIFETIME_COUNTER_FIELDS = tuple(field for field, _ in LIFETIME_COUNTER_PAIRS)
 
 
-class LifetimeCounterTests(EvenniaTest):
+class LifetimeCounterTests(EvenniaTestCase):
     """The eleven lifetime behaviour counters per the delta spec scenarios."""
 
     @covers_requirement("sexual-state-handler::sexualstate-exposes-eleven-independent-unbounded-lifetime-behaviour-counters-each-with-exactly-one-sanctioned-mutator")

@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.sexual_state import SexualState
@@ -49,7 +49,7 @@ def _synthetic_act(key: str, unlock: dict[str, int], *, events=()):
     return skill, act
 
 
-class UnlockQueryTests(EvenniaTest):
+class UnlockQueryTests(EvenniaTestCase):
     """Threshold-based unlock gating against the entity's own counters."""
 
     def _entity(self):

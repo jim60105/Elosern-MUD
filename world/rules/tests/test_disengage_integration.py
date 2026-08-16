@@ -6,7 +6,7 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
@@ -27,7 +27,7 @@ from world.rules.overwhelm import (
 from world.skills.registry import SKILL_REGISTRY
 
 
-class DisengageResolverIntegrationTests(EvenniaTest):
+class DisengageResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")

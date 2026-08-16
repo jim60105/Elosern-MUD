@@ -3,7 +3,7 @@
 from unittest.mock import Mock
 import unittest
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art.subjects import (
     DIGITS_ONLY_KEY_PATTERN,
@@ -202,7 +202,7 @@ class ReservedPlayerStableKeyTests(unittest.TestCase):
         self.assertEqual(DIGITS_ONLY_KEY_PATTERN, r"[0-9]+")
 
 
-class PortraitPolicyTests(EvenniaTest):
+class PortraitPolicyTests(EvenniaTestCase):
     def _character(self, policy):
         character = Mock()
         character.db.portrait_policy = policy
@@ -241,7 +241,7 @@ class PortraitPolicyTests(EvenniaTest):
                     character_subject_for(self._character(bad))
 
 
-class DescriptionTests(EvenniaTest):
+class DescriptionTests(EvenniaTestCase):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):
         character = Mock()

@@ -9,7 +9,7 @@ from unittest.mock import patch
 import unittest
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -75,7 +75,7 @@ class CapOwnershipContractTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
 
-class AffinityWriterTests(EvenniaTest):
+class AffinityWriterTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         register_catalog()
@@ -281,7 +281,7 @@ class AffinityWriterTests(EvenniaTest):
         )
 
 
-class CapBreakWriterTests(EvenniaTest):
+class CapBreakWriterTests(EvenniaTestCase):
     """The sole cap writer ``raise_affinity_cap`` (affinity-cap-break 2.x)."""
 
     def setUp(self):

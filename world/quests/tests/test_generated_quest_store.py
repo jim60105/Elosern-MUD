@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from evennia.utils.create import create_object, create_script
 from evennia.utils.search import search_script
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
@@ -143,7 +143,7 @@ def _clear_process_registries():
     SCENE_REQUIREMENT_REGISTRY.clear()
 
 
-class GeneratedQuestStoreTests(EvenniaTest):
+class GeneratedQuestStoreTests(EvenniaTestCase):
     """Task 1.1/4.1: the store Script CRUD contract."""
 
     def test_get_store_creates_one_persistent_script(self):
@@ -177,7 +177,7 @@ class GeneratedQuestStoreTests(EvenniaTest):
             get_store()
 
 
-class StoreConflictTests(RegistryIsolationMixin, EvenniaTest):
+class StoreConflictTests(RegistryIsolationMixin, EvenniaTestCase):
     """Durable-first registration rejects store content divergence."""
 
     def test_append_conflicting_payload_raises_and_keeps_the_store(self):
@@ -216,7 +216,7 @@ class StoreConflictTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(len(list_payloads()), 1)
 
 
-class PayloadRoundTripTests(RegistryIsolationMixin, EvenniaTest):
+class PayloadRoundTripTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 1.2/4.1: serialization round-trip and registration idempotency."""
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
@@ -261,7 +261,7 @@ class StoreFailureInjectionTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertNotIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
 
 
-class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTest):
+class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTestCase):
     """Design D3: malformed store payloads fail loudly at restore time."""
 
     def _payload(self):
@@ -321,7 +321,7 @@ class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTest):
         )
 
 
-class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTest):
+class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 2.3: startup restore heals the append-then-crash window."""
 
     def test_restore_repopulates_all_three_registries_from_the_store(self):
@@ -347,7 +347,7 @@ class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTest):
         )
 
 
-class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTest):
+class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 4.2: an accepted generated quest survives a simulated restart."""
 
     def setUp(self):
@@ -426,7 +426,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertTrue(completed, "quest did not auto-complete after restore")
 
 
-class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTest):
+class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
     """Delta guild-quest-board: offers resolve, board stays single, accept works."""
 
     def setUp(self):
@@ -498,7 +498,7 @@ class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIn(compiled.definition.key, [r.definition_key for r in read_records(self.player)])
 
 
-class SyncQuestRuntimeRestoreTests(RegistryIsolationMixin, EvenniaTest):
+class SyncQuestRuntimeRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 3.2: sync restores generated content ahead of catalog registration."""
 
     def test_sync_restores_generated_content_and_catalog_together(self):

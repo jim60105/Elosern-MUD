@@ -3,7 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.sexual_state import (
@@ -12,7 +12,7 @@ from world.rules.sexual_state import (
 )
 
 
-class ClimaxPhaseCycleTests(EvenniaTest):
+class ClimaxPhaseCycleTests(EvenniaTestCase):
     def _entity_at(self, level):
         entity = create_object(PlayerCharacter, key=f"phase {level}")
         entity.sexual.climax_phase.value = level

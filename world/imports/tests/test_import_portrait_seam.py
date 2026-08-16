@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -15,7 +15,7 @@ from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from tools.spec_traceability import covers_requirement
 
 
-class ImportPortraitSeamTests(EvenniaTest):
+class ImportPortraitSeamTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()

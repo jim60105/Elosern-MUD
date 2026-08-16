@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
@@ -34,7 +34,7 @@ def _attach_staff(npc: NPC, branch_key: str = "guild_branch_altoria") -> NPC:
     return npc
 
 
-class GuildRegistrationTests(EvenniaTest):
+class GuildRegistrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         # Register the quest catalog in this class's own setup: registration
@@ -166,7 +166,7 @@ class GuildRegistrationTests(EvenniaTest):
             parse_guild_registration(self.player)
 
 
-class ServiceHostResolutionTests(EvenniaTest):
+class ServiceHostResolutionTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="resolution room")
@@ -226,7 +226,7 @@ class RegistrationBoundaryScanTests(unittest.TestCase):
         self.assertEqual(calls, ["get_display_value"])
 
 
-class GuildServicePCIntegrationTests(EvenniaTest):
+class GuildServicePCIntegrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY

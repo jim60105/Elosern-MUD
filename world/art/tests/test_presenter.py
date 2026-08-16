@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -31,7 +31,7 @@ def _scene(key="forest_path"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
-class ArtPresenterTests(EvenniaTest):
+class ArtPresenterTests(EvenniaTestCase):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
@@ -191,7 +191,7 @@ class ArtPresenterTests(EvenniaTest):
         self.assertNotIn(".art", url)
 
 
-class ResolveEntityTests(EvenniaTest):
+class ResolveEntityTests(EvenniaTestCase):
     """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
 
     def setUp(self):

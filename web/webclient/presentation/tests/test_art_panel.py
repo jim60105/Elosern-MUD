@@ -16,7 +16,7 @@ from tools.spec_traceability import covers_requirement
 
 from django.test import override_settings
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
@@ -189,7 +189,7 @@ def _monster(key="art goblin", hp=100):
     return monster
 
 
-class ArtPresenterTests(BattlefieldIsolation, EvenniaTest):
+class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
