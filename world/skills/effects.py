@@ -163,6 +163,37 @@ class SexualCounterEffect:
     act_key: str
 
 
+# 神之秘法 act effects (divine-sexual-arts-reuse): hand-built acts declare
+# these instead of the ordinary pleasure:/sexual_counter: triad. Each is a
+# general dispatch-table entry — no handler reads ``requires_divine_arts``
+# or the caller's line.
+@dataclass(frozen=True)
+class DivinePleasureMaxEffect:
+    """Set every resolved target's pleasure to its ceiling in one cast.
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the target set comes from the cast's resolved targets,
+    and the handler reuses the shipped ``_apply_pleasure_gain`` twice
+    (``gain=100`` then ``gain=0``) to walk the climax cycle into 進行中.
+    """
+
+
+@dataclass(frozen=True)
+class ClimaxExtensionStageEffect:
+    """Stage ``count`` consecutive climax extensions on every resolved target."""
+
+    count: int
+
+
+@dataclass(frozen=True)
+class SexualDrainEffect:
+    """Drain one target's pleasure into the caster's MP, SP, and HP.
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the handler reads the target's pleasure itself.
+    """
+
+
 @dataclass(frozen=True)
 class DamageEffect:
     """Deal damage of one element and school (``physical``/``magic``)."""
@@ -297,6 +328,26 @@ def parse_effect(effect_id: str) -> object:
         return PleasureEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_counter":
         return SexualCounterEffect(act_key=_parse_single_arg(effect_id, prefix))
+    if prefix == "divine_pleasure_max":
+        _parse_single_arg(effect_id, prefix)
+        return DivinePleasureMaxEffect()
+    if prefix == "divine_climax_extension_stage":
+        try:
+            count = int(_parse_single_arg(effect_id, prefix))
+        except ValueError as error:
+            raise ValueError(
+                f"divine_climax_extension_stage count must be an integer, "
+                f"got {effect_id!r}"
+            ) from error
+        if count < 1:
+            raise ValueError(
+                f"divine_climax_extension_stage count must be positive, "
+                f"got {effect_id!r}"
+            )
+        return ClimaxExtensionStageEffect(count=count)
+    if prefix == "divine_drain":
+        _parse_single_arg(effect_id, prefix)
+        return SexualDrainEffect()
     if prefix == "damage":
         _, _, rest = effect_id.partition(":")
         element, _, school = rest.partition(":")

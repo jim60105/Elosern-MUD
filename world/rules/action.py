@@ -789,6 +789,181 @@ def _handle_sexual_counter_effect(
     return pending
 
 
+def _handle_divine_pleasure_max(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Set every non-actor target's pleasure to its ceiling in one cast.
+
+    Stages one ``PendingEffect`` per remaining target whose ``apply()`` calls
+    the shipped :func:`_apply_pleasure_gain` twice in sequence — ``gain=100``
+    (sets ``pleasure`` to its clamped ceiling and walks at most one climax
+    cycle edge) then ``gain=0`` (re-runs the pre/post-mutation check, which
+    now observes the already-updated phase and walks the second edge into
+    進行中). Two calls, not one, because ``_apply_pleasure_gain`` deliberately
+    advances ``climax_phase`` by at most one cycle edge per call
+    (divine-sexual-arts-reuse design D-2).
+
+    The actor is excluded explicitly even when present in the resolved
+    ``targets`` list: the ``"all"`` AREA shorthand has no self-exclusion, and
+    ``_step4b_sexual_resist_gate`` keeps an actor present in ``targets``
+    without rolling a contest for it. An empty or shrunken ``targets`` list
+    (a fully or partially resisted cast) is an ordinary outcome.
+    """
+    del context, scale, effect_id
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_pleasure_max|{_entity_key(target)}|100",
+                frozenset(),
+                lambda target=target: (
+                    _apply_pleasure_gain(target, 100),
+                    _apply_pleasure_gain(target, 0),
+                ),
+            )
+        )
+    return pending
+
+
+def _handle_climax_extension_stage(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Stage ``count`` climax extensions on every non-actor target.
+
+    The ``count`` is parsed from the effect string
+    (``divine_climax_extension_stage:<count>``) and applied through the
+    already-shipped ``SexualState.stage_climax_extension`` — which validates
+    the count and accumulates rather than overwrites. The actor is excluded
+    explicitly, and an empty or shrunken ``targets`` list (a resisted cast)
+    is an ordinary outcome. A target not currently 進行中 has the staged count
+    silently discarded at the next settlement point — accepted, unchanged
+    shipped behaviour (divine-sexual-arts-reuse design D-5).
+    """
+    del context, scale
+    try:
+        count = int(effect_id.partition(":")[2])
+    except ValueError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            f"divine_climax_extension_stage requires an integer count, "
+            f"got {effect_id!r}",
+        ) from error
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_climax_extension|{_entity_key(target)}|{count}",
+                frozenset(),
+                lambda target=target, count=count: target.sexual.stage_climax_extension(
+                    count
+                ),
+            )
+        )
+    return pending
+
+
+def _stored_pleasure_value(entity: Any) -> int:
+    """Read the stored pleasure base without materializing the sexual handler.
+
+    Constructing ``entity.sexual`` writes the ``sexual_traits`` attribute on
+    first access — a storage write at effect-planning time, before the commit
+    snapshot, so a cast rejected after planning would leave the created trait
+    behind and break the action workflow's all-or-nothing boundary. The same
+    no-create discipline ``_sensitivity_level`` (``sexual_act_effects.py``)
+    and ``_stored_sexual_level`` (``combat_modifiers.py``) follow. An entity
+    whose sexual state was never touched has no ``pleasure`` entry, and its
+    baseline floor is 0 (the 平靜 band) — draining it is a no-op.
+    """
+    from collections.abc import Mapping
+
+    traits = entity.attributes.get("sexual_traits", default=None, category="traits")
+    if isinstance(traits, Mapping):
+        raw = traits.get("pleasure")
+        if isinstance(raw, Mapping):
+            base = raw.get("base")
+            if isinstance(base, int) and not isinstance(base, bool):
+                return min(100, max(0, base))
+    return 0
+
+
+def _handle_sexual_drain(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Drain one target's pleasure into the caster's MP, SP, and HP.
+
+    Reads the resolved target's stored ``pleasure`` value once (no-create —
+    see :func:`_stored_pleasure_value`), stages one ``PendingEffect`` on the
+    actor (adding that amount to ``mp``, ``sp``, and ``hp`` — each trait's own
+    existing bound enforcement clamps at its own maximum) and one on the
+    target (setting ``pleasure.base`` to ``0``), so the commit's per-entity
+    snapshot/rollback covers both mutated entities. The commit-time apply
+    closures may materialize ``entity.sexual``; that happens inside the
+    snapshot's coverage and is rolled back by ``_restore_entity_state``.
+
+    ``TargetSpec.SINGLE``'s "exactly one target" guarantee is enforced at
+    targeting time, before the resist gate runs; a successfully-resisted sole
+    target legitimately empties ``targets`` by the time this handler executes,
+    which is an ordinary no-op — never a rejection. Only ``len(targets) > 1``
+    rejects, and that case stays structurally unreachable.
+    """
+    del context, scale, effect_id
+    if not targets:
+        return []
+    if len(targets) > 1:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "divine_drain requires exactly one target",
+        )
+    target = targets[0]
+    if target is actor:
+        return []
+    amount = _stored_pleasure_value(target)
+    return [
+        PendingEffect(
+            actor,
+            f"divine_drain_actor|{_entity_key(actor)}|{amount}",
+            frozenset(),
+            lambda actor=actor, amount=amount: _drain_resources(actor, amount),
+        ),
+        PendingEffect(
+            target,
+            f"divine_drain|{_entity_key(target)}|{amount}",
+            frozenset(),
+            lambda target=target: _zero_pleasure(target),
+        ),
+    ]
+
+
+def _drain_resources(actor: Any, amount: int) -> None:
+    """Add ``amount`` to the caster's MP, SP, and HP, clamped per trait."""
+    for key in ("mp", "sp", "hp"):
+        trait = getattr(actor.traits, key)
+        trait.current = trait.current + amount
+
+
+def _zero_pleasure(target: Any) -> None:
+    """Set the target's pleasure gauge to zero."""
+    target.sexual.pleasure.base = 0
+
+
 register_effect_handler(
     "confer_skill_partial",
     _handle_confer_skill_partial,
@@ -835,6 +1010,24 @@ register_effect_handler(
     "sexual_counter",
     _handle_sexual_counter_effect,
     frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_pleasure_max",
+    _handle_divine_pleasure_max,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_climax_extension_stage",
+    _handle_climax_extension_stage,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_drain",
+    _handle_sexual_drain,
+    frozenset({"traits", "sexual"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
@@ -988,6 +1181,10 @@ _ENTRY_TEMPLATES = {
     "skill_practice": "{actor} 累積了技能熟練度。",
     "combat_kill_xp": "",
     "knocked_out_mark": "",
+    "divine_pleasure_max": "{actor} 以神之律令，將 {target} 的快感推至頂點。",
+    "divine_climax_extension": "{actor} 以神之律令，延續了 {target} 的絕頂。",
+    "divine_drain": "{actor} 從 {target} 身上汲取了神域之力。",
+    "divine_drain_actor": "",
 }
 
 
@@ -1093,6 +1290,12 @@ def _entries_from_effect(
     elif kind == "combat_kill_xp":
         return ()
     elif kind == "knocked_out_mark":
+        return ()
+    elif kind == "divine_drain_actor":
+        # Internal actor-side drain effect: the resource gain is rolled back
+        # with the cast, and the logged narration is the single target-side
+        # divine_drain entry — an actor entry would misnarrate as the caster
+        # draining themselves.
         return ()
     else:
         data = {}

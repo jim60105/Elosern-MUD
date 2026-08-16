@@ -196,11 +196,24 @@ act's individual magnitude).
 ### D-4: 神域搾取's drain is one-to-one and bespoke, not a reusable schema field
 
 The handler reads `target.sexual.pleasure.value`, adds that amount to `caster.traits.mp.current`,
-`caster.traits.sp.current`, and `caster.traits.hp.current` (each trait's own existing bound enforcement
-clamps at its maximum — no new clamping code, mirroring `sexual_transitions.py`'s own `vital_gauge`
-handling of `sp`), then sets `target.sexual.pleasure.base = 0`. No ratio, no participant-count
-multiplier: the design doc is explicit that this is "uncapped by the ratio that bounds the catalogue's
-搾取" (`sexual-catalog-combat`/C5's deferred act).
+`caster.traits.sp.current`, and `caster.traits.hp.current` (each trait's own existing bound
+enforcement clamps at its maximum — no new clamping code, mirroring `sexual_transitions.py`'s own
+`vital_gauge` handling of `sp`), then sets `target.sexual.pleasure.base = 0`. No ratio, no
+participant-count multiplier: the design doc is explicit that this is "uncapped by the ratio that
+bounds the catalogue's 搾取" (`sexual-catalog-combat`/C5's deferred act).
+
+The pleasure read is **no-create**: `_handle_sexual_drain` reads the stored `sexual_traits`
+attribute through `_stored_pleasure_value` rather than constructing `target.sexual`, because
+`SexualState.__init__` writes the traits on first access — a storage write at effect-planning time,
+before the commit snapshot, so a cast rejected after planning would leave the created trait behind
+and break the action workflow's all-or-nothing boundary. This is the same discipline
+`_sensitivity_level` (`sexual_act_effects.py`) and `_stored_sexual_level` (`combat_modifiers.py`)
+document; an unmaterialized target reads as the 0 floor, which is exactly the "draining a
+`pleasure=0` target is a harmless no-op" scenario. The drain is staged as **two** `PendingEffect`s
+(one on the actor for the resource gain, one on the target for the zeroing) so the commit's
+per-entity snapshot/rollback covers both mutated entities; the actor-side effect uses the no-log
+`divine_drain_actor` description kind so the EventLog carries exactly one `divine_drain` entry
+targeting the drained entity, not a duplicate actor-targeted entry.
 
 This is intentionally **not** a step toward a general cross-entity resource-transfer primitive for the
 catalogue. C5 deferred 搾取 for exactly this missing primitive; this proposal does not build one. The
@@ -284,6 +297,49 @@ No SP/action cost is added to the caster and no cap beyond each trait's own maxi
 the design doc's own unresolved Q4 rather than leaving it open. A future balance pass remains free to
 revisit this once real playtesting data exists; nothing here forecloses that.
 
+### D-8: This change amends `unlocked_act_keys_for`'s mastery branch — the shipped blanket grants divine acts, and the delta spec scenario requires otherwise
+
+The proposal's original task 1.3 assumed the 神之秘法 line's blanket-unlock exclusion was already
+enforced by `unlocked_act_keys_for`'s existing logic ("not by any special-casing this change adds").
+**That assumption is false, verified empirically before planning**: the shipped mastery branch is
+`if mastery: return frozenset(SEXUAL_ACT_REGISTRY)` — the *entire* registry, divine acts included once
+registered. The delta spec scenario "SexualMasteryEffect ownership alone does not unlock any of the
+three" and the divine design doc §1.1 ("The 性魔法主宰 blanket unlock does not reach them. That unlock
+covers the counter-gated catalogue only") both require the mastery result to exclude
+`requires_divine_arts=True` acts.
+
+So this change amends `unlocked_act_keys_for` in `world/skills/sexual_acts/__init__.py`: the mastery
+branch becomes
+
+```python
+if mastery:
+    return frozenset(
+        key
+        for key, act in SEXUAL_ACT_REGISTRY.items()
+        if not SKILL_REGISTRY[key].requires_divine_arts
+    )
+```
+
+Keyed on the existing `SkillDef.requires_divine_arts` data field, never a hardcoded key list — the same
+discipline overview D-9 demands. Every `SEXUAL_ACT_REGISTRY` key is present in `SKILL_REGISTRY` by the
+registration-agreement invariant (`check_registries_agree` enforces it modulo the three mastery
+exclusions, which are not acts), so the new dereference is safe without repeating the docstring's
+`if key in SKILL_REGISTRY` guard — that guard stays in the mastery `any()` comprehension exactly where
+the source-inspection test pins it.
+
+The **counter-driven branch is deliberately unchanged**. The three acts declare `unlock={}`, and the
+shipped `sexual-state-handler` contract — "A seed act with an empty unlock mapping is always present",
+plus the delta spec scenario "a divine-capable actor with zero counters owning all three — no counter
+threshold gates it" — requires an empty unlock mapping to mean unconditionally owned. Restricting the
+counter-driven branch would contradict the shipped main spec and break the scenario; the containment
+for this line is the race gate at cast time (overview D-9), not the unlock machinery. The asymmetry —
+a plain human "owns" the acts in `owned_keys()` but can never cast them, while a mastery holder does
+not own them at all — is the design doc's "two unrelated acquisition paths" taken literally.
+
+This is why the delta spec of this change carries a `sexual-state-handler` MODIFIED requirement:
+the shipped requirement text ("or unlocks it entirely for a mastery holder") is amended to carve out
+`requires_divine_arts` acts, so the main spec stays truthful after this change lands.
+
 ## Risks / Trade-offs
 
 - **Three new `action.py` effect prefixes for three acts** → each is a small (10-20 line), independently
@@ -315,6 +371,14 @@ revisit this once real playtesting data exists; nothing here forecloses that.
   神之秘法 remain empty" requirement text is obsolete once this proposal ships (異種 was already filled by
   the already-implemented `sexual-catalog-interspecies`; this proposal is what finally makes the "remain
   empty" clause untrue for both named lines). See tasks.md §6 and the delta spec.
+- **The mastery blanket currently grants divine acts (D-8)** → the delta spec scenario "SexualMasteryEffect
+  ownership alone does not unlock any of the three" and the divine design doc §1.1 require the exclusion,
+  so this proposal amends `unlocked_act_keys_for`'s mastery branch. Two further existing tests break as a
+  direct consequence and are updated in this proposal (tasks.md §6): `test_seed_acts.py`'s
+  `test_interspecies_and_divine_gain_no_seed` pins `DIVINE_ACTS == ()`, and `test_sexual_unlock.py`'s
+  `test_direct_mastery_ownership_unlocks_the_entire_catalogue` asserts the mastery result equals the
+  whole registry (now minus the three divine acts). A `sexual-state-handler` MODIFIED delta (D-8) keeps
+  the shipped "unlocks it entirely" requirement text truthful.
 
 ## Migration Plan
 
