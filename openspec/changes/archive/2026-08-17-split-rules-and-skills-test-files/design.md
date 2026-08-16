@@ -35,8 +35,15 @@ The evennia shard manifest (`.github/evennia-shards.json`) lists
 `world.rules.tests.test_combat_session` in a `rules-*` shard — the label must
 be replaced by the four new module labels.
 
-No repository code imports these two test modules from outside (verified by
-grep at `69aabe6`), so the moves have no external importers.
+No repository code imports these two test modules from outside via import
+statements (verified by grep at `69aabe6`), so the moves have no external
+importers. One string reference exists: the scenario-mapping table in
+`world/rules/tests/test_guild_economy_scenarios.py` resolves
+`world.rules.tests.test_combat_session` through `__import__`; its module keys
+split into `session_flow` / `session_persistence` / `session_recovery` in the
+same change. Developer-doc examples that name the two modules
+(`AGENTS.md`, `docs/development/evennia-testing-guide.md`,
+`docs/development/adding-spells.md`) are updated to the new module names.
 
 ## Goals / Non-Goals
 
@@ -81,6 +88,7 @@ grep at `69aabe6`), so the moves have no external importers.
   helpers module; if imports would become circular, the executor stops and
   reports rather than duplicating the helper.
 - **Test-count drift**: verified by comparing the discovered test count
-  before and after (3,104).
+  before and after (3,104 at proposal time; measured 4,263 both before and
+  after the split at the implementation HEAD).
 - **Manifest/contract mismatch**: the ownership contract test fails loudly
   and is part of the verification gates.

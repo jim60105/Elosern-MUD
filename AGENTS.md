@@ -144,7 +144,7 @@ run):
   the full evidence run only at final handoff.
 
 During iteration, run **only the package tests your change touches** (e.g.
-`uv run --locked evennia test --settings settings.py world.rules.tests.test_combat_session`)
+`uv run --locked evennia test --settings settings.py world.rules.tests.test_combat_session_flow`)
 or the specific Node/browser file. Run the full Evennia suite and the browser
 suite only (a) after a large cross-cutting change, or (b) once, as part of the
 final pre-handoff check. When a browser test needs to be re-run, prefer a single

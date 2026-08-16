@@ -56,5 +56,10 @@ released users.
   module; `world/skills/tests/` — one file replaced by three modules.
 - `tests/test_evennia_test_optimization_contract.py` — pinned-path update.
 - `.github/evennia-shards.json` — label update for the rules shard.
+- `world/rules/tests/test_guild_economy_scenarios.py` — the
+  `__import__`-resolved module key for combat-session classes splits into
+  per-module keys; developer-doc examples naming the deleted modules are
+  updated (`AGENTS.md`, `docs/development/evennia-testing-guide.md`,
+  `docs/development/adding-spells.md`).
 - No production code, no player-facing commands, no test behavior change.
 - Sibling changes split the remaining long files (`world/ai`, `world/quests`).

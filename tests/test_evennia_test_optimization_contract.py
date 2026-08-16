@@ -396,7 +396,7 @@ class TestOptimizationEvidenceTests(unittest.TestCase):
             "world/maps/tests/test_instance_spawn.py": {
                 "InstanceYamlTests": {"unittest.TestCase"},
             },
-            "world/rules/tests/test_combat_session.py": {
+            "world/rules/tests/test_combat_session_persistence.py": {
                 "CombatSessionRecordTests": {"unittest.TestCase"},
                 "CombatSessionIdTests": {"EvenniaTest"},
             },
