@@ -195,6 +195,49 @@ class SexualDrainEffect:
 
 
 @dataclass(frozen=True)
+class SaturateSensitivityEffect:
+    """Pin every resolvable body part's sensitivity to the top level.
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the handler calls ``target.sexual.saturate_sensitivity()``
+    on each resolved non-actor target.
+    """
+
+
+@dataclass(frozen=True)
+class ClampShameEffect:
+    """Pin the target's shame at the vocabulary ceiling (成癮).
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the handler calls ``target.sexual.clamp_shame_to("成癮")``
+    on each resolved non-actor target, eagerly rejecting a ``Monster`` target
+    before staging anything.
+    """
+
+
+@dataclass(frozen=True)
+class MarkSubmissionEffect:
+    """Mark the target as permanently auto-complying toward the caster.
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the handler calls
+    ``target.sexual.mark_submission(str(actor.id))`` on each resolved
+    non-actor target, keying the permanent mark by the caster's unique
+    database id.
+    """
+
+
+@dataclass(frozen=True)
+class RestorePurityEffect:
+    """Restore the target's virgin flag without touching experience_types.
+
+    The effect string's payload is the act's Chinese label, kept for
+    readability only; the handler calls ``target.sexual.restore_purity()``
+    on each resolved non-actor target.
+    """
+
+
+@dataclass(frozen=True)
 class DamageEffect:
     """Deal damage of one element and school (``physical``/``magic``)."""
 
@@ -348,6 +391,18 @@ def parse_effect(effect_id: str) -> object:
     if prefix == "divine_drain":
         _parse_single_arg(effect_id, prefix)
         return SexualDrainEffect()
+    if prefix == "divine_saturate_sensitivity":
+        _parse_single_arg(effect_id, prefix)
+        return SaturateSensitivityEffect()
+    if prefix == "divine_clamp_shame":
+        _parse_single_arg(effect_id, prefix)
+        return ClampShameEffect()
+    if prefix == "divine_mark_submission":
+        _parse_single_arg(effect_id, prefix)
+        return MarkSubmissionEffect()
+    if prefix == "divine_restore_purity":
+        _parse_single_arg(effect_id, prefix)
+        return RestorePurityEffect()
     if prefix == "damage":
         _, _, rest = effect_id.partition(":")
         element, _, school = rest.partition(":")

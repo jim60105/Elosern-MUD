@@ -952,6 +952,150 @@ def _handle_sexual_drain(
     ]
 
 
+def _handle_saturate_sensitivity(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Pin every non-actor target's resolvable body parts to 敏感異常.
+
+    Stages one ``PendingEffect`` per remaining target whose ``apply()`` calls
+    the shipped ``SexualState.saturate_sensitivity()``. The actor is excluded
+    explicitly (matching ``_handle_divine_pleasure_max``'s discipline), and an
+    empty or shrunken ``targets`` list (a fully or partially resisted cast) is
+    an ordinary outcome, never a rejection.
+    """
+    del context, scale, effect_id
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_saturate_sensitivity|{_entity_key(target)}",
+                frozenset(),
+                lambda target=target: target.sexual.saturate_sensitivity(),
+            )
+        )
+    return pending
+
+
+def _handle_clamp_shame(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Pin every non-actor target's shame at 成癮, eagerly rejecting a Monster.
+
+    The ``isinstance(target, Monster)`` check runs eagerly inside the handler
+    body, before any ``PendingEffect`` is staged, and raises
+    ``RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, ...)`` directly.
+    It deliberately does not rely on ``clamp_shame_to()``'s defensive
+    ``ValueError``: an exception raised from inside a staged
+    ``PendingEffect.apply()`` closure is caught by ``_commit()`` and reported
+    as ``RejectReason.COMMIT_FAILED`` — a different, and here incorrect, code
+    path from the synchronous ``RejectedAction`` this file's other defensive
+    rejections produce (divine-sexual-arts-mutators D-3). ``isinstance()`` is
+    a pure read, so the eager check introduces no atomicity risk.
+
+    The actor is excluded explicitly, and an empty or shrunken ``targets``
+    list (a resisted cast) is an ordinary outcome.
+    """
+    del context, scale, effect_id
+    for target in targets:
+        if target is actor:
+            continue
+        if isinstance(target, Monster):
+            raise RejectedAction(
+                RejectReason.EFFECT_RESOLUTION_FAILED,
+                "divine_clamp_shame cannot target a Monster: "
+                f"{_entity_key(target)}",
+            )
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_clamp_shame|{_entity_key(target)}",
+                frozenset(),
+                lambda target=target: target.sexual.clamp_shame_to("成癮"),
+            )
+        )
+    return pending
+
+
+def _handle_mark_submission(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Mark every non-actor target as auto-complying toward the actor.
+
+    Stages one ``PendingEffect`` per remaining target whose ``apply()`` calls
+    ``SexualState.mark_submission(str(actor.id))`` — the actor's
+    guaranteed-unique database id, never ``_entity_key(actor)``/``.key``,
+    which is shared across same-species ``Monster`` spawns and would
+    misattribute the permanent, unremovable mark (divine-sexual-arts-mutators
+    D-5). The actor is excluded explicitly, and an empty or shrunken
+    ``targets`` list (a resisted cast) is an ordinary outcome.
+    """
+    del context, scale, effect_id
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_mark_submission|{_entity_key(target)}",
+                frozenset(),
+                lambda target=target: target.sexual.mark_submission(
+                    str(actor.id)
+                ),
+            )
+        )
+    return pending
+
+
+def _handle_restore_purity(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Restore every non-actor target's virgin flag without clearing experience.
+
+    Stages one ``PendingEffect`` per remaining target whose ``apply()`` calls
+    the shipped ``SexualState.restore_purity()``. The actor is excluded
+    explicitly, and an empty or shrunken ``targets`` list (a resisted cast)
+    is an ordinary outcome, never a rejection.
+    """
+    del context, scale, effect_id
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is actor:
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"divine_restore_purity|{_entity_key(target)}",
+                frozenset(),
+                lambda target=target: target.sexual.restore_purity(),
+            )
+        )
+    return pending
+
+
 def _drain_resources(actor: Any, amount: int) -> None:
     """Add ``amount`` to the caster's MP, SP, and HP, clamped per trait."""
     for key in ("mp", "sp", "hp"):
@@ -1028,6 +1172,30 @@ register_effect_handler(
     "divine_drain",
     _handle_sexual_drain,
     frozenset({"traits", "sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_saturate_sensitivity",
+    _handle_saturate_sensitivity,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_clamp_shame",
+    _handle_clamp_shame,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_mark_submission",
+    _handle_mark_submission,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "divine_restore_purity",
+    _handle_restore_purity,
+    frozenset({"sexual"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(
@@ -1185,6 +1353,10 @@ _ENTRY_TEMPLATES = {
     "divine_climax_extension": "{actor} 以神之律令，延續了 {target} 的絕頂。",
     "divine_drain": "{actor} 從 {target} 身上汲取了神域之力。",
     "divine_drain_actor": "",
+    "divine_saturate_sensitivity": "{actor} 以神之律令，重塑了 {target} 的感官。",
+    "divine_clamp_shame": "{actor} 以神之律令，剝奪了 {target} 的羞恥。",
+    "divine_mark_submission": "{actor} 以神之律令，將 {target} 化為絕對從屬。",
+    "divine_restore_purity": "{actor} 以神之律令，使 {target} 回歸純淨。",
 }
 
 

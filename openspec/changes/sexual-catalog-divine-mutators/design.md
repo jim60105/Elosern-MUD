@@ -56,6 +56,14 @@ shape), and `world/skills/sexual_acts/__init__.py::_register_rows()` accepts any
 SexualActDef)` pair regardless of construction path. `DIVINE_ACTS` grows from three entries (`C7a`) to
 seven; this proposal only appends, never edits `C7a`'s three.
 
+Because the tuple grows, `C7a`'s shipped "SHALL contain exactly three pairs" count pin cannot hold
+anymore. This proposal therefore carries a MODIFIED delta for `sexual-catalog-divine-core`'s
+registration requirement (`specs/sexual-catalog-divine-core/spec.md`): the requirement now pins the
+three pairs' identity and fields, explicitly not the tuple size — the rows themselves are untouched,
+and this proposal's own requirement states the seven-entry total. The main-spec sync (§7.7) applies
+that amendment together with this proposal's three other deltas, so the shipped contract never
+contradicts itself.
+
 ### D-2: 感度創世 seeds only the parts an entity can ever resolve to
 
 `saturate_sensitivity()` sets sensitivity to `SENSITIVITY_LEVELS[-1]` (`敏感異常`, ×2.5) for every
@@ -69,15 +77,18 @@ create trait state nothing ever reads — dead writes with no test that could ev
 ### D-3: clamp_shame_to's bound-setter ordering, and why it rejects a Monster target
 
 `clamp_shame_to(level)` reuses the exact mechanism `SexualState.__init__` already applies to a fresh
-`Monster`'s `shame` (`shame.min = shame.max = 0`), just at the opposite end of the vocabulary. The two
-bound setters are not independent: `OrderedLevelTrait.min`'s setter requires `0 <= value <= self.max`,
-and `.max`'s setter requires `self.min <= value <= vocabulary_max`, each re-clamping `.value` into the
-new range as a side effect. For `level="成癮"` (`SHAME_LEVELS[-1]`, the vocabulary's own maximum), this
-proposal sets `.max` first (`self.max <= target` trivially holds pre-mutation since `target` already
-equals the vocabulary maximum), then `.min` (`0 <= target <= self.max` now holds since `.max` was just
-set to `target`) — an order that is safe for this call's actual argument regardless of the trait's
-current bounds beforehand, since widening/no-op-ing `.max` to the vocabulary ceiling can never violate
-its own precondition.
+`Monster`'s `shame` (`shame.min = shame.max = 0`), at the requested level instead. The two bound
+setters are not independent: `OrderedLevelTrait.min`'s setter requires `0 <= value <= self.max`, and
+`.max`'s setter requires `self.min <= value <= vocabulary_max`, each re-clamping `.value` into the
+new range as a side effect. The mutator therefore widens the leading bound first, choosing the order
+by direction: when the target ordinal is at or above the current `max`, it sets `.max` then `.min`
+(the `.max` write can never violate its precondition because `current_min <= ordinal` follows from
+`ordinal >= current_max`); when it is below the current `max`, it sets `.min` then `.max` (the
+`.min` write can never violate its precondition because `ordinal <= current_max` follows from
+`ordinal < current_max`). This covers every reachable prior bound state in both directions, matching
+the mutator's general contract over `level` rather than only the 成癮 call this line ships. (The
+original design argued a fixed `max`-first order, which is safe for `成癮` — the vocabulary's own
+maximum — but not for clamping down; the conditional order supersedes that argument.)
 
 A `Monster` target is rejected rather than silently re-pinned: `SexualState.__init__` already
 permanently pins a `Monster`'s `shame` bounds to `min=max=0` (`sexual-state-handler`'s own shipped,
@@ -189,11 +200,10 @@ as a no-op, never a rejection, per `C7a` D-6.
   test suite continuing to exercise the two pre-existing terms unmodified; this proposal adds coverage
   only for the new term and the three-way interaction.
 - **`clamp_shame_to`'s bound-setter ordering is argued, not exhaustively tested against every possible
-  prior bound state** → mitigated by the mutator only ever being called with `level="成癮"` (the
-  vocabulary maximum) by this proposal's own act, and by design.md D-3's argument holding for any prior
-  state where `min <= target`, which is guaranteed for every entity this mutator can legally be called on
-  (a `Monster` is rejected — eagerly, before any `PendingEffect` is even staged — before any bound is
-  touched).
+  prior bound state** → mitigated by the mutator's conditional order (design.md D-3): the leading
+  bound is widened first in whichever direction the target ordinal requires, which is safe for every
+  reachable prior state; the shipped 成癮 call is a strict subset of the parameterized test covering
+  all five `SHAME_LEVELS` members from floor-pinned, ceiling-pinned, mid-range, and fresh bounds.
 - **`submission_marks` stores a permanent, unremovable identity with no correction path if the wrong
   identity scheme were used** → this is why D-5 specifically uses `str(actor.id)` (a guaranteed-unique
   database key) rather than `_entity_key`/`.key` (confirmed non-unique across same-species `Monster`

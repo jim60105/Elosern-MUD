@@ -16,8 +16,10 @@ from evennia.contrib.rpg.traits import Trait, TraitHandler
 
 from world.lore.sexual_vocab import (
     AROUSAL_LEVELS,
+    BODY_PARTS,
     CLIMAX_PHASE_LEVELS,
     EXPOSURE_LEVELS,
+    GENERIC_BODY_PART,
     SENSITIVITY_LEVELS,
     SHAME_LEVELS,
     WETNESS_LEVELS,
@@ -679,6 +681,64 @@ class SexualState:
     def sensitivity(self) -> _SensitivityProxy:
         return self._sensitivity
 
+    def saturate_sensitivity(self) -> None:
+        """Pin every resolvable body part's sensitivity to the top level.
+
+        Sets ``SENSITIVITY_LEVELS[-1]`` (敏感異常) on every ``BODY_PARTS``
+        member for an ordinary entity, but on only ``GENERIC_BODY_PART`` for
+        a ``Monster``: ``resolve_part`` collapses every Monster target to
+        that one channel, so seeding named parts it can never resolve to
+        would create trait state nothing ever reads. This is the sole write
+        path for the saturation effect (divine-sexual-arts-mutators D-2).
+        """
+        from typeclasses.monsters import Monster
+
+        if isinstance(self._entity, Monster):
+            parts = (GENERIC_BODY_PART,)
+        else:
+            parts = BODY_PARTS
+        for part in parts:
+            self._sensitivity[part] = SENSITIVITY_LEVELS[-1]
+
+    def clamp_shame_to(self, level: str) -> None:
+        """Pin shame's bounds and current value to one level's ordinal.
+
+        Reuses the exact ``OrderedLevelTrait`` bound-setter mechanism
+        ``__init__`` applies to a fresh ``Monster``'s ``shame``
+        (``min = max = floor``), at the requested level instead. The bound
+        setters are not independent: ``min``'s setter requires
+        ``0 <= value <= max`` and ``max``'s setter requires
+        ``min <= value <= vocabulary_max``, each re-clamping the current
+        value into the new range as a side effect. Widening the leading bound
+        first is therefore safe in both directions: when the target ordinal
+        is at or above the current ``max``, set ``max`` then ``min`` (the
+        ``max`` write can never violate its precondition because
+        ``current_min <= ordinal`` follows from ``ordinal >= current_max``);
+        when it is below the current ``max``, set ``min`` then ``max`` (the
+        ``min`` write can never violate its precondition because
+        ``ordinal <= current_max`` follows from ``ordinal < current_max``).
+        Every reachable prior bound state is covered, matching the mutator's
+        general contract rather than only the 成癮 call this line ships.
+
+        A ``Monster`` entity is rejected without mutating any state: its
+        ``shame`` bounds are permanently pinned at the floor by
+        construction, and re-pinning them would contradict the shipped
+        ``sexual-state-handler`` baseline requirement.
+        """
+        from typeclasses.monsters import Monster
+
+        if isinstance(self._entity, Monster):
+            raise ValueError(
+                "a Monster's shame bounds are permanently pinned at the floor"
+            )
+        ordinal = self.shame._ordinal_of(level)
+        if ordinal >= self.shame.max:
+            self.shame.max = ordinal
+            self.shame.min = ordinal
+        else:
+            self.shame.min = ordinal
+            self.shame.max = ordinal
+
     @property
     def virgin(self) -> bool:
         return self._entity.attributes.get(
@@ -697,6 +757,24 @@ class SexualState:
             category=_STATE_CATEGORY,
         )
 
+    def restore_purity(self) -> None:
+        """Restore the virgin flag by writing the attribute directly.
+
+        Deliberately bypasses the public ``virgin`` setter, which is
+        unconditionally a no-op once ``False`` — the one-way guarantee the
+        ``sexual-state-handler`` requirement scopes to that public setter
+        stays intact, and every ordinary rule path still writes ``virgin``
+        exclusively through it. ``experience_types`` is untouched (the body
+        is restored, the memory is not). Calling this on an already-virgin
+        entity is a no-op: the write is idempotent by construction
+        (divine-sexual-arts-mutators D-4).
+        """
+        self._entity.attributes.add(
+            "virgin",
+            True,
+            category=_STATE_CATEGORY,
+        )
+
     @property
     def experience_types(self) -> frozenset[str]:
         return frozenset(
@@ -712,6 +790,36 @@ class SexualState:
         self._entity.attributes.add(
             "experience_types",
             self.experience_types | {key},
+            category=_STATE_CATEGORY,
+        )
+
+    @property
+    def submission_marks(self) -> frozenset[str]:
+        """Return the append-only set of caster identities this entity submits to.
+
+        Stored in the same ``sexual_state`` attribute category as ``virgin``
+        and ``experience_types``. An entity with no prior
+        ``mark_submission()`` call reads as an empty frozenset, with no
+        baseline-import seeding required.
+        """
+        return frozenset(
+            self._entity.attributes.get(
+                "submission_marks",
+                default=(),
+                category=_STATE_CATEGORY,
+            )
+        )
+
+    def mark_submission(self, caster_key: str) -> None:
+        """Add one caster identity without removing any previously-added key.
+
+        The sole mutator for ``submission_marks``: each call unions in
+        exactly one ``caster_key`` and never removes, mirroring
+        ``add_experience_type``'s append-only discipline.
+        """
+        self._entity.attributes.add(
+            "submission_marks",
+            self.submission_marks | {caster_key},
             category=_STATE_CATEGORY,
         )
 

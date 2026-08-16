@@ -51,11 +51,12 @@ class SeedActOwnershipTests(EvenniaTest):
     def test_interspecies_and_divine_gain_no_seed(self):
         # 異種線 ships no unconditional seed: every one of its seven acts is
         # counter-gated (sexual-catalog-interspecies fills the line). 神之秘法
-        # is filled by its own catalog change (sexual-catalog-divine-core), so
-        # its acts are not seeds — they are owned by everyone through the
-        # empty-unlock mapping, but casting is race-gated.
+        # is filled by its own catalog changes (sexual-catalog-divine-core and
+        # sexual-catalog-divine-mutators), so its acts are not seeds — they are
+        # owned by everyone through the empty-unlock mapping, but casting is
+        # race-gated.
         self.assertEqual(len(INTERSPECIES_ACTS), 7)
-        self.assertEqual(len(DIVINE_ACTS), 3)
+        self.assertEqual(len(DIVINE_ACTS), 7)
 
     def test_seed_rows_are_registered_under_the_same_key_in_both_registries(self):
         for key in (*_SELF_SEEDS, *_SINGLE_SEEDS):

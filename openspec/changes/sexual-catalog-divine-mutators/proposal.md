@@ -87,6 +87,11 @@ without materializing `entity.sexual` — the same discipline `resist_verdict()`
   `world/rules/action.py`, `world/skills/effects.py` (both already amended by `C7a`), and
   `world/rules/sexual_resist.py` (new to this proposal, for 絕對從屬). The design doc itself authorizes
   this: "the design document wins unless a change amends it explicitly" (§3, 無垢回歸).
+- **Amends `sexual-catalog-divine-core`'s registration requirement** (a new MODIFIED delta, synced
+  into `openspec/specs/sexual-catalog-divine-core/spec.md`): its shipped "SHALL contain exactly three
+  pairs" count pin cannot hold once this proposal ships the fourth through seventh entries. The
+  amended requirement pins the three pairs' identity and fields instead of the tuple's size — the C7a
+  rows themselves are untouched, and this proposal's own requirement carries the seven-entry count.
 
 ## Capabilities
 
@@ -115,6 +120,7 @@ without materializing `entity.sexual` — the same discipline `resist_verdict()`
   `world/skills/registry.py` — the `_PARLESS_LINES`/forbidden-events rules, the race gate, and the
   line's three already-shipped skills are exercised, not changed.
 - No change to `sexual-catalog-divine-core`'s three acts or their effect prefixes — this proposal only
-  extends `DIVINE_ACTS`, never edits an existing entry.
+  extends `DIVINE_ACTS`, never edits an existing entry; its registration *requirement* is amended
+  (see above) so the synced contract stays coherent.
 - Completes the 神之秘法 line: after this proposal, all seven acts the source design doc specifies are
   shipped, with no further deferrals on this line.

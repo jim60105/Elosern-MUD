@@ -32,7 +32,7 @@ frozen `ResistVerdict` carrying at minimum `resisted: bool`, `auto_comply: bool`
 - **THEN** `verdict.roll is None` if and only if `verdict.auto_comply is True`
 
 ### Requirement: The ordinary contest reuses the shipped to-hit formula shape with blended scores
-When neither auto-comply condition applies, `resist_verdict()` SHALL compute
+When no auto-comply condition applies, `resist_verdict()` SHALL compute
 `resisted = rng() + resister_score >= COMBAT_YAML["to_hit"]["defender_constant"] + actor_score`,
 where each participant's score is `agility_component * agility_weight + atk_phys_component *
 atk_phys_weight`, with `agility_weight` and `atk_phys_weight` read from
@@ -208,3 +208,37 @@ identical entity state SHALL return an identical `ResistVerdict`.
 #### Scenario: The default RNG is the shipped dice roller
 - **WHEN** `resist_verdict()` is called with no `rng` argument
 - **THEN** it uses `world.rules.dice.roll_d100`, not a private reimplementation
+
+### Requirement: A resister marked as submissive to a specific caster auto-complies against that caster only
+`resist_verdict()` SHALL read `resister.attributes.get("submission_marks", default=frozenset(),
+category="sexual_state")` directly (never through `resister.sexual`, preserving the no-create
+contract) and, when `str(actor.id)` is a member of that set, SHALL short-circuit to `resisted=False,
+auto_comply=True, roll=None` without calling `rng()`, exactly as the existing affinity and climax-turn
+short circuits do. The check SHALL be keyed by `actor.id` (a guaranteed-unique per-instance database
+identifier), never by `actor.key`/`_entity_key(actor)`, since `.key` is not guaranteed unique across
+distinct entities. The check SHALL be keyed to the specific `(actor, resister)` pair — a mark naming
+one caster SHALL NOT short-circuit a contest against a different actor, even one sharing the marked
+caster's `.key`.
+
+#### Scenario: A caster named in the resister's submission_marks auto-complies
+- **WHEN** `resist_verdict(actor, resister)` is called and `resister`'s stored `submission_marks`
+  contains `str(actor.id)`
+- **THEN** the result is `resisted=False`, `auto_comply=True`, `roll=None`, and `rng()` is never
+  called
+
+#### Scenario: A mark naming a different caster does not short-circuit
+- **WHEN** `resist_verdict(actor, resister)` is called and `resister`'s stored `submission_marks`
+  contains some other entity's `id` but not `str(actor.id)`
+- **THEN** the ordinary contest (or another applicable short-circuit) resolves the verdict, unaffected
+  by the unrelated mark
+
+#### Scenario: An entity sharing the marked caster's .key but not its id does not short-circuit
+- **WHEN** `resist_verdict(other, resister)` is called, where `other.key` equals the originally-marked
+  caster's `.key` but `other.id` differs (e.g. two `Monster` instances of the same species)
+- **THEN** the mark does not short-circuit this contest — `str(other.id)` is not a member of
+  `submission_marks`, even though `other.key` matches the marked entity's display name
+
+#### Scenario: The submission check never materializes entity.sexual
+- **WHEN** `resist_verdict()`'s implementation is inspected for its `submission_marks` read
+- **THEN** it reads via `resister.attributes.get(..., category="sexual_state")`, never via
+  `resister.sexual.submission_marks` or any other access that would construct a `SexualState` handler
