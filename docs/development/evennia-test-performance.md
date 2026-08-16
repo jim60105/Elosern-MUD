@@ -310,5 +310,32 @@ package grouping produced a 19 s shard and a ~226 s shard (max/mean ≈ 1.6);
 moving `web.webclient` away from `commands`/`typeclasses` (whose combined run
 is ~2× the sum of parts) and pairing `world.quests` with lightweight packages
 brought max/mean to **1.23** (172 s / 140 s mean), below the 1.35 rebalance
-threshold. Measured CI durations and the final observed balance will be
-recorded here after the first green branch push.
+threshold.
+
+**First CI observation (run 31945742664, branch `feat/split-evennia-ci-shards`,
+green on the first try):**
+
+| Job | Duration |
+|---|---:|
+| preflight | 24 s |
+| evennia shard 1 (rules-a) | 2 m 10 s |
+| evennia shard 2 (rules-b) | 2 m 46 s |
+| evennia shard 3 (rules-c) | 1 m 39 s |
+| evennia shard 4 (quests-skills-art-ai-onboarding-lore) | 2 m 23 s |
+| evennia shard 5 (maps-webclient-imports-prompts-tests) | 2 m 8 s |
+| evennia shard 6 (commands-server-typeclasses) | 1 m 40 s |
+| top-level | 23 s |
+| browser shard 1 (combat) | 19 m 10 s |
+| browser shard 2 (creation-layout) | 16 m 31 s |
+| browser shard 3 (exploration-reconnect) | 13 m 4 s |
+| browser shard 4 (shell-actions-local-map-input-narrative) | 5 m 23 s |
+| browser shard 5 (services-pointer) | 16 m 26 s |
+| browser shard 6 (art-harness) | 11 m 36 s |
+| gate | 23 s |
+
+The evennia suite is now off the CI critical path: its worst shard (2 m 46 s)
+replaces the previous single-job 14 m 02 s, and the six shards finish within a
+max/median of 1.29 (166 s / 129 s), below the ≥ 2× rebalance threshold, so no
+further rebalance was needed. Total workflow wall time is still ~20 min only
+because the managed browser suite dominates (combat 19 m 10 s); that half is
+addressed by the sibling `pack-browser-ci-shards` change.

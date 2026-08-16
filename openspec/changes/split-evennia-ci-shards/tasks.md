@@ -96,13 +96,16 @@
       test_settings.py --noinput --parallel 16 commands server typeclasses
       world web.webclient`, `uv run --locked python -m tools.spec_traceability
       check`, and `openspec validate split-evennia-ci-shards --strict`
-- [ ] 6.3 Push the branch, watch the quality gate, record every job's
+- [x] 6.3 Push the branch, watch the quality gate, record every job's
       duration, rebalance the manifest once if a shard dominates (≥ 2× the
       median), and record final numbers in the performance report
+      (run 31945742664 green; evennia shards 1 m 39 s – 2 m 46 s,
+      max/median 1.29, no rebalance needed)
 
 ## 7. Final handoff
 
 - [ ] 7.1 Sync the delta spec into
       `openspec/specs/evennia-test-optimization/spec.md`, archive the change,
       run `openspec validate --all --strict`, and confirm `git diff --check`
-      is clean
+      is clean (delta already synced during implementation; archive deferred by
+      operator — left active pending merge)
