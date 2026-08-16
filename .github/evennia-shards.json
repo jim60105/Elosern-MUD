@@ -14,6 +14,7 @@
         "world.rules.tests.test_buffs",
         "world.rules.tests.test_cap_break_turnin",
         "world.rules.tests.test_cast_settlement",
+      "world.rules.tests.test_cast_settlement_sexual_coercion",
         "world.rules.tests.test_character_creation",
         "world.rules.tests.test_climax_phase_cycle",
         "world.rules.tests.test_climax_settlement",

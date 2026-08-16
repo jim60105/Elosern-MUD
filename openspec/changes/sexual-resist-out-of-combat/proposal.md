@@ -20,7 +20,8 @@ This proposal closes that gap by adding the out-of-combat half of the mechanism,
 ## What Changes
 
 - Add `world/rules/cast_settlement.py::_scan_out_of_combat_sexual_coercion(actor, targets, event_log) ->
-  tuple[str, ...]`, structurally mirroring `_scan_sexual_coercion` exactly: scans one resolved cast's
+  tuple[tuple[str, ...], _CoercionRestoreState | None]`, structurally mirroring `_scan_sexual_coercion`
+  exactly: scans one resolved cast's
   `EventLog.entries` for `kind == "sexual_resist"` records where `resisted is False and auto_comply is False`
   (a forced outcome), resolves each entry's `target` key against the cast's own explicit `request.targets`
   (no `Battlefield`/roster exists out of combat — the request's target list is already the complete,
@@ -35,10 +36,15 @@ This proposal closes that gap by adding the out-of-combat half of the mechanism,
 - The new scan owns its own before-the-fact snapshot of the touched NPCs' `relations_data` (and, when the
   auto-leave rule fires, the actor's party membership surfaces) and its own on-failure restore, reusing the
   existing `restore_relations_surfaces` / `restore_membership_surfaces` helpers exactly as
-  `_scan_sexual_coercion`'s own except-block already does. This keeps the change entirely additive: the
-  cast-settlement outer snapshot (`_snapshot_settlement_state` / `_restore_settlement_state`) and its
-  existing `_ENTITY_SURFACES` list are untouched, so `cast-settlement-atomicity`'s existing behavior and
-  spec are unaffected.
+  `_scan_sexual_coercion`'s own except-block already does. The scan returns its snapshot as a
+  `_CoercionRestoreState`, which `settle_out_of_combat_cast` also restores from its outer `except` block
+  when a *later* step of the transaction (the clock advance) fails after the scan's penalty block
+  succeeded — the idmapper cache is not transaction-aware, and unlike the in-combat round's
+  `_restore_round_touched`, the settlement's generic restore covers no relations surface, so without this
+  a post-scan failure would leave a rolled-back penalty readable in-process. This keeps the change
+  entirely additive: the cast-settlement outer snapshot (`_snapshot_settlement_state` /
+  `_restore_settlement_state`) and its existing `_ENTITY_SURFACES` list are untouched, so
+  `cast-settlement-atomicity`'s existing behavior and spec are unaffected.
 - Add a `notifications: tuple[str, ...]` field to `cast_settlement.CastSettlement` (default `()`), populated
   from the new scan's auto-leave notification lines, and update `commands/action.py::CmdCast._cast_out_of_combat`
   to send those lines to the caller after a successful cast — mirroring how the in-combat session path already

@@ -69,11 +69,27 @@ before-the-fact snapshot of exactly the `NPC` targets it is about to penalize (n
 `settle_out_of_combat_cast`'s existing outer `transaction.atomic()`:
 
 ```python
+@dataclass(frozen=True)
+class _CoercionRestoreState:
+    """The pre-cast party/relations surfaces of one coercion scan's forced targets."""
+
+    party_before: list[Any]
+    members_before: dict[int, Any]
+    relations_before: dict[int, Any]
+
+    def restore(self, actor: Any) -> None:
+        from world.rules.affinity import restore_relations_surfaces
+        from world.rules.party import restore_membership_surfaces
+
+        restore_membership_surfaces(actor, self.party_before, self.members_before)
+        restore_relations_surfaces(self.relations_before)
+
+
 def _scan_out_of_combat_sexual_coercion(
     actor: Any, targets: list[Any], event_log: EventLog
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], _CoercionRestoreState | None]:
     if event_log.actor != str(actor.key):
-        return ()
+        return (), None
     by_key = {str(target.key): target for target in targets}
     forced: list[Any] = []
     for entry in event_log.entries:
@@ -90,12 +106,14 @@ def _scan_out_of_combat_sexual_coercion(
             continue
         forced.append(target)
     if not forced:
-        return ()
+        return (), None
     penalty = get_config().sexual_forced_penalty
     notifications: list[str] = []
-    party_before = list(actor.db.party or ())
-    members_before = {int(t.pk): t.db.party_member for t in forced}
-    relations_before = {int(t.pk): t.db.relations_data for t in forced}
+    restore_state = _CoercionRestoreState(
+        party_before=list(actor.db.party or ()),
+        members_before={int(t.pk): t.db.party_member for t in forced},
+        relations_before={int(t.pk): t.db.relations_data for t in forced},
+    )
     try:
         with transaction.atomic():
             for target in forced:
@@ -105,10 +123,9 @@ def _scan_out_of_combat_sexual_coercion(
                 if outcome.auto_leave_notification is not None:
                     notifications.append(outcome.auto_leave_notification)
     except Exception:
-        restore_membership_surfaces(actor, party_before, members_before)
-        restore_relations_surfaces(relations_before)
+        restore_state.restore(actor)
         raise
-    return tuple(notifications)
+    return tuple(notifications), restore_state
 ```
 
 This is deliberately near-identical to `_scan_sexual_coercion`, differing only in: a single `event_log`
@@ -121,6 +138,35 @@ structurally-mirrored functions rather than one shared abstraction, because thei
 shapes (roster vs. companion set) already differ. Extracting a shared core now would touch
 `combat_session.py` — already-shipped, already-tested, and outside this proposal's minimal footprint —
 for a three-line difference.
+
+**Amendment (rubber-duck review, duplicate target keys):** the `sexual_resist` entry contract is
+key-keyed (`EventEntry.target = str(entity.key)`), so a target list containing two distinct entities
+with the same `key` would make `by_key.get(entry.target)` resolve every entry for that key to the
+*last* list member — double-penalizing one NPC and silently skipping the other, violating the
+"one independent penalty per forced target" requirement. Unlike the in-combat scan (whose roster is
+built by the session from engaged entities, and whose key collision is a pre-existing shipped shape
+this proposal does not touch), the out-of-combat `request.targets` list is caller-supplied, so
+`settle_out_of_combat_cast` rejects — with `ValueError`, beside the existing shorthand-targets
+rejection and before any snapshot or clock access — an explicit target list whose entity keys repeat
+**when the cast skill is a resistible sexual act** (`SEXUAL_ACT_REGISTRY.get(request.skill_key)` with
+`resistible=True`, a plain dict lookup with no new import surface). The scope guard is load-bearing:
+non-resistible acts never emit `sexual_resist` entries, so their resolution must not be affected by a
+key collision the scan cannot observe; and non-sexual AREA casts keep accepting any candidate set the
+pk-identity-based AREA dedupe admits. This makes the scan's key index sound by construction; the
+malformed/absent-target branches stay unreachable through the production call site.
+
+**Amendment (found during implementation, task 5.7):** the scan also returns its snapshot as a
+`_CoercionRestoreState`, and `settle_out_of_combat_cast` restores it from its own outer `except` block
+when a *later* step of the transaction (the clock advance) fails after the scan's penalty block
+succeeded. The idmapper attribute cache is not transaction-aware, and — unlike the in-combat round,
+whose `_restore_round_touched` explicitly restores the `relations_data` surfaces the scans touched —
+the settlement's generic `_restore_settlement_state` covers no relations surface (that is exactly why
+`_ENTITY_SURFACES` was not widened). Without the settlement-side restore, a clock-advance failure
+would leave the penalized `relations_data` value readable in-process and would corrupt the next
+affinity write on the same NPC. The scan's own internal except block still restores first (innermost)
+for failures inside its penalty block; the settlement-side restore covers every later failure, and the
+two never both fire for the same failure because the assignment of the returned state only completes
+when the scan succeeds.
 
 **Alternative considered:** widen `_ENTITY_SURFACES` with `("relations_data", None)` and let the generic
 snapshot/restore cover it for every cast. Rejected: it charges every out-of-combat cast (buffs, disguise,
@@ -143,11 +189,12 @@ its outer `transaction.atomic()` and returns immediately on rejection. The new s
 immediately after the success check and before the clock-advance step:
 
 ```python
+coercion_restore: _CoercionRestoreState | None = None
 with transaction.atomic():
     result = ActionResolver.resolve(request)
     if result.outcome != "success":
         return CastSettlement(result, (), ())
-    notifications = _scan_out_of_combat_sexual_coercion(
+    notifications, coercion_restore = _scan_out_of_combat_sexual_coercion(
         request.actor, request.targets, result.event_log
     )
     if not supplied and getattr(clock, "_script", None) is None:
@@ -157,6 +204,10 @@ with transaction.atomic():
     )
 return CastSettlement(result, events, notifications)
 ```
+
+with the settlement's outer `except Exception:` block running
+`coercion_restore.restore(request.actor)` after `_restore_settlement_state(snapshot, clock)` when the
+scan succeeded but a later step (the clock advance) failed — see Decision 1's amendment.
 
 Running it before the clock advance (rather than after) mirrors the in-combat ordering, where the
 coercion scan runs immediately after the round's `EventLog`s are produced and before the round record is

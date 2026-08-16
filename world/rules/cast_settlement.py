@@ -16,8 +16,11 @@ from typing import Any, Iterable, Mapping
 from django.db import transaction
 from evennia.utils.logger import log_warn
 
+from typeclasses.npcs import NPC
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
 from world.rules.action import ActionRequest, ActionResult, ActionResolver
+from world.rules.affinity import AffinitySource, apply_affinity_change
+from world.rules.affinity_config import get_config
 from world.rules.clock import (
     MAX_ADVANCE_SECONDS,
     AdvanceSource,
@@ -32,7 +35,9 @@ from world.rules.clock import (
     get_world_clock,
     read_world_clock,
 )
+from world.rules.event_log import EventLog
 from world.rules.surfaces import attribute_snapshot
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 # The action- and clock-touched attribute surfaces of one actor or target: the
@@ -58,10 +63,13 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
 
 @dataclass(frozen=True)
 class CastSettlement:
-    """The committed out-of-combat cast result and its advance events."""
+    """The committed out-of-combat cast result, its advance events, and the
+    caller-facing auto-leave notification lines the settlement's coercion
+    scan produced (``sexual-resist-out-of-combat``)."""
 
     result: ActionResult
     events: tuple[ScheduledEvent, ...]
+    notifications: tuple[str, ...] = ()
 
 
 @dataclass
@@ -261,6 +269,114 @@ def _restore_settlement_state(
             _refresh_advance_entity_caches(entry.obj)
 
 
+@dataclass(frozen=True)
+class _CoercionRestoreState:
+    """The pre-cast party/relations surfaces of one coercion scan's forced targets.
+
+    ``_scan_out_of_combat_sexual_coercion`` returns this so the settlement can
+    restore the surfaces when a *later* step of the outer transaction fails:
+    the idmapper attribute cache is not transaction-aware, so a rolled-back
+    ``relations_data`` write stays readable in-process without an explicit
+    restore (the scan itself restores these surfaces for failures inside its
+    own penalty block). Empty for a scan that penalized nothing.
+    """
+
+    party_before: list[Any]
+    members_before: dict[int, Any]
+    relations_before: dict[int, Any]
+
+    def restore(self, actor: Any) -> None:
+        from world.rules.affinity import restore_relations_surfaces
+        from world.rules.party import restore_membership_surfaces
+
+        restore_membership_surfaces(actor, self.party_before, self.members_before)
+        restore_relations_surfaces(self.relations_before)
+
+
+def _scan_out_of_combat_sexual_coercion(
+    actor: Any, targets: list[Any], event_log: EventLog
+) -> tuple[tuple[str, ...], _CoercionRestoreState | None]:
+    """Apply per-forced-act coercion penalties for one resolved out-of-combat cast.
+
+    Out-of-combat sibling of ``combat_session._scan_sexual_coercion``: scans
+    the single resolved cast's ``EventLog`` for the resist-outcome contract
+    ``action._step4b_sexual_resist_gate`` emits (``EventEntry(kind=
+    "sexual_resist", data={"resisted": bool, "auto_comply": bool, "roll":
+    int | None})``, documented in ``sexual-act-resolution-design.md`` §3.4).
+    Only the actor's own log is scanned (the ``actor`` filter mirrors the
+    combat scan, which must skip other combatants' own logs). Only an entry
+    recording a forced outcome -- ``resisted is False`` and ``auto_comply is
+    False`` -- costs the target's affinity toward the actor; a compliance
+    (rolled or automatic) and a successful resistance apply no penalty. Each
+    qualifying entry calls the sole affinity writer once with the
+    ``sexual_forced`` source and the rulebook penalty, inside one transaction
+    that also covers every resulting auto-leave -- a failure rolls the whole
+    cast's affinity effects back.
+
+    There is no ``Battlefield`` out of combat: each entry's ``target`` key
+    resolves against the cast's own explicit ``targets`` list, so the correct
+    scope is exactly "every ``NPC`` in the cast's target list", settled by
+    construction rather than a roster decision. A target that resolves to no
+    list member or to a non-``NPC`` applies no penalty (mirroring
+    ``apply_affinity_change``'s own owner rejection without needing to call
+    it). Returns the auto-leave notification lines and the pre-cast
+    party/relations surfaces of the penalized targets (``None`` when nothing
+    was penalized); the caller delivers the notifications only after the
+    transaction commits (the writer never notifies) and restores the returned
+    surfaces when a later settlement step fails.
+    """
+    player_key = str(actor.key)
+    if event_log.actor != player_key:
+        return (), None
+    by_key = {str(target.key): target for target in targets}
+    forced: list[Any] = []
+    for entry in event_log.entries:
+        if entry.kind != "sexual_resist":
+            continue
+        if not isinstance(entry.data, Mapping):
+            # Fail closed on a malformed payload: never penalize, never
+            # crash the cast over a bad record.
+            continue
+        # ``is False``, not falsy-truthiness: a missing or mistyped key
+        # must read as "do not penalize" rather than accidentally matching.
+        if entry.data.get("resisted") is not False:
+            continue
+        if entry.data.get("auto_comply") is not False:
+            continue
+        target = by_key.get(entry.target)
+        if target is None or not isinstance(target, NPC):
+            continue
+        forced.append(target)
+    if not forced:
+        return (), None
+    penalty = get_config().sexual_forced_penalty
+    notifications: list[str] = []
+    restore_state = _CoercionRestoreState(
+        party_before=list(actor.db.party or ()),
+        members_before={
+            int(target.pk): target.db.party_member for target in forced
+        },
+        relations_before={
+            int(target.pk): target.db.relations_data for target in forced
+        },
+    )
+    try:
+        with transaction.atomic():
+            for target in forced:
+                outcome = apply_affinity_change(
+                    target, actor, AffinitySource.SEXUAL_FORCED, -penalty
+                )
+                if outcome.auto_leave_notification is not None:
+                    notifications.append(outcome.auto_leave_notification)
+    except Exception:
+        # The outer settlement transaction rolled the database back; restore
+        # the in-process attribute surfaces so readers never observe the
+        # rolled-back values (the idmapper cache is not transaction-aware).
+        restore_state.restore(actor)
+        raise
+    return tuple(notifications), restore_state
+
+
 def settle_out_of_combat_cast(
     request: ActionRequest, *, clock: WorldClock | None = None
 ) -> CastSettlement:
@@ -277,26 +393,45 @@ def settle_out_of_combat_cast(
 
     Snapshots every action- and clock-touched surface before opening the outer
     transaction, runs ``ActionResolver.resolve`` and -- only on success --
-    ``WorldClock.advance`` as nested operations inside it, and returns only
-    after the outer transaction commits. A rejected resolution advances nothing
-    and touches no surface. On any exception the outer rollback reverts the
-    durable rows and ``_restore_settlement_state`` reconciles every snapshotted
-    Evennia cache before the failure propagates.
+    the out-of-combat coercion scan (``_scan_out_of_combat_sexual_coercion``)
+    and ``WorldClock.advance`` as nested operations inside it, and returns
+    only after the outer transaction commits. A rejected resolution advances
+    nothing and touches no surface. On any exception the outer rollback
+    reverts the durable rows and ``_restore_settlement_state`` reconciles
+    every snapshotted Evennia cache before the failure propagates.
     """
     if not isinstance(request.targets, list):
         raise ValueError(
             "settle_out_of_combat_cast requires explicit targets, got "
             f"{request.targets!r}"
         )
+    act = SEXUAL_ACT_REGISTRY.get(request.skill_key)
+    if act is not None and act.resistible:
+        target_keys = [str(target.key) for target in request.targets]
+        if len(target_keys) != len(set(target_keys)):
+            # The ``sexual_resist`` entry contract is key-keyed, so a target
+            # list containing two distinct entities with the same key would
+            # make the coercion scan resolve every entry for that key to the
+            # last list member -- double-penalizing one target and silently
+            # skipping the other. Fail closed before resolution, snapshot, or
+            # clock access; non-resistible casts are unaffected.
+            raise ValueError(
+                "settle_out_of_combat_cast requires unique entity keys in "
+                f"explicit targets, got {target_keys!r}"
+            )
     supplied = clock is not None
     if clock is None:
         clock = read_world_clock() or WorldClock()
     snapshot = _snapshot_settlement_state(request, clock)
+    coercion_restore: _CoercionRestoreState | None = None
     try:
         with transaction.atomic():
             result = ActionResolver.resolve(request)
             if result.outcome != "success":
-                return CastSettlement(result, ())
+                return CastSettlement(result, (), ())
+            notifications, coercion_restore = _scan_out_of_combat_sexual_coercion(
+                request.actor, request.targets, result.event_log
+            )
             if not supplied and getattr(clock, "_script", None) is None:
                 clock = get_world_clock()
             events = tuple(
@@ -308,5 +443,12 @@ def settle_out_of_combat_cast(
             )
     except Exception:
         _restore_settlement_state(snapshot, clock)
+        # A failure after the scan's own penalty block (e.g. the clock
+        # advance) leaves the scan's relations/party writes rolled back in
+        # the database but still readable through the idmapper cache; restore
+        # them explicitly so no in-process reader ever observes a value the
+        # outer transaction rolled back.
+        if coercion_restore is not None:
+            coercion_restore.restore(request.actor)
         raise
-    return CastSettlement(result, events)
+    return CastSettlement(result, events, notifications)

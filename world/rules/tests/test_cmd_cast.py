@@ -4,12 +4,17 @@ from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
 
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from commands.action import CmdCast
+from typeclasses.npcs import NPC
+from world.quests.catalog import register_catalog
 from world.rules.action import RejectReason
+from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.clock import WorldClock
+from world.rules.party import AUTO_LEAVE_MESSAGE, join_party
 from world.rules.player_messages import (
     rejection_message,
     session_reason_message,
@@ -85,3 +90,60 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
         with patch("world.rules.disengage.roll_d100", return_value=100):
             self.call(CmdCast(), "flee", "Char 嘗試脫離戰鬥。")
         self.assertIn(self.char1.key, field.fled)
+
+
+class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):
+    """The auto-leave notification of an out-of-combat forced act reaches the
+    player after the rendered EventLog (sexual-resist-out-of-combat)."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.char1.db.skills = {"active": [], "passive": []}
+        self.clock = WorldClock()
+
+    def _companion(self, key, affinity: int | None = None):
+        npc = create_object(NPC, key=key, location=self.room1)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        npc.traits.hp.base = 100
+        npc.traits.hp.current = 100
+        if affinity is not None:
+            apply_affinity_change(
+                npc, self.char1, AffinitySource.QUEST_COMPLETION, affinity
+            )
+        join_party(npc, self.char1)
+        return npc
+
+    def _forced_cast(self, target_key):
+        with (
+            patch(
+                "world.rules.cast_settlement.read_world_clock",
+                return_value=self.clock,
+            ),
+            patch(
+                "world.rules.cast_settlement.get_world_clock",
+                return_value=self.clock,
+            ),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("commands.action.render_plain_text", return_value="RENDERED"),
+        ):
+            return self.call(
+                CmdCast(), f"combat_tease={target_key}", use_assertequal=True
+            )
+
+    @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-act-s-party-auto-leave-notification-reaches-the-player")
+    def test_auto_leave_notification_arrives_after_the_event_log(self):
+        coerced = self._companion("離隊伴侶", affinity=70)
+        returned = self._forced_cast(coerced.key)
+        self.assertEqual(returned, "RENDERED\n" + AUTO_LEAVE_MESSAGE)
+        self.assertNotIn(int(coerced.pk), self.char1.db.party)
+
+    @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-act-s-party-auto-leave-notification-reaches-the-player")
+    def test_forced_act_without_auto_leave_sends_only_the_event_log(self):
+        companion = self._companion("留守伴侶", affinity=73)
+        returned = self._forced_cast(companion.key)
+        self.assertEqual(returned, "RENDERED")
+        self.assertIn(int(companion.pk), self.char1.db.party)
