@@ -1,4 +1,16 @@
-## ADDED Requirements
+# sexual-resist-turn-cost Specification
+
+## Purpose
+
+Define the deterministic turn-cost of a forced sexual act in combat: a validated
+`sexual_forced_penalty` rulebook field, a coercion scan that penalizes exactly the forced
+outcome (never compliance or successful resistance), the scan's placement inside the round's
+shared outer transaction, and the widened relations snapshot that makes rollback reach every
+roster NPC. The capability wires the affinity consequence of `sexual-resist-contest`'s verdict
+into live combat rounds; the emitter of the resist-outcome log contract lands in later
+proposals.
+
+## Requirements
 
 ### Requirement: sexual_forced_penalty is a validated rulebook field, independent of friendly_fire_penalty_per_hit
 `world/rules/rulebook/affinity.yaml` SHALL declare `sexual_forced_penalty`, a non-negative integer,
@@ -22,14 +34,17 @@ include `sexual_forced_penalty` alongside the existing fields.
 ### Requirement: _scan_sexual_coercion penalizes exactly the forced outcome, never comply or successful resistance
 `world/rules/combat_session.py` SHALL provide `_scan_sexual_coercion(actor, battlefield, logs) ->
 tuple[str, ...]`, scanning the round's `list[EventLog]` for `EventEntry` records with
-`kind == "sexual_resist"`. For every such entry whose `data["resisted"] is False` and
-`data["auto_comply"] is False` — a forced outcome — it SHALL apply `-sexual_forced_penalty` through
-`world.rules.affinity.apply_affinity_change(target, actor, AffinitySource.SEXUAL_FORCED, ...)`,
-resolving `target` from `battlefield.roster.get(entry.target)`. An entry with `data["resisted"] is
-True` (successful resistance) or `data["auto_comply"] is True` (compliance, rolled or automatic)
-SHALL apply no penalty. A `kind == "sexual_resist"` entry whose resolved target is not an `NPC` SHALL
-apply no penalty (mirroring `apply_affinity_change`'s own owner rejection, without needing to call
-it).
+`kind == "sexual_resist"` and `event_log.actor` equal to the submitting player's key (mirroring
+`_scan_friendly_fire`'s actor filter, so a future non-player emitter can never charge the player's
+affinity for someone else's act). A `kind == "sexual_resist"` entry whose `data` is not a mapping
+SHALL be ignored without penalizing and without raising. For every qualifying entry whose
+`data["resisted"] is False` and `data["auto_comply"] is False` — a forced outcome — it SHALL apply
+`-sexual_forced_penalty` through `world.rules.affinity.apply_affinity_change(target, actor,
+AffinitySource.SEXUAL_FORCED, ...)`, resolving `target` from `battlefield.roster.get(entry.target)`.
+An entry with `data["resisted"] is True` (successful resistance) or `data["auto_comply"] is True`
+(compliance, rolled or automatic) SHALL apply no penalty. A `kind == "sexual_resist"` entry whose
+resolved target is not an `NPC` SHALL apply no penalty (mirroring `apply_affinity_change`'s own
+owner rejection, without needing to call it).
 
 #### Scenario: A forced act applies exactly one penalty
 - **WHEN** the round's logs contain one `kind == "sexual_resist"` entry with
@@ -64,6 +79,19 @@ it).
 - **WHEN** the round's logs contain `EventEntry` records of other kinds (for example `"damage"`)
   alongside or instead of any `"sexual_resist"` entry
 - **THEN** `_scan_sexual_coercion` applies no penalty attributable to those entries
+
+#### Scenario: A non-player-actor resist entry is ignored
+- **WHEN** the round's logs contain a forced `kind == "sexual_resist"` entry whose
+  `event_log.actor` is not the submitting player's key (for example a companion's or monster's own
+  cast, a shape a future emitter could produce)
+- **THEN** `_scan_sexual_coercion` applies no penalty for that entry and does not call
+  `apply_affinity_change` for it
+
+#### Scenario: A malformed non-mapping data payload is ignored without raising
+- **WHEN** a `kind == "sexual_resist"` entry's `data` is not a mapping (for example a string or a
+  list)
+- **THEN** `_scan_sexual_coercion` applies no penalty for that entry, does not call
+  `apply_affinity_change` for it, and does not raise
 
 ### Requirement: The coercion scan runs inside the round's shared outer transaction, symmetric with friendly fire
 `submit_player_action` SHALL call `_scan_sexual_coercion(actor, battlefield, logs)` inside the same

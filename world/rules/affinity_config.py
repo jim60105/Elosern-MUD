@@ -2,8 +2,9 @@
 
 ``affinity.yaml`` carries the tunable numbers: the offline party-invite
 threshold, the shared daily interaction cap, the quest-completion gain, the
-per-hit friendly-fire penalty, and exactly seven stage rules whose floors must
-equal the canonical sequence 0/10/30/50/70/90/100. It also carries the
+per-hit friendly-fire penalty, the per-forced-act sexual coercion penalty, and
+exactly seven stage rules whose floors must equal the canonical sequence
+0/10/30/50/70/90/100. It also carries the
 ``cap_breaks`` milestone table: each entry names exactly one matching identity
 (``npc_key`` or ``role``), a ``quest_key`` that resolves in the quest
 definition registry, and an integer ``new_cap`` strictly above the natural cap.
@@ -32,6 +33,7 @@ _TOP_LEVEL_FIELDS = frozenset(
         "daily_interaction_cap",
         "quest_completion_gain",
         "friendly_fire_penalty_per_hit",
+        "sexual_forced_penalty",
         "cap_breaks",
         "stages",
     }
@@ -74,6 +76,7 @@ class AffinityConfig:
     daily_interaction_cap: int
     quest_completion_gain: int
     friendly_fire_penalty_per_hit: int
+    sexual_forced_penalty: int
     cap_breaks: tuple[CapBreak, ...]
     stages: tuple[AffinityStage, ...]
 
@@ -236,6 +239,11 @@ def load_config(
         "friendly_fire_penalty_per_hit",
         minimum=1,
     )
+    sexual_forced_penalty = _require_int(
+        raw["sexual_forced_penalty"],
+        "sexual_forced_penalty",
+        minimum=1,
+    )
 
     stages_raw = raw["stages"]
     if not isinstance(stages_raw, list):
@@ -291,6 +299,7 @@ def load_config(
         daily_interaction_cap=daily_interaction_cap,
         quest_completion_gain=quest_completion_gain,
         friendly_fire_penalty_per_hit=friendly_fire_penalty_per_hit,
+        sexual_forced_penalty=sexual_forced_penalty,
         cap_breaks=cap_breaks,
         stages=tuple(stages),
     )

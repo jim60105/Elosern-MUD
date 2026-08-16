@@ -35,6 +35,7 @@ class AffinitySource(StrEnum):
     AI_DIALOGUE = "ai_dialogue"
     QUEST_COMPLETION = "quest_completion"
     FRIENDLY_FIRE = "friendly_fire"
+    SEXUAL_FORCED = "sexual_forced"
 
 
 @dataclass(frozen=True)

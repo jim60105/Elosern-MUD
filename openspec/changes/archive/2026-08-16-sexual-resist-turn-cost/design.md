@@ -320,6 +320,18 @@ this as an addition to its implementation sequence in the same change as this pr
   cross-proposal test is still out of scope for either proposal alone (neither can import the other's
   not-yet-existing module) but is recommended as part of whichever proposal lands second — this design
   doc records the recommendation rather than silently omitting it.
+- **[Risk]** Without an actor filter, the scan would charge the player's affinity for a forced
+  outcome produced by *any* event log in the round — including a future non-player emitter's cast
+  (a companion's or monster's own act), which must never penalize the player.
+  → **Mitigation:** the scan filters `event_log.actor != str(actor.key)` exactly like
+  `_scan_friendly_fire` does, and a dedicated test drives a non-player-actor forced entry through the
+  scan asserting the affinity writer is never called. Found by this proposal's rubber-duck review;
+  fixed in implementation and pinned in the delta spec.
+- **[Risk]** A malformed `EventEntry.data` (a truthy non-mapping such as a string or list) would
+  crash the scan with `AttributeError` instead of failing closed.
+  → **Mitigation:** the scan guards with `isinstance(entry.data, dict)` and skips the entry without
+  penalizing or raising; a test drives string/list/int payloads through the scan asserting no writer
+  call and no exception. Found by this proposal's rubber-duck review.
 - **[Risk]** Broadening the relations snapshot (Decision 3) to every roster NPC, not only companions,
   adds a small per-round cost (one extra attribute read per non-companion NPC on the battlefield) to
   every round, including rounds with no sexual act at all.
