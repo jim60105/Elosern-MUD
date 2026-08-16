@@ -71,11 +71,11 @@ be Traditional Chinese forms (信賴, 絕對).
 ### Requirement: apply_affinity_change is the sole affinity writer with a source-capped daily budget
 `world/rules/affinity.py` SHALL expose `apply_affinity_change(npc, player, source, delta)` as the
 only function that writes affinity values. The source SHALL be a member of the closed set
-(`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`, `friendly_fire`); an unknown source
-SHALL be rejected without writing. The writer SHALL reject a non-NPC owner without writing. Before
-budgeting a capped positive delta it SHALL lazily reset the daily-gain counter when the record's
-stored tick differs from the current world day; negative deltas (including `friendly_fire`) SHALL
-never reset the counter and never restore spent budget. Positive deltas from the capped sources
+(`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`, `friendly_fire`, `sexual_forced`); an
+unknown source SHALL be rejected without writing. The writer SHALL reject a non-NPC owner without
+writing. Before budgeting a capped positive delta it SHALL lazily reset the daily-gain counter when
+the record's stored tick differs from the current world day; negative deltas (including
+`friendly_fire` and `sexual_forced`) SHALL never reset the counter and never restore spent budget. Positive deltas from the capped sources
 SHALL draw from the remaining daily budget (`cap` 5 shared across `talk`, `trade`, `guild`,
 `ai_dialogue`); `quest_completion` deltas SHALL bypass the cap. The applied delta SHALL be
 `min(requested, remaining_budget, cap - value)`, the daily counter SHALL accrue only the actually
@@ -107,12 +107,17 @@ delta used, budget capped) so callers can render feedback.
 - **THEN** the gain applies and the value increases
 
 #### Scenario: Negative deltas never reset or restore the budget
-- **WHEN** a negative delta (including a `friendly_fire` penalty) applies after the budget was
-  exhausted
+- **WHEN** a negative delta (including a `friendly_fire` or `sexual_forced` penalty) applies after
+  the budget was exhausted
 - **THEN** the value decreases, the daily counter stays exhausted, and the auto-leave hook runs
 
 #### Scenario: A friendly_fire source is accepted without budget interaction
 - **WHEN** a call supplies the `friendly_fire` source with a negative delta
+- **THEN** the penalty applies downward without consuming or resetting the daily budget, and the
+  outcome reports the applied amount
+
+#### Scenario: A sexual_forced source is accepted without budget interaction
+- **WHEN** a call supplies the `sexual_forced` source with a negative delta
 - **THEN** the penalty applies downward without consuming or resetting the daily budget, and the
   outcome reports the applied amount
 

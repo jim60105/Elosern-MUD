@@ -22,6 +22,13 @@ quest_completion_gain: 2
 # the sole affinity writer; negative deltas never reset the daily budget.
 friendly_fire_penalty_per_hit: 1
 
+# The affinity penalty applied when a player combat action forces a sexual act
+# on an NPC that attempted to resist and failed (sexual-resist-turn-cost B6b).
+# Applied per forced act through the sole affinity writer as a negative delta
+# with the sexual_forced source; independently tunable from the friendly-fire
+# penalty because the two are different categories of transgression.
+sexual_forced_penalty: 3
+
 # Milestone cap-break table (affinity-cap-break D2/D3). Each entry carries
 # exactly one matching identity (npc_key matching npc.key, or a role matching
 # the NPC's schedule role-template key), a quest_key that resolves in the quest

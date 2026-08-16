@@ -739,19 +739,31 @@ def _snapshot_party_surfaces(
     actor: Any,
     battlefield: Battlefield,
 ) -> tuple[list[Any], dict[int, Any], dict[int, Any]]:
-    """Snapshot the party/relations surfaces the friendly-fire scan writes."""
+    """Snapshot the party/relations surfaces the post-round scans write.
+
+    ``relations_before`` covers every ``NPC`` on the battlefield roster, not
+    only declared party companions: the coercion scan can write any present
+    NPC's relations record (a forced sexual act is not restricted to
+    companions), so the rollback restore must be able to reach them all. The
+    roster loop always runs, even when the actor has zero declared companions
+    (sexual-resist-turn-cost B6b Decision 3). ``members_before`` stays scoped
+    to companions -- party membership is only meaningful for them.
+    """
+    from typeclasses.npcs import NPC
     from world.rules.party import party_ids
 
     party_before = list(actor.db.party or ())
     members_before: dict[int, Any] = {}
     relations_before: dict[int, Any] = {}
     companion_pks = set(party_ids(actor))
-    if companion_pks:
-        for entity in battlefield.roster.values():
-            pk = getattr(entity, "pk", None)
-            if isinstance(pk, int) and pk in companion_pks:
-                members_before[pk] = entity.db.party_member
-                relations_before[pk] = entity.db.relations_data
+    for entity in battlefield.roster.values():
+        pk = getattr(entity, "pk", None)
+        if not isinstance(pk, int):
+            continue
+        if isinstance(entity, NPC):
+            relations_before[pk] = entity.db.relations_data
+        if pk in companion_pks:
+            members_before[pk] = entity.db.party_member
     return party_before, members_before, relations_before
 
 
@@ -770,7 +782,7 @@ def _restore_round_touched(
         _restore_touched_best_effort(obj, snapshot, surfaces)
     for key, snapshot in extra.items():
         _restore_attribute(actor, key, snapshot)
-    if party_before or members_before:
+    if party_before or members_before or relations_before:
         from world.rules.affinity import restore_relations_surfaces
         from world.rules.party import restore_membership_surfaces
 
@@ -837,6 +849,92 @@ def _scan_friendly_fire(
             for target in hits:
                 outcome = apply_affinity_change(
                     target, actor, AffinitySource.FRIENDLY_FIRE, -penalty
+                )
+                if outcome.auto_leave_notification is not None:
+                    notifications.append(outcome.auto_leave_notification)
+    except Exception:
+        # The round's transaction rolled the database back; restore the
+        # in-process attribute surfaces so readers never observe the
+        # rolled-back values (the idmapper cache is not transaction-aware).
+        from world.rules.affinity import restore_relations_surfaces
+        from world.rules.party import restore_membership_surfaces
+
+        restore_membership_surfaces(actor, party_before, members_before)
+        restore_relations_surfaces(relations_before)
+        raise
+    return tuple(notifications)
+
+
+def _scan_sexual_coercion(
+    actor: Any,
+    battlefield: Battlefield,
+    logs: list[Any],
+) -> tuple[str, ...]:
+    """Apply per-forced-act coercion penalties for one resolved player round.
+
+    Scans the round's ``EventLog``s for the resist-outcome contract
+    ``sexual-act-effects`` emits (``EventEntry(kind="sexual_resist", data=
+    {"resisted": bool, "auto_comply": bool, "roll": int | None})``, documented
+    in ``sexual-act-resolution-design.md`` §3.4). Only the player's own action
+    logs are scanned (mirroring ``_scan_friendly_fire``'s actor filter), so a
+    future non-player emitter -- a companion's or monster's own cast -- can
+    never charge the player's affinity for someone else's act. Only an entry
+    recording a forced outcome -- ``resisted is False`` and ``auto_comply is
+    False`` -- costs the target's affinity toward the actor; a compliance
+    (rolled or automatic) and a successful resistance apply no penalty. Each
+    qualifying entry calls the sole affinity writer once with the
+    ``sexual_forced`` source and the rulebook penalty, inside one transaction
+    that also covers every resulting auto-leave -- a failure rolls the whole
+    round's affinity effects back. A target that resolves to no roster member
+    or to a non-``NPC`` applies no penalty (mirroring
+    ``apply_affinity_change``'s own owner rejection without needing to call
+    it). Returns the auto-leave notification lines; the caller delivers them
+    only after the transaction commits (the writer never notifies).
+    """
+    from django.db import transaction
+
+    from typeclasses.npcs import NPC
+    from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.affinity_config import get_config
+
+    player_key = str(actor.key)
+    forced: list[Any] = []
+    for event_log in logs:
+        if event_log.actor != player_key:
+            continue
+        for entry in event_log.entries:
+            if entry.kind != "sexual_resist":
+                continue
+            if not isinstance(entry.data, dict):
+                # Fail closed on a malformed payload: never penalize, never
+                # crash the round over a bad record.
+                continue
+            # ``is False``, not falsy-truthiness: a missing or mistyped key
+            # must read as "do not penalize" rather than accidentally matching.
+            if entry.data.get("resisted") is not False:
+                continue
+            if entry.data.get("auto_comply") is not False:
+                continue
+            target = battlefield.roster.get(entry.target)
+            if target is None or not isinstance(target, NPC):
+                continue
+            forced.append(target)
+    if not forced:
+        return ()
+    penalty = get_config().sexual_forced_penalty
+    notifications: list[str] = []
+    party_before = list(actor.db.party or ())
+    members_before = {
+        int(target.pk): target.db.party_member for target in forced
+    }
+    relations_before = {
+        int(target.pk): target.db.relations_data for target in forced
+    }
+    try:
+        with transaction.atomic():
+            for target in forced:
+                outcome = apply_affinity_change(
+                    target, actor, AffinitySource.SEXUAL_FORCED, -penalty
                 )
                 if outcome.auto_leave_notification is not None:
                     notifications.append(outcome.auto_leave_notification)
@@ -927,9 +1025,10 @@ def submit_player_action(
     try:
         with transaction.atomic():
             # Shared outer transaction (fix-combat-settlement-recovery D1):
-            # round effects, friendly-fire penalties, session metadata, and
-            # the terminal settlement commit (or roll back) as one unit, so a
-            # process termination can never leave half-round durable state.
+            # round effects, friendly-fire and coercion penalties, session
+            # metadata, and the terminal settlement commit (or roll back) as
+            # one unit, so a process termination can never leave half-round
+            # durable state.
             # Later combat changes that edit this seam (roster-and-overwhelm,
             # friendly-fire reachability) must keep edits inside this block.
             # Compression is player-direction only (fix-combat-session-roster-
@@ -969,6 +1068,7 @@ def submit_player_action(
                 gained = 1
 
             notifications = _scan_friendly_fire(actor, battlefield, logs)
+            notifications += _scan_sexual_coercion(actor, battlefield, logs)
 
             knocked = _knocked_out_ids(logs, battlefield)
             new_record = replace(

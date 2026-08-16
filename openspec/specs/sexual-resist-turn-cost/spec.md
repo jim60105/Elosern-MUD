@@ -1,4 +1,16 @@
-## ADDED Requirements
+# sexual-resist-turn-cost Specification
+
+## Purpose
+
+Define the deterministic turn-cost of a forced sexual act in combat: a validated
+`sexual_forced_penalty` rulebook field, a coercion scan that penalizes exactly the forced
+outcome (never compliance or successful resistance), the scan's placement inside the round's
+shared outer transaction, and the widened relations snapshot that makes rollback reach every
+roster NPC. The capability wires the affinity consequence of `sexual-resist-contest`'s verdict
+into live combat rounds; the emitter of the resist-outcome log contract lands in later
+proposals.
+
+## Requirements
 
 ### Requirement: sexual_forced_penalty is a validated rulebook field, independent of friendly_fire_penalty_per_hit
 `world/rules/rulebook/affinity.yaml` SHALL declare `sexual_forced_penalty`, a non-negative integer,
