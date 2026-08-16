@@ -99,7 +99,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
                 "Validate OpenSpec",
                 "Validate static requirement traceability",
             ),
-            "evennia": ("Run full non-browser Evennia suite with coverage",),
+            "evennia": ("Run evennia shard ${{ matrix.index }}",),
             "top-level": ("Run top-level regression suite with coverage",),
             "gate": (
                 "Verify successful requirement execution",

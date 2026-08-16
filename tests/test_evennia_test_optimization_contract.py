@@ -16,6 +16,26 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TEST_DATABASE = REPO_ROOT / "server" / "db" / "evennia-test.sqlite3"
 
 
+def _resolve_evennia_label(repo_root: Path, label: str) -> set[str]:
+    """Resolve a manifest label to its dotted test modules without importing.
+
+    A label names either a module file directly or a package directory to walk
+    recursively for test modules. The file selection mirrors Django's
+    DiscoverRunner discovery pattern (``test*.py``) so the labeled set can be
+    compared against what the runner actually loads.
+    """
+    module_file = repo_root / (label.replace(".", "/") + ".py")
+    if module_file.is_file():
+        return {label}
+    package_dir = repo_root / label.replace(".", "/")
+    if package_dir.is_dir():
+        return {
+            ".".join(path.relative_to(repo_root).with_suffix("").parts)
+            for path in package_dir.rglob("test*.py")
+        }
+    return set()
+
+
 class TestSettingsContractTests(unittest.TestCase):
     def _load_settings(
         self, *, enabled: bool, arguments: list[str]
@@ -118,13 +138,23 @@ class TestOwnershipContractTests(unittest.TestCase):
         )
         self.assertIn("['shards']", shards_step["run"])
 
+        evennia_job = jobs["evennia"]
+        evennia_strategy = evennia_job["strategy"]
+        self.assertFalse(evennia_strategy.get("fail-fast", False))
+        self.assertIn(
+            "needs.preflight.outputs.evennia-shards",
+            evennia_strategy["matrix"]["include"],
+        )
         evennia_step = next(
             step
             for step in jobs["evennia"]["steps"]
-            if step["name"] == "Run full non-browser Evennia suite with coverage"
+            if step["name"] == "Run evennia shard ${{ matrix.index }}"
         )
-        self.assertEqual(evennia_step["env"]["COVERAGE_FILE"], "coverage-evennia")
-        self.assertIn("commands server typeclasses world web.webclient", evennia_step["run"])
+        self.assertEqual(
+            evennia_step["env"]["COVERAGE_FILE"],
+            "coverage-evennia-shard-${{ matrix.index }}",
+        )
+        self.assertIn("join(matrix.labels, ' ')", evennia_step["run"])
         self.assertIn("--noinput", evennia_step["run"])
         self.assertIn("--parallel 4", evennia_step["run"])
         self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_step["run"])
@@ -205,10 +235,59 @@ class TestOwnershipContractTests(unittest.TestCase):
         evennia = workflow["jobs"]["evennia"]
         evennia_step = next(
             step for step in evennia["steps"]
-            if step["name"] == "Run full non-browser Evennia suite with coverage"
+            if step["name"] == "Run evennia shard ${{ matrix.index }}"
         )
-        self.assertIn("web.webclient", evennia_step["run"])
+        self.assertIn("join(matrix.labels, ' ')", evennia_step["run"])
         self.assertNotIn("web.tests.browser", evennia_step["run"])
+
+    @covers_requirement(
+        "evennia-test-optimization::machine-shards-preserve-exact-per-module-test-ownership"
+    )
+    def test_evennia_shard_manifest_owns_every_non_browser_test_module_exactly_once(self):
+        import json
+
+        manifest = json.loads(
+            (REPO_ROOT / ".github/evennia-shards.json").read_text(encoding="utf-8")
+        )
+        shards = manifest["shards"]
+        self.assertGreaterEqual(len(shards), 2)
+        indices = [shard["index"] for shard in shards]
+        self.assertEqual(indices, sorted(indices), "shard indices must be sorted")
+        self.assertEqual(len(indices), len(set(indices)), "shard indices must be unique")
+
+        roots = ("commands", "server", "typeclasses", "world", "web/webclient")
+        discovered: set[str] = set()
+        for root in roots:
+            root_dir = REPO_ROOT / root
+            for path in root_dir.rglob("test*.py"):
+                discovered.add(".".join(path.relative_to(REPO_ROOT).with_suffix("").parts))
+        self.assertTrue(discovered)
+
+        owned: set[str] = set()
+        for shard in shards:
+            labels = shard.get("labels")
+            self.assertTrue(labels, f"shard {shard['index']} has no labels")
+            shard_owned: set[str] = set()
+            for label in labels:
+                resolved = _resolve_evennia_label(REPO_ROOT, label)
+                self.assertTrue(
+                    resolved, f"label {label!r} in shard {shard['index']} resolves to nothing"
+                )
+                self.assertFalse(
+                    resolved & shard_owned,
+                    f"label {label!r} overlaps another label in shard {shard['index']}",
+                )
+                self.assertFalse(
+                    resolved & owned,
+                    f"label {label!r} is owned by more than one shard",
+                )
+                shard_owned |= resolved
+            owned |= shard_owned
+        self.assertEqual(
+            owned,
+            discovered,
+            "every discovered non-browser test module must be in exactly one shard",
+        )
 
 
 class TestOptimizationEvidenceTests(unittest.TestCase):

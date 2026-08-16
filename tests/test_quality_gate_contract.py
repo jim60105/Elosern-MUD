@@ -34,10 +34,25 @@ class QualityGateContractTests(unittest.TestCase):
         self.assertIn(
             "Run Node DOM-independent test suite", [s["name"] for s in preflight["steps"]]
         )
-        self.assertEqual(preflight["outputs"]["browser-shards"], "${{ steps.shards.outputs.matrix }}")
+        self.assertIn(
+            "Validate execution shard manifests", [s["name"] for s in preflight["steps"]]
+        )
+        self.assertEqual(
+            preflight["outputs"]["browser-shards"], "${{ steps.shards.outputs.matrix }}"
+        )
+        self.assertEqual(
+            preflight["outputs"]["evennia-shards"],
+            "${{ steps.evennia-shards.outputs.matrix }}",
+        )
 
         evennia_job = jobs["evennia"]
         self.assertEqual(evennia_job["needs"], "preflight")
+        evennia_strategy = evennia_job["strategy"]
+        self.assertFalse(evennia_strategy.get("fail-fast", False))
+        self.assertIn(
+            "needs.preflight.outputs.evennia-shards",
+            evennia_strategy["matrix"]["include"],
+        )
         evennia_steps = {step["name"]: step for step in evennia_job["steps"]}
         self.assertEqual(
             evennia_steps["Prepare Evennia runtime directories"]["run"],
@@ -65,7 +80,7 @@ class QualityGateContractTests(unittest.TestCase):
                 )
             ]["run"],
         )
-        evennia_step = evennia_steps["Run full non-browser Evennia suite with coverage"]
+        evennia_step = evennia_steps["Run evennia shard ${{ matrix.index }}"]
         evennia_command = evennia_step["run"]
         self.assertIn(
             "coverage run",
@@ -73,8 +88,16 @@ class QualityGateContractTests(unittest.TestCase):
         )
         self.assertIn("--concurrency=multiprocessing --parallel-mode", evennia_command)
         self.assertIn("--parallel 4", evennia_command)
-        self.assertIn("commands server typeclasses world web.webclient", evennia_command)
+        self.assertIn("join(matrix.labels, ' ')", evennia_command)
         self.assertEqual(evennia_step["env"]["MUD_TEST_SETTINGS"], "1")
+        self.assertEqual(
+            evennia_step["env"]["COVERAGE_FILE"],
+            "coverage-evennia-shard-${{ matrix.index }}",
+        )
+        self.assertEqual(
+            evennia_step["env"]["OPENSPEC_TEST_EVIDENCE"],
+            "evidence.evennia-shard-${{ matrix.index }}.jsonl",
+        )
         self.assertNotIn("evennia test --settings test_settings.py .", evennia_command)
 
         top_level_job = jobs["top-level"]
@@ -117,9 +140,12 @@ class QualityGateContractTests(unittest.TestCase):
         jobs = workflow["jobs"]
         evennia_step = next(
             step for step in jobs["evennia"]["steps"]
-            if step["name"] == "Run full non-browser Evennia suite with coverage"
+            if step["name"] == "Run evennia shard ${{ matrix.index }}"
         )
-        self.assertEqual(evennia_step["env"]["COVERAGE_FILE"], "coverage-evennia")
+        self.assertEqual(
+            evennia_step["env"]["COVERAGE_FILE"],
+            "coverage-evennia-shard-${{ matrix.index }}",
+        )
         browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]
         browser_step = next(
             step for step in browser_jobs[0]["steps"]

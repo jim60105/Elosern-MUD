@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       browser-shards: ${{ steps.shards.outputs.matrix }}
+      evennia-shards: ${{ steps.evennia-shards.outputs.matrix }}
 
     steps:
       - name: Check out repository
@@ -48,6 +49,30 @@ jobs:
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 
+      - name: Validate execution shard manifests
+        run: |
+          uv run --locked python - <<'PY'
+          import json
+          import sys
+          for name in ("evennia-shards", "browser-shards"):
+              manifest = json.load(open(f".github/{name}.json"))
+              shards = manifest.get("shards")
+              if not shards:
+                  print(f"{name}: manifest declares no shards")
+                  sys.exit(1)
+              indices = [shard["index"] for shard in shards]
+              if indices != sorted(indices) or len(indices) != len(set(indices)):
+                  print(f"{name}: shard indices must be unique and sorted")
+                  sys.exit(1)
+              for shard in shards:
+                  items = shard.get("labels") or shard.get("files")
+                  if not items or not all(
+                      isinstance(item, str) and item for item in items
+                  ):
+                      print(f"{name}: shard {shard.get('index')} must declare non-empty string labels/files")
+                      sys.exit(1)
+          PY
+
       - name: Compute browser shard matrix
         id: shards
         run: >-
@@ -55,9 +80,20 @@ jobs:
           "import json; print(json.dumps(json.load(open('.github/browser-shards.json'))['shards']))")"
           >> "$GITHUB_OUTPUT"
 
+      - name: Compute evennia shard matrix
+        id: evennia-shards
+        run: >-
+          echo "matrix=$(uv run --locked python -c
+          "import json; print(json.dumps(json.load(open('.github/evennia-shards.json'))['shards']))")"
+          >> "$GITHUB_OUTPUT"
+
   evennia:
     needs: preflight
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.evennia-shards) }}
 
     steps:
       - name: Check out repository
@@ -79,25 +115,25 @@ jobs:
       - name: Prepare Evennia runtime directories
         run: mkdir -p server/db server/logs
 
-      - name: Run full non-browser Evennia suite with coverage
+      - name: Run evennia shard ${{ matrix.index }}
         env:
-          COVERAGE_FILE: coverage-evennia
+          COVERAGE_FILE: coverage-evennia-shard-${{ matrix.index }}
           MUD_TEST_SETTINGS: "1"
-          OPENSPEC_TEST_EVIDENCE: evidence.evennia.jsonl
+          OPENSPEC_TEST_EVIDENCE: evidence.evennia-shard-${{ matrix.index }}.jsonl
         run: >-
           uv run --locked coverage run
           --concurrency=multiprocessing --parallel-mode
           -m evennia test --settings test_settings.py --noinput
-          --parallel 4 commands server typeclasses world web.webclient
+          --parallel 4 ${{ join(matrix.labels, ' ') }}
 
       - name: Upload coverage and evidence artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: evennia-artifacts
+          name: evennia-shard-${{ matrix.index }}-artifacts
           if-no-files-found: error
           path: |
-            coverage-evennia*
-            evidence.evennia.jsonl
+            coverage-evennia-shard-${{ matrix.index }}*
+            evidence.evennia-shard-${{ matrix.index }}.jsonl
 
   browser:
     needs: preflight
@@ -220,9 +256,12 @@ jobs:
               test -s "$file" || { echo "${label} coverage artifact ${file} is empty"; exit 1; }
             done
           }
-          check_glob "evennia" 'coverage-evennia*'
+          while read -r index; do
+            check_glob "evennia-shard-${index}" "coverage-evennia-shard-${index}*"
+            test -s "evidence.evennia-shard-${index}.jsonl" || { echo "evidence.evennia-shard-${index}.jsonl is missing or empty"; exit 1; }
+          done < <(uv run --locked python -c \
+            "import json; print('\n'.join(str(s['index']) for s in json.load(open('.github/evennia-shards.json'))['shards']))")
           check_glob "top-level" 'coverage-top-level*'
-          test -s evidence.evennia.jsonl || { echo "evidence.evennia.jsonl is missing or empty"; exit 1; }
           test -s evidence.top-level.jsonl || { echo "evidence.top-level.jsonl is missing or empty"; exit 1; }
           while read -r index; do
             check_glob "browser-shard-${index}" "coverage-browser-shard-${index}*"
@@ -232,7 +271,7 @@ jobs:
 
       - name: Concatenate requirement evidence in entry-point order
         run: >-
-          cat evidence.evennia.jsonl evidence.browser-shard-*.jsonl evidence.top-level.jsonl
+          cat evidence.evennia-shard-*.jsonl evidence.browser-shard-*.jsonl evidence.top-level.jsonl
           > evidence.combined.jsonl
 
       - name: Verify successful requirement execution
