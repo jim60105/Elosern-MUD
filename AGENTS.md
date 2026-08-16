@@ -125,9 +125,13 @@ run):
   server per test** because a live combat session (or an abnormal transport
   close during combat) leaves the shared Evennia server in a state that corrupts
   later fresh logins. A combat test therefore takes ~35–70s each.
-- The CI quality gate shards the browser suite across six parallel jobs by
-  `.github/browser-shards.json`; each test file has exactly one serial
-  execution owner (enforced by a top-level contract test).
+- The CI quality gate packs the managed browser suite into 11 two-process
+  shards by `.github/browser-shards.json`; each shard job runs two isolated
+  test processes from two separate checkouts (`w-a`/`w-b`) because the Evennia
+  launcher writes GAMEDIR-relative pidfiles (`server/server.pid`,
+  `server/portal.pid`) and two harnesses in one working tree would race on
+  them. Every test method has exactly one serial execution owner across the
+  22 process lists (enforced by a top-level AST-based contract test).
 - The CI quality gate machine-shards the non-browser Evennia suite across six
   parallel jobs by `.github/evennia-shards.json`; each test module has exactly
   one serial execution owner (enforced by a top-level contract test). The

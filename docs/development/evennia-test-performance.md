@@ -339,3 +339,49 @@ max/median of 1.29 (166 s / 129 s), below the ≥ 2× rebalance threshold, so no
 further rebalance was needed. Total workflow wall time is still ~20 min only
 because the managed browser suite dominates (combat 19 m 10 s); that half is
 addressed by the sibling `pack-browser-ci-shards` change.
+
+### 2026-08-16: Browser suite packed into 11 two-process shards
+
+The six browser jobs (each one `unittest` process, file-level manifest labels)
+were replaced by **11 jobs × 2 isolated processes**. Each browser shard checks
+out the repository twice (`w-a` and `w-b`) because the Evennia launcher writes
+GAMEDIR-relative pidfiles (`server/server.pid`, `server/portal.pid`); two
+harnesses in one working tree would race on them and kill each other's
+processes. The second checkout is cheap (repo pack ~5 MB).
+
+- `.github/browser-shards.json` now carries 11 shards, each with two process
+  lists `files_a`/`files_b` of module/class/method dotted labels. Combat tests
+  (per-test server boot, ~50 s each) are split at method level across five
+  lists of 4–5 tests; creation and services classes split at class level;
+  exploration and art split at method level; the cheap shell-family files pack
+  whole into one or two lists. Every process list targets ≤ 240 s estimated
+  from the measured per-test weights (combat ~50 s, creation/layout ~38 s,
+  services/pointer ~47 s, exploration/reconnect ~40 s, art/harness ~36 s,
+  shell family ~6.4 s).
+- The `browser` job runs its two `unittest` invocations as parallel background
+  processes with inline per-process `COVERAGE_FILE`
+  (`coverage-browser-shard-<n>-p1`/`-p2`) and
+  `OPENSPEC_TEST_EVIDENCE` (`evidence.browser-shard-<n>-p1.jsonl`/`-p2.jsonl`),
+  waits on both with guarded `wait "$pid" || status=$?` (GitHub's `set -e`
+  aborts on a failing bare `wait`), concatenates the two evidence files
+  A-then-B into `evidence.browser-shard-<n>.jsonl`, copies both coverage files
+  to the job root, and fails the step unless both statuses are zero. No
+  `|| true`, no `continue-on-error`.
+- The gate's aggregation contract is unchanged: per-shard artifacts keep the
+  `coverage-browser-shard-<n>*` and `evidence.browser-shard-<n>.jsonl` names,
+  the completeness loop, evidence concatenation, and `coverage combine
+  coverage-browser-shard-*` all work index-based. The 20-slot concurrent-job
+  ceiling counts jobs, not processes: 1 preflight + 6 evennia + 11 browser + 1
+  top-level + 1 gate = 20.
+- The browser ownership contract test moved from file-level to **method-level
+  partition** (AST-based, import-free): every `test_*` method of every
+  `web/tests/browser/test_*.py` file is owned by exactly one of the 22 process
+  lists. Rebalancing after future CI observations is a manifest edit plus the
+  contract tests, not a workflow edit.
+
+Expected effect: the combat shard's 19 m 09 s splits across ~5 parallel
+process lists (~4–5 min each), bringing the browser critical path to ~5–6 min
+and total quality-gate wall time under 10 min together with the evennia
+machine sharding. First CI observation (branch `feat/pack-browser-ci-shards`)
+recorded in a later run; if any process list dominates (≥ 2× the median or
+> 7 min), rebalance the manifest once and re-record.
