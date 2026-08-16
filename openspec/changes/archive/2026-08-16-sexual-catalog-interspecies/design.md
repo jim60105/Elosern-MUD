@@ -159,6 +159,22 @@ that would now resolve this gap for both 乳交 and 異種交合 in a single cha
   both are properties of the already-merged `Monster` typeclass and `sexual-resist-contest`, not
   something this proposal depends on beyond `resolve_part`'s collapse behavior.
 
+### D-6: Target identity is narrative, not mechanically enforced
+
+The source catalog's "targets must be a `Monster`" is framing, not a claim this
+proposal (or any proposal in this batch) mechanically enforces: the shipped
+targeting pipeline's only sex-act-specific rule is the SELF-target exclusion in
+`targeting.py`, and a `TargetSpec.SINGLE` act accepts any co-located living
+non-self entity. A 異種 act cast at a humanoid therefore resolves that target to
+`GENERIC_BODY_PART` (the `None` collapse is unconditional in `resolve_part`) and
+applies the target-side effects there. The delta spec's scenarios are written
+only about `Monster` targets — the generic-channel collapse — and make no
+rejection claim, so the implementation matches the contract exactly. Enforcing
+target-kind would require a targeting or skill-contract change that no proposal
+in the batch owns; the partner line ships under the identical precedent (its
+"partner" identity is equally unenforced), and a future proposal that adds
+enforcement would fix every line at once.
+
 ## Risks / Trade-offs
 
 - **[Risk]** 異種交合's event never reaches its intended recipient under the currently-shipped
@@ -175,10 +191,22 @@ that would now resolve this gap for both 乳交 and 異種交合 in a single cha
   measures.
 - **[Risk]** `interspecies_receive`'s `0.9` ratio is close to `1.0`'s structural ceiling in practice
   (no upper bound is enforced by `_builder.py`, but every other one-way act stays at `0.6` or below),
-  making it an outlier that could read as miscalibrated rather than deliberate. → **Mitigation:** D-3
+  making it an outlier that could read as miscalibrated rather than deliberate. →
+  **Mitigation:** D-3
   states explicitly why `0.9` is the intended value, sourced from the catalog design document's own
   "highest actor ratio in the game" framing for this specific act, not an arbitrary choice.
-
+- **[Risk]** When `sexual-resist-cast-wiring` merges, every `resistible=True` cast runs a d100
+  contest, and this proposal's two target-side-asserting cast tests
+  (`test_cast_against_a_monster_applies_pleasure_through_the_generic_channel`,
+  `test_mating_cast_emits_the_nonhuman_event`) become RNG-dependent: a monster has no affinity
+  record, so its resist is a pure stat contest that can never auto-comply (resolution design §4.2),
+  and a successful resist excludes the target from the act's pleasure/event effects. →
+  **Mitigation:** this proposal is explicitly sequenced before that follow-up (overview §4.3 batch 9
+  is unscheduled), and the wiring change already owns the migration of resistible cast tests under
+  its own task 4.1-4.2 (`patch("world.rules.action.roll_d100", return_value=...)`) and re-runs the
+  full `world.skills.tests` at its task 5.1; its sweep must extend to this proposal's two tests the
+  same way it does to `test_seed_acts.py`. No `world.rules.action.roll_d100` seam exists to patch
+  today, so no pre-patch is possible from this proposal.
 ## Migration Plan
 
 Pure content addition; no data migration. `INTERSPECIES_ACTS` grows from an empty tuple to 7 rows;
