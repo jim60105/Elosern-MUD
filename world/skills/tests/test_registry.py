@@ -1568,6 +1568,13 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "combat_forced_climax",
                 "combat_relentless_torment",
                 "combat_climax_domination",
+                "interspecies_touch",
+                "interspecies_caress",
+                "interspecies_entangle",
+                "interspecies_receive",
+                "interspecies_mating",
+                "interspecies_domination",
+                "interspecies_resonance",
             },
         }
         pinned = set().union(*expected.values())

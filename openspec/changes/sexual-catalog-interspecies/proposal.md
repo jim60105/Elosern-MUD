@@ -42,6 +42,11 @@ does.
   This proposal ships the act anyway — its pleasure and counter effects are correctly
   participant-expanded and deliver full value independent of this gap — and does not attempt to fix
   `_handle_sexual_event` itself, matching C4's disclosed-not-fixed precedent; see design.md D-4.
+- **Target identity is narrative, not mechanically enforced (design.md D-6)**: `TargetSpec.SINGLE`
+  accepts any co-located living non-self entity, so nothing stops a 異種 act from being cast at a
+  humanoid (which then resolves to `GENERIC_BODY_PART` like any parless target). No proposal in the
+  batch enforces target-kind; the partner line ships under the identical precedent, and the delta
+  spec's scenarios make no rejection claim.
 
 ## Capabilities
 

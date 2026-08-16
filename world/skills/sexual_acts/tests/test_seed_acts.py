@@ -49,7 +49,10 @@ class SeedActOwnershipTests(EvenniaTest):
 
     @covers_requirement("sexual-act-seeds::seven-seed-acts-are-registered-with-an-empty-unlock-mapping-and-are-unconditionally-owned")
     def test_interspecies_and_divine_gain_no_seed(self):
-        self.assertEqual(INTERSPECIES_ACTS, ())
+        # 異種線 ships no unconditional seed: every one of its seven acts is
+        # counter-gated (sexual-catalog-interspecies fills the line). 神之秘法
+        # remains empty until its own catalog change lands.
+        self.assertEqual(len(INTERSPECIES_ACTS), 7)
         self.assertEqual(DIVINE_ACTS, ())
 
     def test_seed_rows_are_registered_under_the_same_key_in_both_registries(self):
