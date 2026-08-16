@@ -33,6 +33,13 @@ DEFAULT_BOOT_TIMEOUT = 600
 DEFAULT_READY_TIMEOUT = 240
 DEFAULT_STOP_TIMEOUT = 60
 
+# Ephemeral-port races between concurrent harness processes on one runner.
+# ``allocate_ports`` releases its sockets before Evennia binds those exact
+# ports, so a sibling process may grab a released port; the portal then fails
+# with one of these markers. Retrying with a fresh runtime is the resolution.
+_PORT_CONFLICT_MARKERS = ("CannotListenError", "Address already in use")
+MAX_PORT_CONFLICT_RETRIES = 2
+
 
 class HarnessError(RuntimeError):
     """Raised when the managed server cannot be started or verified."""
@@ -75,27 +82,49 @@ class ManagedServer:
         On any failure (migrate, seed, boot, or readiness timeout), owned
         processes are stopped and temporary state is removed so a failing run
         cannot leak live servers, occupied ports, or databases.
+
+        A boot whose diagnostics show a loopback port conflict (the documented
+        release-then-bind race between concurrent harness processes) is retried
+        with a fresh runtime up to ``MAX_PORT_CONFLICT_RETRIES`` times; other
+        failures propagate immediately.
         """
         if self.started:
             return
-        try:
-            self._run_migrate()
-            self._run_seed()
-            self._clear_pidfiles()
-            self._run_boot()
-            self._record_pids()
-            self.ready = fixtures.webclient_ready(
-                self.runtime, timeout=self.ready_timeout
-            )
-            if not self.ready:
-                raise HarnessError(
-                    "managed server did not become ready in time\n"
-                    + self._diagnostics()
+        attempt = 0
+        while True:
+            try:
+                self._start_once()
+                return
+            except BaseException:
+                diagnostics = self._diagnostics()
+                is_port_conflict = any(
+                    marker in diagnostics for marker in _PORT_CONFLICT_MARKERS
                 )
-            self.started = True
-        except BaseException:
-            self.stop()
-            raise
+                self.stop()
+                if not is_port_conflict or attempt >= MAX_PORT_CONFLICT_RETRIES:
+                    raise
+                attempt += 1
+                self.runtime = fixtures.recreate_runtime(self.runtime)
+                self.migrate_result = None
+                self.seed_result = None
+                self.boot_result = None
+
+    def _start_once(self) -> None:
+        """One migrate/seed/boot/readiness attempt against the current runtime."""
+        self._run_migrate()
+        self._run_seed()
+        self._clear_pidfiles()
+        self._run_boot()
+        self._record_pids()
+        self.ready = fixtures.webclient_ready(
+            self.runtime, timeout=self.ready_timeout
+        )
+        if not self.ready:
+            raise HarnessError(
+                "managed server did not become ready in time\n"
+                + self._diagnostics()
+            )
+        self.started = True
 
     def stop(self) -> None:
         """Shut down owned processes and remove temporary state.

@@ -110,6 +110,96 @@ class ManagedServerFastTests(unittest.TestCase):
         self.server.stop()
         self.assertFalse(self.runtime.root_dir.exists())
 
+    def test_port_conflict_boot_is_retried_with_fresh_runtime(self):
+        """A portal killed by an occupied port is retried with fresh ports.
+
+        Two harness processes may run concurrently on one runner (the packed
+        browser shards); the ephemeral-port release-then-bind race can make
+        the portal fail with ``Address already in use``. The harness must
+        retry with a fresh runtime instead of failing the whole shard.
+        """
+        ready_calls = {"count": 0}
+
+        def flaky_ready(runtime, timeout=0):
+            ready_calls["count"] += 1
+            if ready_calls["count"] == 1:
+                # The real portal writes the bind failure into its log before
+                # the readiness poll gives up.
+                runtime.log_dir.mkdir(parents=True, exist_ok=True)
+                (runtime.log_dir / "portal.log").write_text(
+                    "twisted.internet.error.CannotListenError: Couldn't listen "
+                    "on 127.0.0.1:44951: [Errno 98] Address already in use.\n",
+                    encoding="utf-8",
+                )
+                return False
+            return True
+
+        migrate = mock.patch(
+            "web.tests.browser.harness.fixtures.run_migrate",
+            return_value=_ok_result("migrate"),
+        )
+        seed = mock.patch(
+            "web.tests.browser.harness.fixtures.run_seed",
+            return_value=_ok_result("seed"),
+        )
+        poll = mock.patch(
+            "web.tests.browser.harness.fixtures.webclient_ready",
+            side_effect=flaky_ready,
+        )
+        for patcher in (migrate, seed, poll):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        first_runtime = self.server.runtime
+        first_runtime.env["ELOSERN_BROWSER_CREATION"] = "1"
+        self.server.start()
+        self.assertTrue(self.server.started)
+        self.assertEqual(ready_calls["count"], 2)
+        self.assertIsNot(self.server.runtime, first_runtime)
+        self.assertFalse(first_runtime.root_dir.exists())
+        self.assertEqual(
+            self.server.runtime.env["ELOSERN_BROWSER_CREATION"], "1"
+        )
+        self.server.stop()
+        self.assertFalse(self.server.runtime.root_dir.exists())
+
+    def test_port_conflict_retries_exhausted_raises(self):
+        """A persistent port conflict gives up after the retry budget."""
+        ready_calls = {"count": 0}
+
+        def always_conflicting(runtime, timeout=0):
+            ready_calls["count"] += 1
+            runtime.log_dir.mkdir(parents=True, exist_ok=True)
+            (runtime.log_dir / "portal.log").write_text(
+                "twisted.internet.error.CannotListenError: Couldn't listen on "
+                "127.0.0.1:44951: [Errno 98] Address already in use.\n",
+                encoding="utf-8",
+            )
+            return False
+
+        migrate = mock.patch(
+            "web.tests.browser.harness.fixtures.run_migrate",
+            return_value=_ok_result("migrate"),
+        )
+        seed = mock.patch(
+            "web.tests.browser.harness.fixtures.run_seed",
+            return_value=_ok_result("seed"),
+        )
+        poll = mock.patch(
+            "web.tests.browser.harness.fixtures.webclient_ready",
+            side_effect=always_conflicting,
+        )
+        for patcher in (migrate, seed, poll):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        with self.assertRaises(HarnessError) as caught:
+            self.server.start()
+        self.assertIn("did not become ready", str(caught.exception))
+        self.assertIn("Address already in use", str(caught.exception))
+        self.assertFalse(self.server.started)
+        self.assertEqual(ready_calls["count"], 3)
+
     def test_readiness_timeout_cleans_up_automatically(self):
         """A failed start must stop owned processes and remove temp state.
 

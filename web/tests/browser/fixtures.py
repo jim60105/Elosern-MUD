@@ -95,6 +95,25 @@ def allocate_ports(count: int = PORT_COUNT) -> list[int]:
             sock.close()
 
 
+# Env keys the runtime itself owns (derived from its fresh allocation).
+RUNTIME_ENV_KEYS = frozenset(
+    {
+        "ELOSERN_BROWSER_DB",
+        "ELOSERN_BROWSER_LOG_DIR",
+        "ELOSERN_BROWSER_MEDIA_ROOT",
+        "ELOSERN_BROWSER_STATIC_ROOT",
+        "ELOSERN_BROWSER_CACHE_DIR",
+        "ELOSERN_BROWSER_ART_ROOT",
+        "ELOSERN_BROWSER_TELNET_PORT",
+        "ELOSERN_BROWSER_HTTP_PORT",
+        "ELOSERN_BROWSER_INTERNAL_PORT",
+        "ELOSERN_BROWSER_WS_PORT",
+        "ELOSERN_BROWSER_AMP_PORT",
+        "WEBSOCKET_CLIENT_PROXY_PORT",
+    }
+)
+
+
 def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
     """Create one isolated runtime and its complete environment."""
     root_dir = Path(tempfile.mkdtemp(prefix=prefix))
@@ -132,6 +151,21 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         ports=ports,
         env=env,
     )
+
+
+def recreate_runtime(previous: BrowserRuntime | None = None) -> BrowserRuntime:
+    """Create a fresh runtime, carrying over caller-set env from ``previous``.
+
+    Used by the harness port-conflict retry: a new runtime gets new ports and
+    temporary roots, but keeps caller-configured mode variables (creation,
+    services, exploration, minimap) that are not runtime-owned.
+    """
+    runtime = create_runtime()
+    if previous is not None:
+        for key, value in previous.env.items():
+            if key not in RUNTIME_ENV_KEYS:
+                runtime.env[key] = value
+    return runtime
 
 
 def _base_env(runtime: BrowserRuntime, extra: dict[str, str] | None = None) -> dict[str, str]:

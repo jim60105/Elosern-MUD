@@ -382,6 +382,28 @@ processes. The second checkout is cheap (repo pack ~5 MB).
 Expected effect: the combat shard's 19 m 09 s splits across ~5 parallel
 process lists (~4–5 min each), bringing the browser critical path to ~5–6 min
 and total quality-gate wall time under 10 min together with the evennia
-machine sharding. First CI observation (branch `feat/pack-browser-ci-shards`)
-recorded in a later run; if any process list dominates (≥ 2× the median or
-> 7 min), rebalance the manifest once and re-record.
+machine sharding.
+
+**First CI observations (branch `feat/pack-browser-ci-shards`):**
+
+- Run 31951553328: every browser shard failed at step start with
+  `syntax error near unexpected token '&&'` — the run-step literal block
+  placed a newline before `&&` inside each backgrounded subshell. Fixed by
+  collapsing each `(cd w-a && ...)` / `(cd w-b && ...)` subshell onto a
+  single line (guarded waits, coverage copies, evidence concatenation, and
+  the dual-status check unchanged).
+- Run 31951788668: 10 of 11 browser shards passed; shard 4 (creation, where
+  every journey boots a dedicated server) failed one test with
+  `twisted.internet.error.CannotListenError: Couldn't listen on
+  127.0.0.1:44951: [Errno 98] Address already in use`. This is the
+  harness's documented ephemeral-port release-then-bind race
+  (`allocate_ports` closes its sockets before the portal binds those exact
+  ports): with two harness processes allocating and booting concurrently on
+  one runner, the race became real. The fix **amends the change's
+  "harness untouched" non-goal**: `ManagedServer.start()` now retries up to
+  two times with a fresh runtime when the diagnostics show a port-conflict
+  marker (`CannotListenError` / `Address already in use`), so a sibling
+  process grabbing a released port no longer fails the whole shard. Two fast
+  unit tests pin the retry (fresh runtime on conflict, budget exhausted
+  raises). Rebalancing after further CI observations remains a manifest edit
+  plus the contract tests.
