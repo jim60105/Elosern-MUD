@@ -109,7 +109,8 @@ classes with test methods, 1,174 methods) and the manual dependency review:
   (`world/quests/tests/test_pipeline_scenarios.py`), `MonsterSexualBaselineTests`
   (`world/rules/tests/test_monster_sexual_baseline.py`), `MonsterPopulationTests`
   (`world/rules/tests/test_monster_scale.py`), `LandedEffectHandlerTests`
-  (`world/rules/tests/test_effect_handlers.py`) — each builds
+  (`world/rules/tests/test_effect_handlers.py`), `DisguiseBoundaryTests`
+  (`world/rules/tests/test_disguise_boundary.py`) — each builds
   `PlayerCharacter`/`Monster`/`LivingEntity` entities via `create_object`
   without an explicit `home=`/`nohome=`, so home defaults to
   `settings.DEFAULT_HOME = "#2"`. Under `EvenniaTestCase` in a fresh parallel
