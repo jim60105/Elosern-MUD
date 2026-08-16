@@ -123,7 +123,10 @@ class UnlockQueryTests(EvenniaTest):
             self.assertNotIn(
                 "divine_sexual_mastery", entity.skills.base_owned_keys()
             )
-            self.assertEqual(entity.sexual.unlocked_act_keys(), frozenset())
+            # The seven shipped seeds unlock unconditionally even without
+            # mastery; only the threshold-gated act must stay absent.
+            self.assertNotIn(act.key, entity.sexual.unlocked_act_keys())
+            self.assertTrue(entity.sexual.unlocked_act_keys())
 
     @covers_requirement("sexual-state-handler::sexualstate-unlocked-act-keys-gates-the-sexual-act-catalogue-by-counter-thresholds-or-unlocks-it-entirely-for-a-mastery-holder")
     def test_mastery_check_tolerates_an_innate_key_missing_from_the_registry(self):

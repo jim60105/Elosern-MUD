@@ -23,6 +23,7 @@ from world.rules.combat_view import (
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.skills.registry import SKILL_REGISTRY
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 def _descriptor(key: str) -> SkillDescriptorView:
@@ -115,6 +116,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTest):
                 "fire_ball",
                 "flee",
                 "basic_attack",
+                *sorted(SEXUAL_ACT_REGISTRY),
             ],
         )
         self.assertNotIn("defense_instinct", keys)

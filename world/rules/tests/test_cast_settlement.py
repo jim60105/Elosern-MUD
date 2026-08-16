@@ -35,6 +35,7 @@ from world.rules.progression import SKILL_PRACTICE_XP_PER_USE
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 def _raising_stage():
@@ -399,6 +400,7 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
         "divine_space_distortion",
         "divine_matter_transmutation",
         "divine_life_extension",
+        *sorted(SEXUAL_ACT_REGISTRY),
     )
 
     def test_catalog_actives_are_exactly_the_declared_seven(self):

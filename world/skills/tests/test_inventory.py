@@ -13,6 +13,7 @@ from world.skills.equipment import (
     EquipmentSlot,
     list_items,
 )
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 class InventoryTests(EvenniaTest):
@@ -37,7 +38,13 @@ class InventoryTests(EvenniaTest):
         self.assertEqual(list_items(entity), ["healing_potion"])
         self.assertEqual(
             entity.skills.owned_keys(),
-            [*record["skills"], *record["passives"], "flee", "basic_attack"],
+            [
+                *record["skills"],
+                *record["passives"],
+                "flee",
+                "basic_attack",
+                *sorted(SEXUAL_ACT_REGISTRY),
+            ],
         )
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.ACCESSORY),

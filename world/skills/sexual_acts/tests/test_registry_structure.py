@@ -455,15 +455,19 @@ class ActFamilyTests(unittest.TestCase):
 
 
 class LineModuleTests(unittest.TestCase):
-    """Every line module ships pre-declared and empty (design D-3)."""
+    """The four content modules carry act rows; 異種 and 神之秘法 stay empty (design D-3)."""
 
-    @covers_requirement("sexual-act-registry::the-six-line-modules-ship-pre-declared-and-pre-imported-each-exporting-an-empty-tuple")
-    def test_every_line_module_is_importable_and_empty(self):
+    @covers_requirement("sexual-act-registry::the-six-line-modules-ship-pre-declared-and-pre-imported-異種-and-神之秘法-remain-empty")
+    def test_every_line_module_is_importable_with_only_the_two_parless_lines_empty(self):
         for module, constant in (
             (sexual_acts.solo, "SOLO_ACTS"),
             (sexual_acts.shame, "SHAME_ACTS"),
             (sexual_acts.partner, "PARTNER_ACTS"),
             (sexual_acts.combat, "COMBAT_ACTS"),
+        ):
+            with self.subTest(module=module.__name__):
+                self.assertTrue(getattr(module, constant))
+        for module, constant in (
             (sexual_acts.interspecies, "INTERSPECIES_ACTS"),
             (sexual_acts.divine, "DIVINE_ACTS"),
         ):
@@ -604,18 +608,23 @@ class SexualActEffectsStructuralTests(unittest.TestCase):
 
 
 class OwnershipDriftGuardTests(EvenniaTest):
-    """owned_keys() equals base_owned_keys() with zero unlocked acts."""
+    """owned_keys() equals base_owned_keys() plus the unconditionally-unlocked seed acts."""
 
-    def test_owned_keys_matches_base_owned_keys_when_nothing_is_unlocked(self):
+    _SEED_KEYS = sorted(SEXUAL_ACT_REGISTRY)
+
+    def test_owned_keys_appends_the_unconditionally_unlocked_seed_acts(self):
         entity = create_object(PlayerCharacter, key="drift guard")
         entity.race = "human"
         entity.apply_race_baseline()
         entity.db.skills = {"active": ["fire_ball"], "passive": []}
-        self.assertEqual(entity.sexual.unlocked_act_keys(), frozenset())
-        self.assertEqual(entity.skills.owned_keys(), entity.skills.base_owned_keys())
+        self.assertEqual(entity.sexual.unlocked_act_keys(), frozenset(self._SEED_KEYS))
         self.assertEqual(
             entity.skills.owned_keys(),
-            ["fire_ball", "flee", "basic_attack"],
+            [*entity.skills.base_owned_keys(), *self._SEED_KEYS],
+        )
+        self.assertEqual(
+            entity.skills.owned_keys(),
+            ["fire_ball", "flee", "basic_attack", *self._SEED_KEYS],
         )
 
     @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")
@@ -634,7 +643,7 @@ class OwnershipDriftGuardTests(EvenniaTest):
         bare = SimpleNamespace(db=SimpleNamespace(skills=None))
         self.assertEqual(
             SkillHandler(bare).owned_keys(),
-            ["flee", "basic_attack"],
+            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
         )
 
     @covers_requirement("skill-handler::owned-keys-includes-every-unlocked-sexual-act-and-base-owned-keys-exposes-the-pre-extension-set")

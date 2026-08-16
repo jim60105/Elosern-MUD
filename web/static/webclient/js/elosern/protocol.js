@@ -946,7 +946,13 @@
             throw new Error("a null group key requires a null label");
           }
         } else {
-          validateIdentifier(subGroup.group, "skill group key");
+          // A bounded non-empty string, not an identifier: sexual-act
+          // sub-groups are keyed by their Traditional Chinese line names
+          // (獨處, 羞恥, ...), mirroring the character panel's contract.
+          requireString(subGroup.group, "skill group key", CHARACTER_MAX_KEY);
+          if (!subGroup.group.trim()) {
+            throw new Error("a non-null group key must be non-empty");
+          }
           if (typeof subGroup.label !== "string" || !subGroup.label.trim()) {
             throw new Error("a non-null group key requires a non-empty label");
           }

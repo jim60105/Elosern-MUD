@@ -194,9 +194,18 @@ catalog should never need to revisit a seed's `resistible` value.
 - **[Risk]** Registering real content for the first time is exactly the condition under which a
   latent gap in the shipped structural tests would first surface (they have only ever run against a
   synthetic, torn-down act or an empty registry). → **Mitigation**: this proposal's task list runs
-  the full existing structural-test suite (`test_registry_structure.py`) unmodified against these
-  seven real rows before writing any new test, so a failure here is diagnostic of the registry, not
-  the seeds.
+  the full existing structural-test suite (`test_registry_structure.py`) against these seven real
+  rows before writing any new test, so a failure here is diagnostic of the registry, not the seeds.
+  The change also updates the handful of tests elsewhere that pinned the pre-content state —
+  exact `owned_keys()`/`active_keys` lists and the D4 classification table's `SEXUAL_ACT` set —
+  because seven unconditionally-owned ACTIVE skills change every entity's `owned_keys()` and the
+  assembled registries; those updates are enumerated in tasks 7.5 and in proposal.md's Impact list.
+- **[Risk]** Two main-spec requirement headings become factually stale the moment this change lands:
+  `sexual-act-registry`'s "each exporting an empty tuple" (four modules now carry rows) and
+  `skill-category-registry`'s "117 entries" (seven acts make it 124, and the count will keep
+  moving as catalog proposals land). → **Mitigation**: both are declared as RENAMED + MODIFIED
+  requirements in this change's delta spec, with the covering tests' `covers_requirement` IDs
+  updated to the renamed headings at implementation time (tasks 7.5.1/7.5.9).
 
 ## Migration Plan
 

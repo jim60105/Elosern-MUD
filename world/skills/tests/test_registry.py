@@ -1456,7 +1456,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
         )
         self.assertIsNone(skill.group)
 
-    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_every_registry_key_has_a_valid_category(self):
         for key in SKILL_REGISTRY:
             with self.subTest(key=key):
@@ -1466,7 +1466,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                     key,
                 )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_per_category_partition_covers_the_registry_exactly(self):
         per_category = {
             category: {key for key, skill in SKILL_REGISTRY.items() if skill.category is category}
@@ -1479,7 +1479,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             "a key may appear in only one category",
         )
 
-    @covers_requirement("skill-category-registry::skill-registry-s-117-entries-partition-exactly-across-the-eight-categories")
+    @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_per_category_key_sets_match_the_d4_classification_table(self):
         expected = {
             SkillCategory.MARTIAL_ARTS: {
@@ -1519,6 +1519,13 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "divine_sexual_arts",
                 "divine_sexual_mastery",
                 "reincarnation_boon_yuna",
+                "solo_self_touch",
+                "solo_fondle_breasts",
+                "solo_thigh_rub",
+                "shame_hem_lift",
+                "partner_caress",
+                "partner_hand_hold",
+                "combat_tease",
             },
         }
         pinned = set().union(*expected.values())

@@ -41,6 +41,7 @@ from web.webclient.presentation.registry import build_production_registry
 from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.status_query import StatusQueryError
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 # ``flee`` is injected into ``SKILL_REGISTRY`` at import time by
 # ``world.rules.disengage``, so the presenter tests import it explicitly to
@@ -521,7 +522,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(atk["max"])
         self.assertEqual(
             _flattened_keys(payload["actives"]),
-            ["fire_ball", "basic_attack", "flee"],
+            ["fire_ball", "basic_attack", "flee", *sorted(SEXUAL_ACT_REGISTRY)],
         )
         self.assertEqual(
             _flattened_keys(payload["passives"]),
@@ -546,9 +547,11 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.skills = {"active": [], "passive": []}
         payload = self._render()
         # Category order follows SkillCategory declaration order, so
-        # martial_arts (basic_attack) precedes movement (flee).
+        # martial_arts (basic_attack) precedes movement (flee); the seven
+        # unconditionally-owned seed acts follow as the sexual_act category.
         self.assertEqual(
-            _flattened_keys(payload["actives"]), ["basic_attack", "flee"]
+            _flattened_keys(payload["actives"]),
+            ["basic_attack", "flee", *sorted(SEXUAL_ACT_REGISTRY)],
         )
         martial = next(
             category for category in payload["actives"]

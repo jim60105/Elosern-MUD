@@ -130,6 +130,56 @@ class ContextActionsSchemaTests(unittest.TestCase):
         self.assertTrue(normalized["available"])
         self.assertEqual(normalized["kind"], "combat")
 
+    def test_sexual_act_group_key_accepts_a_chinese_line_name(self):
+        # The act catalog keys sexual_act sub-groups by their Traditional
+        # Chinese line names (獨處, 羞恥, 關係, 戰鬥); the group key is a
+        # bounded string, not an ASCII identifier.
+        panel = _valid_panel(
+            skills=[
+                _valid_category_group(
+                    category="sexual_act",
+                    label="性愛行為",
+                    groups=[
+                        _valid_skill_group(
+                            group="獨處",
+                            label="獨處",
+                            skills=[_valid_skill(key="solo_self_touch")],
+                        ),
+                        _valid_skill_group(
+                            group="戰鬥",
+                            label="戰鬥",
+                            skills=[_valid_skill(key="combat_tease")],
+                        ),
+                    ],
+                )
+            ]
+        )
+        normalized = validate_context_actions(panel)
+        groups = normalized["skills"][0]["groups"]
+        self.assertEqual([group["group"] for group in groups], ["獨處", "戰鬥"])
+
+    def test_skill_group_key_rejects_empty_or_whitespace_strings(self):
+        # The group key is a bounded non-empty string: empty and whitespace
+        # keys are rejected, mirroring the character panel's group contract.
+        for bad in ("", "   "):
+            with self.subTest(group=bad):
+                panel = _valid_panel(
+                    skills=[
+                        _valid_category_group(
+                            category="sexual_act",
+                            label="性愛行為",
+                            groups=[
+                                _valid_skill_group(
+                                    group=bad,
+                                    label="獨處",
+                                )
+                            ],
+                        )
+                    ]
+                )
+                with self.assertRaises(Exception):
+                    validate_context_actions(panel)
+
     def test_valid_recovery_panel_passes(self):
         normalized = validate_context_actions(_recovery_panel())
         self.assertEqual(normalized["session"]["state"], "recovery")
@@ -624,7 +674,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             [category["category"] for category in payload["skills"]],
-            ["elemental_magic", "martial_arts", "movement"],
+            ["elemental_magic", "martial_arts", "movement", "sexual_act"],
         )
         self.assertEqual(payload["skills"][0]["label"], "元素魔法")
         elemental = payload["skills"][0]
@@ -643,6 +693,15 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(len(martial["groups"]), 1)
         self.assertIsNone(martial["groups"][0]["group"])
         self.assertIsNone(martial["groups"][0]["label"])
+        # The seven unconditionally-owned seed acts form the sexual_act
+        # category with their Chinese line names as sub-group keys, in
+        # first-seen group order (sorted seed keys: combat_tease first).
+        sexual = payload["skills"][3]
+        self.assertEqual(sexual["label"], "性愛行為")
+        self.assertEqual(
+            [sub_group["group"] for sub_group in sexual["groups"]],
+            ["戰鬥", "關係", "羞恥", "獨處"],
+        )
         # shadow_slash is stored before the innate basic_attack.
         self.assertEqual(
             [skill["key"] for skill in martial["groups"][0]["skills"]],

@@ -40,6 +40,7 @@ from world.rules.combat_session import (
 )
 from world.rules.party import join_party
 from world.skills.handler import INNATE_SKILL_KEYS
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillKind,
@@ -73,7 +74,8 @@ class InnateSkillTests(EvenniaTest):
         player = _player()
         player.db.skills = None
         self.assertEqual(
-            player.skills.owned_keys(), ["flee", "basic_attack"]
+            player.skills.owned_keys(),
+            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
         )
         self.assertIn("basic_attack", INNATE_SKILL_KEYS)
 
@@ -82,7 +84,13 @@ class InnateSkillTests(EvenniaTest):
         player.db.skills = {"active": ["fire_ball"], "passive": ["defense_instinct"]}
         self.assertEqual(
             player.skills.owned_keys(),
-            ["fire_ball", "defense_instinct", "flee", "basic_attack"],
+            [
+                "fire_ball",
+                "defense_instinct",
+                "flee",
+                "basic_attack",
+                *sorted(SEXUAL_ACT_REGISTRY),
+            ],
         )
 
     def test_monster_instance_can_fight_without_spawned_skills(self):

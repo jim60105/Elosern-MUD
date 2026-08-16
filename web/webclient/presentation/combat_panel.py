@@ -347,7 +347,14 @@ def _validate_skill_group(value: Any) -> dict[str, Any]:
                 "a null group key requires a null label"
             )
     else:
-        _validate_identifier(group, "skill group key")
+        # A bounded non-empty string, not an identifier: sexual-act sub-groups
+        # are keyed by their Traditional Chinese line names (獨處, 羞恥, ...),
+        # mirroring the character panel's group-key contract.
+        group = _require_str(value, "group", maximum=MAX_SKILL_KEY)
+        if not group.strip():
+            raise ProtocolValidationError(
+                "a non-null group key requires a non-empty label"
+            )
         if not isinstance(label, str) or not label.strip():
             raise ProtocolValidationError(
                 "a non-null group key requires a non-empty label"

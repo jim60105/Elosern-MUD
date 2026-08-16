@@ -672,12 +672,19 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         panel = self._combat_panel(page)
         # The seeded character owns elemental spells, martial-arts innates,
-        # enhancement, utility, and movement skills; the payload lists only
-        # the categories that have owned active skills, in SkillCategory
-        # declaration order (sexual_act and others are omitted entirely).
+        # enhancement, utility, movement, and the seven unconditionally-owned
+        # seed acts; the payload lists only the categories that have owned
+        # active skills, in SkillCategory declaration order.
         self.assertEqual(
             [category["category"] for category in panel["skills"]],
-            ["elemental_magic", "martial_arts", "enhancement", "movement", "utility"],
+            [
+                "elemental_magic",
+                "martial_arts",
+                "enhancement",
+                "movement",
+                "utility",
+                "sexual_act",
+            ],
         )
         elemental = panel["skills"][0]
         self.assertEqual(elemental["label"], "元素魔法")

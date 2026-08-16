@@ -1,4 +1,13 @@
-## ADDED Requirements
+# sexual-act-seeds Specification
+
+## Purpose
+
+Register the seven unconditionally-available seed acts — one per targeting shape spanned across
+the solo, shame, partner, and combat lines — plus the single `sexual.yaml` rule row a shame-line
+act needs to raise its own `exposure`. This capability makes the act catalogue enterable from the
+first round of play; the full 62-act catalog ships in later proposals.
+
+## Requirements
 
 ### Requirement: Seven seed acts are registered with an empty unlock mapping and are unconditionally owned
 `world/skills/sexual_acts/solo.py`, `shame.py`, `partner.py`, and `combat.py` SHALL each register at
@@ -91,3 +100,20 @@ declare a non-empty `sexual_events`, equal to `("masturbation_climax",)`.
 - **WHEN** entity A casts `combat_tease` on entity B, both starting at `hostile_act_count == 0`
 - **THEN** `A.sexual.hostile_act_count` equals `1` and `B.sexual.hostile_act_count` remains `0`
   afterward
+
+### Requirement: A SINGLE-target sexual act cannot be self-cast
+The shared targeting pipeline (`world/rules/targeting.py`) SHALL reject a
+`SEXUAL_ACT`-category skill with `target_spec=SINGLE` whose resolved target is
+the actor itself. The three SINGLE-target seeds (`partner_caress`,
+`partner_hand_hold`, `combat_tease`) are two-participant acts by construction:
+their `participant_counters` and the future resist contest assume a second
+party, so self-casting would credit lifetime counters (e.g. `duo_act_count`,
+`hostile_act_count`) with no partner present.
+
+#### Scenario: Self-casting a partner seed is rejected without crediting counters
+- **WHEN** entity A casts `partner_caress` (or `partner_hand_hold`) with A itself as the target
+- **THEN** the cast is rejected and `A.sexual.duo_act_count` remains `0`
+
+#### Scenario: Self-casting the combat seed is rejected without crediting counters
+- **WHEN** entity A casts `combat_tease` with A itself as the target
+- **THEN** the cast is rejected and `A.sexual.hostile_act_count` remains `0`
