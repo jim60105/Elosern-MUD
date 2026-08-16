@@ -1012,7 +1012,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
     --settings test_settings.py \
     --keepdb \
     --failfast \
-    world.rules.tests.test_combat_session
+    world.rules.tests.test_combat_session_flow
 ```
 
 排除 integration tests：

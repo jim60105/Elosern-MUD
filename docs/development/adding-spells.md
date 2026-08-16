@@ -157,7 +157,7 @@ _skill(
 
 測試與行為同步落地，位置與風格對齊 `spell-catalog-*` 系列：
 
-1. **`world/skills/tests/test_registry.py`**：定義 `WATER_SPELL_CATALOG` 形式的 tuple，並加三個測試：
+1. **`world/skills/tests/test_spell_catalogs.py`**：定義 `WATER_SPELL_CATALOG` 形式的 tuple，並加三個測試：
    - `test_all_ten_<element>_spells_declare_the_exact_catalog_fields` — 逐一斷言 label、kind、element、target、faction、cost、effects
    - `test_every_<element>_spell_effect_round_trips_through_typed_dispatch` — 每個 effect 字串經 `parse_effect` 得到正確的 typed dataclass 且存在於 `parsed_effects`
    - `test_<element>_active_spell_keys_are_exactly_the_catalog_set` — 精確 key 集合（元素已有其他 ACTIVE 技能時記得納入，例如 光含 `light_sword_style`、暗含 `shadow_slash`／`dual_blade_mastery`）
@@ -177,7 +177,7 @@ _skill(
 
 ```sh
 # 單元級（快速迭代）
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_registry world.rules.tests.test_progression world.rules.tests.test_buffs world.rules.tests.test_status_display
+MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_progression world.rules.tests.test_buffs world.rules.tests.test_status_display
 
 # 載入即驗證所有 effect 字串可解析
 uv run --locked python -c "from world.skills.registry import SKILL_REGISTRY"

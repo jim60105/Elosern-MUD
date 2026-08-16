@@ -27,7 +27,9 @@ MODULES = {
     "registration": "world.rules.tests.test_guild_registration",
     "acquire": "world.quests.tests.test_acquire",
     "rewards": "world.rules.tests.test_guild_rewards",
-    "session": "world.rules.tests.test_combat_session",
+    "session_flow": "world.rules.tests.test_combat_session_flow",
+    "session_persistence": "world.rules.tests.test_combat_session_persistence",
+    "session_recovery": "world.rules.tests.test_combat_session_recovery",
     "exams": "world.rules.tests.test_guild_exams",
     "economy": "world.rules.tests.test_shop_economy",
     "clock": "world.rules.tests.test_shop_clock_sources",
@@ -177,47 +179,47 @@ SCENARIO_TO_TEST = {
     ),
     # player-combat-session
     "Present monster can be engaged": ref(
-        "session", "EngageTests", "test_present_monster_can_be_engaged"
+        "session_flow", "EngageTests", "test_present_monster_can_be_engaged"
     ),
     "Remote or dead target is rejected": ref(
-        "session", "EngageTests", "test_remote_or_dead_target_is_rejected"
+        "session_flow", "EngageTests", "test_remote_or_dead_target_is_rejected"
     ),
     "Active session blocks another engagement": ref(
-        "session", "EngageTests", "test_active_session_blocks_another_engagement"
+        "session_flow", "EngageTests", "test_active_session_blocks_another_engagement"
     ),
     "Invalid cast preserves the round before initiative": ref(
-        "session", "PlayerRoundTests", "test_invalid_cast_preserves_round_before_initiative"
+        "session_flow", "PlayerRoundTests", "test_invalid_cast_preserves_round_before_initiative"
     ),
     "One request drives one complete round": ref(
-        "session", "PlayerRoundTests", "test_one_request_drives_one_complete_round"
+        "session_flow", "PlayerRoundTests", "test_one_request_drives_one_complete_round"
     ),
     "Flee closes the same session": ref(
-        "session", "PlayerRoundTests", "test_flee_closes_the_same_session"
+        "session_flow", "PlayerRoundTests", "test_flee_closes_the_same_session"
     ),
     "Overwhelming player resolves a reachable hunt": ref(
-        "session", "PlayerRoundTests", "test_overwhelming_player_resolves_after_first_action"
+        "session_flow", "PlayerRoundTests", "test_overwhelming_player_resolves_after_first_action"
     ),
     "Engage alone never runs an overwhelming round": ref(
-        "session", "PlayerRoundTests", "test_no_action_before_overwhelm_round"
+        "session_flow", "PlayerRoundTests", "test_no_action_before_overwhelm_round"
     ),
     "Disconnect and reconnect resume the same session": ref(
-        "session", "SessionPersistenceTests", "test_disconnect_reconnect_resumes_same_session"
+        "session_persistence", "SessionPersistenceTests", "test_disconnect_reconnect_resumes_same_session"
     ),
     "Deleted enemy does not strand the player": ref(
-        "session", "SessionPersistenceTests", "test_deleted_enemy_does_not_strand_player"
+        "session_persistence", "SessionPersistenceTests", "test_deleted_enemy_does_not_strand_player"
     ),
     "Exit traversal is blocked during combat": ref(
-        "session", "SessionPersistenceTests", "test_exit_traversal_is_blocked_during_combat"
+        "session_persistence", "SessionPersistenceTests", "test_exit_traversal_is_blocked_during_combat"
     ),
     "Explicit forfeit cleans an exam": ref(
-        "session", "SessionPersistenceTests", "test_forfeit_cleans_session"
+        "session_persistence", "SessionPersistenceTests", "test_forfeit_cleans_session"
     ),
     # action-resolution-pipeline
     "Preflight rejection has no side effects": ref(
-        "session", "PreflightSideEffectTests", "test_preflight_rejection_has_no_side_effects"
+        "session_recovery", "PreflightSideEffectTests", "test_preflight_rejection_has_no_side_effects"
     ),
     "Successful preflight does not roll or stage": ref(
-        "session", "PreflightSideEffectTests", "test_successful_preflight_does_not_roll_or_stage"
+        "session_recovery", "PreflightSideEffectTests", "test_successful_preflight_does_not_roll_or_stage"
     ),
     # shop-economy
     "Initial ordinary goods validate": ref(
@@ -290,16 +292,16 @@ SCENARIO_TO_TEST = {
     ),
     # universal-action-ownership
     "An entity with no imported skill data still owns both innate actions": ref(
-        "session", "InnateSkillTests", "test_no_skill_entity_owns_both_innate_actions"
+        "session_flow", "InnateSkillTests", "test_no_skill_entity_owns_both_innate_actions"
     ),
     "An entity with a full imported skill list also owns both innate actions": ref(
-        "session", "InnateSkillTests", "test_full_import_list_plus_innate"
+        "session_flow", "InnateSkillTests", "test_full_import_list_plus_innate"
     ),
     "A Monster instance can fight without spawned skill data": ref(
-        "session", "InnateSkillTests", "test_monster_instance_can_fight_without_spawned_skills"
+        "session_flow", "InnateSkillTests", "test_monster_instance_can_fight_without_spawned_skills"
     ),
     "Basic attack does not bypass ActionResolver": ref(
-        "session", "InnateSkillTests", "test_basic_attack_rejects_out_of_combat"
+        "session_flow", "InnateSkillTests", "test_basic_attack_rejects_out_of_combat"
     ),
     # disguised-stats-boundary
     "Accessor documentation still names exactly three consumers": ref(
@@ -310,10 +312,10 @@ SCENARIO_TO_TEST = {
     ),
     # world-clock
     "A successful out-of-combat cast advances its reported command time": ref(
-        "session", "CommandSessionTests", "test_active_session_cast_does_not_advance_command_time"
+        "session_flow", "CommandSessionTests", "test_active_session_cast_does_not_advance_command_time"
     ),
     "Terminal session settles all round time once": ref(
-        "session", "PlayerRoundTests", "test_terminal_victory_settles_rounds_once_and_clears"
+        "session_flow", "PlayerRoundTests", "test_terminal_victory_settles_rounds_once_and_clears"
     ),
 }
 
