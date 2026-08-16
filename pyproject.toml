@@ -30,6 +30,10 @@ source = [
     "web",
     "world",
 ]
+# Store source paths relative to the run cwd so data measured inside a
+# workspace subdirectory (the two-process browser shards run from w-a/w-b)
+# resolves against the gate's own checkout, whose sources sit at the root.
+relative_files = true
 
 [tool.coverage.report]
 fail_under = 80
