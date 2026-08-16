@@ -14,12 +14,14 @@ from tools.spec_traceability import covers_requirement
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS
+from world.quests.catalog import register_catalog
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.rulebook.schema import load_rules
 from world.rules.sexual_act_effects import (
@@ -250,6 +252,7 @@ class CombatCastTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.actor = create_object(
             PlayerCharacter, key="combat catalog caster", location=self.room1
         )
@@ -292,10 +295,15 @@ class CombatCastTests(EvenniaTest):
         # sensitivity (floor, never trained) and 強烈 shame (the lowest
         # multiplier below 成癮's 1.6 outlier) receives
         # round(30 × 1.0 × 1.0 × 0.65 × 1.1) = 21 >= 20.
+        # combat_forced_climax is resistible=True, so the resist gate runs a
+        # d100 contest per target; force roll=1 (a guaranteed comply for two
+        # floor fixtures) to keep the target-side assertion deterministic
+        # (sexual-resist-cast-wiring design D-3a).
         _counter_up(self.actor, "hostile_act", 40)
         _counter_up(self.actor, "climax_count", 30)
         self.target.sexual.shame.value = "強烈"
-        result = self._cast("combat_forced_climax", [self.target])
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("combat_forced_climax", [self.target])
         self.assertEqual(result.outcome, "success")
         threshold = load_effects_config().climax_extension_threshold
         self.assertGreaterEqual(self.target.sexual.pleasure.base, threshold)
@@ -305,7 +313,9 @@ class CombatCastTests(EvenniaTest):
     def test_climax_domination_credits_the_actor_and_raises_each_targets_pleasure(self):
         # The AREA act applies its pleasure effect to every target present and
         # keeps the line's asymmetric crediting: the actor's hostile_act_count
-        # grows, targets' counters never move.
+        # grows, targets' counters never move. resistible=True means each
+        # target runs a resist contest; force compliant rolls so the
+        # target-side pleasure assertions stay deterministic.
         _counter_up(self.actor, "hostile_act", 80)
         _counter_up(self.actor, "climax_extension", 30)
         other = create_object(
@@ -313,7 +323,8 @@ class CombatCastTests(EvenniaTest):
         )
         other.race = "human"
         other.apply_race_baseline()
-        result = self._cast("combat_climax_domination", [self.target, other])
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("combat_climax_domination", [self.target, other])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 81)
         for entity in (self.target, other):
