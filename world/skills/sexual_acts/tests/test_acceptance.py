@@ -1,9 +1,9 @@
 """End-to-end acceptance proof for the act ownership/unlock/ActionResolver seam.
 
 The synthetic act is built inside this test module via ``_act_family()`` and
-installed into both registries for the duration of the test only; no line
-module is ever edited, so the shipped catalogue state stays ``= ()`` from
-the first commit onward (design D-7).
+installed into both registries for the duration of the test only; the shipped
+catalogue rows (the seed acts and, later, the full catalog) live in the line
+modules and are never edited here.
 """
 
 from tools.spec_traceability import covers_requirement

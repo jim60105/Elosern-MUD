@@ -3,7 +3,12 @@
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
-from world.skills.registry import FactionConstraint, SkillDef, TargetSpec
+from world.skills.registry import (
+    FactionConstraint,
+    SkillCategory,
+    SkillDef,
+    TargetSpec,
+)
 
 
 # The approved deterministic AREA shorthands accepted in combat.
@@ -179,6 +184,18 @@ def resolve_targets(
     elif skill.target_spec is TargetSpec.SINGLE:
         if len(candidates) != 1:
             _rejection("target_spec_mismatch", "single-target skill requires one target")
+        if (
+            skill.category is SkillCategory.SEXUAL_ACT
+            and candidates[0] is request.actor
+        ):
+            # A SINGLE-target sex act is a two-participant act by construction:
+            # its participant counters and resist contest assume a second
+            # party, so self-casting would credit lifetime counters (e.g.
+            # duo_act_count, hostile_act_count) with no partner present.
+            _rejection(
+                "target_spec_mismatch",
+                "a sexual act targeting another entity requires a target other than the actor",
+            )
     elif skill.target_spec is TargetSpec.AREA:
         if not candidates:
             _rejection("no_valid_targets_in_area", "area skill has no candidates")

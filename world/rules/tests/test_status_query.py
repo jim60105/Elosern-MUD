@@ -17,6 +17,7 @@ from world.rules.status_query import (
     build_status_read_model,
     group_skill_keys,
 )
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 # ``flee`` is injected into ``SKILL_REGISTRY`` at import time by
 # ``world.rules.disengage`` (the ``universal-action-ownership`` dependency
@@ -30,6 +31,12 @@ def _actor(testcase):
     actor.race = "human"
     actor.apply_race_baseline()
     return actor
+
+
+# The seven unconditionally-owned seed acts are ACTIVE-kind, so they surface
+# in ``active_keys`` right after the innate skills, in ``owned_keys()``'s
+# sorted-append order.
+_SEED_KEYS = tuple(sorted(SEXUAL_ACT_REGISTRY))
 
 
 class StatusReadModelTests(EvenniaTest):
@@ -460,9 +467,13 @@ class CharacterReadModelTests(EvenniaTest):
         # Regression for the shipped defect: ``flee`` and ``basic_attack`` are
         # contributed by ``owned_keys()`` and never written into
         # ``entity.db.skills``, so they must surface from the corrected
-        # owned-keys read instead of disappearing from the panel.
+        # owned-keys read instead of disappearing from the panel. The seven
+        # unconditionally-owned seed acts are ACTIVE-kind and follow the
+        # innates in ``owned_keys()`` order.
         model = self._model()
-        self.assertEqual(model.active_keys, ("flee", "basic_attack"))
+        self.assertEqual(
+            model.active_keys, ("flee", "basic_attack", *_SEED_KEYS)
+        )
         self.assertEqual(model.passive_keys, ())
 
     def test_split_reads_keys_contributed_by_the_handler_beyond_storage(self):
@@ -485,11 +496,15 @@ class CharacterReadModelTests(EvenniaTest):
     def test_split_unknown_key_degrades_to_its_stored_bucket(self):
         self.actor.db.skills = {"active": [], "passive": ["no_such_skill"]}
         model = self._model()
-        self.assertEqual(model.active_keys, ("flee", "basic_attack"))
+        self.assertEqual(
+            model.active_keys, ("flee", "basic_attack", *_SEED_KEYS)
+        )
         self.assertEqual(model.passive_keys, ("no_such_skill",))
         self.actor.db.skills = {"active": ["also_missing"], "passive": []}
         model = self._model()
-        self.assertEqual(model.active_keys, ("also_missing", "flee", "basic_attack"))
+        self.assertEqual(
+            model.active_keys, ("also_missing", "flee", "basic_attack", *_SEED_KEYS)
+        )
         self.assertEqual(model.passive_keys, ())
 
     def test_split_ignores_non_string_entries_in_stored_lists(self):
@@ -498,7 +513,9 @@ class CharacterReadModelTests(EvenniaTest):
             "passive": [None, "defense_instinct"],
         }
         model = self._model()
-        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
+        self.assertEqual(
+            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
+        )
         self.assertEqual(model.passive_keys, ("defense_instinct",))
 
     def test_split_routes_known_keys_by_registry_kind(self):
@@ -506,7 +523,9 @@ class CharacterReadModelTests(EvenniaTest):
         # registry kind wins over the stored bucket for known keys.
         self.actor.db.skills = {"active": ["flight"], "passive": ["fire_ball"]}
         model = self._model()
-        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
+        self.assertEqual(
+            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
+        )
         self.assertEqual(model.passive_keys, ("flight",))
 
     def test_split_de_duplicates_keys_across_both_stored_lists(self):
@@ -518,7 +537,7 @@ class CharacterReadModelTests(EvenniaTest):
         }
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("fire_ball", "flee", "basic_attack")
+            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
         )
         self.assertEqual(model.passive_keys, ("defense_instinct",))
 

@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -265,6 +266,15 @@ class SexualTransitionTests(EvenniaTest):
         apply_event(entity, "clothing_damaged_in_combat")
         self.assertEqual(entity.sexual.exposure.value, 1)
 
+    def test_rule_exposure_up_on_self_exposure(self):
+        entity = self._entity()
+        apply_event(entity, "self_exposure")
+        self.assertEqual(entity.sexual.exposure.value, 1)
+        # The exposure rise cascades into shame within the same apply_event()
+        # call via the pre-existing shame_up_on_exposure_increase rule; no
+        # code in this change references shame directly.
+        self.assertEqual(entity.sexual.shame.value, 1)
+
     def test_rule_sp_cost_on_climax(self):
         entity = self._entity()
         before = entity.traits.sp.value
@@ -402,7 +412,18 @@ class SexualTransitionTests(EvenniaTest):
             "lte",
             "actions_per_turn",
         ):
-            self.assertNotIn(excluded, serialized)
+            # A banned token must not appear as a standalone field or event
+            # name: the match treats ``_`` and other non-alphanumerics as
+            # separators, so ``self_exposure`` legitimately passes (the letters
+            # ``elf`` are inside the longer word ``self``) while a rule that
+            # named ``elf_exposure`` or ``half_elf`` would fail.
+            self.assertIsNone(
+                re.search(
+                    rf"(?<![A-Za-z0-9]){re.escape(excluded)}(?![A-Za-z0-9])",
+                    serialized,
+                ),
+                f"banned token {excluded!r} leaked into the rulebook",
+            )
 
     @covers_requirement("sexual-transition-rulebook::the-one-rule-targeting-a-vital-gauge-outside-sexualstate-writes-through-change-3-s-entity-traits-surface-never-through-sexualstate")
     def test_sp_cost_never_reaches_through_entity_sexual(self):

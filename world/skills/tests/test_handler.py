@@ -16,6 +16,7 @@ from world.skills import handler
 from world.skills.effects import StatMultiplyEffect
 from world.skills.handler import _matching_multiplier
 from world.skills.registry import SKILL_REGISTRY
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 class SkillHandlerTests(EvenniaTest):
@@ -29,7 +30,10 @@ class SkillHandlerTests(EvenniaTest):
     def test_handler_reads_private_storage_and_has_no_bare_assignment(self):
         entity = self._entity()
         entity.db.skills = None
-        self.assertEqual(entity.skills.owned_keys(), ["flee", "basic_attack"])
+        self.assertEqual(
+            entity.skills.owned_keys(),
+            ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)],
+        )
         with self.assertRaises(AttributeError):
             entity.skills = {"active": [], "passive": []}
 
@@ -39,7 +43,13 @@ class SkillHandlerTests(EvenniaTest):
         }
         self.assertEqual(
             entity.skills.owned_keys(),
-            ["fire_ball", "defense_instinct", "flee", "basic_attack"],
+            [
+                "fire_ball",
+                "defense_instinct",
+                "flee",
+                "basic_attack",
+                *sorted(SEXUAL_ACT_REGISTRY),
+            ],
         )
 
     @covers_requirement("universal-action-ownership::innate-ownership-is-unconditional-and-not-combat-gated")
@@ -49,7 +59,7 @@ class SkillHandlerTests(EvenniaTest):
         before = monster.skills.owned_keys()
         monster.db.current_battlefield = object()
         after = monster.skills.owned_keys()
-        self.assertEqual(before, ["flee", "basic_attack"])
+        self.assertEqual(before, ["flee", "basic_attack", *sorted(SEXUAL_ACT_REGISTRY)])
         self.assertEqual(after, before)
 
     @covers_requirement("universal-action-ownership::world-skills-does-not-depend-on-world-rules-to-define-innate-ownership")

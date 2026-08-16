@@ -1252,6 +1252,48 @@ test("a category without a group carries exactly one null-keyed sub-group", () =
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
 });
 
+test("sexual_act sub-group keys accept Traditional Chinese line names", () => {
+  // The act catalog keys sexual_act sub-groups by their Traditional Chinese
+  // line names (獨處, 羞恥, 關係, 戰鬥); the group key is a bounded string,
+  // not an ASCII identifier.
+  const panel = validCombatPanel({
+    skills: [
+      validCategoryGroup({
+        category: "sexual_act",
+        label: "性愛行為",
+        groups: [
+          validSkillGroup({
+            group: "獨處",
+            label: "獨處",
+            skills: [validCombatSkill({ key: "solo_self_touch" })],
+          }),
+          validSkillGroup({
+            group: "戰鬥",
+            label: "戰鬥",
+            skills: [validCombatSkill({ key: "combat_tease" })],
+          }),
+        ],
+      }),
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
+});
+
+test("skill group keys reject empty or whitespace strings", () => {
+  for (const bad of ["", "   "]) {
+    const panel = validCombatPanel({
+      skills: [
+        validCategoryGroup({
+          category: "sexual_act",
+          label: "性愛行為",
+          groups: [validSkillGroup({ group: bad, label: "獨處" })],
+        }),
+      ],
+    });
+    assert.throws(() => Protocol.validateContextActionsPanel(panel));
+  }
+});
+
 test("duplicate skill keys across categories are rejected", () => {
   const panel = validCombatPanel({
     skills: [

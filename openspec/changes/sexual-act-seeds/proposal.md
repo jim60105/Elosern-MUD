@@ -45,22 +45,55 @@ three targeting shapes (SELF, SINGLE, and a hostile-capable SINGLE) so every lin
   catalog) depend on.
 
 ### Modified Capabilities
-- none — `sexual-act-registry` and `sexual-act-effects`'s existing requirements are exercised, not
-  changed. `sexual-transition-rulebook`'s requirements (rule-loading mechanism, `apply_event()`
-  contract) are likewise exercised unchanged by the one new rule row; no existing requirement text in
-  that spec changes.
+- `sexual-act-registry`'s six-modules requirement is renamed and restated: the four content modules
+  now carry the seed rows registered by this change while `異種` and `神之秘法` remain empty —
+  the original heading ("each exporting an empty tuple") is no longer true once this change lands.
+  The registries-agreement, part, counter, event, and ownership requirements are exercised, not
+  changed.
+- `skill-category-registry`'s partition requirement is renamed to drop the hardcoded "117 entries"
+  count from its heading — this change registers seven more `SEXUAL_ACT` skills (117 → 124), and
+  the count will keep moving as the catalog proposals land. The partition property itself is
+  unchanged.
+- `sexual-transition-rulebook`'s requirements (rule-loading mechanism, `apply_event()` contract) are
+  exercised unchanged by the one new rule row; no existing requirement text in that spec changes.
 
 ## Impact
 
 - Code: `world/skills/sexual_acts/solo.py`, `shame.py`, `partner.py`, `combat.py`,
   `world/rules/rulebook/sexual.yaml` (one new row), `world/rules/tests/test_sexual_transitions.py`
-  (one new `test_rule_exposure_up_on_self_exposure`), and one new test file,
-  `world/skills/sexual_acts/tests/test_seed_acts.py` (the delta spec's ownership/resistible/counter
-  scenarios have no other home — the rulebook test file covers only the `exposure`/`shame` cascade).
+  (one new `test_rule_exposure_up_on_self_exposure` plus a shame-cascade companion), and one new
+  test file, `world/skills/sexual_acts/tests/test_seed_acts.py` (the delta spec's
+  ownership/resistible/counter scenarios have no other home — the rulebook test file covers only the
+  `exposure`/`shame` cascade).
+- Collateral test updates (required because registering real acts into `SKILL_REGISTRY` changes
+  every entity's `owned_keys()` and the assembled registry contents, which existing tests pinned to
+  the pre-content state): `world/skills/sexual_acts/tests/test_registry_structure.py`,
+  `world/skills/sexual_acts/tests/test_acceptance.py` (stale docstring only),
+  `world/skills/tests/test_handler.py`, `world/skills/tests/test_inventory.py`,
+  `world/rules/tests/test_combat_session.py`, `world/rules/tests/test_status_query.py`,
+  `world/rules/tests/test_combat_view.py`, `world/rules/tests/test_cast_settlement.py`,
+  `world/rules/tests/test_sexual_unlock.py`, `world/skills/tests/test_registry.py`,
+  `web/webclient/presentation/tests/test_character_panel.py`, and
+  `web/tests/browser/test_browser_combat.py`.
+- One latent-gap fix surfaced by registering real acts (predicted by design.md's Risk section):
+  the combat panel protocol validator required ASCII identifiers for skill sub-group keys, but the
+  act catalog — and the pre-existing `divine_sexual_arts` — key sub-groups by Traditional Chinese
+  line names (`獨處`, `羞恥`, `關係`, `戰鬥`). The webclient-combat-menu contract only requires a
+  nullable group key; the validator now accepts a bounded non-empty string (rejecting
+  empty/whitespace keys in both mirrors), mirroring the character panel. Touched files:
+  `web/webclient/presentation/combat_panel.py`,
+  `web/static/webclient/js/elosern/protocol.js`, `web/webclient/presentation/tests/test_combat_panel.py`,
+  and `web/static/webclient/js/tests/protocol.test.js`.
+- One more latent-gap fix surfaced by the same condition: a SINGLE-target sex act could be
+  self-cast (Evennia's object search resolves `self`/`me`), crediting two-participant counters
+  (`duo_act_count`, `hostile_act_count`) with no second party. `world/rules/targeting.py::resolve_targets`
+  — the shared seam for both the combat and out-of-combat cast paths — now rejects the actor as
+  target for `SEXUAL_ACT`-category SINGLE-target skills, with regression tests in
+  `world/skills/sexual_acts/tests/test_seed_acts.py` and a new delta-spec requirement.
 - No change to `world/skills/sexual_acts/_builder.py`, `__init__.py`, `interspecies.py`, `divine.py`,
-  or any file outside this list — every structural invariant `sexual-act-registry`/
-  `sexual-act-effects` already enforce is inherited unchanged and re-checked against real content for
-  the first time.
+  `world/skills/handler.py`, `world/rules/action.py`, or any other production file — every
+  structural invariant `sexual-act-registry`/`sexual-act-effects` already enforce is inherited
+  unchanged and re-checked against real content for the first time.
 - Player-facing: `docs/game/commands.md` and `docs/game/command-reference.md` gain no entries yet —
   cataloging every sex act's command surface is `sexual-act-docs`'s job once the full catalog lands;
   seven acts appearing mid-catalog would need immediate revision. Deferred deliberately (see

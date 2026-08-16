@@ -73,6 +73,9 @@
 - id: exposure_up_on_clothing_damaged
   when: {event: clothing_damaged_in_combat}
   then: {field: exposure, delta: "+1"}
+- id: exposure_up_on_self_exposure
+  when: {event: self_exposure}
+  then: {field: exposure, delta: "+1"}
 - id: sp_cost_on_climax
   when: {event: climax_ends}
   then: {field: sp, delta: "-30..-20"}

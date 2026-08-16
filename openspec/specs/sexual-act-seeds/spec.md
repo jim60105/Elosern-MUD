@@ -1,4 +1,13 @@
-## ADDED Requirements
+# sexual-act-seeds Specification
+
+## Purpose
+
+Register the seven unconditionally-available seed acts — one per targeting shape spanned across
+the solo, shame, partner, and combat lines — plus the single `sexual.yaml` rule row a shame-line
+act needs to raise its own `exposure`. This capability makes the act catalogue enterable from the
+first round of play; the full 62-act catalog ships in later proposals.
+
+## Requirements
 
 ### Requirement: Seven seed acts are registered with an empty unlock mapping and are unconditionally owned
 `world/skills/sexual_acts/solo.py`, `shame.py`, `partner.py`, and `combat.py` SHALL each register at
