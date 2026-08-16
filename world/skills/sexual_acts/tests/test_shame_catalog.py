@@ -12,12 +12,14 @@ from tools.spec_traceability import covers_requirement
 
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.sexual_vocab import BODY_PARTS
+from world.quests.catalog import register_catalog
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.rulebook.schema import load_rules
 from world.rules.targeting import RoomActionContext
@@ -237,6 +239,11 @@ class ShameCastTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        # Every cast of a resistible act resolves one contest per target; the
+        # resist config validates against the quest registry, which only test
+        # setup populates (same requirement sexual-resist-cast-wiring's own
+        # test changes add).
+        register_catalog()
         self.actor = create_object(
             PlayerCharacter, key="shame catalog caster", location=self.room1
         )
@@ -341,14 +348,15 @@ class ShameCastTests(EvenniaTest):
                     _counter_up(entity, counter, times)
                 self.assertEqual(entity.sexual.exposure.value, 0)
                 self.assertEqual(target.sexual.exposure.value, 0)
-                result = ActionResolver.resolve(
-                    ActionRequest(
-                        entity,
-                        key,
-                        [target],
-                        RoomActionContext(entity.location, {}),
+                with patch("world.rules.action.roll_d100", return_value=1):
+                    result = ActionResolver.resolve(
+                        ActionRequest(
+                            entity,
+                            key,
+                            [target],
+                            RoomActionContext(entity.location, {}),
+                        )
                     )
-                )
                 self.assertEqual(result.outcome, "success")
                 self.assertEqual(target.sexual.exposure.value, 1)
                 self.assertEqual(entity.sexual.exposure.value, 0)
@@ -400,14 +408,18 @@ class ShameCastTests(EvenniaTest):
     def test_provocative_gaze_raises_a_targets_pleasure(self):
         # design.md D-2 regression: 挑釁凝視's "accuracy debuff" is delivered
         # by the shipped high_arousal_agility_accuracy_penalty combat-modifier
-        # row firing once a target's pleasure crosses the 高度 band. The
+        # row once a target's pleasure crosses the 高度 band. The
         # modifier's own firing is probabilistic and owned by
         # combat_modifiers.yaml's suite; what this test pins is that the
         # act's cast actually moves the target's pleasure (2 participants →
         # crowd multiplier 1.1; a neutral target receives
-        # round(14 × 1.0 × 1.0 × 1.0 × 1.1) = 15).
+        # round(14 × 1.0 × 1.0 × 1.0 × 1.1) = 15). The target's resist contest
+        # is forced to compliance (roll=1; two floor humans share equal
+        # contest scores) so the target-side pleasure assertion stays
+        # deterministic under the shipped resist gate.
         _counter_up(self.actor, "watched", 10)
-        result = self._cast("shame_provocative_gaze", [self.target])
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("shame_provocative_gaze", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.pleasure.base, 15)
         # D-4 holds for the actor too: round(14 × 0.4 × 1.1) = 6.
