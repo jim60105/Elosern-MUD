@@ -1,7 +1,7 @@
 ## Why
 
 `world/ai/tests/test_scenario_director.py` (1,569 lines, 12 classes) and
-`world/ai/tests/test_npc_dialogue.py` (1,310 lines, 14 classes) are among the
+`world/ai/tests/test_npc_dialogue.py` (1,310 lines, 13 classes) are among the
 largest test files in the repository. Each class is independently runnable
 via dotted labels, but 1,300+ line files make targeted iteration and review
 slow. Splitting them into themed modules — classes kept byte-identical, only

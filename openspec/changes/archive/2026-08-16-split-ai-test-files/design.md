@@ -80,4 +80,6 @@ no manifest edit.
   exactly once) and `tools.spec_traceability check`.
 - **Circular imports**: avoided by putting helpers in dedicated modules; if a
   cycle appears, STOP and report rather than duplicating helpers.
-- **Test-count drift**: verified by comparing discovered counts (3,104).
+- **Test-count drift**: verified by comparing discovered counts at the
+  `69aabe6` baseline (4,263 discovered with the current `--parallel 16`
+  invocation, matching the on-disk suite size).
