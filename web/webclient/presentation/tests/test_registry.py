@@ -10,6 +10,7 @@ from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.registry import (
     PresenterSpec,
     PresentationRegistry,
+    build_production_registry,
 )
 
 
@@ -111,6 +112,57 @@ class RegistryTests(unittest.TestCase):
             payload = registry.render("status", _context())
         self.assertFalse(payload["available"])
         self.assertEqual(payload["reason"]["code"], "internal_presenter_error")
+
+    @covers_requirement(
+        "webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only"
+    )
+    def test_production_registry_versions_derive_from_module_constants(self):
+        from web.webclient.presentation.art import ART_SCHEMA_VERSION
+        from web.webclient.presentation.character import CHARACTER_SCHEMA_VERSION
+        from web.webclient.presentation.combat_panel import (
+            CONTEXT_ACTIONS_SCHEMA_VERSION,
+        )
+        from web.webclient.presentation.creation import CREATION_SCHEMA_VERSION
+        from web.webclient.presentation.exploration import (
+            EXPLORATION_SCHEMA_VERSION,
+        )
+        from web.webclient.presentation.local_map import LOCAL_MAP_SCHEMA_VERSION
+        from web.webclient.presentation.services import SERVICES_SCHEMA_VERSION
+        from web.webclient.presentation.status import STATUS_SCHEMA_VERSION
+
+        expected = {
+            "art": ART_SCHEMA_VERSION,
+            "status": STATUS_SCHEMA_VERSION,
+            "context_actions": CONTEXT_ACTIONS_SCHEMA_VERSION,
+            "local_map": LOCAL_MAP_SCHEMA_VERSION,
+            "services": SERVICES_SCHEMA_VERSION,
+            "creation": CREATION_SCHEMA_VERSION,
+            "exploration": EXPLORATION_SCHEMA_VERSION,
+            "character": CHARACTER_SCHEMA_VERSION,
+        }
+        registry = build_production_registry()
+        mismatches = [
+            f"{name}: registered={registry.spec(name).schema_version} "
+            f"vs constant={version}"
+            for name, version in sorted(expected.items())
+            if registry.spec(name).schema_version != version
+        ]
+        self.assertEqual(
+            mismatches,
+            [],
+            "production registry schema versions must derive from module constants",
+        )
+
+    @covers_requirement(
+        "webclient-oob-protocol::every-panel-payload-has-an-exact-availability-discriminator"
+    )
+    def test_character_unavailable_payload_stamps_the_registered_version(self):
+        registry = build_production_registry()
+        self.assertEqual(registry.spec("character").schema_version, 3)
+        payload = registry.build_unavailable("character")
+        self.assertEqual(payload["schema_version"], 3)
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "character_unavailable")
 
 
 def json_repr(payload):

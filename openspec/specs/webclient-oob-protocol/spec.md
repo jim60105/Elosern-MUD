@@ -51,7 +51,7 @@ A version-1 `ui_action_result` SHALL contain exactly `protocol_version`, `presen
 - **THEN** exact envelope validation rejects the message
 
 ### Requirement: Every panel payload has an exact availability discriminator
-Each registered panel schema SHALL define an available form and the common unavailable form. The unavailable form SHALL contain exactly `schema_version`, `available: false`, and `reason`; reason SHALL contain bounded `code` and safe Traditional Chinese `message`, plus a bounded `correlation_id` only for an internal presenter failure. Available payloads SHALL contain `available: true` and only fields defined by their panel schema.
+Each registered panel schema SHALL define an available form and the common unavailable form. The unavailable form SHALL contain exactly `schema_version`, `available: false`, and `reason`; reason SHALL contain bounded `code` and safe Traditional Chinese `message`, plus a bounded `correlation_id` only for an internal presenter failure. The unavailable form's `schema_version` SHALL equal the panel's registered schema version — the same version the panel's available form carries — so the client's registered-version gate accepts it. Available payloads SHALL contain `available: true` and only fields defined by their panel schema.
 
 #### Scenario: Missing canonical data uses a safe unavailable value
 - **WHEN** a presenter cannot read required canonical data without mutation
@@ -60,6 +60,10 @@ Each registered panel schema SHALL define an available form and the common unava
 #### Scenario: Presenter exception uses correlated unavailable value
 - **WHEN** a presenter raises an unexpected exception
 - **THEN** its unavailable reason uses a generic message and bounded correlation ID matching the server log without exposing exception details
+
+#### Scenario: Unavailable character payload carries the registered version
+- **WHEN** the character presenter reports the common unavailable form for a character panel registered at schema version 3
+- **THEN** the unavailable payload carries `schema_version: 3` and the client accepts it, and a payload carrying any other version (`schema_version: 2`) is rejected without replacing or merging the stored panel
 
 ### Requirement: Presentation ordering is scoped by transport and puppet epoch
 The server SHALL generate a bounded cryptographically unpredictable presentation epoch for each live WebSocket transport and active-puppet sequence. Reconnection and puppet change SHALL create a new epoch and reset the ephemeral revision sequence. On each browser `connection_open`, the client SHALL begin a new local transport generation, retire the prior active epoch in bounded memory, clear presentation state, and enter `awaiting_initial_snapshot`. Only the first valid full snapshot delivered for the current generation with a non-retired epoch SHALL establish the active epoch; updates and results SHALL NOT establish it. Once active, every different-epoch presentation on that same transport SHALL be discarded. Epochs, generations, revisions, and retired-epoch memory SHALL NOT be persisted to Accounts, characters, Scripts, localStorage, or any canonical game record.
@@ -104,7 +108,7 @@ The server SHALL generate a bounded cryptographically unpredictable presentation
 - **THEN** its ordinary text behavior remains available and it receives no Elosern graphical snapshot
 
 ### Requirement: Presenter registration and execution are isolated and read-only
-The presentation registry SHALL reject duplicate panel names and SHALL expose only registered stable panel names to the coordinator. Each presenter SHALL receive session-derived read context, SHALL return JSON-safe panel data without invoking mutation APIs, and SHALL execute independently so one presenter failure cannot suppress other panels or narrative output.
+The presentation registry SHALL reject duplicate panel names and SHALL expose only registered stable panel names to the coordinator. Each presenter SHALL receive session-derived read context, SHALL return JSON-safe panel data without invoking mutation APIs, and SHALL execute independently so one presenter failure cannot suppress other panels or narrative output. The registry SHALL derive each panel's registered schema version from the panel schema's single server-side constant in its presenter module, and the client's panel allowlist and per-panel schema-version re-checks SHALL mirror the same value under a dual-direction parity contract so the two never diverge.
 
 #### Scenario: Duplicate presenter registration fails
 - **WHEN** two presenters attempt to register the same stable panel name
@@ -117,6 +121,10 @@ The presentation registry SHALL reject duplicate panel names and SHALL expose on
 #### Scenario: Presentation does not mutate canonical state
 - **WHEN** a full snapshot and a panel update are built for an actor
 - **THEN** the actor's traits, buffs, sexual state, combat record, location, wallet, quests, and world-clock tick remain unchanged
+
+#### Scenario: Panel schema versions stay equal across server and client
+- **WHEN** the parity contract compares, for every registered panel, the presenter module's schema-version constant, the registry's registered value, the client allowlist's mirrored value, and the client per-panel available-form re-check literal
+- **THEN** all are numerically equal, and no registered panel stores a literal schema version that can drift from its module constant
 
 ### Requirement: WebClient text commands refresh presentation after completion
 The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL attempt a full snapshot from then-current canonical state only after a WebClient command settles and SHALL NOT emit graphical state for Telnet commands. Presentation failure SHALL be logged separately and SHALL NOT consume a command failure. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.

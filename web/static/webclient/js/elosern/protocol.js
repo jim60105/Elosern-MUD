@@ -547,28 +547,6 @@
 
   // Exact available status panel v1 schema.
   function validateStatusPanel(payload) {
-    if (payload.available === false) {
-      requireExactFields(payload, "status panel", ["schema_version", "available", "reason"], []);
-      requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-      if (payload.schema_version !== 1) {
-        throw new Error("unsupported status panel schema_version");
-      }
-      var reason = payload.reason;
-      var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
-      requireExactFields(
-        reason,
-        "status panel reason",
-        ["code", "message"],
-        hasCorrelation ? ["correlation_id"] : []
-      );
-      validateIdentifier(reason.code, "reason.code");
-      validateMessage(reason.message, "reason.message");
-      if (hasCorrelation) {
-        validateCorrelationId(reason.correlation_id);
-      }
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "status panel",
@@ -839,28 +817,6 @@
 
   // Exact available context_actions combat panel v3 schema.
   function validateContextActionsPanel(payload) {
-    if (payload.available === false) {
-      requireExactFields(payload, "context_actions panel", ["schema_version", "available", "reason"], []);
-      requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-      if (payload.schema_version !== 3) {
-        throw new Error("unsupported context_actions panel schema_version");
-      }
-      var reason = payload.reason;
-      var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
-      requireExactFields(
-        reason,
-        "context_actions panel reason",
-        ["code", "message"],
-        hasCorrelation ? ["correlation_id"] : []
-      );
-      validateIdentifier(reason.code, "reason.code");
-      validateMessage(reason.message, "reason.message");
-      if (hasCorrelation) {
-        validateCorrelationId(reason.correlation_id);
-      }
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "context_actions panel",
@@ -1104,28 +1060,6 @@
   }
 
   function validateLocalMapPanel(payload) {
-    if (payload.available === false) {
-      requireExactFields(payload, "local_map panel", ["schema_version", "available", "reason"], []);
-      requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-      if (payload.schema_version !== 1) {
-        throw new Error("unsupported local_map panel schema_version");
-      }
-      var reason = payload.reason;
-      var hasCorrelation = Object.prototype.hasOwnProperty.call(reason, "correlation_id");
-      requireExactFields(
-        reason,
-        "local_map panel reason",
-        ["code", "message"],
-        hasCorrelation ? ["correlation_id"] : []
-      );
-      validateIdentifier(reason.code, "reason.code");
-      validateMessage(reason.message, "reason.message");
-      if (hasCorrelation) {
-        validateCorrelationId(reason.correlation_id);
-      }
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "local_map panel",
@@ -1589,12 +1523,6 @@
 
   // Exact available services panel v1 schema (design D4).
   function validateServicesPanel(payload) {
-    if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "services panel",
@@ -2163,12 +2091,6 @@
   }
 
   function validateCreationPanel(payload) {
-    if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "creation panel",
@@ -2496,12 +2418,6 @@
 
   // Exact available exploration panel v1 schema (design D10).
   function validateExplorationPanel(payload) {
-    if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "exploration panel",
@@ -2743,12 +2659,6 @@
   // Exact available character panel v3 schema (design D10 + skill category
   // grouping). Shared bounds are guarded by a dual-direction parity test.
   function validateCharacterPanel(payload) {
-    if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "character panel",
@@ -2956,12 +2866,6 @@
   }
 
   function validateArtPanel(payload) {
-    if (payload.available === false) {
-      // The common unavailable discriminator; validateStatusPanel handles it.
-      validateStatusPanel(payload);
-      return payload;
-    }
-
     requireExactFields(
       payload,
       "art panel",

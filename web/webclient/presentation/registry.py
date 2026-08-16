@@ -157,20 +157,41 @@ def build_production_registry() -> PresentationRegistry:
     imported here (rather than at module import) so this module stays
     importable while a presenter is being developed.
     """
-    from web.webclient.presentation.art import art_presenter
-    from web.webclient.presentation.character import character_presenter
-    from web.webclient.presentation.combat_panel import context_actions_presenter
-    from web.webclient.presentation.creation import creation_presenter
-    from web.webclient.presentation.exploration import exploration_presenter
-    from web.webclient.presentation.local_map import local_map_presenter
-    from web.webclient.presentation.services import services_presenter
-    from web.webclient.presentation.status import status_presenter
+    from web.webclient.presentation.art import ART_SCHEMA_VERSION, art_presenter
+    from web.webclient.presentation.character import (
+        CHARACTER_SCHEMA_VERSION,
+        character_presenter,
+    )
+    from web.webclient.presentation.combat_panel import (
+        CONTEXT_ACTIONS_SCHEMA_VERSION,
+        context_actions_presenter,
+    )
+    from web.webclient.presentation.creation import (
+        CREATION_SCHEMA_VERSION,
+        creation_presenter,
+    )
+    from web.webclient.presentation.exploration import (
+        EXPLORATION_SCHEMA_VERSION,
+        exploration_presenter,
+    )
+    from web.webclient.presentation.local_map import (
+        LOCAL_MAP_SCHEMA_VERSION,
+        local_map_presenter,
+    )
+    from web.webclient.presentation.services import (
+        SERVICES_SCHEMA_VERSION,
+        services_presenter,
+    )
+    from web.webclient.presentation.status import (
+        STATUS_SCHEMA_VERSION,
+        status_presenter,
+    )
 
     registry = PresentationRegistry("elosern")
     registry.register(
         PresenterSpec(
             name="art",
-            schema_version=1,
+            schema_version=ART_SCHEMA_VERSION,
             unavailable_reason=("art_unavailable", "場景圖像目前無法顯示"),
             presenter=art_presenter,
         )
@@ -178,7 +199,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="status",
-            schema_version=1,
+            schema_version=STATUS_SCHEMA_VERSION,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=status_presenter,
         )
@@ -186,7 +207,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="context_actions",
-            schema_version=3,
+            schema_version=CONTEXT_ACTIONS_SCHEMA_VERSION,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=context_actions_presenter,
         )
@@ -194,7 +215,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="local_map",
-            schema_version=1,
+            schema_version=LOCAL_MAP_SCHEMA_VERSION,
             unavailable_reason=("map_unavailable", "區域地圖目前無法顯示"),
             presenter=local_map_presenter,
         )
@@ -202,7 +223,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="services",
-            schema_version=1,
+            schema_version=SERVICES_SCHEMA_VERSION,
             unavailable_reason=("services_unavailable", "服務選單目前無法顯示"),
             presenter=services_presenter,
         )
@@ -210,7 +231,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="creation",
-            schema_version=1,
+            schema_version=CREATION_SCHEMA_VERSION,
             unavailable_reason=("creation_unavailable", "角色建立畫面目前無法顯示"),
             presenter=creation_presenter,
         )
@@ -218,7 +239,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="exploration",
-            schema_version=1,
+            schema_version=EXPLORATION_SCHEMA_VERSION,
             unavailable_reason=("exploration_unavailable", "探索選單目前無法顯示"),
             presenter=exploration_presenter,
         )
@@ -226,7 +247,7 @@ def build_production_registry() -> PresentationRegistry:
     registry.register(
         PresenterSpec(
             name="character",
-            schema_version=2,
+            schema_version=CHARACTER_SCHEMA_VERSION,
             unavailable_reason=("character_unavailable", "角色狀態目前無法顯示"),
             presenter=character_presenter,
         )

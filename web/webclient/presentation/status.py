@@ -11,6 +11,8 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.status_query import StatusQueryError, build_status_read_model
 
+STATUS_SCHEMA_VERSION = 1
+
 
 def status_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``status`` panel payload for the actor."""
@@ -50,7 +52,7 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
     if model.combat_mode is not None:
         combat = {"mode": model.combat_mode, "round": model.combat_round}
     return {
-        "schema_version": 1,
+        "schema_version": STATUS_SCHEMA_VERSION,
         "available": True,
         "actor": actor_field,
         "resources": resources,

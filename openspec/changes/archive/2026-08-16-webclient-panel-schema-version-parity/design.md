@@ -109,12 +109,14 @@ Two halves, matching the repo's established contract pattern:
 - **Text-extraction half** (new `tests/test_panel_schema_version_parity_contract.py`):
   top-level tests run under plain `unittest discover` without Evennia settings, so
   imports are disallowed — the existing bounds contracts use source-text regex
-  extraction for the same reason. Extract, for each panel: the registry's
-  `schema_version=<CONST>` reference, the module's `<CONST> = N` value, and the
-  JS allowlist's `name: N` value; assert all three equal. The registry side
-  requires the reference form (`schema_version=<CONST>`), so an inline literal
-  fails the contract. Annotate with `covers_requirement` for the modified
-  `webclient-oob-protocol` requirements.
+  extraction for the same reason. Extract, for each panel, four values: the
+  registry's `schema_version=<CONST>` reference, the module's `<CONST> = N`
+  value, the JS allowlist's `name: N` value, and the per-panel available-form
+  re-check literal (`payload.schema_version !== N` anchored to the validator
+  function); assert all four equal. The registry side requires the reference
+  form (`schema_version=<CONST>`), so an inline literal fails the contract.
+  Annotate with `covers_requirement` for the modified `webclient-oob-protocol`
+  requirements.
 
 *Alternative rejected*: a shared machine-readable JSON consumed by both Python
 and JS. Overkill for eight integers, and protocol.js is deliberately standalone
@@ -134,7 +136,8 @@ accepted and one at version 2 is rejected.
 ## Risks / Trade-offs
 
 - [Text-extraction contract can rot if source formatting changes] → Anchored
-  patterns (`^CONST = N`, `var PANEL_ALLOWLIST = {...}`, `schema_version=CONST`)
+  patterns (`^CONST = N`, `var PANEL_ALLOWLIST = {...}`, `schema_version=CONST`,
+  `payload.schema_version !== N` per validator)
   matching the existing three parity contracts; a formatting change fails the
   contract loudly, which is the intended signal.
 - [Circular import if constants move to module level in registry.py] → All

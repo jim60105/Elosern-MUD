@@ -223,20 +223,28 @@ test("validates panel names against the registered allowlist", () => {
 });
 
 test("validates the status panel available/unavailable discriminator exactly", () => {
-  // Unavailable form is exact.
+  // Unavailable form is exact, through the real validatePanel dispatch path.
   assert.deepEqual(
-    Protocol.validateStatusPanel(unavailableStatusPanel()),
+    Protocol.validatePanel("status", Protocol.PANEL_ALLOWLIST.status, unavailableStatusPanel()),
     unavailableStatusPanel()
   );
   const badReason = unavailableStatusPanel();
   badReason.reason = { code: "x" };
-  assert.throws(() => Protocol.validateStatusPanel(badReason));
   assert.throws(() =>
-    Protocol.validateStatusPanel(unavailableStatusPanel({ schema_version: 2 }))
+    Protocol.validatePanel("status", Protocol.PANEL_ALLOWLIST.status, badReason)
+  );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "status",
+      Protocol.PANEL_ALLOWLIST.status,
+      unavailableStatusPanel({ schema_version: 2 })
+    )
   );
   // An internal reason carries a bounded correlation ID.
   assert.doesNotThrow(() =>
-    Protocol.validateStatusPanel(
+    Protocol.validatePanel(
+      "status",
+      Protocol.PANEL_ALLOWLIST.status,
       unavailableStatusPanel({
         reason: { code: "internal_presenter_error", message: "此介面暫時無法使用", correlation_id: "a".repeat(32) },
       })
@@ -1057,6 +1065,23 @@ test("validates the available context_actions combat panel", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 3);
 });
 
+test("mirrors every registered panel schema version in the allowlist", () => {
+  // The allowlist must cover all eight registered panels so an unmirrored
+  // panel can never slip through the registered-version gate.
+  assert.equal(Protocol.PANEL_ALLOWLIST.status, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 3);
+  assert.equal(
+    Object.keys(Protocol.PANEL_ALLOWLIST).length,
+    8,
+    "PANEL_ALLOWLIST must list exactly the eight registered panels"
+  );
+});
+
 test("freeform_scales is optional and validated when present", () => {
   const scales = [
     { scale: 0.25, label: "1/4", mp_cost: 5 },
@@ -1102,7 +1127,12 @@ test("freeform_scales is optional and validated when present", () => {
 });
 
 test("rejects malformed context_actions panels atomically", () => {
-  assert.throws(() => Protocol.validateContextActionsPanel({ schema_version: 3, available: false }));
+  assert.throws(() =>
+    Protocol.validatePanel("context_actions", Protocol.PANEL_ALLOWLIST.context_actions, {
+      schema_version: 3,
+      available: false,
+    })
+  );
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ kind: "exploration" })));
   assert.throws(() =>
@@ -1388,7 +1418,7 @@ function validLocalMapPanel(overrides) {
 
 test("validates the local_map panel available/unavailable discriminator", () => {
   assert.deepEqual(
-    Protocol.validateLocalMapPanel(unavailableStatusPanel()),
+    Protocol.validatePanel("local_map", Protocol.PANEL_ALLOWLIST.local_map, unavailableStatusPanel()),
     unavailableStatusPanel()
   );
   assert.doesNotThrow(() => Protocol.validateLocalMapPanel(validLocalMapPanel()));
@@ -1726,7 +1756,10 @@ test("validates the services panel available/unavailable discriminator", () => {
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
-  assert.deepEqual(Protocol.validateServicesPanel(unavailable), unavailable);
+  assert.deepEqual(
+    Protocol.validatePanel("services", Protocol.PANEL_ALLOWLIST.services, unavailable),
+    unavailable
+  );
   assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), kind: "combat" }));
   assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), available: "yes" }));
 });
@@ -2127,7 +2160,12 @@ test("art is in the production panel allowlist and validates the available paylo
 });
 
 test("rejects malformed art panels atomically", () => {
-  assert.throws(() => Protocol.validateArtPanel({ schema_version: 1, available: false }));
+  assert.throws(() =>
+    Protocol.validatePanel("art", Protocol.PANEL_ALLOWLIST.art, {
+      schema_version: 1,
+      available: false,
+    })
+  );
   assert.throws(() => Protocol.validateArtPanel(validArtPanel({ kind: "combat" })));
   assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 2 })));
   // A pending scene without a placeholder is untruthful.
@@ -2272,11 +2310,15 @@ function validCreationPanel(overrides) {
 test("accepts a valid creation panel and the common unavailable form", () => {
   assert.doesNotThrow(() => Protocol.validateCreationPanel(validCreationPanel()));
   assert.doesNotThrow(() =>
-    Protocol.validateCreationPanel({
-      schema_version: 1,
-      available: false,
-      reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
-    })
+    Protocol.validatePanel(
+      "creation",
+      Protocol.PANEL_ALLOWLIST.creation,
+      {
+        schema_version: 1,
+        available: false,
+        reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
+      }
+    )
   );
 });
 
@@ -2605,7 +2647,7 @@ function validExplorationPanel(overrides) {
 
 test("validates the exploration panel available/unavailable discriminator", () => {
   assert.deepEqual(
-    Protocol.validateExplorationPanel(unavailableStatusPanel()),
+    Protocol.validatePanel("exploration", Protocol.PANEL_ALLOWLIST.exploration, unavailableStatusPanel()),
     unavailableStatusPanel()
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
@@ -2999,9 +3041,22 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
+  // The unavailable fixture carries the registered version (3), and the real
+  // validatePanel dispatch path is exercised.
   assert.deepEqual(
-    Protocol.validateCharacterPanel(unavailableStatusPanel()),
-    unavailableStatusPanel()
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 3 })
+    ),
+    unavailableStatusPanel({ schema_version: 3 })
+  );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 2 })
+    )
   );
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
@@ -3012,6 +3067,31 @@ test("validates the character panel available/unavailable discriminator", () => 
   const missing = validCharacterPanel();
   delete missing.actives;
   assert.throws(() => Protocol.validateCharacterPanel(missing));
+});
+
+test("a character unavailable snapshot at the registered version is accepted atomically", () => {
+  const store = Protocol.createStore();
+  store.beginTransport(1);
+  const status = validStatusPanel();
+  const version3 = unavailableStatusPanel({ schema_version: 3 });
+  const accepted = snapshot({ panels: { status: status, character: version3 } });
+  const result = store.receive(1, "ui_snapshot", [accepted], {});
+  assert.equal(result.accepted, true);
+  assert.deepEqual(store.getState().panels.status, status, "healthy status panel stays intact");
+  assert.deepEqual(store.getState().panels.character, version3);
+
+  // The identical snapshot at the stale version is rejected with no panel
+  // replaced or merged: a different-but-valid status panel must not leak in.
+  const differentStatus = validStatusPanel({
+    actor: { name: "另一位旅人", identity: "9", location: null },
+  });
+  const stale = snapshot({
+    panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
+  });
+  assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
+  assert.equal(store.getState().phase, "active", "the version-3 state remains committed");
+  assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
+  assert.deepEqual(store.getState().panels.character, version3, "character panel untouched");
 });
 
 test("enforces character D10 bounds and disguise honesty", () => {
