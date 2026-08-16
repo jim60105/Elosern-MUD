@@ -20,6 +20,7 @@ from world.rules.buffs import (
     grant_conferred_growth_rate,
 )
 from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
+from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
@@ -348,6 +349,66 @@ def _step3_targeting(
 def _step4_capability(actor: Any) -> None:
     if actor.attributes.has("buffs") and blocks_action(actor):
         raise RejectedAction(RejectReason.ACTION_FORBIDDEN, _entity_key(actor))
+
+
+def _resist_pending_effect(target: Any, verdict: Any) -> PendingEffect:
+    """Stage one logged resist verdict as a non-mutating pending effect.
+
+    ``resist_verdict()`` has already executed when this helper runs — the
+    dice roll and every state read happened during the gate, before the
+    transactional commit — and the verdict mutates no entity state, so
+    ``apply`` is a no-op. The ``PendingEffect`` exists solely so the verdict
+    becomes a logged, replayable ``EventEntry`` through the ordinary
+    ``_entries_from_effect`` path. The description uses the
+    ``"none"``-sentinel convention for an absent roll (auto-complied verdicts
+    never roll), mirroring ``disengage_attempt``'s optional-field handling.
+    """
+    roll_field = "none" if verdict.roll is None else str(verdict.roll)
+    return PendingEffect(
+        target,
+        f"sexual_resist|{_entity_key(target)}|{int(verdict.resisted)}|"
+        f"{int(verdict.auto_comply)}|{roll_field}",
+        frozenset(),
+        lambda: None,
+    )
+
+
+def _step4b_sexual_resist_gate(
+    request: ActionRequest,
+    skill: SkillDef,
+    targets: list[Any],
+) -> tuple[list[Any], list[PendingEffect]]:
+    """Resolve one resist contest per non-actor target of a resistible act.
+
+    Fires only when the cast skill's key is present in
+    ``SEXUAL_ACT_REGISTRY`` and the act declares ``resistible=True``; any
+    other skill returns ``(targets, [])`` unchanged with no behavioral or
+    performance cost beyond one dict lookup. ``resist_verdict()`` is imported
+    lazily inside the guard: a module-level import would create an import
+    cycle (``action -> sexual_resist -> combat -> action``), and the gate's
+    per-call lookup is the same fresh-name pattern the module-level
+    ``roll_d100`` binding provides for testability (design D-6).
+    """
+    act = SEXUAL_ACT_REGISTRY.get(skill.key)
+    if act is None or not act.resistible:
+        return targets, []
+    from world.rules.sexual_resist import resist_verdict
+
+    surviving: list[Any] = []
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if target is request.actor:
+            # The actor never resists their own act (design D-2); without
+            # this guard a future resistible SELF-target act would roll a
+            # contest against its own caster and could silently withhold
+            # their own D-4 pleasure share.
+            surviving.append(target)
+            continue
+        verdict = resist_verdict(request.actor, target, rng=roll_d100)
+        pending.append(_resist_pending_effect(target, verdict))
+        if not verdict.resisted:
+            surviving.append(target)
+    return surviving, pending
 
 
 def _require_context(context: dict[str, Any], prefix: str) -> dict[str, Any]:
@@ -913,6 +974,7 @@ _ENTRY_TEMPLATES = {
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
     "sexual_transition": "{target} 的狀態發生了變化。",
+    "sexual_resist": "{target} 面對 {actor} 的意圖，做出了自己的選擇。",
     "pleasure_gain": "{target} 的快感提升了。",
     "sexual_counter": "{target} 的性行為計數提升了。",
     "trait_delta": "{target} 的能力值發生了變化。",
@@ -971,6 +1033,16 @@ def _entries_from_effect(
                 f"malformed sexual_counter pending effect {effect.description!r}"
             )
         data = {"counter": values[0]}
+    elif kind == "sexual_resist":
+        if len(values) != 3:
+            raise ValueError(
+                f"malformed sexual_resist pending effect {effect.description!r}"
+            )
+        data = {
+            "resisted": bool(int(values[0])),
+            "auto_comply": bool(int(values[1])),
+            "roll": None if values[2] == "none" else int(values[2]),
+        }
     elif kind == "damage":
         if len(values) != 3:
             raise ValueError(
@@ -1439,7 +1511,16 @@ class ActionResolver:
             _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
-            pending = _step5_effect_resolution(request, skill, targets)
+            targets, resist_pending = _step4b_sexual_resist_gate(
+                request,
+                skill,
+                targets,
+            )
+            pending = resist_pending + _step5_effect_resolution(
+                request,
+                skill,
+                targets,
+            )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             pending.append(_step6_skill_practice(request.actor, skill))
             pending += _step6_combat_kill_xp(request, targets)

@@ -207,6 +207,22 @@ this proposal's own suite uses. `partner_hand_hold` shares the identical `resist
 so no existing test needs updating for it — noted here so a future reader does not need to re-derive why
 only one of the two partner seeds required a fix.
 
+The audit also surfaced a second existing suite the original analysis missed:
+`world/rules/tests/test_sexual_act_effects.py` (B5's own module) builds every test-local act through
+`_build_duo_act`, which hardcodes `resistible=True` — including the `SINGLE` duo acts cast by
+`PleasureHandlerIntegrationTests`/`SexualCounterHandlerTests`/`SexualEventReuseTests` and the `AREA`
+act in `test_area_act_applies_participant_counters_to_every_other_participant`. Every one of those
+casts therefore (a) reaches `resist_verdict()` and needs the quest catalog `register_catalog()`
+bootstraps (the same fixture addition `test_seed_acts.py` needed), and (b) becomes roll-dependent on
+the target's pleasure/counter assertions, so each must be made deterministic. The fix applied to that
+module is one fixture-level change covering both: `_ActCastTestCase.setUp` gains `register_catalog()`,
+and `_ActCastTestCase._cast` wraps its `ActionResolver.resolve()` call in
+`patch("world.rules.action.roll_d100", return_value=1)` (both fixtures are floor humans with equal
+contest scores, so roll 1 is a guaranteed comply). The module's two rejection-path tests
+(`test_unknown_counter_name_rejects_the_action`, `test_rejected_cast_leaves_no_state_or_sensitivity_
+trait_behind`) reject before the resist entries would apply, so the mock is harmless there; the
+`SELF`-target solo-act test exercises D-2's actor-skip and never rolls at all.
+
 ### D-4: Resource cost, time cost, and practice XP stay unconditional on resist outcome
 
 The original source design (`2026-08-15-sexual-act-system-overview-design.md` D-5) frames a successful
@@ -273,6 +289,16 @@ one-line import plus an explicit keyword argument — not a new abstraction — 
 stated cross-cutting testing obligation ("every contest and every random delta takes an injectable RNG,"
 overview doc §5.3) satisfied at the call site that actually needs to be mocked.
 
+`resist_verdict` itself is **not** imported at module level. A top-level `from world.rules.sexual_resist
+import resist_verdict` in `action.py` creates an import cycle — `action → sexual_resist → combat →
+action` — that fails with an `ImportError` from a partially initialized module whenever `action` is the
+import entry point (verified empirically during implementation). `sexual_resist.py` imports `combat` at
+module level, and `combat.py` imports `action` at module level, so the triangle closes only when
+`resist_verdict` is fetched lazily inside the gate's function body — the same in-function-import
+convention `_handle_sexual_event` already uses for `apply_event`. The lazy import sits after the
+`SEXUAL_ACT_REGISTRY` guard, so the ~110 non-act skills never pay for it. Determinism is unaffected:
+`action.py`'s module-level `roll_d100` is what tests patch, and `resist_verdict` is pure.
+
 ### D-7: `AREA` resist-gating reuses the identical per-target loop `_scan_sexual_coercion` already exercises
 
 `_step4b_sexual_resist_gate` iterates `targets` unconditionally — it does not branch on `skill.target_spec`
@@ -311,6 +337,12 @@ Risks).
   `duo_act_count` (a `participant_counters` credit, which resist-gating withholds on a resisted target)
   with no roll mock — this one genuinely becomes flaky and is fixed by tasks §4.1 per D-3a. Tasks §5
   re-runs the whole suite as a regression gate rather than trusting this analysis alone.
+- **[Risk]** The same audit obligation extends beyond the shipped seeds: `test_sexual_act_effects.py`
+  (B5's own module) casts test-local acts that are all `resistible=True` by construction, so every
+  such cast became both quest-catalog-dependent and roll-dependent under this wiring. The original
+  analysis missed this module entirely. → **Mitigation**: D-3a documents the fixture-level fix
+  (`register_catalog()` in `setUp`, compliant-roll mock in `_cast`) applied there, and tasks §5 re-runs
+  the full affected module set as the regression gate.
 - **[Risk]** A future catalog act could ship `resistible=True` with `TargetSpec.SELF`, which D-2's guard
   silently neutralizes (the actor never resists their own act) rather than rejecting at registry-load
   time. → **Mitigation**: disclosed as a known soft spot rather than silently handled; a future proposal
@@ -333,12 +365,13 @@ Risks).
 ## Migration Plan
 
 Additive only: two new private functions (`_step4b_sexual_resist_gate`, `_resist_pending_effect`), one
-new `_entries_from_effect` branch, one new `_ENTRY_TEMPLATES` key, and two new top-level imports, all
-confined to `world/rules/action.py`, plus one determinism fix to an existing test assertion in
-`world/skills/sexual_acts/tests/test_seed_acts.py` (D-3a). No schema, rulebook, or registry change. Zero
-released users; no backward-compatibility concern applies. Rollback is a plain revert of the two changed
-files — no data migration in either direction, since `resistible` was already a validated, already-stored
-field this change is the first to read.
+new `_entries_from_effect` branch, one new `_ENTRY_TEMPLATES` key, and one new top-level import, all
+confined to `world/rules/action.py`, plus determinism fixes to existing test fixtures in
+`world/skills/sexual_acts/tests/test_seed_acts.py` (D-3a) and `world/rules/tests/test_sexual_act_effects.py`
+(D-3a's second half). No schema, rulebook, or registry change. Zero released users; no
+backward-compatibility concern applies. Rollback is a plain revert of the three changed files — no data
+migration in either direction, since `resistible` was already a validated, already-stored field this
+change is the first to read.
 
 ## Open Questions
 
