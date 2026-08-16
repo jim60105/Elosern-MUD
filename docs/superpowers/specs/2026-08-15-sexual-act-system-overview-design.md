@@ -123,9 +123,10 @@ already atomic.
 
 ## 4. Implementation Sequence
 
-Twenty-two proposals, plus one follow-up (`sexual-resist-out-of-combat`, discovered and deferred
-during `B6b`'s own design — see §4.2's table), each sized for one working day. The organising
-principle is **disjoint file
+Twenty-two proposals, plus two follow-ups — `sexual-resist-out-of-combat` (discovered and deferred
+during `B6b`'s own design) and `sexual-resist-cast-wiring` (discovered post-implementation, when `B5`'s
+own row's stated obligation below turned out not to have been fulfilled — see the note under §4.2's
+table) — each sized for one working day. The organising principle is **disjoint file
 ownership**: no two proposals in the same batch touch the same file. That is the only real lever on
 rebase cost.
 
@@ -161,6 +162,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | B6a | `sexual-resist-contest` | Contest as a pure function, affinity modifier table, `auto_comply`, the first-five-climax-turns short circuit | B3, B4 | `world/rules/sexual_resist.py`, `sexual_resist.yaml` |
 | B6b | `sexual-resist-turn-cost` | The in-combat affinity consequence of a resisted or forced act: a new `AffinitySource`, a `_scan_sexual_coercion` post-round scan mirroring `_scan_friendly_fire`, and the documented `EventEntry` contract `sexual-act-effects` must emit for it to react to. **File ownership widened during `B6b`'s own design** (see that proposal's design.md Decision 4) to include the penalty's rulebook field | B5, B6a | `combat_session.py`, `affinity.py`, `affinity_config.py`, `rulebook/affinity.yaml` |
 | — | `sexual-resist-out-of-combat` | The symmetric affinity consequence at the out-of-combat cast path, deferred out of `B6b`'s scope (see that proposal's design.md Decision 5) because neither `cast_settlement.py` nor `commands/action.py` was in any proposal's ownership and auditing them was not achievable within `B6b`'s one-day sizing | B6b | `cast_settlement.py` or `commands/action.py` (exact call site TBD by that proposal) |
+| — | `sexual-resist-cast-wiring` | **`B5`'s row above states it emits the `sexual_resist` `EventEntry` contract; it did not (see the note below the table).** This follow-up actually wires `resist_verdict()` into `ActionResolver.resolve()`: one new pre-effect-resolution step excludes a successfully-resisting target from a `resistible=True` act's pleasure/counter/event effects and emits the `EventEntry(kind="sexual_resist", ...)` `B6b`'s `_scan_sexual_coercion` already consumes. Actor-side effects, resource cost, time cost, and practice XP stay unconditional on resist outcome. | B5, B6a, B6b | `world/rules/action.py` |
 | B8 | `sexual-act-seeds` | Seven seeds plus one representative upper-tier act per line (~14) | B5, B6b | the six line modules |
 | C2 | `sexual-catalog-solo` | 獨處線, 17 acts | B8 | `sexual_acts/solo.py` |
 | C3 | `sexual-catalog-shame` | 羞恥線, 10 acts | B8 | `sexual_acts/shame.py` |
@@ -170,6 +172,19 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | C7a | `divine-sexual-arts-reuse` | 絕頂律令 / 時姦 / 神域搾取 — the three 神之秘法 needing no new `SexualState` surface | B8 | `sexual_acts/divine.py` |
 | C7b | `divine-sexual-arts-mutators` | 感度創世 / 恥辱剝奪 / 絕對從屬 / 無垢回歸 — needs `saturate_sensitivity()`, `clamp_shame_to()`, `mark_submission()`, `restore_purity()` | C7a | `sexual_state.py`, `sexual.yaml` |
 | — | `sexual-act-docs` | `docs/game/commands.md`, `docs/game/command-reference.md` | B8 | `docs/game/` |
+
+**`B5`'s stated emission obligation was not fulfilled.** `B5`'s row above quotes this document's own
+original instruction: `B5` was to emit the `EventEntry(kind="sexual_resist", ...)` contract `B6b`'s scan
+consumes, "regardless of `B5`/`B6b` batch order." `B5`'s actual archived proposal
+(`openspec/changes/archive/2026-08-16-sexual-act-effects/design.md`, Non-Goals) declined it instead: "No
+resist contest — this proposal's handlers assume the act's cast already succeeded; whether it should have
+been resistible is `sexual-resist-contest`'s and `sexual-resist-turn-cost`'s territory." `B6b`, in turn,
+shipped only the consequence side and documented as a known risk that it has "no production caller until
+`sexual-act-effects` lands and actually emits `sexual_resist`-kind entries" — relying on this document's
+`B5` assignment as the reason it did not need to build the emission itself. Neither proposal closed the
+loop, so `resist_verdict()` (`B6a`) had no caller and every `resistible=True` act executed unconditionally
+until `sexual-resist-cast-wiring` (above) was proposed to pick up the obligation `B5`'s row describes but
+did not deliver.
 
 ### 4.3 Parallel batches
 
@@ -183,6 +198,7 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | 6 | `C2` ∥ `C3` ∥ `C4` ∥ `C5` ∥ `C6` ∥ `C7a` ∥ `docs` | Seven fully parallel tracks, zero conflict — pure data rows in disjoint modules. |
 | 7 | `C7b` | Runs alone; it re-enters `sexual_state.py`. |
 | 8 (unscheduled) | `sexual-resist-out-of-combat` | Not part of the original sequence; ready to schedule once `B6b` lands and its `_scan_sexual_coercion` pattern exists to mirror at the out-of-combat cast path. |
+| 9 (unscheduled) | `sexual-resist-cast-wiring` | Not part of the original sequence; picks up the emission obligation `B5`'s row assigned but did not fulfil (see the note under §4.2's table). Ready to schedule once `B5`, `B6a`, and `B6b` have all landed — all three already have. |
 
 Seven batches for the original twenty-two proposals. With the parallel tracks actually staffed, the
 critical path is **seven working days**; implemented serially it is twenty-one. The deferred
