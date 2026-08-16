@@ -38,7 +38,7 @@ The optimized workflow SHALL execute the managed browser suite exactly once acro
 ## ADDED Requirements
 
 ### Requirement: Machine shards preserve exact per-module test ownership
-The committed non-browser Evennia shard manifest SHALL partition every discoverable non-browser test module exactly once: a top-level contract test SHALL enumerate all `test_*.py` modules under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`, resolve every manifest label to its module(s) without importing them (a label names either a module file directly or a package directory to walk recursively), and assert that the discovered set and the labeled set are identical with no overlap between shards. Shard indices SHALL be unique and sorted. Every shard SHALL contain at least one label, and every label SHALL resolve to at least one test module.
+The committed non-browser Evennia shard manifest SHALL partition every discoverable non-browser test module exactly once: a top-level contract test SHALL enumerate all `test*.py` modules under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`, resolve every manifest label to its module(s) without importing them (a label names either a module file directly or a package directory to walk recursively), and assert that the discovered set and the labeled set are identical with no overlap between shards. Shard indices SHALL be unique and sorted. Every shard SHALL contain at least one label, every label SHALL resolve to at least one test module, and the manifest SHALL declare at least one shard. The preflight job SHALL validate these manifest properties before computing the execution matrix, so a syntactically valid but empty or malformed manifest fails the workflow rather than skipping every shard job and the aggregation gate.
 
 #### Scenario: Every non-browser test module is owned exactly once
 - **WHEN** the evennia shard manifest is inspected by the ownership contract test
@@ -47,6 +47,10 @@ The committed non-browser Evennia shard manifest SHALL partition every discovera
 #### Scenario: Manifest labels resolve to real test modules
 - **WHEN** a manifest label does not correspond to an existing test module file or a package directory containing test modules
 - **THEN** the ownership contract test fails with a diagnostic naming the unresolvable label
+
+#### Scenario: Empty or malformed manifest cannot skip the gate
+- **WHEN** the committed evennia manifest declares no shards, a non-sorted or duplicate index, or a shard without non-empty string labels
+- **THEN** the preflight job fails before any execution job is dispatched, so the sharded suite and the aggregation gate always run when the workflow runs
 
 #### Scenario: Shard balance is observable and rebalancable
 - **WHEN** a CI run reports one evennia shard dominating the others by a wide margin

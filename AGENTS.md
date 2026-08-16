@@ -112,11 +112,11 @@ profiling and parallel-evaluation commands.
 ### Test runtime budget (measured, do not waste wall-clock)
 
 The full Evennia suite (`evennia test ... commands server typeclasses web
-world`) is now **3,104 tests**: ~45 s with `--parallel 16` on the 24-core
+world`) is now **4,263 tests**: ~45 s with `--parallel 16` on the 24-core
 development machine, and ~152 s with `--parallel 4` including coverage
-instrumentation (the CI profile). Serial remains canonical for final handoff
-evidence, but `--parallel 16 --noinput` is the default full-suite command
-during development. The managed browser suite is the slowest thing in the repo
+instrumentation (the CI worker profile). Serial remains canonical for final
+handoff evidence, but `--parallel 16 --noinput` is the default full-suite
+command during development. The managed browser suite is the slowest thing in the repo
 and dominates total runtime (measured 3,465 s locally for the full 148-test
 run):
 
@@ -128,6 +128,13 @@ run):
 - The CI quality gate shards the browser suite across six parallel jobs by
   `.github/browser-shards.json`; each test file has exactly one serial
   execution owner (enforced by a top-level contract test).
+- The CI quality gate machine-shards the non-browser Evennia suite across six
+  parallel jobs by `.github/evennia-shards.json`; each test module has exactly
+  one serial execution owner (enforced by a top-level contract test). The
+  evennia shard commands are **CI-only**: every invocation writes to the same
+  local test database path (`server/db/evennia-test.sqlite3`), so never run
+  shard invocations concurrently on one machine. Locally, run the full suite
+  once with the full label set.
 - Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are ~1s.
 - `tools/spec_traceability check` is seconds; the `verify --evidence` gate needs
   the full evidence run only at final handoff.

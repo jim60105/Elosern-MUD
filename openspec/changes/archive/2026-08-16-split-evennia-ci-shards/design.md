@@ -40,10 +40,13 @@ jobs max, `ubuntu-latest` free, larger runners excluded by the operator.
 - **Six shards, package-aware split**: `world.rules` (112 files, ~half the
   suite) split into three equal file groups by sorted filename; remaining
   packages grouped by measured method-count weight into three shards
-  (`world.quests world.maps world.skills`;
-  `world.ai world.art world.lore world.imports world.prompts world.onboarding
-  world.tests`; `commands server typeclasses web.webclient`). Labels are
-  dotted module paths — Django accepts package and module labels alike.
+  (`world.quests world.skills world.art world.ai world.onboarding world.lore`;
+  `world.maps web.webclient world.imports world.prompts world.tests`;
+  `commands server typeclasses`). The final grouping reflects the measured
+  rebalance (task 5.2): `web.webclient` is kept away from
+  `commands`/`typeclasses` because their combined run is ~2× the sum of parts,
+  and `world.quests` is paired with lightweight packages. Labels are dotted
+  module paths — Django accepts package and module labels alike.
 - **Per-shard DB isolation**: each matrix job runs on its own machine and
   creates its own fresh test database (`--noinput`, no `--keepdb`), so
   sharding never shares state. Locally the shards must never run
@@ -58,7 +61,16 @@ jobs max, `ubuntu-latest` free, larger runners excluded by the operator.
 - **Contract pins**: the ownership contract test resolves each label to a
   module file (`label.replace(".", "/") + ".py"`) or, for package labels,
   walks the directory for `test_*.py` files recursively — import-free, so it
-  runs fast in the top-level suite.
+  runs fast in the top-level suite. The file selection mirrors Django's
+  DiscoverRunner discovery pattern (`test*.py`), and a preflight step rejects
+  an empty or malformed manifest so the aggregation gate cannot be skipped.
+- **Shared MODIFIED requirement text**: the delta's "Existing quality gates
+  remain authoritative" MODIFIED block is byte-identical to the one in
+  `pack-browser-ci-shards` (browser method/class-level labels, two-process
+  shards). This change implements only the Evennia half; the browser clauses
+  are forward-declared permissions exercised by the sibling change. Keeping
+  the block byte-identical makes main-spec sync idempotent regardless of which
+  change archives first.
 
 ## Risks / Trade-offs
 

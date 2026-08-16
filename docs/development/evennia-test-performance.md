@@ -273,3 +273,69 @@ The final clean coverage probe also confirmed that an existing retained SQLite
 file causes Django to request deletion confirmation. Canonical non-interactive
 clean commands therefore pass `--noinput`; this permits replacement of only the
 dedicated test database and avoids an `EOFError` in CI.
+
+### 2026-08-16: Evennia suite machine-sharded across six CI jobs
+
+The single CI evennia job (one `ubuntu-latest` runner executing the whole
+non-browser suite, **14 m 02 s** in run 31939321935) was replaced by a six-job
+matrix driven by `.github/evennia-shards.json`. Each shard runs its manifest
+labels on its own runner with the same worker profile (`--parallel 4`,
+subprocess coverage), writes `coverage-evennia-shard-<n>*` and
+`evidence.evennia-shard-<n>.jsonl`, and uploads them as per-shard artifacts.
+The gate loops over the manifest indices for completeness, concatenates
+`evidence.evennia-shard-*.jsonl` with the browser and top-level evidence, and
+combines `coverage-evennia*` sidecars with the rest — aggregation semantics
+unchanged. This targets cutting the evennia job from ~14 min to ~2–4 min and
+off the CI critical path at zero cost on the public Free plan (6 additional
+`ubuntu-latest` jobs; total evennia+browser jobs stay ≤ 20).
+
+**Suite size (2026-08-16):** the non-browser Evennia suite now discovers
+**4,263 tests** (grown from the 3,104 recorded in the 2026-08-11 CI adoption
+after the intervening feature and catalog changes), 267 test modules across
+`commands`, `server`, `typeclasses`, `world`, and `web.webclient`.
+
+**Manifest split and local serial timing** (24-core reference machine,
+`--keepdb`, no coverage; CI runs the same labels with `--parallel 4`):
+
+| Shard | Labels | Tests | Serial test time | Serial wall time |
+|---|---|---:|---:|---:|
+| 1 rules-a | 38 `world.rules.tests` modules | 650 | 137.6 s | ~2:40 |
+| 2 rules-b | 37 `world.rules.tests` modules | 596 | 163.0 s | 2:47 |
+| 3 rules-c | 37 `world.rules.tests` modules | 574 | 96.2 s | 1:39 |
+| 4 | `world.quests world.skills world.art world.ai world.onboarding world.lore` | 1,154 | 171.7 s | 2:55 |
+| 5 | `world.maps web.webclient world.imports world.prompts world.tests` | 817 | 153.3 s | 2:36 |
+| 6 | `commands server typeclasses` | 472 | 118.0 s | 2:01 |
+One rebalance pass was applied after the first measurement: the initial
+package grouping produced a 19 s shard and a ~226 s shard (max/mean ≈ 1.6);
+moving `web.webclient` away from `commands`/`typeclasses` (whose combined run
+is ~2× the sum of parts) and pairing `world.quests` with lightweight packages
+brought max/mean to **1.23** (172 s / 140 s mean), below the 1.35 rebalance
+threshold.
+
+**First CI observation (run 31945742664, branch `feat/split-evennia-ci-shards`,
+green on the first try):**
+
+| Job | Duration |
+|---|---:|
+| preflight | 24 s |
+| evennia shard 1 (rules-a) | 2 m 10 s |
+| evennia shard 2 (rules-b) | 2 m 46 s |
+| evennia shard 3 (rules-c) | 1 m 39 s |
+| evennia shard 4 (quests-skills-art-ai-onboarding-lore) | 2 m 23 s |
+| evennia shard 5 (maps-webclient-imports-prompts-tests) | 2 m 8 s |
+| evennia shard 6 (commands-server-typeclasses) | 1 m 40 s |
+| top-level | 23 s |
+| browser shard 1 (combat) | 19 m 10 s |
+| browser shard 2 (creation-layout) | 16 m 31 s |
+| browser shard 3 (exploration-reconnect) | 13 m 4 s |
+| browser shard 4 (shell-actions-local-map-input-narrative) | 5 m 23 s |
+| browser shard 5 (services-pointer) | 16 m 26 s |
+| browser shard 6 (art-harness) | 11 m 36 s |
+| gate | 23 s |
+
+The evennia suite is now off the CI critical path: its worst shard (2 m 46 s)
+replaces the previous single-job 14 m 02 s, and the six shards finish within a
+max/median of 1.29 (166 s / 129 s), below the ≥ 2× rebalance threshold, so no
+further rebalance was needed. Total workflow wall time is still ~20 min only
+because the managed browser suite dominates (combat 19 m 10 s); that half is
+addressed by the sibling `pack-browser-ci-shards` change.
