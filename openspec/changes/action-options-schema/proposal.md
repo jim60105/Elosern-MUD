@@ -39,6 +39,6 @@ that a suggestion card is always a currently-executable affordance.
   and fixtures; until it lands, tasks use fixtures matching the deterministic-actions design doc
   §1 shape (`action_id`, `label`, `params`, `freeform`, `navigation`).
 - **Consumers (later changes):** `action-options-layer` (generation), `action-options-trigger-service`
-  (cache/publish), `context-actions-v3` (client mirror parity).
+  (cache/publish), `context-actions-suggestions` (client mirror parity).
 - **No backward compatibility:** unreleased project, zero users — no migrations or compatibility
   layers.

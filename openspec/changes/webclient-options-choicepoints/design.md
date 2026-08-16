@@ -7,9 +7,9 @@ moment where the player is reading the story. This change lands the stream place
 
 Schema-version note (roadmap amendment from the affordance-contract change): `context_actions`
 is already v3 (combat); the affordance-contract change lands **v4** (exploration form, no
-suggestions); the sibling roadmap change named `context-actions-v3` lands **v5** (adds the
-`suggestions` section). Throughout this change, "context-actions-v3" refers to that roadmap
-change name, not a wire schema version; the old design set's "v3 validator" wording is
+suggestions); the sibling roadmap change `context-actions-suggestions` lands **v5** (adds the
+`suggestions` section). Throughout this change, "context-actions-suggestions" refers to that
+roadmap change name, not a wire schema version; the old design set's "v3 validator" wording is
 superseded (see affordance-contract proposal.md).
 
 Facts the change builds on:
@@ -88,7 +88,7 @@ Two sibling changes provide contracts this change consumes, and their artifacts 
 landed yet — the following is the fixed integration contract this change depends on, so the last
 slice never copies a renderer or invents a module:
 
-- `context-actions-v3` (roadmap name): `context_actions` wire schema **v5** with the
+- `context-actions-suggestions` (roadmap name): `context_actions` wire schema **v5** with the
   `suggestions` section (`{status, cards}`; statuses `generating`|`ready`|`degraded`|
   `unavailable`; cards with `kind`/`action_code`/`label`/`params`/`hint`) and the client mirror
   that rejects out-of-contract payloads at commit time.
@@ -138,7 +138,7 @@ change's tasks fail loudly at the import/parity test rather than degrading silen
 ## Migration Plan
 
 No released users and no data: this is a client-only addition behind the existing protocol
-surface. Deploy order within the slicing: land `context-actions-v3` (suggestions payload) and
+surface. Deploy order within the slicing: land `context-actions-suggestions` (suggestions payload) and
 `webclient-options-surface` (dock + shared card renderer) first, then this change; the module is
 inert until a committed suggestions status arrives. Rollback: remove the module registration —
 older payloads (no suggestions section) map to removal and leave the stream exactly as before

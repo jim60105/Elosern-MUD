@@ -77,8 +77,8 @@ session-scoped delivery of proposals through the existing `ui_update` contract.
   `build_options_context`) from `action-options-layer`,
   `web/webclient/presentation/affordances.py` (canonical affordance tuple + canonical-JSON
   serializer, eligibility digest source) and `default_cards()` (degraded derivation) from
-  `action-options-affordance-contract`, the v3 `context_actions` suggestions contract as pinned
-  by the six-doc design set (`context-actions-v3` delta lands in the next session; the
+  `action-options-affordance-contract`, the v5 `context_actions` suggestions contract as pinned
+  by the six-doc design set (`context-actions-suggestions` delta lands in the next session; the
   dependency note in `design.md` fixes the authority), and `web/webclient/actions/dispatcher.py`'s
   `_publish_completion` hook point (consumed by the next change).
 - **Layer contract dependency:** the negative memo must know a transport failure apart from an

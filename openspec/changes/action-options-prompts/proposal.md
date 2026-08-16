@@ -19,7 +19,9 @@ output — the feature cannot run end-to-end.
 - `server/conf/settings.py`: one import-time `build_profiles(LLM_PROFILES)` validation call beside
   the existing `LLM_PROFILES = default_profiles()`, so a misconfigured slot fails at startup.
 - `openspec/specs/llm-profiles` main contract gains a MODIFIED delta (the layer-enumeration
-  requirement updates to the six current layer names).
+  requirement updates from the current five layer names to six, adding `action_options` —
+  audit check: the codebase already has five layers incl. `character_creation`, which the main
+  spec's stale four-name list omits).
 - Registry/loader and profile tests updated to cover the new key and slot.
 
 ## Capabilities

@@ -22,5 +22,5 @@ The AI action-option surface can show suggestions the player does not want, and 
 - `web/webclient/actions/registry.py`: `ActionSpec.adapter` annotation; `dispatcher.py::_invoke_adapter` call shape.
 - Every production adapter module (combat, services, creation, exploration) and `web/webclient/actions/options.py` (new): signature updates in one change.
 - `build_production_action_registry()`: gains the dismiss action; registry-locked tests updated.
-- Depends on `action-options-trigger-service` (`evict`, `options_state`, push seam — scaffolded, not yet implemented) and `context-actions-v3` (the `suggestions` field the publication renders).
+- Depends on `action-options-trigger-service` (`evict`, `options_state`, push seam — scaffolded, not yet implemented) and `context-actions-suggestions` (the `suggestions` field the publication renders).
 - No player command changes (`game-command-docs` untouched); no OOB message or panel-schema changes; dock/choice-point dismiss controls are rendering work in a later change.

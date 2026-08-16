@@ -1,6 +1,6 @@
 ## Context
 
-The trigger service (change `action-options-trigger-service`) owns `evict(session, actor)` and `session.ndb.options_state`; the `context_actions` v3 panel (change `context-actions-v3`) renders `suggestions` from the `options_state` snapshot on every presenter render. The round-three architecture review (rubber-duck R3-2) decided session targeting comes from the dispatcher — it already holds the session — which forces a fixed adapter ABI. The webclient dock and narrative choice-points render the dismiss control later (`webclient-options-surface`), but the action, the ABI, and the publication semantics land here.
+The trigger service (change `action-options-trigger-service`) owns `evict(session, actor)` and `session.ndb.options_state`; the `context_actions` v5 panel (change `context-actions-suggestions`) renders `suggestions` from the `options_state` snapshot on every presenter render. The round-three architecture review (rubber-duck R3-2) decided session targeting comes from the dispatcher — it already holds the session — which forces a fixed adapter ABI. The webclient dock and narrative choice-points render the dismiss control later (`webclient-options-surface`), but the action, the ABI, and the publication semantics land here.
 
 ## Goals / Non-Goals
 

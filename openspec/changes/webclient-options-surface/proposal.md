@@ -1,7 +1,7 @@
 ## Why
 
 The `context_actions` v5 panel (landed by the preceding opener slice — OpenSpec change
-`context-actions-v3`, which bumps the panel from the v4 exploration form to v5 with
+`context-actions-suggestions`, which bumps the panel from the v4 exploration form to v5 with
 `suggestions`, per the version sequence recorded in the affordance-contract proposal) carries the
 `suggestions` section — AI `ready` cards, rule `degraded` cards, and the transient `generating`
 state — but nothing in the WebClient renders it yet. The player sees text only; the curated "what

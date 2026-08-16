@@ -38,7 +38,7 @@
       `owner_actor_id` differs from the puppet
 - [ ] 3.3 Presenter-level tests: a `context_actions` presenter renders `suggestions` from the
       snapshot field only (no raw session access) — with the six-doc wire-shape fixtures from
-      the `context-actions-v3` contract — and one state-preservation test per `ui_sync`,
+      the `context-actions-suggestions` contract — and one state-preservation test per `ui_sync`,
       completion, internal-error, and stale-refresh path
 
 ## 4. Trigger service core

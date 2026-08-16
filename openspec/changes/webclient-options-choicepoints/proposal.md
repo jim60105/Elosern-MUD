@@ -64,7 +64,7 @@ change).
   removal, degraded exclusion, click envelope parity with the dock) and one browser test file
   that boots a shared server (no combat sessions — the combat-browser-server rule does not
   apply), following the repo's serial-owner and shard conventions.
-- **Downstream**: depends on `context-actions-v3` (suggestions payload) and
+- **Downstream**: depends on `context-actions-suggestions` (suggestions payload) and
   `webclient-options-surface` (shared card renderer + dock section); consumed by nobody else.
   `docs/game/commands.md` and `docs/game/command-reference.md` are unaffected (no player command
   changes). New main-spec requirements receive `covers_requirement` annotations per the

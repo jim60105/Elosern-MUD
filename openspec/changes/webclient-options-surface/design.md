@@ -1,6 +1,6 @@
 ## Context
 
-The `context_actions` v5 panel (delivered by the preceding `context-actions-v3` slice; version
+The `context_actions` v5 panel (delivered by the preceding `context-actions-suggestions` slice; version
 sequence recorded in the affordance-contract proposal — v4 carries the exploration form, v5 adds
 `suggestions`) already reaches the store, validated by the `protocol.js` mirror. Nothing renders
 `suggestions` yet: in exploration mode the `#action-dock` surface is owned by

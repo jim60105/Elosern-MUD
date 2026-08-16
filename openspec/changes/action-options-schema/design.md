@@ -27,7 +27,7 @@ all consume. The `Affordance` typing and fixtures come from change 1
 - The context builder and `LEAK_BLOCKLIST` composition (pipeline design doc §2) — this change
   only applies a caller-supplied blocklist.
 - The `ACTION_CODE_ALLOWLIST` vocabulary (change 1 owns it); this module consumes affordances.
-- Client-side mirror/parity (change `context-actions-v3`).
+- Client-side mirror/parity (change `context-actions-suggestions`).
 
 ## Decisions
 

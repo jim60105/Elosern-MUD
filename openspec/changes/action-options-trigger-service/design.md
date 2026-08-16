@@ -25,17 +25,18 @@ Existing patterns this design builds on:
   renders `quest_id`, `stage_index`, and `objective_summary` per active objective, so the
   "displayed objective identity" is derivable from existing read-only output.
 
-**Dependency note (review fixing):** `context-actions-v3` — the v3 panel seam — is proposed in the
-next session; its contract is already pinned authoritatively by the reviewed six-doc design set
-(`webclient-design.md` §1.1–§1.3: `suggestions` wire shape with the four statuses, status-bound
-card counts, and the snapshot-only presenter rule). This change treats those documents as the
-contract authority, mirrors them into its fixtures, and lands after `context-actions-v3` (batch
-order B4 → B5 in the overview) so the push path is verified end-to-end against the real seam.
+**Dependency note (review fixing):** the v5 suggestions panel seam (`context-actions-suggestions`)
+is proposed in the next session; its contract is already pinned authoritatively by the reviewed
+six-doc design set (`webclient-design.md` §1.1–§1.3: `suggestions` wire shape with the four
+statuses, status-bound card counts, and the snapshot-only presenter rule). This change treats
+those documents as the contract authority, mirrors them into its fixtures, and lands after
+`context-actions-suggestions` (batch order B4 → B5 in the overview) so the push path is verified
+end-to-end against the real seam.
 
 Dependency position: rooted on `action-options-layer` (the generate entry point),
 `action-options-affordance-contract` (canonical affordances + `default_cards()` + canonical-JSON
-serializer), and `context-actions-v3` (the render seam it pushes through). Hook call sites are
-the next change; the dismiss action and unified adapter ABI are the change after that.
+serializer), and `context-actions-suggestions` (the render seam it pushes through). Hook call
+sites are the next change; the dismiss action and unified adapter ABI are the change after that.
 
 ## Goals / Non-Goals
 
@@ -243,6 +244,7 @@ keeps the controlled-failure detection as the fallback until then.
 - Whether the reconnect hook should ever force regeneration for an unchanged situation on a
   fresh session — currently rendered from cached state when present (the empty-cache path
   regenerates); carried in the trigger-service design doc for the hooks change.
-- `context-actions-v3` exists only as a scaffold in the working tree; its delta is produced in
-  the next session and this change's fixtures mirror the six-doc wire shape until then (batch
+- `context-actions-suggestions` exists only as a scaffold in the working tree; its delta is
+  produced in the next session and this change's fixtures mirror the six-doc wire shape until
+  then (batch
   order B4 → B5 guarantees the seam lands first).
