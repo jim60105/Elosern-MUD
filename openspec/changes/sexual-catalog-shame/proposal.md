@@ -29,9 +29,12 @@ too) — nine acts total, all reusing `sexual-act-seeds`'s one rulebook row with
     `self_exposure`).
   - **Tier 4** (`TargetSpec.AREA`/`SELF`): 獻身姿態 (`unlock={"exposure_act_count": 50}`, AREA) and
     無恥宣言 (`unlock={"exposure_act_count": 50, "watched_count": 30}`, SELF).
-- **Reuses `sexual-act-seeds`'s `self_exposure` event on seven of the nine acts** (every one except
+- **Reuses `sexual-act-seeds`'s `self_exposure` event on eight of the nine acts** (every one except
   挑釁凝視, which targets enemies rather than raising the actor's own exposure, and — see design.md —
-  no other new `sexual.yaml` row is added by this proposal.
+  no other new `sexual.yaml` row is added by this proposal. One disclosed engine-boundary
+  consequence: the event fires on the cast's targets, so on the two AREA acts (公開表演, 獻身姿態) it
+  raises each *target's* exposure rather than the performer's — see design.md D-6, and the delta
+  spec pins this destination as a scenario).
 - **Explicitly drops three flavour-only secondary effects** the source catalog document describes for
   three of these acts — 挑釁凝視's `accuracy` debuff, 獻身姿態's self-`defense` penalty, and
   無恥宣言's temporary "`shame` reads as `成癮`" buff — because `SexualActDef` has no field for a
@@ -60,6 +63,14 @@ too) — nine acts total, all reusing `sexual-act-seeds`'s one rulebook row with
 
 - Code: `world/skills/sexual_acts/shame.py` only, plus a new test module,
   `world/skills/sexual_acts/tests/test_shame_catalog.py`.
+- Collateral test updates (shared with `sexual-catalog-solo`, its parallel batch-6 sibling): the
+  same eight pre-existing test files pin the fresh-entity unlocked set or the SEXUAL_ACT category's
+  key set and are updated to the unconditionally-unlocked (empty-`unlock`) subset:
+  `test_registry_structure.py`, `test_handler.py`, `test_inventory.py`, `test_registry.py`,
+  `test_status_query.py`, `test_combat_view.py`, `test_combat_session.py`, and
+  `web/webclient/presentation/tests/test_character_panel.py`. The two proposals share these files by
+  construction (batch 6's disjoint-ownership rule governs line modules and test modules, not the
+  pre-existing pinned-registry expectations); whichever of the two lands first updates them.
 - No change to `_builder.py`, `__init__.py`, any other line module, or `world/rules/rulebook/
   sexual.yaml` — this proposal is the first catalog line to add zero new rulebook content, reusing
   `sexual-act-seeds`'s single row across the entire remaining line.
