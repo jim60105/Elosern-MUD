@@ -27,6 +27,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.lore.sexual_vocab import GENERIC_BODY_PART
+from world.quests.catalog import register_catalog
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -382,6 +383,7 @@ class _ActCastTestCase(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.actor = create_object(
             PlayerCharacter, key="act-actor", location=self.room1
         )
@@ -401,14 +403,19 @@ class _ActCastTestCase(EvenniaTest):
         )
 
     def _cast(self, act_key, targets, event_context=None):
-        return ActionResolver.resolve(
-            ActionRequest(
-                self.actor,
-                act_key,
-                targets,
-                RoomActionContext(self.room1, event_context),
+        # Every test-local duo act in this module is resistible=True (the
+        # _build_duo_act default), so a real dice roll would make the cast
+        # outcome flaky; force a compliant roll (both fixtures are floor
+        # humans with equal contest scores, so roll=1 always complies).
+        with patch("world.rules.action.roll_d100", return_value=1):
+            return ActionResolver.resolve(
+                ActionRequest(
+                    self.actor,
+                    act_key,
+                    targets,
+                    RoomActionContext(self.room1, event_context),
+                )
             )
-        )
 
     def _build_duo_act(
         self,

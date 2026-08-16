@@ -1,4 +1,15 @@
-## ADDED Requirements
+# sexual-resist-cast-wiring Specification
+
+## Purpose
+
+Define the in-combat resist wiring that turns a `resistible=True` sexual act's cast into an actual
+resist contest: `ActionResolver.resolve()` calls `resist_verdict()` once per non-actor resolved target,
+emits the `sexual_resist` `EventEntry` contract that `sexual-resist-turn-cost`'s coercion scan already
+consumes, and excludes a successfully-resisting target from the act's pleasure, counter, and
+sexual-event effects while never gating the actor's own effects or the cast's resource, time, or
+practice cost on any target's outcome.
+
+## Requirements
 
 ### Requirement: Casting a resistible act resolves one resist contest per non-actor target before its effects apply
 `world/rules/action.py`'s `ActionResolver.resolve()` SHALL call `resist_verdict(actor, target,
@@ -82,5 +93,7 @@ when every target in the cast resists.
 
 #### Scenario: A fully-resisted cast still applies the actor's own pleasure share
 - **WHEN** an actor casts a `resistible=True` act whose only target's contest resolves `resisted=True`
-- **THEN** the actor's own `pleasure` increases by the same amount it would for a `resistible=False` act
-  with the same `base_pleasure` and `actor_pleasure_ratio`
+- **THEN** the actor's own `pleasure` increases by the share computed from the act's `base_pleasure`
+  and `actor_pleasure_ratio` over the post-resist participant set (the actor remains a participant even
+  when every target resists; the participant-count crowd multiplier is applied to the post-resist set,
+  per design D-7), and the resisting target's `pleasure` is unchanged

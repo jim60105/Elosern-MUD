@@ -8,10 +8,13 @@ credit per the sexual-act-seeds delta spec.
 
 from tools.spec_traceability import covers_requirement
 
+from unittest.mock import patch
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from world.quests.catalog import register_catalog
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY
@@ -76,6 +79,7 @@ class SeedActCastingTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.actor = create_object(
             PlayerCharacter, key="seed caster", location=self.room1
         )
@@ -123,7 +127,13 @@ class SeedActCastingTests(EvenniaTest):
 
     @covers_requirement("sexual-act-seeds::partner-seeds-credit-duo-act-count-on-both-participants")
     def test_partner_seed_increments_duo_act_count_on_both_participants(self):
-        result = self._cast("partner_caress", [self.target])
+        # partner_caress is a resistible=True act; the target's
+        # participant_counters credit is withheld on a resisted verdict, so
+        # force a compliant roll (both fixtures are floor humans with equal
+        # contest scores, making roll=1 a guaranteed comply) to keep the
+        # assertion deterministic (sexual-resist-cast-wiring design D-3a).
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("partner_caress", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.duo_act_count, 1)
         self.assertEqual(self.target.sexual.duo_act_count, 1)

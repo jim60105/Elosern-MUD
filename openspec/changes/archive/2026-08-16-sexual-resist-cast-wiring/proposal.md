@@ -79,6 +79,10 @@ always meant to live.
   `duo_act_count` (a `participant_counters` credit, which resist-gating **does** withhold from a
   resisting target) with no `roll_d100` mock, and **must** be updated to force a compliant roll (design.md
   D-3a) or it becomes flaky the moment this change lands.
+- Second existing test touch, discovered during implementation (design.md D-3a): every test-local act in
+  `world/rules/tests/test_sexual_act_effects.py` is built `resistible=True`, so that module's casts also
+  became roll-dependent and quest-catalog-dependent under this wiring. Its `_ActCastTestCase` fixture
+  gains `register_catalog()` in `setUp` and a compliant-roll `roll_d100` mock in `_cast`.
 - No change to `world/rules/sexual_resist.py` (`B6a`'s pure function), `world/rules/combat_session.py`
   (`B6b`'s consumer, already correct and already expecting exactly this contract), `world/skills/
   sexual_acts/_builder.py` (the `resistible` field is already validated; this proposal only reads it),
