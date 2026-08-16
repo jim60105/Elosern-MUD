@@ -305,7 +305,6 @@ after the intervening feature and catalog changes), 267 test modules across
 | 4 | `world.quests world.skills world.art world.ai world.onboarding world.lore` | 1,154 | 171.7 s | 2:55 |
 | 5 | `world.maps web.webclient world.imports world.prompts world.tests` | 817 | 153.3 s | 2:36 |
 | 6 | `commands server typeclasses` | 472 | 118.0 s | 2:01 |
-
 One rebalance pass was applied after the first measurement: the initial
 package grouping produced a 19 s shard and a ~226 s shard (max/mean ≈ 1.6);
 moving `web.webclient` away from `commands`/`typeclasses` (whose combined run

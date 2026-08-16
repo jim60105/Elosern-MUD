@@ -132,7 +132,7 @@
     },
     {
       "index": 4,
-      "name": "quests-maps-skills",
+      "name": "quests-skills-art-ai-onboarding-lore",
       "labels": [
         "world.quests",
         "world.skills",
@@ -144,7 +144,7 @@
     },
     {
       "index": 5,
-      "name": "ai-art-lore-imports-prompts-onboarding-tests",
+      "name": "maps-webclient-imports-prompts-tests",
       "labels": [
         "world.maps",
         "web.webclient",
@@ -155,7 +155,7 @@
     },
     {
       "index": 6,
-      "name": "commands-server-typeclasses-webclient",
+      "name": "commands-server-typeclasses",
       "labels": [
         "commands",
         "server",
