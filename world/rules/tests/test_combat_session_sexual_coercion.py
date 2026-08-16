@@ -29,6 +29,7 @@ import unittest
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
@@ -160,6 +161,7 @@ class AffinityConfigPenaltyTests(unittest.TestCase):
                 load_config(path=path)
             return str(raised.exception)
 
+    @covers_requirement("sexual-resist-turn-cost::sexual-forced-penalty-is-a-validated-rulebook-field-independent-of-friendly-fire-penalty-per-hit")
     def test_missing_sexual_forced_penalty_fails_closed(self):
         source = (
             Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
@@ -167,12 +169,14 @@ class AffinityConfigPenaltyTests(unittest.TestCase):
         message = self._deviant(source.replace("sexual_forced_penalty: 3\n", ""))
         self.assertIn("sexual_forced_penalty", message)
 
+    @covers_requirement("sexual-resist-turn-cost::sexual-forced-penalty-is-a-validated-rulebook-field-independent-of-friendly-fire-penalty-per-hit")
     def test_negative_sexual_forced_penalty_fails_closed(self):
         source = (
             Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
         ).read_text(encoding="utf-8")
         self._deviant(source.replace("sexual_forced_penalty: 3\n", "sexual_forced_penalty: -1\n"))
 
+    @covers_requirement("sexual-resist-turn-cost::sexual-forced-penalty-is-a-validated-rulebook-field-independent-of-friendly-fire-penalty-per-hit")
     def test_penalties_are_independently_configurable(self):
         source = (
             Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
@@ -204,6 +208,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
     def _scan(self, *logs):
         return _scan_sexual_coercion(self.player, self._battlefield(), list(logs))
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_forced_act_applies_exactly_one_penalty(self):
         target = _companion(self.player, "強制目標")
         # High enough that one penalty cannot drop below the invite threshold,
@@ -230,6 +235,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
             target.relations.affinity_for(self.player), 73 - self.penalty
         )
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_complied_act_applies_no_penalty(self):
         target = _companion(self.player, "服從目標")
         _grant_affinity(target, self.player, 10)
@@ -250,6 +256,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         self.assertEqual(calls, [])
         self.assertEqual(target.relations.affinity_for(self.player), 10)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_resisted_act_applies_no_penalty(self):
         target = _companion(self.player, "拒絕目標")
         _grant_affinity(target, self.player, 10)
@@ -263,6 +270,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         writer.assert_not_called()
         self.assertEqual(target.relations.affinity_for(self.player), 10)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_missing_or_mistyped_data_keys_never_penalize(self):
         target = _companion(self.player, "殘缺資料")
         _grant_affinity(target, self.player, 10)
@@ -294,6 +302,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
             writer.assert_not_called()
         self.assertEqual(target.relations.affinity_for(self.player), 10)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_multiple_forced_entries_each_apply_their_own_penalty(self):
         first = _companion(self.player, "雙目標一")
         second = _companion(self.player, "雙目標二")
@@ -321,6 +330,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         self.assertEqual(first.relations.affinity_for(self.player), 73 - self.penalty)
         self.assertEqual(second.relations.affinity_for(self.player), 73 - self.penalty)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_forced_entry_targeting_a_monster_applies_no_penalty(self):
         engage(self.player, self.monster)
         log = self._forced_log(self.monster)
@@ -330,6 +340,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         writer.assert_not_called()
         self.assertFalse(self.monster.relations.has_record(self.player))
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_forced_entry_targeting_a_player_applies_no_penalty(self):
         other = _player("被強制者")
         other.location = self.room
@@ -345,6 +356,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         self.assertEqual(notifications, ())
         writer.assert_not_called()
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_forced_entry_targeting_an_absent_entity_applies_no_penalty(self):
         engage(self.player, self.monster)
         battlefield = self._battlefield()
@@ -363,6 +375,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         self.assertEqual(notifications, ())
         writer.assert_not_called()
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_non_sexual_resist_entries_are_ignored(self):
         companion = _companion(self.player, "無關條目")
         _grant_affinity(companion, self.player, 10)
@@ -387,6 +400,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         writer.assert_not_called()
         self.assertEqual(companion.relations.affinity_for(self.player), 10)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_non_player_actor_logs_never_enter_the_scan(self):
         # A companion's or monster's own cast (a future emitter shape) can
         # never charge the player's affinity for someone else's act.
@@ -403,6 +417,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         writer.assert_not_called()
         self.assertEqual(target.relations.affinity_for(self.player), 10)
 
+    @covers_requirement("sexual-resist-turn-cost::scan-sexual-coercion-penalizes-exactly-the-forced-outcome-never-comply-or-successful-resistance")
     def test_malformed_non_dict_data_never_penalizes_and_never_raises(self):
         target = _companion(self.player, "畸形資料")
         _grant_affinity(target, self.player, 10)
@@ -495,6 +510,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
         ):
             return submit_player_action(self.player, skill_key, targets)
 
+    @covers_requirement("sexual-resist-turn-cost::the-coercion-scan-runs-inside-the-round-s-shared-outer-transaction-symmetric-with-friendly-fire")
     def test_forced_penalty_commits_atomically_with_the_round(self):
         target = _companion(self.player, "整合強制")
         _grant_affinity(target, self.player, 10)
@@ -508,6 +524,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             target.relations.affinity_for(self.player), 10 - self.penalty
         )
 
+    @covers_requirement("sexual-resist-turn-cost::the-coercion-scan-runs-inside-the-round-s-shared-outer-transaction-symmetric-with-friendly-fire")
     def test_rolled_back_round_leaves_no_coercion_penalty_trace(self):
         target = _companion(self.player, "回滾強制")
         _grant_affinity(target, self.player, 10)
@@ -542,6 +559,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
         # Fresh database read agrees.
         self.assertEqual(self._raw_relations(target), raw_before)
 
+    @covers_requirement("sexual-resist-turn-cost::the-coercion-scan-runs-inside-the-round-s-shared-outer-transaction-symmetric-with-friendly-fire")
     def test_friendly_fire_and_coercion_penalties_in_same_round_both_apply(self):
         ff_target = _companion(self.player, "誤傷整合")
         coerced = _companion(self.player, "強制整合")
@@ -562,6 +580,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             coerced.relations.affinity_for(self.player), 10 - self.penalty
         )
 
+    @covers_requirement("sexual-resist-turn-cost::the-coercion-scan-runs-inside-the-round-s-shared-outer-transaction-symmetric-with-friendly-fire")
     def test_auto_leave_notification_combines_both_scans(self):
         coerced = _companion(self.player, "離隊強制")
         _grant_affinity(coerced, self.player, 70)
@@ -613,6 +632,7 @@ class SnapshotWideningTests(SexualCoercionBase):
         ):
             return submit_player_action(self.player, skill_key, targets)
 
+    @covers_requirement("sexual-resist-turn-cost::the-relations-snapshot-covers-every-roster-npc-not-only-party-companions")
     def test_non_companion_npc_penalty_survives_a_successful_round(self):
         stranger = self._add_roster_stranger()
         _grant_affinity(stranger, self.player, 10)
@@ -626,6 +646,7 @@ class SnapshotWideningTests(SexualCoercionBase):
         )
         self.assertNotIn(int(stranger.pk), party_ids(self.player))
 
+    @covers_requirement("sexual-resist-turn-cost::the-relations-snapshot-covers-every-roster-npc-not-only-party-companions")
     def test_zero_companion_rollback_restores_non_companion_relations(self):
         # The Decision 3 regression: no party companions at all, so the old
         # outer guard (``if companion_pks:``) would have skipped the snapshot
@@ -660,6 +681,7 @@ class SnapshotWideningTests(SexualCoercionBase):
         )
         self.assertEqual(self._raw_relations(stranger), raw_before)
 
+    @covers_requirement("sexual-resist-turn-cost::the-relations-snapshot-covers-every-roster-npc-not-only-party-companions")
     def test_companion_snapshot_coverage_is_unchanged(self):
         # A companion-only round still rolls back correctly after the widening.
         companion = _companion(self.player, "同伴回滾")
