@@ -416,5 +416,13 @@ machine sharding.
   keeps in-flight image elements keyed by URL (`pendingImages`) and reuses
   them on re-render instead of issuing a duplicate request; the element
   leaves the cache only on `load`/`error`. A Node contract test pins the
-  reuse behavior. Rebalancing after further CI observations remains a
-  manifest edit plus the contract tests.
+  reuse behavior.
+- Run 31953234137: shard 10 (art) failed the two fullview tests. The reuse
+  introduced a stale-closure regression: listeners attached to a reused
+  element closed over `renderScene`'s `model` *parameter* (a snapshot from
+  the first render), so `model.sceneFullView = true` mutated a dead object.
+  The parameter is renamed to `panelModel` so the listeners read the
+  plugin-scope `model`, which `render()` always keeps current; the full
+  `test_browser_art` module (14 tests) passes again.
+  Rebalancing after further CI observations remains a manifest edit plus the
+  contract tests.

@@ -848,8 +848,8 @@
       }
     }
 
-    function renderScene(root, model) {
-      var scene = model.scene;
+    function renderScene(root, panelModel) {
+      var scene = panelModel.scene;
       var scenePane = makeElement("div", "art-scene");
       scenePane.classList.add("art-scene-" + scene.state);
       if (scene.state === "asset" || scene.state === "pending") {
@@ -862,6 +862,9 @@
           );
           scenePane.appendChild(failed);
         } else {
+          // The listeners close over the plugin-scope ``model`` (not the
+          // ``panelModel`` parameter) so a reused in-flight element always
+          // mutates the current model on activation or error.
           var img = requestSceneImage(
             scene.url,
             scene.alt,
