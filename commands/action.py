@@ -155,5 +155,7 @@ class CmdCast(Command):
         )
         if settlement.result.outcome == "success":
             self.caller.msg(render_plain_text(settlement.result.event_log))
+            for line in settlement.notifications:
+                self.caller.msg(line)
         else:
             self.caller.msg(rejection_message(settlement.result.reason))
