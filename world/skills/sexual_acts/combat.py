@@ -1,9 +1,15 @@
 """戰鬥線 (combat line): hostile acts performed during combat.
 
-Ships the one seed act this change registers; the sexual-catalog-combat
-proposal appends the remaining acts to this same tuple and owns no other
-file. This module is distinct from ``world/rules/combat.py``; the two are
-unambiguous by full path.
+The one unconditionally-owned seed act 挑逗 plus eight counter-gated acts
+across four tiers: two at ``hostile_act_count >= 5``, three at
+``hostile_act_count >= 20``, two at the compound ``hostile_act_count >= 40``
++ ``climax_count >= 30`` gate, and one AREA act at the compound
+``hostile_act_count >= 80`` + ``climax_extension_count >= 30`` gate.
+Every act keeps the seed's asymmetric crediting convention: only the
+aggressor's own ``hostile_act_count`` grows, a hostile target is never
+credited a counter for having been targeted. 搾取 (Tier 4, an SP-transfer
+act) is deferred — no cross-entity resource-transfer effect exists in the
+schema (sexual-catalog-combat design.md D-2).
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -20,6 +26,126 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         7,
         "腰腹",
         "腰腹",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_tease_whisper",
+        "挑逗·耳語",
+        "在交鋒間隙湊近對方耳畔低語，以撩人的言語攪亂其心神。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 5},
+        10,
+        "耳朵",
+        "耳朵",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_tease_touch",
+        "挑逗·觸碰",
+        "在交鋒間隙以指尖輕觸對方腰腹，讓戰意與慾念一同升起。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 5},
+        11,
+        "腰腹",
+        "腰腹",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_charm",
+        "魅惑",
+        "以嫵媚的姿態與魅惑的話語侵蝕對方的心防，令其身手逐漸遲鈍。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 20},
+        20,
+        "頸項",
+        "頸項",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_bind_caress",
+        "束縛愛撫",
+        "以纏綿的愛撫纏繞對方大腿，讓溫柔的束縛癱軟其行動。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 20},
+        20,
+        "大腿",
+        "大腿",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_forced_pleasure",
+        "強制快感",
+        "無視對方的抵抗直攻私處，強行從敵人身軀中逼出快感。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 20},
+        24,
+        "私處",
+        "私處",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_forced_climax",
+        "強制絕頂",
+        "以嫻熟的技巧將敵人逼向絕頂，令其在戰場上無力地高潮。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 40, "climax_count": 30},
+        30,
+        "私處",
+        "私處",
+        0.4,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_relentless_torment",
+        "連續責め",
+        "不給喘息地連續責弄對方臀部，讓快感一層層堆疊直至崩潰。",
+        TargetSpec.SINGLE,
+        {"hostile_act_count": 40, "climax_count": 30},
+        30,
+        "臀部",
+        "臀部",
+        0.6,
+        ("hostile_act_count",),
+        (),
+        (),
+        True,
+    ),
+    (
+        "combat_climax_domination",
+        "絕頂支配",
+        "以支配者的姿態同時壓制在場的所有敵人，令其一齊被推上絕頂。",
+        TargetSpec.AREA,
+        {"hostile_act_count": 80, "climax_extension_count": 30},
+        30,
+        "私處",
+        "私處",
         0.4,
         ("hostile_act_count",),
         (),

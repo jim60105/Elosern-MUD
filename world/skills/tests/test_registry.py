@@ -1560,6 +1560,14 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "partner_group_orgy",
                 "partner_group_service",
                 "combat_tease",
+                "combat_tease_whisper",
+                "combat_tease_touch",
+                "combat_charm",
+                "combat_bind_caress",
+                "combat_forced_pleasure",
+                "combat_forced_climax",
+                "combat_relentless_torment",
+                "combat_climax_domination",
             },
         }
         pinned = set().union(*expected.values())

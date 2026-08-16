@@ -36,9 +36,9 @@ and `participant_counters=()`.
 - **THEN** `combat_climax_domination` is present in the returned set
 
 #### Scenario: Casting any of the eight acts credits hostile_act_count on the actor only
-- **WHEN** entity A casts `combat_tease_whisper` targeting hostile entity B, both starting at
-  `hostile_act_count == 0`
-- **THEN** afterward `A.sexual.hostile_act_count` equals `1` and `B.sexual.hostile_act_count`
+- **WHEN** entity A at the Tier 1 unlock threshold (`hostile_act_count == 5`) casts
+  `combat_tease_whisper` targeting hostile entity B at `hostile_act_count == 0`
+- **THEN** afterward `A.sexual.hostile_act_count` equals `6` and `B.sexual.hostile_act_count`
   remains `0`
 
 ### Requirement: combat_forced_climax, combat_relentless_torment, and combat_climax_domination reliably clear the climax extension threshold
@@ -62,12 +62,15 @@ declare `base_pleasure=30`.
   gain
 
 ### Requirement: combat_climax_domination is the sole AREA act in this catalog line
-`combat_climax_domination` SHALL declare `target_spec=TargetSpec.AREA` and `target_part="私處"`.
+`combat_climax_domination` SHALL declare `target_spec=TargetSpec.AREA` and
+`actor_part="私處"`, `target_part="私處"` (an AREA restatement of 強制絕頂's exact part pair,
+design.md D-1).
 Every other act added by this change SHALL declare `target_spec=TargetSpec.SINGLE`.
 
 #### Scenario: combat_climax_domination targets an area
 - **WHEN** `combat_climax_domination` is read from `SEXUAL_ACT_REGISTRY`
-- **THEN** its `SkillDef.target_spec` equals `TargetSpec.AREA` and its `target_part` equals `"私處"`
+- **THEN** its `SkillDef.target_spec` equals `TargetSpec.AREA`, its `actor_part` equals `"私處"`,
+  and its `target_part` equals `"私處"`
 
 ### Requirement: No act added by this change declares a sexual_events entry
 Every one of the eight acts added by this change SHALL declare `sexual_events=()`.
