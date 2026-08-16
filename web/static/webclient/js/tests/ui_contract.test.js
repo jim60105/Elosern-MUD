@@ -256,3 +256,25 @@ test("creation form requires a subrace and shows the allocation briefing", () =>
   assert.match(dock, /背景設定（風味文字）/);
   assert.match(menu, /background: ""/);
 });
+
+test("art panel reuses an in-flight scene image instead of refetching", () => {
+  // The browser image-load-failure requirement forbids repeatedly fetching
+  // the same scene URL. A re-render while the first request is still in
+  // flight must reuse the pending element rather than creating a second
+  // <img> with the identical src (the two-process browser shards widened
+  // this window enough to observe a duplicate request).
+  const source = read("web/static/webclient/js/plugins/goldenlayout.js");
+  assert.match(source, /pendingImages/);
+  assert.match(source, /function requestSceneImage\(/);
+  // The pending cache is consulted before any new element is created.
+  assert.match(
+    source,
+    /var pending = pendingImages\[url\];\s*if \(pending\) \{\s*return pending;\s*\}/s
+  );
+  // The element is only removed from the cache on load or error, so a
+  // re-render between request start and settlement never duplicates it.
+  assert.match(source, /addEventListener\("load", function \(\) \{\s*delete pendingImages\[url\];/s);
+  assert.match(source, /addEventListener\("error", function \(\) \{\s*delete pendingImages\[url\];/s);
+  // The scene render path routes through the shared request helper.
+  assert.match(source, /requestSceneImage\(\s*scene\.url,/s);
+});

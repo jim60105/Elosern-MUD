@@ -405,5 +405,16 @@ machine sharding.
   marker (`CannotListenError` / `Address already in use`), so a sibling
   process grabbing a released port no longer fails the whole shard. Two fast
   unit tests pin the retry (fresh runtime on conflict, budget exhausted
-  raises). Rebalancing after further CI observations remains a manifest edit
-  plus the contract tests.
+  raises).
+- Run 31952671241: 10 of 11 browser shards passed; shard 11 (art-harness-
+  shell) failed `test_image_load_failure_shows_fallback_without_refetch`
+  with `AssertionError: 2 != 1` — the scene image URL was requested twice.
+  This exposed a latent client race: a snapshot refresh re-rendering between
+  `img.src = url` and the image's `error` event created a second `<img>` for
+  the identical URL, violating the "SHALL NOT repeatedly fetch" requirement.
+  The two-process CPU contention widened that window. The art panel now
+  keeps in-flight image elements keyed by URL (`pendingImages`) and reuses
+  them on re-render instead of issuing a duplicate request; the element
+  leaves the cache only on `load`/`error`. A Node contract test pins the
+  reuse behavior. Rebalancing after further CI observations remains a
+  manifest edit plus the contract tests.

@@ -775,6 +775,41 @@
       return !!url && failedUrls[url] === true;
     }
 
+    // In-flight image elements keyed by URL. A re-render while a request is
+    // still loading reuses the same element instead of issuing a second fetch
+    // for the identical URL (the panel must not repeatedly request a URL that
+    // has not resolved or failed yet).
+    var pendingImages = {};
+
+    function requestSceneImage(url, alt, label, onError, onActivate) {
+      var pending = pendingImages[url];
+      if (pending) {
+        return pending;
+      }
+      var img = makeElement("img", "art-scene-image");
+      img.alt = alt;
+      img.setAttribute("tabindex", "0");
+      img.setAttribute("role", "button");
+      img.setAttribute("aria-label", label + "（按下 Enter 開啟全畫面）");
+      pendingImages[url] = img;
+      img.addEventListener("load", function () {
+        delete pendingImages[url];
+      });
+      img.addEventListener("error", function () {
+        delete pendingImages[url];
+        onError();
+      });
+      img.addEventListener("click", onActivate);
+      img.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onActivate();
+        }
+      });
+      img.src = url;
+      return img;
+    }
+
     function render() {
       subscribeArtFocus();
       clearFullView();
@@ -827,27 +862,19 @@
           );
           scenePane.appendChild(failed);
         } else {
-          var img = makeElement("img", "art-scene-image");
-          img.src = scene.url;
-          img.alt = scene.alt;
-          img.setAttribute("tabindex", "0");
-          img.setAttribute("role", "button");
-          img.setAttribute("aria-label", scene.label + "（按下 Enter 開啟全畫面）");
-          img.addEventListener("error", function () {
-            markFailedUrl(scene.url);
-            render();
-          });
-          img.addEventListener("click", function () {
-            model.sceneFullView = true;
-            render();
-          });
-          img.addEventListener("keydown", function (event) {
-            if (event.key === "Enter") {
-              event.preventDefault();
+          var img = requestSceneImage(
+            scene.url,
+            scene.alt,
+            scene.label,
+            function () {
+              markFailedUrl(scene.url);
+              render();
+            },
+            function () {
               model.sceneFullView = true;
               render();
             }
-          });
+          );
           scenePane.appendChild(img);
         }
         if (scene.state === "pending") {
