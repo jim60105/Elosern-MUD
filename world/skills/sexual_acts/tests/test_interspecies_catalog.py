@@ -309,17 +309,17 @@ class InterspeciesCastTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
         self.assertIn("異種性愛", self.monster.sexual.experience_types)
 
-    def test_mating_event_lands_on_the_monster_not_the_actor(self):
-        # design.md D-4 regression, pinning the presently-shipped gap:
-        # _handle_sexual_event fires on the cast's surviving targets, so
-        # sexual_activity_with_nonhuman credits the Monster, never the actor.
-        # A future _handle_sexual_event fix is a deliberate, visible change.
-        # The monster's contest is forced to compliance (roll=1) so the
-        # target-side event effect actually lands.
+    def test_mating_event_reaches_every_participant(self):
+        # sexual-intercourse-acts D-3: _handle_sexual_event fires on
+        # participants(actor, targets), so sexual_activity_with_nonhuman
+        # credits both the Monster and the acting entity — closing the
+        # recipient asymmetry the original catalog design documented
+        # (interspecies design.md D-4). The monster's contest is forced to
+        # compliance (roll=1) so the target-side event effect actually lands.
         _counter_up(self.actor, "hostile_act", 30)
         _counter_up(self.actor, "climax_count", 20)
         with patch("world.rules.action.roll_d100", return_value=1):
             result = self._cast("interspecies_mating", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertIn("異種性愛", self.monster.sexual.experience_types)
-        self.assertNotIn("異種性愛", self.actor.sexual.experience_types)
+        self.assertIn("異種性愛", self.actor.sexual.experience_types)

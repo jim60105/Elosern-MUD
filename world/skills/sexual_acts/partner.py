@@ -1,10 +1,11 @@
 """關係線 (partner line): partner acts and the D-12 opposite-sex branch.
 
-Ships the two seed acts this change registers; the sexual-catalog-partner
-proposal appends the remaining acts to this same tuple and owns no other
-file. 交合/深度交合 (vaginal intercourse and the D-12 ``virgin``-breaking
-branch) are deferred by design.md D-2: ``SexualActDef.sexual_events`` is a
-fixed tuple with no mechanism to select an event from participant state.
+Ships the two seed acts plus the counter-gated catalogue; the D-12 branch
+itself lives in the trailing 交合/深度交合 rows, whose ``pair_events``
+tables select ``first_vaginal_penetration`` (breaking ``virgin`` for both
+parties of an opposite-sex cast), ``penetrative_sex_with_female``, or
+``penetrative_sex_with_male`` from the participants' ``sex`` fields at cast
+time.
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -206,6 +207,46 @@ PARTNER_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         ("duo_act_count",),
         (),
         True,
+    ),
+    (
+        "partner_vaginal_sex",
+        "交合",
+        "與對方結合為一體，在深入交融之中感受彼此最原始的渴望。",
+        TargetSpec.SINGLE,
+        {"duo_act_count": 30, "climax_count": 10},
+        28,
+        "私處",
+        "私處",
+        0.6,
+        ("duo_act_count",),
+        ("duo_act_count",),
+        (),
+        True,
+        (
+            (("female", "male"), "first_vaginal_penetration"),
+            (("female", "female"), "penetrative_sex_with_female"),
+            (("male", "male"), "penetrative_sex_with_male"),
+        ),
+    ),
+    (
+        "partner_deep_vaginal_sex",
+        "深度交合",
+        "更深入、更猛烈地貫入對方，讓結合的慾望徹底焚燒彼此。",
+        TargetSpec.SINGLE,
+        {"duo_act_count": 30, "climax_count": 10},
+        34,
+        "私處",
+        "私處",
+        0.9,
+        ("duo_act_count",),
+        ("duo_act_count",),
+        (),
+        True,
+        (
+            (("female", "male"), "first_vaginal_penetration"),
+            (("female", "female"), "penetrative_sex_with_female"),
+            (("male", "male"), "penetrative_sex_with_male"),
+        ),
     ),
     (
         "partner_group_caress",

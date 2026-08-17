@@ -323,9 +323,11 @@ class ShameCastTests(EvenniaTest):
                 self.assertEqual(entity.sexual.exposure.value, 1)
 
     @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
-    def test_area_reusing_act_raises_each_targets_exposure_not_the_actors(self):
-        # design.md D-6: the landed event handler fires on the cast's targets,
-        # and an AREA cast's targets never include the actor.
+    def test_area_reusing_act_raises_every_participants_exposure(self):
+        # sexual-intercourse-acts D-3: the landed event handler fires on
+        # participants(actor, targets), so an AREA cast's self_exposure event
+        # raises the acting entity's exposure as well as each target's — the
+        # actor of a public performance is publicly exposed too.
         thresholds = {
             "shame_public_performance": {
                 "watched": 10,
@@ -359,7 +361,7 @@ class ShameCastTests(EvenniaTest):
                     )
                 self.assertEqual(result.outcome, "success")
                 self.assertEqual(target.sexual.exposure.value, 1)
-                self.assertEqual(entity.sexual.exposure.value, 0)
+                self.assertEqual(entity.sexual.exposure.value, 1)
 
     @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
     def test_provocative_gaze_does_not_raise_the_actors_own_exposure(self):

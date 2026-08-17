@@ -108,8 +108,10 @@ values.
 ## Risks / Trade-offs
 
 - **[Risk] `_handle_sexual_event` recipient change alters every existing act's event scope.** 乳交
-  and 異種交合 now credit both parties; SELF acts are unchanged. This is the designed fix (partner
-  D-3), pinned by new tests and the amended `sexual-act-effects` requirement.
+  and 異種交合 now credit both parties; the AREA 羞恥線 acts' `self_exposure` now raises the
+  performing actor's exposure as well as each target's (amended in the `sexual-catalog-shame`
+  delta of this change); SELF acts are unchanged. This is the designed fix (partner D-3), pinned
+  by new tests and the amended `sexual-act-effects` requirement.
 - **[Risk] The legacy-set discriminator adds a second event-name policy next to
   `_FORBIDDEN_SEXUAL_EVENTS`.** → Documented in the handler docstring and the delta spec; a
   structural test asserts `_LEGACY_TARGET_SCOPED_EVENTS` and the acts' declared event names are

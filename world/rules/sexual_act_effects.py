@@ -24,6 +24,7 @@ from typing import Any, Mapping
 
 import yaml
 
+from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.lore.sexual_vocab import GENERIC_BODY_PART, SENSITIVITY_LEVELS
 from world.rules.sexual_state import PLEASURE_CONFIG
 
@@ -250,6 +251,42 @@ def mutator_name_for(counter_name: str) -> str:
         raise ValueError(f"unknown lifetime counter {counter_name!r}") from error
 
 
+def _read_sex(entity: Any) -> str:
+    """Read one entity's ``sex`` attribute with the unknown-party fallback.
+
+    An absent attribute, an explicit ``None``, and any value outside
+    ``SEX_VALUES`` all read as ``DEFAULT_SEX`` (``"other"``) — every
+    ``Monster``, which carries the ``LivingEntity`` default, lands in that
+    branch, so the D-12 ``other``/unknown case "falls out for free"
+    (catalog design D-5), and a corrupted non-string attribute can never
+    crash the selector's pair sort.
+    """
+    value = getattr(entity, "sex", None)
+    return value if value in SEX_VALUES else DEFAULT_SEX
+
+
+def pair_event_name(actor: Any, targets: list[Any], act: Any) -> str | None:
+    """Resolve one act's sex-conditional event from its cast participants.
+
+    Builds the sorted two-member sex tuple of ``participants(actor,
+    targets)`` (reading each participant's ``sex`` through :func:`_read_sex`)
+    and returns the event name of the first ``act.pair_events`` entry whose
+    pair equals it, or ``None`` when no entry matches — the D-12 table's
+    "either party ``other``/unknown emits nothing" branch. The sort is plain
+    ``sorted()`` on the two strings, matching ``_act_family()``'s
+    construction-time sorted-pair validation, so a declared pair can only
+    match casts in the same canonical order. A single-participant surviving
+    cast (the one target resisted) never matches a two-member pair and
+    therefore emits nothing: a resisted 交合 is no 交合 at all.
+    """
+    everyone = participants(actor, targets)
+    pair = tuple(sorted(_read_sex(entity) for entity in everyone))
+    for sex_pair, event_name in act.pair_events:
+        if sex_pair == pair:
+            return event_name
+    return None
+
+
 __all__ = [
     "EffectsConfig",
     "EffectsConfigError",
@@ -257,6 +294,7 @@ __all__ = [
     "compute_pleasure_gain",
     "load_effects_config",
     "mutator_name_for",
+    "pair_event_name",
     "participants",
     "resolve_part",
 ]

@@ -34,6 +34,7 @@ from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
     _EFFECTS_CONFIG,
     compute_pleasure_gain,
+    pair_event_name,
     participants,
     resolve_part,
 )
@@ -52,6 +53,7 @@ from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import parse_effect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.sexual_acts._builder import _LEGACY_TARGET_SCOPED_EVENTS
 
 
 class RejectReason(StrEnum):
@@ -612,6 +614,17 @@ def _handle_sexual_event(
     context: dict[str, Any],
     scale: float,
 ) -> list[PendingEffect]:
+    """Apply one act's declared event to its participants.
+
+    The event fires for **every participant** of the cast —
+    ``participants(actor, targets)`` — mirroring the pleasure and counter
+    handlers, except that an event name in ``_LEGACY_TARGET_SCOPED_EVENTS``
+    (exactly the legacy ``divine_sexual_arts`` skill's ``stimulus_applied``)
+    keeps the historic target-scoped iteration so the divine-arts exemption
+    from self-pleasure (D-9) holds. Resisted targets were already excluded
+    from ``targets`` by ``_step4b_sexual_resist_gate``, so a partially
+    resisted cast reaches only its surviving participants.
+    """
     del scale
     try:
         from world.rules.sexual_transitions import apply_event
@@ -627,6 +640,11 @@ def _handle_sexual_event(
             "sexual_event requires an event name",
         )
     sexual_context = dict(context.get("sexual", {}))
+    recipients = (
+        targets
+        if event_name in _LEGACY_TARGET_SCOPED_EVENTS
+        else participants(actor, targets)
+    )
     return [
         PendingEffect(
             target,
@@ -638,7 +656,53 @@ def _handle_sexual_event(
                 **sexual_context,
             ),
         )
-        for target in targets
+        for target in recipients
+    ]
+
+
+def _handle_act_pair_event(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Resolve one sex-conditional event and apply it to every participant.
+
+    Resolves the acting act through ``_resolve_act`` (rejecting an absent
+    key defensively), selects the emitted event from the cast's participant
+    pair through :func:`pair_event_name`, and stages one ``PendingEffect``
+    per participant when an event matched — the D-12 symmetric ``virgin``
+    break for an opposite-sex cast. A ``None`` resolution (an ``other``/
+    unknown participant, or a single-participant surviving cast) stages no
+    effect. Like ``_handle_sexual_event``, the ``apply_event`` import stays
+    deferred to match the module's existing cycle-avoidance discipline.
+    """
+    del scale
+    sexual_context = dict(context.get("sexual", {}))
+    act = _resolve_act(effect_id)
+    event_name = pair_event_name(actor, targets, act)
+    if event_name is None:
+        return []
+    try:
+        from world.rules.sexual_transitions import apply_event
+    except ImportError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual-transition rules are unavailable (change 7b)",
+        ) from error
+    return [
+        PendingEffect(
+            participant,
+            f"sexual_transition|{_entity_key(participant)}|{event_name}",
+            frozenset(),
+            lambda participant=participant: apply_event(
+                participant,
+                event_name,
+                **sexual_context,
+            ),
+        )
+        for participant in participants(actor, targets)
     ]
 
 
@@ -1153,6 +1217,12 @@ register_effect_handler(
 register_effect_handler(
     "sexual_counter",
     _handle_sexual_counter_effect,
+    frozenset({"sexual"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "act_pair_event",
+    _handle_act_pair_event,
     frozenset({"sexual"}),
     requires_event_context=frozenset(),
 )
