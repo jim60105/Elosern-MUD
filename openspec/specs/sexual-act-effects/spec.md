@@ -4,9 +4,11 @@
 
 Define the runtime machinery that turns a catalog act's metadata into actual state mutation:
 the pure helpers (`resolve_part`, `participants`, `compute_pleasure_gain`, the counter-to-mutator
-table), the two new balance tables in `sexual_act_effects.yaml`, the `pleasure:`/`sexual_counter:`
-effect prefixes and their `world/rules/action.py` handlers, and the direct replication of the two
-arousal-coupled `sexual.yaml` cascade rules that `apply_event()`'s own snapshot cannot observe.
+table, the `observers_present` presence read), the two new balance tables in
+`sexual_act_effects.yaml`, the `pleasure:`/`sexual_counter:`/`sexual_event_actor:` effect
+prefixes and their `world/rules/action.py` handlers, the observer-gated application of the
+watched event/counter names, and the direct replication of the two arousal-coupled `sexual.yaml`
+cascade rules that `apply_event()`'s own snapshot cannot observe.
 
 ## Requirements
 
@@ -138,7 +140,10 @@ participant's computed gain to `entity.sexual.pleasure.base`. For any participan
 `SEXUAL_ACT_REGISTRY[act_key].actor_counters`, the handler SHALL stage one `PendingEffect` calling
 the actor's corresponding sanctioned mutator (per the explicit attribute-to-mutator table, never a
 derived string transform). For each name in `.participant_counters`, the handler SHALL stage one such
-call for every entity in `participants(actor, targets)` other than the actor.
+call for every entity in `participants(actor, targets)` other than the actor. A name in the
+observer-gated counter set (`watched_count`, see the observer-gating requirement) SHALL be staged
+only when `observers_present()` is true for the cast; a cast with no observer SHALL silently skip
+that name while still staging every other declared counter.
 
 #### Scenario: An actor-only counter increments once on the actor and never on the target
 - **WHEN** a `sexual_counter:<act_key>` effect resolves for an act whose `actor_counters` names one
@@ -156,6 +161,16 @@ call for every entity in `participants(actor, targets)` other than the actor.
 - **THEN** every one of the three targets' named `participant_counters` counters increases by exactly
   one, and the actor's copy of that counter is unaffected unless the same name also appears in
   `actor_counters`
+
+#### Scenario: An unobserved cast skips the watched_count increment
+- **WHEN** a `sexual_counter:<act_key>` effect resolves for an act declaring `watched_count` in
+  `actor_counters` while no observer is present (an empty room, out of combat)
+- **THEN** the actor's `watched_count` is unchanged and every other declared counter still
+  increments
+
+#### Scenario: An observed cast increments watched_count normally
+- **WHEN** the same effect resolves while a co-located entity other than the actor is present
+- **THEN** the actor's `watched_count` increases by exactly one
 
 ### Requirement: The counter-to-mutator table is explicit and structurally verified against SexualState
 `world/rules/sexual_act_effects.py` SHALL declare an explicit mapping from each of `SexualState`'s
@@ -270,3 +285,71 @@ the first `act.pair_events` entry whose sex pair equals it, or `None` when no en
 #### Scenario: A pair-event effect naming an act absent from the registry is rejected defensively
 - **WHEN** `act_pair_event:<key>` names an act absent from `SEXUAL_ACT_REGISTRY`
 - **THEN** the action rejects with `RejectReason.EFFECT_RESOLUTION_FAILED` naming the effect string
+
+### Requirement: observers_present returns whether any entity besides the actor observes a cast
+`world/rules/sexual_act_effects.py` SHALL define `observers_present(actor, targets, event_context)
+-> bool`, a deterministic, no-create read: a cast whose target list contains an entity other than
+the actor (an AREA cast's audience, or a SINGLE cast's partner) SHALL count as observed; otherwise
+the co-located candidates SHALL be the battlefield roster's members when
+`event_context["battlefield"]` is present, or the room's `LivingEntity` occupants when
+`event_context["room"]` is present, and the cast SHALL be observed when any candidate is not the
+actor. An event context carrying neither battlefield nor room SHALL read as unobserved.
+
+#### Scenario: An AREA cast is observed by its audience
+- **WHEN** `observers_present(actor, [target_a], event_context)` is called for an AREA cast with
+  one non-actor target
+- **THEN** it returns `True`
+
+#### Scenario: A SELF cast alone in a room is unobserved
+- **WHEN** `observers_present(actor, [actor], {"room": room})` is called for a room whose only
+  `LivingEntity` occupant is the actor
+- **THEN** it returns `False`
+
+#### Scenario: A SELF cast with a co-located entity is observed
+- **WHEN** the same call is made with one other `LivingEntity` in the room
+- **THEN** it returns `True`
+
+#### Scenario: A SELF cast on an empty battlefield is unobserved
+- **WHEN** `observers_present(actor, [actor], {"battlefield": battlefield})` is called for a
+  battlefield whose roster holds only the actor
+- **THEN** it returns `False`
+
+#### Scenario: A missing context reads as unobserved
+- **WHEN** `observers_present(actor, [actor], {})` is called
+- **THEN** it returns `False` without raising
+
+### Requirement: watched_during_activity and watched_count are observer-gated; the gated names are declared as module constants
+`world/rules/sexual_act_effects.py` SHALL declare `_OBSERVER_GATED_EVENTS` (containing exactly
+`"watched_during_activity"`) and `_OBSERVER_GATED_COUNTERS` (containing exactly `"watched_count"`).
+The actor-scoped event handler SHALL skip an event name in `_OBSERVER_GATED_EVENTS` when
+`observers_present()` is false, and the counter handler SHALL skip a counter name in
+`_OBSERVER_GATED_COUNTERS` under the same condition (see the modified counter requirement). A
+structural test SHALL assert `_OBSERVER_GATED_EVENTS` is a subset of `_ACTOR_SCOPED_EVENTS` (the
+actor-scoped event vocabulary in `world/skills/sexual_acts/_builder.py`), and separately that
+`_OBSERVER_GATED_COUNTERS` is a subset of `SexualState`'s sanctioned lifetime counter attribute
+names (the `_COUNTER_MUTATORS` key set).
+
+#### Scenario: An unobserved cast skips the watched event
+- **WHEN** an act declaring `watched_during_activity` is cast while no observer is present
+- **THEN** `apply_event` is never invoked with `"watched_during_activity"` for that cast
+
+#### Scenario: An observed cast emits the watched event
+- **WHEN** the same act is cast while an observer is present
+- **THEN** `apply_event` is invoked with `"watched_during_activity"` for the actor
+
+### Requirement: sexual_event_actor:<name> applies the named event to the actor only
+`world/rules/action.py` SHALL register the `sexual_event_actor:<name>` prefix (surfaces
+`frozenset({"sexual"})`, no required event context). The handler SHALL stage one `PendingEffect`
+calling `apply_event(actor, event_name, ...)` — never for any target — and SHALL apply the
+observer-gating rule for a gated event name. The paired typed effect SHALL exist in
+`world/skills/effects.py` and resolve through the same dispatch table.
+
+#### Scenario: An actor-scoped event reaches the actor and no target
+- **WHEN** an act declaring `sexual_event_actor:self_exposure` is cast against one target
+- **THEN** `apply_event` is invoked with `"self_exposure"` for the actor exactly once and never for
+  the target
+
+#### Scenario: A gated actor-scoped event is skipped without an observer
+- **WHEN** an act declaring `sexual_event_actor:watched_during_activity` is cast against one target
+  in an empty room context
+- **THEN** `apply_event` is never invoked with `"watched_during_activity"`
