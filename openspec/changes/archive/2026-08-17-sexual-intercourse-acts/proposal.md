@@ -51,6 +51,8 @@ D-3's documented asymmetry). This change closes both loops.
 - `sexual-catalog-partner`: the partner catalog grows from fourteen to sixteen acts; 交合/深度交合
   implement the D-12 branch (sex-dependent event, symmetric `virgin` break, `other`/unknown and
   monster targets never break `virgin`).
+- `sexual-catalog-shame`: the AREA-act `self_exposure` recipient scenario is amended to the
+  participant-scoped semantics — the performing actor of a public act is publicly exposed too.
 
 ## Impact
 
@@ -62,4 +64,5 @@ D-3's documented asymmetry). This change closes both loops.
   `_handle_act_pair_event` handler + registration.
 - Tests: registry structural checks, effects unit tests, catalog tests, and a full D-12 branch
   acceptance test (opposite/same-sex/other pairings).
-- Spec deltas: `sexual-act-registry`, `sexual-act-effects`, `sexual-catalog-partner`.
+- Spec deltas: `sexual-act-registry`, `sexual-act-effects`, `sexual-catalog-partner`,
+  `sexual-catalog-shame` (the AREA-act recipient amendment).

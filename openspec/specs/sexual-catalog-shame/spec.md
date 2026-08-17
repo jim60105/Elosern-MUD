@@ -69,11 +69,13 @@ gain no rule row from this change.
 - **WHEN** an entity whose `exposure` is at its vocabulary floor casts `shame_provocative_gaze`
 - **THEN** the actor's `exposure` ordinal is unchanged afterward
 
-#### Scenario: An AREA shame act's self_exposure lands on its targets, not the actor
+#### Scenario: An AREA shame act's self_exposure reaches every participant
 - **WHEN** an entity whose `exposure` is at its vocabulary floor casts `shame_public_performance`
   targeting one other entity
-- **THEN** the target's `exposure` ordinal increases by exactly `1` and the actor's `exposure`
-  ordinal is unchanged afterward
+- **THEN** the target's `exposure` ordinal increases by exactly `1`, and the actor's `exposure`
+  ordinal also increases by exactly `1` — the performing actor is publicly exposed too, per the
+  participant-scoped `sexual_event:` semantics `sexual-intercourse-acts` establishes (partner
+  design.md D-3)
 
 ### Requirement: shame_public_masturbation credits three counters and emits two events
 `shame_public_masturbation` SHALL declare `actor_counters=("exposure_act_count",
