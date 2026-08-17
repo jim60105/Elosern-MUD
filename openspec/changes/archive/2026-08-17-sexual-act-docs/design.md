@@ -17,26 +17,33 @@ The subset of the system this change documents is fully shipped:
 `world/rules/combat_view.py::group_skill_views` groups owned skills into a `sexual_act` category (shown
 by `combat actions`) sub-grouped by line, `world/rules/sexual_resist.py` runs the resist contest (wired
 into `ActionResolver.resolve()` for every cast, in or out of combat, by the archived
-`sexual-resist-cast-wiring`), and `world/rules/combat_session.py::_scan_sexual_coercion` applies the
-affinity/auto-leave consequence of a forced act — **in combat only**. There is no out-of-combat
-equivalent yet: `world/rules/cast_settlement.py` (the out-of-combat cast-settlement path) has no
-coercion-scanning function today; `sexual-resist-out-of-combat` proposes adding one and has not
-archived. `world/rules/rulebook/status_display.yaml` carries the three player-visible condition labels
-for arousal, climax, and exposure. None of the shipped subset above is touched by this change; the
-design problem is purely where the explanatory prose goes, how it stays test-enforceable, and — per the
-correction below — keeping every claim scoped to what is actually shipped.
+`sexual-resist-cast-wiring`), and the affinity/auto-leave consequence of a forced act is applied by
+`world/rules/combat_session.py::_scan_sexual_coercion` in combat and by its shipped out-of-combat
+sibling `world/rules/cast_settlement.py::_scan_out_of_combat_sexual_coercion` outside combat
+(`sexual-resist-out-of-combat` has archived). `world/rules/rulebook/status_display.yaml` carries the
+three player-visible condition labels for arousal, climax, and exposure. None of the shipped subset
+above is touched by this change; the design problem is purely where the explanatory prose goes, how it
+stays test-enforceable, and — per the corrections below — keeping every claim scoped to what is
+actually shipped.
 
-**Correction (post rubber-duck review):** an earlier draft of this change's proposal.md and this file
-incorrectly stated that `sexual-resist-out-of-combat` and both `sexual-catalog-divine-*` proposals were
-already archived, and cited a nonexistent `world/rules/sexual_unlock.py` module and a nonexistent
-`cast_settlement.py::_scan_out_of_combat_sexual_coercion` function. Verified against the actual
-repository state: `openspec/changes/sexual-resist-out-of-combat/`,
-`openspec/changes/sexual-catalog-divine-core/`, and `openspec/changes/sexual-catalog-divine-mutators/`
-are all open (zero completed tasks, not archived, no corresponding `openspec/specs/` entry), and
-`world/skills/sexual_acts/divine.py` still ships `DIVINE_ACTS: tuple = ()`. Every citation and every
-claim in the current proposal.md/design.md/spec delta has been corrected to (a) use the real module
-paths and (b) scope the affinity/auto-leave sentence to in-combat casts only, since that is the only
-half of the mechanism that is actually shipped today.
+**Corrections (state tracked across two reviews):** an early draft of this change's proposal.md and
+this file incorrectly claimed that `sexual-resist-out-of-combat` and both `sexual-catalog-divine-*`
+proposals were already archived, and cited a nonexistent `world/rules/sexual_unlock.py` module and a
+nonexistent `cast_settlement.py::_scan_out_of_combat_sexual_coercion` function. A first rubber-duck
+review caught that by checking the actual repository state (task-completion counts,
+`openspec/specs/` entries, and the cited functions/modules directly), and every citation was corrected
+to the real module paths — including, at that time, scoping the affinity/auto-leave sentence to
+in-combat casts only, since that was the only half of the mechanism shipped then. Before
+implementation, the state moved again in the other direction: `sexual-resist-out-of-combat`,
+`sexual-catalog-divine-core`, and `sexual-catalog-divine-mutators` have all since archived. Verified
+against the current repository: `world/rules/cast_settlement.py` now defines
+`_scan_out_of_combat_sexual_coercion` and `settle_out_of_combat_cast` runs it inside the settlement's
+outer transaction, `world/skills/sexual_acts/divine.py` now ships the seven 神之秘法 acts, and
+`world/rules/sexual_unlock.py` still does not exist — the unlock query lives at
+`world/rules/sexual_state.py::SexualState.unlocked_act_keys()` and
+`world/skills/sexual_acts/__init__.py::unlocked_act_keys_for()`. The affinity/auto-leave sentence is
+therefore documented without combat scoping, and the only retained bound is the Non-Goal of not
+enumerating individual divine-arts acts.
 
 The `element-mastery-freeform-casting` change (archived) already extended the `cast` requirement once,
 adding an `ADDED Requirement` delta to `game-command-docs` with two scenarios: one asserting the
@@ -66,13 +73,15 @@ extension.
   entries, condition labels — and this proposal keeps that register.
 - No change to `EXPECTED_COMMANDS["cast"]` or `["combat actions"]` in `tests/test_command_docs.py`
   (syntax and context are unchanged); only the 說明 field content and a new prose block change.
-- No claim that the out-of-combat affinity/auto-leave consequence exists. Only `_scan_sexual_coercion`
-  (in-combat) is shipped; `sexual-resist-out-of-combat` is still open. The new prose states the
-  consequence explicitly as an in-combat fact, not a general one.
-- No claim about which of the seven 神之秘法 acts exist or what they do — `sexual-catalog-divine-core`
-  and `sexual-catalog-divine-mutators` are both still open and `divine.py` ships an empty tuple. The
-  only divine-arts fact this proposal documents (the race gate on the pre-existing `divine_sexual_arts`
-  skill) predates and does not depend on either open proposal.
+- No claim about which of the seven 神之秘法 acts exist or what they do. Although
+  `sexual-catalog-divine-core` and `sexual-catalog-divine-mutators` have archived and `divine.py`
+  ships real content, the reference page does not enumerate the acts of any line — catalog data is
+  not command documentation, and discovery-by-play is the intended experience. The only divine-arts
+  fact this proposal documents (the race gate on the pre-existing `divine_sexual_arts` skill)
+  predates both archived proposals.
+- No claim that any part of the affinity/auto-leave consequence is combat-scoped. Both
+  `_scan_sexual_coercion` (in-combat) and `_scan_out_of_combat_sexual_coercion` (out of combat) are
+  shipped; the prose states the consequence as applying to forced acts generally.
 
 ## Decisions
 
@@ -93,14 +102,14 @@ extension.
   `assertIn`, not field equality) and keeps the diff reviewable against the shipped behavior each clause
   describes.
 - **The new spec requirement pins keyword substrings, not full sentences, for every fact it states —
-  not only three of the five.** An earlier draft pinned substrings for 抵抗 (resist), 好感度 (affinity),
+  not only some of them.** An earlier draft pinned substrings for 抵抗 (resist), 好感度 (affinity),
   and 神之秘法 (divine arts) but left "unlock is play-driven" and "the three status condition labels
   appear while active" untested, contradicting this same design's stated goal that the content "cannot
-  silently drift." Corrected: the delta now also requires 解鎖 (unlock) in the `cast` entry's clause and
-  one status-label term (興奮, matching 高度興奮敏捷與準度減損) in the `### cast` section's prose. Every
-  fact the prose commits to now has a tripwire. Following the scale-token requirement's own pattern
-  (`assertIn("1/4", entry["說明"])` etc.), substrings rather than exact prose still give the implementer
-  wording latitude.
+  silently drift." Corrected: the delta now also requires 解鎖 (unlock) in the section prose, all three
+  status-label terms (興奮, 高潮, 露出), 戰鬥 (the resist contest applies in and out of combat), and a
+  negative assertion that no individual divine-arts act name appears. Following the scale-token
+  requirement's own pattern (`assertIn("1/4", entry["說明"])` etc.), substrings rather than exact prose
+  still give the implementer wording latitude.
 - **`docs/game/commands.md`'s cast row gets a short addition, not a new table row.** The overview groups
   commands by category (`test_overview_groups_commands_by_category`) and every row must correspond to a
   documented canonical key (`test_overview_links_only_documented_keys_and_all_keys` requires the link set
@@ -118,20 +127,34 @@ extension.
   `_scan_out_of_combat_sexual_coercion` function and a nonexistent `sexual_unlock.py` module. A
   rubber-duck review caught this by checking the actual repository state (task-completion counts,
   `openspec/specs/` entries, and the cited functions/modules directly). → Fixed: every citation now
-  points at real code, the affinity/auto-leave clause is explicitly scoped to in-combat casts, and the
-  proposal's Why/Impact sections state which adjacent proposals are and are not archived. This is the
-  reason a docs-only change still benefits from a correctness review before implementation: the risk was
-  not in the Markdown, it was in an unverified claim about the state of the codebase the Markdown would
-  describe as fact.
+  points at real code. The interim correction then over-corrected in the other direction, scoping the
+  affinity/auto-leave clause to in-combat casts only; that scoping became stale when
+  `sexual-resist-out-of-combat` archived and shipped `_scan_out_of_combat_sexual_coercion`, and this
+  implementation's prose states the consequence without combat scoping, re-verified against the
+  current repository before writing (tasks 1.4 and 1.6). This is the reason a docs-only change still
+  benefits from a correctness review before implementation: the risk was not in the Markdown, it was
+  in an unverified claim about the state of the codebase the Markdown would describe as fact.
+- [Risk — found and fixed during the implementation rubber-duck review] The first full draft of the
+  prose claimed (a) no sexual act is available at character creation except the `divine_sexual_arts`
+  gate skill, and (b) a successful resist means "the cast does not execute" while the caster still
+  pays resources. Both are wrong against the shipped code: `unlocked_act_keys_for()` treats an empty
+  `unlock` table as owned-by-everyone, so the seed acts (solo 3, shame 1, partner 2, combat 1) and
+  all seven 神之秘法 acts are available at creation — the divine line's containment is the cast-time
+  race gate, not ownership; and on a resisted cast `_step5_effect_resolution` still runs the
+  actor-side pleasure/counter effects, `_step6_skill_practice` still grants practice XP, time cost is
+  unconditional, and the divine acts declare `cost={}`. → Fixed: the prose now states per-act unlock
+  (seeds available at creation, the rest gated by counters), describes a successful resist as leaving
+  the target unaffected while the cast still consumes time and the skill's resource cost (if any),
+  and the spec delta pins the corrected claims (解鎖, 戰鬥, all three status labels) plus a negative
+  assertion that no divine act is named.
 - [Risk] The new prose block could drift from the actual resist/affinity behavior if `sexual-resist-*`
-  is ever revised later (e.g. the in-combat penalty stops being affinity-based, or auto-leave is
-  removed), or if `sexual-resist-out-of-combat` later ships and the docs are not updated to drop the
-  "in combat only" scoping. → Mitigation: the spec requirement's substring assertions (好感度, 抵抗, 解鎖,
-  興奮, 神之秘法) give a cheap tripwire — wording that stops matching those tokens fails the test — but a
-  full behavioral rewrite, or a newly-shipped out-of-combat consequence, still needs a human to notice
-  the docs need a matching edit. Flagged explicitly as a task-5 follow-up trigger: when
-  `sexual-resist-out-of-combat` archives, the "in combat only" scoping in this proposal's prose becomes
-  stale and should be revisited.
+  is ever revised later (e.g. the penalty stops being affinity-based, or auto-leave is removed). →
+  Mitigation: the spec requirement's substring assertions (好感度, 抵抗, 解鎖, 興奮, 神之秘法) give a
+  cheap tripwire — wording that stops matching those tokens fails the test — but a full behavioral
+  rewrite still needs a human to notice the docs need a matching edit. (An earlier draft also flagged
+  a follow-up trigger for dropping the "in combat only" scoping once `sexual-resist-out-of-combat`
+  archived; that proposal has since archived and this implementation has already dropped the scoping,
+  so the trigger is closed.)
 - [Risk] Keyword-substring assertions are weaker than the scale-token requirement's full-sentence pin,
   so a low-quality edit could satisfy the test while reading badly. → Mitigation: acceptable trade-off
   for a docs-only change with no numeric contract to pin (unlike scale values); a human review of the
@@ -144,8 +167,8 @@ extension.
 ## Migration Plan
 
 None. Two Markdown files and one spec delta; no code, no data, no deploy step. Lands independently of
-every other active change — its only dependency (`sexual-act-seeds`, plus every catalog/resist proposal
-it documents) is already archived.
+every other active change — every proposal it documents (`sexual-act-seeds`, all six catalog lines,
+and the full resist chain) is already archived.
 
 ## Open Questions
 
