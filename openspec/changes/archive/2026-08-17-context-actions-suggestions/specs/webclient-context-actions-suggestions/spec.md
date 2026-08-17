@@ -78,8 +78,12 @@ snapshot is absent or its status is `"unavailable"`, the form SHALL emit `status
 `"generating"` SHALL emit the status alone; `"ready"` SHALL emit exactly the snapshot's
 `displayed` cards; `"degraded"` SHALL emit `default_cards(affordances)` as its cards. A `ready`
 snapshot whose `displayed` set is missing or fails the v5 shape gate SHALL emit `"unavailable"`
-with a bounded diagnostic log and SHALL NOT fabricate cards. Contexts built without snapshot
-state (default `None`) SHALL behave exactly as before.
+with a bounded diagnostic log and SHALL NOT fabricate cards. A `degraded` derivation whose cards
+fail the v5 shape gate (the vocabulary bounds display names at 128 code points without a CJK
+requirement, while suggestion labels are 1..24 CJK code points) SHALL likewise emit
+`"unavailable"` with a bounded diagnostic log — the panel SHALL stay available and no
+shape-invalid card SHALL reach the wire. Contexts built without snapshot state (default `None`)
+SHALL behave exactly as before.
 
 #### Scenario: A ready display survives later re-renders
 - **WHEN** a session's snapshot reports `ready` and repeated snapshots and updates are rendered
@@ -96,6 +100,10 @@ state (default `None`) SHALL behave exactly as before.
 #### Scenario: One affordance build feeds both the form and the fallback
 - **WHEN** the exploration form is rendered with a `degraded` status
 - **THEN** the `affordances` list in the payload and the input to `default_cards(affordances)` are the identical tuple, so the subset contract (`degraded` cards ⊆ current affordances) holds by construction
+
+#### Scenario: A shape-invalid degraded derivation fails closed to unavailable
+- **WHEN** the exploration form is rendered with a `degraded` status and the derived rule cards fail the v5 shape gate (for example an ASCII or over-24-code-point display name, which the affordance vocabulary bounds at 128 code points without a CJK requirement)
+- **THEN** the presenter emits `{"status": "unavailable"}` with a bounded diagnostic log, the panel stays available and schema-valid at version 5, and no shape-invalid card reaches the wire
 
 ### Requirement: The v5 client mirror and parity contract enforce the suggestions shape
 
