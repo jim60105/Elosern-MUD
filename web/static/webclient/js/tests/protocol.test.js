@@ -1248,20 +1248,34 @@ test("rejects malformed category and skill groups", () => {
 
 test("the flattened skill-count bound rejects a small-category payload", () => {
   // Design D-5: MAX_SKILLS applies to the flattened descriptor total, not to
-  // the top-level category-group count. One category with 33 skills must be
-  // rejected even though its category-group count is far below the bound.
-  const skills = [];
-  for (let index = 1; index <= 33; index++) {
-    skills.push(validCombatSkill({ key: "skill_" + index, label: "技能名稱" + index }));
+  // the top-level category-group count. A payload whose flattened total is
+  // 193 must be rejected even though its category-group count is far below
+  // the bound. Skills are spread across sub-groups so each group stays within
+  // the global MAX_LIST_ITEMS bound — the panel's flattened total, not any
+  // single array, is what must exceed MAX_SKILLS.
+  const subGroups = [];
+  for (let group = 0; group < 3; group++) {
+    const skills = [];
+    const count = group === 2 ? 65 : 64;
+    for (let index = 1; index <= count; index++) {
+      const flat = group * 64 + index;
+      skills.push(validCombatSkill({ key: "skill_" + flat, label: "技能名稱" + flat }));
+    }
+    subGroups.push(validSkillGroup({ group: "group_" + group, label: "群組" + group, skills: skills }));
   }
   assert.throws(() =>
-    Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(...skills) }))
+    Protocol.validateContextActionsPanel(validCombatPanel({ skills: [validCategoryGroup({ groups: subGroups })] }))
   );
-  // 32 skills across the same shape still passes.
-  skills.pop();
+  // 192 skills across the same shape still passes, and the payload also
+  // satisfies the global envelope safety (every array within MAX_LIST_ITEMS,
+  // canonical JSON within the byte bound) that the real client applies
+  // before panel validation.
+  subGroups[2].skills.pop();
+  const accepted = validCombatPanel({ skills: [validCategoryGroup({ groups: subGroups })] });
   assert.doesNotThrow(() =>
-    Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(...skills) }))
+    Protocol.validateContextActionsPanel(accepted)
   );
+  assert.doesNotThrow(() => Protocol.checkEnvelope(accepted));
 });
 
 test("a category without a group carries exactly one null-keyed sub-group", () => {
