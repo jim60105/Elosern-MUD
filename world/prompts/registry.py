@@ -62,6 +62,23 @@ def _build() -> dict[str, PromptSpec]:
             "scene_builder.yaml",
             ("scene_sentence", "quest_context", "room_name", "region"),
         ),
+        PromptSpec(
+            "action_options.system",
+            "action_options.yaml",
+        ),
+        PromptSpec(
+            "action_options.user",
+            "action_options.yaml",
+            (
+                "room_name",
+                "room_summary",
+                "npc_entries",
+                "monster_entries",
+                "objective",
+                "narrative_tail",
+                "affordances",
+            ),
+        ),
     )
     return {spec.key: spec for spec in specs}
 

@@ -1,4 +1,10 @@
-## ADDED Requirements
+## Purpose
+
+The shipped action-options prompt contract and the `action_options` LLM-profile slot: two prompt
+keys in `prompts/action_options.yaml` under the loader's exact placeholder allowlist, and a
+generative-layer profile that requires structured output at construction time.
+
+## Requirements
 
 ### Requirement: prompts/action_options.yaml ships the system and user prompt keys
 `prompts/action_options.yaml` SHALL ship exactly the keys `action_options.system` and

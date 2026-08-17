@@ -18,17 +18,32 @@ from typing import Any
 
 from django.conf import settings
 
-LAYER_NAMES = ("narrator", "npc_dialogue", "scenario_director", "scene_builder", "character_creation")
+LAYER_NAMES = (
+    "narrator",
+    "npc_dialogue",
+    "scenario_director",
+    "scene_builder",
+    "character_creation",
+    "action_options",
+)
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODEL = "llama3.2"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 250
+ACTION_OPTIONS_MAX_TOKENS = 320
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {"Content-Type": ("application/json",)}
+)
+
+# The only generative layer that consumes JSON-schema structured output; its
+# profile must declare the capability at construction time (pipeline design
+# doc §5), enforced per layer in ``build_profiles``.
+REQUIRED_PROFILE_FLAGS: Mapping[str, Mapping[str, bool]] = MappingProxyType(
+    {"action_options": {"supports_response_format": True}}
 )
 
 
@@ -130,10 +145,13 @@ def default_profiles() -> dict[str, dict[str, Any]]:
     The base URL comes from ``OLLAMA_BASE_URL`` when present (the compose
     runtime) and falls back to a bare-metal localhost endpoint otherwise.
     ``supports_response_format`` defaults false because design §7.5 only
-    requests structured output when the endpoint declares support.
+    requests structured output when the endpoint declares support; the
+    ``action_options`` layer is the single exception and always defaults to
+    the capability on, with ``max_tokens`` sized for a 5-card JSON payload
+    (pipeline design doc §5).
     """
     base_url = os.environ.get("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL
-    return {
+    profiles = {
         layer: {
             "base_url": base_url,
             "path": DEFAULT_CHAT_PATH,
@@ -148,6 +166,12 @@ def default_profiles() -> dict[str, dict[str, Any]]:
         }
         for layer in LAYER_NAMES
     }
+    profiles["action_options"] = {
+        **profiles["action_options"],
+        "max_tokens": ACTION_OPTIONS_MAX_TOKENS,
+        "supports_response_format": True,
+    }
+    return profiles
 
 
 def build_profiles(
@@ -157,9 +181,10 @@ def build_profiles(
 
     Accepts either a mapping or an iterable of ``(layer, values)`` pairs so
     duplicate layer keys can be detected. Unknown layers are rejected, every
-    profile is validated against every bound, and any of the four layers missing
+    profile is validated against every bound, and any of the six layers missing
     from the source falls back to the local-first default so the registry maps
-    exactly the four layer names.
+    exactly the six layer names. Per-layer required flags (``action_options``
+    must declare structured output) are enforced after the generic bounds.
     """
     if isinstance(raw_profiles, Mapping):
         entries = list(raw_profiles.items())
@@ -177,6 +202,13 @@ def build_profiles(
     profiles: dict[str, LLMProfile] = {}
     for layer, values in merged.items():
         validate_profile_values(layer, values)
+        for field, required in REQUIRED_PROFILE_FLAGS.get(layer, {}).items():
+            if values.get(field) is not required:
+                raise ProfileValidationError(
+                    layer,
+                    field,
+                    f"must be {required!r} for the {layer!r} layer",
+                )
         profiles[layer] = LLMProfile(**dict(values))
     return MappingProxyType(profiles)
 

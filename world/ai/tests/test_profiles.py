@@ -3,6 +3,8 @@
 from dataclasses import fields
 import importlib
 import os
+import subprocess
+import sys
 from types import MappingProxyType
 from unittest.mock import patch
 import unittest
@@ -20,6 +22,10 @@ from world.ai.profiles import (
 )
 
 from tools.spec_traceability import covers_requirement
+
+REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 class ProfileDataclassTests(unittest.TestCase):
@@ -189,14 +195,18 @@ class RegistryTests(unittest.TestCase):
         importlib.import_module("world.ai.profiles")
         self.assertEqual(os.environ, before)
 
-    @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment")
+    @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment", "ai-action-options-prompts::layer-names-gains-the-action-options-slot-with-structured-output-defaults")
     def test_default_profiles_target_local_ollama_by_default(self):
         profiles = build_profiles(default_profiles())
         for layer in LAYER_NAMES:
             self.assertEqual(profiles[layer].base_url, "http://127.0.0.1:11434")
             self.assertEqual(profiles[layer].path, "/v1/chat/completions")
-            self.assertFalse(profiles[layer].supports_response_format)
             self.assertTrue(profiles[layer].enabled)
+            if layer == "action_options":
+                self.assertTrue(profiles[layer].supports_response_format)
+                self.assertEqual(profiles[layer].max_tokens, 320)
+            else:
+                self.assertFalse(profiles[layer].supports_response_format)
 
     @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment")
     def test_env_variable_selects_the_compose_host(self):
@@ -240,3 +250,95 @@ class GetProfileTests(unittest.TestCase):
         with override_settings(LLM_PROFILES=raw):
             self.assertFalse(get_profile("narrator").enabled)
             self.assertTrue(get_profile("scene_builder").enabled)
+
+
+class ActionOptionsProfileTests(unittest.TestCase):
+    """The action_options slot and its structured-output requirement."""
+
+    @covers_requirement("ai-action-options-prompts::layer-names-gains-the-action-options-slot-with-structured-output-defaults")
+    def test_action_options_is_a_registered_layer(self):
+        self.assertIn("action_options", LAYER_NAMES)
+        profiles = build_profiles(default_profiles())
+        self.assertIsInstance(profiles["action_options"], LLMProfile)
+
+    @covers_requirement("ai-action-options-prompts::layer-names-gains-the-action-options-slot-with-structured-output-defaults")
+    def test_action_options_defaults_support_structured_output(self):
+        profile = build_profiles(default_profiles())["action_options"]
+        self.assertTrue(profile.supports_response_format)
+        self.assertEqual(profile.max_tokens, 320)
+        self.assertEqual(profile.temperature, 0.7)
+
+    @covers_requirement("ai-action-options-prompts::construction-time-validation-rejects-a-structured-output-disabled-action-options-profile-at-settings-load")
+    def test_action_options_disabled_structured_output_is_rejected(self):
+        raw = default_profiles()
+        raw["action_options"]["supports_response_format"] = False
+        with self.assertRaises(ProfileValidationError) as ctx:
+            build_profiles(raw)
+        self.assertEqual(ctx.exception.layer, "action_options")
+        self.assertEqual(ctx.exception.field, "supports_response_format")
+
+    @covers_requirement("ai-action-options-prompts::construction-time-validation-rejects-a-structured-output-disabled-action-options-profile-at-settings-load")
+    def test_other_layers_may_disable_structured_output(self):
+        raw = default_profiles()
+        raw["narrator"]["supports_response_format"] = False
+        profiles = build_profiles(raw)
+        self.assertFalse(profiles["narrator"].supports_response_format)
+        self.assertTrue(profiles["action_options"].supports_response_format)
+
+    @covers_requirement("ai-action-options-prompts::construction-time-validation-rejects-a-structured-output-disabled-action-options-profile-at-settings-load")
+    def test_settings_import_validation_fails_at_startup(self):
+        code = (
+            "import world.ai.profiles as profiles\n"
+            "raw = profiles.default_profiles()\n"
+            "raw['action_options']['supports_response_format'] = False\n"
+            "profiles.default_profiles = lambda: raw\n"
+            "import server.conf.settings\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(REPO_ROOT),
+            env={key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ProfileValidationError", result.stderr)
+        self.assertIn("action_options", result.stderr)
+        self.assertIn("supports_response_format", result.stderr)
+
+    @covers_requirement("ai-action-options-prompts::construction-time-validation-rejects-a-structured-output-disabled-action-options-profile-at-settings-load")
+    def test_settings_import_validates_the_effective_map_after_secret_overrides(self):
+        code = (
+            "import sys\n"
+            "import types\n"
+            "import world.ai.profiles as profiles\n"
+            "raw = profiles.default_profiles()\n"
+            "raw['action_options']['supports_response_format'] = False\n"
+            "secret = types.ModuleType('server.conf.secret_settings')\n"
+            "secret.LLM_PROFILES = raw\n"
+            "sys.modules['server.conf.secret_settings'] = secret\n"
+            "import server.conf.settings\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(REPO_ROOT),
+            env={key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ProfileValidationError", result.stderr)
+        self.assertIn("action_options", result.stderr)
+        self.assertIn("supports_response_format", result.stderr)
+
+    @covers_requirement("ai-action-options-prompts::layer-names-gains-the-action-options-slot-with-structured-output-defaults")
+    def test_effective_settings_expose_the_action_options_slot(self):
+        from django.conf import settings as django_settings
+
+        raw = getattr(django_settings, "LLM_PROFILES", None)
+        self.assertIsNotNone(raw)
+        self.assertIn("action_options", raw)
+        self.assertTrue(raw["action_options"]["supports_response_format"])
+        self.assertEqual(raw["action_options"]["max_tokens"], 320)
