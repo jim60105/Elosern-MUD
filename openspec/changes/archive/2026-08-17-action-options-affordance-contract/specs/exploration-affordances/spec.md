@@ -38,9 +38,12 @@ navigation entries SHALL be emitted only for the exact local host, and the idle 
 follow the idle-baseline requirement below. A schedule-blocked dialogue host SHALL NOT be omitted
 from the vocabulary — the vocabulary preserves the v1 panel's emission semantics; schedule-gate
 exclusion applies only to suggestion eligibility (suggestion-eligibility requirement below).
-Every entry with a disabled state SHALL carry a stable disabled code and safe Traditional Chinese
-message. Nothing in this module SHALL mutate traits, knowledge, dialogue, quests, inventory,
-combat sessions, party, or world time.
+A dialogue host whose authored dialogue table cannot be resolved SHALL have no talk entries in
+the vocabulary — no validator-normalized params exist for a keywordless host; the version-1
+panel's disabled `dialogue_unavailable` affordance is a panel serialization degradation, not a
+vocabulary entry. Every entry with a disabled state SHALL carry a stable disabled code and safe
+Traditional Chinese message. Nothing in this module SHALL mutate traits, knowledge, dialogue,
+quests, inventory, combat sessions, party, or world time.
 
 #### Scenario: The exploration panel and the context form share one vocabulary
 - **WHEN** the same room is presented to the same puppeted actor through both the `exploration`
@@ -115,9 +118,11 @@ executable *suggestions*: `enabled` true, `action_id` in `SUGGESTIBLE_ACTION_IDS
 `explore.engage`, `explore.wait`), not a navigation entry, not a party action, not blocked by the
 talk schedule gate (`interaction_reason(npc, "talk")` — a blocked host's talk entries are
 excluded), and not an unsafe-room wait (wait entries only exist when safe, per the idle-baseline
-requirement). This layer is the single source of "is this card runnable right now" for the
-deterministic fallback and, later, for the AI proposal ladder; the vocabulary itself SHALL remain
-unchanged by this filtering.
+requirement). The schedule and safety gates require the live actor: a call without the actor
+SHALL exclude every talk entry rather than claim executability for an unverifiable card (the
+caller that needs talk suggestions passes the actor). This layer is the single source of "is this
+card runnable right now" for the deterministic fallback and, later, for the AI proposal ladder;
+the vocabulary itself SHALL remain unchanged by this filtering.
 
 #### Scenario: A schedule-blocked host is suggestible-excluded but vocabulary-present
 - **WHEN** a present dialogue host is inside its schedule gate's blocked window
