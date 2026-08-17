@@ -26,6 +26,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from typeclasses.rooms import Room
 from world.lore.sexual_vocab import GENERIC_BODY_PART
 from world.quests.catalog import register_catalog
 from world.rules.action import (
@@ -35,14 +36,18 @@ from world.rules.action import (
     _EFFECT_HANDLERS,
     _apply_pleasure_gain,
     _handle_act_pair_event,
+    _handle_actor_sexual_event,
     _handle_sexual_event,
     _handle_pleasure_effect,
     _handle_sexual_counter_effect,
 )
 from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
+    _OBSERVER_GATED_COUNTERS,
+    _OBSERVER_GATED_EVENTS,
     compute_pleasure_gain,
     load_effects_config,
+    observers_present,
     pair_event_name,
     participants,
     resolve_part,
@@ -51,7 +56,11 @@ from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, SexualState
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.sexual_acts._builder import SexualActDef, _act_family
+from world.skills.sexual_acts._builder import (
+    _ACTOR_SCOPED_EVENTS,
+    SexualActDef,
+    _act_family,
+)
 
 
 def _neutral_participant(part: str = "私處", sensitivity: str = "普通", shame: str = "無"):
@@ -216,6 +225,84 @@ class ParticipantsTests(unittest.TestCase):
         self.assertEqual(first, second)
         result = participants(actor, [first, second])
         self.assertEqual(result, [actor, first, second])
+
+
+class ObserversPresentTests(EvenniaTestCase):
+    """The deterministic, no-create presence read (design D-2)."""
+
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="observer actor")
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_area_cast_with_a_non_actor_target_is_observed_by_construction(self):
+        self.assertTrue(observers_present(self.actor, [object()], {}))
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_self_cast_alone_in_a_room_is_unobserved(self):
+        room = SimpleNamespace(contents=[self.actor])
+        self.assertFalse(observers_present(self.actor, [self.actor], {"room": room}))
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_self_cast_with_a_co_located_living_entity_is_observed(self):
+        occupant = create_object(PlayerCharacter, key="observer occupant")
+        room = SimpleNamespace(contents=[self.actor, occupant])
+        self.assertTrue(observers_present(self.actor, [self.actor], {"room": room}))
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_self_cast_with_only_non_living_room_objects_is_unobserved(self):
+        room = SimpleNamespace(contents=[self.actor, SimpleNamespace(key="exit")])
+        self.assertFalse(observers_present(self.actor, [self.actor], {"room": room}))
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_self_cast_on_a_battlefield_with_only_the_actor_is_unobserved(self):
+        battlefield = SimpleNamespace(roster={"actor": self.actor})
+        self.assertFalse(
+            observers_present(self.actor, [self.actor], {"battlefield": battlefield})
+        )
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_self_cast_on_a_battlefield_with_another_member_is_observed(self):
+        battlefield = SimpleNamespace(
+            roster={"actor": self.actor, "enemy": object()}
+        )
+        self.assertTrue(
+            observers_present(self.actor, [self.actor], {"battlefield": battlefield})
+        )
+
+    @covers_requirement("sexual-act-effects::observers-present-returns-whether-any-entity-besides-the-actor-observes-a-cast")
+    def test_missing_context_reads_as_unobserved(self):
+        self.assertFalse(observers_present(self.actor, [self.actor], {}))
+
+
+class ObserverGatedNameTests(unittest.TestCase):
+    """The observer-gated event/counter name tables (design D-3)."""
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_gated_event_set_names_exactly_watched_during_activity(self):
+        self.assertEqual(_OBSERVER_GATED_EVENTS, frozenset({"watched_during_activity"}))
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_gated_counter_set_names_exactly_watched_count(self):
+        self.assertEqual(_OBSERVER_GATED_COUNTERS, frozenset({"watched_count"}))
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_gated_events_are_a_subset_of_the_actor_scoped_vocabulary(self):
+        self.assertLessEqual(_OBSERVER_GATED_EVENTS, _ACTOR_SCOPED_EVENTS)
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_gated_counters_are_a_subset_of_the_sanctioned_mutator_table(self):
+        self.assertLessEqual(_OBSERVER_GATED_COUNTERS, set(_COUNTER_MUTATORS))
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_no_act_declares_watched_count_as_a_participant_counter(self):
+        # The gated counter is actor-scoped by definition (being watched is a
+        # fact about the performing actor); a participant-side declaration
+        # would bypass the gate, since a non-actor participant implies a
+        # non-actor target, which always reads as observed.
+        for key, act in SEXUAL_ACT_REGISTRY.items():
+            with self.subTest(key=key):
+                self.assertNotIn("watched_count", act.participant_counters)
 
 
 class ComputePleasureGainTests(unittest.TestCase):
@@ -704,6 +791,124 @@ class SexualEventReuseTests(_ActCastTestCase):
             result = self._cast(act.key, [])
         self.assertEqual(result.outcome, "success")
         self.assertIn("自慰", self.actor.sexual.experience_types)
+
+
+class ActorSexualEventHandlerTests(_ActCastTestCase):
+    """The sexual_event_actor:<name> handler and its observer gating."""
+
+    def _build_self_act(
+        self,
+        key: str = "test_actor_event",
+        *,
+        actor_counters: tuple[str, ...] = ("exposure_act_count",),
+        sexual_events: tuple[str, ...] = ("self_exposure",),
+    ):
+        (skill, act), = _act_family(
+            "羞恥",
+            (
+                key,
+                "測試演出行為",
+                "僅存在於測試中的合成自我演出行為。",
+                TargetSpec.SELF,
+                {},
+                10,
+                None,
+                None,
+                1.0,
+                actor_counters,
+                (),
+                sexual_events,
+                False,
+            ),
+        )
+        return skill, act
+
+    def _cast_self_in(self, act_key: str, room):
+        return ActionResolver.resolve(
+            ActionRequest(
+                self.actor,
+                act_key,
+                [],
+                RoomActionContext(room, {}),
+            )
+        )
+
+    @covers_requirement("sexual-act-effects::sexual-event-actor-name-applies-the-named-event-to-the-actor-only")
+    def test_actor_scoped_event_reaches_the_actor_and_never_a_target(self):
+        skill, act = self._build_duo_act(sexual_events=("self_exposure",))
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast(act.key, [self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.sexual.exposure.value, 1)
+        self.assertEqual(self.target.sexual.exposure.value, 0)
+
+    @covers_requirement("sexual-act-effects::sexual-event-actor-name-applies-the-named-event-to-the-actor-only")
+    def test_area_self_exposure_lands_on_the_performer_not_the_audience(self):
+        (skill, act), = _act_family(
+            "羞恥",
+            (
+                "test_area_self_exposure",
+                "測試群體演出",
+                "僅存在於測試中的合成群體演出行為。",
+                TargetSpec.AREA,
+                {},
+                10,
+                None,
+                "腰腹",
+                0.5,
+                (),
+                (),
+                ("self_exposure",),
+                True,
+            ),
+        )
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast(act.key, [self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.sexual.exposure.value, 1)
+        self.assertEqual(self.target.sexual.exposure.value, 0)
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_unobserved_cast_skips_the_watched_event_but_stages_the_others(self):
+        alone = create_object(Room, key="actor event alone room")
+        self.actor.location = alone
+        skill, act = self._build_self_act(
+            actor_counters=("watched_count", "exposure_act_count"),
+            sexual_events=("self_exposure", "watched_during_activity"),
+        )
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast_self_in(act.key, alone)
+        self.assertEqual(result.outcome, "success")
+        self.assertNotIn("被觀看", self.actor.sexual.experience_types)
+        self.assertEqual(self.actor.sexual.watched_count, 0)
+        self.assertEqual(self.actor.sexual.exposure.value, 1)
+        self.assertEqual(self.actor.sexual.exposure_act_count, 1)
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_observed_cast_fires_the_watched_event(self):
+        skill, act = self._build_self_act(
+            actor_counters=("watched_count",),
+            sexual_events=("watched_during_activity",),
+        )
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast_self_in(act.key, self.room1)
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("被觀看", self.actor.sexual.experience_types)
+        self.assertEqual(self.actor.sexual.watched_count, 1)
+
+    @covers_requirement("sexual-act-effects::watched-during-activity-and-watched-count-are-observer-gated-the-gated-names-are-declared-as-module-constants")
+    def test_unobserved_cast_skips_the_watched_counter_while_staging_others(self):
+        alone = create_object(Room, key="counter alone room")
+        self.actor.location = alone
+        skill, act = self._build_self_act(
+            actor_counters=("watched_count", "exposure_act_count"),
+            sexual_events=(),
+        )
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast_self_in(act.key, alone)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.sexual.watched_count, 0)
+        self.assertEqual(self.actor.sexual.exposure_act_count, 1)
 
 
 _CANONICAL_PAIR_EVENTS = (

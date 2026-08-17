@@ -18,6 +18,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
 from world.lore.sexual_vocab import BODY_PARTS
 from world.quests.catalog import register_catalog
 from world.rules.action import ActionRequest, ActionResolver
@@ -77,15 +78,41 @@ _ALL_ACTS = (
     "shame_devoted_pose",
     "shame_shameless_declaration",
 )
-# Every act except the battlefield taunt reuses the seed's self_exposure event.
-_REUSING_ACTS = (
-    *_TIER_1,
-    "shame_full_expose",
-    "shame_public_masturbation",
-    "shame_public_performance",
-    "shame_devoted_pose",
-    "shame_shameless_declaration",
-)
+# Every act except the battlefield taunt reuses the seed's self_exposure event
+# and adds the public_exposure event; the four public acts add the
+# observer-gated watched_during_activity event, and the three implicitly
+# sexual public acts add public_sexual_activity as well.
+_EVENT_TABLE = {
+    "shame_hem_lift": ("self_exposure", "public_exposure"),
+    "shame_half_expose_chest": ("self_exposure", "public_exposure"),
+    "shame_half_expose_lower": ("self_exposure", "public_exposure"),
+    "shame_loosen_collar": ("self_exposure", "public_exposure"),
+    "shame_full_expose": ("self_exposure", "public_exposure"),
+    "shame_public_masturbation": (
+        "self_exposure",
+        "public_exposure",
+        "public_sexual_activity",
+        "masturbation_climax",
+        "watched_during_activity",
+    ),
+    "shame_public_performance": (
+        "self_exposure",
+        "public_exposure",
+        "public_sexual_activity",
+        "watched_during_activity",
+    ),
+    "shame_devoted_pose": (
+        "self_exposure",
+        "public_exposure",
+        "watched_during_activity",
+    ),
+    "shame_shameless_declaration": (
+        "self_exposure",
+        "public_exposure",
+        "public_sexual_activity",
+        "watched_during_activity",
+    ),
+}
 _AREA_ACTS = (
     "shame_provocative_gaze",
     "shame_public_performance",
@@ -143,22 +170,17 @@ class ShameActRegistrationTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIsNone(SEXUAL_ACT_REGISTRY[key].actor_part)
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
-    def test_every_reusing_act_declares_self_exposure_only(self):
-        for key in _REUSING_ACTS:
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
+    def test_every_act_except_provocative_gaze_declares_its_event_tuple(self):
+        for key, expected in _EVENT_TABLE.items():
             with self.subTest(key=key):
-                expected = (
-                    ("self_exposure", "masturbation_climax")
-                    if key == "shame_public_masturbation"
-                    else ("self_exposure",)
-                )
                 self.assertEqual(SEXUAL_ACT_REGISTRY[key].sexual_events, expected)
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
     def test_provocative_gaze_declares_no_sexual_event(self):
         self.assertEqual(SEXUAL_ACT_REGISTRY["shame_provocative_gaze"].sexual_events, ())
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
     def test_sexual_yaml_gains_no_rule_row_from_this_change(self):
         rules = load_rules(_SEXUAL_YAML_PATH)
         self.assertEqual(
@@ -166,20 +188,34 @@ class ShameActRegistrationTests(unittest.TestCase):
             _EXPECTED_RULE_IDS,
         )
 
-    @covers_requirement("sexual-catalog-shame::shame-public-masturbation-credits-three-counters-and-emits-two-events")
-    def test_public_masturbation_declares_three_counters_and_two_events(self):
+    @covers_requirement("sexual-catalog-shame::shame-public-masturbation-credits-three-counters-and-emits-five-events")
+    def test_public_masturbation_declares_three_counters_and_five_events(self):
         act = SEXUAL_ACT_REGISTRY["shame_public_masturbation"]
         self.assertEqual(
             act.actor_counters,
             ("exposure_act_count", "masturbation_count", "watched_count"),
         )
-        self.assertEqual(act.sexual_events, ("self_exposure", "masturbation_climax"))
+        self.assertEqual(act.sexual_events, _EVENT_TABLE["shame_public_masturbation"])
 
-    @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor")
-    def test_public_performance_declares_actor_only_counters(self):
+    @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor-and-emits-the-four-public-events")
+    def test_public_performance_declares_actor_only_counters_and_four_events(self):
         act = SEXUAL_ACT_REGISTRY["shame_public_performance"]
         self.assertEqual(act.actor_counters, ("watched_count", "exposure_act_count"))
         self.assertEqual(act.participant_counters, ())
+        self.assertEqual(act.sexual_events, _EVENT_TABLE["shame_public_performance"])
+
+    @covers_requirement("sexual-catalog-shame::the-four-public-acts-declare-the-public-event-vocabulary")
+    def test_shameless_declaration_declares_the_sexual_activity_event(self):
+        events = SEXUAL_ACT_REGISTRY["shame_shameless_declaration"].sexual_events
+        self.assertIn("public_sexual_activity", events)
+        self.assertIn("watched_during_activity", events)
+
+    @covers_requirement("sexual-catalog-shame::the-four-public-acts-declare-the-public-event-vocabulary")
+    def test_devoted_pose_is_public_exposure_but_not_public_sexual_activity(self):
+        events = SEXUAL_ACT_REGISTRY["shame_devoted_pose"].sexual_events
+        self.assertIn("public_exposure", events)
+        self.assertIn("watched_during_activity", events)
+        self.assertNotIn("public_sexual_activity", events)
 
     @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-the-actor-only-never-on-a-target")
     def test_provocative_gaze_declares_actor_only_hostile_counter(self):
@@ -266,7 +302,7 @@ class ShameCastTests(EvenniaTest):
             )
         )
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
     def test_tier1_act_raises_the_actors_own_exposure_by_one(self):
         entity = _entity()
         entity.location = self.room1
@@ -283,13 +319,28 @@ class ShameCastTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
         self.assertEqual(entity.sexual.exposure.value, 1)
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
+    def test_casting_a_tier1_act_grants_the_exposure_experience(self):
+        entity = _entity(key="exposure experience caster")
+        entity.location = self.room1
+        _counter_up(entity, "exposure_act", 5)
+        result = ActionResolver.resolve(
+            ActionRequest(
+                entity,
+                "shame_half_expose_chest",
+                [],
+                RoomActionContext(entity.location, {}),
+            )
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("露出", entity.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
     def test_every_reusing_act_raises_the_actors_own_exposure_by_one(self):
         # One fresh entity per act keeps every cast at the exposure vocabulary
         # floor (極低, value 0), so "increases by exactly one" never clamps
-        # against the five-level cap. SELF acts fire self_exposure on the
-        # actor; the two AREA acts fire it on their targets instead (design.md
-        # D-6) and are covered by the following test.
+        # against the five-level cap. SELF acts fire their actor-scoped events
+        # on the actor; the two AREA acts are covered by the following test.
         thresholds = {
             "shame_half_expose_chest": {"exposure_act": 5},
             "shame_half_expose_lower": {"exposure_act": 5},
@@ -322,12 +373,11 @@ class ShameCastTests(EvenniaTest):
                 self.assertEqual(result.outcome, "success")
                 self.assertEqual(entity.sexual.exposure.value, 1)
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
-    def test_area_reusing_act_raises_every_participants_exposure(self):
-        # sexual-intercourse-acts D-3: the landed event handler fires on
-        # participants(actor, targets), so an AREA cast's self_exposure event
-        # raises the acting entity's exposure as well as each target's — the
-        # actor of a public performance is publicly exposed too.
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
+    def test_area_self_exposure_lands_on_the_performer_not_the_audience(self):
+        # The actor-scoped channel (sexual-public-act-events D-4): an AREA
+        # cast's self_exposure raises the performing actor's exposure, and the
+        # audience receives no exposure bump it was never designed to receive.
         thresholds = {
             "shame_public_performance": {
                 "watched": 10,
@@ -360,10 +410,10 @@ class ShameCastTests(EvenniaTest):
                         )
                     )
                 self.assertEqual(result.outcome, "success")
-                self.assertEqual(target.sexual.exposure.value, 1)
                 self.assertEqual(entity.sexual.exposure.value, 1)
+                self.assertEqual(target.sexual.exposure.value, 0)
 
-    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-no-new-sexual-yaml-row-is-added")
+    @covers_requirement("sexual-catalog-shame::every-act-except-shame-provocative-gaze-reuses-the-self-exposure-event-actor-scoped-no-new-sexual-yaml-row-is-added")
     def test_provocative_gaze_does_not_raise_the_actors_own_exposure(self):
         _counter_up(self.actor, "watched", 10)
         self.assertEqual(self.actor.sexual.exposure.value, 0)
@@ -371,8 +421,10 @@ class ShameCastTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.exposure.value, 0)
 
-    @covers_requirement("sexual-catalog-shame::shame-public-masturbation-credits-three-counters-and-emits-two-events")
+    @covers_requirement("sexual-catalog-shame::shame-public-masturbation-credits-three-counters-and-emits-five-events")
     def test_public_masturbation_increments_all_three_counters_by_exactly_one(self):
+        # The cast room holds the co-located target, so the cast is observed
+        # and the watched event/counter both fire ("when observed").
         _counter_up(self.actor, "exposure_act", 20)
         _counter_up(self.actor, "masturbation", 25)
         result = self._cast("shame_public_masturbation", [])
@@ -380,8 +432,32 @@ class ShameCastTests(EvenniaTest):
         self.assertEqual(self.actor.sexual.exposure_act_count, 21)
         self.assertEqual(self.actor.sexual.masturbation_count, 26)
         self.assertEqual(self.actor.sexual.watched_count, 1)
+        for experience in ("露出", "自慰", "被觀看"):
+            self.assertIn(experience, self.actor.sexual.experience_types)
 
-    @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor")
+    @covers_requirement("sexual-catalog-shame::shame-public-masturbation-credits-three-counters-and-emits-five-events")
+    def test_public_masturbation_alone_skips_only_the_watched_credit(self):
+        alone = create_object(Room, key="masturbation alone room")
+        self.actor.location = alone
+        _counter_up(self.actor, "exposure_act", 20)
+        _counter_up(self.actor, "masturbation", 25)
+        result = ActionResolver.resolve(
+            ActionRequest(
+                self.actor,
+                "shame_public_masturbation",
+                [],
+                RoomActionContext(alone, {}),
+            )
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.sexual.exposure_act_count, 21)
+        self.assertEqual(self.actor.sexual.masturbation_count, 26)
+        self.assertEqual(self.actor.sexual.watched_count, 0)
+        for experience in ("露出", "自慰"):
+            self.assertIn(experience, self.actor.sexual.experience_types)
+        self.assertNotIn("被觀看", self.actor.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor-and-emits-the-four-public-events")
     def test_public_performance_increments_both_actor_counters_only(self):
         _counter_up(self.actor, "watched", 10)
         _counter_up(self.actor, "exposure_act", 20)
@@ -396,6 +472,24 @@ class ShameCastTests(EvenniaTest):
             "hostile_act_count",
         ):
             self.assertEqual(getattr(self.target.sexual, counter), 0)
+
+    @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor-and-emits-the-four-public-events")
+    def test_public_performance_grants_the_public_experiences_to_the_performer(self):
+        # The AREA cast's target set is the audience, so the cast is observed
+        # by construction; the performer gains 露出 and 被觀看, and shame rises
+        # through shame_up_on_public_sexual_activity. The target gains none of
+        # these experiences.
+        _counter_up(self.actor, "watched", 10)
+        _counter_up(self.actor, "exposure_act", 20)
+        shame_before = self.actor.sexual.shame.value
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("shame_public_performance", [self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("露出", self.actor.sexual.experience_types)
+        self.assertIn("被觀看", self.actor.sexual.experience_types)
+        self.assertGreater(self.actor.sexual.shame.value, shame_before)
+        self.assertNotIn("露出", self.target.sexual.experience_types)
+        self.assertNotIn("被觀看", self.target.sexual.experience_types)
 
     @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-the-actor-only-never-on-a-target")
     def test_provocative_gaze_credits_hostile_act_count_on_the_actor_only(self):

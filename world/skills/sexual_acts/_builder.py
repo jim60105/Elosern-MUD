@@ -59,6 +59,23 @@ _FORBIDDEN_SEXUAL_EVENTS = frozenset(
 # recipient semantics.
 _LEGACY_TARGET_SCOPED_EVENTS = frozenset({"stimulus_applied"})
 
+# Event names whose semantics are inherently performer-scoped: the state the
+# rule applies to belongs to the acting entity (its own exposure, its own
+# watched status, its own public acts), never to the cast's targets. Rows
+# declare these in the ordinary ``sexual_events`` tuple and ``_act_family()``
+# emits them through the actor-scoped ``sexual_event_actor:`` prefix, so a
+# catalog author cannot accidentally mis-scope an event; the observer-gated
+# subset (``watched_during_activity``) additionally fires only when a
+# co-located observer exists.
+_ACTOR_SCOPED_EVENTS = frozenset(
+    {
+        "self_exposure",
+        "public_exposure",
+        "watched_during_activity",
+        "public_sexual_activity",
+    }
+)
+
 
 @dataclass(frozen=True)
 class SexualActDef:
@@ -132,9 +149,11 @@ def _act_family(
     per family; every produced ``SkillDef`` is an ACTIVE, zero-cost,
     out-of-combat-castable skill categorised ``SEXUAL_ACT`` whose ``effects``
     list carries the ``pleasure:<key>``/``sexual_counter:<key>`` prefixes for
-    its own key, one ``sexual_event:<name>`` string per declared event, and a
-    trailing ``act_pair_event:<key>`` string exactly when the row declares a
-    non-empty ``pair_events`` table, resolving through the handlers
+    its own key, one effect string per declared event — ``sexual_event:<name>``
+    for every participant-scoped name and ``sexual_event_actor:<name>`` for a
+    name in the ``_ACTOR_SCOPED_EVENTS`` vocabulary, in declaration order —
+    and a trailing ``act_pair_event:<key>`` string exactly when the row
+    declares a non-empty ``pair_events`` table, resolving through the handlers
     ``sexual-act-effects`` registers.
 
     Runs the per-row structural checks (design D-6 items 1-5 plus the
@@ -279,7 +298,12 @@ def _act_family(
             effects=[
                 f"pleasure:{key}",
                 f"sexual_counter:{key}",
-                *(f"sexual_event:{name}" for name in sexual_events),
+                *(
+                    f"sexual_event_actor:{name}"
+                    if name in _ACTOR_SCOPED_EVENTS
+                    else f"sexual_event:{name}"
+                    for name in sexual_events
+                ),
                 *((f"act_pair_event:{key}",) if pair_events else ()),
             ],
             category=SkillCategory.SEXUAL_ACT,

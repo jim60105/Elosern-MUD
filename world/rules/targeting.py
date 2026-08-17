@@ -42,7 +42,16 @@ class BattlefieldActionContext(ActionContext, Protocol):
 
 
 class RoomActionContext:
-    """Out-of-combat context where every co-located non-self entity is allied."""
+    """Out-of-combat context where every co-located non-self entity is allied.
+
+    The ``event_context`` the caller supplies is copied, then
+    ``event_context["room"]`` is injected unconditionally, bound to the
+    constructed context's room — effect handlers and presenters reading
+    ``event_context`` can deterministically discover the out-of-combat
+    location without a new handler surface (``observers_present`` reads it
+    for the room-occupancy presence check). A caller-supplied ``"room"`` key
+    was meaningless before the injection and is replaced, never duplicated.
+    """
 
     battlefield = None
 
@@ -53,6 +62,7 @@ class RoomActionContext:
     ):
         self.room = room
         self.event_context = {} if event_context is None else dict(event_context)
+        self.event_context["room"] = self.room
 
     def is_present(self, actor: Any, target: Any) -> bool:
         return target is actor or (

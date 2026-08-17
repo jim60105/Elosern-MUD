@@ -5,6 +5,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from world.skills.effects import (
+    ActorSexualEventEffect,
     BuffApplyEffect,
     CleanseEffect,
     ConferGrowthRateEffect,
@@ -128,6 +129,18 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("sexual_event:交合"),
             SexualEventEffect(event_name="交合"),
         )
+
+    def test_sexual_event_actor_parses_into_its_dataclass(self):
+        self.assertEqual(
+            parse_effect("sexual_event_actor:self_exposure"),
+            ActorSexualEventEffect(event_name="self_exposure"),
+        )
+
+    def test_sexual_event_actor_rejects_missing_or_double_payload(self):
+        for effect in ("sexual_event_actor", "sexual_event_actor:a:b"):
+            with self.subTest(effect=effect):
+                with self.assertRaises(ValueError):
+                    parse_effect(effect)
 
     @covers_requirement("skill-effect-model::pleasure-and-sexual-counter-parse-into-bare-key-carrying-typed-dataclasses")
     def test_pleasure_parses_into_its_dataclass(self):

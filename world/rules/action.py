@@ -33,7 +33,10 @@ from world.rules.progression import (
 from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
     _EFFECTS_CONFIG,
+    _OBSERVER_GATED_COUNTERS,
+    _OBSERVER_GATED_EVENTS,
     compute_pleasure_gain,
+    observers_present,
     pair_event_name,
     participants,
     resolve_part,
@@ -626,6 +629,12 @@ def _handle_sexual_event(
     resisted cast reaches only its surviving participants.
     """
     del scale
+    event_name = effect_id.partition(":")[2]
+    if not event_name:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual_event requires an event name",
+        )
     try:
         from world.rules.sexual_transitions import apply_event
     except ImportError as error:
@@ -633,12 +642,6 @@ def _handle_sexual_event(
             RejectReason.EFFECT_RESOLUTION_FAILED,
             "sexual-transition rules are unavailable (change 7b)",
         ) from error
-    event_name = effect_id.partition(":")[2]
-    if not event_name:
-        raise RejectedAction(
-            RejectReason.EFFECT_RESOLUTION_FAILED,
-            "sexual_event requires an event name",
-        )
     sexual_context = dict(context.get("sexual", {}))
     recipients = (
         targets
@@ -657,6 +660,60 @@ def _handle_sexual_event(
             ),
         )
         for target in recipients
+    ]
+
+
+def _handle_actor_sexual_event(
+    actor: Any,
+    targets: list[Any],
+    effect_id: str,
+    context: dict[str, Any],
+    scale: float,
+) -> list[PendingEffect]:
+    """Apply one performer-scoped event to the acting entity alone.
+
+    The actor-scoped twin of ``_handle_sexual_event``: an act declaring a
+    ``_ACTOR_SCOPED_EVENTS`` member (``self_exposure``, ``public_exposure``,
+    ``watched_during_activity``, ``public_sexual_activity``) emits it through
+    the ``sexual_event_actor:<name>`` prefix so the resolved event lands on
+    the performing actor and never on a target — a spectator's observation
+    does not expose the spectator. The apply path, error shape, and description
+    kind mirror the participant handler; an event name in
+    ``_OBSERVER_GATED_EVENTS`` (``watched_during_activity``) is staged only
+    when :func:`observers_present` reads a co-located observer, and an
+    observer-less cast stays silent.
+    """
+    del scale
+    event_name = effect_id.partition(":")[2]
+    if not event_name:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual_event_actor requires an event name",
+        )
+    if (
+        event_name in _OBSERVER_GATED_EVENTS
+        and not observers_present(actor, targets, context)
+    ):
+        return []
+    try:
+        from world.rules.sexual_transitions import apply_event
+    except ImportError as error:
+        raise RejectedAction(
+            RejectReason.EFFECT_RESOLUTION_FAILED,
+            "sexual-transition rules are unavailable (change 7b)",
+        ) from error
+    sexual_context = dict(context.get("sexual", {}))
+    return [
+        PendingEffect(
+            actor,
+            f"sexual_transition|{_entity_key(actor)}|{event_name}",
+            frozenset(),
+            lambda: apply_event(
+                actor,
+                event_name,
+                **sexual_context,
+            ),
+        )
     ]
 
 
@@ -839,13 +896,21 @@ def _handle_sexual_counter_effect(
     land on every other participant. A counter name present in both tuples is
     applied once per side through two independent grants — the schema's way of
     crediting both parties of a symmetric two-person act.
+
+    A counter name in ``_OBSERVER_GATED_COUNTERS`` (``watched_count``) is
+    staged only when :func:`observers_present` reads a co-located observer
+    for the cast; an unobserved cast silently skips that single name while
+    every other declared counter still stages — the "被觀看次數" ladder cannot
+    climb without an audience.
     """
-    del context, scale
     act = _resolve_act(effect_id)
+    observed = observers_present(actor, targets, context)
     all_participants = participants(actor, targets)
     others = [participant for participant in all_participants if participant is not actor]
     pending: list[PendingEffect] = []
     for name in act.actor_counters:
+        if name in _OBSERVER_GATED_COUNTERS and not observed:
+            continue
         pending.append(_counter_pending_effect(actor, name))
     for other in others:
         for name in act.participant_counters:
@@ -1206,6 +1271,12 @@ register_effect_handler(
     "sexual_event",
     _handle_sexual_event,
     frozenset({"sexual", "traits"}),
+    requires_event_context=frozenset(),
+)
+register_effect_handler(
+    "sexual_event_actor",
+    _handle_actor_sexual_event,
+    frozenset({"sexual"}),
     requires_event_context=frozenset(),
 )
 register_effect_handler(

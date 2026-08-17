@@ -354,3 +354,25 @@ class TightenedShapeTests(unittest.TestCase):
         context = _BattlefieldContext(object(), roster)
         expanded = expand_target_shorthand(actor, context, "all")
         self.assertTrue(all(hasattr(item, "traits") for item in expanded))
+
+
+class RoomActionContextEventContextTests(unittest.TestCase):
+    """RoomActionContext injects the room into event_context (design D-4)."""
+
+    @covers_requirement("targeting-validation::roomactioncontext-exposes-the-room-through-event-context")
+    def test_constructed_context_carries_the_room_key(self):
+        room = object()
+        context = RoomActionContext(room, {"disguise": {}})
+        self.assertEqual(context.event_context, {"disguise": {}, "room": room})
+
+    @covers_requirement("targeting-validation::roomactioncontext-exposes-the-room-through-event-context")
+    def test_caller_supplied_room_key_is_replaced_never_duplicated(self):
+        room, other_room = object(), object()
+        context = RoomActionContext(room, {"room": other_room, "disguise": {}})
+        self.assertEqual(context.event_context["room"], room)
+        self.assertEqual(context.event_context["disguise"], {})
+
+    @covers_requirement("targeting-validation::roomactioncontext-exposes-the-room-through-event-context")
+    def test_none_event_context_gains_only_the_room_key(self):
+        room = object()
+        self.assertEqual(RoomActionContext(room).event_context, {"room": room})

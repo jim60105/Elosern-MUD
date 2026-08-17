@@ -12,9 +12,9 @@
 ## MODIFIED Requirements
 
 ### Requirement: Every act except shame_provocative_gaze reuses the self_exposure event, actor-scoped; no new sexual.yaml row is added
-`shame_half_expose_chest`, `shame_half_expose_lower`, `shame_loosen_collar`, `shame_full_expose`,
-`shame_public_masturbation`, `shame_public_performance`, `shame_devoted_pose`, and
-`shame_shameless_declaration` SHALL each declare `"self_exposure"` in `sexual_events`, emitted
+`shame_hem_lift`, `shame_half_expose_chest`, `shame_half_expose_lower`, `shame_loosen_collar`,
+`shame_full_expose`, `shame_public_masturbation`, `shame_public_performance`, `shame_devoted_pose`,
+and `shame_shameless_declaration` SHALL each declare `"self_exposure"` in `sexual_events`, emitted
 through the actor-scoped channel (`sexual_event_actor:self_exposure`) so the event lands on the
 performing actor. `shame_provocative_gaze` SHALL declare `sexual_events=()`. Every act except
 `shame_provocative_gaze` SHALL also declare `"public_exposure"` in `sexual_events`.

@@ -6,8 +6,13 @@ across four tiers: three at ``exposure_act_count >= 5``, two at
 ``masturbation_count``), two at ``watched_count >= 10`` (公開表演
 compound-gated on ``exposure_act_count``), and two at
 ``exposure_act_count >= 50`` (無恥宣言 compound-gated on ``watched_count``).
-Every act except the battlefield taunt 挑釁凝視 reuses the ``self_exposure``
-event shipped with the seed — no further rulebook row is needed.
+Every act except the battlefield taunt 挑釁凝視 declares the actor-scoped
+``self_exposure`` event shipped with the seed and adds the actor-scoped
+``public_exposure`` event — no further rulebook row is needed. The four
+public acts (公開自慰, 公開表演, 獻身姿態, 無恥宣言) additionally declare the
+observer-gated ``watched_during_activity`` event; the three that are
+themselves implicitly sexual acts (公開自慰, 公開表演, 無恥宣言) also declare
+``public_sexual_activity``.
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -27,7 +32,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        ("self_exposure", "public_exposure"),
         False,
     ),
     (
@@ -42,7 +47,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        ("self_exposure", "public_exposure"),
         False,
     ),
     (
@@ -57,7 +62,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        ("self_exposure", "public_exposure"),
         False,
     ),
     (
@@ -72,7 +77,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        ("self_exposure", "public_exposure"),
         False,
     ),
     (
@@ -87,7 +92,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        ("self_exposure", "public_exposure"),
         False,
     ),
     (
@@ -102,7 +107,13 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count", "masturbation_count", "watched_count"),
         (),
-        ("self_exposure", "masturbation_climax"),
+        (
+            "self_exposure",
+            "public_exposure",
+            "public_sexual_activity",
+            "masturbation_climax",
+            "watched_during_activity",
+        ),
         False,
     ),
     (
@@ -132,7 +143,12 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         0.6,
         ("watched_count", "exposure_act_count"),
         (),
-        ("self_exposure",),
+        (
+            "self_exposure",
+            "public_exposure",
+            "public_sexual_activity",
+            "watched_during_activity",
+        ),
         True,
     ),
     (
@@ -147,7 +163,11 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         0.5,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        (
+            "self_exposure",
+            "public_exposure",
+            "watched_during_activity",
+        ),
         True,
     ),
     (
@@ -162,7 +182,12 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         1.0,
         ("exposure_act_count",),
         (),
-        ("self_exposure",),
+        (
+            "self_exposure",
+            "public_exposure",
+            "public_sexual_activity",
+            "watched_during_activity",
+        ),
         False,
     ),
 )
