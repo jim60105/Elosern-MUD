@@ -11,7 +11,6 @@ from types import SimpleNamespace
 from evennia.utils.test_resources import EvenniaTestCase
 
 from web.webclient.presentation.coordinator import (
-    PresentationCoordinator,
     attach_coordinator,
     publish_panel_update,
 )
@@ -96,6 +95,7 @@ class PublishPanelUpdateTests(EvenniaTestCase):
         )
         self.assertIsNone(envelope)
         self.assertEqual(self.session.sent, [])
-        self.assertIsInstance(
-            self.session.ndb.elosern_coordinator, PresentationCoordinator
+        self.assertIsNone(
+            self.session.ndb.elosern_coordinator,
+            "a guarded push must not attach a coordinator as a side effect",
         )

@@ -134,9 +134,8 @@ _clock = time.monotonic
 
 
 def _log(message: str) -> None:
-    log = logger.log_err if hasattr(logger, "log_err") else logger.warning
     try:
-        log("action options: %s" % message)
+        logger.warning("action options: %s" % message)
     except Exception:
         pass
 
@@ -605,9 +604,10 @@ def _run_generation(generation: _PendingGeneration, client: Any, context: Any, a
     from world.ai import action_options
 
     try:
-        # A plain ``yield``: the layer resolves a Deferred on the enabled
-        # path but returns a synchronous ``None`` when the profile is
-        # disabled — Twisted resumes with either without transport work.
+        # A plain ``yield`` on the layer's Deferred: ``generate_action_options``
+        # is an ``inlineCallbacks`` function, so it returns a Deferred on every
+        # path — the disabled profile resolves it with ``None`` before any
+        # transport work, without ever touching the client.
         outcome = yield action_options.generate_action_options(
             context, client, fingerprint=fingerprint_value
         )
@@ -640,11 +640,12 @@ def schedule_action_options(
     failure (a vanished room, a malformed context, a vanished clock, a
     broken client construction) is logged and swallowed; a preflight
     failure degrades the affected sessions in place so no session is left
-    in ``generating``. The return value is the in-flight generation's
-    Deferred — freshly started or an existing one a new watcher attached
-    to — and ``None`` on replays, memo hits, cache hits, preflight
-    no-ops, and preflight failures, for caller observability; never an
-    exception.
+    in ``generating``. The return value is the fingerprint's in-flight
+    generation's Deferred — freshly started, or the existing one when it
+    survives the trigger (a new watcher attached, or every watcher was a
+    replay/cache/memo no-op) — and ``None`` when no generation is in
+    flight (pure replays, memo hits, cache hits, preflight no-ops, and
+    preflight failures), for caller observability; never an exception.
     """
     try:
         situation = _derive_situation(actor)
@@ -678,8 +679,10 @@ def schedule_action_options(
             _complete_degraded(generation, actor, fingerprint_value, memoize=False)
             return None
         observing_client = _ObservingClient(client)
-        generation.deferred = defer.ensureDeferred(
-            _run_generation(generation, observing_client, context, actor, fingerprint_value)
+        # ``_run_generation`` is an inlineCallbacks function: calling it
+        # already yields a Deferred, so no ensureDeferred wrapper is needed.
+        generation.deferred = _run_generation(
+            generation, observing_client, context, actor, fingerprint_value
         )
         generation.deferred.addErrback(_terminal_generation_error)
         generation.deferred.addBoth(lambda _: _drop_if_current(fingerprint_value, generation))

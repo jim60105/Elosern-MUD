@@ -227,17 +227,15 @@ def publish_panel_update(
     started a fresh presentation sequence. This helper returns the emitted
     envelope, or publishes nothing (returning ``None``) when the session's live
     coordinator is absent or its epoch no longer equals the ``expected_epoch``
-    captured when the push was scheduled. ``context`` is the caller's
-    :class:`PresentationContext`, assembled through the shared ingress factory
-    so the ``context_actions`` presenter renders from the ``OptionsSnapshot``.
+    captured when the push was scheduled. An absent coordinator is left alone —
+    nothing is attached by this helper; the ingress attaches on the session's
+    next sync. ``context`` is the caller's :class:`PresentationContext`,
+    assembled through the shared ingress factory so the ``context_actions``
+    presenter renders from the ``OptionsSnapshot``.
     """
-    from web.webclient.presentation.registry import build_production_registry
-
     ndb = getattr(session, "ndb", None)
     coordinator = getattr(ndb, "elosern_coordinator", None) if ndb is not None else None
-    if coordinator is None:
-        coordinator = attach_coordinator(session, build_production_registry())
-    if coordinator.epoch != expected_epoch:
+    if coordinator is None or coordinator.epoch != expected_epoch:
         return None
     try:
         return coordinator.panel_update(context, panels)

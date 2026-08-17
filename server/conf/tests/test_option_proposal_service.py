@@ -270,7 +270,7 @@ class SchedulingContractTests(_BaseServiceTests):
             reattached = self._schedule(client=client)
         self.assertIs(reattached, pending, "only the original generation runs")
         self.assertEqual(client.calls, 1, "no second transport call")
-        # The re-trigger must not have mised the first session's token.
+        # The re-trigger must not have missed the first session's token.
         self.assertEqual(first.ndb.options_state["status"], "generating")
         with override_settings(LLM_PROFILES=_raw()):
             client.pending.callback(_valid_options_json(self._eligible()))
@@ -353,6 +353,43 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         service.evict(session, self.player)
         self.assertNotIn(fingerprint, service._cache)
 
+    def test_evict_clears_the_negative_memo_for_the_displayed_fingerprint(self):
+        fake_clock = [1000.0]
+        session = self._puppet_session()
+        client = FakeLLMClient()
+        client.add_timeout(lambda d: True)
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch.object(service, "_clock", lambda: fake_clock[0]),
+        ):
+            await_result(self._schedule(client=client))
+        fingerprint = self._state()["fingerprint"]
+        self.assertIn(fingerprint, service._negative_memo)
+        service.evict(session, self.player)
+        self.assertNotIn(fingerprint, service._negative_memo)
+        self.assertEqual(service._cache, {})
+
+    def test_sequence_reset_mutes_the_completion_push(self):
+        """A coordinator reset between scheduling and completion writes the
+        session state but pushes nothing (delta requirement 4 scenario: the
+        epoch guard mutes the stale push)."""
+        client = _PendingFakeClient()
+        session = self._puppet_session()
+        with override_settings(LLM_PROFILES=_raw()):
+            pending = self._schedule(client=client)
+        self.assertEqual(self._state()["status"], "generating")
+        session.ndb.elosern_coordinator.reset()
+        published = len(self._envelopes("ui_update"))
+        with override_settings(LLM_PROFILES=_raw()):
+            client.pending.callback(_valid_options_json(self._eligible()))
+            await_result(pending)
+        self.assertEqual(self._state()["status"], "ready")
+        self.assertEqual(
+            len(self._envelopes("ui_update")),
+            published,
+            "the stale-epoch push must be a silent no-op",
+        )
+
 
 class MemoContractTests(_BaseServiceTests):
     def _fail_client(self):
@@ -420,8 +457,11 @@ class MemoContractTests(_BaseServiceTests):
                 self.assertGreaterEqual(len(client.calls), calls + 1)
 
     def test_disabled_profile_degrades_without_a_client_call_or_memo(self):
+        """``client=None`` with a disabled profile builds the offline stub (not
+        the live client), the layer degrades before any transport work, the
+        stub is never invoked, and nothing is memoized (delta requirement 6 /
+        the offline-stub scenario)."""
         disabled = _raw(action_options={"enabled": False})
-        client = FakeLLMClient()
         session = self._puppet_session()
         with (
             override_settings(LLM_PROFILES=disabled),
@@ -431,11 +471,38 @@ class MemoContractTests(_BaseServiceTests):
                     "must not construct the live client when the profile is disabled"
                 ),
             ),
+            patch.object(
+                service._OfflineStubClient,
+                "get_response",
+                side_effect=AssertionError("the offline stub must never be invoked"),
+            ),
+        ):
+            result = self._schedule(client=None)
+            await_result(result)
+            self.assertEqual(self._state()["status"], "degraded")
+            self.assertEqual(service._negative_memo, {})
+
+    def test_client_raised_malformed_transport_error_is_memoized(self):
+        """The memo discrimination is positional, not by failure kind: a
+        client that itself raises ``LLMTransportError("malformed")`` IS the
+        memoized class (observed at the client boundary), while the
+        guardrail's own malformed detection after a successful round-trip
+        (covered above) is not."""
+        from world.ai.errors import LLMTransportError
+
+        client = FakeLLMClient()
+        client.add_failure(
+            lambda d: True, LLMTransportError("malformed", "simulated malformed body")
+        )
+        session = self._puppet_session()
+        fake_clock = [1000.0]
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch.object(service, "_clock", lambda: fake_clock[0]),
         ):
             await_result(self._schedule(client=client))
-            self.assertEqual(self._state()["status"], "degraded")
-        self.assertEqual(len(client.calls), 0)
-        self.assertEqual(service._negative_memo, {})
+        self.assertEqual(self._state()["status"], "degraded")
+        self.assertIn(self._state()["fingerprint"], service._negative_memo)
 
     def test_success_is_never_negatively_memed(self):
         client = FakeLLMClient()
