@@ -342,6 +342,23 @@ class CommandDocsContractTests(unittest.TestCase):
         self.entries = parse_canonical_entries(self.reference)
         self.mounted = mounted_command_classes()
 
+    def _section_text(self, key: str) -> str:
+        """Return the raw text of one canonical section (table plus trailing prose).
+
+        ``parse_canonical_entries`` attributes only table rows to a key, so the
+        section's trailing prose must be read from the raw file instead.
+        """
+        lines = self.reference.splitlines()
+        start = next(
+            index for index, line in enumerate(lines) if line.strip() == f"### {key}"
+        )
+        body: list[str] = []
+        for line in lines[start + 1 :]:
+            if line.startswith("#"):
+                break
+            body.append(line)
+        return "\n".join(body)
+
     @covers_requirement("game-command-docs::complete-command-reference", "game-command-docs::drift-contract-test")
     def test_every_mounted_project_command_is_documented(self):
         manifest_keys = set(EXPECTED_COMMANDS)
@@ -461,6 +478,30 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("主宰", entry["說明"])
         self.assertIn("威力", entry["說明"])
         self.assertIn("MP", entry["說明"])
+
+    @covers_requirement(
+        "game-command-docs::the-command-reference-documents-the-sexual-act-system",
+        "game-command-docs::the-command-reference-documents-the-resist-affinity-and-status-consequences",
+    )
+    def test_cast_and_combat_actions_document_sexual_acts(self):
+        cast_description = self.entries["cast"]["說明"]
+        self.assertIn("性愛", cast_description)
+        self.assertIn("解鎖", cast_description)
+        combat_description = self.entries["combat actions"]["說明"]
+        self.assertIn("性愛", combat_description)
+        cast_section = self._section_text("cast")
+        for token in ("抵抗", "好感度", "解鎖", "興奮", "高潮", "露出", "戰鬥", "神之秘法"):
+            self.assertIn(token, cast_section)
+        for label in ("絕頂律令", "時姦", "神域搾取", "感度創世", "恥辱剝奪", "絕對從屬", "無垢回歸"):
+            self.assertNotIn(label, cast_section)
+
+    @covers_requirement(
+        "game-command-docs::the-overview-page-describes-the-sexual-act-system-s-discoverability"
+    )
+    def test_overview_cast_row_mentions_sexual_acts(self):
+        row = next(line for line in self.overview.splitlines() if line.startswith("| [`cast`]("))
+        self.assertIn("性愛", row)
+        self.assertIn("解鎖", row)
 
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_context_consistent_with_help_category(self):
