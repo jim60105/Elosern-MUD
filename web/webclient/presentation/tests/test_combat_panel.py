@@ -12,12 +12,14 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from web.webclient.presentation.combat_panel import (
     CONTEXT_ACTIONS_SCHEMA_VERSION,
+    ContextActionsError,
     validate_context_actions,
 )
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_LIST_ITEMS,
+    ProtocolValidationError,
     check_envelope,
     json_byte_size,
 )
@@ -83,7 +85,7 @@ def _valid_participant(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "combat",
         "session": {
@@ -104,7 +106,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "combat",
         "session": {
@@ -627,6 +629,224 @@ def _player(key="panel player"):
     return player
 
 
+def _exploration_panel(**overrides):
+    value = {
+        "schema_version": 4,
+        "available": True,
+        "kind": "exploration",
+        "affordances": [
+            {
+                "action_id": "explore.look",
+                "label": "南門",
+                "params": {"room": True},
+                "freeform": False,
+                "navigation": False,
+                "enabled": True,
+                "disabled_reason": None,
+            },
+            {
+                "action_id": "explore.talk_scripted",
+                "label": "註冊",
+                "params": {"npc_id": 5, "keyword_id": "註冊"},
+                "freeform": False,
+                "navigation": False,
+                "enabled": True,
+                "disabled_reason": None,
+            },
+            {
+                "surface": "guild",
+                "label": "公會服務",
+                "navigation": True,
+                "enabled": True,
+                "disabled_reason": None,
+            },
+        ],
+    }
+    value.update(overrides)
+    return value
+
+
+class ContextActionsExplorationFormTests(unittest.TestCase):
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-4-panel")
+    def test_valid_exploration_form_passes(self):
+        normalized = validate_context_actions(_exploration_panel())
+        self.assertEqual(normalized["schema_version"], CONTEXT_ACTIONS_SCHEMA_VERSION)
+        self.assertTrue(normalized["available"])
+        self.assertEqual(normalized["kind"], "exploration")
+        self.assertEqual(normalized["affordances"][0]["params"], {"room": True})
+        self.assertEqual(
+            normalized["affordances"][1]["params"],
+            {"npc_id": 5, "keyword_id": "註冊"},
+        )
+        self.assertTrue(normalized["affordances"][2]["navigation"])
+        self.assertNotIn("surface", normalized["affordances"][0])
+        self.assertNotIn("action_id", normalized["affordances"][2])
+
+    def test_combat_fields_in_the_exploration_form_reject(self):
+        payload = _exploration_panel(session={"session_id": "x"}, skills=[])
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(payload)
+
+    def test_exploration_fields_in_the_combat_form_reject(self):
+        payload = _valid_panel(affordances=[_exploration_panel()["affordances"][0]])
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(payload)
+
+    def test_wrong_kind_and_version_reject(self):
+        with self.assertRaises(Exception):
+            validate_context_actions(_exploration_panel(kind="combat"))
+        with self.assertRaises(ContextActionsError):
+            validate_context_actions(_exploration_panel(schema_version=3))
+        with self.assertRaises(Exception):
+            validate_context_actions(_exploration_panel(kind="bogus"))
+
+    def test_affordance_bounds_reject(self):
+        from web.webclient.presentation.combat_panel import MAX_CONTEXT_AFFORDANCES
+
+        payload = _exploration_panel(
+            affordances=[_exploration_panel()["affordances"][0]]
+            * (MAX_CONTEXT_AFFORDANCES + 1)
+        )
+        with self.assertRaises(ContextActionsError):
+            validate_context_actions(payload)
+        payload = _exploration_panel(affordances=42)
+        with self.assertRaises(Exception):
+            validate_context_actions(payload)
+
+    def test_affordance_entry_shapes_reject(self):
+        valid = _exploration_panel()["affordances"][0]
+        cases = (
+            {**valid, "action_id": "explore.take"},
+            {**valid, "action_id": "explore.interact"},
+            {**valid, "freeform": "yes"},
+            {**valid, "freeform": True},
+            {
+                **valid,
+                "action_id": "explore.talk_freeform",
+                "freeform": False,
+                "params": {"npc_id": 9},
+            },
+            {**valid, "params": {"room": "yes"}},
+            {**valid, "params": {"room": True, "extra": 1}},
+            {**valid, "label": " "},
+            {**valid, "enabled": False, "disabled_reason": None},
+            {**valid, "enabled": True, "disabled_reason": {"code": "x", "message": "說明"}},
+            {**valid, "navigation": "false"},
+            {**valid, "navigation": True},
+            {
+                "surface": "bank",
+                "label": "公會",
+                "navigation": True,
+                "enabled": True,
+                "disabled_reason": None,
+            },
+            {
+                "surface": "guild",
+                "label": "公會服務",
+                "navigation": True,
+                "enabled": True,
+                "disabled_reason": None,
+                "action_id": "explore.look",
+            },
+            {
+                "action_id": "explore.look",
+                "label": "南門",
+                "params": {"room": True},
+                "freeform": False,
+                "navigation": False,
+                "enabled": True,
+                "disabled_reason": None,
+                "surface": "guild",
+            },
+            {**valid, "params": "room"},
+            {**valid, "params": {"room": True, "target_id": 1}},
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                with self.assertRaises(Exception):
+                    validate_context_actions(_exploration_panel(affordances=[payload]))
+
+    def test_freeform_entry_params_are_exactly_the_binding_shape(self):
+        valid = _exploration_panel()["affordances"][0]
+        entry = {
+            **valid,
+            "action_id": "explore.talk_freeform",
+            "freeform": True,
+            "params": {"npc_id": 9},
+        }
+        normalized = validate_context_actions(_exploration_panel(affordances=[entry]))
+        self.assertEqual(normalized["affordances"][0]["params"], {"npc_id": 9})
+        for bad in (
+            {**entry, "params": {"npc_id": 9, "speech": "你好"}},
+            {**entry, "params": {"npc_id": 0}},
+            {**entry, "params": {}},
+        ):
+            with self.assertRaises(Exception):
+                validate_context_actions(_exploration_panel(affordances=[bad]))
+
+    def test_combat_form_is_byte_identical_to_version_3(self):
+        version3 = {
+            "schema_version": 3,
+            "available": True,
+            "kind": "combat",
+            "session": {
+                "session_id": "hostile:1:0",
+                "mode": "hostile",
+                "round": 0,
+                "state": "ready",
+                "reason": None,
+            },
+            "participants": [_valid_participant()],
+            "root_actions": ["attack", "skills", "items", "defend", "flee"],
+            "secondary_actions": ["forfeit"],
+            "skills": [_valid_category_group()],
+        }
+        version4 = _valid_panel()
+        self.assertEqual(version3["schema_version"], 3)
+        self.assertEqual(version4["schema_version"], 4)
+        self.assertEqual(
+            {key: value for key, value in version4.items() if key != "schema_version"},
+            {key: value for key, value in version3.items() if key != "schema_version"},
+        )
+        normalized = validate_context_actions(version4)
+        self.assertEqual(normalized["schema_version"], 4)
+        self.assertEqual(normalized["session"], version3["session"])
+        self.assertEqual(normalized["participants"], version3["participants"])
+        self.assertEqual(normalized["root_actions"], version3["root_actions"])
+        self.assertEqual(normalized["secondary_actions"], version3["secondary_actions"])
+        self.assertEqual(normalized["skills"], version3["skills"])
+
+    def test_over_envelope_exploration_form_fails_closed(self):
+        wide = "寬" * 128
+        affordances = [
+            {
+                "action_id": "explore.look",
+                "label": wide,
+                "params": {"room": True},
+                "freeform": False,
+                "navigation": False,
+                "enabled": True,
+                "disabled_reason": None,
+            }
+            for _ in range(320)
+        ]
+        with self.assertRaises(ContextActionsError):
+            validate_context_actions(
+                _exploration_panel(affordances=affordances)
+            )
+
+    def test_unavailable_form_differs_only_in_schema_version(self):
+        from web.webclient.presentation.protocol import unavailable_payload
+
+        version3 = unavailable_payload(3, "presentation_unavailable", "目前無法顯示此介面")
+        version4 = unavailable_payload(4, "presentation_unavailable", "目前無法顯示此介面")
+        self.assertEqual(
+            {key: value for key, value in version4.items() if key != "schema_version"},
+            {key: value for key, value in version3.items() if key != "schema_version"},
+        )
+        self.assertEqual(version4["schema_version"], 4)
+
+
 def _monster(key="panel goblin", hp=100):
     monster = create_object(Monster, key=key)
     monster.threat_tier = "low"
@@ -747,15 +967,21 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
-    def test_exploration_uses_unavailable_form_without_fabrication(self):
+    def test_exploration_uses_the_available_exploration_form_without_fabrication(self):
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        self.assertFalse(payload["available"])
-        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        self.assertEqual(payload["schema_version"], 4)
+        self.assertNotIn("session", payload)
+        self.assertNotIn("participants", payload)
+        self.assertNotIn("root_actions", payload)
+        self.assertNotIn("secondary_actions", payload)
         self.assertNotIn("skills", payload)
         self.assertNotIn("attack", repr(payload))
+        self.assertGreaterEqual(len(payload["affordances"]), 1)
 
     def test_presenter_is_read_only(self):
         engage(self.player, self.monster)
@@ -855,11 +1081,21 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("威力", repr(payload["skills"]))
 
     def test_presenter_isolation_on_missing_session(self):
+        # Outside combat the exploration form is available; only a
+        # creation-pending or locationless puppet renders unavailable.
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        self.player.db.creation_pending = True
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_catalog_complete_panel_fits_protocol_envelope(self):
@@ -916,6 +1152,128 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 }
             ),
         )
+
+    @covers_requirement("webclient-context-actions::the-exploration-context-form-enumerates-the-complete-canonical-affordance-list")
+    def test_maximal_legal_room_serializes_untruncated(self):
+        from evennia.objects.objects import DefaultObject
+        from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
+        from typeclasses.npcs import LLMNPC, NPC
+        from web.webclient.presentation.combat_panel import MAX_CONTEXT_AFFORDANCES
+        from web.webclient.presentation.affordances import exploration_affordances
+
+        # The combat fixture monster leaves the room so the vocabulary reaches
+        # the shared caps: 30 generative hosts with a full authored keyword
+        # list (6 keywords + freeform + invite = 8 per target), the guild and
+        # shop hosts (6 keywords + one navigation entry each), 12 exits,
+        # 32 look objects, and the 2-entry safe baseline: 30*8 + 7 + 7 +
+        # 12 + 32 + 2 = 300 entries.
+        self.monster.location = None
+        for index in range(30):
+            npc = create_object(LLMNPC, key=f"話者{index}", location=self.room)
+            npc.components.add(
+                ScriptedDialogue.create(npc, dialogue_key="guild_staff")
+            )
+        staff = create_object(NPC, key="公會職員", location=self.room)
+        staff.components.add(
+            ScriptedDialogue.create(staff, dialogue_key="guild_staff")
+        )
+        staff.components.add(
+            GuildStaff.create(staff, service_id="staff", branch_key="guild_branch_altoria")
+        )
+        shop = create_object(NPC, key="商人", location=self.room)
+        shop.components.add(
+            ScriptedDialogue.create(shop, dialogue_key="guild_staff")
+        )
+        shop.components.add(
+            Merchant.create(shop, service_id="shop", branch_key="guild_branch_altoria")
+        )
+        destinations = [
+            create_object(Room, key=f"目的地{index}", location=None)
+            for index in range(12)
+        ]
+        for index, destination in enumerate(destinations):
+            create_object(
+                "evennia.objects.objects.DefaultExit",
+                key=f"出口{index}",
+                location=self.room,
+                destination=destination,
+            )
+        for index in range(32):
+            create_object(DefaultObject, key=f"木箱{index}", location=self.room)
+        vocabulary = exploration_affordances(self.player)
+        self.assertEqual(len(vocabulary), 300)
+        self.assertLessEqual(len(vocabulary), MAX_CONTEXT_AFFORDANCES)
+        # Every target slot and every navigation surface is present; only the
+        # monster-bound engage code and the companion-bound leave code are
+        # absent from this room.
+        from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
+
+        ids = {
+            entry.action_id
+            for entry in vocabulary
+            if not entry.navigation
+        }
+        self.assertEqual(
+            ids,
+            set(ACTION_CODE_ALLOWLIST) - {"explore.engage", "explore.party_leave"},
+        )
+        surfaces = {entry.surface for entry in vocabulary if entry.navigation}
+        self.assertEqual(surfaces, {"guild", "shop"})
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        self.assertEqual(len(payload["affordances"]), len(vocabulary))
+        normalized = validate_context_actions(payload)
+        self.assertEqual(normalized["affordances"], payload["affordances"])
+        # The maximal form must also survive the global envelope safety gate
+        # the client enforces before accepting any snapshot or update, and
+        # stays within the OOB byte bound on its own.
+        check_envelope(payload)
+        self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
+        # A full snapshot for this degenerate maximal room combines two
+        # full-size panels (the version-1 exploration panel and this form) and
+        # can exceed the envelope; the client rejects such snapshots
+        # fail-closed exactly like the version-1 panel's own over-envelope
+        # rejection — the form-level bound above is this change's guarantee.
+
+    def test_exploration_presenter_is_read_only(self):
+        before = {
+            "location": self.player.location,
+            "wallet": self.player.db.wallet,
+            "map_knowledge": self.player.attributes.get("map_knowledge"),
+        }
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        self.assertIs(self.player.location, before["location"])
+        self.assertEqual(self.player.db.wallet, before["wallet"])
+        self.assertEqual(
+            self.player.attributes.get("map_knowledge"), before["map_knowledge"]
+        )
+
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-4-panel")
+    def test_creation_pending_renders_the_version_four_unavailable_form(self):
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        self.player.db.creation_pending = True
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
+        self.assertNotIn("affordances", payload)
 
 
 if __name__ == "__main__":

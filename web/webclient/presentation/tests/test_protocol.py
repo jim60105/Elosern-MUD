@@ -116,7 +116,12 @@ class JSONSafetyTests(unittest.TestCase):
         with self.assertRaises(JSONSafetyError):
             check_json_safety({"fields": {str(i): i for i in range(65)}})
         with self.assertRaises(JSONSafetyError):
-            check_json_safety({"items": list(range(129))})
+            check_json_safety({"items": list(range(MAX_LIST_ITEMS + 1))})
+        # The raised ceiling clears the largest legitimate flat panel list
+        # (the context_actions exploration form's 320-entry affordance array).
+        self.assertIsNone(
+            check_json_safety({"items": list(range(MAX_LIST_ITEMS))})
+        )
         with self.assertRaises(JSONSafetyError):
             check_json_safety({"s": "x" * (MAX_STRING_CODE_POINTS + 1)})
         with self.assertRaises(JSONSafetyError):

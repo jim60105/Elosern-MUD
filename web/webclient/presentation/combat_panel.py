@@ -1,11 +1,16 @@
-"""Exact schema-version-3 ``context_actions`` combat panel and presenter.
+"""Exact schema-version-4 ``context_actions`` panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
-bounded schema before returning it to the presentation registry. Outside a
-valid active combat session it raises :class:`PanelUnavailableError` so the
-registry emits the common unavailable form; it never fabricates exploration
-actions.
+bounded schema before returning it to the presentation registry. Inside a
+valid active combat session it emits the combat available form (byte-identical
+to schema version 3 apart from the version field); in exploration mode it
+emits the exploration available form carrying the canonical affordance
+vocabulary (``web.webclient.presentation.affordances``); only outside both
+modes (creation-pending or absent location) does it raise
+:class:`PanelUnavailableError` so the registry emits the common unavailable
+form. It never fabricates combat fields outside a combat session and never
+fabricates exploration actions inside one.
 
 The panel is read-only: it reconstructs the active session, reads participants
 and active-skill previews, and never mutates traits, resources, buffs, sexual
@@ -18,8 +23,25 @@ byte-identical to schema version 2.
 
 from typing import Any
 
+from web.webclient.actions.exploration_actions import (
+    ExplorationActionError,
+    validate_engage_payload,
+    validate_look_payload,
+    validate_move_payload,
+    validate_party_invite_payload,
+    validate_party_leave_payload,
+    validate_talk_scripted_payload,
+    validate_wait_payload,
+)
+from web.webclient.presentation.affordances import (
+    ACTION_CODE_ALLOWLIST,
+    SURFACES,
+    exploration_affordances,
+    in_exploration_mode,
+)
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
     ProtocolValidationError,
     _require_bool,
@@ -28,6 +50,7 @@ from web.webclient.presentation.protocol import (
     _require_str,
     _validate_identifier,
     _validate_message,
+    json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.combat_view import (
@@ -49,7 +72,31 @@ from world.rules.progression import (
 )
 from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 3
+CONTEXT_ACTIONS_SCHEMA_VERSION = 4
+
+# The exploration form carries the complete canonical affordance vocabulary of
+# a room. The bound derives from the shared vocabulary caps (<= 32 targets x
+# <= 8 affordances per target, <= 16 scripted keyword pool entries per host,
+# <= 12 exits, <= 32 look objects, <= 2 baseline, <= 2 navigation), so a legal
+# room can never truncate the list.
+MAX_CONTEXT_AFFORDANCES = 320
+
+# Per-affordance-entry bounds of the exploration form.
+MAX_AFFORDANCE_LABEL = 128
+MAX_AFFORDANCE_PARAM_KEYS = 8
+MAX_AFFORDANCE_PARAM_STRING = 512
+
+# Validators the exploration form reuses for the canonical params of every
+# non-freeform action (the freeform binding shape is validated separately).
+_ACTION_PAYLOAD_VALIDATORS = {
+    "explore.move": validate_move_payload,
+    "explore.look": validate_look_payload,
+    "explore.talk_scripted": validate_talk_scripted_payload,
+    "explore.party_invite": validate_party_invite_payload,
+    "explore.party_leave": validate_party_leave_payload,
+    "explore.engage": validate_engage_payload,
+    "explore.wait": validate_wait_payload,
+}
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_SKILL_KEY = 64
@@ -390,12 +437,148 @@ def _validate_category_group(value: Any) -> dict[str, Any]:
     }
 
 
+def _validate_affordance_params(action_id: str, params: Any) -> dict[str, Any]:
+    """Validate the canonical params of one exploration affordance entry.
+
+    Every non-freeform action's params are run through its registered action
+    validator so the wire payload is byte-for-byte what the dispatcher
+    accepts; the freeform entry's ``{"npc_id": int}`` binding shape is the
+    single exception (no registered validator produces it without ``speech``).
+    """
+    if action_id == "explore.talk_freeform":
+        _require_exact_fields(params, "freeform params", {"npc_id"}, {})
+        return {"npc_id": _require_int(params, "npc_id", minimum=1, maximum=MAX_SAFE_INTEGER)}
+    validator = _ACTION_PAYLOAD_VALIDATORS[action_id]
+    try:
+        return validator(params)
+    except ExplorationActionError as error:
+        raise ProtocolValidationError(str(error)) from error
+
+
+def _validate_affordance_view(value: Any) -> dict[str, Any]:
+    """Validate one discriminated ``AffordanceView`` wire entry."""
+    if not isinstance(value, dict):
+        raise ProtocolValidationError("affordance must be a JSON object")
+    navigation = value.get("navigation")
+    if not isinstance(navigation, bool):
+        raise ProtocolValidationError("affordance navigation must be a boolean")
+    label = _require_str(value, "label", maximum=MAX_AFFORDANCE_LABEL)
+    if not label.strip():
+        raise ProtocolValidationError("affordance label must be non-empty")
+    enabled = _require_bool(value, "enabled")
+    disabled_reason = _validate_disabled_reason(value["disabled_reason"])
+    if disabled_reason is None:
+        if not enabled:
+            raise ProtocolValidationError("a disabled affordance requires a disabled_reason")
+    elif enabled:
+        raise ProtocolValidationError("an enabled affordance must not carry a disabled_reason")
+    if navigation:
+        _require_exact_fields(
+            value,
+            "navigation affordance",
+            {"surface", "label", "navigation", "enabled", "disabled_reason"},
+            {},
+        )
+        surface = value["surface"]
+        if surface not in SURFACES:
+            raise ProtocolValidationError("affordance surface is not a stable value")
+        return {
+            "surface": surface,
+            "label": label,
+            "navigation": True,
+            "enabled": enabled,
+            "disabled_reason": disabled_reason,
+        }
+    _require_exact_fields(
+        value,
+        "action affordance",
+        {"action_id", "label", "params", "freeform", "navigation", "enabled", "disabled_reason"},
+        {},
+    )
+    action_id = _validate_identifier(value["action_id"], "action_id")
+    if action_id not in ACTION_CODE_ALLOWLIST:
+        raise ProtocolValidationError("action_id is not a registered exploration action")
+    freeform = value["freeform"]
+    if not isinstance(freeform, bool):
+        raise ProtocolValidationError("affordance freeform must be a boolean")
+    if freeform != (action_id == "explore.talk_freeform"):
+        raise ProtocolValidationError(
+            "freeform must be true exactly for explore.talk_freeform"
+        )
+    params_value = value["params"]
+    if not isinstance(params_value, dict):
+        raise ProtocolValidationError("affordance params must be a JSON object")
+    if len(params_value) > MAX_AFFORDANCE_PARAM_KEYS:
+        raise ProtocolValidationError("affordance params exceed their bound")
+    for key, child in params_value.items():
+        if isinstance(child, str) and len(child) > MAX_AFFORDANCE_PARAM_STRING:
+            raise ProtocolValidationError("affordance params string exceeds its bound")
+    params = _validate_affordance_params(action_id, params_value)
+    return {
+        "action_id": action_id,
+        "label": label,
+        "params": params,
+        "freeform": freeform,
+        "navigation": False,
+        "enabled": enabled,
+        "disabled_reason": disabled_reason,
+    }
+
+
+def _validate_exploration_form(payload: Any) -> dict[str, Any]:
+    """Validate one exact available exploration ``context_actions`` payload."""
+    _require_exact_fields(
+        payload,
+        "context_actions exploration form",
+        {"schema_version", "available", "kind", "affordances"},
+        {},
+    )
+    if _require_int(
+        payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER
+    ) != CONTEXT_ACTIONS_SCHEMA_VERSION:
+        raise ContextActionsError("unsupported context_actions schema_version")
+    if not _require_bool(payload, "available"):
+        raise ContextActionsError("available must be true for the exploration form")
+    if payload["kind"] != "exploration":
+        raise ContextActionsError("exploration panel kind must be exploration")
+    affordances = payload["affordances"]
+    if not isinstance(affordances, list) or len(affordances) > MAX_CONTEXT_AFFORDANCES:
+        raise ContextActionsError(
+            f"affordances must be a list of at most {MAX_CONTEXT_AFFORDANCES} entries"
+        )
+    views = [_validate_affordance_view(entry) for entry in affordances]
+    result = {
+        "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
+        "available": True,
+        "kind": "exploration",
+        "affordances": views,
+    }
+    # Envelope guarantee (mirrors the version-1 exploration panel): a
+    # conforming form must serialize within the OOB envelope limit. The list
+    # bound is a ceiling, not a guarantee that any content fits, so an
+    # over-limit payload fails closed rather than being emitted.
+    if json_byte_size(result) > MAX_CANONICAL_JSON_BYTES:
+        raise ContextActionsError(
+            "context_actions exploration form exceeds the OOB envelope limit"
+        )
+    return result
+
+
 def validate_context_actions(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``context_actions`` payload.
 
     Returns a normalized payload or raises :class:`ContextActionsError`. The
     common unavailable form is NOT accepted here; the registry handles it.
+    The available form dispatches on ``kind``: the combat branch keeps the
+    exact version-3 field set, validation, and semantics; the exploration
+    branch accepts exactly the schema-version-4 exploration form.
     """
+    if not isinstance(payload, dict) or "kind" not in payload:
+        raise ContextActionsError("context_actions payload must carry a kind discriminator")
+    if payload["kind"] == "exploration":
+        return _validate_exploration_form(payload)
+    if payload["kind"] != "combat":
+        raise ContextActionsError("context_actions kind is not a stable value")
     _require_exact_fields(
         payload,
         "context_actions panel",
@@ -535,13 +718,38 @@ def _serialize_skills(skills: tuple[Any, ...]) -> list[dict[str, Any]]:
     return categories
 
 
+def _exploration_payload(actor: Any) -> dict[str, Any]:
+    """Return the exact available exploration form for the authenticated puppet."""
+    if not in_exploration_mode(actor):
+        raise PanelUnavailableError
+    location = getattr(actor, "location", None)
+    if location is None:
+        raise PanelUnavailableError
+    payload = {
+        "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
+        "available": True,
+        "kind": "exploration",
+        "affordances": [
+            entry.as_dict() for entry in exploration_affordances(actor)
+        ],
+    }
+    return validate_context_actions(payload)
+
+
 def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
-    """Return the exact available combat panel for the authenticated puppet."""
+    """Return the exact available panel for the authenticated puppet.
+
+    Inside a valid active combat session the combat form is emitted
+    (byte-identical to schema version 3 apart from the version field); in
+    exploration mode the exploration available form carries the canonical
+    affordance vocabulary; outside both modes the registry emits the shared
+    unavailable form.
+    """
     actor = context.actor
     try:
         view = build_combat_view(actor)
     except CombatViewError:
-        raise PanelUnavailableError
+        return _exploration_payload(actor)
 
     if view.recovery:
         session = {

@@ -418,8 +418,10 @@ test("enforces global JSON-safety bounds", () => {
   }
   assert.throws(() => Protocol.checkGlobalSafety(many));
 
-  // Over 128 list items.
-  assert.throws(() => Protocol.checkGlobalSafety(new Array(130).fill(1)));
+  // Over 320 list items.
+  assert.throws(() => Protocol.checkGlobalSafety(new Array(322).fill(1)));
+  // A 300-item affordance list is inside the global ceiling.
+  assert.doesNotThrow(() => Protocol.checkGlobalSafety(new Array(300).fill({ x: 1 })));
 
   // Over-long string (code points).
   assert.throws(() => Protocol.checkGlobalSafety("x".repeat(3000)));
@@ -1011,7 +1013,7 @@ function validCombatParticipant(overrides) {
 function validCombatPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "combat",
       session: {
@@ -1033,7 +1035,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "combat",
       session: {
@@ -1062,7 +1064,269 @@ test("validates the available context_actions combat panel", () => {
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validRecoveryPanel()));
   // The registered production allowlist must advertise the same version the
   // server ships (mirror of web.webclient.presentation.registry).
-  assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 4);
+});
+
+test("validates the available context_actions exploration form", () => {
+  const affordance = {
+    action_id: "explore.talk_scripted",
+    label: "註冊",
+    params: { npc_id: 5, keyword_id: "註冊" },
+    freeform: false,
+    navigation: false,
+    enabled: true,
+    disabled_reason: null,
+  };
+  const panel = {
+    schema_version: 4,
+    available: true,
+    kind: "exploration",
+    affordances: [
+      {
+        action_id: "explore.look",
+        label: "南門",
+        params: { room: true },
+        freeform: false,
+        navigation: false,
+        enabled: true,
+        disabled_reason: null,
+      },
+      affordance,
+      {
+        surface: "guild",
+        label: "公會服務",
+        navigation: true,
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+  };
+  const normalized = Protocol.validateContextActionsPanel(panel);
+  assert.equal(normalized.schema_version, 4);
+  assert.equal(normalized.kind, "exploration");
+  assert.equal(normalized.affordances.length, 3);
+  assert.deepEqual(normalized.affordances[0].params, { room: true });
+  assert.equal(normalized.affordances[1].freeform, false);
+  assert.equal(normalized.affordances[2].navigation, true);
+  // Cross-form contamination rejects on both sides.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      Object.assign(deepMerge(panel, {}), { session: {}, skills: [] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      Object.assign(deepMerge(validCombatPanel(), {}), { affordances: [affordance] })
+    )
+  );
+  // Malformed entries reject atomically.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [Object.assign({}, affordance, { action_id: "explore.interact" })],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [
+        Object.assign({}, affordance, {
+          params: { npc_id: 5, keyword_id: "註冊", extra: 1 },
+        }),
+      ],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [
+        {
+          surface: "bank",
+          label: "公會",
+          navigation: true,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [Object.assign({}, affordance, { enabled: false, disabled_reason: null })],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [Object.assign({}, affordance, { freeform: "yes" })],
+    })
+  );
+  // The 320-entry bound rejects.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: new Array(321).fill(affordance),
+    })
+  );
+  // The freeform entry accepts exactly the binding shape.
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [
+        {
+          action_id: "explore.talk_freeform",
+          label: "自由交談",
+          params: { npc_id: 9 },
+          freeform: true,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [
+        {
+          action_id: "explore.talk_freeform",
+          label: "自由交談",
+          params: { npc_id: 9, speech: "你好" },
+          freeform: true,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    })
+  );
+  // The freeform flag must pair with the action code on both sides.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [Object.assign({}, affordance, { freeform: true })],
+    })
+  );
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel({
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: [
+        {
+          action_id: "explore.talk_freeform",
+          label: "自由交談",
+          params: { npc_id: 9 },
+          freeform: false,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    })
+  );
+});
+
+test("a 300-affordance exploration form passes the global envelope gate", () => {
+  const affordance = {
+    action_id: "explore.look",
+    label: "南門",
+    params: { room: true },
+    freeform: false,
+    navigation: false,
+    enabled: true,
+    disabled_reason: null,
+  };
+  const panel = {
+    schema_version: 4,
+    available: true,
+    kind: "exploration",
+    affordances: new Array(300).fill(affordance),
+  };
+  // The global list ceiling (MAX_LIST_ITEMS) must clear the maximal
+  // affordance list or the client would reject every snapshot for a large
+  // room before panel validation ever runs.
+  assert.doesNotThrow(() => Protocol.checkEnvelope(panel));
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      Object.assign({}, panel, {
+        affordances: new Array(Protocol.CONTEXT_ACTIONS_MAX_AFFORDANCES + 1).fill(affordance),
+      })
+    )
+  );
+});
+
+test("the combat form is byte-identical to version 3", () => {
+  const version3 = {
+    schema_version: 3,
+    available: true,
+    kind: "combat",
+    session: {
+      session_id: "hostile:1:0",
+      mode: "hostile",
+      round: 0,
+      state: "ready",
+      reason: null,
+    },
+    participants: [validCombatParticipant()],
+    root_actions: ["attack", "skills", "items", "defend", "flee"],
+    secondary_actions: ["forfeit"],
+    skills: [validCategoryGroup()],
+  };
+  const version4 = validCombatPanel();
+  assert.equal(version3.schema_version, 3);
+  assert.equal(version4.schema_version, 4);
+  const withoutVersion = (panel) => {
+    const copy = Object.assign({}, panel);
+    delete copy.schema_version;
+    return copy;
+  };
+  assert.deepEqual(withoutVersion(version4), withoutVersion(version3));
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(version4));
+});
+
+test("the unavailable forms differ only in schema_version", () => {
+  const version3 = {
+    schema_version: 3,
+    available: false,
+    reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+  };
+  const version4 = {
+    schema_version: 4,
+    available: false,
+    reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+  };
+  const withoutVersion = (panel) => {
+    const copy = Object.assign({}, panel);
+    delete copy.schema_version;
+    return copy;
+  };
+  assert.deepEqual(withoutVersion(version4), withoutVersion(version3));
+  assert.doesNotThrow(() =>
+    Protocol.validatePanel("context_actions", 4, version4)
+  );
+  assert.throws(() => Protocol.validatePanel("context_actions", 4, version3));
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
@@ -1129,7 +1393,7 @@ test("freeform_scales is optional and validated when present", () => {
 test("rejects malformed context_actions panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("context_actions", Protocol.PANEL_ALLOWLIST.context_actions, {
-      schema_version: 3,
+      schema_version: 4,
       available: false,
     })
   );

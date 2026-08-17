@@ -70,7 +70,7 @@ function nestedSkills(...skills) {
 function readyPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "combat",
       session: {

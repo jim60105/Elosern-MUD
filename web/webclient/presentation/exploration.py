@@ -24,10 +24,32 @@ by a dual-direction parity test.
 
 from typing import Any
 
-from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildStaff, Merchant
-from typeclasses.monsters import Monster
-from typeclasses.npcs import LLMNPC, NPC
+from web.webclient.presentation import affordances as affordances_module
+from web.webclient.presentation.affordances import (
+    MAX_AFFORDANCES,
+    MAX_DISPLAY_NAME_CODE_POINTS,
+    MAX_EXIT_REF_CHARS,
+    MAX_INTERACT_TARGETS,
+    MAX_KEYWORD_ID_CHARS,
+    MAX_KEYWORD_LABEL_CODE_POINTS,
+    MAX_LABEL_CODE_POINTS,
+    MAX_LOOK_OBJECTS,
+    MAX_MOVE_EXITS,
+    MAX_NODE_ID_CHARS,
+    MAX_SCRIPTED_KEYWORDS,
+    _DIALOGUE_UNAVAILABLE_REASON,
+    _bounded_display_name,
+    _destination_node,
+    _entity_kind,
+    _exit_ref,
+    _is_exit,
+    _look_entries,
+    _move_entries,
+    _resolve_single_host,
+    _scripted_keyword_descriptors,
+    _target_affordance_entries,
+    _traversable,
+)
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -41,38 +63,19 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.onboarding.guide_dialogue import DIALOGUE_TABLE
-from world.rules.dialogue import dialogue_key_for, is_dialogue_host
-from world.rules.guild import (
-    GuildServiceError,
-    resolve_local_service_host,
-)
+from world.rules.dialogue import is_dialogue_host
 from world.rules.map_knowledge import (
     KnowledgeError,
     decode_node,
-    encode_grid,
-    encode_room,
-    encode_wild,
 )
 from world.rules.service_view import build_services_view
 
 EXPLORATION_SCHEMA_VERSION = 1
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
-MAX_MOVE_EXITS = 12
 MAX_LOOK_ENTITIES = 32
-MAX_LOOK_OBJECTS = 32
-MAX_INTERACT_TARGETS = 32
-MAX_AFFORDANCES = 8
-MAX_SCRIPTED_KEYWORDS = 16
-MAX_EXIT_REF_CHARS = 64
-MAX_NODE_ID_CHARS = 128
 MAX_IDENTITY = MAX_SAFE_INTEGER
-MAX_DISPLAY_NAME_CODE_POINTS = 128
 MAX_KIND_CODE_POINTS = 32
-MAX_LABEL_CODE_POINTS = 128
-MAX_KEYWORD_ID_CHARS = 64
-MAX_KEYWORD_LABEL_CODE_POINTS = 128
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 
 ACTION_KINDS = ("action", "navigate")
@@ -85,13 +88,6 @@ ACTION_IDS = (
 )
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")
-
-# Stable localized disabled reasons for move rows.
-_LOCKED_REASON = ("locked", "此出口目前無法通行。")
-_DIALOGUE_UNAVAILABLE_REASON = ("dialogue_unavailable", "對方目前沒有可以交談的話題。")
-
-# The kind label used by the look entity descriptor for each present living type.
-_KIND_BY_TYPE = (PlayerCharacter, "character"), (LLMNPC, "npc"), (NPC, "npc"), (Monster, "monster")
 
 
 class ExplorationPanelError(ProtocolValidationError):
@@ -428,74 +424,20 @@ def validate_exploration(payload: Any) -> dict[str, Any]:
 
 
 def _in_exploration_mode(actor: Any) -> bool:
-    from world.rules.combat_session import is_in_active_session
-
-    if bool(getattr(actor, "creation_pending", False)):
-        return False
-    if is_in_active_session(actor):
-        return False
-    return True
-
-
-def _exit_ref(exit_obj: Any) -> str:
-    """An opaque, stable ASCII identifier for a real exit (its dbref)."""
-    return str(int(exit_obj.id))
-
-
-def _traversable(exit_obj: Any, actor: Any) -> bool:
-    try:
-        return bool(exit_obj.access(actor, "traverse"))
-    except Exception:
-        return False
-
-
-def _destination_node(destination: Any) -> str | None:
-    """Return the canonical node ID for a destination room, or ``None``."""
-    from typeclasses.rooms import GridRoom, TerrainRoom
-    from world.maps.wilderness_provider import WILDERNESS_NAME
-
-    if isinstance(destination, GridRoom):
-        try:
-            x, y, z = destination.xyz
-        except Exception:
-            return None
-        return encode_grid(str(z), x, y)
-    if isinstance(destination, TerrainRoom):
-        coordinates = destination.coordinates
-        if coordinates is None:
-            return None
-        return encode_wild(WILDERNESS_NAME, coordinates[0], coordinates[1])
-    if not getattr(destination, "id", None):
-        return None
-    return encode_room(int(destination.id))
-
-
-def _entity_kind(obj: Any) -> str | None:
-    for typeclass, kind in _KIND_BY_TYPE:
-        if isinstance(obj, typeclass):
-            return kind
-    return None
-
-
-def _is_exit(obj: Any) -> bool:
-    from evennia.objects.objects import DefaultExit
-
-    return isinstance(obj, DefaultExit)
-
-
-def _bounded_display_name(obj: Any) -> str:
-    return str(getattr(obj, "key", "?"))[:MAX_DISPLAY_NAME_CODE_POINTS]
+    return affordances_module.in_exploration_mode(actor)
 
 
 def _move_rows(actor: Any) -> list[dict[str, Any]]:
-    """Serialize the bounded move exit list from the actor's current location.
+    """Serialize the bounded move exit list from the shared vocabulary.
 
-    Wilderness rooms route every direction through the canonical destination
-    resolver (fix-wilderness-web-navigation): the contrib's self-loop exits
-    name the current room, and the registered gateway south exit actually
-    returns to the grid, so ``exit_obj.destination`` can never be trusted
-    there. A direction the resolver cannot route (out of bounds, gateway
-    without a grid room) is omitted, exactly like a missing destination room.
+    The row's ``exit_ref``, ``label``, ``enabled``, and disabled reason come
+    from the canonical move entry; the ``destination`` field (the canonical
+    arrival node of the exit, not the actor's current node) is re-derived from
+    the exit object exactly like the version-1 panel. Wilderness rooms route
+    every direction through the canonical destination resolver
+    (fix-wilderness-web-navigation): the contrib's self-loop exits name the
+    current room, and the registered gateway south exit actually returns to
+    the grid, so ``exit_obj.destination`` can never be trusted there.
     """
     from typeclasses.rooms import TerrainRoom
     from world.maps.wilderness_destination import (
@@ -507,10 +449,15 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
     if location is None:
         return []
     wilderness = isinstance(location, TerrainRoom)
-    exits = sorted(location.exits, key=lambda exit_obj: (exit_obj.key or "", int(exit_obj.id)))
+    exits_by_ref = {
+        _exit_ref(exit_obj): exit_obj
+        for exit_obj in location.exits
+        if exit_obj.destination is not None
+    }
     rows: list[dict[str, Any]] = []
-    for exit_obj in exits[:MAX_MOVE_EXITS]:
-        if exit_obj.destination is None:
+    for entry in _move_entries(actor):
+        exit_obj = exits_by_ref.get(entry.params["exit_ref"])
+        if exit_obj is None:
             continue
         if wilderness:
             direction = normalize_wilderness_direction(exit_obj.key)
@@ -523,19 +470,18 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
             destination_node = _destination_node(exit_obj.destination)
         if destination_node is None:
             continue
-        enabled = _traversable(exit_obj, actor)
-        if enabled:
-            disabled_reason = None
-        else:
-            code, message = _LOCKED_REASON
-            disabled_reason = {"code": code, "message": message}
+        reason = entry.disabled_reason
         rows.append(
             {
-                "exit_ref": _exit_ref(exit_obj),
-                "label": _bounded_display_name(exit_obj),
+                "exit_ref": entry.params["exit_ref"],
+                "label": entry.label,
                 "destination": destination_node,
-                "enabled": enabled,
-                "disabled_reason": disabled_reason,
+                "enabled": entry.enabled,
+                "disabled_reason": (
+                    None
+                    if reason is None
+                    else {"code": reason[0], "message": reason[1]}
+                ),
             }
         )
     return rows
@@ -566,168 +512,38 @@ def _look_entities(actor: Any) -> list[dict[str, Any]]:
 
 
 def _look_objects(actor: Any) -> list[dict[str, Any]]:
-    """Serialize bounded present non-exit object descriptors."""
-    location = getattr(actor, "location", None)
-    if location is None:
-        return []
-    present = [
-        obj
-        for obj in location.contents
-        if obj is not actor and _entity_kind(obj) is None and not _is_exit(obj)
+    """Serialize bounded present non-exit object descriptors (shared look entries)."""
+    return [
+        {"identity": entry.params["target_id"], "display_name": entry.label}
+        for entry in _look_entries(actor)
     ]
-    present.sort(key=lambda obj: (int(obj.pk),))
-    objects: list[dict[str, Any]] = []
-    for obj in present[:MAX_LOOK_OBJECTS]:
-        objects.append({"identity": int(obj.pk), "display_name": _bounded_display_name(obj)})
-    return objects
-
-
-def _scripted_affordance(npc: Any, actor: Any) -> dict[str, Any]:
-    """Build the scripted-talk affordance for a dialogue host (or a disabled one).
-
-    The bounded keyword buttons live on the target descriptor (``keywords``),
-    not on the affordance, so the interact payload stays within the global
-    JSON-depth bound. A host whose dialogue component resolves but whose
-    authored table cannot be resolved degrades to a disabled affordance so the
-    failure is confined to that one affordance while the whole panel stays
-    available.
-    """
-    del actor
-    dialogue_key = dialogue_key_for(npc)
-    definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
-    keywords: list[dict[str, Any]] = []
-    if definition is not None:
-        keywords = [
-            {"keyword_id": response.keyword, "label": response.keyword}
-            for response in definition.responses[:MAX_SCRIPTED_KEYWORDS]
-        ]
-    if keywords:
-        return {
-            "kind": "action",
-            "action_id": "explore.talk_scripted",
-            "label": "交談",
-            "enabled": True,
-            "disabled_reason": None,
-        }
-    code, message = _DIALOGUE_UNAVAILABLE_REASON
-    return {
-        "kind": "action",
-        "action_id": "explore.talk_scripted",
-        "label": "交談",
-        "enabled": False,
-        "disabled_reason": {"code": code, "message": message},
-    }
 
 
 def _scripted_keywords(npc: Any) -> list[dict[str, Any]]:
     """Return the bounded scripted keyword descriptors for a dialogue host."""
-    dialogue_key = dialogue_key_for(npc)
-    definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
-    if definition is None:
-        return []
-    return [
-        {"keyword_id": response.keyword, "label": response.keyword}
-        for response in definition.responses[:MAX_SCRIPTED_KEYWORDS]
-    ]
+    return _scripted_keyword_descriptors(npc)
 
 
-def _freeform_affordance(npc: Any) -> dict[str, Any]:
-    return {
-        "kind": "action",
-        "action_id": "explore.talk_freeform",
-        "label": "自由交談",
-        "enabled": True,
-        "disabled_reason": None,
-    }
-
-
-def _party_invite_affordance(npc: Any, actor: Any) -> dict[str, Any]:
-    """Build the invite affordance for a present unbound ``LLMNPC``.
-
-    Mirrors the ``invite`` command's deterministic preflight: the affordance
-    is disabled with the full-party reason when the actor's party is already
-    at the bound; it is never offered for an already-bound companion (the
-    caller decides that).
-    """
-    del npc
-    from world.rules.party import (
-        PARTY_FULL_MESSAGE,
-        PARTY_MAX_COMPANIONS,
-        party_size,
-    )
-
-    if party_size(actor) >= PARTY_MAX_COMPANIONS:
-        return {
-            "kind": "action",
-            "action_id": "explore.party_invite",
-            "label": "邀請",
-            "enabled": False,
-            "disabled_reason": {"code": "party_full", "message": PARTY_FULL_MESSAGE},
-        }
-    return {
-        "kind": "action",
-        "action_id": "explore.party_invite",
-        "label": "邀請",
-        "enabled": True,
-        "disabled_reason": None,
-    }
-
-
-def _party_leave_affordance() -> dict[str, Any]:
-    """Build the leave affordance for a present bound companion."""
-    return {
-        "kind": "action",
-        "action_id": "explore.party_leave",
-        "label": "解散",
-        "enabled": True,
-        "disabled_reason": None,
-    }
-
-
-def _engage_affordance(monster: Any) -> dict[str, Any]:
-    living = getattr(getattr(monster, "traits", None), "hp", None) is not None and monster.traits.hp.value > 0
-    if not living:
-        return {
-            "kind": "action",
-            "action_id": "explore.engage",
-            "label": "戰鬥",
-            "enabled": False,
-            "disabled_reason": {"code": "target_dead", "message": "目標已經死亡。"},
-        }
-    return {
-        "kind": "action",
-        "action_id": "explore.engage",
-        "label": "戰鬥",
-        "enabled": True,
-        "disabled_reason": None,
-    }
-
-
-def _service_affordance(component_class: type, surface: str) -> dict[str, Any]:
-    """Return the navigate-kind service affordance for one surface."""
-    label = "公會服務" if surface == "guild" else "商店"
-    return {
-        "kind": "navigate",
-        "surface": surface,
-        "label": label,
-        "enabled": True,
-        "disabled_reason": None,
-    }
-
-
-def _resolve_single_host(actor: Any, component_class: type) -> Any | None:
-    try:
-        return resolve_local_service_host(actor, component_class)
-    except GuildServiceError:
+def _reason_dict(entry: Any) -> dict[str, Any] | None:
+    if entry.disabled_reason is None:
         return None
+    code, message = entry.disabled_reason
+    return {"code": code, "message": message}
 
 
 def _interact_targets(actor: Any) -> list[dict[str, Any]]:
-    """Serialize bounded present NPC/monster targets with their legal affordances.
+    """Serialize bounded present NPC/monster targets from the shared vocabulary.
 
-    A `navigate`-kind service affordance is attached to the exact local host's
-    own target descriptor, never to a remote or unrelated target.
+    The per-target affordance rules (dialogue-host gating, freeform, party
+    bound/full rules, companion rule, dead-monster engage, exact-local-host
+    navigation) live in the canonical vocabulary; this serializer maps the
+    shared candidates into the exact version-1 descriptor shapes, with the
+    scripted keyword buttons reading the authored keyword pool.
     """
+    from typeclasses.components import GuildStaff, Merchant
+    from typeclasses.monsters import Monster
+    from typeclasses.npcs import NPC
+
     location = getattr(actor, "location", None)
     if location is None:
         return []
@@ -740,26 +556,65 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
     ]
     present.sort(key=lambda obj: (int(obj.pk),))
     targets: list[dict[str, Any]] = []
-    from world.rules.party import is_companion
-
     for obj in present[:MAX_INTERACT_TARGETS]:
+        entries = _target_affordance_entries(
+            obj, actor, guild_host=guild_host, shop_host=shop_host
+        )
         affordances: list[dict[str, Any]] = []
         target_keywords: list[dict[str, Any]] | None = None
-        if isinstance(obj, NPC) and is_dialogue_host(obj):
-            affordances.append(_scripted_affordance(obj, actor))
-            target_keywords = _scripted_keywords(obj) or None
-        if isinstance(obj, LLMNPC):
-            affordances.append(_freeform_affordance(obj))
-        if isinstance(obj, NPC) and is_companion(obj, actor):
-            affordances.append(_party_leave_affordance())
-        elif isinstance(obj, LLMNPC):
-            affordances.append(_party_invite_affordance(obj, actor))
-        if isinstance(obj, Monster):
-            affordances.append(_engage_affordance(obj))
-        if guild_host is not None and obj is guild_host:
-            affordances.append(_service_affordance(GuildStaff, "guild"))
-        if shop_host is not None and obj is shop_host:
-            affordances.append(_service_affordance(Merchant, "shop"))
+        scripted_present = any(
+            not entry.navigation and entry.action_id == "explore.talk_scripted"
+            for entry in entries
+        )
+        if is_dialogue_host(obj):
+            if scripted_present:
+                affordances.append(
+                    {
+                        "kind": "action",
+                        "action_id": "explore.talk_scripted",
+                        "label": "交談",
+                        "enabled": True,
+                        "disabled_reason": None,
+                    }
+                )
+                target_keywords = _scripted_keywords(obj) or None
+            else:
+                code, message = _DIALOGUE_UNAVAILABLE_REASON
+                affordances.append(
+                    {
+                        "kind": "action",
+                        "action_id": "explore.talk_scripted",
+                        "label": "交談",
+                        "enabled": False,
+                        "disabled_reason": {"code": code, "message": message},
+                    }
+                )
+        for entry in entries:
+            if entry.navigation:
+                affordances.append(
+                    {
+                        "kind": "navigate",
+                        "surface": entry.surface,
+                        "label": entry.label,
+                        "enabled": entry.enabled,
+                        "disabled_reason": _reason_dict(entry),
+                    }
+                )
+            elif entry.action_id in (
+                "explore.talk_freeform",
+                "explore.party_invite",
+                "explore.party_leave",
+                "explore.engage",
+            ):
+                affordances.append(
+                    {
+                        "kind": "action",
+                        "action_id": entry.action_id,
+                        "label": entry.label,
+                        "enabled": entry.enabled,
+                        "disabled_reason": _reason_dict(entry),
+                    }
+                )
         target: dict[str, Any] = {
             "identity": int(obj.pk),
             "display_name": _bounded_display_name(obj),

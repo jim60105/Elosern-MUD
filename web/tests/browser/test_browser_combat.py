@@ -304,11 +304,12 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.forfeit")
         self.assertEqual(envelope["payload"]["session_id"], session_id)
-        # The confirmed forfeit ends the session.
+        # The confirmed forfeit ends the session; the panel reverts to the
+        # exploration available form.
         page.wait_for_function(
             "() => { const s = Elosern.StateController.getState(); "
             "const p = s.panels && s.panels['context_actions']; "
-            "return p && p.available === false; }",
+            "return p && p.available === true && p.kind === 'exploration'; }",
             timeout=15000,
         )
 
@@ -338,7 +339,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             state = store_state(page)
             if (
                 state["mode"] == "exploration"
-                and state["panels"].get("context_actions", {}).get("available") is False
+                and state["panels"]
+                .get("context_actions", {})
+                .get("available") is True
+                and state["panels"]["context_actions"].get("kind") == "exploration"
             ):
                 break
             page.wait_for_timeout(250)
