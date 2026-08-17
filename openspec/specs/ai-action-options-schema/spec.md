@@ -1,4 +1,15 @@
-## ADDED Requirements
+## Purpose
+
+The immutable suggestion-card vocabulary and validation ladder for the AI action-options
+surface: the frozen `OptionSet`/`SuggestionCard` dataclasses, exact bounds constants, the
+12-stage `validate_optionset` ladder with one named rejection code per stage, the stage-9
+canonical replacement against the change-1 affordance vocabulary (vocabulary lock), the
+freeform binding-only exception, the leak gates on label/hint, the enrichment helper, and the
+exact-field `action_options` JSON contract parser. This capability owns the proposal-only
+vocabulary; `action-options-layer` (generation), `action-options-trigger-service`
+(cache/publish), and `context-actions-suggestions` (client mirror parity) consume it.
+
+## Requirements
 
 ### Requirement: world/ai/action_options.py defines the frozen one-wire-shape card vocabulary
 `world/ai/action_options.py` SHALL define frozen dataclasses `OptionSet` and `SuggestionCard`.

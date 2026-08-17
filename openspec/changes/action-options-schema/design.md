@@ -45,23 +45,36 @@ all consume. The `Affordance` typing and fixtures come from change 1
   on the validated *result* (`(action_code, params) == (action_id, params)` of one affordance).
   This resolves the round-three contradiction between "exact match" and "replacement" (rubber-duck
   round 4).
+- **Multi-entry codes are pinned by the model's params.** Several current affordances can share
+  `action_code` (one move entry per exit, one look per object). Stage 9 then uses the model's
+  typed params as a *selector* — the unique entry whose canonical params they match — never as a
+  rejection against a single canonical; a card whose params identify no unique entry rejects with
+  `no_such_affordance` rather than guess. This keeps the wire-shape guarantee true for
+  multi-exit/multi-object rooms (rubber-duck review finding, documented in the delta spec).
 - **Card label gates are local, not narrator imports.** Only the CJK check reuses
-  `world/ai/narrator.py::_validate_has_cjk`. The generic `{...}` placeholder gate and the digit
+  `world/ai/narrator.py::_validate_has_cjk` — imported lazily inside the ladder so this module
+  keeps no Evennia import at module time (narrator transitively loads ``evennia.logger`` through
+  the guardrail). The generic `{...}` placeholder gate and the digit
   gate are implemented in this module because narrator's `_TEMPLATE_PLACEHOLDER_RE` is
   token-specific (`{actor}|{target}|{data[...]}`) and narrator has no digit gate — amends the
   schema design doc's stage 6–8 reuse line.
+- **Params admit exactly one boolean shape.** Values are ints within `MAX_SAFE_INTEGER`, strings
+  ≤ 32 chars, or — as the single boolean exception — the exact room-survey marker
+  `{"room": true}` of the canonical look payload (schema design doc §1.1); any other boolean or a
+  boolean mixed with other fields is rejected at construction (rubber-duck review finding).
 - **Leak blocklist is an explicit parameter.** `validate_optionset` takes
   `leak_blocklist: frozenset[str] = frozenset()`; the context builder (pipeline change) supplies
   it. An empty default keeps the function pure and total — no implicit reads of game state.
 - **Freeform binding-only params are the single exception** to the validator-normalized rule
   (round-three review): `validate_talk_freeform_payload` requires `speech`, so no validator can
-  produce `{"npc_id"}`. The ladder therefore validates the binding shape only, and the full
-  dispatcher validator runs on the client-composed payload.
+  produce `{"npc_id"}`. The ladder therefore validates the binding shape only, requires the
+  matched freeform affordance to carry exactly the binding shape, and leaves the validated card's
+  params at exactly `{"npc_id": <int>}` — the full dispatcher validator runs on the client-composed
+  payload (rubber-duck review finding: never copy the affordance's params, which could smuggle
+  extra fields past the binding contract).
 - **Leak gates read a caller-supplied `LEAK_BLOCKLIST`** (numeric literals + hidden trait keys).
   The gates apply to `label`/`hint`; `params` are exempt by construction — canonical copies after
   stage 9.
-- **Stage 6–8 reuse the narrator's exact validators** (`_validate_has_cjk`,
-  `_validate_no_template_placeholder`, digit gate) so label rules cannot drift between layers.
 - **Enrichment stays thin.** It injects `fingerprint`, `status: "ready"`, and the freeform
   `action_code` default. The `npc_index` binding belongs to the layer change because it needs the
   prompt's bound-NPC list; fixtures here feed resolved `{"npc_id": int}`.
