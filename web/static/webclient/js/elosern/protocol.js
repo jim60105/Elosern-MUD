@@ -35,7 +35,9 @@
   // depth 11; must match web.webclient.presentation.protocol.MAX_DEPTH.
   var MAX_DEPTH = 12;
   var MAX_FIELDS = 64;
-  var MAX_LIST_ITEMS = 128;
+  // Clears the largest legitimate flat panel list: the `context_actions`
+  // exploration form's affordance array (at most 320 entries).
+  var MAX_LIST_ITEMS = 320;
   var MAX_STRING_CODE_POINTS = 2048;
   var MAX_PANEL_COUNT = 32;
   var MAX_LAYOUT_VERSION = 65535;
@@ -91,6 +93,28 @@
   var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
   var SECONDARY_ACTIONS = ["forfeit"];
   var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
+  // Exploration available form bounds (mirror of
+  // web.webclient.presentation.combat_panel).
+  var CONTEXT_ACTIONS_MAX_AFFORDANCES = 320;
+  var CONTEXT_ACTIONS_MAX_AFFORDANCE_LABEL = 128;
+  var CONTEXT_ACTIONS_MAX_PARAM_KEYS = 8;
+  var CONTEXT_ACTIONS_MAX_PARAM_STRING = 512;
+  var CONTEXT_ACTIONS_MAX_EXIT_REF = 64;
+  var CONTEXT_ACTIONS_MAX_NODE_ID = 128;
+  var CONTEXT_ACTIONS_MAX_KEYWORD_ID = 64;
+  var CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS = 43200;
+  var CONTEXT_ACTIONS_ACTION_CODES = [
+    "explore.move",
+    "explore.look",
+    "explore.talk_scripted",
+    "explore.talk_freeform",
+    "explore.party_invite",
+    "explore.party_leave",
+    "explore.engage",
+    "explore.wait",
+  ];
+  var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
+  var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];
   // SkillCategory enum values, in the registry's fixed declaration order
   // (mirror of world.skills.registry.SkillCategory).
   var SKILL_CATEGORY_KEYS = [
@@ -210,7 +234,7 @@
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 1,
-    context_actions: 3,
+    context_actions: 4,
     local_map: 1,
     services: 1,
     creation: 1,
@@ -820,21 +844,225 @@
     return value;
   }
 
-  // Exact available context_actions combat panel v3 schema.
+  // Exact available context_actions combat/exploration panel v4 schema.
+  function validateContextActionsAffordanceParams(actionId, params) {
+    if (!isPlainObject(params)) {
+      throw new Error("affordance params must be a JSON object");
+    }
+    if (Object.keys(params).length > CONTEXT_ACTIONS_MAX_PARAM_KEYS) {
+      throw new Error("affordance params exceed their bound");
+    }
+    Object.keys(params).forEach(function (key) {
+      var child = params[key];
+      if (typeof child === "string" && codePoints(child) > CONTEXT_ACTIONS_MAX_PARAM_STRING) {
+        throw new Error("affordance params string exceeds its bound");
+      }
+    });
+    if (actionId === "explore.move") {
+      requireExactFields(params, "move params", ["exit_ref", "current_node"], []);
+      if (
+        typeof params.exit_ref !== "string" ||
+        params.exit_ref.length < 1 ||
+        params.exit_ref.length > CONTEXT_ACTIONS_MAX_EXIT_REF
+      ) {
+        throw new Error("exit_ref must be 1.." + CONTEXT_ACTIONS_MAX_EXIT_REF + " ASCII characters");
+      }
+      if (/[^\x00-\x7F]/.test(params.exit_ref)) {
+        throw new Error("exit_ref must be ASCII");
+      }
+      requireString(params.current_node, "current_node", CONTEXT_ACTIONS_MAX_NODE_ID);
+      if (!NODE_ID_RE.test(params.current_node)) {
+        throw new Error("current_node is not a canonical node ID");
+      }
+      return params;
+    }
+    if (actionId === "explore.look") {
+      if (Object.keys(params).length === 1 && params.room !== undefined) {
+        if (params.room !== true) {
+          throw new Error("explore.look room must be the exact boolean true");
+        }
+        return params;
+      }
+      requireExactFields(params, "look params", ["target_id"], []);
+      requireInt(params.target_id, "target_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.talk_scripted") {
+      requireExactFields(params, "talk_scripted params", ["npc_id", "keyword_id"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      var keywordId = requireString(params.keyword_id, "keyword_id", CONTEXT_ACTIONS_MAX_KEYWORD_ID);
+      if (!keywordId.trim()) {
+        throw new Error("keyword_id must be non-empty");
+      }
+      return params;
+    }
+    if (actionId === "explore.talk_freeform") {
+      // Binding-only shape: no validator produces npc_id without speech.
+      requireExactFields(params, "freeform params", ["npc_id"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.party_invite") {
+      requireExactFields(params, "party_invite params", ["npc_id", "message"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      requireString(params.message, "message", MAX_MESSAGE_CODE_POINTS);
+      return params;
+    }
+    if (actionId === "explore.party_leave") {
+      requireExactFields(params, "party_leave params", ["npc_id"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.engage") {
+      requireExactFields(params, "engage params", ["monster_id"], []);
+      requireInt(params.monster_id, "monster_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.wait") {
+      if (Object.keys(params).length === 1 && params.daypart !== undefined) {
+        if (CONTEXT_ACTIONS_DAYPARTS.indexOf(params.daypart) === -1) {
+          throw new Error("explore.wait daypart is not a stable value");
+        }
+        return params;
+      }
+      if (Object.keys(params).length === 1 && params.seconds !== undefined) {
+        requireInt(params.seconds, "seconds", 1, CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS);
+        return params;
+      }
+      if (Object.keys(params).length === 1 && params.sleep !== undefined) {
+        if (params.sleep !== true) {
+          throw new Error("explore.wait sleep must be the exact boolean true");
+        }
+        return params;
+      }
+      throw new Error("explore.wait requires exactly one of daypart, seconds, or sleep");
+    }
+    throw new Error("affordance params carry an unregistered action code");
+  }
+
+  function validateContextActionsAffordance(value) {
+    if (!isPlainObject(value)) {
+      throw new Error("affordance must be a JSON object");
+    }
+    requireExactFields(
+      value,
+      "affordance",
+      ["label", "navigation", "enabled", "disabled_reason"],
+      ["action_id", "params", "freeform", "surface"]
+    );
+    var label = requireString(value.label, "label", CONTEXT_ACTIONS_MAX_AFFORDANCE_LABEL);
+    if (!label.trim()) {
+      throw new Error("affordance label must be non-empty");
+    }
+    var navigation = requireBool(value.navigation, "navigation");
+    var enabled = requireBool(value.enabled, "enabled");
+    var disabledReason = validateDisabledReason(value.disabled_reason);
+    if (disabledReason === null) {
+      if (!enabled) {
+        throw new Error("a disabled affordance requires a disabled_reason");
+      }
+    } else if (enabled) {
+      throw new Error("an enabled affordance must not carry a disabled_reason");
+    }
+    if (navigation) {
+      requireExactFields(
+        value,
+        "navigation affordance",
+        ["surface", "label", "navigation", "enabled", "disabled_reason"],
+        []
+      );
+      if (CONTEXT_ACTIONS_SURFACES.indexOf(value.surface) === -1) {
+        throw new Error("affordance surface is not a stable value");
+      }
+      return {
+        surface: value.surface,
+        label: label,
+        navigation: true,
+        enabled: enabled,
+        disabled_reason: disabledReason,
+      };
+    }
+    requireExactFields(
+      value,
+      "action affordance",
+      ["action_id", "label", "params", "freeform", "navigation", "enabled", "disabled_reason"],
+      []
+    );
+    var actionId = validateIdentifier(value.action_id, "action_id");
+    if (CONTEXT_ACTIONS_ACTION_CODES.indexOf(actionId) === -1) {
+      throw new Error("action_id is not a registered exploration action");
+    }
+    if (typeof value.freeform !== "boolean") {
+      throw new Error("affordance freeform must be a boolean");
+    }
+    if (value.freeform !== (actionId === "explore.talk_freeform")) {
+      throw new Error("freeform must be true exactly for explore.talk_freeform");
+    }
+    var params = validateContextActionsAffordanceParams(actionId, value.params);
+    return {
+      action_id: actionId,
+      label: label,
+      params: params,
+      freeform: value.freeform,
+      navigation: false,
+      enabled: enabled,
+      disabled_reason: disabledReason,
+    };
+  }
+
+  function validateContextActionsExplorationForm(payload) {
+    requireExactFields(
+      payload,
+      "context_actions exploration form",
+      ["schema_version", "available", "kind", "affordances"],
+      []
+    );
+    if (payload.available !== true || payload.kind !== "exploration") {
+      throw new Error("exploration form must be available with kind exploration");
+    }
+    if (
+      !Array.isArray(payload.affordances) ||
+      payload.affordances.length > CONTEXT_ACTIONS_MAX_AFFORDANCES
+    ) {
+      throw new Error(
+        "affordances must be a list of at most " + CONTEXT_ACTIONS_MAX_AFFORDANCES + " entries"
+      );
+    }
+    var affordances = payload.affordances.map(validateContextActionsAffordance);
+    return {
+      schema_version: 4,
+      available: true,
+      kind: "exploration",
+      affordances: affordances,
+    };
+  }
+
   function validateContextActionsPanel(payload) {
+    requireExactFields(
+      payload,
+      "context_actions panel",
+      ["schema_version", "available", "kind"],
+      ["session", "participants", "root_actions", "secondary_actions", "skills", "affordances"]
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 4) {
+      throw new Error("unsupported context_actions panel schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("context_actions panel must be available");
+    }
+    if (payload.kind === "exploration") {
+      return validateContextActionsExplorationForm(payload);
+    }
+    if (payload.kind !== "combat") {
+      throw new Error("context_actions panel kind must be combat or exploration");
+    }
     requireExactFields(
       payload,
       "context_actions panel",
       ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "skills"],
       []
     );
-    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 3) {
-      throw new Error("unsupported context_actions panel schema_version");
-    }
-    if (payload.available !== true || payload.kind !== "combat") {
-      throw new Error("combat panel must be available with kind combat");
-    }
 
     var session = validateSession(payload.session);
 
@@ -3183,6 +3411,12 @@
     EXPLORATION_ACTION_IDS: EXPLORATION_ACTION_IDS.slice(),
     EXPLORATION_SURFACES: EXPLORATION_SURFACES.slice(),
     EXPLORATION_ENTITY_KINDS: EXPLORATION_ENTITY_KINDS.slice(),
+    CONTEXT_ACTIONS_MAX_AFFORDANCES: CONTEXT_ACTIONS_MAX_AFFORDANCES,
+    CONTEXT_ACTIONS_MAX_AFFORDANCE_LABEL: CONTEXT_ACTIONS_MAX_AFFORDANCE_LABEL,
+    CONTEXT_ACTIONS_MAX_PARAM_KEYS: CONTEXT_ACTIONS_MAX_PARAM_KEYS,
+    CONTEXT_ACTIONS_MAX_PARAM_STRING: CONTEXT_ACTIONS_MAX_PARAM_STRING,
+    CONTEXT_ACTIONS_ACTION_CODES: CONTEXT_ACTIONS_ACTION_CODES.slice(),
+    CONTEXT_ACTIONS_SURFACES: CONTEXT_ACTIONS_SURFACES.slice(),
     CHARACTER_MAX_TRAIT_ROWS: CHARACTER_MAX_TRAIT_ROWS,
     CHARACTER_MAX_ACTIVE_ROWS: CHARACTER_MAX_ACTIVE_ROWS,
     CHARACTER_MAX_PASSIVE_ROWS: CHARACTER_MAX_PASSIVE_ROWS,

@@ -16,20 +16,13 @@ from typing import Any
 
 from twisted.internet.defer import Deferred
 
-from typeclasses.rooms import GridRoom, TerrainRoom
-from world.maps.wilderness_provider import WILDERNESS_NAME
+from web.webclient.actions.node_ids import node_id_for_location
 from world.onboarding.guide_dialogue import DIALOGUE_TABLE
 from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
 from world.rules.dialogue import dialogue_key_for, is_dialogue_host
-from world.rules.map_knowledge import (
-    KnowledgeError,
-    decode_node,
-    encode_grid,
-    encode_room,
-    encode_wild,
-)
+from world.rules.map_knowledge import KnowledgeError, decode_node
 from world.rules.npc_intents import (
     STALE_CONTEXT_NOTE,
     apply_npc_intent,
@@ -260,21 +253,7 @@ def _present_by_id(actor: Any, identity: int) -> Any | None:
 
 def _current_node(actor: Any) -> str | None:
     """Return the canonical node ID of the actor's current location."""
-    location = getattr(actor, "location", None)
-    if location is None:
-        return None
-    if isinstance(location, GridRoom):
-        try:
-            x, y, z = location.xyz
-        except Exception:
-            return None
-        return encode_grid(str(z), x, y)
-    if isinstance(location, TerrainRoom):
-        coordinates = location.coordinates
-        if coordinates is None:
-            return None
-        return encode_wild(WILDERNESS_NAME, coordinates[0], coordinates[1])
-    return encode_room(int(location.pk))
+    return node_id_for_location(getattr(actor, "location", None))
 
 
 def _resolve_exit(actor: Any, exit_ref: str) -> Any | None:

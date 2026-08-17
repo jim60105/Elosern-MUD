@@ -3,10 +3,11 @@
 The D10 ``exploration`` and ``character`` bounds are shared between the Python
 validators in ``web/webclient/presentation/exploration.py`` and
 ``web/webclient/presentation/character.py`` and the JavaScript validators in
-``web/static/webclient/js/elosern/protocol.js``. This contract enforces
-numerically identical values so a browser never disables a panel the server
-considers valid (or vice versa), mirroring the local_map D10a and services D4
-parity contracts.
+``web/static/webclient/js/elosern/protocol.js``. The canonical affordance
+vocabulary bounds live in ``web/webclient/presentation/affordances.py`` (the
+version-1 panel delegates to it); this contract enforces numerically identical
+values so a browser never disables a panel the server considers valid (or
+vice versa), mirroring the local_map D10a and services D4 parity contracts.
 """
 
 from pathlib import Path
@@ -16,12 +17,20 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PY_EXPLORATION = REPO_ROOT / "web/webclient/presentation/exploration.py"
+_PY_AFFORDANCES = REPO_ROOT / "web/webclient/presentation/affordances.py"
 _PY_CHARACTER = REPO_ROOT / "web/webclient/presentation/character.py"
 _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
 
-_EXPLORATION_CONSTANTS = (
-    ("MAX_MOVE_EXITS", "EXPLORATION_MAX_MOVE_EXITS"),
+# Bounds the exploration panel still owns (look entities are panel-only; the
+# disabled-reason message bound is shared by the panel validator).
+_EXPLORATION_ONLY_CONSTANTS = (
     ("MAX_LOOK_ENTITIES", "EXPLORATION_MAX_LOOK_ENTITIES"),
+    ("MAX_REASON_MESSAGE_CODE_POINTS", "EXPLORATION_MAX_REASON_MESSAGE"),
+)
+
+# Bounds owned by the canonical affordance vocabulary, imported by the panel.
+_AFFORDANCE_CONSTANTS = (
+    ("MAX_MOVE_EXITS", "EXPLORATION_MAX_MOVE_EXITS"),
     ("MAX_LOOK_OBJECTS", "EXPLORATION_MAX_LOOK_OBJECTS"),
     ("MAX_INTERACT_TARGETS", "EXPLORATION_MAX_INTERACT_TARGETS"),
     ("MAX_AFFORDANCES", "EXPLORATION_MAX_AFFORDANCES"),
@@ -32,7 +41,6 @@ _EXPLORATION_CONSTANTS = (
     ("MAX_LABEL_CODE_POINTS", "EXPLORATION_MAX_LABEL"),
     ("MAX_KEYWORD_ID_CHARS", "EXPLORATION_MAX_KEYWORD_ID"),
     ("MAX_KEYWORD_LABEL_CODE_POINTS", "EXPLORATION_MAX_KEYWORD_LABEL"),
-    ("MAX_REASON_MESSAGE_CODE_POINTS", "EXPLORATION_MAX_REASON_MESSAGE"),
 )
 
 _CHARACTER_CONSTANTS = (
@@ -66,7 +74,7 @@ class ExplorationValidatorParityContract(unittest.TestCase):
         py_source = _PY_EXPLORATION.read_text(encoding="utf-8")
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
         mismatches = []
-        for py_name, js_name in _EXPLORATION_CONSTANTS:
+        for py_name, js_name in _EXPLORATION_ONLY_CONSTANTS:
             py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
             js_match = re.search(rf"var {js_name}\s*=\s*([0-9]+)", js_source)
             if py_match is None or js_match is None:
@@ -77,6 +85,22 @@ class ExplorationValidatorParityContract(unittest.TestCase):
                     f"{py_name}={py_match.group(1)} vs {js_name}={js_match.group(1)}"
                 )
         self.assertEqual(mismatches, [], "Python/JS exploration bounds diverged")
+
+    def test_python_and_js_affordance_bounds_are_identical(self):
+        py_source = _PY_AFFORDANCES.read_text(encoding="utf-8")
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        mismatches = []
+        for py_name, js_name in _AFFORDANCE_CONSTANTS:
+            py_match = re.search(rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE)
+            js_match = re.search(rf"var {js_name}\s*=\s*([0-9]+)", js_source)
+            if py_match is None or js_match is None:
+                mismatches.append(f"{py_name}/{js_name}: missing constant")
+                continue
+            if py_match.group(1) != js_match.group(1):
+                mismatches.append(
+                    f"{py_name}={py_match.group(1)} vs {js_name}={js_match.group(1)}"
+                )
+        self.assertEqual(mismatches, [], "Python/JS affordance bounds diverged")
 
     def test_python_and_js_character_bounds_are_identical(self):
         py_source = _PY_CHARACTER.read_text(encoding="utf-8")

@@ -63,7 +63,12 @@ the validator-normalized `params` (or the freeform binding shape), exact `freefo
 code and safe Traditional Chinese message. Each navigation entry SHALL carry `surface`
 (`"guild"` or `"shop"`), a bounded safe `label`, `navigation` true, exact `enabled`,
 `disabled_reason`, and no `action_id`/`params`, and SHALL never be dispatched as a `ui_action`.
-The form SHALL NOT contain a `suggestions` section in this version.
+The form SHALL NOT contain a `suggestions` section in this version. The form SHALL fail closed
+over the OOB envelope byte limit exactly like the version-1 exploration panel: the entry-count
+bound is a ceiling, not a guarantee that any content fits, so a form whose canonical serialization
+exceeds `MAX_CANONICAL_JSON_BYTES` SHALL be rejected by the server validator rather than emitted.
+The client's global envelope gate (list-item ceiling) SHALL clear the maximal affordance list so a
+large room's form is never rejected before panel validation.
 
 #### Scenario: The context form mirrors the vocabulary exactly
 - **WHEN** the exploration form is rendered for a fixture room
