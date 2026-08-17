@@ -84,9 +84,9 @@ _ACTION_OPTIONS_USER = (
     "近期脈絡：{narrative_tail}\n"
     "可執行行動（每個行動附有 action_code 與參數）：{affordances}\n"
     "請依照系統提示的規則，以正體中文輸出 JSON 行動建議。"
-    'known_action 卡片格式為 {"kind": "known_action", "action_code": "清單中的代碼", '
+    'known_action 卡片格式為 {"action_code": "清單中的代碼", '
     '"label": "正體中文標籤", "params": {"參數": 值}, "hint": "正體中文說明"}；'
-    'freeform 卡片格式為 {"kind": "freeform", "npc_index": 0, "label": "對該人物說的話", '
+    'freeform 卡片格式為 {"npc_index": 0, "label": "對該人物說的話", '
     '"hint": "正體中文說明"}。重申鐵律：label 與 hint 中不得出現任何數字，'
     "不得洩漏隱藏數值，不得虛構目標，卡片只能引用現場存在的人事物；"
     "npc_index、params 等結構欄位不受此限，並嚴格依照上述 JSON 格式輸出。"

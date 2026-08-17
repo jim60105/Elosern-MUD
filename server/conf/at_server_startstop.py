@@ -147,6 +147,34 @@ def _register_scene_flavor_layer():
         logger.log_warn(f"scene_flavor registration skipped at server start: {exc}")
 
 
+def _register_action_options_layer():
+    """Register the action_options layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover action_options
+    registration (a conflicting fallback or output schema) must never abort
+    server startup. Unlike the other layers, the ``action_options`` profile
+    slot (``LAYER_NAMES``) arrives with the prompts change, so a branch that
+    lands this wiring first must also survive ``UnknownLayerError`` with a
+    bounded warning-and-skip — the same warning-and-skip applies to
+    ``DuplicateSchemaError``/``GuardrailRegistrationError`` as with the other
+    layers. The proposal gate still fails loudly on a non-action_options
+    registration, so correctness is preserved.
+    """
+    from evennia import logger
+    from world.ai.action_options import register_action_options
+    from world.ai.guardrail import GuardrailRegistrationError
+    from world.ai.profiles import UnknownLayerError
+    from world.ai.schemas.registry import DuplicateSchemaError
+
+    try:
+        register_action_options()
+    except (GuardrailRegistrationError, DuplicateSchemaError, UnknownLayerError) as exc:
+        logger.log_warn(f"action_options registration skipped at server start: {exc}")
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -208,6 +236,7 @@ def at_server_start():
     _register_scenario_director_layer()
     _register_character_creation_layer()
     _register_scene_flavor_layer()
+    _register_action_options_layer()
 
     # Deterministic art-assets startup sync: ensure a record for every scene
     # and generic-monster subject, then recover explicit named portrait

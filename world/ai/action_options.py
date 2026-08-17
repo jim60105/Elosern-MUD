@@ -23,20 +23,48 @@ to degrade. ``validate_optionset`` returns an ``OptionSet`` on success and
 raises ``OptionsValidationError`` carrying one named rejection code on the
 first failure.
 
+The generative layer (pipeline design doc) extends this module with the
+bounded-context serializer, the prompt assembly, and the guarded generation
+pipeline: ``build_options_context`` truncates the deterministic view in fixed
+order, ``build_action_options_prompt`` renders the two ``action_options``
+prompt-library keys, and ``generate_action_options`` runs the guardrail's
+validation-retry-degrade loop (with the degrade fallback and the raw-wire
+output schema installed by ``register_action_options``). The same import
+discipline holds: no Evennia import, no state writer, no live transport, and
+no module-level logger binding at module time; the only outputs are the frozen
+``OptionSet`` proposal and ``None``.
+
 The bounds constants below are the single source mirrored later by
 ``protocol.js`` under the dual-direction parity test.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields, is_dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from twisted.internet import defer
+
 from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+from world.ai import guardrail
+from world.ai.guardrail import (
+    GuardrailRegistrationError,
+    guarded_call,
+    register_degrade_fallback,
+)
+from world.ai.profiles import get_profile
+from world.ai.schemas import ChatRequestDescriptor
+from world.ai.schemas.registry import (
+    DuplicateSchemaError,
+    _OUTPUT_SCHEMAS,
+    register_output_schema,
+)
+from world.prompts.loader import PromptUnavailableError, render_prompt
 
 if TYPE_CHECKING:
     from web.webclient.presentation.affordances import AffordanceView
@@ -669,7 +697,664 @@ def validate_optionset(
     )
 
 
+# ==== Bounded-context serializer (pipeline design doc §2) ====
+
+# Hard context budgets; the single source the trigger service's deterministic
+# view mirrors. ``affordances``, ``room_name``, and ``room_summary`` are never
+# truncated (a summary of what you *can't* do is useless); every other field is
+# truncated by ``build_options_context`` in the fixed order: narrative tail
+# first (oldest characters), then persona-digest characters, then the oldest
+# NPC (and monster) entries.
+MAX_ROOM_NAME_LENGTH = 40
+MAX_ROOM_SUMMARY_LENGTH = 300
+MAX_NARRATIVE_TAIL_LENGTH = 600
+MAX_NPC_ENTRIES = 8
+MAX_NPC_DIGEST_LENGTH = 160
+MAX_MONSTER_ENTRIES = 4
+MAX_MONSTER_ENTRY_LENGTH = 80
+MAX_OBJECTIVE_LENGTH = 120
+MAX_AFFORDANCES = 16
+
+
+class ActionOptionsInputError(ValueError):
+    """A context input outside its hard budget or of the wrong shape.
+
+    Raised by ``build_options_context`` and ``ActionOptionsContext``
+    construction; the generation entry point catches it, logs a bounded
+    diagnostic, and resolves ``None`` — out-of-bounds data is never emitted.
+    """
+
+
+class ActionOptionsBindingError(ValueError):
+    """A freeform ``{npc_index}`` binding failure (unknown index or duplicate)."""
+
+
+class ActionOptionsClientRequiredError(TypeError):
+    """Raised when a generation call is made with an explicit ``None`` client."""
+
+
+class ActionOptionsNotRegisteredError(RuntimeError):
+    """Raised when the action_options layer's hooks are not installed."""
+
+
+@dataclass(frozen=True)
+class ActionOptionsNPCEntry:
+    """One present NPC in the bounded context (stable positional identity).
+
+    ``npc_id`` is the deterministic entity id the freeform binding resolves to;
+    ``persona_digest`` is the public persona digest (never true traits);
+    ``public_tier`` is the relationship tier label (e.g. 好感層級), never the
+    numeric affinity — the same boundary npc_dialogue observes. Construction
+    validates every field type so a later digest-length check can never hit a
+    non-string.
+    """
+
+    npc_id: int
+    display_name: str
+    dialogue_key: str | None = None
+    persona_digest: str = ""
+    public_tier: str | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.npc_id, bool) or not isinstance(self.npc_id, int):
+            raise ActionOptionsInputError("npc_id must be an integer")
+        if not isinstance(self.display_name, str) or not self.display_name:
+            raise ActionOptionsInputError("display_name must be a non-empty string")
+        if not isinstance(self.persona_digest, str):
+            raise ActionOptionsInputError("persona_digest must be a string")
+        for field in ("dialogue_key", "public_tier"):
+            value = getattr(self, field)
+            if value is not None and not isinstance(value, str):
+                raise ActionOptionsInputError(f"{field} must be a string or None")
+
+
+@dataclass(frozen=True)
+class ActionOptionsMonsterEntry:
+    """One present monster in the bounded context."""
+
+    monster_id: int
+    display_name: str
+    threat_tier: str | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.monster_id, bool) or not isinstance(self.monster_id, int):
+            raise ActionOptionsInputError("monster_id must be an integer")
+        if not isinstance(self.display_name, str) or not self.display_name:
+            raise ActionOptionsInputError("display_name must be a non-empty string")
+        if self.threat_tier is not None and not isinstance(self.threat_tier, str):
+            raise ActionOptionsInputError("threat_tier must be a string or None")
+
+
+@dataclass(frozen=True)
+class ActionOptionsContext:
+    """The frozen bounded context for one action-options generation.
+
+    Construction is strict: every field is type-checked and every cap is
+    enforced, raising ``ActionOptionsInputError`` for out-of-bounds values.
+    ``build_options_context`` is the sanctioned constructor that applies the
+    fixed truncation policy first. ``affordances`` holds the canonical tuple
+    the ladder validates against (never truncated); ``leak_blocklist`` is
+    consumed by validation only and never rendered into a prompt.
+    """
+
+    room_name: str
+    room_summary: str
+    npc_entries: tuple[ActionOptionsNPCEntry, ...]
+    monster_entries: tuple[ActionOptionsMonsterEntry, ...]
+    objective: str | None
+    narrative_tail: str
+    affordances: tuple[AffordanceView, ...]
+    leak_blocklist: frozenset[str]
+
+    def __post_init__(self) -> None:
+        self._check_budget("room_name", self.room_name, MAX_ROOM_NAME_LENGTH)
+        self._check_budget("room_summary", self.room_summary, MAX_ROOM_SUMMARY_LENGTH)
+        self._check_budget("narrative_tail", self.narrative_tail, MAX_NARRATIVE_TAIL_LENGTH)
+        if self.objective is not None and not isinstance(self.objective, str):
+            raise ActionOptionsInputError("objective must be a string or None")
+        if self.objective is not None and len(self.objective) > MAX_OBJECTIVE_LENGTH:
+            raise ActionOptionsInputError(
+                f"objective exceeds the maximum of {MAX_OBJECTIVE_LENGTH} chars"
+            )
+        if not isinstance(self.npc_entries, tuple) or not all(
+            isinstance(entry, ActionOptionsNPCEntry) for entry in self.npc_entries
+        ):
+            raise ActionOptionsInputError("npc_entries must be a tuple of NPCEntry")
+        if len(self.npc_entries) > MAX_NPC_ENTRIES:
+            raise ActionOptionsInputError(
+                f"npc_entries exceed the maximum of {MAX_NPC_ENTRIES} entries"
+            )
+        for entry in self.npc_entries:
+            if len(entry.persona_digest) > MAX_NPC_DIGEST_LENGTH:
+                raise ActionOptionsInputError(
+                    f"persona digest exceeds the maximum of {MAX_NPC_DIGEST_LENGTH} chars"
+                )
+        if not isinstance(self.monster_entries, tuple) or not all(
+            isinstance(entry, ActionOptionsMonsterEntry) for entry in self.monster_entries
+        ):
+            raise ActionOptionsInputError("monster_entries must be a tuple of MonsterEntry")
+        if len(self.monster_entries) > MAX_MONSTER_ENTRIES:
+            raise ActionOptionsInputError(
+                f"monster_entries exceed the maximum of {MAX_MONSTER_ENTRIES} entries"
+            )
+        for entry in self.monster_entries:
+            if len(entry.display_name) > MAX_MONSTER_ENTRY_LENGTH:
+                raise ActionOptionsInputError(
+                    f"monster display name exceeds the maximum of "
+                    f"{MAX_MONSTER_ENTRY_LENGTH} chars"
+                )
+        if not isinstance(self.affordances, tuple) or not all(
+            isinstance(getattr(entry, "navigation", None), bool)
+            and isinstance(getattr(entry, "action_id", None), (str, type(None)))
+            and hasattr(entry, "label")
+            for entry in self.affordances
+        ):
+            raise ActionOptionsInputError(
+                "affordances must be a tuple of AffordanceView entries"
+            )
+        if len(self.affordances) > MAX_AFFORDANCES:
+            raise ActionOptionsInputError(
+                f"affordances exceed the maximum of {MAX_AFFORDANCES} entries"
+            )
+        if not isinstance(self.leak_blocklist, frozenset) or any(
+            not isinstance(token, str) or not token for token in self.leak_blocklist
+        ):
+            raise ActionOptionsInputError(
+                "leak_blocklist must be a frozenset of non-empty strings"
+            )
+
+    def _check_budget(self, field: str, value: Any, cap: int) -> None:
+        if not isinstance(value, str):
+            raise ActionOptionsInputError(f"{field} must be a string")
+        if len(value) > cap:
+            raise ActionOptionsInputError(f"{field} exceeds the maximum of {cap} chars")
+
+
+def _build_npc_entry(raw: Mapping[str, Any]) -> ActionOptionsNPCEntry:
+    """Validate one plain-data NPC mapping and bound its persona digest."""
+    if not isinstance(raw, Mapping):
+        raise ActionOptionsInputError("each npc entry must be a mapping")
+    npc_id = raw.get("npc_id")
+    display_name = raw.get("display_name")
+    if isinstance(npc_id, bool) or not isinstance(npc_id, int):
+        raise ActionOptionsInputError("npc_id must be an integer")
+    if not isinstance(display_name, str) or not display_name:
+        raise ActionOptionsInputError("display_name must be a non-empty string")
+    for field in ("dialogue_key", "public_tier"):
+        value = raw.get(field)
+        if value is not None and not isinstance(value, str):
+            raise ActionOptionsInputError(f"{field} must be a string or absent")
+    digest = raw.get("persona_digest", "")
+    if not isinstance(digest, str):
+        raise ActionOptionsInputError("persona_digest must be a string")
+    return ActionOptionsNPCEntry(
+        npc_id=npc_id,
+        display_name=display_name,
+        dialogue_key=raw.get("dialogue_key"),
+        persona_digest=digest[:MAX_NPC_DIGEST_LENGTH],
+        public_tier=raw.get("public_tier"),
+    )
+
+
+def _build_monster_entry(raw: Mapping[str, Any]) -> ActionOptionsMonsterEntry:
+    """Validate one plain-data monster mapping and bound its display name."""
+    if not isinstance(raw, Mapping):
+        raise ActionOptionsInputError("each monster entry must be a mapping")
+    monster_id = raw.get("monster_id")
+    display_name = raw.get("display_name")
+    if isinstance(monster_id, bool) or not isinstance(monster_id, int):
+        raise ActionOptionsInputError("monster_id must be an integer")
+    if not isinstance(display_name, str) or not display_name:
+        raise ActionOptionsInputError("display_name must be a non-empty string")
+    threat_tier = raw.get("threat_tier")
+    if threat_tier is not None and not isinstance(threat_tier, str):
+        raise ActionOptionsInputError("threat_tier must be a string or absent")
+    return ActionOptionsMonsterEntry(
+        monster_id=monster_id,
+        display_name=display_name[:MAX_MONSTER_ENTRY_LENGTH],
+        threat_tier=threat_tier,
+    )
+
+
+def build_options_context(
+    *,
+    room_name: str,
+    room_summary: str,
+    narrative_tail: str,
+    npc_entries: Sequence[Mapping[str, Any]],
+    monster_entries: Sequence[Mapping[str, Any]] = (),
+    objective: str | None = None,
+    affordances: Sequence[AffordanceView],
+    secret_tokens: Iterable[str] = (),
+) -> ActionOptionsContext:
+    """Assemble the frozen bounded context from caller-supplied plain data.
+
+    The fixed truncation policy applies to the truncatable fields only:
+    narrative tail keeps the most recent ``MAX_NARRATIVE_TAIL_LENGTH``
+    characters (oldest dropped first), persona digests keep their first
+    ``MAX_NPC_DIGEST_LENGTH`` characters, and NPC/monster entries beyond the
+    caps drop the oldest. ``affordances``, ``room_name``, and ``room_summary``
+    are never truncated: an over-cap value raises ``ActionOptionsInputError``.
+    ``secret_tokens`` (numeric literals + hidden trait keys of the
+    deterministic view) compose the context's ``LEAK_BLOCKLIST``, consumed by
+    validation only. Identical input produces a byte-identical frozen context
+    with no live entity references; NPC order is the caller's stable order.
+    """
+    if not isinstance(narrative_tail, str):
+        raise ActionOptionsInputError("narrative_tail must be a string")
+    if objective is not None and not isinstance(objective, str):
+        raise ActionOptionsInputError("objective must be a string or None")
+    if isinstance(secret_tokens, str):
+        raise ActionOptionsInputError(
+            "secret_tokens must be an iterable of strings, not a string"
+        )
+    if len(affordances) > MAX_AFFORDANCES:
+        raise ActionOptionsInputError(
+            f"affordances exceed the maximum of {MAX_AFFORDANCES} entries"
+        )
+    npc = tuple(npc_entries)[-MAX_NPC_ENTRIES:]
+    monsters = tuple(monster_entries)[-MAX_MONSTER_ENTRIES:]
+    return ActionOptionsContext(
+        room_name=room_name,
+        room_summary=room_summary,
+        npc_entries=tuple(_build_npc_entry(entry) for entry in npc),
+        monster_entries=tuple(_build_monster_entry(entry) for entry in monsters),
+        objective=objective[:MAX_OBJECTIVE_LENGTH] if objective is not None else None,
+        narrative_tail=narrative_tail[-MAX_NARRATIVE_TAIL_LENGTH:],
+        affordances=tuple(affordances),
+        leak_blocklist=frozenset(token for token in secret_tokens if token),
+    )
+
+
+# ==== Prompt assembly (pipeline design doc §3) ====
+
+
+def _serialize_structured(value: Any) -> str:
+    """Deterministic stable-key JSON with non-ASCII kept literal."""
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def build_action_options_prompt(
+    context: ActionOptionsContext,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Build the deterministic (system, user) message pair for one proposal.
+
+    Both messages render through the prompt library's two ``action_options``
+    keys: the system key with no substitution values (empty allowlist), the
+    user key with exactly the seven serialized ``ActionOptionsContext`` fields
+    (``leak_blocklist`` is never rendered). Structured fields are
+    pre-serialized: NPC entries carry their stable positional ``npc_index`` so
+    freeform cards reference a present person without the model typing an id,
+    and the affordance list carries each entry's canonical ``action_id`` +
+    typed params (navigation entries have no dispatcher code and are excluded).
+    Identical input always produces byte-identical messages with no live entity
+    references.
+    """
+    system = {"role": "system", "content": render_prompt("action_options.system")}
+    npc_entries = [
+        {
+            "npc_index": index,
+            "npc_id": entry.npc_id,
+            "display_name": entry.display_name,
+            "dialogue_key": entry.dialogue_key,
+            "persona_digest": entry.persona_digest,
+            "public_tier": entry.public_tier,
+        }
+        for index, entry in enumerate(context.npc_entries)
+    ]
+    monster_entries = [
+        {
+            "monster_id": entry.monster_id,
+            "display_name": entry.display_name,
+            "threat_tier": entry.threat_tier,
+        }
+        for entry in context.monster_entries
+    ]
+    affordances = [
+        {
+            "action_id": entry.action_id,
+            "label": entry.label,
+            "params": dict(entry.params or {}),
+        }
+        for entry in context.affordances
+        if not entry.navigation
+    ]
+    user = {
+        "role": "user",
+        "content": render_prompt(
+            "action_options.user",
+            room_name=context.room_name,
+            room_summary=context.room_summary,
+            npc_entries=_serialize_structured(npc_entries),
+            monster_entries=_serialize_structured(monster_entries),
+            objective=context.objective or "",
+            narrative_tail=context.narrative_tail,
+            affordances=_serialize_structured(affordances),
+        ),
+    }
+    return system, user
+
+
+# ==== Generation pipeline (pipeline design doc §4-§5) ====
+
+
+# The raw model wire shape (schema design doc §5): ``context_kind`` plus
+# ``cards`` where a known_action card carries action_code/label and optional
+# params/hint, and a freeform card carries npc_index/label and optional hint.
+# The caller-injected ``fingerprint``/``status`` (and the enriched
+# ``kind``/``action_code``/``params``) never appear here (design D-7); the
+# exact-field parser enforces the same contract with named rejections.
+ACTION_OPTIONS_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["context_kind", "cards"],
+    "additionalProperties": False,
+    "properties": {
+        "context_kind": {"type": "string", "enum": [CONTEXT_KIND]},
+        "cards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["label"],
+                "additionalProperties": False,
+                "properties": {
+                    "label": {"type": "string"},
+                    "hint": {"type": "string"},
+                    "action_code": {"type": "string"},
+                    "params": {"type": "object"},
+                    "npc_index": {"type": "integer", "minimum": 0},
+                },
+                "oneOf": [
+                    {"required": ["action_code"]},
+                    {"required": ["npc_index"]},
+                ],
+            },
+        },
+    },
+}
+
+_ACTION_OPTIONS_DEGRADED = object()
+
+
+def _degrade_fallback() -> object:
+    """Return the sentinel so the entry point can map it to the public ``None``."""
+    return _ACTION_OPTIONS_DEGRADED
+
+
+def _resolve_freeform_bindings(
+    payload: Mapping[str, Any], npc_bindings: tuple[int, ...]
+) -> dict[str, Any]:
+    """Resolve every freeform card's ``{npc_index}`` against the bound NPC list.
+
+    The prompt's bound NPC list fixes the positional order; an out-of-range
+    index, or a target already bound by an earlier freeform card in the same
+    proposal, rejects the card with a binding error (design D-4). Resolved
+    cards carry the enriched freeform shape (``kind``, ``action_code``,
+    ``params``) so the ladder's stage-0 enrichment keeps them freeform and
+    stage 9 validates the binding-only params.
+    """
+    resolved_cards: list[dict[str, Any]] = []
+    bound_targets: set[int] = set()
+    for card in payload["cards"]:
+        if "npc_index" not in card:
+            resolved_cards.append(dict(card))
+            continue
+        index = card["npc_index"]
+        if index < 0 or index >= len(npc_bindings):
+            raise ActionOptionsBindingError(
+                f"freeform npc_index {index} is outside the bound NPC list"
+            )
+        target = npc_bindings[index]
+        if target in bound_targets:
+            raise ActionOptionsBindingError(
+                f"freeform npc_index {index} binds target {target} twice"
+            )
+        bound_targets.add(target)
+        resolved = {key: value for key, value in card.items() if key != "npc_index"}
+        resolved["kind"] = "freeform"
+        resolved["action_code"] = FREEFORM_ACTION_CODE
+        resolved["params"] = {"npc_id": target}
+        resolved_cards.append(resolved)
+    return {"context_kind": payload["context_kind"], "cards": resolved_cards}
+
+
+# The stage each ladder code is reported with in retry messages — the first
+# ladder stage able to raise the code (schema design doc §3). Parse failures
+# share the structure stage (1): the exact-field parser enforces the raw JSON
+# contract before the ladder, so enrichment-stage violations are unreachable
+# after a successful parse.
+_STAGE_BY_CODE: Mapping[str, int] = {
+    SCHEMA_VIOLATION: 1,
+    CARD_COUNT_OUT_OF_RANGE: 4,
+    EMPTY_LABEL: 6,
+    LABEL_TOO_LONG: 6,
+    NON_CJK_LABEL: 6,
+    PLACEHOLDER_LABEL: 7,
+    DIGIT_IN_LABEL: 8,
+    UNKNOWN_ACTION_CODE: 9,
+    NO_SUCH_AFFORDANCE: 9,
+    UNKNOWN_TARGET: 9,
+    HINT_TOO_LONG: 10,
+    LEAK_DETECTED: 10,
+}
+
+
+def _stage_message(code: str) -> str:
+    return f"stage {_STAGE_BY_CODE.get(code, 0)}: {code}"
+
+
+def _evaluate_enriched(
+    parsed: Any,
+    *,
+    fingerprint: str,
+    affordances: tuple[AffordanceView, ...],
+    npc_bindings: tuple[int, ...],
+    leak_blocklist: frozenset[str],
+) -> tuple[OptionSet | None, list[str]]:
+    """Total enrichment + binding + ladder evaluation; never raises (design D-3).
+
+    Returns ``(OptionSet, [])`` on success, or ``(None, [message])`` where the
+    message is a named error for the guardrail's retry loop: ``"stage N: <code>"``
+    for ladder/parse rejections, the binding error text for freeform resolution,
+    and a generation-rule message for sets the ladder accepts below ``MIN_CARDS``.
+    Every parsing, enrichment, binding, and ladder exception is converted here —
+    nothing escapes into ``guarded_call``, which would errback the Deferred
+    instead of retrying.
+    """
+    try:
+        payload = parse_action_options_payload(parsed)
+    except OptionsValidationError as exc:
+        return None, [_stage_message(exc.code)]
+    try:
+        resolved = _resolve_freeform_bindings(payload, npc_bindings)
+    except ActionOptionsBindingError as exc:
+        return None, [str(exc)]
+    try:
+        optionset = validate_optionset(
+            resolved,
+            fingerprint=fingerprint,
+            affordances=affordances,
+            leak_blocklist=leak_blocklist,
+        )
+    except OptionsValidationError as exc:
+        return None, [_stage_message(exc.code)]
+    except (TypeError, ValueError) as exc:
+        return None, [f"internal error: {type(exc).__name__}: {exc}"]
+    if len(optionset.cards) < MIN_CARDS:
+        return None, [f"generation rule: fewer than {MIN_CARDS} cards proposed"]
+    return optionset, []
+
+
+def _make_enriched_validator(
+    *,
+    fingerprint: str,
+    affordances: tuple[AffordanceView, ...],
+    npc_bindings: tuple[int, ...],
+    leak_blocklist: frozenset[str],
+) -> Callable[[Any], list[str]]:
+    """Return the per-call semantic validator bound to this call's data (D-2).
+
+    The closure is carried by the request descriptor, never registered: it
+    captures only this call's immutable copies of the fingerprint, affordance
+    tuple, NPC bindings, and leak blocklist, so an interleaved second call can
+    never observe another call's data.
+    """
+
+    def validate(parsed: Any) -> list[str]:
+        _, errors = _evaluate_enriched(
+            parsed,
+            fingerprint=fingerprint,
+            affordances=affordances,
+            npc_bindings=npc_bindings,
+            leak_blocklist=leak_blocklist,
+        )
+        return errors
+
+    return validate
+
+
+def _is_registered() -> bool:
+    """True when the guardrail registries hold every action_options hook."""
+    if guardrail._degrade_fallbacks.get("action_options") is not _degrade_fallback:
+        return False
+    return _OUTPUT_SCHEMAS.get("action_options") is ACTION_OPTIONS_OUTPUT_SCHEMA
+
+
+def _require_registered() -> None:
+    if not _is_registered():
+        raise ActionOptionsNotRegisteredError(
+            "the action_options layer is not registered; call register_action_options() first"
+        )
+
+
+def _uninstall_fallback() -> None:
+    if guardrail._degrade_fallbacks.get("action_options") is _degrade_fallback:
+        del guardrail._degrade_fallbacks["action_options"]
+
+
+def _uninstall_schema() -> None:
+    if _OUTPUT_SCHEMAS.get("action_options") is ACTION_OPTIONS_OUTPUT_SCHEMA:
+        del _OUTPUT_SCHEMAS["action_options"]
+
+
+def _uninstall_all_own_hooks() -> None:
+    """Remove every action_options hook this module installed (by identity)."""
+    _uninstall_fallback()
+    _uninstall_schema()
+
+
+def register_action_options() -> None:
+    """Install the action_options layer's guardrail hooks atomically and idempotently.
+
+    Registers the sentinel degrade fallback and the raw-wire output schema
+    (design D-7). No semantic validators are registered — the ladder owns every
+    text gate, and the per-call closure rides the request descriptor (D-2). On
+    a partial failure every hook belonging to this module (by identity) is
+    removed before the error propagates, so the layer is never left
+    half-registered. A second call is a no-op that keeps the first
+    registration.
+    """
+    if _is_registered():
+        return
+    try:
+        if guardrail._degrade_fallbacks.get("action_options") is not _degrade_fallback:
+            register_degrade_fallback("action_options", _degrade_fallback)
+        if _OUTPUT_SCHEMAS.get("action_options") is not ACTION_OPTIONS_OUTPUT_SCHEMA:
+            register_output_schema("action_options", ACTION_OPTIONS_OUTPUT_SCHEMA)
+    except (GuardrailRegistrationError, DuplicateSchemaError):
+        _uninstall_all_own_hooks()
+        raise
+
+
+def _log_bounded_diagnostic(problem: str) -> None:
+    """Log one bounded degrade diagnostic through the evennia logger."""
+    from evennia import logger
+
+    logger.log_warn(f"action_options: {problem}")
+
+
+@defer.inlineCallbacks
+def generate_action_options(
+    context: ActionOptionsContext,
+    client: Any,
+    *,
+    fingerprint: str,
+):
+    """Run the action_options layer's guarded pipeline for one proposal.
+
+    Args:
+        context: The frozen bounded context (``build_options_context`` output)
+            whose affordance tuple is the vocabulary-lock source and whose
+            ``leak_blocklist`` feeds the ladder's leak gates.
+        client: The injected client protocol (``OpenAICompatClient`` or
+            ``FakeLLMClient``); an explicit ``None`` is rejected with
+            ``ActionOptionsClientRequiredError`` before any prompt construction
+            or transport interaction.
+        fingerprint: The caller-supplied opaque situation fingerprint; carried
+            through into the enriched ``OptionSet`` and into the ladder entry
+            point, never rendered into the prompt.
+
+    Returns:
+        A Deferred resolving to a frozen ``OptionSet`` (``status: "ready"``,
+        3-5 cards in the model's order) on success, or to ``None`` — the single
+        public degraded marker — when the profile is disabled (before any
+        prompt construction or transport work), the prompt key is unavailable,
+        the transport fails (no retry loop; the trigger service memoizes), the
+        retry budget is exhausted, or an over-budget context input raises
+        ``ActionOptionsInputError``. No state change is ever made.
+    """
+    if client is None:
+        raise ActionOptionsClientRequiredError(
+            "generate_action_options requires an injected client; got None"
+        )
+    if not get_profile("action_options").enabled:
+        return None
+    _require_registered()
+    try:
+        system, user = build_action_options_prompt(context)
+    except (PromptUnavailableError, ActionOptionsInputError) as exc:
+        _log_bounded_diagnostic(str(exc))
+        return None
+    npc_bindings = tuple(entry.npc_id for entry in context.npc_entries)
+    descriptor = ChatRequestDescriptor(
+        messages=(system, user),
+        schema_id="action_options",
+        semantic_validators={
+            "enriched_optionset": _make_enriched_validator(
+                fingerprint=fingerprint,
+                affordances=context.affordances,
+                npc_bindings=npc_bindings,
+                leak_blocklist=context.leak_blocklist,
+            ),
+        },
+    )
+    text = yield guarded_call("action_options", client, descriptor)
+    if text is _ACTION_OPTIONS_DEGRADED:
+        return None
+    parsed = json.loads(text)
+    optionset, errors = _evaluate_enriched(
+        parsed,
+        fingerprint=fingerprint,
+        affordances=context.affordances,
+        npc_bindings=npc_bindings,
+        leak_blocklist=context.leak_blocklist,
+    )
+    if optionset is None:
+        _log_bounded_diagnostic(
+            "accepted text failed strict re-validation: " + " | ".join(errors)
+        )
+        return None
+    return optionset
+
+
 __all__ = [
+    "ACTION_OPTIONS_OUTPUT_SCHEMA",
+    "ActionOptionsBindingError",
+    "ActionOptionsClientRequiredError",
+    "ActionOptionsContext",
+    "ActionOptionsInputError",
+    "ActionOptionsMonsterEntry",
+    "ActionOptionsNPCEntry",
+    "ActionOptionsNotRegisteredError",
     "CARD_KINDS",
     "CARD_COUNT_OUT_OF_RANGE",
     "CONTEXT_KIND",
@@ -680,11 +1365,20 @@ __all__ = [
     "LABEL_TOO_LONG",
     "LADDER_CODES",
     "LEAK_DETECTED",
+    "MAX_AFFORDANCES",
     "MAX_CARDS",
     "MAX_HINT_LENGTH",
     "MAX_LABEL_LENGTH",
+    "MAX_MONSTER_ENTRIES",
+    "MAX_MONSTER_ENTRY_LENGTH",
+    "MAX_NARRATIVE_TAIL_LENGTH",
+    "MAX_NPC_DIGEST_LENGTH",
+    "MAX_NPC_ENTRIES",
+    "MAX_OBJECTIVE_LENGTH",
     "MAX_OPTIONSET_CACHE_ENTRIES",
     "MAX_PARAMS",
+    "MAX_ROOM_NAME_LENGTH",
+    "MAX_ROOM_SUMMARY_LENGTH",
     "MAX_SAFE_INTEGER",
     "MIN_CARDS",
     "NEGATIVE_MEMO_TTL",
@@ -698,7 +1392,11 @@ __all__ = [
     "SuggestionCard",
     "UNKNOWN_ACTION_CODE",
     "UNKNOWN_TARGET",
+    "build_action_options_prompt",
+    "build_options_context",
     "enrich_options_payload",
+    "generate_action_options",
     "parse_action_options_payload",
+    "register_action_options",
     "validate_optionset",
 ]

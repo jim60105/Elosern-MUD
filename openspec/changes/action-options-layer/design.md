@@ -202,6 +202,44 @@ suite.
   schema validates the model's raw shape only (`params` optional on known-action cards, `npc_index`
   on freeform); the integration test proves an accepted raw payload enriches and validates.
 
+## Review Fixes
+
+### D-9 (rubber-duck review): profile-gate ordering and named-input hardening
+
+- **Disabled profile resolves `None` even when the layer is unregistered.** The entry point
+  originally checked registration before the profile gate, so the allowed startup-skip path
+  (prerequisites missing, registration skipped) turned a disabled-profile call into a failed
+  Deferred instead of `None`. The gate now runs before `_require_registered()`: a disabled
+  profile resolves `None` with no transport work and no registration requirement; an *enabled*
+  profile on an unregistered layer still fails loudly (regression test added).
+- **Context construction is uniformly named-error safe.** The entry dataclasses now validate
+  their own field types (a `persona_digest=None` can no longer reach a `len()` `TypeError`),
+  the affordance shape check reads through `getattr` so a garbage entry raises
+  `ActionOptionsInputError` instead of `AttributeError`, and the builder materializes
+  sequences before slicing so any iterable input is handled (tests added).
+- **Rejected: making the guardrail import lazy at module time.** The review flagged that
+  `from world.ai import guardrail` transitively imports `evennia.logger` at module import
+  time. This matches the repository-wide pattern the design doc itself cites — `narrator.py`
+  imports guardrail at module level (as do npc_dialogue/character_creation/scene_flavor) —
+  the transport-contract test (the enforcement for the proposal-only requirement) is green,
+  and no code path imports this module before `evennia._init()` (settings.py imports only
+  `world.ai.profiles`; the startup wrapper imports the layer inside `at_server_start`). The
+  module's own direct Evennia use stays lazy (`_log_bounded_diagnostic`).
+
+### D-8: The shipped user-prompt examples taught a `kind` field the raw contract forbids
+
+The schema change's JSON contract (§5) — pinned by the exact-field parser and its main spec —
+requires raw cards **without** `kind`: known_action cards carry `{action_code, label, params?,
+hint?}`, freeform cards carry `{npc_index, label, hint?}`; `kind` is derived at enrichment.
+The prompts change's `prompts/action_options.yaml` user-key example formats showed
+`{"kind": "known_action", ...}` / `{"kind": "freeform", ...}`, which a faithful model would emit
+and the parser would reject every time (`schema_violation` → retry → exhaust → degrade — the
+suggestion surface would never come online). This change fixes the two example formats in
+`prompts/action_options.yaml` to the raw wire shape (no `kind`); no placeholder, key, or allowlist
+changes. The main `ai-action-options-prompts` requirement ("exactly the documented JSON schema
+output") is thereby honored, and the layer's parse-then-bind-then-enrich tests exercise the fixed
+contract end to end.
+
 ## Migration Plan
 
 Pure additive change: one new module, one new startup registration call, one new test suite.
