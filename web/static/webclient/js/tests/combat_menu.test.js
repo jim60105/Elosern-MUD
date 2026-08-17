@@ -70,7 +70,7 @@ function nestedSkills(...skills) {
 function readyPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "combat",
       session: {
@@ -93,6 +93,7 @@ function readyPanel(overrides) {
           shorthands: ["all-enemies", "all"],
         })
       ),
+      suggestions: { status: "unavailable" },
     },
     overrides
   );

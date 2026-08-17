@@ -3,7 +3,7 @@
 **Date:** 2026-08-15
 **Status:** Approved (pending final user review of this document set)
 **Scope:** `world/ai/action_options.py`, `server/option_proposal_service.py`,
-`prompts/action_options.yaml` (+ registry/profile slot), `context_actions` panel v3,
+`prompts/action_options.yaml` (+ registry/profile slot), `context_actions` panel v5,
 `web/webclient/actions/options.py` (dismiss + freeform bridge), exploration/dialogue deterministic
 producers, and the webclient dock + narrative choice-points.
 
@@ -17,7 +17,7 @@ designs live in:
 | [Generative Pipeline](2026-08-15-ai-action-options-pipeline-design.md) | Bounded-context serializer, prompt contract, `action_options` profile, retry/degrade ladder |
 | [Trigger Service & Cache](2026-08-15-ai-action-options-trigger-service-design.md) | Fingerprint, one-call-per-situation LRU replay, negative memo, coordinator push seam, dismiss eviction |
 | [Deterministic Available Actions](2026-08-15-ai-action-options-deterministic-actions-design.md) | The canonical affordance contract, exploration kind rule table, `default_cards()`, vocabulary lock source |
-| [WebClient Presentation](2026-08-15-ai-action-options-webclient-design.md) | `context_actions` v3 mirrors, dock + narrative choice-points, generating state, dismiss, execution paths |
+| [WebClient Presentation](2026-08-15-ai-action-options-webclient-design.md) | `context_actions` v5 mirrors, dock + narrative choice-points, generating state, dismiss, execution paths |
 
 This document set is subordinate to `2026-07-29-ai-mud-engine-design.md`, the architectural source
 of truth. Where it amends that document, the amendment is stated explicitly (D-1).
@@ -80,10 +80,10 @@ What is missing is a proactive suggestions surface:
 | `server/option_proposal_service.py` (new) | Fingerprint, pending registry (+tokens/epochs), LRU + negative memo, session options state, fire-and-forget scheduling, epoch-guarded push | ephemeral cache + presentation state only |
 | `web/webclient/presentation/watchers.py` (new) | Ingress-maintained puppet → live-session watcher registry (`watchers_for`) for the room-entry hook | ephemeral registry only |
 | `web/webclient/presentation/affordances.py` (new) | Canonical affordance builders, `default_cards()`, vocabulary source | presentation only |
-| `web/webclient/presentation/` | `context_actions` v3 validator + presenter reading `context.options_state`; `publish_panel_update` helper (epoch guard) | presentation only |
+| `web/webclient/presentation/` | `context_actions` v5 validator + presenter reading `context.options_state`; `publish_panel_update` helper (epoch guard) | presentation only |
 | `web/webclient/actions/node_ids.py` (new) | Shared `node_id_for_location` encoder (adapter + affordance builders) | none (pure) |
 | `web/webclient/actions/options.py` (new) | `options.dismiss` adapter; freeform bridge (reuses `explore.talk_freeform`) | none beyond normal action flow |
-| `web/static/webclient/js/` | `protocol.js` v3 mirror + allowlist; dock section; narrative choice-points; card renderer | presentation only |
+| `web/static/webclient/js/` | `protocol.js` v5 mirror + allowlist; dock section; narrative choice-points; card renderer | presentation only |
 
 ---
 
@@ -92,8 +92,8 @@ What is missing is a proactive suggestions surface:
 Redesigned after the rubber-duck review into **ten 1-workday changes**, each landing independently
 (specs, code, tests, `spec_traceability`, archive) and each small enough to finish in one day. The
 dependency graph fixes the review's R7 findings: the shared canonical affordance contract is a root
-change (everything vocabulary-shaped depends on it), the v3 panel seam (change 7) lands **before**
-the trigger service (change 5) so the push path is end-to-end verifiable against the v3 contract
+change (everything vocabulary-shaped depends on it), the v5 panel seam (change 7) lands **before**
+the trigger service (change 5) so the push path is end-to-end verifiable against the v5 contract
 (round-three review: no parallel integration risk on the coordinator/presentation seam), and the
 unified adapter ABI lands with the dismiss action (change 8).
 
@@ -119,7 +119,7 @@ unified adapter ABI lands with the dismiss action (change 8).
  1 ───── 7 ───────────┘
 ```
 
-(5 depends on 7 so the trigger service publishes through the v3 seam it verifies end-to-end; 8 is
+(5 depends on 7 so the trigger service publishes through the v5 seam it verifies end-to-end; 8 is
 bundled with the unified adapter ABI; 9 depends on the panel from 7, the eviction path from 5, and
 the dismiss action from 8; 10 depends on 7 and 9 for the shared card component.)
 
@@ -133,8 +133,8 @@ database or the retained Evennia test server — see isolation note below):
 | B1 | 1 | 1 (alone) | The affordance contract is the shared root everyone else builds against |
 | B2 | 2 | 2 + 3 | Pure schema (world/ai) vs prompts/profile (world/prompts + settings) — disjoint packages |
 | B3 | 3 | 4 (alone) | The generative layer is the deepest single unit |
-| B4 | 4 | 7 (alone) | The v3 protocol seam lands before the trigger service so push is verifiable (round-three review) |
-| B5 | 5 | 5 (alone) | Trigger service builds on the v3 seam; single owner of the coordinator/presentation integration |
+| B4 | 4 | 7 (alone) | The v5 protocol seam lands before the trigger service so push is verifiable (round-three review) |
+| B5 | 5 | 5 (alone) | Trigger service builds on the v5 seam; single owner of the coordinator/presentation integration |
 | B6 | 6 | 6 + 8 | Hook call sites (world/actions + typeclasses) vs dismiss action (web/actions, incl. the unified ABI) — both depend on 5, disjoint files |
 | B7 | 7 | 9 (alone) | Dock surface; choice-points depend on it |
 | B8 | 8 | 10 (alone) | Narrative choice-points on top of the dock surface |

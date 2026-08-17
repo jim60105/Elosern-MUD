@@ -4,7 +4,7 @@
 **Status:** Approved (revised after rubber-duck review)
 **Scope:** The immutable `OptionSet` / `SuggestionCard` vocabulary exchanged between the generative
 layer (`world/ai/action_options.py`), the trigger service (`server/option_proposal_service.py`),
-and the presentation layer (`context_actions` panel v3). This document defines the exact fields,
+and the presentation layer (`context_actions` panel v5). This document defines the exact fields,
 bounds, the validation ladder, the leak gates, and the LLM output contract.
 
 Part of the [AI Action Options document set](2026-08-15-ai-action-options-overview-design.md),
@@ -70,7 +70,7 @@ R3-1):
 |---|---|---|
 | Raw generation ladder (stage 4) | accepts 0–5 | a sub-minimum or empty set degrades instead of failing |
 | Generation rule (AI `ready`) | 3–5; a set below the minimum degrades | the curated-variety product decision |
-| Emitted v3 payload | `ready` 3–5; `degraded` 1–5 in v1 | the idle baseline (deterministic-actions doc §2) is always eligible while a puppeted player is inside a location, so a v1 degraded set is never empty; the mirror still accepts 0–5 so a future room without a baseline cannot crash it |
+| Emitted v5 payload | `ready` 3–5; `degraded` 1–5 in v1 | the idle baseline (deterministic-actions doc §2) is always eligible while a puppeted player is inside a location, so a v1 degraded set is never empty; the mirror still accepts 0–5 so a future room without a baseline cannot crash it |
 
 The 3–5 minimum is a *generation* rule, not a validation rule (rubber-duck R14); the mirrors
 accept `ready` 3–5 and `degraded` 0–5 (webclient doc §1.1).

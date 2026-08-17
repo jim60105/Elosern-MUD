@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-15
 **Status:** Approved
-**Scope:** `context_actions` panel schema v3 (server validator + `protocol.js` mirror), the
+**Scope:** `context_actions` panel schema v5 (server validator + `protocol.js` mirror), the
 `dismiss_options` (uid `options.dismiss`) action, dock rendering with the generating state, and
 narrative-flow choice-points — the dual placement the player sees.
 
@@ -13,14 +13,16 @@ push in [trigger-service](2026-08-15-ai-action-options-trigger-service-design.md
 
 ---
 
-## 1. `context_actions` Schema v3
+## 1. `context_actions` Schema v5
 
-v3 keeps the v2 combat fields and semantics (schema version bumps to 3, and one field is added to
-every form):
+v5 keeps the v4 combat fields and semantics (schema version bumps to 5, and a `suggestions`
+envelope is added to every **available** form — the common unavailable form keeps its exact
+field set `schema_version`/`available`/`reason` and never carries `suggestions`, per the
+overview's D-1 amendment):
 
 ```
-context_actions v3 {
-  schema_version: 3
+context_actions v5 {
+  schema_version: 5
   available: bool
   kind: "combat" | "exploration"
   ... (kind-specific sections: combat keeps session/participants/root_actions/
@@ -38,31 +40,32 @@ context_actions v3 {
   `unavailable`: hidden section (initial state, after dismiss, and when no kind applies).
 - The combat presenter emits `suggestions` with `status: "unavailable"` for combat sessions — v1
   explicitly excludes combat-round proposals ([overview] §out-of-scope).
-- Revision (rubber-duck R3): "byte-identical" is dropped — schema version bumps to 3 and adds
-  `suggestions` to *every* form, so the claim is **combat fields and semantics preserved**: the
-  combat-specific sections keep their v2 shapes and validation, and the change that lands v3 must
-  cover the combat available *and* unavailable forms, the combat dock, and the combat browser
-  fixtures in one unit.
+- Revision (rubber-duck R3): "byte-identical" is dropped — schema version bumps to 5 and adds
+  `suggestions` to every *available* form, so the claim is **combat fields and semantics
+  preserved**: the combat-specific sections keep their v4 shapes and validation, and the change
+  that lands v5 must cover the combat available *and* unavailable forms, the combat dock, and
+  the combat browser fixtures in one unit.
 
 ### 1.1 Server validator
 
 `validate_context_actions` in `web/webclient/presentation/combat_panel.py` (or a shared
-`context_actions_schema.py` module extracted from it) enforces v3 exactly: `suggestions` present in
-every v3 payload, `cards` validated by the optionschema ladder (schema doc §3) with the
+`context_actions_schema.py` module extracted from it) enforces v5 exactly: `suggestions` present in
+every available v5 payload, `cards` validated by the optionschema ladder (schema doc §3) with the
 **status-dependent count bounds: `ready` 3–5, `degraded` 0–5 accepted** (schema doc §1.2's
 three-layer contract: the raw ladder accepts 0–5 and the generation rule enforces ready 3–5; v1
 degraded sets always carry ≥ 1 card because the idle baseline is always eligible — the mirror
 still accepts 0 so a future baseline-less room cannot break the client), and the kind-specific
 sections left to their existing validators. Unknown keys reject — the closed schema contract from
-the OOB foundation.
+the OOB foundation. The common unavailable form is built by the registry and carries exactly
+`schema_version`/`available`/`reason` — both validators reject a `suggestions` field on it.
 
 ### 1.2 Client mirror + allowlist
 
 `web/static/webclient/js/elosern/protocol.js`:
 
-- `PANEL_ALLOWLIST.context_actions` → `3`.
-- A `validateContextActionsV3` mirror with identical bounds (including the optionschema caps) and
-  the existing dual-direction parity test extended to v3 — the convention that already guards the
+- `PANEL_ALLOWLIST.context_actions` → `5`.
+- A `validateSuggestions` mirror with identical bounds (including the optionschema caps) and
+  the existing dual-direction parity test extended to v5 — the convention that already guards the
   exploration panel v1.
 - `ui_update` processing (`commitPresentation`) is unchanged: the whole panel replaces at the new
   revision; the narrative choice-point layer additionally reacts to `context_actions` changes
@@ -155,10 +158,10 @@ inserted into the narrative stream.
 
 | Area | Method |
 |---|---|
-| Mirrors | Dual-direction parity test extended to v3 (server validator ↔ `protocol.js`), covering combat available + unavailable forms |
+| Mirrors | Dual-direction parity test extended to v5 (server validator ↔ `protocol.js`), covering combat available + unavailable forms |
 | Dock rendering | Node tests: four status renders; section hidden on `unavailable`; card click dispatches the right envelope |
 | Choice-points | Node tests: generating-line append → ready in-place replacement; dismiss removal; **narrative text appended after a ready commit moves the block to stream end** |
-| Null paths | Combat fields preserved (v2 shapes, v3 envelope); unknown suggestions status rejected by both mirrors; `ui_sync` after `ready` preserves cards (state-backed render) |
+| Null paths | Combat fields preserved (v4 shapes, v5 envelope); unknown suggestions status rejected by both mirrors; `ui_sync` after `ready` preserves cards (state-backed render) |
 | Browser | Playwright: move into a room → generating line → ready cards; click a known card executes; freeform card sends speech; dismiss hides both surfaces; LLM-off path shows degraded cards in the dock only |
 
 Browser notes per the repo conventions: put the options browser tests in a file that boots one

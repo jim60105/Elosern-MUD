@@ -115,6 +115,16 @@
   ];
   var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
   var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];
+  // Suggestions envelope bounds and enums (mirror of
+  // web.webclient.presentation.options and the generative schema caps).
+  var OPTIONS_STATUSES = ["generating", "ready", "degraded", "unavailable"];
+  var OPTIONS_CARD_KINDS = ["known_action", "freeform"];
+  var MAX_OPTION_CARDS = 5;
+  var MAX_OPTION_LABEL = 24;
+  var MAX_OPTION_HINT = 60;
+  var MAX_OPTION_PARAMS = 4;
+  var OPTIONS_FREEFORM_ACTION_CODE = "explore.talk_freeform";
+  var OPTIONS_MAX_PARAM_STRING = 512;
   // SkillCategory enum values, in the registry's fixed declaration order
   // (mirror of world.skills.registry.SkillCategory).
   var SKILL_CATEGORY_KEYS = [
@@ -234,7 +244,7 @@
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 1,
-    context_actions: 4,
+    context_actions: 5,
     local_map: 1,
     services: 1,
     creation: 1,
@@ -1014,7 +1024,7 @@
     requireExactFields(
       payload,
       "context_actions exploration form",
-      ["schema_version", "available", "kind", "affordances"],
+      ["schema_version", "available", "kind", "affordances", "suggestions"],
       []
     );
     if (payload.available !== true || payload.kind !== "exploration") {
@@ -1030,11 +1040,145 @@
     }
     var affordances = payload.affordances.map(validateContextActionsAffordance);
     return {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "exploration",
       affordances: affordances,
+      suggestions: validateSuggestions(payload.suggestions),
     };
+  }
+
+  // Whether a label contains at least one CJK Unified Ideograph.
+  function hasCjk(text) {
+    if (typeof text !== "string") {
+      return false;
+    }
+    for (var index = 0; index < text.length; index++) {
+      var code = text.charCodeAt(index);
+      if (code >= 0x4e00 && code <= 0x9fff) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Validate one suggestion card's params: for a known_action card the
+  // canonical validator-normalized payload of its action (safe ints, bounded
+  // strings, plus the literal boolean true for the explore.look room-survey
+  // form — any other boolean rejected); for a freeform card the exact
+  // {"npc_id": positive int} binding.
+  function validateSuggestionParams(actionCode, kind, params) {
+    if (!isPlainObject(params)) {
+      throw new Error("suggestion params must be a JSON object");
+    }
+    var keys = Object.keys(params);
+    if (keys.length < 1 || keys.length > MAX_OPTION_PARAMS) {
+      throw new Error("suggestion params exceed their bound");
+    }
+    if (kind === "freeform") {
+      return validateContextActionsAffordanceParams(actionCode, params);
+    }
+    for (var i = 0; i < keys.length; i++) {
+      var child = params[keys[i]];
+      if (typeof child === "boolean") {
+        if (actionCode === "explore.look" && params.room === true && keys.length === 1) {
+          continue;
+        }
+        throw new Error("suggestion params carry an unsupported boolean");
+      }
+      if (typeof child === "number") {
+        if (!Number.isInteger(child) || child < 0 || child > MAX_SAFE_INTEGER) {
+          throw new Error("suggestion params integer is out of bounds");
+        }
+        continue;
+      }
+      if (typeof child === "string") {
+        if (codePoints(child) > OPTIONS_MAX_PARAM_STRING) {
+          throw new Error("suggestion params string exceeds its bound");
+        }
+        continue;
+      }
+      throw new Error("suggestion params carry an unsupported value type");
+    }
+    return validateContextActionsAffordanceParams(actionCode, params);
+  }
+
+  function validateSuggestionCard(value) {
+    requireExactFields(
+      value,
+      "suggestion card",
+      ["kind", "action_code", "label", "params"],
+      ["hint"]
+    );
+    var kind = value.kind;
+    if (OPTIONS_CARD_KINDS.indexOf(kind) === -1) {
+      throw new Error("suggestion card kind is not a stable value");
+    }
+    var actionCode = validateIdentifier(value.action_code, "action_code");
+    if (CONTEXT_ACTIONS_ACTION_CODES.indexOf(actionCode) === -1) {
+      throw new Error("action_code is not a registered exploration action");
+    }
+    if ((kind === "freeform") !== (actionCode === OPTIONS_FREEFORM_ACTION_CODE)) {
+      throw new Error("freeform cards must carry exactly explore.talk_freeform");
+    }
+    var label = requireString(value.label, "label", MAX_OPTION_LABEL);
+    var labelPoints = codePoints(label);
+    if (labelPoints < 1 || labelPoints > MAX_OPTION_LABEL) {
+      throw new Error("suggestion label must be 1..24 code points");
+    }
+    if (!hasCjk(label)) {
+      throw new Error("suggestion label must contain a CJK code point");
+    }
+    var params = validateSuggestionParams(actionCode, kind, value.params);
+    var hint = null;
+    if (
+      Object.prototype.hasOwnProperty.call(value, "hint") &&
+      value.hint !== null
+    ) {
+      hint = requireString(value.hint, "hint", MAX_OPTION_HINT);
+    }
+    return {
+      kind: kind,
+      action_code: actionCode,
+      label: label,
+      params: params,
+      hint: hint,
+    };
+  }
+
+  // Validate one exact suggestions envelope: status decides the exact key set
+  // (status alone for generating/unavailable; status + cards for
+  // ready/degraded); ready sets number 3..5, degraded sets 0..5.
+  function validateSuggestions(value) {
+    if (!isPlainObject(value)) {
+      throw new Error("suggestions must be a JSON object");
+    }
+    var status = value.status;
+    if (OPTIONS_STATUSES.indexOf(status) === -1) {
+      throw new Error("suggestions status is not a stable value");
+    }
+    if (status === "generating" || status === "unavailable") {
+      var statusKeys = Object.keys(value);
+      if (statusKeys.length !== 1 || statusKeys[0] !== "status") {
+        throw new Error("generating/unavailable suggestions carry only status");
+      }
+      return { status: status };
+    }
+    var keys = Object.keys(value);
+    if (keys.length !== 2 || keys.indexOf("status") === -1 || keys.indexOf("cards") === -1) {
+      throw new Error("ready/degraded suggestions carry exactly status and cards");
+    }
+    if (!Array.isArray(value.cards)) {
+      throw new Error("suggestions cards must be an array");
+    }
+    var minimum = status === "ready" ? 3 : 0;
+    if (value.cards.length < minimum || value.cards.length > MAX_OPTION_CARDS) {
+      throw new Error(
+        "suggestions cards must number " + minimum + ".." + MAX_OPTION_CARDS
+      );
+    }
+    var cards = value.cards.map(validateSuggestionCard);
+    return { status: status, cards: cards };
   }
 
   function validateContextActionsPanel(payload) {
@@ -1042,10 +1186,10 @@
       payload,
       "context_actions panel",
       ["schema_version", "available", "kind"],
-      ["session", "participants", "root_actions", "secondary_actions", "skills", "affordances"]
+      ["session", "participants", "root_actions", "secondary_actions", "skills", "affordances", "suggestions"]
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 4) {
+    if (payload.schema_version !== 5) {
       throw new Error("unsupported context_actions panel schema_version");
     }
     if (payload.available !== true) {
@@ -1060,7 +1204,7 @@
     requireExactFields(
       payload,
       "context_actions panel",
-      ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "skills"],
+      ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "skills", "suggestions"],
       []
     );
 
@@ -1177,7 +1321,16 @@
       }
       skillKeys[skill.key] = true;
     });
-    return payload;
+    // Combat proposals are out of scope: the combat form always reports the
+    // suggestions envelope as exactly unavailable.
+    var combatSuggestions = validateSuggestions(payload.suggestions);
+    if (
+      combatSuggestions.status !== "unavailable" ||
+      Object.keys(combatSuggestions).length !== 1
+    ) {
+      throw new Error("combat suggestions must be exactly unavailable");
+    }
+    return Object.assign({}, payload, { suggestions: combatSuggestions });
   }
 
   // Exact available local_map panel v1 schema (design D10a).
@@ -3471,6 +3624,16 @@
     validateExplorationPanel: validateExplorationPanel,
     validateCharacterPanel: validateCharacterPanel,
     validateContextActionsPanel: validateContextActionsPanel,
+    validateSuggestions: validateSuggestions,
+    validateSuggestionCard: validateSuggestionCard,
+    OPTIONS_STATUSES: OPTIONS_STATUSES.slice(),
+    OPTIONS_CARD_KINDS: OPTIONS_CARD_KINDS.slice(),
+    MAX_OPTION_CARDS: MAX_OPTION_CARDS,
+    MAX_OPTION_LABEL: MAX_OPTION_LABEL,
+    MAX_OPTION_HINT: MAX_OPTION_HINT,
+    MAX_OPTION_PARAMS: MAX_OPTION_PARAMS,
+    OPTIONS_FREEFORM_ACTION_CODE: OPTIONS_FREEFORM_ACTION_CODE,
+    OPTIONS_MAX_PARAM_STRING: OPTIONS_MAX_PARAM_STRING,
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
     validateCreationPanel: validateCreationPanel,

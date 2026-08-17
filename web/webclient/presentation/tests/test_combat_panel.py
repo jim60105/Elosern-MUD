@@ -15,7 +15,20 @@ from web.webclient.presentation.combat_panel import (
     ContextActionsError,
     validate_context_actions,
 )
-from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.context import (
+    FrozenCard,
+    OptionsSnapshot,
+    PresentationContext,
+)
+from web.webclient.presentation.options import (
+    MAX_OPTION_CARDS,
+    MAX_OPTION_HINT,
+    MAX_OPTION_LABEL,
+    MAX_OPTION_PARAMS,
+    OPTIONS_CARD_KINDS,
+    OPTIONS_STATUSES,
+    validate_suggestions,
+)
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_LIST_ITEMS,
@@ -85,7 +98,7 @@ def _valid_participant(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 4,
+        "schema_version": 5,
         "available": True,
         "kind": "combat",
         "session": {
@@ -99,6 +112,7 @@ def _valid_panel(**overrides):
         "root_actions": ["attack", "skills", "items", "defend", "flee"],
         "secondary_actions": ["forfeit"],
         "skills": [_valid_category_group()],
+        "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
     return value
@@ -106,7 +120,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 4,
+        "schema_version": 5,
         "available": True,
         "kind": "combat",
         "session": {
@@ -120,6 +134,7 @@ def _recovery_panel(**overrides):
         "root_actions": [],
         "secondary_actions": ["forfeit"],
         "skills": [],
+        "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
     return value
@@ -631,7 +646,7 @@ def _player(key="panel player"):
 
 def _exploration_panel(**overrides):
     value = {
-        "schema_version": 4,
+        "schema_version": 5,
         "available": True,
         "kind": "exploration",
         "affordances": [
@@ -661,13 +676,37 @@ def _exploration_panel(**overrides):
                 "disabled_reason": None,
             },
         ],
+        "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
     return value
 
 
+def _suggestion_card(**overrides):
+    value = {
+        "kind": "known_action",
+        "action_code": "explore.look",
+        "label": "查看房間",
+        "params": {"room": True},
+    }
+    value.update(overrides)
+    return value
+
+
+def _ready_suggestions(count=3):
+    cards = [
+        _suggestion_card(),
+        _suggestion_card(action_code="explore.wait", label="等待片刻", params={"daypart": "noon"}),
+        _suggestion_card(label="查看木箱", params={"target_id": 9}),
+        _suggestion_card(label="前往東邊", params={"target_id": 9}),
+        _suggestion_card(label="查看南門", params={"target_id": 9}),
+        _suggestion_card(label="查看北門", params={"target_id": 9}),
+    ]
+    return {"status": "ready", "cards": cards[:count]}
+
+
 class ContextActionsExplorationFormTests(unittest.TestCase):
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
     def test_valid_exploration_form_passes(self):
         normalized = validate_context_actions(_exploration_panel())
         self.assertEqual(normalized["schema_version"], CONTEXT_ACTIONS_SCHEMA_VERSION)
@@ -696,7 +735,7 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_context_actions(_exploration_panel(kind="combat"))
         with self.assertRaises(ContextActionsError):
-            validate_context_actions(_exploration_panel(schema_version=3))
+            validate_context_actions(_exploration_panel(schema_version=4))
         with self.assertRaises(Exception):
             validate_context_actions(_exploration_panel(kind="bogus"))
 
@@ -784,9 +823,9 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_context_actions(_exploration_panel(affordances=[bad]))
 
-    def test_combat_form_is_byte_identical_to_version_3(self):
-        version3 = {
-            "schema_version": 3,
+    def test_combat_form_is_byte_identical_to_version_4_plus_suggestions(self):
+        version4 = {
+            "schema_version": 4,
             "available": True,
             "kind": "combat",
             "session": {
@@ -801,20 +840,35 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
             "secondary_actions": ["forfeit"],
             "skills": [_valid_category_group()],
         }
-        version4 = _valid_panel()
-        self.assertEqual(version3["schema_version"], 3)
+        version5 = _valid_panel()
         self.assertEqual(version4["schema_version"], 4)
+        self.assertEqual(version5["schema_version"], 5)
+        # Every combat field serializes exactly as at version 4; only the
+        # version field and the suggestions envelope are added.
         self.assertEqual(
-            {key: value for key, value in version4.items() if key != "schema_version"},
-            {key: value for key, value in version3.items() if key != "schema_version"},
+            {
+                key: value
+                for key, value in version5.items()
+                if key not in ("schema_version", "suggestions")
+            },
+            {
+                key: value
+                for key, value in version4.items()
+                if key != "schema_version"
+            },
         )
-        normalized = validate_context_actions(version4)
-        self.assertEqual(normalized["schema_version"], 4)
-        self.assertEqual(normalized["session"], version3["session"])
-        self.assertEqual(normalized["participants"], version3["participants"])
-        self.assertEqual(normalized["root_actions"], version3["root_actions"])
-        self.assertEqual(normalized["secondary_actions"], version3["secondary_actions"])
-        self.assertEqual(normalized["skills"], version3["skills"])
+        self.assertEqual(version5["suggestions"], {"status": "unavailable"})
+        normalized = validate_context_actions(version5)
+        self.assertEqual(normalized["schema_version"], 5)
+        self.assertEqual(normalized["session"], version4["session"])
+        self.assertEqual(normalized["participants"], version4["participants"])
+        self.assertEqual(normalized["root_actions"], version4["root_actions"])
+        self.assertEqual(normalized["secondary_actions"], version4["secondary_actions"])
+        self.assertEqual(normalized["skills"], version4["skills"])
+        self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
+        # A version-4 payload is rejected by the version-5 validator.
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(version4)
 
     def test_over_envelope_exploration_form_fails_closed(self):
         wide = "寬" * 128
@@ -838,13 +892,260 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
     def test_unavailable_form_differs_only_in_schema_version(self):
         from web.webclient.presentation.protocol import unavailable_payload
 
-        version3 = unavailable_payload(3, "presentation_unavailable", "目前無法顯示此介面")
         version4 = unavailable_payload(4, "presentation_unavailable", "目前無法顯示此介面")
+        version5 = unavailable_payload(5, "presentation_unavailable", "目前無法顯示此介面")
         self.assertEqual(
+            {key: value for key, value in version5.items() if key != "schema_version"},
             {key: value for key, value in version4.items() if key != "schema_version"},
-            {key: value for key, value in version3.items() if key != "schema_version"},
         )
-        self.assertEqual(version4["schema_version"], 4)
+        self.assertEqual(version5["schema_version"], 5)
+        # The common unavailable form carries exactly schema_version,
+        # available, and reason — never a suggestions field (design D-1
+        # amendment; the shared builder in presentation/registry.py is
+        # unchanged).
+        self.assertEqual(
+            set(version5),
+            {"schema_version", "available", "reason"},
+        )
+        self.assertNotIn("suggestions", version5)
+
+
+class SuggestionsEnvelopeTests(unittest.TestCase):
+    """Per-status suggestions schema tests (tasks 1.3-1.4)."""
+
+    @covers_requirement("webclient-context-actions-suggestions::the-context-actions-panel-carries-a-suggestions-envelope-at-version-5")
+    def test_generating_and_unavailable_carry_only_status(self):
+        for status in ("generating", "unavailable"):
+            with self.subTest(status=status):
+                normalized = validate_context_actions(
+                    _exploration_panel(suggestions={"status": status})
+                )
+                self.assertEqual(normalized["suggestions"], {"status": status})
+
+    def test_unknown_status_rejects(self):
+        for status in ("bogus", "", 1, None):
+            with self.subTest(status=status):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_context_actions(
+                        _exploration_panel(suggestions={"status": status, "cards": []})
+                    )
+
+    def test_generating_and_unavailable_reject_cards_and_extra_keys(self):
+        for status in ("generating", "unavailable"):
+            with self.subTest(status=status):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_context_actions(
+                        _exploration_panel(suggestions={"status": status, "cards": []})
+                    )
+                with self.assertRaises(ProtocolValidationError):
+                    validate_context_actions(
+                        _exploration_panel(suggestions={"status": status, "extra": 1})
+                    )
+
+    def test_ready_and_degraded_require_both_fields(self):
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(_exploration_panel(suggestions={"status": "ready"}))
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(
+                _exploration_panel(suggestions={"status": "degraded"})
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(
+                _exploration_panel(suggestions={"status": "ready", "cards": [], "extra": 1})
+            )
+
+    def test_ready_count_bound_rejects(self):
+        for count in (0, 1, 2, 6):
+            with self.subTest(count=count):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_context_actions(
+                        _exploration_panel(suggestions=_ready_suggestions(count))
+                    )
+
+    def test_degraded_count_bound_accepts_zero_and_rejects_over_cap(self):
+        normalized = validate_context_actions(
+            _exploration_panel(suggestions={"status": "degraded", "cards": []})
+        )
+        self.assertEqual(normalized["suggestions"], {"status": "degraded", "cards": []})
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(
+                _exploration_panel(
+                    suggestions={"status": "degraded", "cards": [_suggestion_card()] * 6}
+                )
+            )
+
+    def test_ready_suggestions_accept_and_normalize(self):
+        payload = _ready_suggestions()
+        normalized = validate_context_actions(_exploration_panel(suggestions=payload))
+        self.assertEqual(normalized["suggestions"]["status"], "ready")
+        self.assertEqual(len(normalized["suggestions"]["cards"]), 3)
+        self.assertEqual(normalized["suggestions"]["cards"][0]["params"], {"room": True})
+        self.assertEqual(
+            normalized["suggestions"]["cards"][1]["params"],
+            {"daypart": "noon"},
+        )
+
+    @covers_requirement("webclient-context-actions-suggestions::suggestion-cards-are-a-bounded-closed-exact-shape")
+    def test_card_exact_keys_reject(self):
+        valid = _suggestion_card()
+        cases = (
+            {**valid, "extra": 1},
+            {k: v for k, v in valid.items() if k != "params"},
+            {**valid, "kind": "bogus"},
+            {**valid, "action_code": "explore.take"},
+            {**valid, "action_code": "explore.talk_freeform"},
+            {**valid, "label": " "},
+            {**valid, "label": "abc"},
+            {**valid, "label": "很" * 25},
+            {**valid, "hint": "很" * 61},
+            {**valid, "params": {"room": True, "extra": 1}},
+            {**valid, "params": {"room": False}},
+            {**valid, "params": {"room": "yes"}},
+            {**valid, "params": {"target_id": 0}},
+            {**valid, "params": {}},
+            {**valid, "params": [1, 2]},
+        )
+        for card in cases:
+            with self.subTest(card=card):
+                with self.assertRaises(Exception):
+                    validate_context_actions(
+                        _exploration_panel(
+                            suggestions={"status": "ready", "cards": [card] * 3}
+                        )
+                    )
+
+    def test_freeform_card_pins_explore_talk_freeform_and_binding_params(self):
+        freeform = {
+            "kind": "freeform",
+            "action_code": "explore.talk_freeform",
+            "label": "隨意聊聊",
+            "params": {"npc_id": 9},
+        }
+        cards = [_suggestion_card(), freeform, _suggestion_card(label="查看木箱")]
+        normalized = validate_context_actions(
+            _exploration_panel(suggestions={"status": "ready", "cards": cards})
+        )
+        self.assertEqual(normalized["suggestions"]["cards"][1]["kind"], "freeform")
+        self.assertEqual(
+            normalized["suggestions"]["cards"][1]["action_code"],
+            "explore.talk_freeform",
+        )
+        self.assertEqual(normalized["suggestions"]["cards"][1]["params"], {"npc_id": 9})
+        bad_freeform_cards = (
+            {**freeform, "action_code": "explore.move"},
+            {**freeform, "params": {"npc_id": 9, "speech": "你好"}},
+            {**freeform, "params": {"npc_id": 0}},
+            {**freeform, "params": {}},
+        )
+        for bad in bad_freeform_cards:
+            with self.subTest(bad=bad):
+                with self.assertRaises(Exception):
+                    validate_context_actions(
+                        _exploration_panel(
+                            suggestions={
+                                "status": "ready",
+                                "cards": [_suggestion_card(), bad, _suggestion_card(label="查看木箱")],
+                            }
+                        )
+                    )
+
+    def test_room_survey_boolean_accepts_and_other_booleans_reject(self):
+        payload = validate_context_actions(
+            _exploration_panel(suggestions=_ready_suggestions())
+        )
+        self.assertEqual(payload["suggestions"]["cards"][0]["params"], {"room": True})
+        bad = {
+            "kind": "known_action",
+            "action_code": "explore.wait",
+            "label": "等待片刻",
+            "params": {"sleep": True},
+        }
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(
+                _exploration_panel(
+                    suggestions={
+                        "status": "ready",
+                        "cards": [_suggestion_card(), bad, _suggestion_card(label="查看木箱")],
+                    }
+                )
+            )
+
+    def test_hint_optional_and_bounded(self):
+        card = {**_suggestion_card(), "hint": "可以查看整個房間。"}
+        normalized = validate_context_actions(
+            _exploration_panel(
+                suggestions={
+                    "status": "ready",
+                    "cards": [card, _suggestion_card(label="查看木箱"), _suggestion_card(label="查看南門")],
+                }
+            )
+        )
+        self.assertEqual(normalized["suggestions"]["cards"][0]["hint"], "可以查看整個房間。")
+        self.assertIsNone(normalized["suggestions"]["cards"][1]["hint"])
+
+    def test_combat_form_pins_suggestions_unavailable(self):
+        normalized = validate_context_actions(_valid_panel())
+        self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
+        for suggestions in (
+            {"status": "ready", "cards": [_suggestion_card()] * 3},
+            {"status": "generating"},
+            {"status": "degraded", "cards": []},
+        ):
+            with self.subTest(suggestions=suggestions):
+                with self.assertRaises(ContextActionsError):
+                    validate_context_actions(_valid_panel(suggestions=suggestions))
+
+    def test_deepest_legitimate_envelope_leaf_stays_at_depth_eleven(self):
+        # Design D-5: with suggestions.cards[].params present (leaf depth 7),
+        # the deepest legitimate envelope leaf remains combat skills at depth
+        # 11 (the freeform_scales entry value), so MAX_DEPTH = 12 needs no
+        # change. Depth is measured from the ui_snapshot envelope root exactly
+        # like check_json_safety.
+        from web.webclient.presentation.protocol import MAX_DEPTH, check_json_safety
+
+        payload = _valid_panel(
+            skills=[
+                _valid_category_group(
+                    groups=[_valid_skill_group(
+                        skills=[
+                            _valid_skill(
+                                freeform_scales=[
+                                    {"scale": 0.25, "label": "1/4", "mp_cost": 5},
+                                    {"scale": 0.5, "label": "1/2", "mp_cost": 10},
+                                    {"scale": 1.0, "label": "1", "mp_cost": 20},
+                                    {"scale": 2.0, "label": "2", "mp_cost": 40},
+                                    {"scale": 4.0, "label": "4", "mp_cost": 80},
+                                ]
+                            )
+                        ]
+                    )]
+                )
+            ],
+            suggestions={
+                "status": "ready",
+                "cards": [
+                    {**_suggestion_card(), "hint": "查看房間"},
+                    _suggestion_card(label="查看木箱"),
+                    _suggestion_card(label="查看南門"),
+                ],
+            },
+        )
+        envelope = {"panels": {"context_actions": payload}}
+
+        def _leaf_depth(value, depth=0):
+            if isinstance(value, dict):
+                children = value.values()
+            elif isinstance(value, list):
+                children = value
+            else:
+                return depth
+            if not children:
+                return depth
+            return max(_leaf_depth(child, depth + 1) for child in children)
+
+        check_json_safety(envelope)
+        self.assertEqual(_leaf_depth(envelope), 11)
+        self.assertLessEqual(_leaf_depth(envelope), MAX_DEPTH)
 
 
 def _monster(key="panel goblin", hp=100):
@@ -974,7 +1275,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "exploration")
-        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(payload["schema_version"], 5)
         self.assertNotIn("session", payload)
         self.assertNotIn("participants", payload)
         self.assertNotIn("root_actions", payload)
@@ -982,6 +1283,37 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("skills", payload)
         self.assertNotIn("attack", repr(payload))
         self.assertGreaterEqual(len(payload["affordances"]), 1)
+        # Without trigger-service state the exploration suggestions are inert.
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+
+    def test_combat_presenter_pins_suggestions_unavailable_in_both_forms(self):
+        # A ready options snapshot must never leak into the combat form: the
+        # combat presenter does not read options_state at all.
+        engage(self.player, self.monster)
+        context = PresentationContext(
+            actor=self.player,
+            protocol_version=1,
+            options_state=OptionsSnapshot(
+                fingerprint="fp",
+                status="ready",
+                generation_token=1,
+                displayed=(
+                    FrozenCard(
+                        kind="known_action",
+                        action_code="explore.look",
+                        label="查看房間",
+                        params={"room": True},
+                    ),
+                ),
+            ),
+        )
+        payload = self.registry.render("context_actions", context)
+        self.assertEqual(payload["kind"], "combat")
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+        # The recovery form carries the same pin (schema-level; the presenter
+        # emits it verbatim in both branches).
+        normalized = validate_context_actions(_recovery_panel())
+        self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
 
     def test_presenter_is_read_only(self):
         engage(self.player, self.monster)
@@ -1257,8 +1589,8 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.player.attributes.get("map_knowledge"), before["map_knowledge"]
         )
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-4-panel")
-    def test_creation_pending_renders_the_version_four_unavailable_form(self):
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    def test_creation_pending_renders_the_version_five_unavailable_form(self):
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
@@ -1271,9 +1603,374 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
-        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(payload["schema_version"], 5)
         self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
         self.assertNotIn("affordances", payload)
+        self.assertNotIn("suggestions", payload)
+
+class SuggestionsRenderPathTests(BattlefieldIsolation, EvenniaTestCase):
+    """Exploration suggestions render paths (design D-3; task 5.2)."""
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="建議測試房")
+        self.player = _player()
+        self.player.location = self.room
+        self.registry = build_production_registry()
+
+    def _render(self, options_state=None):
+        return self.registry.render(
+            "context_actions",
+            PresentationContext(
+                actor=self.player,
+                protocol_version=1,
+                options_state=options_state,
+            ),
+        )
+
+    def test_absent_snapshot_is_inert(self):
+        payload = self._render(options_state=None)
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+
+    def test_unavailable_snapshot_is_inert(self):
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="fp",
+                status="unavailable",
+                generation_token=0,
+                displayed=None,
+            )
+        )
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+
+    def test_generating_carries_status_alone(self):
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="fp",
+                status="generating",
+                generation_token=3,
+                displayed=None,
+            )
+        )
+        self.assertEqual(payload["suggestions"], {"status": "generating"})
+
+    @covers_requirement("webclient-context-actions-suggestions::exploration-suggestions-render-from-an-immutable-session-snapshot")
+    def test_ready_renders_the_snapshot_displayed_cards(self):
+        cards = (
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.look",
+                label="查看房間",
+                params={"room": True},
+            ),
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.wait",
+                label="等待片刻",
+                params={"daypart": "noon"},
+            ),
+            FrozenCard(
+                kind="freeform",
+                action_code="explore.talk_freeform",
+                label="隨意聊聊",
+                params={"npc_id": 5},
+            ),
+        )
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="fp",
+                status="ready",
+                generation_token=3,
+                displayed=cards,
+            )
+        )
+        self.assertEqual(payload["suggestions"]["status"], "ready")
+        self.assertEqual(payload["suggestions"]["cards"][0]["params"], {"room": True})
+        self.assertEqual(
+            payload["suggestions"]["cards"][1]["params"],
+            {"daypart": "noon"},
+        )
+        self.assertEqual(
+            payload["suggestions"]["cards"][2]["action_code"],
+            "explore.talk_freeform",
+        )
+
+    def test_ready_render_is_stable_across_repeated_renders(self):
+        cards = (
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.look",
+                label="查看房間",
+                params={"room": True},
+            ),
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.wait",
+                label="等待片刻",
+                params={"daypart": "noon"},
+            ),
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.look",
+                label="查看木箱",
+                params={"target_id": 9},
+            ),
+        )
+        snapshot = OptionsSnapshot(
+            fingerprint="fp",
+            status="ready",
+            generation_token=3,
+            displayed=cards,
+        )
+        first = self._render(snapshot)
+        second = self._render(snapshot)
+        self.assertEqual(first["suggestions"], second["suggestions"])
+        # The snapshot writer may replace the session state object later; the
+        # presenter never consults default_cards for a ready render.
+        self.assertEqual(first["suggestions"]["cards"][0]["action_code"], "explore.look")
+
+    @covers_requirement("webclient-context-actions-suggestions::exploration-suggestions-render-from-an-immutable-session-snapshot")
+    def test_degraded_derives_rule_cards_from_default_cards(self):
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="fp",
+                status="degraded",
+                generation_token=2,
+                displayed=None,
+            )
+        )
+        self.assertEqual(payload["suggestions"]["status"], "degraded")
+        cards = payload["suggestions"]["cards"]
+        self.assertGreaterEqual(len(cards), 1)
+        self.assertLessEqual(len(cards), MAX_OPTION_CARDS)
+        for card in cards:
+            self.assertEqual(card["kind"], "known_action")
+            self.assertIn(card["action_code"], ("explore.look", "explore.wait", "explore.move"))
+        # The degraded derivation is a strict subset of the serialized form.
+        affordance_payloads = {
+            (entry["action_id"], str(entry["params"]), entry["label"])
+            for entry in payload["affordances"]
+            if entry.get("action_id") is not None
+        }
+        for card in cards:
+            self.assertIn(
+                (card["action_code"], str(card["params"]), card["label"]),
+                affordance_payloads,
+            )
+
+    def test_corrupted_ready_falls_back_to_unavailable_without_fabrication(self):
+        from unittest import mock
+
+        with mock.patch("web.webclient.presentation.combat_panel.log_unavailable") as logged:
+            payload = self._render(
+                OptionsSnapshot(
+                    fingerprint="fp",
+                    status="ready",
+                    generation_token=3,
+                    displayed=None,
+                )
+            )
+            self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+            logged.assert_called_once()
+        with mock.patch("web.webclient.presentation.combat_panel.log_unavailable") as logged:
+            payload = self._render(
+                OptionsSnapshot(
+                    fingerprint="fp",
+                    status="ready",
+                    generation_token=3,
+                    displayed=(
+                        FrozenCard(
+                            kind="known_action",
+                            action_code="explore.look",
+                            label="bad",  # no CJK: fails the v5 shape gate
+                            params={"room": True},
+                        ),
+                    ),
+                )
+            )
+            self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+            logged.assert_called_once()
+
+    def test_degraded_with_ascii_display_names_fails_closed_to_unavailable(self):
+        # The affordance vocabulary bounds display names at 128 code points
+        # without a CJK requirement, while suggestion labels are 1..24 CJK.
+        # An ASCII-named room must degrade the suggestions section alone —
+        # never the whole exploration panel (rubber-duck review finding).
+        from unittest import mock
+
+        self.room.key = "english room name"
+        with mock.patch("web.webclient.presentation.combat_panel.log_unavailable") as logged:
+            payload = self._render(
+                OptionsSnapshot(
+                    fingerprint="fp",
+                    status="degraded",
+                    generation_token=2,
+                    displayed=None,
+                )
+            )
+            self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+            logged.assert_called_once()
+        # The panel itself stays available and schema-valid.
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["kind"], "exploration")
+        validate_context_actions(payload)
+
+    def test_degraded_with_overlong_display_name_fails_closed_to_unavailable(self):
+        # A room display name beyond the 24-code-point suggestion label bound
+        # must also fail closed to a section-level unavailable (rubber-duck
+        # review finding); CJK content itself never guarantees the bound.
+        from unittest import mock
+
+        self.room.key = "這是一個非常非常非常非常非常非常非常非常長的房間名稱"
+        with mock.patch("web.webclient.presentation.combat_panel.log_unavailable") as logged:
+            payload = self._render(
+                OptionsSnapshot(
+                    fingerprint="fp",
+                    status="degraded",
+                    generation_token=2,
+                    displayed=None,
+                )
+            )
+            self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+            logged.assert_called_once()
+        self.assertTrue(payload["available"])
+        validate_context_actions(payload)
+
+
+class OptionsSnapshotFactoryTests(unittest.TestCase):
+    """Read-side options_snapshot factory (task 1.5; review hardening)."""
+
+    def test_absent_state_yields_none(self):
+        from web.webclient.presentation.ingress import options_snapshot
+
+        class _Session:
+            class _Ndb:
+                options_state = None
+
+            ndb = _Ndb()
+
+        self.assertIsNone(options_snapshot(_Session()))
+
+    def test_repuppeted_owner_is_refused(self):
+        from web.webclient.presentation.ingress import options_snapshot
+
+        class _Actor:
+            pk = 7
+
+        class _Session:
+            puppet = _Actor()
+
+            class _Ndb:
+                options_state = {
+                    "owner_actor_id": 99,
+                    "fingerprint": "fp",
+                    "status": "ready",
+                    "generation_token": 1,
+                    "displayed": [],
+                }
+
+            ndb = _Ndb()
+
+        self.assertIsNone(options_snapshot(_Session()))
+
+    def test_malformed_state_never_raises(self):
+        # A corrupt ephemeral write must degrade to an inert snapshot (or
+        # None), never raise into the ingress/dispatcher publication path
+        # (review finding).
+        from web.webclient.presentation.ingress import options_snapshot
+
+        class _Actor:
+            pk = 7
+
+        class _Session:
+            puppet = _Actor()
+
+            class _Ndb:
+                options_state = "not a dict"
+
+            ndb = _Ndb()
+
+        self.assertIsNone(options_snapshot(_Session()))
+
+        class _BadCards:
+            ndb = type(
+                "Ndb",
+                (),
+                {"options_state": {"displayed": [42], "status": "ready"}},
+            )()
+            puppet = _Actor()
+
+        snapshot = options_snapshot(_BadCards())
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.displayed, ())
+        # The non-dict card entry is dropped; the presenter renders the
+        # ready-without-valid-cards case as inert unavailable.
+        from web.webclient.presentation.context import PresentationContext
+        from web.webclient.presentation.registry import build_production_registry
+
+        from typeclasses.characters import PlayerCharacter
+        from evennia.utils.create import create_object
+        from evennia.utils.test_resources import EvenniaTestCase
+
+        room = create_object(Room, key="備援測試房")
+        player = create_object(PlayerCharacter, key="備援測試角色")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = room
+        payload = build_production_registry().render(
+            "context_actions",
+            PresentationContext(
+                actor=player,
+                protocol_version=1,
+                options_state=snapshot,
+            ),
+        )
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+
+    def test_valid_state_copies_cards_immutably(self):
+        from web.webclient.presentation.ingress import options_snapshot
+
+        class _Actor:
+            pk = 7
+
+        class _Session:
+            puppet = _Actor()
+
+            class _Ndb:
+                options_state = {
+                    "owner_actor_id": 7,
+                    "fingerprint": "fp-1234",
+                    "status": "ready",
+                    "generation_token": 3,
+                    "displayed": [
+                        {
+                            "kind": "known_action",
+                            "action_code": "explore.look",
+                            "label": "查看房間",
+                            "params": {"room": True},
+                        },
+                        {
+                            "kind": "freeform",
+                            "action_code": "explore.talk_freeform",
+                            "label": "隨意聊聊",
+                            "params": {"npc_id": 9},
+                            "hint": "可以聊聊",
+                        },
+                    ],
+                }
+
+            ndb = _Ndb()
+
+        snapshot = options_snapshot(_Session())
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.fingerprint, "fp-1234")
+        self.assertEqual(snapshot.status, "ready")
+        self.assertEqual(snapshot.generation_token, 3)
+        self.assertEqual(len(snapshot.displayed), 2)
+        card = snapshot.displayed[0]
+        self.assertEqual(card.as_dict()["params"], {"room": True})
+        # The deep copy is detached from the source state.
+        _Session._Ndb.options_state["displayed"][0]["params"]["room"] = False
+        self.assertEqual(card.as_dict()["params"], {"room": True})
 
 
 if __name__ == "__main__":
