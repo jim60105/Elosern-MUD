@@ -3,12 +3,13 @@
 ### Requirement: world/ai/action_options.py defines the frozen one-wire-shape card vocabulary
 `world/ai/action_options.py` SHALL define frozen dataclasses `OptionSet` and `SuggestionCard`.
 `SuggestionCard` SHALL carry exactly `kind` (`"known_action" | "freeform"`), `action_code` (a real
-dispatcher action id string), `label` (player-facing text), `params` (`Mapping[str, str | int]`),
-and optional `hint` — one wire shape, no hidden side structure. `OptionSet` SHALL carry
-`fingerprint` (opaque string), `context_kind` (`"exploration"` in v1), `status` (exactly
-`"ready"`), and a card tuple. Construction SHALL reject mutable containers anywhere
-(`_reject_mutable_containers`, mirroring `QuestBlueprint` in `world/ai/scenario_director.py`) so a
-proposal is safe to hand across the `world/ai` boundary.
+dispatcher action id string), `label` (player-facing text), `params` (`Mapping[str, str | int]`,
+additionally admitting the exact boolean room-survey marker `{"room": true}` of the canonical
+look payload, schema design doc §1.1), and optional `hint` — one wire shape, no hidden side
+structure. `OptionSet` SHALL carry `fingerprint` (opaque string), `context_kind`
+(`"exploration"` in v1), `status` (exactly `"ready"`), and a card tuple. Construction SHALL
+reject mutable containers anywhere (`_reject_mutable_containers`, mirroring `QuestBlueprint` in
+`world/ai/scenario_director.py`) so a proposal is safe to hand across the `world/ai` boundary.
 
 #### Scenario: A proposal rejects mutable containers at construction
 - **WHEN** an `OptionSet` is constructed with a list or dict nested inside its card params
@@ -20,10 +21,12 @@ proposal is safe to hand across the `world/ai` boundary.
 
 ### Requirement: The schema defines exact caps and a status-dependent card-count contract
 `world/ai/action_options.py` SHALL define `MIN_CARDS`/`MAX_CARDS` (3/5), `MAX_LABEL_LENGTH` (24),
-`MAX_HINT_LENGTH` (60), `MAX_PARAMS` (4 keys), and value shapes (ints within `MAX_SAFE_INTEGER`,
-strings ≤ 32 chars). The validation ladder SHALL accept 0–5 cards (stage 4); the 3–5 minimum is a
-*generation* rule owned by `action-options-layer`, not a ladder rejection (three-layer contract,
-schema design doc §1.2).
+`MAX_HINT_LENGTH` (60), `MAX_PARAMS` (4 keys), the trigger-service bounds
+`MAX_OPTIONSET_CACHE_ENTRIES` (16) and `NEGATIVE_MEMO_TTL` (30 seconds), and value shapes: ints
+within `MAX_SAFE_INTEGER`, strings ≤ 32 chars, or the exact boolean room-survey marker
+(`{"room": true}` of the canonical look payload, schema design doc §1.1). The validation ladder
+SHALL accept 0–5 cards (stage 4); the 3–5 minimum is a *generation* rule owned by
+`action-options-layer`, not a ladder rejection (three-layer contract, schema design doc §1.2).
 
 #### Scenario: Card count within the acceptance band passes
 - **WHEN** a proposal with 0 to 5 cards is validated
@@ -68,12 +71,17 @@ For `known_action` cards, the model's `params` SHALL be treated as curation hint
 for equality; stage 9 SHALL resolve `action_code` against the `affordances` argument and, on a
 unique match, **unconditionally replace the card's params with that affordance's canonical
 payload** so the validated card always satisfies `(action_code, params) == (affordance.action_id,
-affordance.params)`. An `action_code` outside the current affordances SHALL reject with
-`unknown_action_code` (unregistered) or `no_such_affordance` (registered but not current). For
-`freeform` cards, stage 9 SHALL require `action_code == "explore.talk_freeform"` and
-`params == {"npc_id": <int>}` equal to a freeform affordance's bound target. The freeform card's
-`{npc_id}` params are the single binding-only exception to the canonical-payload rule; the full
-`validate_talk_freeform_payload` (which requires `speech`) runs only on the client-composed
+affordance.params)`. When several current affordances share `action_code` (e.g. one move entry
+per exit), the model's typed params SHALL select the unique entry whose canonical params they
+match — a hint, never a rejection against a single canonical — and a card whose params identify
+no unique entry SHALL reject with `no_such_affordance` rather than guess. An `action_code`
+outside the current affordances SHALL reject with `unknown_action_code` (unregistered) or
+`no_such_affordance` (registered but not current). For `freeform` cards, stage 9 SHALL require
+`action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` equal to a freeform
+affordance's bound target; the matched freeform affordance SHALL itself carry exactly the binding
+shape, and the validated card's params SHALL remain exactly `{"npc_id": <int>}`. The freeform
+card's `{npc_id}` params are the single binding-only exception to the canonical-payload rule; the
+full `validate_talk_freeform_payload` (which requires `speech`) runs only on the client-composed
 dispatch payload (schema design doc §1).
 
 #### Scenario: A valid-now known card passes with canonical replacement
@@ -87,6 +95,17 @@ dispatch payload (schema design doc §1).
 - **THEN** stage 9 supplies the canonical payload and passes — equality is guaranteed on the
   result, not on the model's input
 
+#### Scenario: A multi-entry code is pinned by the model's params
+- **WHEN** several current affordances share `action_code` (e.g. two move exits) and the card's
+  params equal exactly one entry's canonical params
+- **THEN** stage 9 passes and the card's params become that entry's canonical payload
+
+#### Scenario: An ambiguous multi-entry code fails
+- **WHEN** several current affordances share `action_code` and the card's params identify no
+  unique entry (omitted or non-matching params)
+- **THEN** stage 9 rejects it with `no_such_affordance` — the ladder never guesses which
+  affordance the model meant
+
 #### Scenario: A globally-allowed but not-current affordance fails
 - **WHEN** a card names an action that exists in `ACTION_CODE_ALLOWLIST` but is not in the
   current `affordances` argument
@@ -95,6 +114,11 @@ dispatch payload (schema design doc §1).
 #### Scenario: A freeform card binding an unknown target fails
 - **WHEN** a `freeform` card carries an `npc_id` that no freeform affordance binds
 - **THEN** stage 9 rejects it with `unknown_target`
+
+#### Scenario: A freeform card's params stay exactly the binding shape
+- **WHEN** a `freeform` card is validated against a bound freeform affordance
+- **THEN** the validated card's params equal exactly `{"npc_id": <int>}` — never a copy of the
+  affordance's params, so extra fields cannot smuggle past the binding contract
 
 ### Requirement: Leak gates apply to model-visible text only and expose no hidden values
 The ladder SHALL apply the leak predicate to `label` and `hint` only — against the caller-supplied
