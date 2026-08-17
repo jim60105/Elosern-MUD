@@ -728,6 +728,8 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "partner_foot_service",
                 "partner_anal_sex",
                 "partner_mutual_masturbation",
+                "partner_vaginal_sex",
+                "partner_deep_vaginal_sex",
                 "partner_group_caress",
                 "partner_group_orgy",
                 "partner_group_service",

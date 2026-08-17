@@ -163,6 +163,20 @@ class SexualCounterEffect:
     act_key: str
 
 
+@dataclass(frozen=True)
+class PairEventEffect:
+    """Resolve one sex-conditional rule event from a cast's participant pair.
+
+    The parsed segment is the acting ``SexualActDef``'s own key; the
+    per-sex-pair event table is read from ``SEXUAL_ACT_REGISTRY[act_key]`` at
+    cast time so no value is duplicated between the registry and the effect
+    string. A cast whose participants match no declared pair resolves no
+    event and stages no effect (the ``other``/unknown D-12 branch).
+    """
+
+    act_key: str
+
+
 # 神之秘法 act effects (divine-sexual-arts-reuse): hand-built acts declare
 # these instead of the ordinary pleasure:/sexual_counter: triad. Each is a
 # general dispatch-table entry — no handler reads ``requires_divine_arts``
@@ -371,6 +385,8 @@ def parse_effect(effect_id: str) -> object:
         return PleasureEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_counter":
         return SexualCounterEffect(act_key=_parse_single_arg(effect_id, prefix))
+    if prefix == "act_pair_event":
+        return PairEventEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "divine_pleasure_max":
         _parse_single_arg(effect_id, prefix)
         return DivinePleasureMaxEffect()

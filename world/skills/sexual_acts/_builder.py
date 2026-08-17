@@ -6,7 +6,9 @@ consume it unchanged) plus a parallel frozen ``SexualActDef`` carrying the
 act-specific metadata a ``SkillDef`` has no field for: counter-based unlock
 requirements, participant body parts, base pleasure magnitude, the actor's
 share of that pleasure, the lifetime counters an execution touches, the
-``sexual.yaml`` events it emits, and whether the target may resist.
+``sexual.yaml`` events it emits, whether the target may resist, and the
+optional sex-conditional pair-event table that selects the emitted event
+from the cast's participants (the D-12 ``virgin``-breaking branch).
 
 ``line`` is deliberately not a field of ``SexualActDef``: ``SkillDef.group``
 carries it, mirroring how ``_elemental_spells()`` writes ``group=element``
@@ -19,6 +21,7 @@ from math import isfinite
 from types import MappingProxyType
 from typing import Mapping
 
+from world.lore.sex import SEX_VALUES
 from world.lore.sexual_vocab import BODY_PARTS, GENERIC_BODY_PART
 from world.skills.registry import (
     SkillCategory,
@@ -46,6 +49,16 @@ _FORBIDDEN_SEXUAL_EVENTS = frozenset(
     }
 )
 
+# Event names that keep the historic target-scoped recipient semantics when
+# ``_handle_sexual_event`` resolves them (design D-3): the set names exactly
+# the legacy ``divine_sexual_arts`` skill's declared event, so the divine-arts
+# exemption from self-pleasure (D-9) survives the participant-expanded
+# default. It is deliberately distinct from ``_FORBIDDEN_SEXUAL_EVENTS``,
+# which remains solely the act-catalog emission prohibition: a future
+# addition to the forbidden set can never silently change a legacy skill's
+# recipient semantics.
+_LEGACY_TARGET_SCOPED_EVENTS = frozenset({"stimulus_applied"})
+
 
 @dataclass(frozen=True)
 class SexualActDef:
@@ -67,6 +80,7 @@ class SexualActDef:
     participant_counters: tuple[str, ...]
     sexual_events: tuple[str, ...]
     resistible: bool
+    pair_events: tuple[tuple[tuple[str, str], str], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "unlock", MappingProxyType(dict(self.unlock)))
@@ -88,6 +102,22 @@ def _act_family(
         tuple[str, ...],
         tuple[str, ...],
         bool,
+    ]
+    | tuple[
+        str,
+        str,
+        str,
+        TargetSpec,
+        Mapping[str, int],
+        int,
+        str | None,
+        str | None,
+        float,
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+        bool,
+        tuple[tuple[tuple[str, str], str], ...],
     ],
     requires_divine_arts: bool = False,
 ) -> tuple[tuple[SkillDef, SexualActDef], ...]:
@@ -96,20 +126,29 @@ def _act_family(
     Each row is ``(key, label, description, target_spec, unlock,
     base_pleasure, actor_part, target_part, actor_pleasure_ratio,
     actor_counters, participant_counters, sexual_events, resistible)`` in
-    the exact order of the resolution design doc. The line is written once
+    the exact order of the resolution design doc, with an optional trailing
+    14th ``pair_events`` table (defaulting to ``()``) for acts whose emitted
+    event depends on the participants' sexes. The line is written once
     per family; every produced ``SkillDef`` is an ACTIVE, zero-cost,
     out-of-combat-castable skill categorised ``SEXUAL_ACT`` whose ``effects``
     list carries the ``pleasure:<key>``/``sexual_counter:<key>`` prefixes for
-    its own key plus one ``sexual_event:<name>`` string per declared event,
-    resolving through the handlers ``sexual-act-effects`` registers.
+    its own key, one ``sexual_event:<name>`` string per declared event, and a
+    trailing ``act_pair_event:<key>`` string exactly when the row declares a
+    non-empty ``pair_events`` table, resolving through the handlers
+    ``sexual-act-effects`` registers.
 
     Runs the per-row structural checks (design D-6 items 1-5 plus the
-    forbidden-events check) before returning, raising ``ValueError`` naming
-    the offending key so a catalog author's mistake fails at import time
-    rather than at play time.
+    forbidden-events check and the pair-events contract) before returning,
+    raising ``ValueError`` naming the offending key so a catalog author's
+    mistake fails at import time rather than at play time.
     """
     pairs: list[tuple[SkillDef, SexualActDef]] = []
     for row in rows:
+        if len(row) not in (13, 14):
+            raise ValueError(
+                f"act row {row[0]!r}: rows must carry exactly 13 or 14 "
+                f"fields, got {len(row)}"
+            )
         (
             key,
             label,
@@ -124,7 +163,8 @@ def _act_family(
             participant_counters,
             sexual_events,
             resistible,
-        ) = row
+        ) = row[:13]
+        pair_events = row[13] if len(row) == 14 else ()
         forbidden = _FORBIDDEN_SEXUAL_EVENTS & set(sexual_events)
         if forbidden:
             raise ValueError(
@@ -177,6 +217,55 @@ def _act_family(
             raise ValueError(f"act {key!r}: base_pleasure must be a positive integer")
         if not isinstance(resistible, bool):
             raise ValueError(f"act {key!r}: resistible must be a bare bool")
+        if not isinstance(pair_events, tuple):
+            raise ValueError(
+                f"act {key!r}: pair_events must be a tuple, got "
+                f"{type(pair_events).__name__}"
+            )
+        if pair_events:
+            if target_spec is not TargetSpec.SINGLE:
+                raise ValueError(
+                    f"act {key!r}: pair_events requires a SINGLE-target act"
+                )
+            seen_pairs: set[tuple[str, str]] = set()
+            for entry in pair_events:
+                if not isinstance(entry, tuple) or len(entry) != 2:
+                    raise ValueError(
+                        f"act {key!r}: pair_events entries must be "
+                        f"(sex_pair, event_name) tuples, got {entry!r}"
+                    )
+                sex_pair, event_name = entry
+                if (
+                    not isinstance(sex_pair, tuple)
+                    or len(sex_pair) != 2
+                    or any(
+                        not isinstance(sex, str) or sex not in SEX_VALUES
+                        for sex in sex_pair
+                    )
+                ):
+                    raise ValueError(
+                        f"act {key!r}: pair_events entry {sex_pair!r} must be "
+                        "a two-member SEX_VALUES pair"
+                    )
+                if tuple(sorted(sex_pair)) != sex_pair:
+                    raise ValueError(
+                        f"act {key!r}: pair_events entry {sex_pair!r} must be "
+                        "sorted ascending"
+                    )
+                if sex_pair in seen_pairs:
+                    raise ValueError(
+                        f"act {key!r}: pair_events repeats pair {sex_pair!r}"
+                    )
+                seen_pairs.add(sex_pair)
+                if not isinstance(event_name, str):
+                    raise ValueError(
+                        f"act {key!r}: pair_events event names must be strings"
+                    )
+                if event_name in _FORBIDDEN_SEXUAL_EVENTS:
+                    raise ValueError(
+                        f"act {key!r}: pair_events names forbidden event "
+                        f"{event_name!r}"
+                    )
 
         skill = SkillDef(
             key=key,
@@ -191,6 +280,7 @@ def _act_family(
                 f"pleasure:{key}",
                 f"sexual_counter:{key}",
                 *(f"sexual_event:{name}" for name in sexual_events),
+                *((f"act_pair_event:{key}",) if pair_events else ()),
             ],
             category=SkillCategory.SEXUAL_ACT,
             group=line,
@@ -207,6 +297,7 @@ def _act_family(
             participant_counters=participant_counters,
             sexual_events=sexual_events,
             resistible=resistible,
+            pair_events=pair_events,
         )
         pairs.append((skill, act))
     return tuple(pairs)

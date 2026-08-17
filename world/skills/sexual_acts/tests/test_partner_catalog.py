@@ -1,12 +1,13 @@
-"""Behaviour tests for the fourteen counter-gated 關係線 acts.
+"""Behaviour tests for the sixteen counter-gated 關係線 acts.
 
 The two seed acts ship unconditionally in ``partner.py`` (covered by
-``test_seed_acts.py``); this module covers the fourteen rows this change
+``test_seed_acts.py``); this module covers the sixteen rows this change
 adds: their counter-threshold unlock gates (including the Tier 3 compound
 gate and the Tier 4 group-credit split), the symmetric duo/group counter
 credits, the sole ``breast_sex_performed`` emitter, the D-4 baseline
-pleasure trade-off between the two Tier 3 acts, and the D-3 regression
-pinning 乳交's event recipient asymmetry.
+pleasure trade-off between the four Tier 3 acts, the D-12 ``virgin``-
+breaking branch of 交合/深度交合, and the participant-scoped event credit
+that closes the original recipient asymmetry (partner design.md D-3).
 """
 
 from tools.spec_traceability import covers_requirement
@@ -18,6 +19,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
 from world.lore.sexual_vocab import BODY_PARTS
 from world.quests.catalog import register_catalog
 from world.rules.action import ActionRequest, ActionResolver
@@ -39,7 +41,12 @@ _TIER_2 = (
     "partner_thigh_rub",
     "partner_foot_service",
 )
-_TIER_3 = ("partner_anal_sex", "partner_mutual_masturbation")
+_TIER_3 = (
+    "partner_anal_sex",
+    "partner_mutual_masturbation",
+    "partner_vaginal_sex",
+    "partner_deep_vaginal_sex",
+)
 _TIER_4 = ("partner_group_caress", "partner_group_orgy", "partner_group_service")
 _ALL_ACTS = (*_TIER_1, *_TIER_2, *_TIER_3, *_TIER_4)
 
@@ -56,6 +63,8 @@ _UNLOCK_TABLE = {
     "partner_foot_service": {"duo_act_count": 15},
     "partner_anal_sex": {"duo_act_count": 30, "climax_count": 10},
     "partner_mutual_masturbation": {"duo_act_count": 30, "climax_count": 10},
+    "partner_vaginal_sex": {"duo_act_count": 30, "climax_count": 10},
+    "partner_deep_vaginal_sex": {"duo_act_count": 30, "climax_count": 10},
     "partner_group_caress": {"duo_act_count": 30},
     "partner_group_orgy": {"group_act_count": 15},
     "partner_group_service": {"group_act_count": 30},
@@ -81,9 +90,9 @@ def _counter_up(entity, counter, times):
 
 
 class PartnerActRegistrationTests(unittest.TestCase):
-    """The fourteen rows carry exactly the D-1 unlock/event/part table."""
+    """The sixteen rows carry exactly the D-1 unlock/event/part table."""
 
-    @covers_requirement("sexual-catalog-partner::fourteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
+    @covers_requirement("sexual-catalog-partner::sixteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
     def test_each_act_declares_its_d1_unlock_mapping(self):
         for key, expected in _UNLOCK_TABLE.items():
             with self.subTest(key=key):
@@ -120,21 +129,21 @@ class PartnerActRegistrationTests(unittest.TestCase):
                 )
                 self.assertEqual(SEXUAL_ACT_REGISTRY[key].sexual_events, expected)
 
-    @covers_requirement("sexual-catalog-partner::all-fourteen-acts-declare-resistible-true")
+    @covers_requirement("sexual-catalog-partner::all-sixteen-acts-declare-resistible-true")
     def test_every_act_is_resistible(self):
         for key in _ALL_ACTS:
             with self.subTest(key=key):
                 self.assertTrue(SEXUAL_ACT_REGISTRY[key].resistible)
 
-    @covers_requirement("sexual-catalog-partner::none-of-this-change-s-fourteen-keys-collide-with-any-previously-registered-act-key")
+    @covers_requirement("sexual-catalog-partner::none-of-this-change-s-sixteen-keys-collide-with-any-previously-registered-act-key")
     def test_new_keys_are_disjoint_from_every_pre_existing_registry_key(self):
         new_keys = set(_ALL_ACTS)
-        self.assertEqual(len(new_keys), 14)
+        self.assertEqual(len(new_keys), 16)
         pre_existing = set(SEXUAL_ACT_REGISTRY) - new_keys
         self.assertTrue(pre_existing.isdisjoint(new_keys))
         self.assertEqual(
             len(pre_existing),
-            len(SEXUAL_ACT_REGISTRY) - 14,
+            len(SEXUAL_ACT_REGISTRY) - 16,
         )
 
     @covers_requirement("sexual-catalog-partner::the-three-tier-4-acts-declare-target-part-as-a-body-parts-member-never-none")
@@ -150,7 +159,7 @@ class PartnerActRegistrationTests(unittest.TestCase):
 class PartnerUnlockTests(EvenniaTestCase):
     """The counter-threshold gates read through SkillHandler.owned_keys()."""
 
-    @covers_requirement("sexual-catalog-partner::fourteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
+    @covers_requirement("sexual-catalog-partner::sixteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
     def test_tier1_act_locked_below_threshold_and_unlocked_at_it(self):
         entity = _entity()
         _counter_up(entity, "duo_act_count", 4)
@@ -158,16 +167,20 @@ class PartnerUnlockTests(EvenniaTestCase):
         entity.sexual.record_duo_act()
         self.assertIn("partner_kiss", entity.skills.owned_keys())
 
-    @covers_requirement("sexual-catalog-partner::fourteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
+    @covers_requirement("sexual-catalog-partner::sixteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
     def test_tier3_act_requires_both_duo_and_climax_not_duo_alone(self):
         entity = _entity()
         _counter_up(entity, "duo_act_count", 30)
         _counter_up(entity, "climax_count", 9)
         self.assertNotIn("partner_anal_sex", entity.skills.owned_keys())
+        self.assertNotIn("partner_vaginal_sex", entity.skills.owned_keys())
+        self.assertNotIn("partner_deep_vaginal_sex", entity.skills.owned_keys())
         entity.sexual.record_climax_count()
         self.assertIn("partner_anal_sex", entity.skills.owned_keys())
+        self.assertIn("partner_vaginal_sex", entity.skills.owned_keys())
+        self.assertIn("partner_deep_vaginal_sex", entity.skills.owned_keys())
 
-    @covers_requirement("sexual-catalog-partner::fourteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
+    @covers_requirement("sexual-catalog-partner::sixteen-tier-1-4-partner-acts-are-registered-gated-by-duo-act-count-and-or-group-act-count-and-or-climax-count-thresholds")
     def test_group_orgy_is_gated_by_group_act_count_alone(self):
         entity = _entity()
         _counter_up(entity, "group_act_count", 15)
@@ -176,7 +189,7 @@ class PartnerUnlockTests(EvenniaTestCase):
 
 
 class PartnerPleasureTradeOffTests(EvenniaTestCase):
-    """D-4's baseline trade-off between the two Tier 3 acts, pinned numerically."""
+    """D-4's baseline trade-offs among the four Tier 3 acts, pinned numerically."""
 
     def setUp(self):
         super().setUp()
@@ -189,7 +202,7 @@ class PartnerPleasureTradeOffTests(EvenniaTestCase):
             self.entity, part, base_pleasure, ratio, participant_count=2
         )
 
-    @covers_requirement("sexual-catalog-partner::partner-anal-sex-and-partner-mutual-masturbation-are-the-two-tier-3-acts-trading-off-at-baseline-sensitivity")
+    @covers_requirement("sexual-catalog-partner::the-four-tier-3-acts-trade-off-at-baseline-sensitivity")
     def test_anal_sex_grants_the_target_more_than_mutual_masturbation(self):
         # Target ratio is always 1.0: round(26 × 1.0 × 1.0 × 1.0 × 1.1) = 29
         # vs round(18 × 1.0 × 1.0 × 1.0 × 1.1) = 20 at baseline 普通/無.
@@ -201,7 +214,7 @@ class PartnerPleasureTradeOffTests(EvenniaTestCase):
         self.assertEqual(mutual_gain, 20)
         self.assertGreater(anal_gain, mutual_gain)
 
-    @covers_requirement("sexual-catalog-partner::partner-anal-sex-and-partner-mutual-masturbation-are-the-two-tier-3-acts-trading-off-at-baseline-sensitivity")
+    @covers_requirement("sexual-catalog-partner::the-four-tier-3-acts-trade-off-at-baseline-sensitivity")
     def test_mutual_masturbation_grants_the_actor_more_than_anal_sex(self):
         # Actor-side ratios come from the acts: round(18 × 1.0 × 1.1) = 20 vs
         # round(26 × 0.6 × 1.1) = 17 at baseline 普通/無.
@@ -216,6 +229,27 @@ class PartnerPleasureTradeOffTests(EvenniaTestCase):
         self.assertEqual(mutual_gain, 20)
         self.assertEqual(anal_gain, 17)
         self.assertGreater(mutual_gain, anal_gain)
+
+    @covers_requirement("sexual-catalog-partner::the-four-tier-3-acts-trade-off-at-baseline-sensitivity")
+    def test_deep_vaginal_sex_escalates_the_stakes_over_vaginal_sex(self):
+        # 交合: target round(28 × 1.0 × 1.1) = 31, actor round(28 × 0.6 × 1.1)
+        # = 18; 深度交合: target round(34 × 1.0 × 1.1) = 37, actor
+        # round(34 × 0.9 × 1.1) = 34. The target-side gap is +6 while the
+        # actor-side gap is +16 — the deeper act costs the actor
+        # disproportionately more (design.md D-6).
+        vaginal = SEXUAL_ACT_REGISTRY["partner_vaginal_sex"]
+        deep = SEXUAL_ACT_REGISTRY["partner_deep_vaginal_sex"]
+        target_gap = self._gain(
+            deep.base_pleasure, 1.0, deep.target_part
+        ) - self._gain(vaginal.base_pleasure, 1.0, vaginal.target_part)
+        actor_gap = self._gain(
+            deep.base_pleasure, deep.actor_pleasure_ratio, deep.actor_part
+        ) - self._gain(
+            vaginal.base_pleasure, vaginal.actor_pleasure_ratio, vaginal.actor_part
+        )
+        self.assertEqual(target_gap, 6)
+        self.assertEqual(actor_gap, 16)
+        self.assertGreater(actor_gap, target_gap)
 
 
 class PartnerCastTests(EvenniaTest):
@@ -292,15 +326,133 @@ class PartnerCastTests(EvenniaTest):
                 )
 
     @covers_requirement("sexual-catalog-partner::partner-breast-sex-is-the-sole-emitter-of-breast-sex-performed")
-    def test_breast_sex_credits_the_breast_sex_experience_type_to_the_target_only(self):
-        # design.md D-3 regression: _handle_sexual_event fires on the cast's
-        # targets only, so the breast_sex_performed → 乳交 experience credit
-        # lands on the chosen partner and never on the initiating actor. This
-        # pins the presently-shipped asymmetry so a future participant-expanded
-        # event handler is a deliberate, visible behavior change.
+    def test_breast_sex_credits_the_breast_sex_experience_type_to_every_participant(self):
+        # sexual-intercourse-acts D-3: _handle_sexual_event fires on
+        # participants(actor, targets), so the breast_sex_performed → 乳交
+        # experience credit lands on both the acting entity and the partner —
+        # closing the recipient asymmetry the original catalog design
+        # documented (partner design.md D-3).
         _counter_up(self.actor, "duo_act_count", 15)
         self.assertEqual(self.actor.sexual.experience_types, frozenset())
         result = self._cast(self.actor, "partner_breast_sex", [self.target])
         self.assertEqual(result.outcome, "success")
+        self.assertIn("乳交", self.actor.sexual.experience_types)
         self.assertIn("乳交", self.target.sexual.experience_types)
-        self.assertNotIn("乳交", self.actor.sexual.experience_types)
+
+
+class IntercourseActsTests(PartnerCastTests):
+    """The D-12 branch: 交合/深度交合 emit one sex-dependent event per cast."""
+
+    def setUp(self):
+        super().setUp()
+        # Both intercourse acts gate on the compound duo/climax threshold;
+        # the casters below are fresh entities, so unlock them first.
+        _counter_up(self.actor, "duo_act_count", 30)
+        _counter_up(self.actor, "climax_count", 10)
+
+    def _partner(self, key="intercourse partner"):
+        partner = _entity(key=key, location=self.room1)
+        return partner
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_opposite_sex_cast_breaks_virgin_on_both_parties(self):
+        self.actor.sex = "female"
+        partner = self._partner()
+        partner.sex = "male"
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(partner.sexual.virgin)
+        result = self._cast(self.actor, "partner_vaginal_sex", [partner])
+        self.assertEqual(result.outcome, "success")
+        self.assertFalse(self.actor.sexual.virgin)
+        self.assertFalse(partner.sexual.virgin)
+        self.assertIn("陰道性交", self.actor.sexual.experience_types)
+        self.assertIn("陰道性交", partner.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_deep_vaginal_sex_breaks_virgin_identically(self):
+        self.actor.sex = "female"
+        partner = self._partner()
+        partner.sex = "male"
+        result = self._cast(self.actor, "partner_deep_vaginal_sex", [partner])
+        self.assertEqual(result.outcome, "success")
+        self.assertFalse(self.actor.sexual.virgin)
+        self.assertFalse(partner.sexual.virgin)
+        self.assertIn("陰道性交", partner.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_both_female_cast_never_breaks_virgin_and_credits_the_lesbian_event(self):
+        self.actor.sex = "female"
+        partner = self._partner()
+        partner.sex = "female"
+        result = self._cast(self.actor, "partner_vaginal_sex", [partner])
+        self.assertEqual(result.outcome, "success")
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(partner.sexual.virgin)
+        self.assertIn("女女性愛", self.actor.sexual.experience_types)
+        self.assertIn("女女性愛", partner.sexual.experience_types)
+        self.assertNotIn("陰道性交", partner.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_both_male_cast_never_breaks_virgin_and_credits_the_gay_event(self):
+        self.actor.sex = "male"
+        partner = self._partner()
+        partner.sex = "male"
+        result = self._cast(self.actor, "partner_vaginal_sex", [partner])
+        self.assertEqual(result.outcome, "success")
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(partner.sexual.virgin)
+        self.assertIn("男男性愛", self.actor.sexual.experience_types)
+        self.assertIn("男男性愛", partner.sexual.experience_types)
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_other_or_unknown_party_emits_no_event_and_breaks_nothing(self):
+        self.actor.sex = "male"
+        partner = self._partner()
+        partner.sex = "other"
+        result = self._cast(self.actor, "partner_vaginal_sex", [partner])
+        self.assertEqual(result.outcome, "success")
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(partner.sexual.virgin)
+        self.assertEqual(self.actor.sexual.experience_types, frozenset())
+        self.assertEqual(partner.sexual.experience_types, frozenset())
+
+    @covers_requirement("sexual-catalog-partner::交合-and-深度交合-emit-exactly-one-sex-dependent-penetration-event-per-cast-breaking-virgin-symmetrically-and-only-for-opposite-sex-parties")
+    def test_cast_against_a_monster_never_breaks_virgin(self):
+        self.actor.sex = "female"
+        monster = create_object(Monster, key="intercourse monster", location=self.room1)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier()
+        monster.db.skills = {"active": [], "passive": []}
+        self.assertEqual(monster.sex, "other")
+        result = self._cast(self.actor, "partner_vaginal_sex", [monster])
+        self.assertEqual(result.outcome, "success")
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(monster.sexual.virgin)
+        self.assertEqual(self.actor.sexual.experience_types, frozenset())
+        self.assertEqual(monster.sexual.experience_types, frozenset())
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_resisted_cast_emits_no_penetration_event_and_keeps_actor_effects(self):
+        # A resisting partner is excluded by _step4b_sexual_resist_gate before
+        # the pair-event handler runs, leaving a single-participant surviving
+        # cast: pair_event_name resolves no event, so virgin stays intact on
+        # both sides while the actor's own counter credit still lands.
+        self.actor.sex = "female"
+        partner = self._partner()
+        partner.sex = "male"
+        with patch("world.rules.action.roll_d100", return_value=100):
+            result = ActionResolver.resolve(
+                ActionRequest(
+                    self.actor,
+                    "partner_vaginal_sex",
+                    [partner],
+                    RoomActionContext(self.actor.location, {}),
+                )
+            )
+        self.assertEqual(result.outcome, "success")
+        self.assertTrue(self.actor.sexual.virgin)
+        self.assertTrue(partner.sexual.virgin)
+        self.assertEqual(self.actor.sexual.experience_types, frozenset())
+        self.assertEqual(partner.sexual.experience_types, frozenset())
+        self.assertEqual(self.actor.sexual.duo_act_count, 31)
+        self.assertEqual(partner.sexual.duo_act_count, 0)

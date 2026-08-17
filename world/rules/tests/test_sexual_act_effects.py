@@ -31,8 +31,10 @@ from world.quests.catalog import register_catalog
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
+    RejectReason,
     _EFFECT_HANDLERS,
     _apply_pleasure_gain,
+    _handle_act_pair_event,
     _handle_sexual_event,
     _handle_pleasure_effect,
     _handle_sexual_counter_effect,
@@ -41,6 +43,7 @@ from world.rules.sexual_act_effects import (
     _COUNTER_MUTATORS,
     compute_pleasure_gain,
     load_effects_config,
+    pair_event_name,
     participants,
     resolve_part,
 )
@@ -48,7 +51,7 @@ from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, SexualState
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.sexual_acts._builder import _act_family
+from world.skills.sexual_acts._builder import SexualActDef, _act_family
 
 
 def _neutral_participant(part: str = "私處", sensitivity: str = "普通", shame: str = "無"):
@@ -449,6 +452,41 @@ class _ActCastTestCase(EvenniaTest):
         )
         return skill, act
 
+    def _build_pair_act(
+        self,
+        key: str = "test_pair_act",
+        *,
+        pair_events: tuple[tuple[tuple[str, str], str], ...] | None = None,
+    ):
+        (skill, act), = _act_family(
+            "關係",
+            (
+                key,
+                "測試交合行為",
+                "僅存在於測試中的合成交合行為。",
+                TargetSpec.SINGLE,
+                {},
+                20,
+                "私處",
+                "私處",
+                0.6,
+                ("duo_act_count",),
+                ("duo_act_count",),
+                (),
+                True,
+                (
+                    pair_events
+                    if pair_events is not None
+                    else (
+                        (("female", "male"), "first_vaginal_penetration"),
+                        (("female", "female"), "penetrative_sex_with_female"),
+                        (("male", "male"), "penetrative_sex_with_male"),
+                    )
+                ),
+            ),
+        )
+        return skill, act
+
 
 class PleasureHandlerIntegrationTests(_ActCastTestCase):
     """The pleasure:<act_key> handler through the full cast pipeline."""
@@ -608,10 +646,10 @@ class MissingActRejectionTests(_ActCastTestCase):
 
 
 class SexualEventReuseTests(_ActCastTestCase):
-    """sexual_event:<name> entries reuse the existing handler unchanged (D-8)."""
+    """sexual_event:<name> entries reuse the existing handler; recipients follow D-3."""
 
     @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
-    def test_declared_event_calls_apply_event_with_the_resolved_part(self):
+    def test_declared_event_calls_apply_event_for_every_participant(self):
         skill, act = self._build_duo_act(sexual_events=("frequent_stimulation",))
         with self._install(skill, act)[0], self._install(skill, act)[1]:
             result = self._cast(
@@ -621,10 +659,239 @@ class SexualEventReuseTests(_ActCastTestCase):
             )
             self.assertEqual(result.outcome, "success")
             self.assertEqual(self.target.sexual.sensitivity["私處"].level, "高")
+            self.assertEqual(self.actor.sexual.sensitivity["私處"].level, "高")
 
     @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
     def test_no_new_handler_is_registered_for_sexual_event(self):
         self.assertIs(_EFFECT_HANDLERS["sexual_event"], _handle_sexual_event)
+
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    def test_legacy_stimulus_event_stays_target_scoped(self):
+        # D-9: _LEGACY_TARGET_SCOPED_EVENTS keeps the divine skill's declared
+        # event on the cast's targets only — the acting entity is never a
+        # recipient, so the divine-arts exemption from self-pleasure holds.
+        pending = _handle_sexual_event(
+            self.actor,
+            [self.target],
+            "sexual_event:stimulus_applied",
+            {},
+            1.0,
+        )
+        self.assertEqual(len(pending), 1)
+        self.assertIs(pending[0].entity, self.target)
+
+    @covers_requirement("sexual-act-effects::sexual-event-name-entries-in-an-act-s-effects-reuse-the-existing-handler-and-dispatch-table-unchanged")
+    def test_self_act_event_reaches_the_actor_exactly_once(self):
+        (skill, act), = _act_family(
+            "獨處線",
+            (
+                "test_event_solo",
+                "測試事件自慰",
+                "僅存在於測試中的合成事件自慰行為。",
+                TargetSpec.SELF,
+                {},
+                10,
+                "私處",
+                None,
+                1.0,
+                ("masturbation_count",),
+                (),
+                ("masturbation_climax",),
+                True,
+            ),
+        )
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast(act.key, [])
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("自慰", self.actor.sexual.experience_types)
+
+
+_CANONICAL_PAIR_EVENTS = (
+    (("female", "male"), "first_vaginal_penetration"),
+    (("female", "female"), "penetrative_sex_with_female"),
+    (("male", "male"), "penetrative_sex_with_male"),
+)
+
+
+def _pair_act():
+    """One test-local SexualActDef carrying the canonical three-pair table."""
+    return SexualActDef(
+        key="pair_test",
+        unlock={},
+        base_pleasure=10,
+        actor_part="私處",
+        target_part="私處",
+        actor_pleasure_ratio=0.6,
+        actor_counters=(),
+        participant_counters=(),
+        sexual_events=(),
+        resistible=True,
+        pair_events=_CANONICAL_PAIR_EVENTS,
+    )
+
+
+class PairEventNameTests(unittest.TestCase):
+    """The pair_event_name selector implements the full D-12 table."""
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_opposite_sex_pair_resolves_first_vaginal_penetration(self):
+        act = _pair_act()
+        actor = SimpleNamespace(sex="female")
+        target = SimpleNamespace(sex="male")
+        self.assertEqual(
+            pair_event_name(actor, [target], act),
+            "first_vaginal_penetration",
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_both_female_pair_resolves_the_lesbian_event(self):
+        act = _pair_act()
+        actor = SimpleNamespace(sex="female")
+        target = SimpleNamespace(sex="female")
+        self.assertEqual(
+            pair_event_name(actor, [target], act),
+            "penetrative_sex_with_female",
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_both_male_pair_resolves_the_gay_event(self):
+        act = _pair_act()
+        actor = SimpleNamespace(sex="male")
+        target = SimpleNamespace(sex="male")
+        self.assertEqual(
+            pair_event_name(actor, [target], act),
+            "penetrative_sex_with_male",
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_other_or_unknown_party_resolves_no_event(self):
+        act = _pair_act()
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(sex="male"),
+                [SimpleNamespace(sex="other")],
+                act,
+            )
+        )
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(),
+                [SimpleNamespace()],
+                act,
+            )
+        )
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(sex="female"),
+                [SimpleNamespace(sex="unknown")],
+                act,
+            )
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_pair_not_in_the_table_resolves_no_event(self):
+        act = _pair_act()
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(sex="female"),
+                [SimpleNamespace(sex="other")],
+                act,
+            )
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_single_participant_surviving_cast_resolves_no_event(self):
+        act = _pair_act()
+        self.assertIsNone(
+            pair_event_name(SimpleNamespace(sex="female"), [], act)
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_none_sex_value_reads_as_the_unknown_default(self):
+        act = _pair_act()
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(sex=None),
+                [SimpleNamespace(sex="male")],
+                act,
+            )
+        )
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_corrupted_non_string_sex_value_reads_as_the_unknown_default(self):
+        # A corrupted non-SEX_VALUES attribute can never crash the pair sort:
+        # it normalizes to the unknown default, which matches no pair.
+        act = _pair_act()
+        self.assertIsNone(
+            pair_event_name(
+                SimpleNamespace(sex=123),
+                [SimpleNamespace(sex="male")],
+                act,
+            )
+        )
+
+
+class MonsterPairEventTests(EvenniaTestCase):
+    """A Monster target reads sex as the default, resolving no pair event."""
+
+    def setUp(self):
+        super().setUp()
+        self.monster = create_object(Monster, key="pair monster")
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_monster_target_resolves_no_event(self):
+        act = _pair_act()
+        actor = SimpleNamespace(sex="female")
+        self.assertIsNone(pair_event_name(actor, [self.monster], act))
+        self.assertEqual(self.monster.sex, "other")
+
+
+class ActPairEventHandlerTests(_ActCastTestCase):
+    """The act_pair_event:<key> handler through the full cast pipeline."""
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_opposite_sex_cast_applies_the_event_to_every_participant(self):
+        skill, act = self._build_pair_act()
+        self.actor.sex = "female"
+        self.target.sex = "male"
+        with self._install(skill, act)[0], self._install(skill, act)[1]:
+            result = self._cast(act.key, [self.target])
+        self.assertEqual(result.outcome, "success")
+        self.assertFalse(self.actor.sexual.virgin)
+        self.assertFalse(self.target.sexual.virgin)
+        self.assertIn("陰道性交", self.actor.sexual.experience_types)
+        self.assertIn("陰道性交", self.target.sexual.experience_types)
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_other_unknown_party_stages_no_effect(self):
+        skill, act = self._build_pair_act()
+        self.actor.sex = "male"
+        self.target.sex = "other"
+        with self._install(skill, act)[0]:
+            pending = _handle_act_pair_event(
+                self.actor,
+                [self.target],
+                f"act_pair_event:{act.key}",
+                {},
+                1.0,
+            )
+        self.assertEqual(pending, [])
+
+    @covers_requirement("sexual-act-effects::the-pair-event-handler-resolves-one-sex-conditional-event-per-cast-and-applies-it-to-every-participant")
+    def test_absent_act_rejects_with_effect_resolution_failed(self):
+        with self.assertRaises(Exception) as caught:
+            _handle_act_pair_event(
+                self.actor,
+                [self.target],
+                "act_pair_event:never_registered",
+                {},
+                1.0,
+            )
+        self.assertEqual(caught.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
+        self.assertIn(
+            "act_pair_event:never_registered",
+            str(caught.exception.detail),
+        )
 
 
 class SoloActCastTests(_ActCastTestCase):
