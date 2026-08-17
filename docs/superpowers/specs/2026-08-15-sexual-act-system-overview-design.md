@@ -84,7 +84,7 @@ one unsorted array. This is already marginal; adding 69 acts makes it unusable.
 | D-9 | **神之秘法 acts are exempt from D-4 and from every counter gate.** The exemption is keyed on the existing data field `requires_divine_arts`, never on a hardcoded key list. | 神之秘法 is defined in world lore as the highest technique for altering the world through divinity, and is deliberately positioned to break game balance. The exemption from self-inflicted pleasure is precisely what makes it break: every other act punishes overuse, these do not. Containment is the pre-existing, very narrow `RaceProfile.can_use_divine_arts` gate enforced by `_step1_divine_arts_gate`, not a resource cost — consistent with the skill-system redesign's D7, which shipped divine mysteries as free-cost and race-gated. |
 | D-10 | **`無垢回歸` restores `virgin` through a separately named mutator, `SexualState.restore_purity()`; `experience_types` is never cleared.** This is an explicit amendment to `2026-07-29-ai-mud-engine-design.md` §6.4's "one-way, irreversible" description. | The shipped `sexual-state-handler` requirement constrains *the public setter* ("no later mutation **through that public setter**"), so a separately named mutator does not weaken it — every ordinary rule path stays one-way. The same requirement's `experience_types` clause is absolute ("SHALL expose no replacement or removal method"), so clearing it would require rewriting a live requirement; leaving experience intact avoids that and reads better besides (the body is restored, the memory is not). |
 | D-11 | **The act catalog is a package with one module per line, and the empty line modules plus their `__init__.py` imports ship in the registry proposal before any catalog content.** | Six catalog proposals can then be implemented fully in parallel, each owning exactly one file. If the catalog were one module, or if `__init__.py` grew an import per line, every catalog proposal would conflict with every other. See §4. |
-| D-12 | **`virgin` breaks only on vaginal intercourse with an opposite-sex partner.** A same-sex act, an anal act, and any act against a `Monster` never break it. This requires a new `sex` field on entities, which does not exist anywhere in the codebase today. | The rulebook already draws this distinction and has since it shipped: `virginity_once` is conditioned on `first_vaginal_penetration`, while the same-sex path `penetrative_sex_with_female` adds the `女女性愛` experience type and deliberately never touches `virgin`. The branch therefore belongs in the act catalog, not in the rules — but nothing can currently *evaluate* it, because `CHARACTER_SCHEMA_V1` declares `age`, `apparent_age`, `race`, and `subrace` and no notion of sex. An entity whose sex is unknown or `other` never breaks virginity, which makes the monster case fall out for free instead of needing a special case. |
+| D-12 | **`virgin` breaks only on vaginal intercourse with an opposite-sex partner.** A same-sex act, an anal act, and any act against a `Monster` never break it. This requires a new `sex` field on entities, which does not exist anywhere in the codebase today. | The rulebook already draws this distinction and has since it shipped: `virginity_once` is conditioned on `first_vaginal_penetration`, while the same-sex path `penetrative_sex_with_female` adds the `女女性愛` experience type and deliberately never touches `virgin`. The branch therefore belongs in the act catalog, not in the rules — but nothing can currently *evaluate* it, because `CHARACTER_SCHEMA_V1` declares `age`, `apparent_age`, `race`, and `subrace` and no notion of sex. An entity whose sex is unknown or `other` never breaks virginity, which makes the monster case fall out for free instead of needing a special case. **The branch itself ships in the follow-up `sexual-intercourse-acts` (§4.2), which supplies the sex-conditional event mechanism C4 could not build.** |
 
 ---
 
@@ -123,10 +123,13 @@ already atomic.
 
 ## 4. Implementation Sequence
 
-Twenty-two proposals, plus two follow-ups — `sexual-resist-out-of-combat` (discovered and deferred
-during `B6b`'s own design) and `sexual-resist-cast-wiring` (discovered post-implementation, when `B5`'s
+Twenty-two proposals, plus five follow-ups — `sexual-resist-out-of-combat` (discovered and deferred
+during `B6b`'s own design), `sexual-resist-cast-wiring` (discovered post-implementation, when `B5`'s
 own row's stated obligation below turned out not to have been fulfilled — see the note under §4.2's
-table) — each sized for one working day. The organising principle is **disjoint file
+table), and the three post-implementation review proposals `sexual-intercourse-acts`,
+`sexual-public-act-events`, and `combat-panel-skill-capacity` (discovered when the shipped system was
+reviewed for wiring gaps — see the second note under §4.2's table) — each sized for one working day.
+The organising principle is **disjoint file
 ownership**: no two proposals in the same batch touch the same file. That is the only real lever on
 rebase cost.
 
@@ -166,12 +169,31 @@ B7 ──┘ (independent)                                 C7b ── (last)
 | B8 | `sexual-act-seeds` | Seven seeds plus one representative upper-tier act per line (~14) | B5, B6b | the six line modules |
 | C2 | `sexual-catalog-solo` | 獨處線, 17 acts | B8 | `sexual_acts/solo.py` |
 | C3 | `sexual-catalog-shame` | 羞恥線, 10 acts | B8 | `sexual_acts/shame.py` |
-| C4 | `sexual-catalog-partner` | 關係線, 18 acts; the D-12 opposite-sex branch on 交合 / 深度交合 | B8, **S1** | `sexual_acts/partner.py` |
+| C4 | `sexual-catalog-partner` | 關係線, 18 acts; the D-12 opposite-sex branch on 交合 / 深度交合. **交合 / 深度交合 were deferred out of C4 (its design D-2) and ship in the follow-up `sexual-intercourse-acts` below.** | B8, **S1** | `sexual_acts/partner.py` |
 | C5 | `sexual-catalog-combat` | 戰鬥線, 10 acts | B8 | `sexual_acts/combat.py` |
 | C6 | `sexual-catalog-interspecies` | 異種線, 7 acts, `異種次數` wiring | B8 | `sexual_acts/interspecies.py` |
 | C7a | `divine-sexual-arts-reuse` | 絕頂律令 / 時姦 / 神域搾取 — the three 神之秘法 needing no new `SexualState` surface | B8 | `sexual_acts/divine.py` |
 | C7b | `divine-sexual-arts-mutators` | 感度創世 / 恥辱剝奪 / 絕對從屬 / 無垢回歸 — needs `saturate_sensitivity()`, `clamp_shame_to()`, `mark_submission()`, `restore_purity()` | C7a | `sexual_state.py`, `sexual.yaml` |
 | — | `sexual-act-docs` | `docs/game/commands.md`, `docs/game/command-reference.md` | B8 | `docs/game/` |
+| — | `sexual-intercourse-acts` | 交合 / 深度交合 — the D-12 branch C4 deferred. Adds `SexualActDef.pair_events` (sorted two-sex pairs → event, validated in `_act_family()`), the `act_pair_event:<key>` effect prefix, and makes acts' `sexual_event:` entries fire on **every participant** — with a dedicated `_LEGACY_TARGET_SCOPED_EVENTS` keeping `divine_sexual_arts`'s `stimulus_applied` target-scoped (D-9). Opposite-sex casts emit `first_vaginal_penetration` and break `virgin` on both parties; both-female/both-male emit the matching experience event without breaking it; either party `other`/unknown (incl. every `Monster`) emits nothing. S1's `sex` field gets its first consumer; the participant-scoped semantics also closes C4's design D-3 recipient asymmetry for 乳交 / 異種交合. | B5, B8, **S1** | `_builder.py`, `sexual_act_effects.py`, `action.py`, `effects.py`, `partner.py` |
+| — | `sexual-public-act-events` | `watched_during_activity`, `public_exposure`, and `public_sexual_activity` still had no production emitter. Adds the actor-scoped `sexual_event_actor:` channel, the deterministic `observers_present()` presence read (`RoomActionContext` now injects `event_context["room"]`), observer-gating for `watched_during_activity`/`watched_count`, and the shame catalog's public-event declarations — completing the room-occupancy read C3's design D-4 deferred and the actor-side event channel C3's design D-6 deferred. | `sexual-intercourse-acts` | `targeting.py`, `_builder.py`, `shame.py`, `sexual_act_effects.py`, `action.py`, `effects.py` |
+| — | `combat-panel-skill-capacity` | The combat panel's `MAX_SKILLS = 32` presentation bound vs. the catalog's 63 new active skills (154 obtainable active skills total, against 32): raise the bound to 192 across the four mirrors (`combat_view.py`, `combat_panel.py`, `protocol.js`, and the boundary tests), keep the flattened-total semantics, and gate the raise on a measured byte-fit test against the OOB envelope (`MAX_CANONICAL_JSON_BYTES` / `MAX_LIST_ITEMS`). | A2 | `combat_view.py`, `combat_panel.py`, `protocol.js`, panel/protocol tests |
+
+**The three post-implementation review proposals.** A code review of the shipped system found three
+wiring gaps the original sequence left open. (1) C4's own deferral of 交合/深度交合 (design D-2) meant
+`first_vaginal_penetration`, `penetrative_sex_with_male`, and `penetrative_sex_with_female` still had
+no production emitter: `virginity_once` could never fire, `virgin` could never break through play,
+and S1's `sex` field had zero consumers — `sexual-intercourse-acts` closes that loop, and its
+participant-scoped event semantics also fixes the recipient asymmetry C4's design D-3 documented for
+乳交 and 異種交合. (2) `watched_during_activity`, `public_exposure`, and `public_sexual_activity`
+still had no emitter, and C3's own D-4/D-6 notes explicitly deferred the room-occupancy read and the
+actor-side event channel — `sexual-public-act-events` is that follow-up, and it closes the "被觀看/露出
+experience types can never be granted" gap in the same move. (3) the catalog's 63
+active skills push realistic characters past the combat panel's `MAX_SKILLS = 32` presentation bound,
+taking the whole combat action panel down with a `CombatViewError` — `combat-panel-skill-capacity`
+reconciles the bound with the enlarged skill universe. The first two re-enter `action.py`'s event
+handling and the `_act_family()` effects shape; they SHALL be implemented and archived in that order
+(see §4.4).
 
 **`B5`'s stated emission obligation was not fulfilled.** `B5`'s row above quotes this document's own
 original instruction: `B5` was to emit the `EventEntry(kind="sexual_resist", ...)` contract `B6b`'s scan
@@ -199,14 +221,18 @@ did not deliver.
 | 7 | `C7b` | Runs alone; it re-enters `sexual_state.py`. |
 | 8 (unscheduled) | `sexual-resist-out-of-combat` | Not part of the original sequence; ready to schedule once `B6b` lands and its `_scan_sexual_coercion` pattern exists to mirror at the out-of-combat cast path. |
 | 9 (unscheduled) | `sexual-resist-cast-wiring` | Not part of the original sequence; picks up the emission obligation `B5`'s row assigned but did not fulfil (see the note under §4.2's table). Ready to schedule once `B5`, `B6a`, and `B6b` have all landed — all three already have. |
+| 10 (unscheduled) | `sexual-intercourse-acts` | Post-implementation review proposal; owns the D-12 branch and the participant-scoped event semantics (see the second note under §4.2's table). |
+| 11 (unscheduled) | `sexual-public-act-events` | Must follow batch 10: both re-enter `action.py`'s event handlers and the `_act_family()` effects shape, and its delta specs are written against the post-10 main specs (see §4.4). |
+| 12 (unscheduled) | `combat-panel-skill-capacity` | Independent of batches 10–11; touches only the combat panel/protocol files and their tests. |
 
 Seven batches for the original twenty-two proposals. With the parallel tracks actually staffed, the
 critical path is **seven working days**; implemented serially it is twenty-one. The deferred
-follow-up adds at most one more day once scheduled.
+follow-ups (batches 8–12) each add at most one more day once scheduled; batches 10 and 11 are
+strictly ordered (§4.4).
 
 ### 4.4 Serialization constraints
 
-Two things cannot be parallelised and must be scheduled explicitly.
+Three things cannot be parallelised and must be scheduled explicitly.
 
 - **Delta-spec sync at archive time.** Each proposal's `openspec/changes/<name>/` directory is
   conflict-free by construction, but archiving syncs deltas into the shared `openspec/specs/` tree.
@@ -215,6 +241,12 @@ Two things cannot be parallelised and must be scheduled explicitly.
   reordered or merged into one day. They already fall in batches 1, 2, 3, and 7 respectively, so the
   spine is naturally staggered — but this is the constraint that fixes the overall batch count at
   seven, and any re-planning must preserve it.
+- **The `action.py` event-handler seam (`sexual-intercourse-acts` → `sexual-public-act-events`).**
+  Both follow-ups edit the `sexual_event:` recipient semantics and the `_act_family()` effects shape
+  (plus their shared `sexual-act-registry` / `sexual-act-effects` delta requirement blocks). They
+  cannot be parallelised: `sexual-public-act-events` SHALL be implemented and archived after
+  `sexual-intercourse-acts`, and its delta requirement blocks are written against the
+  post-`sexual-intercourse-acts` main specs.
 
 ### 4.5 Why `B4` ships empty stubs
 
