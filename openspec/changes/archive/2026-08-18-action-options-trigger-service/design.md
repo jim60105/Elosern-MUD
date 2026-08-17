@@ -150,7 +150,9 @@ survive the next snapshot and dismiss state survive re-renders.
 `OptionsSnapshot`-carrying context (via the D5 factory), compares `expected_epoch` with the live
 coordinator's epoch, and silently does nothing on mismatch. It reuses
 `_build_presentation`/`_send` so revision monotonicity and envelope shape are exactly the
-dispatcher's. **State before push:** the session's `options_state` write is deliberate and
+dispatcher's. An absent coordinator is left alone: the helper never attaches one as a side
+effect (the ingress attaches on the session's next sync); with no coordinator, or on mismatch,
+nothing is published. **State before push:** the session's `options_state` write is deliberate and
 survives a failed push (lost world clock, reset coordinator); the guarded push is best-effort,
 and the session's next snapshot re-establishes the rendering from the state.
 
@@ -234,6 +236,19 @@ decision recorded for `action-options-trigger-hooks`, not left open.
   connect/read timeouts, and a terminal errback (whatever its cause) settles the watchers as a
   no-memo degrade and retires the pending entry, so a hung transport degrades instead of
   parking sessions in `generating` beyond the transport budget.
+- [Stale cards delivered when the situation changes mid-flight] → Delivery is guarded by the
+  session token and the captured epoch; once the room-entry hook lands, any move retriggers
+  synchronously (the single-threaded reactor runs the entry trigger to completion before any
+  in-flight completion runs), bumping the token so the old completion is muted by the token
+  guard. A residual same-room change (e.g. monster death) delivers at most one transiently
+  stale set that the next trigger replaces — bounded and self-healing, and a delivery always
+  settles the session's state, so no session is ever parked in `generating`.
+- [Persistently malformed model output carries no negative memo] → By the observation-position
+  contract, a guardrail-internal schema failure (the client succeeded) is not observable at the
+  client boundary, so it is never memoized; a misconfigured model therefore costs one generation
+  per trigger. The guardrail's own retry budget bounds the per-generation cost, and the deferred
+  typed-outcome amendment (Open Questions) can add a separate malformed backoff without changing
+  the transport memo semantics.
 - [A second window generating on the same fingerprint while the first window dismisses] → The
   per-session token isolates the dismissed window; the other window's subscriber entry, token,
   and pending generation survive (covered by multi-session tests).

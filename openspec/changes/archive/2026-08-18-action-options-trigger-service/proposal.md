@@ -93,7 +93,8 @@ session-scoped delivery of proposals through the existing `ui_update` contract.
   the unified three-parameter adapter ABI (`dismiss-options-action`); the three hook call sites
   (`action-options-trigger-hooks`); the dock/choice-point surfaces
   (`webclient-options-surface`, `webclient-options-choicepoints`).
-- **Test surface:** `server/tests/test_option_proposal_service.py`,
+- **Test surface:** `server/conf/tests/test_option_proposal_service.py` (the established home
+  for `server/`-side tests — `server/` has no top-level tests package),
   `web/webclient/presentation/tests/test_watchers.py`, coordinator push tests; FakeLLM fixtures
   via the layer; no player command, panel schema, or protocol change in this change.
 - No backward-compatibility or migration concerns: the project has no released users.
