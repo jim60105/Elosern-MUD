@@ -6,11 +6,17 @@ thin and delegate authentication, synchronization, protocol-error emission, and
 post-command refresh here.
 """
 
+from copy import deepcopy
+from types import MappingProxyType
 from typing import Any
 
 from twisted.internet.defer import Deferred
 
-from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.context import (
+    FrozenCard,
+    OptionsSnapshot,
+    PresentationContext,
+)
 from web.webclient.presentation.coordinator import (
     ClockUnavailable,
     PresentationCoordinator,
@@ -113,6 +119,63 @@ def reset_client_sequence(session: Any) -> None:
         session.ndb.elosern_actor_id = None
 
 
+def options_snapshot(session: Any) -> OptionsSnapshot | None:
+    """Return an immutable snapshot of ``session.ndb.options_state``, or ``None``.
+
+    The write side (the trigger service) populates ``session.ndb.options_state``
+    as a dict carrying ``owner_actor_id``, ``fingerprint``, ``status``,
+    ``generation_token``, and ``displayed``; this read-side factory deep-copies
+    the displayed cards into frozen :class:`FrozenCard` representations so a
+    presenter's render is stable even if the async writer later replaces the
+    session state object. An absent state (the common case until the trigger
+    service lands) yields ``None``, as does any malformed state — this factory
+    must never raise on the ingress/dispatcher publication path, so a corrupt
+    ephemeral write degrades to an inert snapshot rather than an internal
+    presentation error.
+    """
+    ndb = getattr(session, "ndb", None)
+    state = getattr(ndb, "options_state", None) if ndb is not None else None
+    if state is None:
+        return None
+    try:
+        return _build_options_snapshot(session, state)
+    except Exception:
+        log_unavailable("options snapshot", "malformed options_state degraded to None")
+        return None
+
+
+def _build_options_snapshot(session: Any, state: Any) -> OptionsSnapshot | None:
+    if not isinstance(state, dict):
+        return None
+    owner = state.get("owner_actor_id")
+    if owner is not None:
+        actor = getattr(session, "puppet", None)
+        if str(getattr(actor, "pk", "")) != str(owner):
+            # A repuppeted session never renders the previous character's
+            # fingerprint, cards, or degraded state (belt and braces).
+            return None
+    displayed = state.get("displayed")
+    cards: tuple[FrozenCard, ...] | None = None
+    if isinstance(displayed, (list, tuple)):
+        cards = tuple(
+            FrozenCard(
+                kind=str(card.get("kind", "")),
+                action_code=str(card.get("action_code", "")),
+                label=str(card.get("label", "")),
+                params=MappingProxyType(deepcopy(card.get("params") or {})),
+                hint=card.get("hint"),
+            )
+            for card in displayed
+            if isinstance(card, dict)
+        )
+    return OptionsSnapshot(
+        fingerprint=state.get("fingerprint"),
+        status=str(state.get("status", "")),
+        generation_token=int(state.get("generation_token", 0)),
+        displayed=cards,
+    )
+
+
 def synchronize_session(session: Any, actor: Any) -> bool:
     """Emit a full snapshot for a puppeted session; return success.
 
@@ -122,7 +185,11 @@ def synchronize_session(session: Any, actor: Any) -> bool:
     unaffected.
     """
     coordinator = _coordinator_for(session, actor)
-    context = PresentationContext(actor=actor, protocol_version=PROTOCOL_VERSION)
+    context = PresentationContext(
+        actor=actor,
+        protocol_version=PROTOCOL_VERSION,
+        options_state=options_snapshot(session),
+    )
     try:
         coordinator.synchronize(context)
     except ClockUnavailable:

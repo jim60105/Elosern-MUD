@@ -5,11 +5,11 @@ Exact combat context actions panel, keyboard menu, allowlisted combat adapters, 
 ## Requirements
 
 ### Requirement: Combat context actions are an exact read-only panel
-The production presentation registry SHALL register `context_actions` schema version 4. For a valid active combat session, its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`, `secondary_actions`, and `skills`; `available` SHALL be true and `kind` SHALL be `combat`. `session` SHALL contain exactly `session_id`, `mode`, `round`, `state`, and `reason`: session ID SHALL be bounded, mode SHALL be `hostile` or `guild_exam`, round SHALL be a non-negative safe integer, state SHALL be `ready` or `recovery`, and reason SHALL be null or an exact object containing stable code and safe Traditional Chinese message. A ready session SHALL have a null reason; a recovery session SHALL have a non-null reason, no cast/flee action, and one confirmed Forfeit descriptor when its record is strictly parsed. The presenter SHALL strictly read and reconstruct the authenticated puppet's current `CombatSessionRecord`, SHALL preserve persisted participant order, SHALL emit no live object or filesystem reference, and SHALL NOT mutate traits, resources, buffs, sexual state, battlefield state, session state, quests, location, or world time. **Outside a valid active combat session the combat form SHALL never be emitted** — the panel instead emits the exploration available form owned by the `webclient-context-actions` capability (in exploration mode) or the registered common unavailable form (creation-pending or absent location); it SHALL never fabricate combat-shaped fields, and it SHALL never fabricate exploration actions in a combat session.
+The production presentation registry SHALL register `context_actions` schema version 5. For a valid active combat session, its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`, `secondary_actions`, `skills`, and `suggestions`; `available` SHALL be true, `kind` SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`. `session` SHALL contain exactly `session_id`, `mode`, `round`, `state`, and `reason`: session ID SHALL be bounded, mode SHALL be `hostile` or `guild_exam`, round SHALL be a non-negative safe integer, state SHALL be `ready` or `recovery`, and reason SHALL be null or an exact object containing stable code and safe Traditional Chinese message. A ready session SHALL have a null reason; a recovery session SHALL have a non-null reason, no cast/flee action, and one confirmed Forfeit descriptor when its record is strictly parsed. The presenter SHALL strictly read and reconstruct the authenticated puppet's current `CombatSessionRecord`, SHALL preserve persisted participant order, SHALL emit no live object or filesystem reference, and SHALL NOT mutate traits, resources, buffs, sexual state, battlefield state, session state, quests, location, or world time. **Outside a valid active combat session the combat form SHALL never be emitted** — the panel instead emits the exploration available form owned by the `webclient-context-actions` capability (in exploration mode) or the registered common unavailable form (creation-pending or absent location); it SHALL never fabricate combat-shaped fields, and it SHALL never fabricate exploration actions in a combat session.
 
 #### Scenario: Active session produces canonical combat presentation
 - **WHEN** a puppeted WebClient in a valid persistent combat session receives a full snapshot
-- **THEN** `context_actions` reports that session's ID, mode, round, ordered participants, and current actions while a before/after comparison of canonical game state is unchanged
+- **THEN** `context_actions` reports that session's ID, mode, round, ordered participants, current actions, and the exact `suggestions` object `{"status": "unavailable"}` while a before/after comparison of canonical game state is unchanged
 
 #### Scenario: Exploration does not receive fake combat actions
 - **WHEN** the active puppet is in exploration mode
@@ -25,11 +25,9 @@ The production presentation registry SHALL register `context_actions` schema ver
   `secondary_actions`, or `skills` field — the exploration available form (exploration mode) or
   the shared unavailable form is emitted instead
 
-#### Scenario: The combat form validates exactly as version 3
-- **WHEN** a ready-session combat fixture and a recovery-session combat fixture are validated at
-  schema version 4
-- **THEN** every field serializes byte-identically to version 3, the ready/recovery action
-  contracts hold, and only `schema_version` is 4
+#### Scenario: Combat fields stay byte-identical across the version bump
+- **WHEN** a v4-compatible combat fixture is validated by the version-5 validator and the client mirror
+- **THEN** every combat field serializes exactly as it did at schema version 4, with only `schema_version` equal to 5 and the `suggestions` object added
 
 ### Requirement: Combat presentation enumerates complete deterministic choices
 The combat panel's `skills` field SHALL be an ordered array of category groups. Each category group

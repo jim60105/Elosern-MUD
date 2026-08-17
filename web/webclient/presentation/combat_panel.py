@@ -1,16 +1,17 @@
-"""Exact schema-version-4 ``context_actions`` panel and presenter.
+"""Exact schema-version-5 ``context_actions`` panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
 bounded schema before returning it to the presentation registry. Inside a
 valid active combat session it emits the combat available form (byte-identical
-to schema version 3 apart from the version field); in exploration mode it
-emits the exploration available form carrying the canonical affordance
-vocabulary (``web.webclient.presentation.affordances``); only outside both
-modes (creation-pending or absent location) does it raise
-:class:`PanelUnavailableError` so the registry emits the common unavailable
-form. It never fabricates combat fields outside a combat session and never
-fabricates exploration actions inside one.
+to schema version 4 apart from the version field and the ``suggestions``
+envelope); in exploration mode it emits the exploration available form
+carrying the canonical affordance vocabulary
+(``web.webclient.presentation.affordances``) and the state-backed
+``suggestions`` envelope; only outside both modes (creation-pending or absent
+location) does it raise :class:`PanelUnavailableError` so the registry emits
+the common unavailable form. It never fabricates combat fields outside a
+combat session and never fabricates exploration actions inside one.
 
 The panel is read-only: it reconstructs the active session, reads participants
 and active-skill previews, and never mutates traits, resources, buffs, sexual
@@ -23,23 +24,21 @@ byte-identical to schema version 2.
 
 from typing import Any
 
-from web.webclient.actions.exploration_actions import (
-    ExplorationActionError,
-    validate_engage_payload,
-    validate_look_payload,
-    validate_move_payload,
-    validate_party_invite_payload,
-    validate_party_leave_payload,
-    validate_talk_scripted_payload,
-    validate_wait_payload,
-)
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     SURFACES,
+    AffordanceView,
+    default_cards,
     exploration_affordances,
     in_exploration_mode,
 )
 from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.coordinator import log_unavailable
+from web.webclient.presentation.options import (
+    OPTIONS_STATUSES,
+    _validate_affordance_params,
+    validate_suggestions,
+)
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -72,7 +71,7 @@ from world.rules.progression import (
 )
 from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 4
+CONTEXT_ACTIONS_SCHEMA_VERSION = 5
 
 # The exploration form carries the complete canonical affordance vocabulary of
 # a room. The bound derives from the shared vocabulary caps (<= 32 targets x
@@ -85,18 +84,6 @@ MAX_CONTEXT_AFFORDANCES = 320
 MAX_AFFORDANCE_LABEL = 128
 MAX_AFFORDANCE_PARAM_KEYS = 8
 MAX_AFFORDANCE_PARAM_STRING = 512
-
-# Validators the exploration form reuses for the canonical params of every
-# non-freeform action (the freeform binding shape is validated separately).
-_ACTION_PAYLOAD_VALIDATORS = {
-    "explore.move": validate_move_payload,
-    "explore.look": validate_look_payload,
-    "explore.talk_scripted": validate_talk_scripted_payload,
-    "explore.party_invite": validate_party_invite_payload,
-    "explore.party_leave": validate_party_leave_payload,
-    "explore.engage": validate_engage_payload,
-    "explore.wait": validate_wait_payload,
-}
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_SKILL_KEY = 64
@@ -437,24 +424,6 @@ def _validate_category_group(value: Any) -> dict[str, Any]:
     }
 
 
-def _validate_affordance_params(action_id: str, params: Any) -> dict[str, Any]:
-    """Validate the canonical params of one exploration affordance entry.
-
-    Every non-freeform action's params are run through its registered action
-    validator so the wire payload is byte-for-byte what the dispatcher
-    accepts; the freeform entry's ``{"npc_id": int}`` binding shape is the
-    single exception (no registered validator produces it without ``speech``).
-    """
-    if action_id == "explore.talk_freeform":
-        _require_exact_fields(params, "freeform params", {"npc_id"}, {})
-        return {"npc_id": _require_int(params, "npc_id", minimum=1, maximum=MAX_SAFE_INTEGER)}
-    validator = _ACTION_PAYLOAD_VALIDATORS[action_id]
-    try:
-        return validator(params)
-    except ExplorationActionError as error:
-        raise ProtocolValidationError(str(error)) from error
-
-
 def _validate_affordance_view(value: Any) -> dict[str, Any]:
     """Validate one discriminated ``AffordanceView`` wire entry."""
     if not isinstance(value, dict):
@@ -530,7 +499,7 @@ def _validate_exploration_form(payload: Any) -> dict[str, Any]:
     _require_exact_fields(
         payload,
         "context_actions exploration form",
-        {"schema_version", "available", "kind", "affordances"},
+        {"schema_version", "available", "kind", "affordances", "suggestions"},
         {},
     )
     if _require_int(
@@ -547,11 +516,13 @@ def _validate_exploration_form(payload: Any) -> dict[str, Any]:
             f"affordances must be a list of at most {MAX_CONTEXT_AFFORDANCES} entries"
         )
     views = [_validate_affordance_view(entry) for entry in affordances]
+    suggestions = validate_suggestions(payload["suggestions"])
     result = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
         "kind": "exploration",
         "affordances": views,
+        "suggestions": suggestions,
     }
     # Envelope guarantee (mirrors the version-1 exploration panel): a
     # conforming form must serialize within the OOB envelope limit. The list
@@ -591,6 +562,7 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
             "root_actions",
             "secondary_actions",
             "skills",
+            "suggestions",
         },
         {},
     )
@@ -656,6 +628,12 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
     if len({skill["key"] for skill in skill_views}) != len(skill_views):
         raise ContextActionsError("skill keys must be unique")
 
+    # Combat proposals are out of scope: the combat form always reports the
+    # suggestions envelope as exactly unavailable.
+    suggestions = validate_suggestions(payload["suggestions"])
+    if suggestions != {"status": "unavailable"}:
+        raise ContextActionsError("combat suggestions must be exactly unavailable")
+
     return {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
@@ -665,6 +643,7 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
         "root_actions": root_actions,
         "secondary_actions": secondary_actions,
         "skills": category_views,
+        "suggestions": suggestions,
     }
 
 
@@ -718,20 +697,95 @@ def _serialize_skills(skills: tuple[Any, ...]) -> list[dict[str, Any]]:
     return categories
 
 
-def _exploration_payload(actor: Any) -> dict[str, Any]:
+def _serialize_suggestions_card(entry: AffordanceView) -> dict[str, Any]:
+    """Serialize one ``AffordanceView`` into a deterministic rule card.
+
+    The degraded derivation reuses the canonical affordance payloads the AI
+    prompt sees: the card kind pairs with the freeform flag, the action code
+    is the entry's canonical code, and the params are the validator-normalized
+    payload — so ``degraded`` cards are a strict subset of the same action
+    space by construction.
+    """
+    return {
+        "kind": "freeform" if entry.freeform else "known_action",
+        "action_code": entry.action_id,
+        "label": entry.label,
+        "params": dict(entry.params),
+    }
+
+
+def _suggestions_section(
+    context: PresentationContext, affordances: tuple[AffordanceView, ...]
+) -> dict[str, Any]:
+    """Assemble the exploration form's ``suggestions`` envelope (design D-3).
+
+    State-backed rendering rules, in order: an absent or ``unavailable``
+    snapshot is inert; ``generating`` carries the status alone; ``ready``
+    re-serializes exactly the snapshot's displayed cards (a missing or
+    shape-invalid displayed set degrades to ``unavailable`` with a bounded
+    diagnostic, never fabricated cards); ``degraded`` derives rule cards from
+    ``default_cards`` over the very affordance tuple just serialized into the
+    form. ``ready``/``generating`` never consult ``default_cards`` and
+    ``degraded`` never consults snapshot cards.
+
+    Both state-backed branches validate their derived cards through the v5
+    shape gate before returning: the affordance vocabulary bounds entity
+    display names at 128 code points without a CJK requirement, while the
+    suggestion card contract bounds labels at 1..24 CJK code points, so an
+    out-of-shape name (an ASCII or over-long display name) must degrade the
+    section alone — never the whole panel.
+    """
+    snapshot = context.options_state
+    if snapshot is None or snapshot.status not in OPTIONS_STATUSES or snapshot.status == "unavailable":
+        return {"status": "unavailable"}
+    if snapshot.status == "generating":
+        return {"status": "generating"}
+    if snapshot.status == "degraded":
+        cards = [
+            _serialize_suggestions_card(entry)
+            for entry in default_cards(affordances, actor=context.actor)
+        ]
+        try:
+            return validate_suggestions({"status": "degraded", "cards": cards})
+        except ProtocolValidationError:
+            log_unavailable(
+                "exploration suggestions",
+                "degraded derivation fails the v5 shape gate",
+            )
+            return {"status": "unavailable"}
+    displayed = snapshot.displayed
+    if displayed is None:
+        log_unavailable(
+            "exploration suggestions",
+            "ready snapshot carries no displayed set",
+        )
+        return {"status": "unavailable"}
+    cards = [card.as_dict() for card in displayed]
+    try:
+        return validate_suggestions({"status": "ready", "cards": cards})
+    except ProtocolValidationError:
+        log_unavailable(
+            "exploration suggestions",
+            "ready displayed set fails the v5 shape gate",
+        )
+        return {"status": "unavailable"}
+
+
+def _exploration_payload(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available exploration form for the authenticated puppet."""
+    actor = context.actor
     if not in_exploration_mode(actor):
         raise PanelUnavailableError
     location = getattr(actor, "location", None)
     if location is None:
         raise PanelUnavailableError
+    affordances = exploration_affordances(actor)
     payload = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
         "kind": "exploration",
-        "affordances": [
-            entry.as_dict() for entry in exploration_affordances(actor)
-        ],
+        "affordances": [entry.as_dict() for entry in affordances],
+        "suggestions": _suggestions_section(context, affordances),
     }
     return validate_context_actions(payload)
 
@@ -740,16 +794,17 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available panel for the authenticated puppet.
 
     Inside a valid active combat session the combat form is emitted
-    (byte-identical to schema version 3 apart from the version field); in
-    exploration mode the exploration available form carries the canonical
-    affordance vocabulary; outside both modes the registry emits the shared
-    unavailable form.
+    (byte-identical to schema version 4 apart from the version field and the
+    ``suggestions`` envelope pinned to unavailable); in exploration mode the
+    exploration available form carries the canonical affordance vocabulary
+    and the state-backed suggestions envelope; outside both modes the registry
+    emits the shared unavailable form.
     """
     actor = context.actor
     try:
         view = build_combat_view(actor)
     except CombatViewError:
-        return _exploration_payload(actor)
+        return _exploration_payload(context)
 
     if view.recovery:
         session = {
@@ -771,6 +826,7 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
             "root_actions": [],
             "secondary_actions": list(RECOVERY_SECONDARY_ACTIONS),
             "skills": [],
+            "suggestions": {"status": "unavailable"},
         }
         return validate_context_actions(payload)
 
@@ -802,5 +858,6 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
         "root_actions": list(ROOT_ACTIONS),
         "secondary_actions": list(SECONDARY_ACTIONS),
         "skills": _serialize_skills(view.skills),
+        "suggestions": {"status": "unavailable"},
     }
     return validate_context_actions(payload)
