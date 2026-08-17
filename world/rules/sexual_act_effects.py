@@ -4,11 +4,13 @@ A catalog act's ``pleasure:``/``sexual_counter:`` effect strings resolve
 through ``world/rules/action.py``'s registered handlers, which delegate every
 derivation here: which body part a participant resolves to (monsters collapse
 to the generic channel), who participates in a cast, the scaled pleasure gain
-formula, and the explicit counter-name-to-mutator table. This module owns the
-two new balance tables (the participant-count multiplier ladder and the
-climax-extension threshold) in ``rulebook/sexual_act_effects.yaml``; it reads
-``PLEASURE_CONFIG``'s sensitivity/shame tables from ``sexual_state.py``
-read-only, exactly as the shipped ``pleasure-gauge`` change declared them.
+formula, the explicit counter-name-to-mutator table, and the deterministic
+observer-presence read that gates the watched event/counter names. This
+module owns the two new balance tables (the participant-count multiplier
+ladder and the climax-extension threshold) in ``rulebook/sexual_act_effects.yaml``;
+it reads ``PLEASURE_CONFIG``'s sensitivity/shame tables from
+``sexual_state.py`` read-only, exactly as the shipped ``pleasure-gauge``
+change declared them.
 
 ``sexual_state.py`` never imports this module, so the top-level
 ``PLEASURE_CONFIG`` import here is cycle-free — unlike the ``Monster`` import
@@ -174,6 +176,46 @@ def participants(actor: Any, targets: list[Any]) -> list[Any]:
     return result
 
 
+# Event and counter names whose effect is semantically "being watched": they
+# fire only when another entity can observe the cast (design D-3). Both sets
+# are name-keyed so the gating rule cannot drift between acts; the event name
+# is a member of ``_ACTOR_SCOPED_EVENTS`` (a spectator is a fact about the
+# performing actor) and the counter of ``_COUNTER_MUTATORS``, each pinned by
+# the structural tests.
+_OBSERVER_GATED_EVENTS = frozenset({"watched_during_activity"})
+_OBSERVER_GATED_COUNTERS = frozenset({"watched_count"})
+
+
+def observers_present(actor: Any, targets: list[Any], event_context: Any) -> bool:
+    """Return whether any entity besides the actor can observe a cast.
+
+    A deterministic, no-create presence read: a target list containing an
+    entity other than the actor (an AREA cast's audience, or a SINGLE cast's
+    partner) counts as observed by construction. Otherwise the co-located
+    candidates are the battlefield roster's members when
+    ``event_context["battlefield"]`` is present (injected by
+    ``BattlefieldActionContext``), or the room's ``LivingEntity`` occupants
+    when ``event_context["room"]`` is present (injected by
+    ``RoomActionContext``); any candidate that is not the actor counts. An
+    event context carrying neither key reads as unobserved, so callers that
+    never construct either key behave exactly as before.
+    """
+    if any(target is not actor for target in targets):
+        return True
+    battlefield = event_context.get("battlefield")
+    if battlefield is not None:
+        return any(member is not actor for member in battlefield.roster.values())
+    room = event_context.get("room")
+    if room is not None:
+        from typeclasses.entities import LivingEntity
+
+        return any(
+            occupant is not actor and isinstance(occupant, LivingEntity)
+            for occupant in room.contents
+        )
+    return False
+
+
 def _sensitivity_level(participant: Any, part: str) -> str:
     """Read one body part's sensitivity level without materializing its trait.
 
@@ -291,9 +333,12 @@ __all__ = [
     "EffectsConfig",
     "EffectsConfigError",
     "_COUNTER_MUTATORS",
+    "_OBSERVER_GATED_COUNTERS",
+    "_OBSERVER_GATED_EVENTS",
     "compute_pleasure_gain",
     "load_effects_config",
     "mutator_name_for",
+    "observers_present",
     "pair_event_name",
     "participants",
     "resolve_part",

@@ -36,6 +36,7 @@ import world.skills.registry as registry_module
 from world.skills import sexual_acts
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 from world.skills.sexual_acts._builder import (
+    _ACTOR_SCOPED_EVENTS,
     _LEGACY_TARGET_SCOPED_EVENTS,
     SexualActDef,
     _act_family,
@@ -399,6 +400,9 @@ class ActFamilyTests(unittest.TestCase):
 
     @covers_requirement("sexual-act-registry::act-family-populates-every-row-s-effects-with-the-pleasure-and-sexual-counter-prefixes-for-that-row-s-own-key-plus-one-sexual-event-entry-per-declared-event-and-one-act-pair-event-entry-when-the-row-declares-pair-events")
     def test_declared_sexual_events_gain_one_entry_per_name_in_order(self):
+        # A name in the actor-scoped vocabulary (watched_during_activity) is
+        # emitted through the sexual_event_actor: prefix; a participant-scoped
+        # name keeps the plain sexual_event: prefix.
         skill, _ = _seed_act_row(
             "test_act",
             sexual_events=("frequent_stimulation", "watched_during_activity"),
@@ -409,7 +413,7 @@ class ActFamilyTests(unittest.TestCase):
                 "pleasure:test_act",
                 "sexual_counter:test_act",
                 "sexual_event:frequent_stimulation",
-                "sexual_event:watched_during_activity",
+                "sexual_event_actor:watched_during_activity",
             ],
         )
 
@@ -780,6 +784,59 @@ class SexualActEffectsStructuralTests(unittest.TestCase):
             check_external_acts_declare_a_target_part(
                 SEXUAL_ACT_REGISTRY, SKILL_REGISTRY
             )
+
+
+class ActorScopedEventChannelTests(unittest.TestCase):
+    """The actor-scoped channel classification (sexual-public-act-events D-6)."""
+
+    @covers_requirement("sexual-act-registry::acts-classify-each-declared-event-by-name-into-the-actor-scoped-or-participant-scoped-channel")
+    def test_actor_scoped_vocabulary_is_exactly_the_four_names(self):
+        self.assertEqual(
+            _ACTOR_SCOPED_EVENTS,
+            frozenset(
+                {
+                    "self_exposure",
+                    "public_exposure",
+                    "watched_during_activity",
+                    "public_sexual_activity",
+                }
+            ),
+        )
+
+    @covers_requirement("sexual-act-registry::acts-classify-each-declared-event-by-name-into-the-actor-scoped-or-participant-scoped-channel")
+    def test_every_actor_scoped_name_is_a_real_rulebook_event(self):
+        self.assertLessEqual(_ACTOR_SCOPED_EVENTS, _KNOWN_EVENTS)
+
+    @covers_requirement("sexual-act-registry::acts-classify-each-declared-event-by-name-into-the-actor-scoped-or-participant-scoped-channel")
+    def test_self_exposure_always_uses_the_actor_channel(self):
+        # Two acts on different lines both declare self_exposure; neither row
+        # can pick the participant channel for the name.
+        for key in ("shame_hem_lift", "shame_half_expose_chest"):
+            with self.subTest(key=key):
+                effects = SKILL_REGISTRY[key].effects
+                self.assertIn("sexual_event_actor:self_exposure", effects)
+                self.assertNotIn("sexual_event:self_exposure", effects)
+
+    @covers_requirement("sexual-act-registry::acts-classify-each-declared-event-by-name-into-the-actor-scoped-or-participant-scoped-channel")
+    def test_participant_scoped_name_never_uses_the_actor_channel(self):
+        effects = SKILL_REGISTRY["shame_public_masturbation"].effects
+        self.assertIn("sexual_event:masturbation_climax", effects)
+        self.assertNotIn("sexual_event_actor:masturbation_climax", effects)
+
+    @covers_requirement("sexual-act-registry::acts-classify-each-declared-event-by-name-into-the-actor-scoped-or-participant-scoped-channel")
+    def test_every_declared_event_resolves_to_exactly_one_channel(self):
+        for key, act in SEXUAL_ACT_REGISTRY.items():
+            effects = SKILL_REGISTRY[key].effects
+            for name in act.sexual_events:
+                with self.subTest(act=key, event=name):
+                    self.assertIn(name, _KNOWN_EVENTS)
+                    actor_channel = f"sexual_event_actor:{name}" in effects
+                    participant_channel = f"sexual_event:{name}" in effects
+                    self.assertNotEqual(
+                        actor_channel,
+                        participant_channel,
+                        f"{key!r} declares {name!r} on both channels or neither",
+                    )
 
 
 class LegacyTargetScopedEventTests(unittest.TestCase):

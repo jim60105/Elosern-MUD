@@ -139,6 +139,20 @@ class SexualEventEffect:
 
 
 @dataclass(frozen=True)
+class ActorSexualEventEffect:
+    """Resolve one rule-driven sexual transition on the performing actor only.
+
+    The actor-scoped sibling of ``SexualEventEffect``: an act declaring a
+    performer-scoped event (``self_exposure``, ``public_exposure``,
+    ``watched_during_activity``, ``public_sexual_activity``) emits it through
+    the ``sexual_event_actor:<name>`` string, and the cast-side handler
+    applies the named event to the acting entity, never to a target.
+    """
+
+    event_name: str
+
+
+@dataclass(frozen=True)
 class PleasureEffect:
     """Apply one sexual act's pleasure to every participant of its cast.
 
@@ -381,6 +395,8 @@ def parse_effect(effect_id: str) -> object:
         return ConferGrowthRateEffect()
     if prefix == "sexual_event":
         return SexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
+    if prefix == "sexual_event_actor":
+        return ActorSexualEventEffect(event_name=_parse_single_arg(effect_id, prefix))
     if prefix == "pleasure":
         return PleasureEffect(act_key=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_counter":
