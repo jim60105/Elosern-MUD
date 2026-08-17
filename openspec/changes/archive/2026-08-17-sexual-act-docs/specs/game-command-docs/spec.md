@@ -5,12 +5,13 @@ The `cast` and `combat actions` entries in `docs/game/command-reference.md` SHAL
 性愛 (sexual act) skills are ordinary castable skills reached through the two existing commands, with
 no separate syntax or command of their own. The `cast` entry's 說明 field SHALL state that a
 character's unlocked 性愛 skills are cast through the same `cast <skill_key>[@<scale>][=<target_key>]`
-syntax once unlocked by play, and SHALL contain the substrings `性愛` and `解鎖`. The `combat actions`
-entry's 說明 field SHALL state that owned skills are grouped by category and that unlocked 性愛 acts
-form their own category once their unlock requirement is met, and SHALL contain the substring `性愛`.
-This requirement adds documentation content only; it changes neither entry's `語法` nor `情境` field,
-and the curated manifest in `tests/test_command_docs.py` (`EXPECTED_COMMANDS["cast"]` and
-`["combat actions"]`) is unchanged.
+syntax — a few basic seed acts are available from character creation, the rest once unlocked by play —
+and SHALL contain the substrings `性愛` and `解鎖`. The `combat actions` entry's 說明 field SHALL
+state that owned skills are grouped by category and that unlocked 性愛 acts form their own category
+once their unlock requirement is met, and SHALL contain the substring `性愛`. This requirement adds
+documentation content only; it changes neither entry's `語法` nor `情境` field, and the curated
+manifest in `tests/test_command_docs.py` (`EXPECTED_COMMANDS["cast"]` and `["combat actions"]`) is
+unchanged.
 
 #### Scenario: The cast entry mentions unlocked sexual acts
 - **WHEN** the drift contract test inspects the `cast` canonical entry's 說明 field
@@ -22,35 +23,45 @@ and the curated manifest in `tests/test_command_docs.py` (`EXPECTED_COMMANDS["ca
 - **THEN** the field contains the substring `性愛` and states that owned skills are grouped by
   category, with unlocked sexual acts forming their own category
 
-### Requirement: The command reference documents the resist, in-combat affinity, and status consequences
+### Requirement: The command reference documents the resist, affinity, and status consequences
 `docs/game/command-reference.md` SHALL document, in prose placed under the existing `### cast`
 heading (not as a new canonical heading — a new heading with no corresponding mounted command would
 be an orphan canonical entry), the parts of the sexual act system a player must understand before
-casting one against another character: that a resistible act's target receives one resist roll where
-success wastes the caster's turn and failure executes the act, in or out of combat (SHALL contain the
-substring `抵抗`); that a forced act (a failed resist) against a companion NPC **in combat** costs
-relationship affinity and can trigger the companion auto-leaving the party, with the caster notified
-when it happens — the prose SHALL scope this consequence to combat and SHALL NOT claim it also applies
-to an out-of-combat cast (SHALL contain the substring `好感度`); that sustained arousal, an in-progress
-climax, and high exposure appear as ordinary combat condition labels while active (SHALL contain the
-substring `興奮`, matching the shipped 高度興奮敏捷與準度減損 label); and that 神之秘法 (divine arts)
-acts require a race-eligible caster (SHALL contain the substring `神之秘法`), without asserting which
-individual divine-arts acts exist.
+casting one against another character: that unlock is per-act — a few basic acts are available from
+character creation while the rest are gained by meeting their unlock conditions in play (SHALL
+contain the substring `解鎖`); that a resistible act's target receives one resist roll, in or out of
+combat, where a successful resist leaves that target unaffected by the cast's target effects while
+the cast still consumes time and the skill's resource cost (if any), and a failed resist executes the
+act against the target (SHALL contain the substrings `抵抗` and `戰鬥`); that a forced act (a failed
+resist) against a companion NPC costs relationship affinity and can trigger the companion
+auto-leaving the party, with the caster notified when it happens — the consequence applies to forced
+acts in combat and out of combat alike, both halves shipped and archived
+(`sexual-resist-turn-cost`'s `_scan_sexual_coercion` and `sexual-resist-out-of-combat`'s
+`_scan_out_of_combat_sexual_coercion`) (SHALL contain the substring `好感度`); that sustained arousal,
+an in-progress climax, and high exposure appear as ordinary combat condition labels while active
+(SHALL contain the substrings `興奮`, `高潮`, and `露出`, matching the shipped 高度興奮敏捷與準度減損,
+高潮進行中鎖定行動, and 高露出防禦減損 labels); and that 神之秘法 (divine arts) acts require a
+race-eligible caster and have no counter unlock threshold (SHALL contain the substring `神之秘法`),
+without asserting which individual divine-arts acts exist and SHALL NOT name any of them.
 
-#### Scenario: The reference documents the resist and in-combat affinity consequence
+#### Scenario: The reference documents the unlock ladder
 - **WHEN** the drift contract test inspects the full text of the `### cast` section (its field table
   plus the trailing prose block)
-- **THEN** the section contains the substrings `抵抗` and `好感度`, and the sentence containing `好感度`
-  also states or is scoped to a combat context (e.g. contains `戰鬥` or `combat`)
+- **THEN** the section contains the substring `解鎖` and states that basic acts are available from
+  character creation while the rest unlock in play
+
+#### Scenario: The reference documents the resist and affinity consequence
+- **WHEN** the drift contract test inspects the full text of the `### cast` section
+- **THEN** the section contains the substrings `抵抗`, `好感度`, and `戰鬥`
 
 #### Scenario: The reference documents the status conditions
 - **WHEN** the drift contract test inspects the full text of the `### cast` section
-- **THEN** the section contains the substring `興奮`
+- **THEN** the section contains the substrings `興奮`, `高潮`, and `露出`
 
 #### Scenario: The reference documents the divine-arts race gate
 - **WHEN** the drift contract test inspects the full text of the `### cast` section
-- **THEN** the section contains the substring `神之秘法` and states that casting acts on that line
-  requires a race-eligible caster
+- **THEN** the section contains the substring `神之秘法`, states that casting acts on that line
+  requires a race-eligible caster, and names no individual divine-arts act
 
 #### Scenario: No orphan canonical heading is introduced
 - **WHEN** `test_no_orphan_canonical_entries` runs after this content is added

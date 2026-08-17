@@ -51,7 +51,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。 |
+| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。性愛技能亦屬可施放之列，隨遊玩解鎖後可經 `combat actions` 的分類檢視。 |
 
 ## 公會
 
