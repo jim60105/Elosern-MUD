@@ -7,7 +7,7 @@ the idle baseline, the suggestion-eligibility layer, and the deterministic `defa
 degradation derivation. This capability owns the vocabulary; `webclient-context-actions` and
 (later) the suggestions feature consume it.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The canonical affordance vocabulary is shared and read-only
 A shared module (`web/webclient/presentation/affordances.py`) SHALL own the canonical

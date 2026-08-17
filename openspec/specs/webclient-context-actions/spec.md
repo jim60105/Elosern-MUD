@@ -6,7 +6,7 @@ exploration form carrying the canonical affordance vocabulary (`exploration-affo
 the shared unavailable form whose field set is unchanged across versions. The `suggestions`
 section is deliberately absent (a later change bumps to version 5).
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: context_actions is an exact read-only version-4 panel
 The production presentation registry SHALL register panel name `context_actions` at schema
