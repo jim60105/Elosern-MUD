@@ -26,12 +26,12 @@ Existing patterns this design builds on:
   "displayed objective identity" is derivable from existing read-only output.
 
 **Dependency note (review fixing):** the v5 suggestions panel seam (`context-actions-suggestions`)
-is proposed in the next session; its contract is already pinned authoritatively by the reviewed
-six-doc design set (`webclient-design.md` §1.1–§1.3: `suggestions` wire shape with the four
-statuses, status-bound card counts, and the snapshot-only presenter rule). This change treats
-those documents as the contract authority, mirrors them into its fixtures, and lands after
-`context-actions-suggestions` (batch order B4 → B5 in the overview) so the push path is verified
-end-to-end against the real seam.
+has already landed (archived): the `suggestions` wire shape with the four statuses, the
+status-bound card counts, the `validate_suggestions` shape gate, and the snapshot-only presenter
+rule (`OptionsSnapshot` on `PresentationContext`, built by the ingress factory from
+`session.ndb.options_state`) are the current main-spec contract. This change lands after it
+(batch order B4 → B5 in the overview), so the push path is verified end-to-end against the real
+seam.
 
 Dependency position: rooted on `action-options-layer` (the generate entry point),
 `action-options-affordance-contract` (canonical affordances + `default_cards()` + canonical-JSON
@@ -109,8 +109,9 @@ inert by construction (cache write skipped, subscribers none). Delivery publishe
 only when BOTH (a) the subscriber's session token is still the session's current token and (b)
 the session's live coordinator epoch still equals the captured one (retired transport/puppet →
 silent drop, mirroring `dispatcher._settle_internal_error`). The session token is monotonic per
-session and incremented on every trigger and every dismiss — making evict-vs-generation
-deterministic per session.
+session and incremented when a session starts or joins a new generation and
+on every dismiss (replays that merely re-publish never increment) — making
+evict-vs-generation deterministic per session.
 
 ### D4 — Watcher registry: ingress-maintained, keyed by session identity, current epochs
 
@@ -149,7 +150,9 @@ survive the next snapshot and dismiss state survive re-renders.
 `OptionsSnapshot`-carrying context (via the D5 factory), compares `expected_epoch` with the live
 coordinator's epoch, and silently does nothing on mismatch. It reuses
 `_build_presentation`/`_send` so revision monotonicity and envelope shape are exactly the
-dispatcher's.
+dispatcher's. **State before push:** the session's `options_state` write is deliberate and
+survives a failed push (lost world clock, reset coordinator); the guarded push is best-effort,
+and the session's next snapshot re-establishes the rendering from the state.
 
 ### D7 — One LLM call per residency; degraded replay is a fresh derivation
 
@@ -159,22 +162,29 @@ Flow per trigger: (1) already-displayed same fingerprint at `ready` → re-publi
 publish as a status refresh (degraded replay is *not* byte-identical by contract — display names
 and ordering are not in the fingerprint); (3) cache hit for the fingerprint → publish the cached
 set; (4) pending → append subscriber; (5) miss → register pending and start one generation.
-Generation result: success → cache + publish `ready` per guard; **typed outcome
-(review-fixed contract):** `degraded(transport)` → negative memo (30 s TTL) + publish `degraded`;
-`degraded(validation|disabled)` → publish `degraded`, no memo. Because the layer today resolves
-plain `None`, the dependency contract is amended (see below) so the service can distinguish
-transport failures from ordinary degrade; until the amendment lands, the transport outcome is
-carried as a controlled failure type the service recognizes, and every other `None` is a
-no-memo degrade. `generating → generating` transitions publish nothing: a new trigger while the
-previous generation is in flight sets the new state, but only sessions that were not already
-`generating` receive the generating line.
+Generation result: success → cache + publish `ready` per guard; degraded outcome carried by an
+**observed transport failure** (`LLMTransportError` from the layer client, see below) → negative
+memo (30 s TTL) + publish `degraded`; every other degrade (validation exhaustion, disabled
+profile, prompt unavailability) → publish `degraded`, no memo. `generating → generating`
+transitions publish nothing: a new trigger while the previous generation is in flight sets the
+new state, but only sessions that were not already `generating` receive the generating line. An
+unexpected generation errback (any non-outcome failure) is a no-memo degrade with a status
+refresh, so no session is ever left stuck in `generating`.
 
-**Layer contract amendment (dependency):** `action-options-layer`'s resolve-to-`None` is
-augmented to a typed outcome `OptionGenerationOutcome(status="ready"|"degraded", reason=
-"transport"|"validation"|"disabled")` (or equivalent); this change's service consumes the typed
-reason for memo decisions. The amendment is recorded as a MODIFIED delta on the layer change
-before implementation; the service degrades gracefully (controlled-failure detection) if the
-plain-`None` contract is still in place.
+**Transport-failure discrimination (review-fixed contract, deferred layer amendment):**
+`action-options-layer`'s resolve-to-`None` was originally to be augmented to a typed outcome
+`OptionGenerationOutcome(status="ready"|"degraded", reason="transport"|"validation"|"disabled")`;
+the layer change has since landed and been archived with the plain-`None` contract, so that
+typed-outcome amendment is **deferred** (carried in Open Questions) rather than recorded as a
+MODIFIED delta on the archived change. This change therefore implements the controlled-failure
+fallback this design always kept as the transitional mechanism: the service calls
+`generate_action_options` through a thin client wrapper that observes
+`LLMTransportError` (raise or Deferred errback) on the injected layer client; a plain-`None`
+degrade with an observed transport failure is the memoized class, and every other degrade
+(disabled profile resolves before any client call, prompt unavailability and exhausted retries
+never fail the client, and an unparseable response fails inside the guardrail
+rather than at the client boundary) is a no-memo degrade. A follow-up change may swap the observation for the
+typed outcome without changing the service contract or the memo semantics.
 
 ### D8 — Eviction is per-session with generation retirement
 
@@ -219,6 +229,11 @@ decision recorded for `action-options-trigger-hooks`, not left open.
 - [Stale `displayed` vs. evicted LRU entry] → Replay precedence is the session's `displayed`
   set, never the cache; the cache entry's absence never triggers regeneration for an
   already-displayed session (covered by a dedicated test).
+- [A pending generation outlives its subscribers only as long as the HTTP call in flight] →
+  The service deliberately does not own the client timeout; the LLM client profile enforces
+  connect/read timeouts, and a terminal errback (whatever its cause) settles the watchers as a
+  no-memo degrade and retires the pending entry, so a hung transport degrades instead of
+  parking sessions in `generating` beyond the transport budget.
 - [A second window generating on the same fingerprint while the first window dismisses] → The
   per-session token isolates the dismissed window; the other window's subscriber entry, token,
   and pending generation survive (covered by multi-session tests).
@@ -232,19 +247,20 @@ decision recorded for `action-options-trigger-hooks`, not left open.
 ## Migration Plan
 
 No released users; no data migration. Deployment is a landing sequence of the ten daily changes
-in dependency order; within this change, landing order is internal (watchers registry →
-snapshot field + single context factory → service → push helper → evict → puppet-change
+in dependency order; within this change, landing order is internal (fingerprint primitives →
+watchers registry → single context factory → service → push helper → evict → puppet-change
 cleanup → tests), and the hook call sites arrive with the next change — until then the service
-is exercised through tests, and the `ui_sync` seam is wired there. The layer outcome amendment
-`openspec changes` delta is recorded when `action-options-layer` implements, and the service
-keeps the controlled-failure detection as the fallback until then.
+is exercised through tests, and the `ui_sync` seam is wired there. The layer typed-outcome
+amendment is deferred (D7): the service's controlled-failure observation is the standing
+mechanism until a follow-up change lands it, and no main-spec delta on `action-options-layer`
+is produced by this change.
 
 ## Open Questions
 
 - Whether the reconnect hook should ever force regeneration for an unchanged situation on a
   fresh session — currently rendered from cached state when present (the empty-cache path
   regenerates); carried in the trigger-service design doc for the hooks change.
-- `context-actions-suggestions` exists only as a scaffold in the working tree; its delta is
-  produced in the next session and this change's fixtures mirror the six-doc wire shape until
-  then (batch
-  order B4 → B5 guarantees the seam lands first).
+- The deferred `action-options-layer` typed-outcome amendment
+  (`OptionGenerationOutcome(status="ready"|"degraded", reason=
+  "transport"|"validation"|"disabled")`): a follow-up change records the MODIFIED delta and
+  swaps the service's client observation for the typed reason; the memo semantics are unchanged.

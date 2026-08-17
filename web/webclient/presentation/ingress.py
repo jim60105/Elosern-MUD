@@ -80,8 +80,11 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
     actor_id = str(getattr(actor, "pk", ""))
     last_actor = getattr(session.ndb, "elosern_actor_id", None)
     if last_actor is not None and last_actor != actor_id:
-        # A puppet change starts a distinct presentation sequence.
+        # A puppet change starts a distinct presentation sequence and drops the
+        # previous character's options state (the new puppet never inherits the
+        # old one's fingerprint, cards, or degraded status).
         coordinator.reset()
+        session.ndb.options_state = None
         from web.webclient.actions.dispatcher import retire_sequence
 
         retire_sequence(session)
@@ -117,6 +120,7 @@ def reset_client_sequence(session: Any) -> None:
     coordinator.reset()
     if getattr(session, "ndb", None) is not None:
         session.ndb.elosern_actor_id = None
+        session.ndb.options_state = None
 
 
 def options_snapshot(session: Any) -> OptionsSnapshot | None:
@@ -176,6 +180,25 @@ def _build_options_snapshot(session: Any, state: Any) -> OptionsSnapshot | None:
     )
 
 
+def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
+    """The single factory every publication path builds its context through.
+
+    Full-snapshot synchronization, the dispatcher's completion, internal-error,
+    and stale paths, the art-completion push, and the trigger service's own
+    guarded push all assemble their :class:`PresentationContext` through this
+    factory, so no path can omit the options snapshot. It deep-copies
+    ``session.ndb.options_state`` into the immutable :class:`OptionsSnapshot`
+    (an absent or malformed state degrades to ``None``, and a snapshot whose
+    owner differs from the rendering puppet is refused) and never hands the
+    raw session to a presenter.
+    """
+    return PresentationContext(
+        actor=actor,
+        protocol_version=PROTOCOL_VERSION,
+        options_state=options_snapshot(session),
+    )
+
+
 def synchronize_session(session: Any, actor: Any) -> bool:
     """Emit a full snapshot for a puppeted session; return success.
 
@@ -185,11 +208,7 @@ def synchronize_session(session: Any, actor: Any) -> bool:
     unaffected.
     """
     coordinator = _coordinator_for(session, actor)
-    context = PresentationContext(
-        actor=actor,
-        protocol_version=PROTOCOL_VERSION,
-        options_state=options_snapshot(session),
-    )
+    context = build_presentation_context(session, actor)
     try:
         coordinator.synchronize(context)
     except ClockUnavailable:
@@ -212,6 +231,13 @@ def synchronize_session(session: Any, actor: Any) -> bool:
             correlation_id=correlation_id,
         )
         return False
+    # The snapshot is on the wire; this session is a live watcher of its
+    # puppet for the room-entry hook (idempotent per session). A function-local
+    # import keeps the ingress importable while a worker is under development
+    # and avoids a module cycle (watchers imports the ingress predicate).
+    from web.webclient.presentation.watchers import register_watcher
+
+    register_watcher(session)
     return True
 
 

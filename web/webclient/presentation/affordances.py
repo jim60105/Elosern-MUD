@@ -14,6 +14,8 @@ All builders are read-only: nothing here mutates traits, knowledge, dialogue,
 quests, inventory, combat sessions, party, or world time.
 """
 
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -704,6 +706,71 @@ def default_cards(
     return tuple(ordered[:max_cards])
 
 
+# ---------------------------------------------------------------------------
+# Canonical serialization and the eligibility digest (shared sources).
+# ---------------------------------------------------------------------------
+
+
+def canonical_json(value: Any) -> str:
+    """Serialize one JSON-safe value into its canonical stable-key form.
+
+    Keys are recursively sorted, non-ASCII text is kept literal, and compact
+    separators are used, so byte-identical input produces byte-identical output
+    regardless of key insertion order. Tuples serialize as arrays (the
+    deterministic type coercion over the vocabulary's containers). This is the
+    single serialization the schema ladder's canonical comparison, the
+    trigger-service eligibility and public-state digests, and the test fixtures
+    all share, so builder-side and validator-side representations cannot drift.
+
+    Raises ``ValueError`` for containers with non-string keys, which have no
+    deterministic ordering.
+    """
+    _ensure_canonical(value)
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+
+
+def _ensure_canonical(value: Any) -> None:
+    """Recursively verify that ``value`` is deterministically serializable."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("canonical JSON requires string-sortable keys")
+            _ensure_canonical(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _ensure_canonical(item)
+    elif not isinstance(value, (str, int, float, bool)) and value is not None:
+        raise ValueError(
+            f"canonical JSON cannot serialize {type(value).__name__}; "
+            "sets have no deterministic ordering"
+        )
+
+
+def eligible_affordance_digest(affordances: Any) -> str:
+    """Digest of the canonical eligible-affordance list (labels excluded).
+
+    ``affordances`` is a sequence of action-entry :class:`AffordanceView`
+    (navigation entries are rejected — a navigation surface has no dispatcher
+    action code and no eligibility). The digest is the SHA-256 of the canonical
+    JSON of the ``sorted((action_id, params))`` pairs with ``params`` serialized
+    key-sorted, so any change that makes an action executable or not —
+    schedule-gate flips, locked exits, monster death, vanishing objects —
+    changes the digest while identical eligibility (labels, display names, and
+    ordering aside) always produces the same value.
+    """
+    pairs = []
+    for entry in affordances:
+        if getattr(entry, "navigation", False):
+            raise ValueError("the eligibility digest covers action entries only")
+        if entry.params is None:
+            raise ValueError("a digest action entry carries no params")
+        pairs.append((entry.action_id, canonical_json(entry.params)))
+    pairs.sort()
+    return hashlib.sha256(
+        canonical_json([list(pair) for pair in pairs]).encode("utf-8")
+    ).hexdigest()
+
+
 __all__ = [
     "ACTION_CODE_ALLOWLIST",
     "AffordanceView",
@@ -723,7 +790,9 @@ __all__ = [
     "MAX_SCRIPTED_KEYWORDS",
     "SUGGESTIBLE_ACTION_IDS",
     "SURFACES",
+    "canonical_json",
     "default_cards",
+    "eligible_affordance_digest",
     "exploration_affordances",
     "in_exploration_mode",
     "suggestible_candidates",

@@ -28,7 +28,7 @@ from web.webclient.presentation.coordinator import (
     PresentationCoordinator,
     attach_coordinator,
 )
-from web.webclient.presentation.ingress import options_snapshot
+from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import (
     PROTOCOL_VERSION,
     UI_ACTION_RESULT,
@@ -271,11 +271,7 @@ def _settle_internal_error(
         # The sequence was retired; nothing may publish into the replacement.
         _settle_in_flight(session, epoch, None)
         return
-    context = PresentationContext(
-        actor=actor,
-        protocol_version=PROTOCOL_VERSION,
-        options_state=options_snapshot(session),
-    )
+    context = build_presentation_context(session, actor)
     _publish_presentation(session, coordinator, context, None)
     result = {
         "outcome": "error",
@@ -331,11 +327,7 @@ def _publish_completion(
 
     outcome = value.get("outcome")
     affected = value.get("affected_panels")
-    context = PresentationContext(
-        actor=actor,
-        protocol_version=PROTOCOL_VERSION,
-        options_state=options_snapshot(session),
-    )
+    context = build_presentation_context(session, actor)
     if not isinstance(affected, (tuple, list, set)):
         affected = None
     if affected is not None:
@@ -433,10 +425,8 @@ def _publish_presentation(
 
 
 def _send_stale(session: Any, coordinator: PresentationCoordinator, state: SequenceState, request_id: str) -> None:
-    context = PresentationContext(
-        actor=getattr(session, "puppet", None),
-        protocol_version=PROTOCOL_VERSION,
-        options_state=options_snapshot(session),
+    context = build_presentation_context(
+        session, getattr(session, "puppet", None)
     )
     _publish_presentation(session, coordinator, context, None)
     result = _stale_result()

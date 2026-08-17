@@ -75,19 +75,24 @@ session-scoped delivery of proposals through the existing `ui_update` contract.
   existing `coordinator.reset()`/`retire_sequence()`).
 - **Consumed contracts:** `world/ai/action_options.py` (`generate_action_options`,
   `build_options_context`) from `action-options-layer`,
-  `web/webclient/presentation/affordances.py` (canonical affordance tuple + canonical-JSON
-  serializer, eligibility digest source) and `default_cards()` (degraded derivation) from
-  `action-options-affordance-contract`, the v5 `context_actions` suggestions contract as pinned
-  by the six-doc design set (`context-actions-suggestions` delta lands in the next session; the
-  dependency note in `design.md` fixes the authority), and `web/webclient/actions/dispatcher.py`'s
-  `_publish_completion` hook point (consumed by the next change).
+   `web/webclient/presentation/affordances.py` (canonical affordance tuple + canonical-JSON
+   serializer, eligibility digest source) and `default_cards()` (degraded derivation) from
+   `action-options-affordance-contract`, the landed v5 `context_actions` suggestions contract
+   (`context-actions-suggestions`, already archived: `suggestions` wire shape, shape gate,
+   snapshot-only presenter) that this change pushes through, and
+   `web/webclient/actions/dispatcher.py`'s `_publish_completion` hook point (consumed by the next
+   change).
 - **Layer contract dependency:** the negative memo must know a transport failure apart from an
-  ordinary degrade; the layer's resolve-to-`None` contract is augmented with a typed outcome
-  (ready / degraded(reason)) — carried as a dependency amendment for `action-options-layer`
-  (design.md D7).
-- **Deferred to follow-ups:** `options.dismiss` action + the unified three-parameter adapter ABI
-  (`dismiss-options-action`); the three hook call sites (`action-options-trigger-hooks`); the
-  dock/choice-point surfaces (`webclient-options-surface`, `webclient-options-choicepoints`).
+  ordinary degrade. The typed `OptionGenerationOutcome` amendment to `action-options-layer` is
+  deferred (that change has already landed and archived with the resolve-to-`None` contract), so
+  the service implements the controlled-failure fallback from design.md D7: it observes
+  `LLMTransportError` through a thin wrapper around the injected layer client; a degrade with an
+  observed transport failure is memoized, every other degrade is not.
+- **Deferred to follow-ups:** the `action-options-layer` typed-outcome amendment (swaps the
+  client observation for a typed reason; memo semantics unchanged); `options.dismiss` action +
+  the unified three-parameter adapter ABI (`dismiss-options-action`); the three hook call sites
+  (`action-options-trigger-hooks`); the dock/choice-point surfaces
+  (`webclient-options-surface`, `webclient-options-choicepoints`).
 - **Test surface:** `server/tests/test_option_proposal_service.py`,
   `web/webclient/presentation/tests/test_watchers.py`, coordinator push tests; FakeLLM fixtures
   via the layer; no player command, panel schema, or protocol change in this change.

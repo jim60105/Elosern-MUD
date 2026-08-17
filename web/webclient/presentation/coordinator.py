@@ -212,6 +212,42 @@ def attach_coordinator(session: Any, registry: PresentationRegistry) -> Presenta
     return coordinator
 
 
+def publish_panel_update(
+    session: Any,
+    actor: Any,
+    panels: dict[str, Any],
+    *,
+    context: PresentationContext,
+    expected_epoch: str,
+) -> dict[str, Any] | None:
+    """Push one validated panel subset to a live session under the epoch guard.
+
+    The trigger service's async generation completes after scheduling; between
+    the two moments a puppet change, reconnect, or sequence reset may have
+    started a fresh presentation sequence. This helper returns the emitted
+    envelope, or publishes nothing (returning ``None``) when the session's live
+    coordinator is absent or its epoch no longer equals the ``expected_epoch``
+    captured when the push was scheduled. ``context`` is the caller's
+    :class:`PresentationContext`, assembled through the shared ingress factory
+    so the ``context_actions`` presenter renders from the ``OptionsSnapshot``.
+    """
+    from web.webclient.presentation.registry import build_production_registry
+
+    ndb = getattr(session, "ndb", None)
+    coordinator = getattr(ndb, "elosern_coordinator", None) if ndb is not None else None
+    if coordinator is None:
+        coordinator = attach_coordinator(session, build_production_registry())
+    if coordinator.epoch != expected_epoch:
+        return None
+    try:
+        return coordinator.panel_update(context, panels)
+    except Exception:
+        # A guarded push's contract is a silent no-op on any failure: an
+        # async delivery cannot raise into the generation route, and the
+        # session's next snapshot re-establishes the truth.
+        return None
+
+
 def detach_coordinator(session: Any) -> None:
     """Drop the ephemeral coordinator (transport or puppet change)."""
     if getattr(session, "ndb", None) is not None:
