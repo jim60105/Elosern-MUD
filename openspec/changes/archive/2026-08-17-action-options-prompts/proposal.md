@@ -16,8 +16,9 @@ output — the feature cannot run end-to-end.
   emits the layer defaults (`temperature` 0.7, `max_tokens` ≈ 320, `supports_response_format:
   true`); a per-layer required-flag rule makes construction reject
   `supports_response_format: false` for the action_options layer.
-- `server/conf/settings.py`: one import-time `build_profiles(LLM_PROFILES)` validation call beside
-  the existing `LLM_PROFILES = default_profiles()`, so a misconfigured slot fails at startup.
+- `server/conf/settings.py`: one import-time `build_profiles(LLM_PROFILES)` validation call after
+  every settings override (at the end of the module, past `secret_settings`), so a misconfigured
+  slot fails at startup.
 - `openspec/specs/llm-profiles` main contract gains a MODIFIED delta (the layer-enumeration
   requirement updates from the current five layer names to six, adding `action_options` —
   audit check: the codebase already has five layers incl. `character_creation`, which the main

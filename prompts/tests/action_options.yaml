@@ -1,0 +1,11 @@
+# Hostile fixture for world/prompts/tests/test_loader.py: this directory is
+# never scanned by the loader (it reads only root-level *.yaml files under the
+# prompt root). Tests copy this file over a fixture root's action_options.yaml
+# to prove that an unknown placeholder token like {nmme} records a named
+# PromptLibraryError instead of being silently rendered.
+schema_version: 1
+prompts:
+  action_options.system: |-
+    你是《伊洛瑟恩大陸》的遊戲企劃，請提出行動建議 {nmme}。
+  action_options.user: |-
+    場景名稱：{room_name} 在場人物 {nmme}。

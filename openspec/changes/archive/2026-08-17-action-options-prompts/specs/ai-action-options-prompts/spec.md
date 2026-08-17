@@ -7,8 +7,9 @@ key SHALL direct the model as a game-design curator for an adult single-player w
 actions in Traditional Chinese, always choosing `known_action` cards from the provided affordance
 codes and using `freeform` only for speech a present person could plausibly be addressed with. The
 user key SHALL carry the serialized context block. Both keys SHALL repeat the hard rules: no
-numbers, no hidden values, no fabricated targets, cards reference only present people/places/things,
-and exactly the documented JSON schema output (pipeline design doc §3).
+numbers in player-visible `label`/`hint` text (structural fields such as `npc_index` and `params`
+are exempt), no hidden values, no fabricated targets, cards reference only present
+people/places/things, and exactly the documented JSON schema output (pipeline design doc §3).
 
 #### Scenario: Both prompt keys resolve through the loader
 - **WHEN** `world/prompts/loader.py` loads the prompt library
@@ -16,7 +17,8 @@ and exactly the documented JSON schema output (pipeline design doc §3).
 
 #### Scenario: The system prompt forbids hidden values
 - **WHEN** the `action_options.system` text is inspected
-- **THEN** it explicitly forbids numbers, hidden values, and fabricated targets
+- **THEN** it explicitly forbids numbers in `label`/`hint` text, hidden values, and fabricated
+  targets, while exempting structural fields (`npc_index`, `params`) from the number rule
 
 ### Requirement: The registry declares the action_options entries with an exact placeholder allowlist
 `world/prompts/registry.py` SHALL register `action_options.system` and `action_options.user`
@@ -59,8 +61,8 @@ assert the effective profile for the new layer.
 `world/ai/profiles.py` SHALL enforce a per-layer required-flag rule: building profiles with
 `action_options.supports_response_format: false` SHALL raise `ProfileValidationError` naming the
 layer and field. `server/conf/settings.py` SHALL validate the effective profile map at import time
-(one `build_profiles(LLM_PROFILES)` call beside the existing
-`LLM_PROFILES = default_profiles()`), so a misconfigured endpoint for the one layered
+(one `build_profiles(LLM_PROFILES)` call placed after every settings override, including the
+`secret_settings` block at the end of the module), so a misconfigured endpoint for the one layered
 JSON-schema consumer fails **at startup** rather than at the first live call (pipeline design doc
 §5). All other bounds and layers SHALL behave exactly as today.
 

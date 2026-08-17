@@ -65,6 +65,32 @@ _SCENE_BUILDER_SYSTEM = (
     "不得描述正在發生的事件，也不得預言後續發展。"
     "只輸出氛圍散文本身，不要加上任何標題、前言、註解或元資訊。"
 )
+_ACTION_OPTIONS_SYSTEM = (
+    "你是《伊洛瑟恩大陸》的遊戲企劃，負責為單人冒險的主角規劃接下來可以採取的行動。"
+    "請以正體中文，從底下提供的行動清單中挑選 3 到 5 個主角現在就能執行的行動，做成建議卡片。"
+    "每張卡片只有兩種形式：known_action 卡片必須採用清單中給定的行動代碼（action_code），"
+    "不得自創或改寫代碼與參數；freeform 卡片只能用來表達主角對在場人物說得出口、且合理的台詞。"
+    "鐵律：卡片標籤（label）與說明（hint）中不得出現任何數字，也不得洩漏隱藏數值、真實屬性或好感度；"
+    "不得虛構目標，卡片只能引用現場確實存在的人物、地點與物品；"
+    "結構欄位（如 npc_index、params）不受此限，必須依照指定的 JSON 格式輸出。"
+    "只輸出 JSON 本身，不要加上任何前言、註解或說明。"
+)
+_ACTION_OPTIONS_USER = (
+    "場景名稱：{room_name}\n"
+    "場景描述：{room_summary}\n"
+    "在場 NPC（每個條目附有 npc_index 供 freeform 卡片引用）：{npc_entries}\n"
+    "在場怪物：{monster_entries}\n"
+    "目前目標：{objective}\n"
+    "近期脈絡：{narrative_tail}\n"
+    "可執行行動（每個行動附有 action_code 與參數）：{affordances}\n"
+    "請依照系統提示的規則，以正體中文輸出 JSON 行動建議。"
+    'known_action 卡片格式為 {"kind": "known_action", "action_code": "清單中的代碼", '
+    '"label": "正體中文標籤", "params": {"參數": 值}, "hint": "正體中文說明"}；'
+    'freeform 卡片格式為 {"kind": "freeform", "npc_index": 0, "label": "對該人物說的話", '
+    '"hint": "正體中文說明"}。重申鐵律：label 與 hint 中不得出現任何數字，'
+    "不得洩漏隱藏數值，不得虛構目標，卡片只能引用現場存在的人事物；"
+    "npc_index、params 等結構欄位不受此限，並嚴格依照上述 JSON 格式輸出。"
+)
 
 
 class VerbatimShipmentTests(unittest.TestCase):
@@ -180,6 +206,39 @@ class VerbatimShipmentTests(unittest.TestCase):
         )
         self.assertIn("正體中文", rendered)
         self.assertIn("不得虛構", rendered)
+
+    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys")
+    def test_action_options_system_prompt_is_shipped_verbatim(self):
+        system = render_prompt("action_options.system")
+        self.assertEqual(system, _ACTION_OPTIONS_SYSTEM)
+        self.assertIn("正體中文", system)
+        self.assertIn("不得洩漏隱藏數值", system)
+        self.assertIn("不得虛構目標", system)
+
+    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys")
+    def test_action_options_user_template_is_shipped_verbatim(self):
+        rendered = render_prompt(
+            "action_options.user",
+            room_name="林間祭壇",
+            room_summary="古老森林深處的祭壇",
+            npc_entries="1. 艾洛西亞（npc_index=0）",
+            monster_entries="無",
+            objective="採集靈藥草",
+            narrative_tail="你沿著小徑走進森林。",
+            affordances="explore.look",
+        )
+        self.assertEqual(
+            rendered,
+            _ACTION_OPTIONS_USER.replace("{room_name}", "林間祭壇")
+            .replace("{room_summary}", "古老森林深處的祭壇")
+            .replace("{npc_entries}", "1. 艾洛西亞（npc_index=0）")
+            .replace("{monster_entries}", "無")
+            .replace("{objective}", "採集靈藥草")
+            .replace("{narrative_tail}", "你沿著小徑走進森林。")
+            .replace("{affordances}", "explore.look"),
+        )
+        self.assertIn("正體中文", rendered)
+        self.assertIn("npc_index", rendered)
 
 
 class LibrarySourceTests(unittest.TestCase):

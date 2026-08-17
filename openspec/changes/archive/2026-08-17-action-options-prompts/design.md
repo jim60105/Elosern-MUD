@@ -38,9 +38,10 @@ surfaces — no behavior change outside the generative layer.
 - **Startup enforcement in `server/conf/settings.py`:** `build_profiles` is otherwise reached only
   lazily through `get_profile`, so a misconfigured `LLM_PROFILES` would fail on the first live
   call, not at startup. The settings module therefore validates the map at import time with one
-  explicit `build_profiles(LLM_PROFILES)` call beside `LLM_PROFILES = default_profiles()` —
-  making the pipeline doc's fail-closed-at-startup promise real and testable without changing the
-  profile resolution path.
+  explicit `build_profiles(LLM_PROFILES)` call placed **after every settings override**, including
+  the `secret_settings` block at the end of the module — so a misconfigured slot fails at startup
+  even when it arrives through the documented override mechanism (rubber-duck R2), while the
+  profile resolution path itself is untouched.
 - **Defaults in `default_profiles()`** (`temperature` 0.7, `max_tokens` 320,
   `supports_response_format: true`, otherwise the shared locals-first shape) so the slot appears
   everywhere the default source is used, including `settings.LLM_PROFILES`.

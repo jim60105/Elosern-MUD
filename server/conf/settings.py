@@ -56,7 +56,7 @@ PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototype
 # Generative-layer LLM endpoint profiles (llm-client). Local-first by default:
 # base_url derives from OLLAMA_BASE_URL (the compose runtime) or falls back to a
 # bare-metal localhost endpoint.
-from world.ai.profiles import default_profiles
+from world.ai.profiles import build_profiles, default_profiles
 
 LLM_PROFILES = default_profiles()
 
@@ -155,3 +155,8 @@ try:
     from server.conf.secret_settings import *
 except ImportError:
     print("secret_settings.py file not found or failed to import.")
+
+# Validate the effective profile map after every settings override, so a
+# misconfigured action_options structured-output slot fails at startup rather
+# than at the first live call, even when it arrives via secret_settings.
+build_profiles(LLM_PROFILES)

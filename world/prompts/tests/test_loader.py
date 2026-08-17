@@ -56,6 +56,7 @@ class ValidLoadTests(unittest.TestCase):
                 "npc.yaml",
                 "art.yaml",
                 "character_creation.yaml",
+                "action_options.yaml",
             },
         )
 
@@ -103,6 +104,73 @@ class ValidLoadTests(unittest.TestCase):
         self.assertIn("種族：human（…）", text)
         self.assertNotIn("{concept}", text)
         self.assertNotIn("{race_catalog}", text)
+
+    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys", "ai-action-options-prompts::the-registry-declares-the-action-options-entries-with-an-exact-placeholder-allowlist")
+    def test_action_options_keys_are_registered_with_split_allowlists(self):
+        library = load_prompt_library(str(REPO_PROMPTS))
+        for key in ("action_options.system", "action_options.user"):
+            self.assertIn(key, library.texts)
+            self.assertIn(key, PROMPT_SPECS)
+        system = PROMPT_SPECS["action_options.system"]
+        user = PROMPT_SPECS["action_options.user"]
+        self.assertEqual(system.allowed_placeholders, ())
+        self.assertEqual(
+            set(user.allowed_placeholders),
+            {
+                "room_name",
+                "room_summary",
+                "npc_entries",
+                "monster_entries",
+                "objective",
+                "narrative_tail",
+                "affordances",
+            },
+        )
+        self.assertEqual(system.file, "action_options.yaml")
+        self.assertEqual(user.file, "action_options.yaml")
+
+    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys")
+    def test_action_options_system_prompt_forbids_hidden_values(self):
+        load_prompt_library(str(REPO_PROMPTS))
+        text = render_prompt("action_options.system")
+        self.assertIn("不得出現任何數字", text)
+        self.assertIn("不得洩漏隱藏數值", text)
+        self.assertIn("不得虛構目標", text)
+        self.assertIn("正體中文", text)
+        self.assertIn("npc_index、params", text)
+
+    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys", "ai-action-options-prompts::the-registry-declares-the-action-options-entries-with-an-exact-placeholder-allowlist")
+    def test_action_options_user_renders_the_seven_context_fields_exactly_once(self):
+        load_prompt_library(str(REPO_PROMPTS))
+        text = render_prompt(
+            "action_options.user",
+            room_name="林間祭壇",
+            room_summary="古老森林深處的祭壇",
+            npc_entries="1. 艾洛西亞（npc_index=0）",
+            monster_entries="無",
+            objective="採集靈藥草",
+            narrative_tail="你沿著小徑走進森林。",
+            affordances="explore.look",
+        )
+        for value in (
+            "林間祭壇",
+            "古老森林深處的祭壇",
+            "1. 艾洛西亞（npc_index=0）",
+            "採集靈藥草",
+            "你沿著小徑走進森林。",
+            "explore.look",
+        ):
+            self.assertEqual(text.count(value), 1)
+        for token in (
+            "{room_name}",
+            "{room_summary}",
+            "{npc_entries}",
+            "{monster_entries}",
+            "{objective}",
+            "{narrative_tail}",
+            "{affordances}",
+        ):
+            self.assertNotIn(token, text)
 
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_allowlisted_placeholders_are_substituted_exactly_once(self):
@@ -263,6 +331,22 @@ class ValidationFailureTests(PromptFixture):
         self.assertIn("unknown placeholder", error.problem)
         self.assertIn("nmme", error.problem)
         self.assertNotIn("scene_builder.system", library.texts)
+
+    @covers_requirement("ai-action-options-prompts::the-registry-declares-the-action-options-entries-with-an-exact-placeholder-allowlist")
+    def test_action_options_hostile_fixture_records_unknown_placeholder_errors(self):
+        import shutil
+
+        shutil.copyfile(
+            REPO_PROMPTS / "tests" / "action_options.yaml",
+            self.root / "action_options.yaml",
+        )
+        library = self.load()
+        for key in ("action_options.system", "action_options.user"):
+            error = library.errors[key]
+            self.assertIn("unknown placeholder", error.problem)
+            self.assertIn("nmme", error.problem)
+            self.assertNotIn(key, library.texts)
+        self.assertIn("narrator.system", library.texts)
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_a_malformed_file_fails_only_its_own_key(self):
