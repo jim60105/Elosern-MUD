@@ -12,9 +12,10 @@ the group key is non-null, and an ordered array of skill descriptors. Category o
 array entirely, not emitted with an empty `groups` array; a category whose skills carry no `group`
 SHALL emit exactly one sub-group with a `null` group key and label. The total count of skill
 descriptors across every category and sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound
-of `192` — raised from the previous `32` so the bound clears the current theoretical maximum of 154
-owned active skills (91 base active skills including innate plus 63 registered sexual acts) with
-headroom for catalog growth, while remaining a multiple of 16 consistent with the presentation-bounds
+of `192` — raised from the previous `32` so the bound clears the current theoretical maximum of 157
+owned active skills (91 base active skills including innate plus 65 registered sexual acts and the
+pre-existing `divine_sexual_arts`) with headroom for catalog growth, while remaining a multiple of
+16 consistent with the presentation-bounds
 family; this bound applies to the flattened total, not to the count of top-level category-group
 entries, which is separately bounded by the number of `SkillCategory` members. Within each sub-group, skill
 descriptors SHALL list each unique owned active `SkillDef` in `SkillHandler.owned_keys()` order after

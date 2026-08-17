@@ -8,15 +8,16 @@ panel) preserved it deliberately ("the actual total-skill-count bound the OOB pr
 on") and re-asserted it in three places — the build-time bound in `combat_view._build_skills`
 (raising `CombatViewError` → `PanelUnavailableError` for the web panel), the server-side payload
 validator in `web/webclient/presentation/combat_panel.py`, and the client-side mirror in
-`web/static/webclient/js/elosern/protocol.js`. The catalog added 63 active `SEXUAL_ACT` skills on
-top of the 91 base active skills (including the two innate), for a theoretical maximum of **154
-owned active skills** — any character who unlocks a meaningful share of the catalog alongside
+`web/static/webclient/js/elosern/protocol.js`. The catalog added 65 active `SEXUAL_ACT` skills on
+top of the 91 base active skills (including the two innate), for a theoretical maximum of **157
+owned active skills** (the extra one over 91 + 65 being the pre-existing `divine_sexual_arts`
+active skill) — any character who unlocks a meaningful share of the catalog alongside
 normal spell acquisition exceeds 32 and loses the combat action panel entirely.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Raise `MAX_SKILLS` from 32 to **192**, clearing the 154-skill theoretical maximum with headroom
+- Raise `MAX_SKILLS` from 32 to **192**, clearing the 157-skill theoretical maximum with headroom
   while staying a multiple of 16 (the presentation-bounds family is `MAX_PARTICIPANTS = 16`,
   `MAX_SKILLS = 32`).
 - Update all four enforcement points and both boundary tests with the new value.
@@ -44,10 +45,10 @@ Two global webclient protocol constants apply to every validated server payload 
 `MAX_LIST_ITEMS = 128` bounds every array):
 
 - **List-item bound**: satisfied structurally. The largest array in the v3 combat envelope is a
-  category sub-group's `skills` list — at most 16 descriptors today (關係線), well under 128; the
+  category sub-group's `skills` list — at most 18 descriptors today (關係線), well under 128; the
   `groups` arrays and the top-level category array are bounded by `len(SkillCategory)`; participants
   are bounded by `MAX_PARTICIPANTS = 16`.
-- **Byte bound**: measured, not assumed. The actual text payload of all 154 obtainable active
+- **Byte bound**: measured, not assumed. The actual text payload of all 157 obtainable active
   skills' descriptor fields (key, label, description, cost, spec/group/category strings) totals
   ≈ 20 KB in the current registry (≈130 bytes per descriptor); with per-descriptor JSON scaffolding
   and the envelope overhead, the catalog-complete payload is estimated at ≈ 50–62 KB — inside
@@ -56,6 +57,9 @@ Two global webclient protocol constants apply to every validated server payload 
   active skill and assert it is at or below `MAX_CANONICAL_JSON_BYTES`. The decision rule is
   deterministic: if the measured payload exceeds the limit, `MAX_SKILLS` SHALL be lowered to the
   largest multiple of 16 that fits and the test re-run; 192 stands only if the gate passes.
+  **Measured at implementation time: the catalog-complete payload serializes to 47,805 bytes
+  (73% of the 65,536 ceiling), and every array fits under `MAX_LIST_ITEMS` — the gate passes and
+  `MAX_SKILLS = 192` stands.**
 
 **Rejected — paging/chunking the skill list.** The webclient panel renders the full list and has no
 pagination seam; a byte-aware pagination scheme would be a protocol change (new schema version)

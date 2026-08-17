@@ -15,7 +15,12 @@ from web.webclient.presentation.combat_panel import (
     validate_context_actions,
 )
 from web.webclient.presentation.context import PresentationContext
-from web.webclient.presentation.protocol import json_byte_size
+from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES,
+    MAX_LIST_ITEMS,
+    check_envelope,
+    json_byte_size,
+)
 from web.webclient.presentation.registry import (
     PanelUnavailableError,
     build_production_registry,
@@ -481,21 +486,47 @@ class ContextActionsSchemaTests(unittest.TestCase):
     def test_flattened_skill_count_bound_rejects_small_category_payload(self):
         # Design.md D-5: MAX_SKILLS applies to the flattened descriptor
         # total, not to the number of top-level category-group entries. A
-        # hand-built payload with one category group carrying 33 skills must
-        # be rejected even though its top-level count is far below
-        # len(SkillCategory).
-        skills = []
-        for index in range(1, 34):
-            skills.append(
-                _valid_skill(
-                    key=f"skill_{index}",
-                    label=f"技能名稱{index}",
-                    targets=[2],
+        # hand-built payload whose flattened total is 193 must be rejected
+        # even though its top-level count is far below len(SkillCategory).
+        # Skills are spread across sub-groups so each group stays within the
+        # global MAX_LIST_ITEMS bound — the flattened total, not any single
+        # array, is what exceeds MAX_SKILLS.
+        skills_by_group = []
+        for group in range(3):
+            count = 65 if group == 2 else 64
+            skills_by_group.append(
+                _valid_skill_group(
+                    group=f"group_{group}",
+                    label=f"群組{group}",
+                    skills=[
+                        _valid_skill(
+                            key=f"skill_{group * 64 + index}",
+                            label=f"技能名稱{group * 64 + index}",
+                            targets=[2],
+                        )
+                        for index in range(1, count + 1)
+                    ],
                 )
             )
-        panel = _valid_panel(skills=self._nested_skills(*skills))
+        panel = _valid_panel(
+            skills=[_valid_category_group(groups=skills_by_group)]
+        )
         with self.assertRaises(Exception):
             validate_context_actions(panel)
+
+        # 192 skills across the same shape still passes.
+        skills_by_group[2]["skills"].pop()
+        panel = _valid_panel(
+            skills=[_valid_category_group(groups=skills_by_group)]
+        )
+        validate_context_actions(panel)
+        # The 192-skill payload also satisfies the global envelope safety the
+        # real client applies before panel validation: every array stays
+        # within MAX_LIST_ITEMS and the canonical JSON fits the byte bound.
+        check_envelope(panel)
+        for group in panel["skills"][0]["groups"]:
+            self.assertLessEqual(len(group["skills"]), MAX_LIST_ITEMS)
+        self.assertLessEqual(json_byte_size(panel), MAX_CANONICAL_JSON_BYTES)
 
     def test_actions_key_bounds_reject(self):
         panel = _valid_panel()
@@ -693,14 +724,15 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(len(martial["groups"]), 1)
         self.assertIsNone(martial["groups"][0]["group"])
         self.assertIsNone(martial["groups"][0]["label"])
-        # The seven unconditionally-owned seed acts form the sexual_act
-        # category with their Chinese line names as sub-group keys, in
-        # first-seen group order (sorted seed keys: combat_tease first).
+        # The unconditionally-owned seed acts form the sexual_act category
+        # with their Chinese line names as sub-group keys, in first-seen
+        # group order (sorted seed keys: combat_tease first, then the seven
+        # 神之秘法 acts whose unlock={} makes them owned by everyone).
         sexual = payload["skills"][3]
         self.assertEqual(sexual["label"], "性愛行為")
         self.assertEqual(
             [sub_group["group"] for sub_group in sexual["groups"]],
-            ["戰鬥", "關係", "羞恥", "獨處"],
+            ["戰鬥", "神之秘法", "關係", "羞恥", "獨處"],
         )
         # shadow_slash is stored before the innate basic_attack.
         self.assertEqual(
@@ -828,6 +860,45 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_catalog_complete_panel_fits_protocol_envelope(self):
+        # Design.md D-2: the raised MAX_SKILLS stands only while the
+        # catalog-complete payload still fits the OOB envelope limits. Own
+        # every obtainable active skill (the 91 base active skills including
+        # innate, plus all 65 registered sexual acts) and measure the
+        # serialized panel: it must build without a presentation error and
+        # stay at or below MAX_CANONICAL_JSON_BYTES with every array within
+        # MAX_LIST_ITEMS.
+        from world.skills.registry import SKILL_REGISTRY, SkillKind
+
+        all_active = sorted(
+            key
+            for key, skill in SKILL_REGISTRY.items()
+            if skill.kind is SkillKind.ACTIVE
+        )
+        self.player.db.skills = {"active": all_active, "passive": []}
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        flattened = self._flatten_skills(payload)
+        self.assertGreater(len(flattened), 32)
+        self.assertEqual(len(flattened), len(all_active))
+
+        def _walk_arrays(value):
+            if isinstance(value, list):
+                yield value
+                for item in value:
+                    yield from _walk_arrays(item)
+            elif isinstance(value, dict):
+                for item in value.values():
+                    yield from _walk_arrays(item)
+
+        for array in _walk_arrays(payload):
+            self.assertLessEqual(len(array), MAX_LIST_ITEMS)
+        self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
 
     def test_production_registry_contains_every_registered_panel(self):
         self.assertEqual(

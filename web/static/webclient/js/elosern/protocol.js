@@ -64,7 +64,12 @@
   // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
   var MAX_SESSION_ID_CODE_POINTS = 128;
   var MAX_PARTICIPANTS = 16;
-  var MAX_SKILLS = 32;
+  // Flattened active-skill descriptor bound. Raised from 32 to clear the
+  // current theoretical maximum of 157 obtainable active skills (91 base
+  // active skills including innate, plus the 65 registered sexual acts and
+  // the pre-existing divine_sexual_arts); a multiple of 16 like the other
+  // presentation bounds.
+  var MAX_SKILLS = 192;
   var MAX_DISPLAY_NAME = 64;
   var MAX_LABEL = 128;
   var MAX_DESCRIPTION = 512;

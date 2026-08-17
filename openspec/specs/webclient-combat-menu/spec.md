@@ -28,8 +28,12 @@ the group key is non-null, and an ordered array of skill descriptors. Category o
 `ELEMENT_REGISTRY`'s declaration order. A category with zero owned skills SHALL be omitted from the
 array entirely, not emitted with an empty `groups` array; a category whose skills carry no `group`
 SHALL emit exactly one sub-group with a `null` group key and label. The total count of skill
-descriptors across every category and sub-group, flattened, SHALL NOT exceed the existing `MAX_SKILLS`
-bound; this bound applies to the flattened total, not to the count of top-level category-group
+descriptors across every category and sub-group, flattened, SHALL NOT exceed the `MAX_SKILLS` bound
+of `192` — raised from the previous `32` so the bound clears the current theoretical maximum of 157
+owned active skills (91 base active skills including innate plus 65 registered sexual acts and the
+pre-existing `divine_sexual_arts`) with headroom for catalog growth, while remaining a multiple of
+16 consistent with the presentation-bounds
+family; this bound applies to the flattened total, not to the count of top-level category-group
 entries, which is separately bounded by the number of `SkillCategory` members. Within each sub-group, skill
 descriptors SHALL list each unique owned active `SkillDef` in `SkillHandler.owned_keys()` order after
 passive filtering, including innate skills, without alphabetical reordering. Each skill descriptor
@@ -74,9 +78,21 @@ bounds and the serialized envelope SHALL remain within the OOB protocol limit.
 
 #### Scenario: The flattened skill-count bound rejects a payload whose total exceeds MAX_SKILLS even when its category-group count is small
 - **WHEN** a hand-constructed `skills` payload has few top-level category-group entries but a
-  flattened total skill count across all of their sub-groups exceeding `MAX_SKILLS`
+  flattened total skill count across all of their sub-groups exceeding `192`
 - **THEN** validation rejects the payload, because the bound applies to the flattened total, not to
   the count of top-level category-group entries
+
+#### Scenario: A payload at the raised bound passes validation
+- **WHEN** a hand-constructed `skills` payload's flattened total is exactly `192`
+- **THEN** validation accepts the payload
+
+#### Scenario: A catalog-complete panel fits within the canonical JSON byte bound
+- **WHEN** the combat view is built for an entity owning every currently obtainable active skill
+  (all base active skills plus every registered sexual act) and the resulting `context_actions`
+  payload is serialized
+- **THEN** the panel builds without a presentation error and the canonical JSON size of the
+  serialized payload is at or below `MAX_CANONICAL_JSON_BYTES` (65,536), and every array in the
+  payload is within `MAX_LIST_ITEMS`
 
 #### Scenario: Unavailable skill remains visible
 - **WHEN** an owned active skill lacks resources, has no valid target, has an unavailable effect
