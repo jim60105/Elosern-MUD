@@ -19,10 +19,8 @@ from typing import Any
 
 from django.conf import settings
 
-from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.ingress import is_webclient
-from web.webclient.presentation.protocol import PROTOCOL_VERSION
+from web.webclient.presentation.ingress import build_presentation_context, is_webclient
 from web.webclient.presentation.registry import build_production_registry
 
 # Stable per-subscriber identity so re-connecting from at_server_start is a
@@ -44,7 +42,7 @@ def _subject_keys(payload: dict[str, Any]) -> set[str]:
 
 def _render_art_for_session(session: Any, actor: Any) -> dict[str, Any]:
     """Render the art panel for one live session's canonical state."""
-    context = PresentationContext(actor=actor, protocol_version=PROTOCOL_VERSION)
+    context = build_presentation_context(session, actor)
     return build_production_registry().render("art", context)
 
 
@@ -56,7 +54,7 @@ def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
         return
     if not payload.get("available"):
         return
-    context = PresentationContext(actor=actor, protocol_version=PROTOCOL_VERSION)
+    context = build_presentation_context(session, actor)
     coordinator.panel_update(context, {"art": payload})
 
 

@@ -1,4 +1,15 @@
-## ADDED Requirements
+## Purpose
+
+This capability covers the action-options trigger service, the write side of the
+`context_actions` suggestions panel: situation fingerprinting, the
+one-LLM-call-per-cache-residency contract with replay and pending semantics,
+session-scoped presentation state, token/epoch-guarded delivery, per-session
+eviction, the transport-failure-only negative memo, the watcher registry for the
+room-entry hook, and fire-and-forget scheduling. The read side of the panel is
+pinned by the `webclient-context-actions-suggestions` capability. This spec was
+added by the `action-options-trigger-service` change.
+
+## Requirements
 
 ### Requirement: Fingerprint identifies the situation, not the moment
 
@@ -164,10 +175,21 @@ later trigger for the same situation SHALL regenerate.
 A transport failure SHALL memoize the fingerprint for `NEGATIVE_MEMO_TTL` (30 s); a trigger
 within the TTL SHALL resolve to `degraded` immediately without transport work; after the TTL a
 trigger SHALL attempt once more. A degraded outcome that is not a transport failure — validation
-exhaustion or a disabled profile — SHALL NOT be memoized. The service SHALL distinguish the two
-through the layer's typed outcome (`OptionGenerationOutcome` with `reason`
-`transport|validation|disabled`, or the controlled-failure fallback until the layer amendment
-lands); a successful generation SHALL NOT be memoized negatively.
+exhaustion, prompt unavailability, a disabled profile, or a response that
+failed the guardrail's declared output schema (the client succeeded, so the
+failure is never observed at the client boundary) — SHALL NOT be memoized.
+The discrimination is positional, not by failure kind: a client that itself
+raises `LLMTransportError` (even one carrying the reason `"malformed"`) IS
+the memoized class, because it was observed at the client boundary, while
+the guardrail's own `LLMTransportError` raised after a successful client
+round-trip is not. The service
+SHALL distinguish the two through the controlled-failure fallback: it calls the layer through a
+thin client wrapper that observes `LLMTransportError` (raised or errbacked) on the injected
+client, and a degraded outcome with an observed transport failure is the memoized class while
+every other degrade is not (the disabled profile resolves before any client call, so it is
+never observable through the wrapper); a successful generation SHALL NOT be memoized
+negatively. A later change MAY replace the observation with the layer's typed outcome without
+changing the memo semantics.
 
 #### Scenario: A dead endpoint is not hammered within the TTL
 - **WHEN** a transport failure memoizes a fingerprint and another trigger fires within 30 s
