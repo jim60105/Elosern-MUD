@@ -99,6 +99,7 @@ def _imports_state_writer(tree: ast.Module) -> list[str]:
 
 class AiTransportBoundaryTests(unittest.TestCase):
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
+    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_only_client_py_imports_a_live_transport(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -137,6 +138,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     @covers_requirement("persona-dialogue-injection::persona-wiring-is-read-only-and-value-passing")
+    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_no_ai_module_imports_a_state_writer(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -156,6 +158,7 @@ class AiTransportBoundaryTests(unittest.TestCase):
 
     @covers_requirement("fake-llm-client::generative-layer-tests-never-contact-a-live-endpoint")
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
+    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_generative_module_source_has_no_socket_imports(self):
         for module_path in [
             *_production_module_paths(AI_ROOT),
