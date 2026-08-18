@@ -140,9 +140,12 @@ inserted into the narrative stream.
 
 - New action code `options.dismiss` in `web/webclient/actions/` (payload `{}`): the adapter calls
   `evict(session, actor)` with the session the dispatcher injects (trigger-service doc §4), which
-  invalidates that session's in-flight generation, clears the global cache/memo for the displayed
-  fingerprint, and publishes `suggestions.status="unavailable"` — the section disappears in both
-  dock and narrative stream.
+  invalidates that session's in-flight generation and clears the global cache/memo for the
+  displayed fingerprint. `evict` is state-only and never sends (dismiss-options-action D1); the
+  completion publication — the adapter declares `affected_panels=("context_actions",)` — renders
+  `suggestions.status="unavailable"` from the mutated state, and the section disappears in both
+  dock and narrative stream. A failed eviction (the service reports `False`, never raising)
+  rejects with the stable `dismiss_failed` code instead of claiming success.
 - **Unified adapter ABI (round-three review):** `ActionSpec.adapter` becomes
   `adapter(actor, payload, session=None)` for *every* registered adapter — the same change that
   introduces `options.dismiss` updates all production adapters and the `ActionSpec` type, and

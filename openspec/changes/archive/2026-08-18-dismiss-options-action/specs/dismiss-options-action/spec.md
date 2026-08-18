@@ -32,6 +32,11 @@ The dismiss adapter SHALL call the trigger service's `evict(session, actor)` wit
 - **WHEN** the player dismisses and then returns to (or re-enters) the same situation
 - **THEN** the service schedules a new generation rather than replaying the evicted cached set
 
+#### Scenario: A failed eviction rejects without reporting success
+
+- **WHEN** the trigger service reports the eviction could not be applied (or raises unexpectedly)
+- **THEN** the dismiss adapter returns a `rejected` result with a stable code and no presentation update claims the dismissal succeeded
+
 ### Requirement: Dismissal publishes exactly one state-backed unavailable update
 
 The dismiss adapter SHALL NOT send any message itself. Its success result SHALL declare `affected_panels=("context_actions",)`, so the normal dispatcher completion publication builds the panel from the now-`unavailable` `options_state` and emits exactly one `ui_update` with `suggestions.status == "unavailable"` before the matching success result.

@@ -72,7 +72,14 @@ def _proof_spec(action_id="proof.noop", adapter=None):
         action_id=action_id,
         validate_payload=lambda payload: payload,
         adapter=adapter
-        or (lambda actor, payload: {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}),
+        or (
+            lambda actor, payload, session=None: {
+                "outcome": "success",
+                "code": "ok",
+                "message": "完成",
+                "affected_panels": ("status",),
+            }
+        ),
         affected_panels=("status",),
     )
 
@@ -149,6 +156,7 @@ class RegistryTests(unittest.TestCase):
                     "explore.party_leave",
                     "explore.engage",
                     "explore.wait",
+                    "options.dismiss",
                 }
             ),
         )
@@ -204,7 +212,7 @@ class DispatcherTests(unittest.TestCase):
     def test_stale_revision_calls_no_adapter_and_emits_snapshot(self):
         calls = []
         registry = ActionRegistry("test")
-        registry.register(_proof_spec(adapter=lambda actor, payload: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
+        registry.register(_proof_spec(adapter=lambda actor, payload, session=None: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
         session = self._session_with_coordinator()
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
@@ -222,7 +230,7 @@ class DispatcherTests(unittest.TestCase):
     def test_prior_epoch_calls_no_adapter(self):
         calls = []
         registry = ActionRegistry("test")
-        registry.register(_proof_spec(adapter=lambda actor, payload: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
+        registry.register(_proof_spec(adapter=lambda actor, payload, session=None: calls.append(1) or {"outcome": "success", "code": "ok", "message": "完成"}))
         session = self._session_with_coordinator()
         envelope = self._envelope(epoch="a" * 22, base_revision=1, action_id="proof.noop")
         handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
@@ -236,7 +244,7 @@ class DispatcherTests(unittest.TestCase):
         registry = ActionRegistry("test")
         registry.register(
             _proof_spec(
-                adapter=lambda actor, payload: calls.append(1)
+                adapter=lambda actor, payload, session=None: calls.append(1)
                 or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
             )
         )
@@ -287,7 +295,7 @@ class DispatcherTests(unittest.TestCase):
             ActionSpec(
                 action_id="proof.slow",
                 validate_payload=lambda payload: payload,
-                adapter=lambda actor, payload: calls.append(1) or held,
+                adapter=lambda actor, payload, session=None: calls.append(1) or held,
             )
         )
         session = self._session_with_coordinator()
@@ -336,7 +344,7 @@ class DispatcherTests(unittest.TestCase):
         registry = ActionRegistry("test")
         registry.register(
             _proof_spec(
-                adapter=lambda actor, payload: {
+                adapter=lambda actor, payload, session=None: {
                     "outcome": "success",
                     "code": "fled",
                     "message": "你脫離了戰鬥。",
@@ -393,7 +401,7 @@ class DispatcherTests(unittest.TestCase):
         session = self._session_with_coordinator()
         registry = ActionRegistry("test")
         registry.register(
-            _proof_spec(adapter=lambda actor, payload: (_ for _ in ()).throw(RuntimeError("boom")))
+            _proof_spec(adapter=lambda actor, payload, session=None: (_ for _ in ()).throw(RuntimeError("boom")))
         )
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
@@ -414,7 +422,7 @@ class DispatcherTests(unittest.TestCase):
         registry = ActionRegistry("test")
         registry.register(
             _proof_spec(
-                adapter=lambda actor, payload: {"outcome": "rejected", "code": "insufficient_sp", "message": "SP 不足"}
+                adapter=lambda actor, payload, session=None: {"outcome": "rejected", "code": "insufficient_sp", "message": "SP 不足"}
             )
         )
         coordinator = session.ndb.elosern_coordinator
@@ -467,7 +475,7 @@ class DispatcherTests(unittest.TestCase):
                 validate_payload=lambda payload: (_ for _ in ()).throw(
                     ProtocolValidationError("bad payload")
                 ),
-                adapter=lambda actor, payload: {"outcome": "success", "code": "ok", "message": "m"},
+                adapter=lambda actor, payload, session=None: {"outcome": "success", "code": "ok", "message": "m"},
             )
         )
         coordinator = session.ndb.elosern_coordinator
@@ -499,7 +507,7 @@ class DispatcherTests(unittest.TestCase):
             ActionSpec(
                 action_id="proof.slow",
                 validate_payload=lambda payload: payload,
-                adapter=lambda actor, payload: calls.append(actor) or held,
+                adapter=lambda actor, payload, session=None: calls.append(actor) or held,
             )
         )
         coordinator = session.ndb.elosern_coordinator
@@ -522,6 +530,78 @@ class DispatcherTests(unittest.TestCase):
             # Any recreated state carries no epoch token and is not in flight.
             self.assertIsNone(state.epoch)
             self.assertFalse(state.in_flight)
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_proof_adapter_receives_the_session_as_the_third_argument(self):
+        received = []
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: received.append((actor, session))
+                or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(len(received), 1)
+        actor_arg, session_arg = received[0]
+        self.assertIs(actor_arg, session.puppet)
+        self.assertIs(session_arg, session)
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_two_argument_direct_invocation_defaults_session_to_none(self):
+        received = {}
+
+        def proof(actor, payload, session=None):
+            received["session"] = session
+            return {"outcome": "success", "code": "ok", "message": "完成"}
+
+        result = proof("actor", {"x": 1})
+        self.assertIsNone(received["session"])
+        self.assertEqual(result["outcome"], "success")
+
+    @covers_requirement(
+        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
+        "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
+    )
+    def test_dispatcher_passes_three_positionals_without_introspection(self):
+        received = []
+
+        def proof(actor, payload, session=None, *extra):
+            # The declared three-parameter ABI plus a rest slot: the rest must
+            # stay empty, proving the dispatcher passes exactly three
+            # positional arguments unconditionally, never introspecting.
+            received.append((actor, payload, session, extra))
+            return {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+
+        registry = ActionRegistry("test")
+        registry.register(
+            ActionSpec(
+                action_id="proof.noop",
+                validate_payload=lambda payload: payload,
+                adapter=proof,
+            )
+        )
+        session = self._session_with_coordinator()
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
+        envelope = self._envelope(epoch=coordinator.epoch, base_revision=coordinator.revision, action_id="proof.noop")
+        handle_ui_action(session, session.puppet, envelope, registry, _presenter_registry())
+        self.assertEqual(len(received), 1)
+        actor_arg, payload_arg, session_arg, extra = received[0]
+        self.assertIs(actor_arg, session.puppet)
+        self.assertEqual(payload_arg, {})
+        self.assertIs(session_arg, session)
+        self.assertEqual(extra, ())
 
 
 def _sequence_state_for_test(session):

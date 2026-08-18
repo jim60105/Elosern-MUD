@@ -298,7 +298,7 @@ def _resolve_monster(actor: Any, monster_id: int) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
-def _move_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Re-resolve the Exit and traverse through its own method (design D3).
 
     The Exit's own ``at_traverse`` flows through ``MovementCostMixin`` so the
@@ -306,6 +306,7 @@ def _move_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     as the typed command produces them, and the ``at_pre_move`` combat veto
     still runs inside the traversal.
     """
+    del session
     current_node = _current_node(actor)
     if current_node is None or current_node != payload["current_node"]:
         return _rejected("stale_location", "你的位置已經改變，請重新操作。")
@@ -339,8 +340,9 @@ def _move_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("moved", message, AFFECTED_FULL)
 
 
-def _look_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Route the look through the ordinary ``at_look`` appearance path (design D4)."""
+    del session
     if "room" in payload:
         target = actor.location
         if target is None:
@@ -357,8 +359,9 @@ def _look_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("looked", "你仔細打量了一番。", AFFECTED_FULL)
 
 
-def _talk_scripted_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Re-verify the host and keyword, then call the deterministic dialogue API."""
+    del session
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有這個對象。")
@@ -388,7 +391,7 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
     return _success("talked", message, AFFECTED_FULL)
 
 
-def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
+def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
     """Run the guarded dialogue seam through the injected client (design D5/D6).
 
     Re-resolves a present ``LLMNPC`` synchronously so a tampered, ineligible,
@@ -396,6 +399,7 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     Deferred settles after the seam finishes (offline degrade, memory, and
     verified-intent included).
     """
+    del session
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以自由交談的對象。")
@@ -423,7 +427,7 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     return deferred
 
 
-def _party_invite_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
+def _party_invite_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
     """Propose a party through the guarded dialogue seam (party-core D-2).
 
     Re-resolves a present ``LLMNPC`` and re-verifies the deterministic gate
@@ -433,6 +437,7 @@ def _party_invite_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     ``party_invite`` intent is applied through the deterministic applier --
     an AI decision is never overridden by the threshold.
     """
+    del session
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以邀請的對象。")
@@ -521,8 +526,9 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
     return REFUSED_MESSAGE
 
 
-def _party_leave_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _party_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Dismiss a bound companion through the membership module (party-core)."""
+    del session
     from world.rules.party import (
         LEAVE_DISMISSED_MESSAGE,
         NOT_COMPANION_MESSAGE,
@@ -539,8 +545,9 @@ def _party_leave_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("left", LEAVE_DISMISSED_MESSAGE, AFFECTED_FULL)
 
 
-def _engage_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Re-resolve a present monster and delegate to the existing engage contract."""
+    del session
     monster = _resolve_monster(actor, payload["monster_id"])
     if monster is None:
         return _rejected("no_monster", "這裡沒有這個對象。")
@@ -560,8 +567,9 @@ def _engage_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("engaged", message, AFFECTED_ENGAGE)
 
 
-def _wait_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _wait_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck safety and advance the clock through the shared skip helper."""
+    del session
     rejection = unsafe_rejection(actor)
     if rejection is not None:
         return _rejected("unsafe_skip", rejection)

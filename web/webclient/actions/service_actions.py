@@ -212,9 +212,9 @@ def _exact_next_rank(rank_key: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _guild_register_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _guild_register_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Resolve the local staff host and register the actor at rank F."""
-    del payload
+    del payload, session
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
         return _rejected(reason)
@@ -230,8 +230,9 @@ def _guild_register_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, An
     return _success("registered", message, AFFECTED_REGISTER)
 
 
-def _quest_accept_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _quest_accept_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Revalidate board eligibility and delegate acceptance to the quest runtime."""
+    del session
     definition_key = payload["definition_key"]
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
@@ -254,8 +255,9 @@ def _quest_accept_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]
     return _success("accepted", message, AFFECTED_ACCEPT)
 
 
-def _quest_abandon_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _quest_abandon_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Delegate abandonment of the exact quest ID to the quest runtime."""
+    del session
     quest_id = payload["quest_id"]
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
@@ -272,8 +274,9 @@ def _quest_abandon_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any
     return _success("abandoned", message, AFFECTED_ABANDON)
 
 
-def _quest_turnin_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Claim one completed quest reward exactly once through the local staff."""
+    del session
     quest_id = payload["quest_id"]
     staff, reason = _resolve_local(actor, GuildStaff, "no_staff", "ambiguous_staff")
     if staff is None:
@@ -295,8 +298,9 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]
     return _success("claimed", message, AFFECTED_TURNIN)
 
 
-def _exam_start_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _exam_start_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Start the examination for the exact server-derived next rank only."""
+    del session
     target_rank = payload["target_rank"]
     examiner, reason = _resolve_local(
         actor, GuildExaminer, "no_examiner", "ambiguous_examiner"
@@ -323,8 +327,9 @@ def _exam_start_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("exam_started", message, AFFECTED_EXAM)
 
 
-def _buy_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck open state, price, funds, and stock, then call ``economy.buy``."""
+    del session
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(
@@ -347,8 +352,9 @@ def _buy_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return _success("bought", message, AFFECTED_TRADE)
 
 
-def _sell_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck open state, held items, and stock cap, then call ``economy.sell``."""
+    del session
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(

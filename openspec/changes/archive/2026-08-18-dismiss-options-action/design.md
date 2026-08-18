@@ -34,7 +34,7 @@ The migration covers **every registered adapter**, including test-owned registri
 
 ### D3: The dismiss adapter stays thin
 
-The adapter calls `evict(session, actor)` wrapped in the same exception discipline as other adapters (a failure maps to a rejection, never raises), then returns the standard success dict (`_success("dismissed", …, ("context_actions",))`). All eviction semantics (which fingerprint, token bump, pending removal, other sessions untouched) live in the service; duplicating them in the adapter would create a second writer of options state.
+The adapter calls `evict(session, actor)` wrapped in the same exception discipline as other adapters (a failure maps to a rejection, never raises), then returns the standard success dict (`_success("dismissed", …, ("context_actions",))`). All eviction semantics (which fingerprint, token bump, pending removal, other sessions untouched) live in the service; duplicating them in the adapter would create a second writer of options state. Because `evict` is failure-silent (rubber-duck finding: it must never raise into the dispatcher), the service returns a boolean success signal: the adapter rejects with the stable `dismiss_failed` code when `evict` reports `False` (or raises), so a failed eviction never reports success. The return-value contract is pinned in the trigger-service main spec and design doc §4.
 
 ### D4: Registration without a full-snapshot fallback
 

@@ -24,17 +24,22 @@ class ActionSpec:
         action_id: The stable lowercase dotted action identifier.
         validate_payload: A callable validating one exact action payload and
             returning a normalized dict (or raising on violation).
-        adapter: A callable ``adapter(actor, payload)`` that re-resolves every
-            referenced identity, re-authorizes current domain state, and calls
-            a public deterministic-core API. Returns a JSON-safe result dict
-            with ``outcome``, ``code``, and ``message``.
+        adapter: A callable ``adapter(actor, payload, session=None)`` that
+            re-resolves every referenced identity, re-authorizes current domain
+            state, and calls a public deterministic-core API. The dispatcher
+            passes the authenticated session positionally as the third argument
+            (never through signature introspection); a direct two-argument call
+            stays valid through the default. The session is used only for
+            per-session presentation targeting, never to read or write
+            character state. Returns a JSON-safe result dict with ``outcome``,
+            ``code``, and ``message``.
         affected_panels: The stable panel names this action may update, or an
             empty tuple to signal the coordinator to publish a full snapshot.
     """
 
     action_id: str
     validate_payload: Callable[[dict[str, Any]], dict[str, Any]]
-    adapter: Callable[[Any, dict[str, Any]], dict[str, Any]]
+    adapter: Callable[[Any, dict[str, Any], Any], dict[str, Any]]
     affected_panels: tuple[str, ...] = ()
 
 
@@ -79,7 +84,8 @@ def build_production_action_registry() -> ActionRegistry:
     ``creation.concept``, ``creation.activate``, ``creation.reset``), and the
     eight exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
-    ``explore.party_leave``, ``explore.engage``, ``explore.wait``). Each action
+    ``explore.party_leave``, ``explore.engage``, ``explore.wait``), and the
+    ``options.dismiss`` action. Each action
     binds one exact payload validator and one narrow deterministic adapter; no
     action routes through the text parser.
     """
@@ -120,6 +126,10 @@ def build_production_action_registry() -> ActionRegistry:
         validate_talk_freeform_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
+    )
+    from web.webclient.actions.options import (
+        _dismiss_adapter,
+        validate_options_dismiss_payload,
     )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
@@ -333,6 +343,17 @@ def build_production_action_registry() -> ActionRegistry:
             # No affected panels: a clock skip changes header, status, shop
             # hours, and quest deadlines together (design D7).
             affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="options.dismiss",
+            validate_payload=validate_options_dismiss_payload,
+            adapter=_dismiss_adapter,
+            # The completion publication is the single send: the adapter's
+            # eviction is state-only, and the panel renders the session's
+            # now-unavailable options state exactly once (design D1).
+            affected_panels=("context_actions",),
         )
     )
     return registry
