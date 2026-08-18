@@ -114,7 +114,7 @@ evict, or mutate state.
   stale displayed card, and leaves scheduling to the lifecycle trigger
 
 #### Scenario: A corrupted ready snapshot cannot fabricate cards
-- **WHEN** a snapshot reports `ready` but its `displayed` set is missing or fails validation
+- **WHEN** a current snapshot reports `ready` but its `displayed` set is missing or fails validation
 - **THEN** the presenter emits `{"status": "unavailable"}` and a bounded diagnostic log entry, and no card is emitted
 
 #### Scenario: One affordance build feeds both the form and the fallback
