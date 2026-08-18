@@ -13,6 +13,12 @@ The dispatcher holds per-sequence ephemeral state on ``session.ndb``:
 
 It never writes persistent canonical state itself; adapters are the only
 presentation-side components allowed to invoke public deterministic APIs.
+
+Adapters declare the fixed ``adapter(actor, payload, session=None)`` ABI;
+``_invoke_adapter`` passes the authenticated session positionally as the third
+argument with no signature introspection, so an adapter may target the session
+(for example the ``options.dismiss`` eviction) without guessing Evennia
+account APIs.
 """
 
 from collections import OrderedDict
@@ -245,7 +251,7 @@ def _invoke_adapter(
     synchronous result is published immediately through the critical section.
     """
     try:
-        result = adapter(actor, normalized)
+        result = adapter(actor, normalized, session)
     except Exception:
         return _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
     if isinstance(result, Deferred):

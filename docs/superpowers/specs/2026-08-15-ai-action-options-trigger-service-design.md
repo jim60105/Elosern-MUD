@@ -208,9 +208,14 @@ per-session eviction, in order:
 3. Invalidate that session's in-flight generation: remove its subscriber entry in
    `pending[fingerprint]` and **increment its `options_state.generation_token`** — the racing
    completion finds the token stale for that session and publishes nothing.
-4. Set `options_state = {fingerprint: None, status: unavailable, token+1}` and publish
-   `suggestions.status="unavailable"` (section hidden in dock and narrative stream) to that
-   session.
+4. Set `options_state = {fingerprint: None, status: unavailable, token+1}`. **`evict` never sends
+   (state-only contract, pinned by the dismiss-options-action change D1):** the dismissal's single
+   `suggestions.status="unavailable"` publication (section hidden in dock and narrative stream) is
+   made by the dispatcher completion path, after the `options.dismiss` adapter declares
+   `affected_panels=("context_actions",)` and the panel renders from the mutated state.
+   `evict` returns a boolean success signal (never raises): the dismiss adapter rejects with the
+   stable `dismiss_failed` code when the eviction could not be applied, so a failed dismissal never
+   reports success.
 
 Other sessions are untouched: their subscriber entries, tokens, states, and cached publications
 survive an unrelated dismiss (review R15). A later trigger for the same situation regenerates —

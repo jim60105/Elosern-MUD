@@ -319,8 +319,9 @@ def _pending_owner(actor: Any):
 # ---------------------------------------------------------------------------
 
 
-def _creation_preset_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _creation_preset_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Validate the preset key and persist the ``preset_selected`` draft."""
+    del session
     account = _pending_owner(actor)
     if account is None:
         _invalidate_confirmation(actor)
@@ -334,8 +335,9 @@ def _creation_preset_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, A
     return _confirmed_success("preset_saved", message, AFFECTED_CREATION, actor)
 
 
-def _creation_custom_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _creation_custom_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Validate the complete custom form and persist the ``custom_filled`` draft."""
+    del session
     account = _pending_owner(actor)
     if account is None:
         _invalidate_confirmation(actor)
@@ -350,7 +352,7 @@ def _creation_custom_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, A
     return _confirmed_success("custom_saved", message, AFFECTED_CREATION, actor)
 
 
-def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
+def _creation_concept_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
     """Run the guarded concept seam and save the concept draft (D4).
 
     Resolves the owning account synchronously so a tampered or unowned puppet
@@ -361,6 +363,7 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     persona block) and the ``creation`` panel refreshes. On degrade or a
     stale fingerprint the stable outcome is returned with zero state change.
     """
+    del session
     account = _pending_owner(actor)
     if account is None:
         _invalidate_confirmation(actor)
@@ -422,7 +425,7 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any]) -> Deferred:
     return deferred
 
 
-def _creation_activate_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _creation_activate_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Atomically activate the stored draft and hand off to exploration.
 
     Activation is bound to the draft confirmed by the last successful save
@@ -431,7 +434,7 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any]) -> dict[str,
     save ever happened) and the activation is refused with a stable code
     before any deterministic write.
     """
-    del payload
+    del payload, session
     account = _pending_owner(actor)
     if account is None:
         return _rejected("ownership_rejected")
@@ -467,9 +470,9 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any]) -> dict[str,
     return _success("activated", message, AFFECTED_ACTIVATE)
 
 
-def _creation_reset_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _creation_reset_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Idempotently clear the staging draft; the character stays pending."""
-    del payload
+    del payload, session
     account = _pending_owner(actor)
     if account is None:
         return _rejected("ownership_rejected")

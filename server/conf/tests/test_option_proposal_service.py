@@ -20,6 +20,8 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from twisted.internet.defer import Deferred
 
+from tools.spec_traceability import covers_requirement
+
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
@@ -191,6 +193,10 @@ class _BaseServiceTests(EvenniaTest):
 
 
 class SchedulingContractTests(_BaseServiceTests):
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
+        "action-options-trigger-service::session-scoped-options-presentation-state-survives-async-completion-and-puppet-change",
+    )
     def test_ready_success_caches_and_publishes_per_session(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -207,6 +213,9 @@ class SchedulingContractTests(_BaseServiceTests):
         suggestions = updates[-1]["panels"]["context_actions"]["suggestions"]
         self.assertEqual(suggestions["status"], "ready")
 
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+    )
     def test_unchanged_situation_replays_without_a_second_transport_call(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -223,6 +232,9 @@ class SchedulingContractTests(_BaseServiceTests):
             len(self._envelopes("ui_update")), before, "the replay republishes"
         )
 
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+    )
     def test_a_second_session_receives_the_cache_hit_without_transport(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -238,6 +250,9 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(self._state()["status"], "ready")
         self.assertTrue(self._state()["fingerprint"])
 
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+    )
     def test_cache_evicted_ready_display_replays_without_transport(self):
         """A ready display takes precedence over the cache even after the
         global LRU entry has been evicted (delta requirement 2 scenario)."""
@@ -258,6 +273,9 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(self._state()["fingerprint"], first)
         self.assertEqual(self._state()["status"], "ready")
 
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+    )
     def test_pending_generation_is_shared_by_a_new_watcher(self):
         client = _PendingFakeClient()
         first = self._puppet_session(31)
@@ -279,6 +297,9 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(second.ndb.options_state["status"], "ready")
         self.assertEqual(client.calls, 1)
 
+    @covers_requirement(
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+    )
     def test_mid_flight_retrigger_does_not_start_a_second_generation(self):
         client = _PendingFakeClient()
         self._puppet_session()
@@ -290,16 +311,24 @@ class SchedulingContractTests(_BaseServiceTests):
 
 
 class StaleTokenAndEvictionTests(_BaseServiceTests):
+    @covers_requirement(
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation",
+        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing",
+    )
     def test_evict_mutes_the_in_flight_completion(self):
         client = _PendingFakeClient()
         session = self._puppet_session()
         with override_settings(LLM_PROFILES=_raw()):
             self._schedule(client=client)
         self.assertEqual(self._state()["status"], "generating")
-        service.evict(session, self.player)
+        published = len(self._envelopes("ui_update"))
+        self.assertIs(service.evict(session, self.player), True)
+        # The state-only evict contract (dismiss-options-action D1): eviction
+        # itself sends nothing; the dismissal's single ui_update is published
+        # by the dispatcher completion path.
+        self.assertEqual(len(self._envelopes("ui_update")), published)
         state = self._state()
         self.assertEqual(state["status"], "unavailable")
-        published = len(self._envelopes("ui_update"))
         with override_settings(LLM_PROFILES=_raw()):
             client.pending.callback(_valid_options_json(self._eligible()))
         # The retired generation must write nothing.
@@ -311,6 +340,9 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
             self.assertNotEqual(suggestions["status"], "ready")
         self.assertEqual(service._cache, {})
 
+    @covers_requirement(
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation"
+    )
     def test_dismiss_token_increments_and_retrigger_regenerates(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -327,6 +359,9 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertEqual(len(client.calls), 2)
         self.assertEqual(self._state()["status"], "ready")
 
+    @covers_requirement(
+        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing"
+    )
     def test_dismiss_is_isolated_per_session_among_watched_sessions(self):
         client = _PendingFakeClient()
         first = self._puppet_session(31)
@@ -342,6 +377,28 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertEqual(first.ndb.options_state["status"], "unavailable")
         self.assertEqual(second.ndb.options_state["status"], "ready")
 
+    @covers_requirement(
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation"
+    )
+    def test_evict_returns_false_and_leaves_state_unchanged_when_it_cannot_apply(self):
+        """A corrupt options state fails the eviction: ``evict`` reports
+        ``False`` (never raises) and the session state is left untouched, so
+        the dismiss adapter rejects instead of reporting success."""
+        session = self._puppet_session()
+        session.ndb.options_state = {
+            "owner_actor_id": str(self.player.pk),
+            "fingerprint": "situation-fp",
+            "status": "ready",
+            "generation_token": "corrupt",
+            "displayed": [],
+        }
+        self.assertIs(service.evict(session, self.player), False)
+        self.assertEqual(session.ndb.options_state["status"], "ready")
+        self.assertEqual(session.ndb.options_state["generation_token"], "corrupt")
+
+    @covers_requirement(
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation"
+    )
     def test_evict_clears_the_cache_for_the_displayed_fingerprint(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -353,6 +410,9 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         service.evict(session, self.player)
         self.assertNotIn(fingerprint, service._cache)
 
+    @covers_requirement(
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation"
+    )
     def test_evict_clears_the_negative_memo_for_the_displayed_fingerprint(self):
         fake_clock = [1000.0]
         session = self._puppet_session()
@@ -369,6 +429,9 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertNotIn(fingerprint, service._negative_memo)
         self.assertEqual(service._cache, {})
 
+    @covers_requirement(
+        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing"
+    )
     def test_sequence_reset_mutes_the_completion_push(self):
         """A coordinator reset between scheduling and completion writes the
         session state but pushes nothing (delta requirement 4 scenario: the
@@ -397,6 +460,9 @@ class MemoContractTests(_BaseServiceTests):
         client.add_timeout(lambda d: True)
         return client
 
+    @covers_requirement(
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+    )
     def test_transport_failure_memos_for_30_seconds(self):
         fake_clock = [1000.0]
         session = self._puppet_session()
@@ -425,6 +491,9 @@ class MemoContractTests(_BaseServiceTests):
             await_result(self._schedule(client=client))
         self.assertEqual(len(client.calls), 2)
 
+    @covers_requirement(
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+    )
     def test_non_transport_degrades_never_memo(self):
         self._puppet_session()
 
@@ -456,6 +525,9 @@ class MemoContractTests(_BaseServiceTests):
                     await_result(self._schedule(client=client))
                 self.assertGreaterEqual(len(client.calls), calls + 1)
 
+    @covers_requirement(
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+    )
     def test_disabled_profile_degrades_without_a_client_call_or_memo(self):
         """``client=None`` with a disabled profile builds the offline stub (not
         the live client), the layer degrades before any transport work, the
@@ -482,6 +554,9 @@ class MemoContractTests(_BaseServiceTests):
             self.assertEqual(self._state()["status"], "degraded")
             self.assertEqual(service._negative_memo, {})
 
+    @covers_requirement(
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+    )
     def test_client_raised_malformed_transport_error_is_memoized(self):
         """The memo discrimination is positional, not by failure kind: a
         client that itself raises ``LLMTransportError("malformed")`` IS the
@@ -504,6 +579,9 @@ class MemoContractTests(_BaseServiceTests):
         self.assertEqual(self._state()["status"], "degraded")
         self.assertIn(self._state()["fingerprint"], service._negative_memo)
 
+    @covers_requirement(
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+    )
     def test_success_is_never_negatively_memed(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -515,6 +593,9 @@ class MemoContractTests(_BaseServiceTests):
 
 
 class FailureIsolationTests(_BaseServiceTests):
+    @covers_requirement(
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+    )
     def test_vanished_room_resolves_to_nothing_without_raising(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json([]))
@@ -525,6 +606,9 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertEqual(len(client.calls), 0)
         self.assertIsNone(self._state())
 
+    @covers_requirement(
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+    )
     def test_no_watchers_is_a_no_op(self):
         client = FakeLLMClient()
         self._puppet_session()
@@ -536,6 +620,9 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertIsNone(self._state())
         self.assertEqual(len(client.calls), 0)
 
+    @covers_requirement(
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+    )
     def test_out_of_exploration_mode_is_a_no_op(self):
         client = FakeLLMClient()
         self._puppet_session()
@@ -546,6 +633,9 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertIsNone(self._state())
         self.assertEqual(len(client.calls), 0)
 
+    @covers_requirement(
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+    )
     def test_preflight_client_construction_failure_degrades_without_stranding(self):
         """A broken client construction after pending registration must settle
         the sessions degraded — never leave them in "generating" behind a
@@ -573,6 +663,9 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertEqual(service._pending, {})
         self.assertGreater(self._state()["generation_token"], 1)
 
+    @covers_requirement(
+        "action-options-trigger-service::session-scoped-options-presentation-state-survives-async-completion-and-puppet-change"
+    )
     def test_puppet_change_clears_the_session_options_state(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))
@@ -583,6 +676,9 @@ class FailureIsolationTests(_BaseServiceTests):
         reset_client_sequence(session)
         self.assertIsNone(self._state())
 
+    @covers_requirement(
+        "action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment"
+    )
     def test_situation_change_invalidates_the_fingerprint(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _valid_options_json(self._eligible()))

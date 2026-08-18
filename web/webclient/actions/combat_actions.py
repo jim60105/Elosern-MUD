@@ -204,7 +204,7 @@ def _participants_by_id(actor: Any) -> dict[int, Any]:
     return by_id
 
 
-def _cast_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Resolve one ``combat.cast`` request and invoke the combat-session facade."""
     skill_key = payload["skill_key"]
     record = read_session(actor)
@@ -256,9 +256,9 @@ def _cast_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return settle_to_oob_result(result)
 
 
-def _flee_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _flee_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Invoke the innate SELF flee path for the session puppet."""
-    del payload
+    del payload, session
     record = read_session(actor)
     if record is None:
         return _rejected_result(SessionReason.NO_ACTIVE_SESSION)
@@ -280,7 +280,7 @@ def _flee_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return settle_to_oob_result(result)
 
 
-def _forfeit_adapter(actor: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def _forfeit_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """End the actor's current session only when the stale-guard matches."""
     record = read_session(actor)
     if record is None:

@@ -154,8 +154,13 @@ transport failure SHALL additionally record a negative memo.
 is dismissing, even if they moved away), remove that fingerprint's cache entry and negative memo
 from the global stores, remove that session from that fingerprint's pending subscribers
 (retiring the generation when it was the last subscriber), increment the session's generation
-token, set its `options_state` to `{owner_actor_id, fingerprint: None, status: unavailable,
-token+1}`, and publish `suggestions.status="unavailable"` to that session. Eviction SHALL leave
+token, and set its `options_state` to `{owner_actor_id, fingerprint: None, status: unavailable,
+token+1}`. `evict` SHALL return whether the eviction succeeded (a boolean) and SHALL NOT raise; a
+failed eviction SHALL leave the session's state unchanged, so the dismiss adapter rejects instead
+of reporting success. Eviction SHALL NOT send a presentation update itself (state-only contract,
+dismiss-options-action D1): the dismissal's single `ui_update` with
+`suggestions.status="unavailable"` is published by the dispatcher completion path after the
+`options.dismiss` adapter declares `context_actions` affected. Eviction SHALL leave
 every other session's subscriber entries, tokens, states, and future publications intact; a
 later trigger for the same situation SHALL regenerate.
 

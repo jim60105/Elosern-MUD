@@ -88,7 +88,7 @@ class UiActionIntegrationTests(EvenniaTest):
     def test_proof_adapter_receives_session_actor_and_executes_once(self):
         received = []
         registry = self._registry_with(
-            lambda actor, payload: received.append(actor)
+            lambda actor, payload, session=None: received.append(actor)
             or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
         )
         envelope = self._sync()
@@ -119,7 +119,7 @@ class UiActionIntegrationTests(EvenniaTest):
     )
     def test_completion_update_sent_before_same_revision_result(self):
         registry = self._registry_with(
-            lambda actor, payload: {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
+            lambda actor, payload, session=None: {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
         )
         envelope = self._sync()
         action = {
@@ -149,7 +149,7 @@ class UiActionIntegrationTests(EvenniaTest):
     )
     def test_sync_remains_available_while_action_in_flight(self):
         held = Deferred()
-        registry = self._registry_with(lambda actor, payload: held)
+        registry = self._registry_with(lambda actor, payload, session=None: held)
         envelope = self._sync()
         action = {
             "protocol_version": 1,
@@ -177,7 +177,7 @@ class UiActionIntegrationTests(EvenniaTest):
         calls = []
         held = Deferred()
         registry = self._registry_with(
-            lambda actor, payload: calls.append(actor) or held
+            lambda actor, payload, session=None: calls.append(actor) or held
         )
         envelope = self._sync()
         action = {
@@ -284,7 +284,7 @@ class OocLifecycleIntegrationTests(EvenniaTest):
                 "payload": {},
             },
             self._registry_with(
-                lambda actor, payload: {
+                lambda actor, payload, session=None: {
                     "outcome": "success",
                     "code": "ok",
                     "message": "完成",
@@ -363,7 +363,7 @@ class OocLifecycleIntegrationTests(EvenniaTest):
         # The old completed-request cache is gone: replaying the same request
         # id after repuppet executes the adapter again.
         received = []
-        adapter = lambda actor, payload: received.append(actor) or {
+        adapter = lambda actor, payload, session=None: received.append(actor) or {
             "outcome": "success",
             "code": "ok",
             "message": "完成",

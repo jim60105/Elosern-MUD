@@ -692,14 +692,18 @@ def schedule_action_options(
         return None
 
 
-def evict(session: Any, actor: Any) -> None:
-    """Dismiss the displayed options for one session.
+def evict(session: Any, actor: Any) -> bool:
+    """Dismiss the displayed options for one session (state-only contract).
 
     Reads the fingerprint the session currently displays, evicts it from the
     cache, memo, and pending registry (retiring an emptied generation), bumps
     the session's generation token so an in-flight completion cannot deliver,
-    sets the state to ``unavailable``, and publishes the unavailable form.
-    Never raises.
+    and sets the state to ``unavailable``. Returns ``True`` on success and
+    ``False`` when the eviction could not be applied (the state is left
+    unchanged); never raises. Never sends: the dismissal's single ``ui_update``
+    is published by the dispatcher completion path after the ``options.dismiss``
+    adapter declares ``context_actions`` affected (dismiss-options-action
+    design D1).
     """
     try:
         actor_id = str(getattr(actor, "pk", ""))
@@ -724,11 +728,7 @@ def evict(session: Any, actor: Any) -> None:
         _set_options_state(
             session, _state(actor_id, None, "unavailable", token, None)
         )
-        ndb = getattr(session, "ndb", None)
-        coordinator = getattr(ndb, "elosern_coordinator", None) if ndb is not None else None
-        if coordinator is not None:
-            _push_options_update(session, actor, coordinator.epoch)
-        # When no coordinator is attached there is no live presentation
-        # sequence to push to; the state write above is the whole effect.
+        return True
     except Exception as error:
         _log("evict failed: %s: %s" % (type(error).__name__, error))
+        return False
