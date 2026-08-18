@@ -169,6 +169,28 @@ class AiTransportBoundaryTests(unittest.TestCase):
                 self.assertNotIn("import socket", source)
                 self.assertNotIn("from socket", source)
 
+    @covers_requirement("action-options-trigger-hooks::every-trigger-is-fire-and-forget-non-raising-and-non-mutating")
+    def test_generative_layer_never_references_the_triggers_or_the_scheduling_api(self):
+        """The trigger call sites and the scheduling API live outside
+        ``world/ai``: no module under the generative layer may name the
+        service, its scheduling entry point, or the watcher registry
+        (action-options-trigger-hooks requirement 5 scenario)."""
+        forbidden = (
+            "option_proposal_service",
+            "schedule_action_options",
+            "watchers_for",
+            "web.webclient.presentation.watchers",
+        )
+        for module_path in _production_module_paths(AI_ROOT):
+            source = module_path.read_text(encoding="utf-8")
+            with self.subTest(module=module_path.as_posix()):
+                for fragment in forbidden:
+                    self.assertNotIn(
+                        fragment,
+                        source,
+                        f"{module_path} must not reference {fragment}",
+                    )
+
 
 class DeterministicPathBanTests(unittest.TestCase):
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")

@@ -214,7 +214,7 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(suggestions["status"], "ready")
 
     @covers_requirement(
-        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
     )
     def test_unchanged_situation_replays_without_a_second_transport_call(self):
         client = FakeLLMClient()
@@ -233,7 +233,7 @@ class SchedulingContractTests(_BaseServiceTests):
         )
 
     @covers_requirement(
-        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
     )
     def test_a_second_session_receives_the_cache_hit_without_transport(self):
         client = FakeLLMClient()
@@ -251,7 +251,8 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertTrue(self._state()["fingerprint"])
 
     @covers_requirement(
-        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
+        "action-options-trigger-service::session-scoped-options-presentation-state-survives-async-completion-and-puppet-change",
     )
     def test_cache_evicted_ready_display_replays_without_transport(self):
         """A ready display takes precedence over the cache even after the
@@ -274,7 +275,7 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(self._state()["status"], "ready")
 
     @covers_requirement(
-        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
     )
     def test_pending_generation_is_shared_by_a_new_watcher(self):
         client = _PendingFakeClient()
@@ -298,7 +299,7 @@ class SchedulingContractTests(_BaseServiceTests):
         self.assertEqual(client.calls, 1)
 
     @covers_requirement(
-        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics"
+        "action-options-trigger-service::one-llm-call-per-cache-residency-with-replay-and-pending-semantics",
     )
     def test_mid_flight_retrigger_does_not_start_a_second_generation(self):
         client = _PendingFakeClient()
@@ -312,8 +313,8 @@ class SchedulingContractTests(_BaseServiceTests):
 
 class StaleTokenAndEvictionTests(_BaseServiceTests):
     @covers_requirement(
-        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation",
         "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing",
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation",
     )
     def test_evict_mutes_the_in_flight_completion(self):
         client = _PendingFakeClient()
@@ -341,7 +342,7 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertEqual(service._cache, {})
 
     @covers_requirement(
-        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation"
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation",
     )
     def test_dismiss_token_increments_and_retrigger_regenerates(self):
         client = FakeLLMClient()
@@ -360,7 +361,8 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertEqual(self._state()["status"], "ready")
 
     @covers_requirement(
-        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing"
+        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing",
+        "action-options-trigger-service::eviction-is-per-session-and-clears-the-displayed-situation",
     )
     def test_dismiss_is_isolated_per_session_among_watched_sessions(self):
         client = _PendingFakeClient()
@@ -430,7 +432,7 @@ class StaleTokenAndEvictionTests(_BaseServiceTests):
         self.assertEqual(service._cache, {})
 
     @covers_requirement(
-        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing"
+        "action-options-trigger-service::delivery-is-guarded-by-token-and-epoch-and-retired-generations-write-nothing",
     )
     def test_sequence_reset_mutes_the_completion_push(self):
         """A coordinator reset between scheduling and completion writes the
@@ -461,7 +463,7 @@ class MemoContractTests(_BaseServiceTests):
         return client
 
     @covers_requirement(
-        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only",
     )
     def test_transport_failure_memos_for_30_seconds(self):
         fake_clock = [1000.0]
@@ -492,7 +494,7 @@ class MemoContractTests(_BaseServiceTests):
         self.assertEqual(len(client.calls), 2)
 
     @covers_requirement(
-        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only",
     )
     def test_non_transport_degrades_never_memo(self):
         self._puppet_session()
@@ -526,7 +528,8 @@ class MemoContractTests(_BaseServiceTests):
                 self.assertGreaterEqual(len(client.calls), calls + 1)
 
     @covers_requirement(
-        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks",
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only",
     )
     def test_disabled_profile_degrades_without_a_client_call_or_memo(self):
         """``client=None`` with a disabled profile builds the offline stub (not
@@ -555,7 +558,7 @@ class MemoContractTests(_BaseServiceTests):
             self.assertEqual(service._negative_memo, {})
 
     @covers_requirement(
-        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only",
     )
     def test_client_raised_malformed_transport_error_is_memoized(self):
         """The memo discrimination is positional, not by failure kind: a
@@ -580,7 +583,7 @@ class MemoContractTests(_BaseServiceTests):
         self.assertIn(self._state()["fingerprint"], service._negative_memo)
 
     @covers_requirement(
-        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only"
+        "action-options-trigger-service::the-negative-memo-applies-to-transport-failures-only",
     )
     def test_success_is_never_negatively_memed(self):
         client = FakeLLMClient()
@@ -594,7 +597,7 @@ class MemoContractTests(_BaseServiceTests):
 
 class FailureIsolationTests(_BaseServiceTests):
     @covers_requirement(
-        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks",
     )
     def test_vanished_room_resolves_to_nothing_without_raising(self):
         client = FakeLLMClient()
@@ -607,7 +610,7 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertIsNone(self._state())
 
     @covers_requirement(
-        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks",
     )
     def test_no_watchers_is_a_no_op(self):
         client = FakeLLMClient()
@@ -621,7 +624,7 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertEqual(len(client.calls), 0)
 
     @covers_requirement(
-        "action-options-trigger-service::scheduling-never-raises-and-never-blocks"
+        "action-options-trigger-service::scheduling-never-raises-and-never-blocks",
     )
     def test_out_of_exploration_mode_is_a_no_op(self):
         client = FakeLLMClient()
@@ -664,7 +667,7 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertGreater(self._state()["generation_token"], 1)
 
     @covers_requirement(
-        "action-options-trigger-service::session-scoped-options-presentation-state-survives-async-completion-and-puppet-change"
+        "action-options-trigger-service::session-scoped-options-presentation-state-survives-async-completion-and-puppet-change",
     )
     def test_puppet_change_clears_the_session_options_state(self):
         client = FakeLLMClient()
@@ -677,7 +680,7 @@ class FailureIsolationTests(_BaseServiceTests):
         self.assertIsNone(self._state())
 
     @covers_requirement(
-        "action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment"
+        "action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment",
     )
     def test_situation_change_invalidates_the_fingerprint(self):
         client = FakeLLMClient()
@@ -707,6 +710,136 @@ class CacheBoundTests(unittest.TestCase):
         self.assertNotIn("fp-01", service._cache)
         self.assertIn("fp-00", service._cache)
         service._reset_service_state()
+
+
+class ReconnectTriggerTests(_BaseServiceTests):
+    """The reconnect trigger through the real ``ui_sync`` ingress path: the
+    snapshot is emitted first and the service is called once with the
+    requesting session as the only watcher; a still-current ``ready`` state
+    and a degraded-but-cached state schedule nothing (the service's stale
+    predicate decides, never the hook)."""
+
+    def _sync(self, sessid=51):
+        from server.conf import inputfuncs
+
+        session = _make_session(self.sessionhandler, sessid, self.player)
+        inputfuncs.ui_sync(session, {"protocol_version": 1})
+        self._session = session
+        return session
+
+    def _wrapped(self, client):
+        """Patch the service entry with a capturing wrapper around the real
+        implementation; the hook's fire-and-forget call is observable and its
+        in-flight Deferred is collectible for awaiting."""
+        real = service.schedule_action_options
+        captured = []
+        deferreds = []
+
+        def _wrapping(actor, *, watchers, client=None):
+            captured.append((actor, watchers))
+            deferred = real(actor, watchers=watchers, client=client)
+            deferreds.append(deferred)
+            return deferred
+
+        patch_object = patch.object(service, "schedule_action_options", side_effect=_wrapping)
+        patch_client = patch.object(service, "_build_action_options_client", return_value=client)
+        return patch_object, patch_client, captured, deferreds
+
+    @covers_requirement(
+        "action-options-trigger-hooks::reconnect-triggers-a-proposal-subject-to-the-stale-predicate"
+    )
+    def test_first_sync_schedules_one_generation_after_the_snapshot(self):
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _valid_options_json(self._eligible()))
+        patch_object, patch_client, captured, deferreds = self._wrapped(client)
+        snapshot_before = len(self.sessionhandler.data_out.call_args_list)
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch_object,
+            patch_client,
+        ):
+            session = self._sync()
+        self.assertEqual(len(captured), 1)
+        self.assertIs(captured[0][0], self.player)
+        self.assertEqual(len(captured[0][1]), 1)
+        self.assertIs(captured[0][1][0][0], session)
+        envelopes = self.sessionhandler.data_out.call_args_list[snapshot_before:]
+        self.assertTrue(
+            any("ui_snapshot" in call.kwargs for call in envelopes),
+            "the snapshot reaches the wire before the scheduling call",
+        )
+        await_result(deferreds[0])
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(self._state()["status"], "ready")
+
+    def test_reconnect_with_a_current_ready_state_schedules_nothing(self):
+        from server.conf import inputfuncs
+
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _valid_options_json(self._eligible()))
+        patch_object, patch_client, captured, deferreds = self._wrapped(client)
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch_object,
+            patch_client,
+        ):
+            session = self._sync()
+            await_result(deferreds[0])
+            self.assertEqual(len(client.calls), 1)
+            self.assertEqual(self._state()["status"], "ready")
+            fingerprint = self._state()["fingerprint"]
+            inputfuncs.ui_sync(session, {"protocol_version": 1})
+        self.assertEqual(len(captured), 2, "the hook still calls the service")
+        self.assertEqual(len(client.calls), 1, "a current ready state never schedules")
+        self.assertEqual(self._state()["fingerprint"], fingerprint)
+        self.assertEqual(self._state()["status"], "ready")
+
+    def test_reconnect_with_a_degraded_but_cached_state_schedules_nothing(self):
+        from server.conf import inputfuncs
+
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _valid_options_json(self._eligible()))
+        patch_object, patch_client, captured, deferreds = self._wrapped(client)
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch_object,
+            patch_client,
+        ):
+            session = self._sync()
+            await_result(deferreds[0])
+            self.assertEqual(self._state()["status"], "ready")
+            fingerprint = self._state()["fingerprint"]
+            self.assertIn(fingerprint, service._cache)
+        # Force a degraded display for the same cached fingerprint: the stale
+        # predicate must republish the cached set without any transport work.
+        self._session.ndb.options_state["status"] = "degraded"
+        with (
+            override_settings(LLM_PROFILES=_raw()),
+            patch_object,
+            patch_client,
+        ):
+            inputfuncs.ui_sync(session, {"protocol_version": 1})
+        self.assertEqual(len(captured), 2, "the hook still calls the service")
+        self.assertEqual(len(client.calls), 1, "a degraded-but-cached state never schedules")
+        self.assertEqual(self._state()["fingerprint"], fingerprint)
+        self.assertEqual(self._state()["status"], "ready")
+
+    @covers_requirement("action-options-trigger-hooks::every-trigger-is-fire-and-forget-non-raising-and-non-mutating")
+    def test_reconnect_scheduling_failure_never_breaks_the_snapshot(self):
+        snapshot_before = len(self.sessionhandler.data_out.call_args_list)
+        with patch.object(
+            service,
+            "schedule_action_options",
+            side_effect=RuntimeError("transport unavailable"),
+        ):
+            session = self._sync()
+        self.assertIsNotNone(self._session)
+        self.assertIs(session.puppet, self.player)
+        envelopes = self.sessionhandler.data_out.call_args_list[snapshot_before:]
+        self.assertTrue(
+            any("ui_snapshot" in call.kwargs for call in envelopes),
+            "the snapshot still reaches the wire when scheduling fails",
+        )
 
     def test_caps_match_the_layer(self):
         self.assertEqual(

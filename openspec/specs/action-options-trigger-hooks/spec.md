@@ -2,7 +2,7 @@
 
 Deterministic trigger call sites for the AI action-option proposal service: room entry, conversation completion, and `ui_sync` reconnect — plus the ingress-maintained session-watcher registry that supplies the service's per-session targets without guessing Evennia account APIs.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Room entry triggers a proposal on deterministic movement success
 
