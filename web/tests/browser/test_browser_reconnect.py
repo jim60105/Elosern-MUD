@@ -138,6 +138,9 @@ class ReconnectTest(BrowserAcceptanceTest):
         revision_before = before["revision"]
 
         # Inflate the active revision so the new epoch's lower revision is real.
+        # Wait until every one of the four resyncs has landed (each costs one
+        # server round trip and bumps the revision), so the disconnect cannot
+        # cut the inflation short and let the new epoch's revision race past it.
         page.evaluate(
             "() => { for (let i = 0; i < 4; i++) { "
             "Elosern.StateController.requestResync('status'); "
@@ -146,10 +149,10 @@ class ReconnectTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "(r) => { const s = Elosern.StateController.getState(); "
             "return s.revision >= r; }",
-            arg=revision_before,
+            arg=revision_before + 4,
         )
         revision_inflated = store_state(page)["revision"]
-        self.assertGreaterEqual(revision_inflated, revision_before)
+        self.assertGreaterEqual(revision_inflated, revision_before + 4)
 
         generation_before = store_state(page)["generation"]
         self._disconnect_transport(page)
