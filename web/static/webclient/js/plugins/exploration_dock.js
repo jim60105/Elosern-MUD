@@ -78,6 +78,10 @@
     _restKeydownBound: null,
     _unsubscribe: null,
     _lastSignature: null,
+    // The latest store snapshot (for the `context_actions` panel read) and
+    // the change-detection signature of its suggestions section.
+    _state: null,
+    _lastSuggestionsSignature: null,
 
     isActive: function () {
       return this._mounted;
@@ -179,6 +183,8 @@
       this._mounted = false;
       this._ownsKeyboard = false;
       this._lastSignature = null;
+      this._lastSuggestionsSignature = null;
+      this._state = null;
       // In combat or creation mode the owning dock controls the action-dock
       // DOM; this dock must never wipe it. Guidance is restored only when
       // exploration mode returns without an available exploration panel.
@@ -242,6 +248,8 @@
         layout.appendChild(this._buildDetailPane());
       }
       root.appendChild(layout);
+
+      this._renderSuggestionsSection(root);
 
       var live = makeElement("div", "exploration-live elosern-live");
       live.id = "elosern-action-live";
@@ -344,6 +352,9 @@
         this._renderMenuItems(menuEl, this._model.panel);
         this._syncDetailPane(root);
         this._renderFocusHint();
+        // A menu-only refresh must never leave the suggestions section stale
+        // (a `generating` -> `ready` push can arrive between router events).
+        this._renderSuggestionsSection(root);
         return;
       }
       // Never rebuild over another mode's dock: the combat/creation docks set
@@ -427,22 +438,13 @@
           if (menuEl) {
             this._renderMenuItems(menuEl, this._model && this._model.panel);
             this._syncDetailPane(root);
+            this._renderSuggestionsSection(root);
           } else if (
             root &&
             this._model &&
             // Same ownership guards as `_refresh`: never rebuild over another
             // mode's dock or over a sub-dock that is still active.
-            root.getAttribute("data-mode") === "exploration" &&
-            !(
-              services &&
-              services.isActive &&
-              services.isActive()
-            ) &&
-            !(
-              character &&
-              character.isActive &&
-              character.isActive()
-            )
+            this._ownsExplorationSurface(root)
           ) {
             // The surface was owned by a re-homed service/character sub-view
             // that has just left: rebuild the exploration dock so the
@@ -771,6 +773,146 @@
         panel.inventory.available
       );
     },
+
+    // The validated v5 `context_actions` panel (the same read the combat dock
+    // uses), or null while no such panel is present in the store.
+    _suggestionsPanel: function () {
+      var state = this._state;
+      return (state && state.panels && state.panels["context_actions"]) || null;
+    },
+
+    // Change-detection signature of the suggestions section (the full
+    // validated envelope: status, card count, and every card's content), or
+    // null when the envelope is absent.
+    _suggestionsSignature: function () {
+      var panel = this._suggestionsPanel();
+      var suggestions = panel && panel.suggestions ? panel.suggestions : null;
+      if (!suggestions || !window.Elosern || !window.Elosern.OptionCards) {
+        return null;
+      }
+      return window.Elosern.OptionCards.suggestionsSignature(suggestions);
+    },
+
+    // Whether this dock currently owns the action-dock surface: exploration
+    // mode and no re-homed services/character sub-dock active.
+    _ownsExplorationSurface: function (root) {
+      if (!root || root.getAttribute("data-mode") !== "exploration") {
+        return false;
+      }
+      var services = getServices();
+      var character = getCharacter();
+      return !(
+        (services && services.isActive && services.isActive()) ||
+        (character && character.isActive && character.isActive())
+      );
+    },
+
+    // Render (or remove) the suggestions section in place. The section is a
+    // bounded subtree assembled from the mirror-validated v5 panel through
+    // `buildOptionsView`: `generating` shows one muted line; `ready` shows
+    // the cards plus the dismiss control; `degraded` shows the rule cards
+    // with the muted note (the 0-card empty-state line when the payload
+    // carries none); `unavailable` (and any missing-section guard) renders
+    // nothing. Every card and the dismiss control are native buttons with
+    // direct click handlers; tearing the subtree down detaches their
+    // listeners with it.
+    _renderSuggestionsSection: function (root) {
+      if (!window.Elosern || !window.Elosern.OptionCards) {
+        return;
+      }
+      var existing = root.querySelector(".suggestions-section");
+      if (existing) {
+        existing.parentNode.removeChild(existing);
+      }
+      var view = window.Elosern.OptionCards.buildOptionsView(
+        this._suggestionsPanel()
+      );
+      if (!view.visible) {
+        return;
+      }
+      var section = makeElement("div", "suggestions-section");
+      section.id = "suggestions-section";
+      section.setAttribute("role", "region");
+      section.setAttribute("aria-label", "AI 建議");
+      if (view.status === "generating") {
+        var line = makeElement("div", "suggestions-generating");
+        setText(line, "AI 正在構思建議…");
+        section.appendChild(line);
+      } else {
+        var header = makeElement("div", "suggestions-header");
+        var title = makeElement("span", "suggestions-title");
+        setText(title, "AI 建議");
+        header.appendChild(title);
+        header.appendChild(
+          window.Elosern.OptionCards.buildDismissButton(
+            this._submitDismiss.bind(this)
+          )
+        );
+        section.appendChild(header);
+        if (view.status === "degraded") {
+          var note = makeElement("div", "suggestions-note");
+          setText(note, "AI 建議目前不可用");
+          section.appendChild(note);
+        }
+        if (view.emptyState) {
+          var empty = makeElement("div", "suggestions-empty");
+          setText(empty, "現在沒有什麼值得做的動作");
+          section.appendChild(empty);
+        } else {
+          var cards = makeElement("div", "suggestions-cards");
+          cards.setAttribute("role", "group");
+          cards.setAttribute("aria-label", "建議動作");
+          view.cards.forEach(
+            function (card) {
+              cards.appendChild(
+                window.Elosern.OptionCards.buildCard(
+                  card,
+                  this._submitCard.bind(this)
+                )
+              );
+            }.bind(this)
+          );
+          section.appendChild(cards);
+        }
+      }
+      // Insert between the menu layout and the stable live region when the
+      // live region is present, else append at the end of the subtree.
+      var live = root.querySelector("#elosern-action-live");
+      if (live && live.parentNode === root) {
+        root.insertBefore(section, live);
+      } else {
+        root.appendChild(section);
+      }
+    },
+
+    // Dispatch one card click through the existing action client with the
+    // exact envelope: `known_action` reuses the validator-normalized params
+    // as-is; `freeform` composes the canonical talk payload whose speech is
+    // always the label text. No display descriptor is passed, so the echo
+    // bridge resolves to null and stays silent.
+    _submitCard: function (card) {
+      var actions = getActions();
+      if (!actions || !card) {
+        return;
+      }
+      if (card.kind === "freeform") {
+        actions.submit("explore.talk_freeform", {
+          npc_id: card.params && card.params.npc_id,
+          speech: card.label,
+        });
+        return;
+      }
+      actions.submit(card.action_code, card.params);
+    },
+
+    // Dispatch the dismiss control: `options.dismiss` with the exact empty
+    // payload (an OOB action, never a player command).
+    _submitDismiss: function () {
+      var actions = getActions();
+      if (actions) {
+        actions.submit("options.dismiss", {});
+      }
+    },
   };
 
   function panelAvailable(state) {
@@ -790,6 +932,7 @@
         if (!root) {
           return;
         }
+        dock._state = state;
         var epochChanged = state.activeEpoch && state.activeEpoch !== lastEpoch;
         if (epochChanged) {
           lastEpoch = state.activeEpoch;
@@ -802,18 +945,43 @@
           var signature = dock._panelSignature(panel);
           if (!dock._mounted) {
             dock._mount(root, panel, state);
+            dock._lastSuggestionsSignature = dock._suggestionsSignature();
           } else if (epochChanged || signature !== dock._lastSignature) {
             dock._model = window.Elosern.ExplorationMenu.buildMenus(panel, {
               currentNode: dock._currentNodeFrom(state),
             });
             dock._currentMenuKey = "root";
             dock._menuStack = ["root"];
-            dock._renderDock(root, panel);
-            var keyboard = getKeyboard();
-            if (keyboard && epochChanged) {
-              keyboard.reset(dock._model.menus.root);
-              dock._ownsKeyboard = true;
-              dock._focusKey = null;
+            if (dock._ownsExplorationSurface(root)) {
+              dock._renderDock(root, panel);
+              var keyboard = getKeyboard();
+              if (keyboard && epochChanged) {
+                keyboard.reset(dock._model.menus.root);
+                dock._ownsKeyboard = true;
+                dock._focusKey = null;
+              }
+              dock._lastSuggestionsSignature = dock._suggestionsSignature();
+            } else {
+              // The surface belongs to a re-homed services/character sub-dock:
+              // keep the model (and the signature tracking) fresh but defer
+              // the DOM rebuild and the router reset until the sub-dock
+              // leaves; the escape-root path then rebuilds from the current
+              // snapshot, so the section never renders under a sub-dock.
+              dock._lastSuggestionsSignature = dock._suggestionsSignature();
+            }
+          } else {
+            // Only the suggestions content may have moved (a `generating` ->
+            // `ready` push or a dismiss): re-render the section in place --
+            // never a dock rebuild, never a keyboard-router reset. While a
+            // re-homed sub-dock owns the surface the section is not rendered
+            // here; the next exploration rebuild brings it back from the
+            // current snapshot.
+            var suggestionsSignature = dock._suggestionsSignature();
+            if (suggestionsSignature !== dock._lastSuggestionsSignature) {
+              if (dock._ownsExplorationSurface(root)) {
+                dock._renderSuggestionsSection(root);
+              }
+              dock._lastSuggestionsSignature = suggestionsSignature;
             }
           }
           dock._lastSignature = signature;

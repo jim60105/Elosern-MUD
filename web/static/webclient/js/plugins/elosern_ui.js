@@ -39,6 +39,18 @@
     );
   }
 
+  // A focused suggestion card or dismiss button is a native-button surface:
+  // Enter/Space must reach the button's own activation (the card click path
+  // is a direct listener, never the KeyboardRouter), so the routing gate
+  // defers to the browser default for exactly those keys.
+  function isSuggestionButton(target) {
+    return !!(
+      target &&
+      target.closest &&
+      (target.closest(".option-card") || target.closest(".suggestions-dismiss"))
+    );
+  }
+
   function getKeyboard() {
     return (
       window.Elosern &&
@@ -145,6 +157,15 @@
     }
     if (isEditable(event.target)) {
       // Normal typing in the input field is untouched.
+      return false;
+    }
+    if (
+      isSuggestionButton(event.target) &&
+      (event.key === "Enter" || event.key === " ")
+    ) {
+      // Native-button activation for the suggestions surface: the key is
+      // unclaimed so the browser dispatches the button's own click (the
+      // direct card/dismiss listener), never the menu router.
       return false;
     }
     if (keyboard) {

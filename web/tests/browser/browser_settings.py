@@ -16,6 +16,8 @@ from evennia.settings_default import *  # noqa: F401, F403
 
 import os
 
+import json
+
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
@@ -190,3 +192,180 @@ def _browser_is_webclient(session) -> bool:
 
 
 _ingress.is_webclient = _browser_is_webclient
+
+# ---------------------------------------------------------------------------
+# Deterministic action-options client (webclient-options-surface).
+#
+# Only when the options-surface fixture is opted in
+# (``ELOSERN_BROWSER_OPTIONS_SURFACE=1``, set on the harness runtime) does the
+# action_options client become a replay double so the suggestions trigger is
+# fully deterministic: generations for the options-surface plaza room resolve
+# a fixed four-card OptionSet after a short reactor delay (so the transient
+# ``generating`` state stays observable by a polling journey), generations
+# for the empty-ground room fail with a scripted transport error (the
+# memoized degraded path), and any other room matches no fixture and degrades
+# exactly like an offline endpoint. No socket is ever opened. Sibling browser
+# suites keep the production client (and its plain offline degrade), exactly
+# as before this change. The room names below are authored by the seed
+# fixture in seed.py.
+# ---------------------------------------------------------------------------
+import server.option_proposal_service as _options_service  # noqa: E402
+
+PLAZA_ROOM_NAME = "選項測試廣場"
+EMPTY_GROUND_ROOM_NAME = "選項測試空地"
+SOUTH_GATE_EXIT_KEY = "離開廣場"
+_GENERATION_DELAY_SECONDS = 1.5
+
+
+def _room_matcher(room_name: str):
+    """Match a request whose user message names exactly ``room_name``."""
+    prefix = "場景名稱：" + room_name
+
+    def matches(descriptor) -> bool:
+        return any(
+            str(message.get("content") or "").startswith(prefix)
+            for message in getattr(descriptor, "messages", ())
+        )
+
+    return matches
+
+
+def _browser_character():
+    """The deterministic seeded player character (see seed.py)."""
+    from typeclasses.characters import PlayerCharacter
+
+    name = os.environ.get("ELOSERN_BROWSER_CHARACTER", "BrowserTest")
+    return PlayerCharacter.objects.filter(db_key=name).first()
+
+
+def _plaza_option_set_json() -> str | None:
+    """Build the fixed plaza OptionSet from the canonical affordances.
+
+    The cards are derived from ``exploration_affordances(actor)`` at call time
+    so every ``params`` value (exit ref, npc id, monster id) is byte-identical
+    to what the prompt context carries: the schema ladder's exact-match stage
+    can never reject the fixture. Returns ``None`` (degrade) when the fixture
+    room or any required affordance is absent.
+    """
+    from web.webclient.presentation.affordances import exploration_affordances
+
+    actor = _browser_character()
+    if actor is None or getattr(actor, "location", None) is None:
+        return None
+    if str(getattr(actor.location, "key", "")) != PLAZA_ROOM_NAME:
+        return None
+    affordances = exploration_affordances(actor)
+
+    def _pick(action_id, **preds):
+        for entry in affordances:
+            if entry.action_id != action_id:
+                continue
+            params = entry.params or {}
+            if all(params.get(key) == value for key, value in preds.items()):
+                return entry
+        return None
+
+    look = _pick("explore.look", room=True)
+    engage = _pick("explore.engage")
+    freeform = _pick("explore.talk_freeform")
+    # The move card names the 離開廣場 exit (its destination is 南門), so the
+    # fixture label matches what the player actually walks through. The exit
+    # lookup is scoped to the plaza room itself so a same-keyed exit elsewhere
+    # can never be picked.
+    gate_exit = next(
+        (
+            exit_obj
+            for exit_obj in getattr(actor.location, "exits", ())
+            if getattr(exit_obj, "key", None) == SOUTH_GATE_EXIT_KEY
+        ),
+        None,
+    )
+    move = (
+        _pick("explore.move", exit_ref=str(gate_exit.id))
+        if gate_exit is not None
+        else None
+    )
+    if None in (look, move, freeform, engage):
+        return None
+    cards = [
+        {
+            "action_code": "explore.look",
+            "label": "查看四周",
+            "params": dict(look.params),
+            "hint": "觀察廣場四周的動靜",
+        },
+        {
+            "action_code": "explore.move",
+            "label": "前往南門",
+            "params": dict(move.params),
+        },
+        {
+            # The plaza hosts exactly one NPC, so the freeform binding is
+            # always npc_index 0 (the context's stable NPC order).
+            "npc_index": 0,
+            "label": "我們聊聊好嗎？",
+            "hint": "對廣場夥伴說出這句話",
+        },
+        {
+            "action_code": "explore.engage",
+            "label": "試試身手",
+            "params": dict(engage.params),
+        },
+    ]
+    return json.dumps(
+        {"context_kind": "exploration", "cards": cards}, ensure_ascii=False
+    )
+
+
+from twisted.internet import reactor  # noqa: E402
+
+
+class _DeterministicOptionsClient:
+    """Replay double with a delayed plaza response and scripted failures.
+
+    Implements the same ``get_response(descriptor)`` protocol as
+    ``world.ai.fake_client.FakeLLMClient`` (whose conventions this fixture
+    follows): the plaza request fires after ``_GENERATION_DELAY_SECONDS`` so
+    the dock's ``generating`` line is observable, the empty-ground request
+    errbacks with ``LLMTransportError`` (the memoized degraded path), and any
+    other request errbacks with ``MissingFixtureError`` — a plain generation
+    failure that degrades without a memo, exactly like an offline endpoint.
+    """
+
+    def __init__(self, plaza_text: str | None) -> None:
+        self._plaza_text = plaza_text
+
+    def get_response(self, descriptor):
+        from twisted.internet import defer
+        from twisted.python.failure import Failure
+
+        from world.ai.errors import LLMTransportError
+        from world.ai.fake_client import MissingFixtureError
+
+        if _room_matcher(EMPTY_GROUND_ROOM_NAME)(descriptor):
+            return defer.fail(
+                Failure(LLMTransportError("connection", "simulated offline"))
+            )
+        if _room_matcher(PLAZA_ROOM_NAME)(descriptor):
+            if self._plaza_text is None:
+                return defer.fail(Failure(MissingFixtureError("plaza unavailable")))
+            result = defer.Deferred()
+            reactor.callLater(
+                _GENERATION_DELAY_SECONDS,
+                lambda: result.callback(self._plaza_text),
+            )
+            return result
+        return defer.fail(Failure(MissingFixtureError("no fixture for this room")))
+
+
+def _browser_options_client():
+    """Deterministic action_options client for the options-surface journeys."""
+    try:
+        plaza_text = _plaza_option_set_json()
+    except Exception:
+        plaza_text = None
+    return _DeterministicOptionsClient(plaza_text)
+
+
+if os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") == "1":
+    _options_service._build_action_options_client = _browser_options_client

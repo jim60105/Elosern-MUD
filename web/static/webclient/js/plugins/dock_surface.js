@@ -187,11 +187,14 @@
         return;
       }
       // Keep DOM focus on the composite widget so the visible focus ring
-      // stays where the router says it is.
+      // stays where the router says it is. `preventScroll` stops the browser
+      // from scrolling the (possibly clipped) listbox into view between
+      // mousedown and mouseup -- that scroll would move the row under the
+      // cursor and the resulting click would resolve to the container.
       event.preventDefault();
       var container = row.parentNode;
       if (container && typeof container.focus === "function") {
-        container.focus();
+        container.focus({ preventScroll: true });
       }
     });
 
