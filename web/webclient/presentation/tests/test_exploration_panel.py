@@ -1049,6 +1049,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         from unittest.mock import PropertyMock
 
         from typeclasses.rooms import GridRoom, TerrainRoom
+        from web.webclient.actions.node_ids import node_id_for_location
         from world.maps.bootstrap import NORTH_GATE_XYZ
 
         north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
@@ -1073,6 +1074,13 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             location=self.south_gate,
             destination=bare,
         )
+        plain = create_object(Room, key="普通目的地", location=None)
+        plain_exit = create_object(
+            "evennia.objects.objects.DefaultExit",
+            key="門",
+            location=self.south_gate,
+            destination=plain,
+        )
         none_exit = create_object(
             "evennia.objects.objects.DefaultExit",
             key="虛",
@@ -1081,8 +1089,20 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         payload = self._render()
         rows = {row["exit_ref"]: row for row in payload["move"]}
-        self.assertTrue(rows[str(int(grid_exit.id))]["destination"].startswith("grid:"))
-        self.assertTrue(rows[str(int(wild_exit.id))]["destination"].startswith("wild:"))
+        # Every destination node is byte-identical to the shared encoder's
+        # derivation (ordinary room, GridRoom, and TerrainRoom alike).
+        self.assertEqual(
+            rows[str(int(grid_exit.id))]["destination"],
+            node_id_for_location(north_gate),
+        )
+        self.assertEqual(
+            rows[str(int(wild_exit.id))]["destination"],
+            node_id_for_location(terrain),
+        )
+        self.assertEqual(
+            rows[str(int(plain_exit.id))]["destination"],
+            node_id_for_location(plain),
+        )
         self.assertNotIn(str(int(bare_exit.id)), rows)
         with patch.object(
             type(none_exit), "destination", new_callable=PropertyMock, return_value=None
@@ -1123,6 +1143,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(engage["disabled_reason"]["code"], "target_dead")
 
     def test_locationless_serializers_return_empty_lists(self):
+        from web.webclient.actions.node_ids import node_id_for_location
         from web.webclient.presentation import exploration as module
 
         self.player.location = None
@@ -1130,7 +1151,8 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(module._look_entities(self.player), [])
         self.assertEqual(module._look_objects(self.player), [])
         self.assertEqual(module._interact_targets(self.player), [])
-        self.assertIsNone(module._destination_node(object()))
+        self.assertIsNone(node_id_for_location(None))
+        self.assertFalse(hasattr(module, "_destination_node"))
 
 
 class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):

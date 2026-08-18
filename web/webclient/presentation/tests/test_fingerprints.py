@@ -3,11 +3,15 @@
 Covers the canonical-JSON serializer's determinism and type coercion, the
 eligibility digest's label-blindness and its invalidation on schedule-gate
 flips, exit locks, and monster death, the public-state digest's
-order-determinism and partial-progress/sub-tier stability (anti-oracle), and
-the ``fingerprint`` combiner's replay and per-component invalidation.
+order-determinism and partial-progress/sub-tier stability (anti-oracle), the
+``fingerprint`` combiner's replay and per-component invalidation, and the
+shared exploration situation derivation (the single source scheduling and
+presentation both consume).
 """
 
 import unittest
+
+from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
 
@@ -17,6 +21,7 @@ from web.webclient.presentation.affordances import (
     eligible_affordance_digest,
 )
 from web.webclient.presentation.fingerprints import (
+    derive_exploration_situation,
     displayed_objective_identity,
     fingerprint,
     public_state_digest,
@@ -255,3 +260,103 @@ class DisplayedObjectiveIdentityTests(unittest.TestCase):
             db = type("db", (), {"quest_log": None})()
 
         self.assertEqual(displayed_objective_identity(_Actor()), ())
+
+
+class SharedDerivationBoundaryTests(unittest.TestCase):
+    """The shared derivation never imports the trigger service or ``world.ai``.
+
+    The module must stay cold importable and dependency-free of the transport
+    boundary: scheduling and presentation consume the same helper, and nothing
+    under it may drag in the server service or the generative layer.
+    """
+
+    def test_forbidden_imports_are_absent(self):
+        import ast
+        from pathlib import Path
+
+        module_path = (
+            Path(__file__).resolve().parents[1] / "fingerprints.py"
+        )
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        imported = set()
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                imported.update(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module is not None:
+                    imported.add(node.module)
+        for name in ("server", "world.ai", "world"):
+            self.assertFalse(
+                any(candidate == name or candidate.startswith(name + ".")
+                    for candidate in imported),
+                f"fingerprints.py must not import {name!r}",
+            )
+
+
+class ExplorationSituationDerivationTests(EvenniaTest):
+    """The shared derivation: one fingerprint for scheduling and presentation.
+
+    Uses real Evennia fixtures so the typeclass identity, eligibility digest,
+    and public-state inputs all resolve; the trigger service delegates to this
+    exact helper, so the two consumers cannot drift.
+    """
+
+    def setUp(self):
+        from evennia.utils.create import create_object
+
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.monsters import Monster
+        from typeclasses.npcs import NPC
+        from typeclasses.rooms import Room
+
+        self.room = create_object(Room, key="推導廣場", location=None)
+        self.player = create_object(PlayerCharacter, key="推導玩家")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.npc = create_object(NPC, key="推導店員", location=self.room)
+        self.monster = create_object(Monster, key="推導哥布林", location=self.room)
+
+    def test_derivation_names_the_situation_with_sorted_identities(self):
+        situation = derive_exploration_situation(self.player)
+        self.assertIsNotNone(situation)
+        fingerprint_value, vocab, eligible, npcs, monsters, objectives = situation
+        self.assertEqual(
+            [int(entity.pk) for entity in npcs], [int(self.npc.pk)]
+        )
+        self.assertEqual(
+            [int(entity.pk) for entity in monsters], [int(self.monster.pk)]
+        )
+        self.assertTrue(vocab)
+        self.assertTrue(eligible)
+        self.assertIsInstance(fingerprint_value, str)
+        self.assertTrue(fingerprint_value)
+
+    def test_derivation_is_the_service_single_source(self):
+        from server import option_proposal_service as service
+
+        self.assertEqual(
+            service._derive_situation(self.player),
+            derive_exploration_situation(self.player),
+        )
+
+    def test_no_location_or_out_of_exploration_yields_none(self):
+        self.player.location = None
+        self.assertIsNone(derive_exploration_situation(self.player))
+        self.player.location = self.room
+        self.player.creation_pending = True
+        self.assertIsNone(derive_exploration_situation(self.player))
+        self.player.creation_pending = False
+        situation = derive_exploration_situation(self.player)
+        self.assertIsNotNone(situation)
+
+    def test_situation_change_turns_over_the_fingerprint(self):
+        first = derive_exploration_situation(self.player)[0]
+        self.monster.delete()
+        second = derive_exploration_situation(self.player)[0]
+        self.assertNotEqual(first, second)
+

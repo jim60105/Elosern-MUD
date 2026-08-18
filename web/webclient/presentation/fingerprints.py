@@ -8,10 +8,15 @@ stays out — the anti-oracle rule — so cache-miss patterns leak at most the
 public relationship tier, never the affinity number.
 
 This module owns the read-only public-state views (the displayed objective
-identity, the public tier labels) and the pure ``fingerprint`` combiner; the
-eligibility digest and the canonical JSON serializer live in
-``affordances.py`` so the vocabulary, the digest, and the ladder comparison
-share one serialization. Nothing here mutates state.
+identity, the public tier labels), the pure ``fingerprint`` combiner, and the
+shared exploration situation derivation ``derive_exploration_situation``. The
+trigger service (``server.option_proposal_service``) and the presentation
+context factory both consume that one derivation, so scheduling and
+presentation can never drift on what names the situation; the eligibility
+digest and the canonical JSON serializer live in ``affordances.py`` so the
+vocabulary, the digest, and the ladder comparison share one serialization.
+This module MUST NOT import ``server.option_proposal_service`` or ``world.ai``;
+everything here is read-only and none of it mutates state.
 """
 
 import hashlib
@@ -20,6 +25,7 @@ from typing import Any, Iterable
 from web.webclient.presentation.affordances import canonical_json
 
 __all__ = [
+    "derive_exploration_situation",
     "displayed_objective_identity",
     "fingerprint",
     "public_state_digest",
@@ -127,3 +133,66 @@ def fingerprint(
             ]
         ).encode("utf-8")
     ).hexdigest()
+
+
+def derive_exploration_situation(
+    actor: Any,
+) -> "tuple[str, Any, Any, list[Any], list[Any], tuple] | None":
+    """Derive ``(fingerprint, vocab, eligible, npcs, monsters, objectives)``
+    for the actor's current exploration situation, or ``None`` when no room
+    can name the situation.
+
+    This is the single read-only derivation scheduling and presentation both
+    use: the trigger service schedules from it and the presentation-context
+    factory records its fingerprint, so the two can never drift on what names
+    the situation. Every import is function-local (this module stays cold
+    importable and never reaches for ``server.option_proposal_service`` or
+    ``world.ai``); nothing here mutates state.
+    """
+    from typeclasses.monsters import Monster
+    from typeclasses.npcs import NPC
+    from web.webclient.actions.node_ids import node_id_for_location
+    from web.webclient.presentation.affordances import (
+        eligible_affordance_digest,
+        exploration_affordances,
+        in_exploration_mode,
+        suggestible_candidates,
+    )
+
+    if not in_exploration_mode(actor):
+        return None
+    location = getattr(actor, "location", None)
+    if location is None:
+        return None
+    room_key = node_id_for_location(location)
+    if room_key is None:
+        try:
+            room_key = "room:%d" % int(location.id)
+        except Exception:
+            return None
+
+    npcs: list[Any] = []
+    monsters: list[Any] = []
+    actor_id = getattr(actor, "pk", None)
+    for occupant in list(getattr(location, "contents", ()) or ()):
+        if getattr(occupant, "pk", None) == actor_id:
+            continue
+        if isinstance(occupant, Monster):
+            monsters.append(occupant)
+        elif isinstance(occupant, NPC):
+            npcs.append(occupant)
+    npcs.sort(key=lambda entity: int(entity.pk))
+    monsters.sort(key=lambda entity: int(entity.pk))
+
+    vocab = exploration_affordances(actor)
+    eligible = suggestible_candidates(vocab, actor=actor)
+    objectives = displayed_objective_identity(actor)
+    tiers = public_tier_labels(actor, npcs)
+    digest_value = fingerprint(
+        room_key,
+        (int(entity.pk) for entity in npcs),
+        (int(entity.pk) for entity in monsters),
+        eligible_affordance_digest(eligible),
+        public_state_digest(objectives, tiers),
+    )
+    return digest_value, vocab, eligible, npcs, monsters, objectives

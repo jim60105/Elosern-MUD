@@ -31,7 +31,6 @@ from web.webclient.actions.exploration_actions import (
 from web.webclient.actions.node_ids import node_id_for_location
 from world.onboarding.guide_dialogue import DIALOGUE_TABLE
 from world.rules.dialogue import dialogue_key_for, is_dialogue_host
-from world.rules.map_knowledge import encode_grid, encode_room, encode_wild
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party import is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
@@ -227,27 +226,6 @@ def _traversable(exit_obj: Any, actor: Any) -> bool:
         return bool(exit_obj.access(actor, "traverse"))
     except Exception:
         return False
-
-
-def _destination_node(destination: Any) -> str | None:
-    """Return the canonical node ID for a destination room, or ``None``."""
-    from typeclasses.rooms import GridRoom, TerrainRoom
-    from world.maps.wilderness_provider import WILDERNESS_NAME
-
-    if isinstance(destination, GridRoom):
-        try:
-            x, y, z = destination.xyz
-        except Exception:
-            return None
-        return encode_grid(str(z), x, y)
-    if isinstance(destination, TerrainRoom):
-        coordinates = destination.coordinates
-        if coordinates is None:
-            return None
-        return encode_wild(WILDERNESS_NAME, coordinates[0], coordinates[1])
-    if not getattr(destination, "id", None):
-        return None
-    return encode_room(int(destination.id))
 
 
 def _resolve_single_host(actor: Any, component_class: type) -> Any | None:
@@ -459,9 +437,11 @@ def _move_entries(actor: Any) -> list[AffordanceView]:
 
     Wilderness rooms route every direction through the canonical destination
     resolver exactly like the version-1 panel: an exit whose destination
-    cannot be resolved is omitted (the move adapter would reject it), and the
-    entry's ``current_node`` is the shared node-ID encoder's value so the
-    adapter's ``stale_location`` compare passes byte-identically.
+    cannot be resolved is omitted (the move adapter would reject it). The
+    entry's ``current_node`` and every destination node are derived through
+    the shared node-ID encoder, so the adapter's ``stale_location`` compare
+    passes byte-identically for ordinary rooms, ``GridRoom``, and
+    ``TerrainRoom`` destinations alike.
     """
     from typeclasses.rooms import TerrainRoom
     from world.maps.wilderness_destination import (
@@ -491,7 +471,7 @@ def _move_entries(actor: Any) -> list[AffordanceView]:
                 else None
             )
         else:
-            destination_node = _destination_node(exit_obj.destination)
+            destination_node = node_id_for_location(exit_obj.destination)
         if destination_node is None:
             continue
         enabled = _traversable(exit_obj, actor)

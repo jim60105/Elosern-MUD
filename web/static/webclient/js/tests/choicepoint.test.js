@@ -289,7 +289,6 @@ function makeLayerHarness() {
   const facade = {
     appendInput: () => false,
     mountChoicePoint: (element) => block.mount(element),
-    moveChoicePointToEnd: () => block.moveToEnd(),
     replaceChoicePoint: (element) => block.replace(element),
     unmountChoicePoint: () => block.unmount(),
   };
@@ -321,19 +320,33 @@ function collectButtons(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Task 1.4: facade shape contract (appendInput plus the four block ops).
+// Task 1.4: facade shape contract (appendInput plus the three block ops; the
+// facade must not expose a separate move-to-end operation — append-owned
+// stream-end placement is the only relocation owner).
 // ---------------------------------------------------------------------------
 
-test("the narrativeInput facade keeps appendInput and gains the four block ops", () => {
+test("the narrativeInput facade keeps appendInput and gains the three block ops", () => {
   installDomDouble();
   delete require.cache[require.resolve("../plugins/goldenlayout.js")];
   require("../plugins/goldenlayout.js");
   const facade = window.Elosern.narrativeInput;
   assert.equal(typeof facade.appendInput, "function");
   assert.equal(typeof facade.mountChoicePoint, "function");
-  assert.equal(typeof facade.moveChoicePointToEnd, "function");
   assert.equal(typeof facade.replaceChoicePoint, "function");
   assert.equal(typeof facade.unmountChoicePoint, "function");
+  assert.equal(
+    typeof facade.moveChoicePointToEnd,
+    "undefined",
+    "no separate move-to-end operation on the facade"
+  );
+});
+
+test("FACADE_OPS expose only attach, replace-in-place, and remove", () => {
+  assert.deepEqual(
+    ChoicePoints.FACADE_OPS,
+    ["mountChoicePoint", "replaceChoicePoint", "unmountChoicePoint"],
+    "the readiness contract names no move operation"
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -545,19 +558,19 @@ test("each narrative text event counts exactly once with a block mounted", () =>
   assert.equal(container.scrollTop, 200, "scrolled-away viewport untouched");
 });
 
-test("relocation never increments the unread count and never scrolls", () => {
+test("appends relocate the block to the new end with one decision only", () => {
   const { container, block, unread } = makeBlockHarness();
   const node = new FakeElement("div");
   block.mount(node);
   container.scrollTop = 150;
   const before = unread();
-  // Displace the block (a defensive path; appends normally keep it last).
-  container.appendChild(new FakeElement("div"));
-  assert.equal(block.moveToEnd(), true);
-  assert.equal(block.moveToEnd(), false, "already last is a no-op");
-  assert.equal(container.lastChild, node);
-  assert.equal(unread(), before, "relocation never increments");
-  assert.equal(container.scrollTop, 150, "relocation never scrolls");
+  // An append while scrolled away is the only relocation the block needs:
+  // the block stays last, exactly one unread decision is taken, and no
+  // separate move operation or extra scroll/unread event exists.
+  block.appendNode(new FakeElement("div"));
+  assert.equal(container.lastChild, node, "the block stays last");
+  assert.equal(unread(), before + 1, "the append's own single decision only");
+  assert.equal(container.scrollTop, 150, "no extra scroll event");
 });
 
 test("text appended after a ready block moves the block to the new end", () => {
@@ -584,7 +597,6 @@ test("multiple appends and one block in any order keep the block last", () => {
   block.appendNode(new FakeElement("div"));
   block.mount(new FakeElement("div"));
   block.appendNode(new FakeElement("div"));
-  block.moveToEnd();
   block.appendNode(new FakeElement("div"));
   const classes = container.children.map((child) => String(child.className || ""));
   assert.equal(classes[classes.length - 1], "", "the block is always last");
@@ -612,7 +624,6 @@ test("mount/replace/unmount are safe no-ops without a mounted block", () => {
   const { container, block } = makeBlockHarness();
   assert.equal(block.replace(new FakeElement("div")), false);
   assert.equal(block.unmount(), false);
-  assert.equal(block.moveToEnd(), false);
   assert.equal(container.children.length, 0);
 });
 
@@ -715,7 +726,6 @@ test("a failed facade mount leaves the state unadvanced; the next commit retries
   const facade = {
     appendInput: () => false,
     mountChoicePoint: (element) => (allowMount ? block.mount(element) : false),
-    moveChoicePointToEnd: () => block.moveToEnd(),
     replaceChoicePoint: (element) => block.replace(element),
     unmountChoicePoint: () => block.unmount(),
   };
@@ -754,7 +764,6 @@ test("a failed unmount keeps the block state until the next commit retries", () 
   const facade = {
     appendInput: () => false,
     mountChoicePoint: (element) => block.mount(element),
-    moveChoicePointToEnd: () => block.moveToEnd(),
     replaceChoicePoint: (element) => block.replace(element),
     unmountChoicePoint: () => (allowUnmount ? block.unmount() : false),
   };
@@ -938,7 +947,6 @@ test("the readiness gate is a bounded no-op until every contract is present", ()
   window.Elosern.narrativeInput = {
     appendInput: () => false,
     mountChoicePoint: () => false,
-    moveChoicePointToEnd: () => false,
     replaceChoicePoint: () => false,
     unmountChoicePoint: () => false,
   };

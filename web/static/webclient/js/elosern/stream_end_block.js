@@ -3,8 +3,8 @@
  *
  * The narrative choice-point (webclient-options-choicepoints) is a stream-end
  * block owned by the `window.Elosern.narrativeInput` facade: the facade mounts,
- * moves, replaces, and unmounts exactly one block element, and every narrative
- * text append flows through this controller so the stream's end geometry,
+ * replaces, and unmounts exactly one block element, and every narrative text
+ * append flows through this controller so the stream's end geometry,
  * scroll-keep, and the polite unread marker stay one owner.
  *
  * The controller is DOM-abstracted (`container` with appendChild/removeChild/
@@ -16,10 +16,12 @@
  * - `appendNode` inserts before the mounted block (the block always stays
  *   last) and performs exactly one scroll/unread decision: at the bottom it
  *   scrolls to keep the end visible, otherwise it invokes `onUnread` once.
- *   This is the ONLY path that ever increments the unread count.
+ *   This is the ONLY path that ever increments the unread count and the ONLY
+ *   relocation mechanism the choice-point needs — there is no separate
+ *   move-to-end operation.
  * - `mount`/`replace` keep the end visible when the viewport is already at the
  *   bottom (the block is presentation chrome, never an unread event).
- * - `moveToEnd`/`unmount` never scroll and never touch the unread count.
+ * - `unmount` never scrolls and never touches the unread count.
  */
 (function (root, factory) {
   "use strict";
@@ -116,21 +118,6 @@
       return element;
     }
 
-    // Relocate the remembered block to the current stream end. Produces no
-    // scroll event and no unread increment; no-op when nothing is mounted or
-    // the block is already last.
-    function moveToEnd() {
-      if (!container || !mounted()) {
-        return false;
-      }
-      if (container.lastChild === block) {
-        return false;
-      }
-      container.removeChild(block);
-      container.appendChild(block);
-      return true;
-    }
-
     // Swap the mounted block node for a new one in place (position kept).
     // No-op when nothing is mounted. Keeps the end visible when the viewport
     // is already at the bottom (the decision is taken before the swap, since
@@ -164,7 +151,6 @@
     return {
       appendNode: appendNode,
       mount: mount,
-      moveToEnd: moveToEnd,
       replace: replace,
       unmount: unmount,
       hasBlock: mounted,

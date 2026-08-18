@@ -249,6 +249,116 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(result["code"], "insufficient_resource")
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_terminal_forfeit_schedules_every_live_watcher_after_the_result(self):
+        """A successful terminal combat action schedules the exploration
+        trigger for every live watcher of the actor only after the completion
+        presentation and the action result are on the wire."""
+        from unittest.mock import patch
+
+        from server import option_proposal_service as service
+        from web.webclient.presentation import watchers as watchers_module
+
+        engage(self.player, self.monster)
+        coordinator = self._coordinator()
+        watcher_a = _FakeSession(self.player)
+        watcher_b = _FakeSession(self.player)
+        captured = {}
+        with (
+            patch.object(
+                service,
+                "schedule_action_options",
+                side_effect=lambda *a, **kw: captured.update(
+                    {"watchers": kw["watchers"], "sent_before": len(self.session.sent)}
+                ),
+            ),
+            patch.object(
+                watchers_module,
+                "watchers_for",
+                return_value=((watcher_a, "epoch-a"), (watcher_b, "epoch-b")),
+            ),
+        ):
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.forfeit",
+                    {"session_id": read_session(self.player).session_id},
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        self.assertIsNone(read_session(self.player), "the session ended")
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(captured["watchers"], ((watcher_a, "epoch-a"), (watcher_b, "epoch-b")))
+        self.assertEqual(
+            captured["sent_before"],
+            len(self.session.sent),
+            "the trigger is scheduled after the result publication, never before",
+        )
+        self.assertTrue(
+            any("ui_action_result" in call for call in self.session.sent[: captured["sent_before"]]),
+            "the action result is already on the wire when scheduling runs",
+        )
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_non_terminal_round_never_schedules(self):
+        """A successful round that keeps the session active stays in combat:
+        no exploration trigger is scheduled."""
+        engage(self.player, self.monster)
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        from server import option_proposal_service as service
+
+        with patch.object(service, "schedule_action_options") as schedule:
+            with patch("world.rules.combat.roll_d100", return_value=100):
+                handle_ui_action(
+                    self.session,
+                    self.player,
+                    self._envelope(
+                        coordinator,
+                        "combat.cast",
+                        {"skill_key": "fire_ball", "target_ids": [self.monster.pk]},
+                    ),
+                    self.action_registry,
+                    self.registry,
+                )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "round")
+        self.assertIsNotNone(read_session(self.player))
+        schedule.assert_not_called()
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_rejected_combat_action_never_schedules(self):
+        """A rejected (non-successful) combat action must never schedule,
+        whatever its action id."""
+        engage(self.player, self.monster)
+        coordinator = self._coordinator()
+        from unittest.mock import patch
+
+        from server import option_proposal_service as service
+
+        with patch.object(service, "schedule_action_options") as schedule:
+            handle_ui_action(
+                self.session,
+                self.player,
+                self._envelope(
+                    coordinator,
+                    "combat.forfeit",
+                    {"session_id": "hostile:999:0"},
+                ),
+                self.action_registry,
+                self.registry,
+            )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertIsNotNone(read_session(self.player), "the session survives")
+        schedule.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

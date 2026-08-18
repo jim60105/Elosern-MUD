@@ -39,7 +39,6 @@ from web.webclient.presentation.affordances import (
     MAX_SCRIPTED_KEYWORDS,
     _DIALOGUE_UNAVAILABLE_REASON,
     _bounded_display_name,
-    _destination_node,
     _entity_kind,
     _exit_ref,
     _is_exit,
@@ -50,6 +49,7 @@ from web.webclient.presentation.affordances import (
     _target_affordance_entries,
     _traversable,
 )
+from web.webclient.actions.node_ids import node_id_for_location
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -467,7 +467,7 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
                 else None
             )
         else:
-            destination_node = _destination_node(exit_obj.destination)
+            destination_node = node_id_for_location(exit_obj.destination)
         if destination_node is None:
             continue
         reason = entry.disabled_reason

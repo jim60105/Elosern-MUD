@@ -720,13 +720,18 @@ def _suggestions_section(
     """Assemble the exploration form's ``suggestions`` envelope (design D-3).
 
     State-backed rendering rules, in order: an absent or ``unavailable``
-    snapshot is inert; ``generating`` carries the status alone; ``ready``
-    re-serializes exactly the snapshot's displayed cards (a missing or
-    shape-invalid displayed set degrades to ``unavailable`` with a bounded
-    diagnostic, never fabricated cards); ``degraded`` derives rule cards from
-    ``default_cards`` over the very affordance tuple just serialized into the
-    form. ``ready``/``generating`` never consult ``default_cards`` and
-    ``degraded`` never consults snapshot cards.
+    snapshot is inert; every non-``unavailable`` snapshot must carry a
+    fingerprint equal to the context's current exploration fingerprint (the
+    shared freshness derivation) — a missing or mismatched fingerprint emits
+    ``unavailable`` with a bounded diagnostic, never the stale cards, and this
+    gate is read-only (scheduling stays with the lifecycle triggers);
+    ``generating`` carries the status alone; ``ready`` re-serializes exactly
+    the snapshot's displayed cards (a missing or shape-invalid displayed set
+    degrades to ``unavailable`` with a bounded diagnostic, never fabricated
+    cards); ``degraded`` derives rule cards from ``default_cards`` over the
+    very affordance tuple just serialized into the form. ``ready``/``generating``
+    never consult ``default_cards`` and ``degraded`` never consults snapshot
+    cards.
 
     Both state-backed branches validate their derived cards through the v5
     shape gate before returning: the affordance vocabulary bounds entity
@@ -737,6 +742,12 @@ def _suggestions_section(
     """
     snapshot = context.options_state
     if snapshot is None or snapshot.status not in OPTIONS_STATUSES or snapshot.status == "unavailable":
+        return {"status": "unavailable"}
+    if context.options_fingerprint is None or snapshot.fingerprint != context.options_fingerprint:
+        log_unavailable(
+            "exploration suggestions",
+            "snapshot fingerprint no longer matches the current situation",
+        )
         return {"status": "unavailable"}
     if snapshot.status == "generating":
         return {"status": "generating"}

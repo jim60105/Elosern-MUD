@@ -76,16 +76,21 @@ exactly `{"npc_id": int}` (binding-only), because no registered validator produc
 without `speech`; the full validator SHALL run only on the client-composed dispatch payload
 (`speech` = the label text) defined by the later suggestions slices. A builder whose candid
 payload is rejected by its validator SHALL be treated as a logging bug in tests, never silently
-omitted. A move entry's `current_node` SHALL be produced by the shared pure node-ID encoder
-(`web/webclient/actions/node_ids.py::node_id_for_location`) that the move adapter's
-`stale_location` check uses, so the value is byte-identical across GridRoom, TerrainRoom, and
-ordinary-room encodings.
+omitted. Both a move entry's `current_node` and its destination-node derivation SHALL call the
+shared pure node-ID encoder (`web/webclient/actions/node_ids.py::node_id_for_location`). The move
+adapter's `stale_location` check and every ordinary-room, `GridRoom`, and `TerrainRoom` move
+affordance SHALL therefore share one byte-identical encoding implementation.
 
 #### Scenario: Every emitted entry executes against its real adapter
 - **WHEN** a unit or integration test takes the vocabulary emitted for a fixture room and
   dispatches each suggestible action entry through the production dispatcher
 - **THEN** no `malformed_payload` rejection occurs, and the move entry passes the adapter's
   `stale_location` comparison unchanged
+
+#### Scenario: Move source and destination use one encoder
+- **WHEN** a move affordance is built for an ordinary room, `GridRoom`, or `TerrainRoom`
+- **THEN** its current node and destination node are derived only through `node_id_for_location`,
+  with no duplicate room-type encoder in the affordance module
 
 #### Scenario: The freeform entry stays a binding shape
 - **WHEN** an `explore.talk_freeform` `AffordanceView` is constructed

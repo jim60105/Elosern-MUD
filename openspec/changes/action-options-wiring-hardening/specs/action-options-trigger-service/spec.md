@@ -79,6 +79,17 @@ eligible generation.
   current successor exactly once through chain identity checks, and A receives only that successor
   outcome
 
+#### Scenario: A second dismissal bars the queued successor
+- **WHEN** a session already queued on a successor dismisses again — raising its barrier above the
+  successor's generation — and then triggers
+- **THEN** the session never joins the pre-dismiss successor, settles degraded in place with the
+  barrier standing, and a later trigger starts fresh work above the barrier
+
+#### Scenario: A successor that cannot name the old situation settles without clearing the barrier
+- **WHEN** the actor moved on or the situation vanished before the queued successor started
+- **THEN** the successor settles its queued watchers degraded with no memo and without clearing
+  their dismissal barriers for the old fingerprint, and the chain drops the successor
+
 ### Requirement: Retired pending generations are removed by identity immediately
 When `evict()` removes the final subscriber from a pending generation, the service SHALL mark that
 generation retired and remove that exact generation from the joinable pending registry immediately.
