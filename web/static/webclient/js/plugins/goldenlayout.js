@@ -33,6 +33,9 @@
   var narrativeUnread = 0;
   var narrativeUnreadElement = null;
   var layoutStoreInstance = null;
+  // The stream-end block controller (choice-points): lazily bound to
+  // narrativeDiv once the narrative component mounts.
+  var streamEndBlock = null;
 
   function getStateController() {
     return (
@@ -1154,24 +1157,58 @@
     return /[\u2500-\u257f]/.test(text || "");
   }
 
+  // The single stream-end block owner: the choice-point layer (mount/move/
+  // replace/unmount) and every narrative append flow through the controller,
+  // so scroll-keep and the unread marker stay one owner. Bound lazily to the
+  // mounted narrative container; null while the narrative is unmounted or the
+  // controller module is absent (defensive: script order guarantees it).
+  function getStreamEndBlock() {
+    if (!narrativeDiv) {
+      return null;
+    }
+    if (!streamEndBlock) {
+      var module = window.Elosern && window.Elosern.StreamEndBlock;
+      if (!module || typeof module.createStreamEndBlock !== "function") {
+        return null;
+      }
+      streamEndBlock = module.createStreamEndBlock(narrativeDiv, {
+        atBottom: atNarrativeBottom,
+        scrollToBottom: function () {
+          narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+        },
+        onUnread: function () {
+          narrativeUnread += 1;
+          updateUnread();
+        },
+      });
+    }
+    return streamEndBlock;
+  }
+
   function appendNarrative(text) {
     if (!narrativeDiv) {
       return false;
     }
-    var wasAtBottom = atNarrativeBottom();
     var line = makeElement("div", "out");
     if (hasBoxDrawing(text)) {
       line.classList.add("map-art");
     }
     renderConvertedText(line, text);
-    narrativeDiv.appendChild(line);
-    if (wasAtBottom) {
-      narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    var block = getStreamEndBlock();
+    if (block) {
+      // One scroll/unread decision, made around the insertion: when the
+      // choice-point block is mounted the text lands before it and the block
+      // stays last (the movable end-block invariant).
+      block.appendNode(line);
     } else {
-      // Preserve scrollback position and surface an unread count instead of
-      // forcing the viewport to the bottom.
-      narrativeUnread += 1;
-      updateUnread();
+      var wasAtBottom = atNarrativeBottom();
+      narrativeDiv.appendChild(line);
+      if (wasAtBottom) {
+        narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+      } else {
+        narrativeUnread += 1;
+        updateUnread();
+      }
     }
     return true;
   }
@@ -1181,25 +1218,35 @@
   // line whose text is inserted as a single literal text node -- client-
   // authored text must never enter the markup allowlist pipeline. One input
   // event (divider + line) counts as exactly one unread increment and one
-  // scroll-keep event, exactly like one server line.
+  // scroll-keep event, exactly like one server line; the divider and the line
+  // travel as one fragment so the choice-point block always stays last.
   function appendInput(text) {
     if (!narrativeDiv) {
       return false;
     }
+    // The decision is taken before the divider so one input event counts
+    // exactly once (D5), byte-identical to the pre-choice-point path.
     var wasAtBottom = atNarrativeBottom();
     var hasPriorLine =
       narrativeDiv.querySelector(".out, .inp, .sys, .err") !== null;
+    var fragment = document.createDocumentFragment();
     if (hasPriorLine) {
-      narrativeDiv.appendChild(makeElement("div", "narrative-divider"));
+      fragment.appendChild(makeElement("div", "narrative-divider"));
     }
     var line = makeElement("div", "inp");
     line.appendChild(document.createTextNode(text == null ? "" : String(text)));
-    narrativeDiv.appendChild(line);
-    if (wasAtBottom) {
-      narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    fragment.appendChild(line);
+    var block = getStreamEndBlock();
+    if (block) {
+      block.appendNode(fragment, wasAtBottom);
     } else {
-      narrativeUnread += 1;
-      updateUnread();
+      narrativeDiv.appendChild(fragment);
+      if (wasAtBottom) {
+        narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+      } else {
+        narrativeUnread += 1;
+        updateUnread();
+      }
     }
     return true;
   }
@@ -1309,8 +1356,32 @@
     // client (dispatch echo) and the drawer (ordinary send echo) both route
     // through this facade so scroll-keep and the unread marker stay single-
     // owner (D5).
+    //
+    // The stream-end block API (choice-points) keeps the same single owner:
+    // the choice-point layer mounts, moves, replaces, and unmounts exactly
+    // one block element through these operations, and every narrative append
+    // keeps the block last (the movable end-block invariant). The operations
+    // are safe no-ops when no block is mounted and never write outside the
+    // narrative container; blocks are DOM nodes supplied by the caller, never
+    // built from markup here.
     window.Elosern.narrativeInput = {
       appendInput: appendInput,
+      mountChoicePoint: function (element) {
+        var block = getStreamEndBlock();
+        return block ? block.mount(element) : false;
+      },
+      moveChoicePointToEnd: function () {
+        var block = getStreamEndBlock();
+        return block ? block.moveToEnd() : false;
+      },
+      replaceChoicePoint: function (element) {
+        var block = getStreamEndBlock();
+        return block ? block.replace(element) : false;
+      },
+      unmountChoicePoint: function () {
+        var block = getStreamEndBlock();
+        return block ? block.unmount() : false;
+      },
     };
   }
   if (typeof window !== "undefined" && window.plugin_handler) {
