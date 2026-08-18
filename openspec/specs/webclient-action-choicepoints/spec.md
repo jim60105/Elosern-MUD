@@ -8,7 +8,7 @@ the stream. The block is owned by the `window.Elosern.narrativeInput` facade so 
 the unread marker stay single-owner, and its cards are the exact dock card component with one
 click path.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The choice-point renders generating and ready states at the stream end
 The browser SHALL append one muted line "AI 正在構思建議…" at the narrative stream end when the
