@@ -168,7 +168,6 @@
       "files_a": [
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_missing_scene_uses_the_placeholder_and_play_continues",
         "web.tests.browser.test_browser_art.ArtImageLoadFailureTest.test_image_load_failure_shows_fallback_without_refetch",
-        "web.tests.browser.test_browser_shell.ShellAcceptanceTest",
         "web.tests.browser.test_browser_actions.ActionLockingTest",
         "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest"
       ],
@@ -179,6 +178,16 @@
         "web.tests.browser.test_harness.ManagedServerFastTests",
         "web.tests.browser.test_harness.PortAllocationTests",
         "web.tests.browser.test_harness.RealServerBootTest"
+      ]
+    },
+    {
+      "index": 12,
+      "name": "options-surface",
+      "files_a": [
+        "web.tests.browser.test_browser_options_surface"
+      ],
+      "files_b": [
+        "web.tests.browser.test_browser_shell.ShellAcceptanceTest"
       ]
     }
   ]

@@ -318,16 +318,22 @@ input:focus-visible,
  * ---------------------------------------------------------------- */
 
 /* The mockup's command surface: `#211c18` surface with a 1px seal-red frame,
-   a guidance line naming the shortcuts, and grid buttons. */
+   a guidance line naming the shortcuts, and grid buttons. `safe center`
+   keeps the short-bar centering while falling back to top alignment when the
+   dock content (e.g. the suggestions section) overflows, and the dock then
+   scrolls instead of clipping; `flex-shrink: 0` on the dock layouts (see
+   below) stops the shrink-collapse that would let later content overlap the
+   menu rows. */
 .elosern-action-dock {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   gap: .35rem;
   background: var(--elm-ink-dock);
   border: 1px solid var(--elm-vermilion);
   border-top: 1px solid var(--elm-vermilion);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .elosern-action-dock .action-guidance {
@@ -361,7 +367,9 @@ input:focus-visible,
 }
 
 /* The mockup split: item grid on the left, detail pane on the right
-   (dock-level ≈1.35fr / 0.9fr). */
+   (dock-level ≈1.35fr / 0.9fr). The layouts never shrink: a shrunk grid
+   collapses to height 0 while its rows overflow, letting later dock content
+   (the suggestions section) overlap the menu rows. */
 .exploration-layout,
 .combat-layout,
 .services-layout,
@@ -371,6 +379,7 @@ input:focus-visible,
   grid-template-columns: 1.35fr 0.9fr;
   gap: .5rem;
   min-height: 0;
+  flex-shrink: 0;
 }
 
 .exploration-layout .exploration-menu,
@@ -788,6 +797,79 @@ input:focus-visible,
 .elosern-action-dock .services-live {
   color: var(--elm-warn);
   min-height: 1.2rem;
+}
+
+/* ---------------------------------------------------------------- *
+ * Exploration dock suggestions section (webclient-options-surface).
+ * The section is a bounded subtree between the menu layout and the
+ * live region; cards and the dismiss control are native buttons with
+ * native focus outlines.
+ * ---------------------------------------------------------------- */
+
+.elosern-action-dock .suggestions-section {
+  margin-top: .3rem;
+  border-top: 1px solid var(--elm-border-dim);
+  padding-top: .3rem;
+}
+
+.elosern-action-dock .suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .2rem;
+}
+
+.elosern-action-dock .suggestions-title {
+  font-family: var(--elm-serif);
+  font-weight: 700;
+  color: var(--elm-paper);
+}
+
+.elosern-action-dock .suggestions-generating,
+.elosern-action-dock .suggestions-note,
+.elosern-action-dock .suggestions-empty {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+}
+
+.elosern-action-dock .suggestions-dismiss {
+  color: var(--elm-paper-dim);
+  background: var(--elm-ink-panel);
+  border: 1px solid var(--elm-border-dim);
+  padding: .1rem .4rem;
+  cursor: pointer;
+}
+
+.elosern-action-dock .suggestions-dismiss:focus-visible,
+.elosern-action-dock .option-card:focus-visible {
+  outline: 2px solid var(--elm-focus-ring);
+  outline-offset: 2px;
+}
+
+.elosern-action-dock .suggestions-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.elosern-action-dock .option-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .1rem;
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel);
+  border: 1px solid var(--elm-border);
+  padding: .2rem .6rem;
+  cursor: pointer;
+  text-align: left;
+  max-width: 16rem;
+}
+
+.elosern-action-dock .option-card-hint {
+  color: var(--elm-paper-dim);
+  font-size: .85em;
 }
 
 @media (max-width: 1280px), (max-height: 720px) {

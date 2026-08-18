@@ -66,10 +66,19 @@ Rationale over alternatives:
 `exploration` panel signature (or epoch) changes — suggestions updates (`generating` → `ready`,
 dismiss → `unavailable`) do not move that signature. The handler SHALL additionally derive a
 small `suggestionsSignature` from the validated `context_actions` panel (status + card count +
-card action codes, not the full card list), and when only that signature changes, re-render the
+the full card content — kind, action code, label, canonical params, hint — never just the
+action codes: a regenerated set can keep the same codes while changing labels or params, and a
+stale section would keep old click payloads), and when only that signature changes, re-render the
 section in place **without** rebuilding the dock or resetting the keyboard router. The `_refresh`
 partial path (which re-renders only menu rows when `.exploration-menu` exists) SHALL also
 re-render the section, so a stale section can never survive a menu-only refresh.
+
+A full-rebuild trigger (exploration panel signature or epoch change) SHALL additionally defer the
+DOM rebuild while a re-homed services/character sub-dock owns the surface: the model and the
+signature tracking stay fresh, but `_renderDock` (which would wipe the sub-dock and render the
+section under it) runs only after the sub-dock leaves, through the existing escape-root rebuild
+path (review finding: the pre-change code rebuilt unconditionally; the section made the violation
+visible).
 
 The section's state derivation is extracted as a DOM-independent pure function
 `buildOptionsView(panel) → {status, cards, visible, emptyState}` in the same new module so the
@@ -143,15 +152,25 @@ field (the panel slice's own parity suite; this slice's Node tests cover the gua
 - Dock integration (four status renders, pointer + keyboard activation → exact envelopes, dismiss
   hides the section, suggestions-only updates re-render the section without a dock rebuild, mode
   gating vs combat/creation, LLM-off degraded path) is covered by one Playwright file
-  `web/tests/browser/test_browser_options_surface.py` booting a **shared server** (the repo rule:
-  each browser file has one serial owner; no combat sessions are started, so shared-server reuse
-  applies).
+  `web/tests/browser/test_browser_options_surface.py` booting **one server per test class** (the
+  repo rule: each browser file has one serial owner; no combat sessions are started, so one server
+  is safe and every journey resets the character through the superuser `@tel` command). The
+  fixture env lives on the harness runtime (`ELOSERN_BROWSER_OPTIONS_SURFACE=1`), never the
+  process environment, so sibling test files in the same process are never affected; the process
+  shared server cannot carry the fixture without the process-env leak (review finding).
 - **Deterministic browser fixtures (review fix):** the ready/degraded paths need a fixed `OptionSet`
   without any live LLM. Each test uses the test-only fake-client injection the layer already
-  provides (`world/ai/fake_client.py` conventions), resets the character's room/session options
-  state before each test, and waits on the store's `context_actions.suggestions.status` (poll
-  until a bounded deadline) instead of timing sleeps, so generating→ready transitions and card
-  clicks are asserted against a known payload.
+  provides (`world/ai/fake_client.py` conventions) — active only when the harness runtime opts
+  into the options-surface fixture (`ELOSERN_BROWSER_OPTIONS_SURFACE=1`), so sibling browser
+  suites keep the production client — resets the character's room/session options state before
+  each test, and waits on the store's `context_actions.suggestions.status` (poll until a bounded
+  deadline) instead of timing sleeps, so generating→ready transitions and card clicks are
+  asserted against a known payload.
+- **Zero-card degraded render (review fix):** the empty-state line ("現在沒有什麼值得做的動作")
+  is unreachable through the v1 derivation (which always yields ≥ 1 rule card), so one browser
+  journey injects a schema-valid `ui_update` carrying `{status: "degraded", cards: []}` through
+  the store and asserts the dock renders the empty-state line together with the muted note and
+  the dismiss control — never a card container. The Node suite covers the view-model derivation.
 
 ## Risks / Trade-offs
 

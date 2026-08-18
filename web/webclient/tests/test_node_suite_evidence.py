@@ -246,6 +246,51 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
+    )
+    def test_option_cards_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/option_cards.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "option-cards Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-options-surface::the-exploration-dock-renders-the-suggestions-section-from-the-validated-v5-panel",
+        "webclient-options-surface::a-degraded-payload-with-zero-cards-renders-the-defined-empty-state",
+    )
+    def test_options_view_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/options_view.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "options-view Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

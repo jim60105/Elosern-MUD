@@ -145,6 +145,18 @@ test("the rest-duration form never swallows keys typed in the drawer field", () 
   assert.match(source, /closest\(\s*["']\.inputfieldwrapper["']\s*\)/);
 });
 
+test("suggestion buttons keep native Enter and Space activation", () => {
+  // The routing gate defers to the browser default for Enter/Space pressed
+  // on a focused suggestion card or dismiss button: the card click path is a
+  // direct listener, never the KeyboardRouter, so the router must not claim
+  // those keys (webclient-options-surface D4).
+  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
+  assert.match(source, /isSuggestionButton/);
+  assert.match(source, /target\.closest\(\s*["']\.option-card["']\s*\)/);
+  assert.match(source, /target\.closest\(\s*["']\.suggestions-dismiss["']\s*\)/);
+  assert.match(source, /event\.key === "Enter" \|\| event\.key === " "/);
+});
+
 test("seal-red small text is never used on dark surfaces", () => {
   // The deep seal-red token (≈2.9:1 on ink) is restricted to fills, borders,
   // and large/bold text and symbols. A dark-surface `color:` declaration that

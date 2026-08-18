@@ -43,11 +43,12 @@ narrative choice-point slice reuses.
   panel in `commitPresentation` before the store ever exposes it; a missing `suggestions` field
   is only a defensive compatibility guard (never a valid v5 render case).
 - Node tests for the card model/renderer and the dock-section view model, plus one Playwright
-  test file booting a shared server (no combat sessions, so the shared-server reuse rule holds):
-  move into a room → generating line → ready cards; clicking a known card executes; a freeform
-  card sends its speech; dismiss hides the dock section; LLM-off shows degraded cards in the dock
-  only. Browser fixtures use the deterministic fake-client injection (no live LLM), reset the
-  character's room/options state per test, and wait on the store's
+  test file booting a single per-class server (no combat sessions, so one server is safe and each
+  journey resets the character through the superuser `@tel` command): move into a room →
+  generating line → ready cards; clicking a known card executes; a freeform card sends its
+  speech; dismiss hides the dock section; LLM-off shows degraded cards in the dock only. Browser
+  fixtures use the deterministic fake-client injection (no live LLM), reset the character's
+  room/options state per test, and wait on the store's
   `context_actions.suggestions.status` rather than timing sleeps.
 
 ## Capabilities
