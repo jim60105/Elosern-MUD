@@ -16,13 +16,14 @@
  * to absence synchronously on its own notification.
  *
  * The block itself is owned by the `window.Elosern.narrativeInput` facade
- * (goldenlayout.js): mount/move/replace/unmount through the facade keep the
- * stream's end geometry, scroll-keep, and unread marker single-owner. Cards
- * are built exclusively through the shared OptionCards factory — the same
- * DOM component and the same click/dispatch path as the dock section
- * (envelope parity), including the "✕ 清除建議" dismiss control and the
- * action-client admission rule (a stream card click while locked is rejected
- * by the same code path as a dock card click).
+ * (goldenlayout.js): mount/replace/unmount through the facade keep the
+ * stream's end geometry, scroll-keep, and unread marker single-owner —
+ * every narrative append relocates the block to the new stream end without a
+ * separate move operation. Cards are built exclusively through the shared
+ * OptionCards factory — the same DOM component and the same click/dispatch
+ * path as the dock section (envelope parity), including the "✕ 清除建議"
+ * dismiss control and the action-client admission rule (a stream card click
+ * while locked is rejected by the same code path as a dock card click).
  */
 (function (root, factory) {
   "use strict";
@@ -38,7 +39,6 @@
   var GENERATING_LINE = "AI 正在構思建議…";
   var FACADE_OPS = [
     "mountChoicePoint",
-    "moveChoicePointToEnd",
     "replaceChoicePoint",
     "unmountChoicePoint",
   ];

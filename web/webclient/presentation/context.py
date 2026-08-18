@@ -66,12 +66,19 @@ class PresentationContext:
             never a client-controlled value and never persisted.
         options_state: The immutable session options snapshot (or ``None``);
             presenters render suggestions exclusively from it.
+        options_fingerprint: The current read-only exploration situation
+            fingerprint derived through the shared freshness derivation (or
+            ``None`` when no exploration situation can be derived). The
+            suggestions presenter requires every non-``unavailable`` snapshot
+            fingerprint to equal this value, so a stale snapshot can never
+            render after the situation changed.
     """
 
     actor: Any
     protocol_version: int
     session_tag: str | None = field(default=None)
     options_state: OptionsSnapshot | None = field(default=None)
+    options_fingerprint: str | None = field(default=None)
 
 
 __all__ = [

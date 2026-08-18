@@ -1358,21 +1358,17 @@
     // owner (D5).
     //
     // The stream-end block API (choice-points) keeps the same single owner:
-    // the choice-point layer mounts, moves, replaces, and unmounts exactly
-    // one block element through these operations, and every narrative append
-    // keeps the block last (the movable end-block invariant). The operations
-    // are safe no-ops when no block is mounted and never write outside the
-    // narrative container; blocks are DOM nodes supplied by the caller, never
-    // built from markup here.
+    // the choice-point layer mounts, replaces, and unmounts exactly one block
+    // element through these operations, and every narrative append keeps the
+    // block last (append-owned stream-end placement — there is no separate
+    // move-to-end operation). The operations are safe no-ops when no block is
+    // mounted and never write outside the narrative container; blocks are DOM
+    // nodes supplied by the caller, never built from markup here.
     window.Elosern.narrativeInput = {
       appendInput: appendInput,
       mountChoicePoint: function (element) {
         var block = getStreamEndBlock();
         return block ? block.mount(element) : false;
-      },
-      moveChoicePointToEnd: function () {
-        var block = getStreamEndBlock();
-        return block ? block.moveToEnd() : false;
       },
       replaceChoicePoint: function (element) {
         var block = getStreamEndBlock();

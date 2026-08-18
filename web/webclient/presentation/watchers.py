@@ -1,15 +1,15 @@
-"""Ephemeral puppet → live-session watcher registry for the room-entry hook.
+"""Ephemeral puppet → live-session watcher registry for the relocation hook.
 
 The OOB ingress maintains this registry: every live webclient session is
 registered under its current puppet on ``ui_sync`` and command settlement
 (idempotent per session — repeated settlements update the entry, never
 append), and stale entries are pruned at every registration and query. The
-room-entry hook (a typeclass call site with no session context) resolves the
-watching sessions through :func:`watchers_for`, which returns each watcher
-with its *current* coordinator epoch read at query time, so a post-reset epoch
-is never stale. A disconnected or repuppeted leftover is harmless by
-construction: the push's epoch guard silently drops anything the live
-coordinator no longer matches, no disconnect hook is required, and the
+relocation trigger (a typeclass post-move call site with no session context)
+resolves the watching sessions through :func:`watchers_for`, which returns
+each watcher with its *current* coordinator epoch read at query time, so a
+post-reset epoch is never stale. A disconnected or repuppeted leftover is
+harmless by construction: the push's epoch guard silently drops anything the
+live coordinator no longer matches, no disconnect hook is required, and the
 session-keyed maps keep growth bounded by live sessions.
 
 Nothing here is persisted; the registry disappears with the process, which is

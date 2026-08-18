@@ -1,14 +1,16 @@
-"""Integration tests for the room-entry action-options trigger.
+"""Integration tests for the relocation action-options trigger.
 
-The trigger registers through ``transaction.on_commit`` at the end of the
-shared movement-success boundary (``after_successful_movement``), after the
-onboarding observer, and runs only for a puppeted ``PlayerCharacter``. These
-tests pin the contract through the real ``Exit.at_traverse`` lineage: exactly
-one fire-and-forget scheduling call with the live watchers on a committed
-success, silence on a failed or rolled-back settlement, silence for NPC
-traversals, and an unchanged movement result. ``captureOnCommitCallbacks``
-executes the registered callback immediately, mirroring a committed outer
-transaction.
+The trigger registers through ``transaction.on_commit`` in the player
+typeclass's post-move lifecycle (``PlayerCharacter.at_post_move``), so every
+successful hooks-enabled relocation — ordinary exit traversal and a direct
+``move_to()`` alike — shares one observer, and rollback compensations with
+hooks disabled never fire it. These tests pin the contract through the real
+movement paths: exactly one fire-and-forget scheduling call with the live
+watchers on a committed success, silence for NPC movement, silence for
+``move_hooks=False`` moves (the compensation surface), silence on a failed or
+rolled-back settlement, and an unchanged movement result.
+``captureOnCommitCallbacks`` executes the registered callback immediately,
+mirroring a committed outer transaction.
 """
 
 from unittest.mock import patch
@@ -167,3 +169,57 @@ class RoomEntryTriggerTests(EvenniaTest):
             schedule.assert_not_called()
         self.assertIs(self.char1.location, self.room2)
         self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_direct_move_to_relocation_schedules_exactly_one_call(self):
+        """A direct ``move_to()`` (no exit involved) shares the post-move
+        lifecycle observer with ordinary traversal: one scheduling call with
+        the live watchers after the move commits."""
+        session = self._puppeted_watcher()
+        with patch.object(service, "schedule_action_options") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                moved = self.char1.move_to(self.room2)
+            self.assertTrue(moved)
+            self.assertEqual(schedule.call_count, 1)
+            call = schedule.call_args
+            self.assertIs(call.args[0], self.char1)
+            self.assertEqual(
+                call.kwargs["watchers"],
+                watchers.watchers_for(self.char1),
+            )
+            self.assertIs(call.kwargs["watchers"][0][0], session)
+        self.assertIs(self.char1.location, self.room2)
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_npc_direct_move_to_schedules_nothing(self):
+        npc = create_object(NPC, key="路人", location=self.room1)
+        with patch.object(service, "schedule_action_options") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                moved = npc.move_to(self.room2)
+            self.assertTrue(moved)
+            schedule.assert_not_called()
+        self.assertIs(npc.location, self.room2)
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_move_hooks_disabled_move_schedules_nothing(self):
+        """Rollback compensations move with ``move_hooks=False``; the
+        post-move lifecycle never fires there, so compensation stays silent."""
+        with patch.object(service, "schedule_action_options") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                moved = self.char1.move_to(self.room2, move_hooks=False)
+            self.assertTrue(moved)
+            schedule.assert_not_called()
+        self.assertIs(self.char1.location, self.room2)
+
+    @covers_requirement("action-options-trigger-service::all-committed-player-relocations-and-terminal-combat-returns-trigger-options")
+    def test_creation_pending_relocation_is_a_service_level_no_op(self):
+        """An account-owned player still in creation has no exploration
+        situation: the relocation trigger fires but the service's exploration
+        gate resolves it to a logged no-op, never touching session state."""
+        session = self._puppeted_watcher()
+        self.char1.creation_pending = True
+        with self.captureOnCommitCallbacks(execute=True):
+            moved = self.char1.move_to(self.room2)
+        self.assertTrue(moved)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertIsNone(session.ndb.options_state)

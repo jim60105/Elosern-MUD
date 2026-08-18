@@ -66,6 +66,11 @@ _INTERNAL_MESSAGE = "操作時發生內部錯誤"
 # action-options generation (action-options-trigger-hooks D3).
 _DIALOGUE_TRIGGER_ACTION_IDS = frozenset({"explore.talk_scripted", "explore.talk_freeform"})
 
+# The combat actions whose successful completion may end the active session
+# and therefore trigger a fresh exploration action-options generation for
+# every live watcher of the actor (action-options-wiring-hardening D2).
+_COMBAT_TRIGGER_ACTION_IDS = frozenset({"combat.cast", "combat.flee", "combat.forfeit"})
+
 
 class DispatchError(ValueError):
     """A UI action could not be admitted for a safe, stable reason."""
@@ -380,11 +385,14 @@ def _publish_completion(
     _cache_result(state, request_id, result)
     _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
     _settle_in_flight(session, epoch, None)
-    # The gate uses the *normalized* outcome actually sent to the client: a
+    # The gates use the *normalized* outcome actually sent to the client: a
     # raw ``success`` that normalizes into an internal error must never
-    # schedule (action-options-trigger-hooks D3).
+    # schedule (action-options-trigger-hooks D3 / action-options-wiring-
+    # hardening D2).
     if result["outcome"] == "success" and action_id in _DIALOGUE_TRIGGER_ACTION_IDS:
         _schedule_dialogue_options(session, actor, coordinator)
+    if result["outcome"] == "success" and action_id in _COMBAT_TRIGGER_ACTION_IDS:
+        _schedule_terminal_combat_options(actor)
     return value
 
 
@@ -412,6 +420,36 @@ def _schedule_dialogue_options(
         logger.warning(
             "action options: dialogue-reply trigger scheduling failed for session %s (swallowed)",
             getattr(session, "sessid", "?"),
+            exc_info=True,
+        )
+
+
+def _schedule_terminal_combat_options(actor: Any) -> None:
+    """Fire-and-forget the exploration options trigger after terminal combat.
+
+    Runs only after the dispatcher has published the terminal completion
+    presentation and the action result, and only when the successful combat
+    action actually returned the actor to exploration — a non-terminal round
+    leaves the session active, so nothing schedules. Every live watcher of the
+    actor (``watchers_for(actor)``) is refreshed, not just the initiating
+    session. Fire-and-forget by contract: any synchronous failure is logged
+    as a bounded diagnostic and swallowed.
+    """
+    try:
+        from server.option_proposal_service import schedule_action_options
+        from web.webclient.presentation.affordances import in_exploration_mode
+        from web.webclient.presentation.watchers import watchers_for
+
+        if not in_exploration_mode(actor):
+            return
+        schedule_action_options(
+            actor,
+            watchers=watchers_for(actor),
+        )
+    except Exception:
+        logger.warning(
+            "action options: terminal-combat trigger scheduling failed for %s (swallowed)",
+            getattr(actor, "key", "?"),
             exc_info=True,
         )
 

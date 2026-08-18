@@ -82,9 +82,11 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
     if last_actor is not None and last_actor != actor_id:
         # A puppet change starts a distinct presentation sequence and drops the
         # previous character's options state (the new puppet never inherits the
-        # old one's fingerprint, cards, or degraded status).
+        # old one's fingerprint, cards, or degraded status) and its dismissal
+        # barriers (a dismissed minimum generation is per character).
         coordinator.reset()
         session.ndb.options_state = None
+        session.ndb.options_barriers = None
         from web.webclient.actions.dispatcher import retire_sequence
 
         retire_sequence(session)
@@ -121,6 +123,7 @@ def reset_client_sequence(session: Any) -> None:
     if getattr(session, "ndb", None) is not None:
         session.ndb.elosern_actor_id = None
         session.ndb.options_state = None
+        session.ndb.options_barriers = None
 
 
 def options_snapshot(session: Any) -> OptionsSnapshot | None:
@@ -189,14 +192,38 @@ def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
     factory, so no path can omit the options snapshot. It deep-copies
     ``session.ndb.options_state`` into the immutable :class:`OptionsSnapshot`
     (an absent or malformed state degrades to ``None``, and a snapshot whose
-    owner differs from the rendering puppet is refused) and never hands the
-    raw session to a presenter.
+    owner differs from the rendering puppet is refused) and derives the
+    current exploration situation fingerprint through the shared freshness
+    derivation (``None`` when no situation can be derived — for example in
+    combat, creation, or on a malformed actor — and never raising into the
+    publication path). It never hands the raw session to a presenter.
     """
     return PresentationContext(
         actor=actor,
         protocol_version=PROTOCOL_VERSION,
         options_state=options_snapshot(session),
+        options_fingerprint=_current_options_fingerprint(actor),
     )
+
+
+def _current_options_fingerprint(actor: Any) -> str | None:
+    """The current exploration situation fingerprint, or ``None``.
+
+    Read-only and fail-closed: a derivation that cannot name the situation
+    (or raises on a malformed actor) yields ``None`` so the suggestions
+    presenter emits ``unavailable`` instead of rendering a stale snapshot.
+    """
+    try:
+        from web.webclient.presentation.fingerprints import derive_exploration_situation
+
+        situation = derive_exploration_situation(actor)
+    except Exception:
+        log_unavailable(
+            "options fingerprint",
+            "exploration situation derivation failed (degraded to None)",
+        )
+        return None
+    return situation[0] if situation is not None else None
 
 
 def synchronize_session(session: Any, actor: Any) -> bool:

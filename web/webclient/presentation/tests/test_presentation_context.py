@@ -48,10 +48,10 @@ def _wire_cards():
     return [{**card, "hint": None} for card in CARDS]
 
 
-def _options_state(owner_pk, **overrides):
+def _options_state(owner_pk, fingerprint, **overrides):
     state = {
         "owner_actor_id": owner_pk,
-        "fingerprint": "situation-fingerprint",
+        "fingerprint": fingerprint,
         "status": "ready",
         "generation_token": 1,
         "displayed": [dict(card) for card in CARDS],
@@ -93,21 +93,21 @@ class ContextFactoryTests(EvenniaTestCase):
         self.assertIsNone(context.options_state)
 
     def test_valid_state_deep_copies_into_an_immutable_snapshot(self):
-        state = _options_state("1")
+        state = _options_state("1", "fixture-fingerprint")
         session = self._session("1", state)
         context = build_presentation_context(session, SimpleNamespace(pk="1"))
         snapshot = context.options_state
-        self.assertEqual(snapshot.fingerprint, "situation-fingerprint")
+        self.assertEqual(snapshot.fingerprint, "fixture-fingerprint")
         self.assertEqual(snapshot.status, "ready")
         self.assertEqual(len(snapshot.displayed), len(CARDS))
         self.assertEqual(snapshot.displayed[0].action_code, "explore.look")
         # Later replacement of the session state object must not move the
         # snapshot the presenter already holds.
-        session.ndb.options_state = _options_state("1", status="unavailable")
+        session.ndb.options_state = _options_state("1", "fixture-fingerprint", status="unavailable")
         self.assertEqual(snapshot.status, "ready")
 
     def test_aliens_owner_snapshot_is_refused(self):
-        state = _options_state("other", status="ready")
+        state = _options_state("other", "fixture-fingerprint", status="ready")
         context = build_presentation_context(self._session("1", state), SimpleNamespace(pk="1"))
         self.assertIsNone(context.options_state)
 
@@ -117,7 +117,7 @@ class ContextFactoryTests(EvenniaTestCase):
             self.assertIsNone(context.options_state)
 
     def test_shape_invalid_displayed_entries_are_dropped_without_raising(self):
-        state = _options_state("1", displayed=[1, "x", dict(CARDS[0])])
+        state = _options_state("1", "fixture-fingerprint", displayed=[1, "x", dict(CARDS[0])])
         context = build_presentation_context(self._session("1", state), SimpleNamespace(pk="1"))
         self.assertIsNotNone(context.options_state)
         self.assertEqual(len(context.options_state.displayed), 1)
@@ -131,6 +131,8 @@ class PublicationPathSnapshotTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        from web.webclient.presentation.fingerprints import derive_exploration_situation
+
         from world.rules.clock import get_world_clock
 
         get_world_clock()
@@ -141,7 +143,55 @@ class PublicationPathSnapshotTests(EvenniaTest):
         self.player.location = self.room
         self.registry = build_production_registry()
         self.session = _FakeSession(self.player)
-        self.session.ndb.options_state = _options_state(str(self.player.pk))
+        situation = derive_exploration_situation(self.player)
+        self.assertIsNotNone(situation)
+        self.fingerprint = situation[0]
+        self.session.ndb.options_state = _options_state(
+            str(self.player.pk), self.fingerprint
+        )
+
+    def test_context_factory_carries_the_current_situation_fingerprint(self):
+        context = build_presentation_context(self.session, self.player)
+        self.assertEqual(context.options_fingerprint, self.fingerprint)
+
+    def test_context_factory_fails_closed_without_a_derivable_situation(self):
+        # A malformed actor or an out-of-exploration mode never raises: the
+        # context carries no fingerprint and the presenter emits unavailable.
+        self.player.creation_pending = True
+        context = build_presentation_context(self.session, self.player)
+        self.assertIsNone(context.options_fingerprint)
+        self.player.creation_pending = False
+        self.player.location = None
+        context = build_presentation_context(self.session, self.player)
+        self.assertIsNone(context.options_fingerprint)
+
+    def test_puppet_change_clears_options_state_and_barriers(self):
+        from collections import OrderedDict
+
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+
+        second_room = create_object(Room, key="second snapshot room")
+        other = create_object(PlayerCharacter, key="other snapshot player")
+        other.race = "human"
+        other.apply_race_baseline()
+        other.location = second_room
+        session = _FakeSession(self.player)
+        session.ndb.elosern_actor_id = str(self.player.pk)
+        session.ndb.options_state = _options_state(str(self.player.pk), self.fingerprint)
+        session.ndb.options_barriers = OrderedDict([(self.fingerprint, 7)])
+        from web.webclient.presentation.coordinator import attach_coordinator
+
+        attach_coordinator(session, self.registry)
+        session.puppet = other
+        synchronize_session(session, other)
+        # The puppet change cleared the previous character's barrier store and
+        # options state before the reconnect trigger wrote the new puppet's
+        # own state (the old fingerprint never survives the change).
+        self.assertIsNone(session.ndb.options_barriers)
+        state = session.ndb.options_state
+        self.assertEqual(state["owner_actor_id"], str(other.pk))
+        self.assertNotEqual(state["fingerprint"], self.fingerprint)
 
     def test_ui_sync_snapshot_carries_the_ready_suggestions(self):
         synchronize_session(self.session, self.player)

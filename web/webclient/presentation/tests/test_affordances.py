@@ -289,6 +289,66 @@ class AffordanceVocabularyTests(VocabularyTestCase):
         self.player.location = None
         self.assertEqual(self._vocabulary(), ())
 
+    def test_move_destinations_route_through_the_shared_encoder(self):
+        """Every destination node — ordinary room, GridRoom, and TerrainRoom —
+        is derived only through ``node_id_for_location``: the affordance
+        module holds no duplicate room-type encoder (wiring-hardening D4)."""
+        from unittest import mock
+
+        from typeclasses.rooms import GridRoom, TerrainRoom
+        from web.webclient.actions.node_ids import node_id_for_location
+        from web.webclient.presentation import affordances as module
+        from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
+
+        sync_grid()
+        grid = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        self.assertIsNotNone(grid)
+        plain = create_object(Room, key="普通目的地", location=None)
+        terrain = create_object(TerrainRoom, key="荒野目的地", location=None)
+        terrain.ndb.active_coordinates = (7, 11)
+        destinations = {"東": plain, "南": grid, "西": terrain}
+        for key, destination in destinations.items():
+            create_object(
+                "evennia.objects.objects.DefaultExit",
+                key=key,
+                location=self.room,
+                destination=destination,
+            )
+        self.assertFalse(
+            hasattr(module, "_destination_node"),
+            "the duplicate destination encoder must not exist",
+        )
+        seen = []
+        real = module.node_id_for_location
+
+        def _spy(location):
+            seen.append(location)
+            return real(location)
+
+        with mock.patch.object(module, "node_id_for_location", side_effect=_spy):
+            vocabulary = self._vocabulary()
+        move_entries = [
+            entry
+            for entry in vocabulary
+            if not entry.navigation and entry.action_id == "explore.move"
+        ]
+        self.assertEqual(len(move_entries), 3)
+        for destination in destinations.values():
+            self.assertIn(
+                destination, seen,
+                "every destination goes through the shared encoder",
+            )
+        self.assertEqual(
+            seen.count(self.room), 1,
+            "the current node derives once through the same encoder",
+        )
+        for entry in move_entries:
+            self.assertEqual(
+                entry.params["current_node"],
+                real(self.room),
+                "the current node is byte-identical to the shared encoder",
+            )
+
 
 class AffordanceRuleTests(VocabularyTestCase):
     def setUp(self):

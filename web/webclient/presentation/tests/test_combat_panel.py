@@ -1616,14 +1616,16 @@ class SuggestionsRenderPathTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _player()
         self.player.location = self.room
         self.registry = build_production_registry()
+        self.fingerprint = "fp"
 
-    def _render(self, options_state=None):
+    def _render(self, options_state=None, fingerprint="fp"):
         return self.registry.render(
             "context_actions",
             PresentationContext(
                 actor=self.player,
                 protocol_version=1,
                 options_state=options_state,
+                options_fingerprint=fingerprint,
             ),
         )
 
@@ -1834,6 +1836,126 @@ class SuggestionsRenderPathTests(BattlefieldIsolation, EvenniaTestCase):
             logged.assert_called_once()
         self.assertTrue(payload["available"])
         validate_context_actions(payload)
+
+    @covers_requirement(
+        "action-options-trigger-service::current-situation-freshness-gates-session-backed-suggestions"
+    )
+    def test_stale_non_unavailable_snapshots_fail_closed_to_unavailable(self):
+        """A snapshot whose fingerprint no longer matches the current
+        situation renders unavailable with a bounded diagnostic and never
+        reaches the wire with old cards or a stale generating line
+        (action-options-wiring-hardening R1 scenarios)."""
+        from unittest import mock
+
+        stale_cards = (
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.look",
+                label="查看房間",
+                params={"room": True},
+            ),
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.wait",
+                label="等待片刻",
+                params={"daypart": "noon"},
+            ),
+            FrozenCard(
+                kind="known_action",
+                action_code="explore.look",
+                label="查看木箱",
+                params={"target_id": 9},
+            ),
+        )
+        for status, displayed in (
+            ("generating", None),
+            ("ready", stale_cards),
+            ("degraded", None),
+        ):
+            with self.subTest(status=status):
+                with mock.patch(
+                    "web.webclient.presentation.combat_panel.log_unavailable"
+                ) as logged:
+                    payload = self._render(
+                        OptionsSnapshot(
+                            fingerprint="fp",
+                            status=status,
+                            generation_token=3,
+                            displayed=displayed,
+                        ),
+                        fingerprint="a-different-current-fingerprint",
+                    )
+                    self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+                    logged.assert_called_once()
+                    self.assertNotIn("cards", payload["suggestions"])
+
+    @covers_requirement(
+        "action-options-trigger-service::current-situation-freshness-gates-session-backed-suggestions"
+    )
+    def test_absent_current_fingerprint_fails_closed_to_unavailable(self):
+        """A context without a derivable exploration situation can never
+        render a session-backed state: the gate emits unavailable even for a
+        snapshot whose shape is valid (action-options-wiring-hardening R1)."""
+        from unittest import mock
+
+        with mock.patch("web.webclient.presentation.combat_panel.log_unavailable") as logged:
+            payload = self._render(
+                OptionsSnapshot(
+                    fingerprint="fp",
+                    status="ready",
+                    generation_token=3,
+                    displayed=(
+                        FrozenCard(
+                            kind="known_action",
+                            action_code="explore.look",
+                            label="查看房間",
+                            params={"room": True},
+                        ),
+                        FrozenCard(
+                            kind="known_action",
+                            action_code="explore.wait",
+                            label="等待片刻",
+                            params={"daypart": "noon"},
+                        ),
+                        FrozenCard(
+                            kind="known_action",
+                            action_code="explore.look",
+                            label="查看木箱",
+                            params={"target_id": 9},
+                        ),
+                    ),
+                ),
+                fingerprint=None,
+            )
+            self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+            logged.assert_called_once()
+            self.assertNotIn("cards", payload["suggestions"])
+
+    def test_unavailable_snapshot_is_inert_regardless_of_fingerprint(self):
+        """The ``unavailable`` status needs no fingerprint gate: it emits the
+        same unavailable envelope whether or not the fingerprint matches."""
+        from unittest import mock
+
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="stale",
+                status="unavailable",
+                generation_token=0,
+                displayed=None,
+            ),
+            fingerprint="different",
+        )
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+        payload = self._render(
+            OptionsSnapshot(
+                fingerprint="stale",
+                status="unavailable",
+                generation_token=0,
+                displayed=None,
+            ),
+            fingerprint=None,
+        )
+        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
 
 
 class OptionsSnapshotFactoryTests(unittest.TestCase):
