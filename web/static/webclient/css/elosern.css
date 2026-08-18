@@ -872,6 +872,66 @@ input:focus-visible,
   font-size: .85em;
 }
 
+/* ---------------------------------------------------------------- *
+ * Narrative choice-point block (webclient-options-choicepoints).
+ * The stream is the AI-only surface: the muted generating line and the
+ * ready card group share the OptionCards component with the dock section
+ * (same classes, one click path), inside the movable stream-end block
+ * owned by the narrativeInput facade.
+ * ---------------------------------------------------------------- */
+
+.elosern-narrative .choicepoint-block {
+  margin: .3rem 0 .4rem 0;
+  padding: .35rem .5rem;
+  border: 1px solid var(--elm-border-dim);
+  background: var(--elm-ink-panel);
+}
+
+.elosern-narrative .choicepoint-generating {
+  color: var(--elm-paper-dim);
+  font-size: .9em;
+}
+
+.elosern-narrative .choicepoint-ready .choicepoint-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: .25rem;
+}
+
+.elosern-narrative .choicepoint-ready .option-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .1rem;
+  color: var(--elm-paper);
+  background: var(--elm-ink-panel);
+  border: 1px solid var(--elm-border);
+  padding: .2rem .6rem;
+  cursor: pointer;
+  text-align: left;
+  max-width: 16rem;
+}
+
+.elosern-narrative .choicepoint-ready .option-card-hint {
+  color: var(--elm-paper-dim);
+  font-size: .85em;
+}
+
+.elosern-narrative .choicepoint-ready .suggestions-dismiss {
+  color: var(--elm-paper-dim);
+  background: var(--elm-ink-panel);
+  border: 1px solid var(--elm-border-dim);
+  padding: .1rem .4rem;
+  cursor: pointer;
+}
+
+.elosern-narrative .choicepoint-ready .suggestions-dismiss:focus-visible,
+.elosern-narrative .choicepoint-ready .option-card:focus-visible {
+  outline: 2px solid var(--elm-focus-ring);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1280px), (max-height: 720px) {
   .elosern-action-dock[data-mode="exploration"] .services-menu {
     max-height: 9rem;

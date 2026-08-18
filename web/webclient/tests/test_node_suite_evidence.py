@@ -291,6 +291,53 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-action-choicepoints::the-choice-point-renders-generating-and-ready-states-at-the-stream-end",
+        "webclient-action-choicepoints::degraded-rule-cards-never-enter-the-stream",
+        "webclient-action-choicepoints::the-choice-point-recovers-deterministically-across-sessions",
+    )
+    def test_choicepoint_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/choicepoint.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "choice-point Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-action-choicepoints::the-choice-point-is-a-movable-stream-end-block-owned-by-the-narrative-facade",
+        "webclient-action-choicepoints::choice-point-cards-share-the-dock-card-component-and-click-path",
+    )
+    def test_choicepoint_block_node_suite_passes(self):
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/choicepoint.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "choice-point block Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
