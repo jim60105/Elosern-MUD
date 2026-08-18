@@ -666,7 +666,7 @@ class DialogueTriggerTests(unittest.TestCase):
         session, order = self._traced_session()
         registry = self._talk_registry(
             "explore.talk_scripted",
-            lambda actor, payload: {
+            lambda actor, payload, session=None: {
                 "outcome": "success",
                 "code": "talked",
                 "message": "店員說：你好。",
@@ -716,7 +716,7 @@ class DialogueTriggerTests(unittest.TestCase):
         held = Deferred()
         registry = self._talk_registry(
             "explore.talk_freeform",
-            lambda actor, payload: held,
+            lambda actor, payload, session=None: held,
         )
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
@@ -760,7 +760,7 @@ class DialogueTriggerTests(unittest.TestCase):
         session = self._session_with_coordinator()
         registry = self._talk_registry(
             "explore.talk_scripted",
-            lambda actor, payload: {
+            lambda actor, payload, session=None: {
                 "outcome": "rejected",
                 "code": "schedule_blocked",
                 "message": "對方現在沒空理你。",
@@ -787,7 +787,7 @@ class DialogueTriggerTests(unittest.TestCase):
         session = self._session_with_coordinator()
         registry = self._talk_registry(
             "explore.look",
-            lambda actor, payload: {
+            lambda actor, payload, session=None: {
                 "outcome": "success",
                 "code": "looked",
                 "message": "你仔細打量了一番。",
@@ -813,7 +813,7 @@ class DialogueTriggerTests(unittest.TestCase):
         session, order = self._traced_session()
         registry = self._talk_registry(
             "explore.talk_scripted",
-            lambda actor, payload: {
+            lambda actor, payload, session=None: {
                 "outcome": "success",
                 "code": "talked",
                 "message": "店員說：你好。",
@@ -850,7 +850,7 @@ class DialogueTriggerTests(unittest.TestCase):
         session = self._session_with_coordinator()
         registry = self._talk_registry(
             "explore.talk_scripted",
-            lambda actor, payload: {
+            lambda actor, payload, session=None: {
                 "outcome": "success",
                 "code": "bad code with spaces",
                 "message": "店員說：你好。",
@@ -879,7 +879,7 @@ class DialogueTriggerTests(unittest.TestCase):
         held = Deferred()
         registry = self._talk_registry(
             "explore.talk_freeform",
-            lambda actor, payload: held,
+            lambda actor, payload, session=None: held,
         )
         coordinator = session.ndb.elosern_coordinator
         coordinator.full_snapshot(SimpleNamespace(actor=session.puppet, protocol_version=1))
