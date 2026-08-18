@@ -77,6 +77,24 @@ class UiActionIntegrationTests(EvenniaTest):
         envelope = calls[-1].kwargs["ui_snapshot"][0][0]
         return envelope
 
+    def _live_action(self, request_id, action_id="proof.noop"):
+        """An action envelope at the live coordinator's current epoch/revision.
+
+        A successful ``ui_sync`` may be followed by the reconnect trigger's
+        fire-and-forget push (for example a ``generating`` suggestions
+        transition), which consumes one revision; a browser acting on the
+        latest view carries that revision, not the snapshot's.
+        """
+        coordinator = attach_coordinator(self.ws_session, build_production_registry())
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": request_id,
+            "base_revision": coordinator.revision,
+            "action_id": action_id,
+            "payload": {},
+        }
+
     def _send_action(self, registry, envelope):
         handle_ui_action(
             self.ws_session, self.char1, envelope, registry, build_production_registry()
@@ -91,16 +109,8 @@ class UiActionIntegrationTests(EvenniaTest):
             lambda actor, payload, session=None: received.append(actor)
             or {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
         )
-        envelope = self._sync()
-        coordinator = attach_coordinator(self.ws_session, build_production_registry())
-        action = {
-            "protocol_version": 1,
-            "presentation_epoch": envelope["presentation_epoch"],
-            "request_id": "r:1",
-            "base_revision": envelope["revision"],
-            "action_id": "proof.noop",
-            "payload": {},
-        }
+        self._sync()
+        action = self._live_action("r:1")
         self._send_action(registry, action)
         self.assertEqual(received, [self.char1])
         # Duplicate request replays without executing again.
@@ -121,15 +131,8 @@ class UiActionIntegrationTests(EvenniaTest):
         registry = self._registry_with(
             lambda actor, payload, session=None: {"outcome": "success", "code": "ok", "message": "完成", "affected_panels": ("status",)}
         )
-        envelope = self._sync()
-        action = {
-            "protocol_version": 1,
-            "presentation_epoch": envelope["presentation_epoch"],
-            "request_id": "r:2",
-            "base_revision": envelope["revision"],
-            "action_id": "proof.noop",
-            "payload": {},
-        }
+        self._sync()
+        action = self._live_action("r:2")
         self.sessionhandler.data_out.reset_mock()
         self._send_action(registry, action)
         sent = list(self.sessionhandler.data_out.call_args_list)
@@ -179,15 +182,8 @@ class UiActionIntegrationTests(EvenniaTest):
         registry = self._registry_with(
             lambda actor, payload, session=None: calls.append(actor) or held
         )
-        envelope = self._sync()
-        action = {
-            "protocol_version": 1,
-            "presentation_epoch": envelope["presentation_epoch"],
-            "request_id": "r:4",
-            "base_revision": envelope["revision"],
-            "action_id": "proof.noop",
-            "payload": {},
-        }
+        self._sync()
+        action = self._live_action("r:4")
         self.sessionhandler.data_out.reset_mock()
         self._send_action(registry, action)
         retire_sequence(self.ws_session)
@@ -271,18 +267,11 @@ class OocLifecycleIntegrationTests(EvenniaTest):
         cmd.playable = self.char1
         cmd.func()
 
-    def _send_action(self, envelope, request_id):
+    def _send_action(self, request_id):
         handle_ui_action(
             self.ws_session,
             self.ws_session.puppet,
-            {
-                "protocol_version": 1,
-                "presentation_epoch": envelope["presentation_epoch"],
-                "request_id": request_id,
-                "base_revision": envelope["revision"],
-                "action_id": "proof.noop",
-                "payload": {},
-            },
+            self._live_action(request_id),
             self._registry_with(
                 lambda actor, payload, session=None: {
                     "outcome": "success",
@@ -293,6 +282,17 @@ class OocLifecycleIntegrationTests(EvenniaTest):
             ),
             build_production_registry(),
         )
+
+    def _live_action(self, request_id, action_id="proof.noop"):
+        coordinator = attach_coordinator(self.ws_session, build_production_registry())
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": request_id,
+            "base_revision": coordinator.revision,
+            "action_id": action_id,
+            "payload": {},
+        }
 
     def _registry_with(self, adapter):
         registry = ActionRegistry("test")
@@ -338,10 +338,10 @@ class OocLifecycleIntegrationTests(EvenniaTest):
         "webclient-oob-protocol::unpuppet-retires-the-active-presentation-and-dispatch-sequence"
     )
     def test_same_character_repuppet_starts_fresh_sequence(self):
-        envelope = self._sync()
+        self._sync()
         coordinator = attach_coordinator(self.ws_session, build_production_registry())
         epoch_before = coordinator.epoch
-        self._send_action(envelope, "r:1")
+        self._send_action("r:1")
 
         self._run_ooc()
         self.assertIsNone(self.ws_session.puppet)
@@ -374,14 +374,7 @@ class OocLifecycleIntegrationTests(EvenniaTest):
         handle_ui_action(
             self.ws_session,
             self.ws_session.puppet,
-            {
-                "protocol_version": 1,
-                "presentation_epoch": envelope2["presentation_epoch"],
-                "request_id": "r:1",
-                "base_revision": envelope2["revision"],
-                "action_id": "proof.noop",
-                "payload": {},
-            },
+            self._live_action("r:1"),
             registry,
             build_production_registry(),
         )

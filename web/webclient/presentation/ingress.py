@@ -238,7 +238,33 @@ def synchronize_session(session: Any, actor: Any) -> bool:
     from web.webclient.presentation.watchers import register_watcher
 
     register_watcher(session)
+    _schedule_on_reconnect(session, actor, coordinator)
     return True
+
+
+def _schedule_on_reconnect(
+    session: Any,
+    actor: Any,
+    coordinator: Any,
+) -> None:
+    """Fire-and-forget the action-options trigger after a successful sync.
+
+    The requesting session is the sole watcher; whether a generation actually
+    starts is decided by the service's stale predicate (absent options state,
+    changed fingerprint, or a non-ready/non-cached state), never by this hook.
+    Covers both ``ui_sync`` and post-command refresh with one seam. Fire-and-
+    forget: any synchronous failure is logged and swallowed so the snapshot
+    path is never altered.
+    """
+    try:
+        from server.option_proposal_service import schedule_action_options
+
+        schedule_action_options(actor, watchers=((session, coordinator.epoch),))
+    except Exception:
+        log_unavailable(
+            getattr(session, "sessid", "?"),
+            "reconnect trigger scheduling failed (swallowed)",
+        )
 
 
 def refresh_after_command(session: Any, actor: Any) -> None:

@@ -6,7 +6,7 @@ Deterministic trigger call sites for the AI action-option proposal service: room
 
 ### Requirement: Room entry triggers a proposal on deterministic movement success
 
-The room-entry trigger SHALL fire only from the deterministic movement-success boundary shared by every project exit lineage — the end of `after_successful_movement` in `typeclasses/exits.py`, after the onboarding `observe_room_entry` — and only for a puppeted `PlayerCharacter`. The trigger SHALL call the proposal service fire-and-forget with the watchers resolved from `watchers_for(actor)`; it SHALL NOT fire on failed or compensated movements, on non-player traversers, on an unpuppeted player, or from any hook inside `world/ai/`.
+The room-entry trigger SHALL fire only from the deterministic movement-success boundary shared by every project exit lineage — the end of `after_successful_movement` in `typeclasses/exits.py`, after the onboarding `observe_room_entry` — and only for a puppeted `PlayerCharacter`. The trigger SHALL register its scheduling through `transaction.on_commit`, so the fire-and-forget call to the proposal service (with the watchers resolved from `watchers_for(actor)`) runs only after the movement transaction commits; it SHALL NOT fire on failed or compensated movements, on non-player traversers, on an unpuppeted player, on a rolled-back outer transaction, or from any hook inside `world/ai/`.
 
 #### Scenario: A successful plain-exit traversal schedules a generation
 
@@ -25,7 +25,7 @@ The room-entry trigger SHALL fire only from the deterministic movement-success b
 
 ### Requirement: Conversation completion triggers a proposal after publication
 
-The dialogue-reply trigger SHALL fire inside the dispatcher's completion publication path (`_publish_completion` in `web/webclient/actions/dispatcher.py`) only after the reply text, the resulting presentation, and the matching action result are already on the wire, and only for completions whose action ID is `explore.talk_scripted` or `explore.talk_freeform` with outcome `success`. It SHALL pass the dispatcher-held session and the coordinator epoch captured at publication, so the service publishes through the correct sequence. It SHALL NOT fire on rejection paths, stale results, internal errors, or any other action.
+The dialogue-reply trigger SHALL fire inside the dispatcher's completion publication path (`_publish_completion` in `web/webclient/actions/dispatcher.py`) only after the reply text, the resulting presentation, and the matching action result are already on the wire, and only for completions whose action ID is `explore.talk_scripted` or `explore.talk_freeform` whose **normalized** result (the outcome actually sent to the client) is `success`. It SHALL pass the dispatcher-held session and the coordinator epoch captured at publication, so the service publishes through the correct sequence. It SHALL NOT fire on rejection paths, stale results, internal errors (including a raw `success` that normalizes into an internal error), retired sequences, or any other action.
 
 #### Scenario: A successful scripted-talk reply schedules after publication
 
@@ -77,12 +77,17 @@ The reconnect trigger SHALL fire on the `ui_sync` happy path (`synchronize_sessi
 
 ### Requirement: Every trigger is fire-and-forget, non-raising, and non-mutating
 
-Every trigger hook SHALL invoke the service without blocking its caller, SHALL swallow and log bounded diagnostics on any synchronous failure of the scheduling call, and SHALL NOT alter the movement settlement result, the action result, the snapshot, or any canonical game state. No module under `world/ai/` SHALL contain or call a trigger. Schedules SHALL be issued outside the caller's critical section so arrival, command handling, and publication are never delayed by proposal work.
+Every trigger hook SHALL invoke the service without blocking its caller, SHALL swallow and log bounded diagnostics on any synchronous failure of the scheduling call, and SHALL NOT alter the movement settlement result, the action result, the snapshot, or any canonical game state. No module under `world/ai/` SHALL contain or call a trigger. Schedules SHALL be issued outside the caller's critical section so arrival, command handling, and publication are never delayed by proposal work: the room-entry schedule SHALL be registered through `transaction.on_commit` so it runs only after the movement transaction commits (a rolled-back outer transaction SHALL never fire it), and the dialogue and reconnect schedules SHALL fire only after publication has fully settled.
 
 #### Scenario: A scheduling failure cannot break the move
 
 - **WHEN** the service's scheduling call raises synchronously inside the movement-success path
 - **THEN** the traversal still completes exactly as before, the failure is logged with a bounded diagnostic, and no state change occurs
+
+#### Scenario: A rolled-back movement transaction never schedules
+
+- **WHEN** a traversal succeeds inside an outer transaction that subsequently rolls back
+- **THEN** the on_commit-registered trigger never fires, so no proposal is derived from a room the player never reached
 
 #### Scenario: Triggers never originate in the generative layer
 

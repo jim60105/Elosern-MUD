@@ -24,11 +24,20 @@ Evennia 6.1 has no `at_object_location_change` hook; the design doc's row is cor
 - `PlayerCharacter.at_post_move` — fires on *every* relocation including respawns and non-settlement moves; too broad and harder to tie to the settlement atomicity contract.
 - `after_successful_movement` (end, after `observe_room_entry`) — the exact deterministic success boundary every exit lineage already shares; a failed settlement never reaches it, and non-player traversers are excluded by the puppeted-player gate.
 
-Chosen: `after_successful_movement`. The call goes through a function-local deferred import of the service (the `commands/scene.py` precedent at scene.py:128), gated on `isinstance(traversing_object, PlayerCharacter)` plus a puppeted check (`traversing_object.account is not None`).
+Chosen: `after_successful_movement`. The scheduling runs *after the movement
+transaction commits*, not inside its critical section: the hook registers the
+trigger through `django.db.transaction.on_commit` (the `commands/scene.py`
+precedent at scene.py:128), so the call happens only once the settlement
+transaction commits — or immediately when no outer transaction is active — and
+a rolled-back outer transaction never fires it. The committed callback is a
+function-local deferred import of the service gated on
+`isinstance(traversing_object, PlayerCharacter)` plus a puppeted check
+(`traversing_object.account is not None`), with every synchronous failure
+logged and swallowed.
 
 ### D2: Import direction — typeclasses → server with a contractual fallback
 
-`after_successful_movement` lives in `typeclasses/`; the service lives in `server/`. The repo contract scan allows commands → server imports but typeclasses → server is new. The service module itself imports `world/ai` and `web/webclient` pieces *inside functions* (scene-flavor precedent), so a module-level cycle is avoided; the hook's own import is function-local regardless. If the transport contract test rejects the edge, the fallback is a thin re-export seam: the hook calls a stable function defined in `typeclasses/` that the web layer wires at startup (post-move observer registration), keeping the hook import-free. The choice is pinned during implementation by the contract test result; either way the observable behavior is identical.
+`after_successful_movement` lives in `typeclasses/`; the service lives in `server/`. The repo contract scan allows commands → server imports but typeclasses → server is new. The service module itself imports `world/ai` and `web/webclient` pieces *inside functions* (scene-flavor precedent), so a module-level cycle is avoided; the hook's own import is function-local regardless. If the transport contract test rejects the edge, the fallback is a thin re-export seam: the hook calls a stable function defined in `typeclasses/` that the web layer wires at startup (post-move observer registration), keeping the hook import-free. **Pinned during implementation:** the repository contract scans (`tests/test_ai_transport_contract.py` deterministic-path ban and the container contracts) do not restrict `typeclasses/` imports, so the direct function-local deferred import of `server.option_proposal_service` and `web.webclient.presentation.watchers` is used — no fallback seam needed. Observable behavior is identical either way.
 
 ### D3: Dialogue trigger threads the action ID through the completion path
 

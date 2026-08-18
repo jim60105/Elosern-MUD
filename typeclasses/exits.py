@@ -7,6 +7,7 @@ for allowing Characters to traverse the exit to its destination.
 
 """
 
+import logging
 from typing import Any
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit, enter_wilderness
@@ -17,6 +18,59 @@ from .objects import ObjectParent
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.movement_settlement import settle_movement
+
+logger = logging.getLogger(__name__)
+
+
+def _schedule_action_options_after_entry(traversing_object: Any) -> None:
+    """Register the action-options trigger to run after the movement commits.
+
+    The room-entry trigger must never run inside the movement transaction's
+    critical section: a rollback would leave suggestions derived from a room
+    the player never reached. The scheduling is therefore registered through
+    ``transaction.on_commit`` (the ``commands/scene.py`` precedent), so it
+    runs only after the settlement transaction commits — or immediately when
+    no outer transaction is active. The gate and the fire-and-forget call
+    happen inside the committed callback; every synchronous failure is logged
+    as a bounded diagnostic and swallowed, never altering settlement.
+    """
+    from django.db import transaction
+
+    transaction.on_commit(
+        lambda: _schedule_action_options_committed(traversing_object)
+    )
+
+
+def _schedule_action_options_committed(traversing_object: Any) -> None:
+    """The committed room-entry trigger: puppeted-player gate, then schedule.
+
+    Only a puppeted ``PlayerCharacter`` traverses (NPC and monster traversals
+    stay silent). The service import is function-local (the ``commands/
+    scene.py`` precedent) and every synchronous failure is logged as a bounded
+    diagnostic and swallowed: the trigger never alters settlement and never
+    raises into its caller.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(traversing_object, PlayerCharacter):
+        return
+    if getattr(traversing_object, "account", None) is None:
+        return
+    try:
+        from server.option_proposal_service import schedule_action_options
+        from web.webclient.presentation.watchers import watchers_for
+
+        schedule_action_options(
+            traversing_object,
+            watchers=watchers_for(traversing_object),
+        )
+    except Exception:
+        logger.warning(
+            "action options: room-entry trigger failed for %s: %s",
+            getattr(traversing_object, "key", "?"),
+            "scheduling call raised (swallowed)",
+            exc_info=True,
+        )
 
 
 def after_successful_movement(
@@ -43,7 +97,11 @@ def after_successful_movement(
     (movement-settlement-atomicity design D1) compensates that failure — and
     ``record_arrival``/``follow_companions`` are exception-isolated. The
     onboarding observer is player-gated and idempotent, so the helper is safe
-    to call on any successful traversal from any path.
+    to call on any successful traversal from any path. After the observer, the
+    action-options trigger is registered through ``transaction.on_commit`` for
+    puppeted players only (action-options-trigger-hooks D1): the scheduling
+    runs after the settlement transaction commits, never inside its critical
+    section, and a rollback never fires it.
     """
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement import charge_movement
@@ -61,6 +119,7 @@ def after_successful_movement(
         wilderness_name=wilderness_name,
     )
     observe_room_entry(traversing_object)
+    _schedule_action_options_after_entry(traversing_object)
 
 
 class MovementCostMixin:

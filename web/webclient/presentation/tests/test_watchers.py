@@ -6,6 +6,8 @@ next registration, the non-webclient/unpuppeted exclusion, and the ingress
 wiring that registers a session on a successful ``ui_sync``.
 """
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -61,7 +63,7 @@ class WatcherRegistryTests(EvenniaTest):
         return session
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_puppeted_window_registers_and_resolves_once(self):
         session = self._puppet_session(11)
@@ -76,7 +78,7 @@ class WatcherRegistryTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_non_webclient_and_unpuppeted_are_never_registered(self):
         telnet = _make_session(self.sessionhandler, "telnet", self.account, 12)
@@ -94,7 +96,7 @@ class WatcherRegistryTests(EvenniaTest):
         self.assertEqual(watchers.watchers_for(self.char1), ())
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_epoch_is_read_fresh_after_a_sequence_reset(self):
         session = self._puppet_session(15)
@@ -107,7 +109,7 @@ class WatcherRegistryTests(EvenniaTest):
         self.assertEqual(watchers.watchers_for(self.char1)[0][1], fresh)
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_disconnected_session_is_pruned_at_the_next_registration(self):
         first = self._puppet_session(16)
@@ -124,7 +126,7 @@ class WatcherRegistryTests(EvenniaTest):
         self.assertIs(remaining[0][0], second)
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_repuppeted_session_moves_to_the_new_puppet(self):
         session = self._puppet_session(18)
@@ -138,7 +140,7 @@ class WatcherRegistryTests(EvenniaTest):
         self.assertEqual(len(watchers.watchers_for(other)), 1)
 
     @covers_requirement(
-        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook"
+        "action-options-trigger-service::watcher-registry-resolves-live-sessions-for-the-room-entry-hook",
     )
     def test_ingress_registers_on_a_successful_ui_sync(self):
         session = self._puppet_session(19)
@@ -151,3 +153,42 @@ class WatcherRegistryTests(EvenniaTest):
         found = watchers.watchers_for(self.char1)
         self.assertEqual(len(found), 1)
         self.assertIs(found[0][0], session)
+
+    @covers_requirement("action-options-trigger-hooks::the-watcher-registry-is-ingress-maintained-and-pruned")
+    def test_ingress_registers_on_a_post_command_refresh(self):
+        from twisted.internet.defer import succeed
+
+        session = self._puppet_session(20)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        from world.rules.clock import get_world_clock
+
+        get_world_clock()
+        from web.webclient.presentation.ingress import observe_command_settlement
+
+        observe_command_settlement(succeed(True), session)
+        found = watchers.watchers_for(self.char1)
+        self.assertEqual(len(found), 1)
+        self.assertIs(found[0][0], session)
+
+    @covers_requirement("action-options-trigger-hooks::the-watcher-registry-is-ingress-maintained-and-pruned")
+    def test_a_closed_session_is_pruned_at_the_next_ingress_registration(self):
+        from twisted.internet.defer import succeed
+
+        first = self._puppet_session(21)
+        second = self._puppet_session(22)
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        from world.rules.clock import get_world_clock
+
+        get_world_clock()
+        inputfuncs.ui_sync(first, {"protocol_version": 1})
+        inputfuncs.ui_sync(second, {"protocol_version": 1})
+        self.assertEqual(len(watchers.watchers_for(self.char1)), 2)
+        del self.sessionhandler[first.sessid]
+        from web.webclient.presentation.ingress import observe_command_settlement
+
+        observe_command_settlement(succeed(True), second)
+        remaining = watchers.watchers_for(self.char1)
+        self.assertEqual(len(remaining), 1)
+        self.assertIs(remaining[0][0], second)

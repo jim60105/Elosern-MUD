@@ -41,7 +41,7 @@ transport and deterministic-path contract tests.
 
 | Hook | Where | When |
 |---|---|---|
-| Room entry | `PlayerCharacter.at_object_location_change` (puppeted player only) | After the move settles atomically |
+| Room entry | **End of `after_successful_movement` in `typeclasses/exits.py`** (puppeted `PlayerCharacter` only; corrected from the originally drafted `PlayerCharacter.at_object_location_change`, which does not exist in Evennia 6.1 — the shared movement-success boundary every exit lineage already uses) | After the move settles atomically and the onboarding observer runs |
 | Dialogue reply | **After the completion publication** of `explore.talk_scripted` / `explore.talk_freeform` (`web/webclient/actions/dispatcher.py` `_publish_completion` success path) | Ordering guarantee: the reply text and action result are already on the wire before the trigger fires (review R3); never on rejection paths |
 | Reconnect / initial | `ui_sync` happy path, after the full snapshot publishes | See the stale predicate below |
 
@@ -54,10 +54,13 @@ schedules — the render already assembles from `options_state`, and the cache n
 Hook code is three tiny deterministic call sites — no module under `world/ai/` touches them. Each
 hook supplies **explicit watchers** (round-three review R3-2):
 
-- Room entry: `PlayerCharacter.at_object_location_change` (puppeted player only). The hook mounts
-  with a function-local deferred import of the service (the `commands/scene.py` precedent; if the
-  typeclasses → server import turns cyclic, the call site moves to the command-settlement channel
-  — pinned during change 6). It resolves watchers through
+- Room entry: **end of `after_successful_movement`** in `typeclasses/exits.py`, gated to a
+  puppeted `PlayerCharacter` (the originally drafted `at_object_location_change` hook does not
+  exist in Evennia 6.1 — corrected by change `action-options-trigger-hooks`; the movement
+  boundary is the deterministic success seam every exit lineage already shares). The hook mounts
+  with a function-local deferred import of the service (the `commands/scene.py` precedent); the
+  typeclasses → server import is permitted by the repository contract scans, so no re-export
+  fallback seam is needed. It resolves watchers through
   `web/webclient/presentation/watchers.py::watchers_for(actor)`: an ephemeral registry the OOB
   ingress maintains — it registers each live webclient session on `ui_sync`/command settlement and
   prunes disconnected sessions at every registration. `captured_epoch` comes from

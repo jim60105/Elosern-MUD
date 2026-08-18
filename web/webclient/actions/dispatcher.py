@@ -23,6 +23,7 @@ account APIs.
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
+import logging
 import secrets
 from typing import Any
 
@@ -44,6 +45,8 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PresentationRegistry
 
+logger = logging.getLogger(__name__)
+
 # Bounded size of the completed-request cache per live sequence.
 CACHE_CAPACITY = 64
 
@@ -58,6 +61,10 @@ _MALFORMED_PAYLOAD_CODE = "malformed_payload"
 _MALFORMED_PAYLOAD_MESSAGE = "操作內容格式錯誤"
 _INTERNAL_CODE = "internal_error"
 _INTERNAL_MESSAGE = "操作時發生內部錯誤"
+
+# The dialogue actions whose successful completion triggers a fresh
+# action-options generation (action-options-trigger-hooks D3).
+_DIALOGUE_TRIGGER_ACTION_IDS = frozenset({"explore.talk_scripted", "explore.talk_freeform"})
 
 
 class DispatchError(ValueError):
@@ -227,7 +234,7 @@ def handle_ui_action(
     # still match so a puppet change cannot publish A-derived state to B.
     state.in_flight = True
     state.epoch = coordinator.epoch
-    deferred = _invoke_adapter(session, actor, spec.adapter, normalized, action_registry, registry, request_id, state.epoch)
+    deferred = _invoke_adapter(session, actor, spec.adapter, normalized, action_registry, registry, request_id, state.epoch, action_id=spec.action_id)
     if deferred is not None:
         deferred.addBoth(lambda result, session=session, epoch=state.epoch: _settle_in_flight(session, epoch, result))
     else:
@@ -244,11 +251,15 @@ def _invoke_adapter(
     registry: PresentationRegistry,
     request_id: str,
     epoch: str,
+    action_id: str | None = None,
 ) -> Deferred | None:
     """Invoke the adapter, observing both settlement paths.
 
     Returns the Deferred when the adapter is Deferred-returning; otherwise the
     synchronous result is published immediately through the critical section.
+    ``action_id`` (default ``None`` so existing callers and tests keep their
+    signatures) is threaded into the completion publication so the dialogue
+    trigger can identify talk completions (action-options-trigger-hooks D3).
     """
     try:
         result = adapter(actor, normalized, session)
@@ -256,10 +267,10 @@ def _invoke_adapter(
         return _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
     if isinstance(result, Deferred):
         result.addBoth(
-            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch: _publish_completion(_s, _a, value, _r, _q, _e)
+            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch, _i=action_id: _publish_completion(_s, _a, value, _r, _q, _e, action_id=_i)
         )
         return result
-    _publish_completion(session, actor, result, registry, request_id, epoch)
+    _publish_completion(session, actor, result, registry, request_id, epoch, action_id=action_id)
     return None
 
 
@@ -297,6 +308,7 @@ def _publish_completion(
     registry: PresentationRegistry,
     request_id: str,
     epoch: str,
+    action_id: str | None = None,
 ) -> Any:
     """Publish canonical presentation and the matching result for an adapter.
 
@@ -305,7 +317,11 @@ def _publish_completion(
     exact result naming the same revision, and the server in-flight marker is
     released only after both sends. The captured ``epoch`` must still match the
     live coordinator; a retired sequence publishes nothing into its
-    replacement.
+    replacement. After both sends, a successful talk completion fires the
+    action-options dialogue trigger fire-and-forget (action-options-trigger-
+    hooks D3): the reply text, update, and result are already on the wire, so
+    the trigger cannot reorder existing traffic; a scheduling failure is
+    logged and swallowed, never raised into publication.
     """
     coordinator = attach_coordinator(session, registry)
     state = _sequence_state(session)
@@ -364,7 +380,40 @@ def _publish_completion(
     _cache_result(state, request_id, result)
     _send_action_result(session, coordinator.epoch, request_id, result, coordinator.revision)
     _settle_in_flight(session, epoch, None)
+    # The gate uses the *normalized* outcome actually sent to the client: a
+    # raw ``success`` that normalizes into an internal error must never
+    # schedule (action-options-trigger-hooks D3).
+    if result["outcome"] == "success" and action_id in _DIALOGUE_TRIGGER_ACTION_IDS:
+        _schedule_dialogue_options(session, actor, coordinator)
     return value
+
+
+def _schedule_dialogue_options(
+    session: Any,
+    actor: Any,
+    coordinator: PresentationCoordinator,
+) -> None:
+    """Fire-and-forget the action-options generation after a talk completion.
+
+    The dispatcher-held session is the sole watcher and the coordinator epoch
+    is captured at publication time, so the service publishes through the
+    correct sequence. The scheduling call is fire-and-forget by contract; any
+    synchronous failure is logged as a bounded diagnostic and swallowed so
+    publication is never delayed or altered.
+    """
+    try:
+        from server.option_proposal_service import schedule_action_options
+
+        schedule_action_options(
+            actor,
+            watchers=((session, coordinator.epoch),),
+        )
+    except Exception:
+        logger.warning(
+            "action options: dialogue-reply trigger scheduling failed for session %s (swallowed)",
+            getattr(session, "sessid", "?"),
+            exc_info=True,
+        )
 
 
 def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
