@@ -8,6 +8,7 @@ isolated, repeatable, and free of failure suppression or remote fixtures.
 """
 
 from pathlib import Path
+import json
 import re
 import tomllib
 import unittest
@@ -138,6 +139,13 @@ class BrowserVerificationContractTests(unittest.TestCase):
                 "Validate static requirement traceability",
             ),
             "evennia": ("Run evennia shard ${{ matrix.index }}",),
+            "frontend": (
+                "Install locked npm toolchain",
+                "Build Vue application with Vite",
+                "Run Vue component tests with Vitest",
+                "Build Storybook component showcase",
+                "Check component coverage",
+            ),
             "top-level": ("Run top-level regression suite with coverage",),
             "gate": (
                 "Verify successful requirement execution",
@@ -150,6 +158,11 @@ class BrowserVerificationContractTests(unittest.TestCase):
             step_names = [step["name"] for step in jobs[job_name]["steps"]]
             for required_name in names:
                 self.assertIn(required_name, step_names, f"gate {required_name!r} is missing")
+        self.assertIn(
+            "frontend",
+            jobs["gate"].get("needs", []),
+            "the aggregate gate must depend on the frontend gates",
+        )
         combined = " ".join(
             step.get("run", "") + str(step.get("uses", ""))
             for job in jobs.values()
@@ -174,7 +187,9 @@ class BrowserVerificationContractTests(unittest.TestCase):
     @covers_requirement(
         "webclient-browser-verification::dom-independent-client-behavior-has-an-executable-node-test-gate"
     )
-    def test_node_suite_requires_no_npm_package(self):
+    def test_node_suite_stays_free_of_npm_runtime_dependencies(self):
+        # The DOM-independent logic remains dependency-free UMD/CommonJS:
+        # nothing under the Node-gate tree may require an npm package.
         npm_require = re.compile(
             r'require\(\s*["\'](?!node:|\.{1,2}/)[^"\']+["\']'
         )
@@ -185,7 +200,11 @@ class BrowserVerificationContractTests(unittest.TestCase):
                 match,
                 f"{path} must not require an npm package (found {match.group(0) if match else None})",
             )
-        self.assertFalse((REPO_ROOT / "package.json").exists())
+        # The repo-root toolchain is dev/CI-time only: a project package.json
+        # exists for the Vue build, but it declares no runtime npm dependency.
+        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertNotIn("dependencies", package)
+        self.assertTrue(package.get("devDependencies"))
 
     @covers_requirement(
         "webclient-browser-verification::browser-acceptance-uses-an-isolated-managed-evennia-runtime"

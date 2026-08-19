@@ -69,6 +69,29 @@ WEBSOCKET_CLIENT_ENABLED = True
 WEBSOCKET_CLIENT_PORT = _env_int("ELOSERN_BROWSER_WS_PORT", 4102)
 WEBSOCKET_CLIENT_INTERFACE = "127.0.0.1"
 
+# Vue/legacy XOR load flag (webclient-vue-01-foundation). The production
+# default is False (legacy); C3 flips this here so the wiring wave tests can
+# force the Vue branch from test config only.
+ELOSERN_VUE_CLIENT = os.environ.get("ELOSERN_BROWSER_VUE_CLIENT") == "1"
+
+# Expose the flag to the webclient templates through the project context
+# processor (this module does not import server.conf.settings, so the
+# registration there does not apply here; the ``?__vue=1`` review fixture
+# depends on it in the browser acceptance tests).
+TEMPLATES = [
+    {
+        **engine,
+        "OPTIONS": {
+            **engine.get("OPTIONS", {}),
+            "context_processors": [
+                *engine.get("OPTIONS", {}).get("context_processors", []),
+                "web.webclient.context_processors.elosern_webclient",
+            ],
+        },
+    }
+    for engine in TEMPLATES
+]
+
 # The portal/server control channel must also be per-instance so concurrent
 # harnesses (or a running developer server) never attach to each other.
 AMP_HOST = "localhost"
