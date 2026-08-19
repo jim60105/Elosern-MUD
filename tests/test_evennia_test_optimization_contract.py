@@ -173,8 +173,9 @@ class TestOwnershipContractTests(unittest.TestCase):
         jobs = workflow["jobs"]
         self.assertEqual(jobs["evennia"]["needs"], "preflight")
         self.assertEqual(jobs["top-level"]["needs"], "preflight")
+        self.assertEqual(jobs["frontend"]["needs"], "preflight")
         self.assertEqual(
-            jobs["gate"]["needs"], ["evennia", "browser", "top-level"]
+            jobs["gate"]["needs"], ["evennia", "browser", "top-level", "frontend"]
         )
 
         browser_jobs = [job for name, job in jobs.items() if name.startswith("browser")]

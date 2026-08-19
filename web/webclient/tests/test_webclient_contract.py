@@ -73,7 +73,13 @@ class WebclientShellContractTest(unittest.TestCase):
             if not path.is_file() or path.suffix not in (".js", ".css"):
                 continue
             relative = path.relative_to(STATIC_ROOT).as_posix()
-            if relative.startswith("vendor/") or "/tests/" in "/" + relative:
+            if (
+                relative.startswith("vendor/")
+                # Vite build output (gitignored; regenerated from the authored
+                # sources plus locked npm dependencies, never hand-authored).
+                or relative.startswith("app/dist/")
+                or "/tests/" in "/" + relative
+            ):
                 continue
             content = path.read_text(encoding="utf-8")
             if "http://" in content or "https://" in content:

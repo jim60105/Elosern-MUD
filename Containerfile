@@ -48,6 +48,25 @@ RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/ro
     uv sync --locked --no-dev --no-install-project
 
 ########################################
+# Vue dist build stage (webclient-vue-01-foundation)
+########################################
+FROM docker.io/library/node:24-slim AS vue-dist
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+WORKDIR /build
+
+COPY --chown=root:0 package.json package-lock.json vite.config.js ./
+RUN --mount=type=cache,id=npm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+COPY --chown=root:0 web/ /build/web/
+# Emits the stable-entry dist (index.js + index.css + hashed assets/) into the
+# static tree; the app-layout stage copies it into the served image root.
+RUN npm run build
+
+########################################
 # Application layout stage
 ########################################
 FROM docker.io/library/python:3.13-slim AS app-layout
@@ -63,6 +82,9 @@ COPY --chown=root:0 tools/ /app/tools/
 # bind mount below overrides them read-only. World-readable so an external art
 # worker can reuse the shipped fragments (design D11, unchanged worker contract).
 COPY --chown=root:0 prompts/ /app/prompts/
+# Vue SPA dist produced by the vue-dist stage, served from the project origin
+# like every other web/static asset (webclient-vue-01-foundation, design D2).
+COPY --chown=root:0 --from=vue-dist /build/web/static/webclient/app/dist/ /app/web/static/webclient/app/dist/
 
 RUN find /app -type d -exec chmod 0755 {} + && \
     find /app -type f -exec chmod 0644 {} + && \

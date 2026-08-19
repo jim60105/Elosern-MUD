@@ -149,6 +149,33 @@ GLOBAL_SCRIPTS = {
 
 
 ######################################################################
+# WebClient Vue SPA load flag (webclient-vue-01-foundation)
+######################################################################
+
+# Mutually-exclusive Vue/legacy script-load flag for the webclient template
+# (base.html XOR flag, design D4). The production default is the legacy
+# shell; C4 flips this to True in the single atomic production flip. The
+# ``?__vue=1`` query parameter forces the Vue branch per request for the
+# offline-load browser check (the design's test-routed page fixture).
+ELOSERN_VUE_CLIENT = False
+
+# Expose the flag to the webclient templates through the project context
+# processor (Evennia's general_context does not carry it).
+TEMPLATES = [
+    {
+        **engine,
+        "OPTIONS": {
+            **engine.get("OPTIONS", {}),
+            "context_processors": [
+                *engine.get("OPTIONS", {}).get("context_processors", []),
+                "web.webclient.context_processors.elosern_webclient",
+            ],
+        },
+    }
+    for engine in TEMPLATES
+]
+
+######################################################################
 # Settings given in secret_settings.py override those in this file.
 ######################################################################
 try:

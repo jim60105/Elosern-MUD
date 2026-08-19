@@ -1,0 +1,23 @@
+/*
+ * Minimal page chrome for the A2 foundation stub. B1 (AppShell) replaces the
+ * full-viewport mount styling; keep this file scoped to what the stub needs.
+ */
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--ink-950);
+  color: var(--paper-100);
+  font-family: var(--f-sans);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#main-sub {
+  height: 100vh;
+}

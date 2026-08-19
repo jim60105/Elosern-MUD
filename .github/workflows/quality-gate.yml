@@ -183,6 +183,20 @@ jobs:
         run: uv sync --locked
         working-directory: w-b
 
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      # The Vue dist is built into each checkout so the portal serves the
+      # bundle from the project origin in both two-process workspaces
+      # (webclient-vue-01-foundation, design D2).
+      - name: Build Vue dist in browser workspaces
+        run: |
+          (cd w-a && npm ci --no-audit --no-fund && npm run build)
+          (cd w-b && npm ci --no-audit --no-fund && npm run build)
+
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
         working-directory: w-a
@@ -220,6 +234,40 @@ jobs:
             coverage-browser-shard-${{ matrix.index }}-p2*
             evidence.browser-shard-${{ matrix.index }}.jsonl
 
+  frontend:
+    needs: preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: true
+
+      - name: Install locked npm toolchain
+        run: npm ci --no-audit --no-fund
+
+      - name: Build Vue application with Vite
+        run: npm run build
+
+      - name: Run Vue component tests with Vitest
+        run: npm test
+
+      - name: Build Storybook component showcase
+        run: npm run build-storybook
+
+      - name: Check component coverage
+        run: npm run showcase-coverage
+
+      - name: Verify dist artifact
+        run: |
+          test -s web/static/webclient/app/dist/index.js
+          test -s web/static/webclient/app/dist/index.css
+
   top-level:
     needs: preflight
     runs-on: ubuntu-latest
@@ -227,6 +275,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.0
@@ -257,7 +311,7 @@ jobs:
             evidence.top-level.jsonl
 
   gate:
-    needs: [evennia, browser, top-level]
+    needs: [evennia, browser, top-level, frontend]
     runs-on: ubuntu-latest
 
     steps:

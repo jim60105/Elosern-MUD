@@ -198,6 +198,17 @@
       "files_b": [
         "web.tests.browser.test_browser_actions.ActionLockingTest"
       ]
+    },
+    {
+      "index": 14,
+      "name": "vue-foundation",
+      "files_a": [
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline",
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_legacy_default_stays_when_flag_is_absent"
+      ],
+      "files_b": [
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_text_console_round_trips_commands_without_jquery"
+      ]
     }
   ]
 }

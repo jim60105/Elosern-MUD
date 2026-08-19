@@ -42,15 +42,24 @@ class ContainerContractTests(unittest.TestCase):
             containerfile,
             flags=re.MULTILINE | re.IGNORECASE,
         )
-        self.assertEqual(stage_names, ["download", "builder", "app-layout", "final"])
+        self.assertEqual(
+            stage_names, ["download", "builder", "vue-dist", "app-layout", "final"]
+        )
 
         download = _stage(containerfile, "download")
         builder = _stage(containerfile, "builder")
+        vue_dist = _stage(containerfile, "vue-dist")
         final = _stage(containerfile, "final")
         self.assertIn("sha256sum --check", download)
         self.assertRegex(builder, r"uv sync\s+--locked\s+--no-dev")
         self.assertRegex(builder, r"id=uv-\$TARGETARCH\$TARGETVARIANT")
         self.assertRegex(builder, r"COPY[^\n]*pyproject\.toml uv\.lock")
+        self.assertRegex(vue_dist, r"npm ci")
+        self.assertRegex(vue_dist, r"npm run build")
+        self.assertRegex(
+            _stage(containerfile, "app-layout"),
+            r"COPY[^\n]*--from=vue-dist[^\n]*web/static/webclient/app/dist/",
+        )
         self.assertRegex(final, r"COPY --link[^\n]*--from=builder /venv /venv")
         self.assertRegex(final, r"COPY --link[^\n]*--from=download /dumb-init")
         self.assertRegex(final, r"COPY --link[^\n]*--from=app-layout /app /app")
@@ -203,8 +212,12 @@ class EvenniaSkeletonContractTests(unittest.TestCase):
         self.assertNotIn("evennia migrate", containerfile)
         self.assertNotRegex(containerfile, r"(?i)COPY[^\n]*\.(?:db|db3|sqlite3)\b")
         self.assertEqual(
-            entrypoint_commands[-2:],
-            ["evennia migrate --noinput", "exec evennia start --log"],
+            entrypoint_commands[-3:],
+            [
+                "evennia migrate --noinput",
+                "evennia collectstatic --noinput",
+                "exec evennia start --log",
+            ],
         )
         bootstrap = compose["services"]["bootstrap"]
         self.assertEqual(bootstrap["profiles"], ["bootstrap"])
