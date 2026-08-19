@@ -123,8 +123,8 @@ These rules bind every sub-change; they are what make twelve independent changes
 | B5 | `webclient-vue-06-showcase-overlays` | B2, B3, B4 | the full overlays `MapOverlay`/`SettingsOverlay`/`HelpOverlay`/`CreationOverlay` (adult gate on both age fields); assert the deferred surfaces are **not** built; **freeze the manifest** to the complete required set | Planned |
 | C1 | `webclient-vue-07-wire-store` | A2 (∥ Wave B) | the Pinia store using the preserved protocol reducer (CJS-interop import) as its core; view slices; atomic publish / committed-only reads; store integration tests (snapshot adoption, old-epoch/revision rejection) | Planned |
 | C2 | `webclient-vue-08-wire-bridge-contracts` | A1, C1 (∥ B5) | the public-contract bridge (`window.Elosern.{Protocol,KeyboardRouter,narrativeInput,actions}`) over the store + imported logic; apply A1's frozen `MODIFIED`/`RENAMED` deltas to the façade-referencing `webclient-*` capabilities and re-point their traceability tests | Planned |
-| C3 | `webclient-vue-09-wire-transport-mount` | C2, B5 | bind the store to the `evennia.js` OOB events (snapshot/update/result/protocol-error) and the unchanged allowlisted dispatch (dispatch-only, one-mutation-in-flight, reconnect/epoch/lock); mount `#app`; finalize `base.html` (remove jQuery/GoldenLayout/plugin loads, keep `evennia.js` + vanilla console + the Vite bundle); `desktop-shell` RENAMED from the GoldenLayout shell to the Vue SPA shell | Planned |
-| C4 | `webclient-vue-10-wire-views-browser` | C3 | migrate legacy `js/plugins/*` view behavior into store-bound components; preserve the DOM contract hooks and re-map the rest to `data-testid`; make the per-surface Playwright slices green; offline/behavior regression (bundle blocked → text playable; incompatible OOB → graphical locked with text round-tripping) | Planned |
+| C3 | `webclient-vue-09-wire-transport-mount` | C2, B5 | bind the store to the `evennia.js` OOB events (snapshot/update/result/protocol-error: reconnect/epoch/lock re-asserted) and the unchanged allowlisted dispatch (dispatch-only, one-mutation-in-flight); bind the B-wave components to the store as the live renderers; prove it in a managed-browser harness (the A2 XOR flag, **test config only** — the production `base.html` default stays legacy); `webclient-vue-application` gains the "degraded text stays playable" requirement | Planned |
+| C4 | `webclient-vue-10-wire-views-browser` | C3 | the single atomic production flip: `base.html` default → the Vite bundle + remove the jQuery/GoldenLayout/plugin loads; mount the app as the live client; `webclient-desktop-shell` RENAMED from the GoldenLayout shell to the Vue SPA **desktop** shell; re-map the **production** Playwright behavioral slices to the preserved hooks + `data-testid`; offline/behavior regression (bundle blocked → text playable; incompatible OOB → graphical locked with text round-tripping) | Planned |
 | D1 | `webclient-vue-11-finalize` | C4 | delete retired legacy view files + dead CSS; `AGENTS.md` frontend commands + the Python-vs-npm split; apply the D13/webclient amendment to the engine design doc + `webclient-ui-design.md`; finalize `docs/` links; traceability + all gates (Python branch ≥ 80%) | Planned |
 
 Within Wave B the **Depends on** column encodes the mandatory *landing* order, not a data dependency
@@ -166,8 +166,8 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
 | `web/webclient-app/components/**` + `stories/**` | the B-change that owns that family | distinct per family (core / action / data / world / overlays) |
 | component-coverage `manifest` | B1 seeds → B2→B3→B4 extend → B5 freezes | this is the Wave B serial bottleneck |
 | `openspec` main spec for `webclient-component-showcase` | B1 ADDED → B2–B5 MODIFIED (at archive) | serial |
-| `web/templates/webclient/base.html` | **A2** (XOR-flag infra + vanilla console) → **C3** (flip-to-Vue + mount) | B* / C1 / C2 do not touch it |
-| `web/templates/webclient/webclient.html` | **C3** (single live mount) | A2's build stub renders in Storybook only |
+| `web/templates/webclient/base.html` | **A2** (XOR-flag infra + vanilla console) → **C4** (flip-to-Vue + remove legacy loads) | B* / C1 / C2 do not touch it; C3 only uses the flag in a test config |
+| `web/templates/webclient/webclient.html` | **C4** (single live mount) | A2's build stub renders in Storybook only; C3 mounts in the test harness |
 | `.github/workflows/quality-gate.yml` | **A2** (npm/build/Vitest/Storybook/`dist` gates) | B1 only completes the manifest; no workflow edit |
 | `Containerfile` / `docker-entrypoint.sh` | **A2** | — |
 | `docs/design/` (the 設計稿) + `docs/_sidebar.md` (its entry) | **A1** → **D1** (finalize links) | A2 writes `docs/development/` files but **not** the sidebar |
@@ -194,7 +194,7 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
   shared story-util helpers, are a single coordination point. B1→B2→B3→B4→B5 land in order. Within a
   single change, the components are distinct files, so contributors can parallelize *inside* a change —
   but the changes land in order.
-- `base.html` (A2 → C3) and `package.json`/`vite`/`vitest` (A2 only) are single-owner.
+- `base.html` (A2 → C4) and `package.json`/`vite`/`vitest` (A2 only) are single-owner.
 
 ### 6.4 Global rule
 
