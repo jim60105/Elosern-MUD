@@ -7,8 +7,9 @@
 ## 2. Desktop-shell rename + production Playwright re-map
 
 - [ ] 2.1 Apply the `webclient-desktop-shell` rename (GoldenLayout → Vue SPA desktop shell) and reword only its mount/fallback + tab-strip scenarios; confirm the behavioral shell requirements are otherwise unchanged
-- [ ] 2.2 Re-map the production per-surface Playwright slices to the preserved hooks (`#action-dock`, `action-`/`target-` keys, `#combat-row-0`, panel ids) + `data-testid` (layout/shell, local map, exploration, combat, combat-rejection, creation, services, input/narrative, options, art, choicepoints, pointer, session lifecycle, reconnect)
+- [ ] 2.2 Re-map the production per-surface Playwright slices to the preserved hooks (`#action-dock`, `action-`/`target-` keys, `#combat-row-0`, `#inputfield`, `.inp` / `.narrative-divider`, `#narrative-unread`, `#elosern-action-live`, `#elosern-offline-overlay`, `data-node` / `data-node-id`) + `data-testid` (layout/shell, local map, exploration, combat, combat-rejection, creation, services, input/narrative, options, art, choicepoints, pointer, session lifecycle, reconnect), row-by-row per the frozen audit §2.3
 - [ ] 2.3 Make each re-mapped slice green before proceeding to the next surface
+- [ ] 2.4 Apply the flip-time `webclient-narrative-markup` wording fix (frozen audit entry C4-03): drop "or the stock plugins" from the converted-stream requirement and reword the notice scenario from "the stock handler" to "the shell"; the stock plugins are gone from the load path as of 1.1, so this lands green at the flip
 
 ## 3. Offline / behavior regression
 

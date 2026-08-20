@@ -13,6 +13,7 @@
 
 - 專案設計
   - [引擎架構設計](/superpowers/specs/2026-07-29-ai-mud-engine-design)
+  - [Vue WebClient 設計稿](/design/elosern-redesign/index)
 
 - Developer guides
   - [新增魔法指南](/development/adding-spells)
