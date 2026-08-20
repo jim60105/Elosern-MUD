@@ -32,10 +32,12 @@ public contract survives the DOM becoming Vue.
   and the stable public façades via the bridge.
 - **Audit-driven additions (applied here, per A1's frozen list):** the façade-referencing `webclient-*`
   capabilities — candidates include action-choicepoints, options-surface, pointer-activation,
-   character-creation-ui, narrative-markup, and the desktop-shell keyboard-routing requirement — each
-   re-expressed for the bridge. The exact set is A1's frozen `MODIFIED`/`RENAMED` list; those delta specs
-   are finalized and applied during C2 implementation against that list. A1 is a hard dependency, so it is
-   implemented and archived before C2's full delta set is finalized from its committed `audit.md`; the
+   character-creation-ui, and the desktop-shell keyboard-routing requirement — each
+   re-expressed for the bridge. The exact set is A1's frozen `MODIFIED`/`RENAMED` list (the
+   entries whose `applying_change` is this change); those delta specs are finalized and applied during
+   C2 implementation against that list. A1 is a hard dependency, so it is
+   implemented and archived before C2's full delta set is finalized from the committed
+   `docs/development/webclient-vue-frozen-contract-audit.md`; the
    `webclient-vue-application` requirement authored here is complete and valid on its own.
 
 ## Impact

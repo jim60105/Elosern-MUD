@@ -12,13 +12,18 @@ proven; no legacy view plugin in the load path.
 
 ## Decisions
 
-- **D1 — Atomic flip.** The flip (default → Vue), the legacy load removal, the desktop-shell rename, and the
-  production Playwright re-map land **together**, so at C4's archive production IS the Vue client and the
+- **D1 — Atomic flip.** The flip (default → Vue), the legacy load removal, the desktop-shell rename, the
+  flip-time `webclient-narrative-markup` wording fix (frozen audit entry C4-03), and the production
+  Playwright re-map land **together**, so at C4's archive production IS the Vue client and the
   re-mapped suite is green. C3 already made the store-bound components live-capable, so the flip points
   production at a working app rather than a half-wired one.
-- **D2 — Preserve hooks, re-map the rest.** `#action-dock`, the `action-`/`target-` keys, `#combat-row-0`,
-  and the panel ids are preserved; every other interactive surface carries a `data-testid`; the Playwright
-  slices are re-mapped per surface in lockstep.
+- **D2 — Preserve hooks, re-map the rest (row-by-row per the frozen audit).** The per-identifier decision
+  lives in the Phase-0 frozen audit (`docs/development/webclient-vue-frozen-contract-audit.md` §2.3): the
+  PRESERVE-SAME-HOOK rows (`#action-dock`, the `action-`/`target-` keys, `#combat-row-0`, `#inputfield`,
+  `.inp` / `.narrative-divider`, `#narrative-unread`, `#elosern-action-live`, `#elosern-offline-overlay`,
+  `data-node` / `data-node-id`) stay unchanged; the REMAP-TO-TESTID rows (including `combat-detail` and
+  `local-map-detail`) are served as `data-testid` with the same string; every other interactive surface
+  carries a stable `data-testid`; the Playwright slices are re-mapped per surface in lockstep.
 - **D3 — Legacy files are unreferenced here, deleted in D1.** C4 removes the loads so the legacy view
   files are dead; D1 deletes them. No legacy view code remains in the load path at C4.
 
