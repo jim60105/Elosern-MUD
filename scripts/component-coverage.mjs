@@ -13,7 +13,10 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = join(repoRoot, "web/webclient-app");
-const manifestPath = join(appRoot, "component-manifest.json");
+// Optional first argument: an alternate manifest path (the test suite probes
+// the gate with temporary manifests instead of mutating the tracked file).
+const manifestPath =
+  process.argv[2] ?? join(appRoot, "component-manifest.json");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 const required = Array.isArray(manifest.required) ? manifest.required : [];

@@ -50,6 +50,26 @@ Constraints:
   through the preserved `narrative_markup` pipeline (via the A2 `lib` wrapper), including its
   degrade-to-literal-text path. Design tokens / fonts come from A2; nothing is fetched at render.
 
+- **D4 — Requirement evidence is executed from Python (the A2 evidence-bridge pattern).**
+  `covers_requirement` attaches only to Python `test_*` functions, but the B1 behavior lives in Node
+  (Vite build, Vitest, Storybook, coverage script) and Playwright. So the change ships:
+  (a) `web/webclient/tests/test_vue_showcase_evidence.py` — `unittest` methods that execute the npm
+  gates as evidence records (following A2's `test_node_suite_evidence.py` idiom; the
+  `@covers_requirement` annotations are added at this change's archive, when the two new requirement
+  IDs enter the index with the synced delta specs, so the static `check` stays green at apply time);
+  and (b) a Vue-branch browser test in `web/tests/browser/test_vue_foundation.py` asserting the core
+  surfaces render visibly and fully in-viewport at 1440x900 and 1280x720 against a live server (the
+  bounded-render scenario cannot be asserted by Vitest alone). The same B1 update retires the
+  replaced-fallback contract from A2's round-trip test: the B1 shell hides the text console on
+  mount, so that test asserts the retirement and drives the round-trip through the revealed console.
+
+- **D5 — The A2 stable-entry-CSS hook is scoped to the production app build.** A2's `stableEntryCss`
+  Vite hook assumed exactly one CSS asset in any bundle generation. With per-component SFC `<style>`
+  blocks, `build-storybook` (which auto-loads this `vite.config`) emits per-component preview CSS
+  chunks plus its own preview stylesheet, so the hook now fires only when the bundle carries the
+  production app's stable `index.js` entry; the Storybook build passes through untouched while the
+  served `dist` keeps its single stable `index.css` (the D2 stable-entry contract is unchanged).
+
 ## Risks / Trade-offs
 
 - **Manifest drift** (a story added but the manifest not updated, or vice versa) → the component-coverage

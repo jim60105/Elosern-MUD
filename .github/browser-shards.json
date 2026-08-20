@@ -208,7 +208,7 @@
       ],
       "files_b": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_text_console_round_trips_commands_without_jquery",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_bounded_at_supported_viewports"
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports"
       ]
     }
   ]

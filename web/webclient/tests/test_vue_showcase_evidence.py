@@ -34,8 +34,10 @@ Intended annotations at archive:
 from __future__ import annotations
 
 import glob
+import json
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -166,6 +168,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
 
     def test_component_coverage_gate_passes(self):
         """The manifest and the registered stories are in complete lockstep."""
+        required = json.loads(
+            (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
+        )["required"]
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(
             result.returncode,
@@ -173,31 +178,37 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             "component coverage gate failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn(
-            "component coverage: all 6 required component(s) have stories",
+            f"component coverage: all {len(required)} required component(s) "
+            "have stories",
             result.stdout,
         )
 
     def test_component_coverage_gate_fails_for_a_missing_required_story(self):
-        """A manifest-listed component without a story fails the gate."""
-        manifest_path = APP_ROOT / "component-manifest.json"
-        original = manifest_path.read_text(encoding="utf-8")
-        try:
-            manifest_path.write_text(
-                original.replace(
-                    '"Core/CommandDrawer"',
-                    '"Core/CommandDrawer",\n    "Core/UnlistedProbe"',
-                ),
-                encoding="utf-8",
+        """A manifest-listed component without a story fails the gate.
+
+        The probe runs against a temporary manifest (the gate accepts an
+        alternate manifest path) so parallel processes never observe a
+        mutated tracked file.
+        """
+        original = json.loads(
+            (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
+        )
+        probe = dict(original)
+        probe["required"] = list(probe["required"]) + ["Core/UnlistedProbe"]
+        with tempfile.TemporaryDirectory() as tmp:
+            probe_path = Path(tmp) / "manifest.json"
+            probe_path.write_text(json.dumps(probe), encoding="utf-8")
+            result = run_node(
+                ["scripts/component-coverage.mjs", str(probe_path)], timeout=120
             )
-            result = run_node(["scripts/component-coverage.mjs"], timeout=120)
-            self.assertNotEqual(
-                result.returncode,
-                0,
-                "the coverage gate must fail when a required story is missing",
-            )
-            self.assertIn("Core/UnlistedProbe", result.stderr)
-        finally:
-            manifest_path.write_text(original, encoding="utf-8")
+        self.assertNotEqual(
+            result.returncode,
+            0,
+            "the coverage gate must fail when a required story is missing:\n"
+            + result.stdout
+            + result.stderr,
+        )
+        self.assertIn("Core/UnlistedProbe", result.stderr)
 
     def test_story_files_import_only_local_or_bundled_modules(self):
         """Stories import only relative files or the locked, bundled Vue runtime.

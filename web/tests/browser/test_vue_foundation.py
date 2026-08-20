@@ -30,16 +30,17 @@ CONSOLE_LOG = '[data-testid="text-console-log"]'
 CONSOLE_INPUT = '[data-testid="text-console-input"]'
 VUE_ROOT = '[data-testid="elosern-vue-root"]'
 
-# The B1 core family's top-level surfaces; each must be visible at both
-# supported desktop viewports (the pre-store shell renders all of them with
-# its static slices — the narrative feed is present but empty until the C1
-# store feeds it).
+# The B1 core family's top-level surfaces that must be visible at both
+# supported desktop viewports (the pre-store shell mounts the usable "ready"
+# slice, so all of these render unobscured — the narrative feed is present
+# but empty until the C1 store feeds it). The connect overlay is a state
+# surface rendered only for non-ready statuses, so its absence on the ready
+# mount is asserted separately (proving the shell is not covered).
 CORE_SURFACE_TESTIDS = (
     "topbar",
     "narrative-feed",
     "command-drawer",
     "command-drawer-entry",
-    "connect-overlay",
 )
 
 
@@ -119,19 +120,33 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             "the pre-store shell must mount in the default world mode",
         )
 
-    def test_core_surfaces_render_bounded_at_supported_viewports(self):
-        """Each required B1 core surface is visible and no layout overflows.
+    def test_core_surfaces_render_usable_at_supported_viewports(self):
+        """Each required B1 core surface is visible, in-bounds, and usable.
 
-        open_vue_page opens at the default 1440x900 viewport; the page is
-        then resized to the 1280x720 minimum and asserted again, so both
-        supported desktop viewports are bounded with a single login. The
-        traceability annotation for
+        The B1 shell mounts the usable "ready" slice, so the pre-connection
+        splash must be absent and a real pointer round-trip on the command
+        drawer must succeed (a covered shell would swallow the click). The
+        page then resizes to the 1280x720 minimum, so both supported desktop
+        viewports are bounded with a single login. The traceability
+        annotation for
         webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa
         is added at this change's archive, when the requirement ID enters
         the index with the synced delta specs.
         """
         page, _responses = self.open_vue_page()
         page.wait_for_selector(VUE_ROOT, timeout=30000)
+
+        # The ready mount renders no blocking pre-connection layer.
+        self.assertEqual(
+            page.locator('[data-testid="connect-overlay"]').count(),
+            0,
+            "the ready mount must not render the pre-connection splash",
+        )
+        self.assertEqual(
+            page.get_attribute("#elosern-offline-overlay", "data-visible"),
+            "false",
+            "the offline alert must stay hidden while the shell is ready",
+        )
 
         for viewport in ((1440, 900), (1280, 720)):
             page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
@@ -160,10 +175,35 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     f"{testid} is not fully inside the {viewport[0]}x{viewport[1]}"
                     " viewport",
                 )
+
+        # Usability with a real pointer at the default viewport: the entry
+        # button opens the drawer, the field accepts text, Enter sends (the
+        # field clears), and Escape releases back to the narrative pane.
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.locator('[data-testid="command-drawer-entry"]').click()
+        page.wait_for_selector(
+            '[data-testid="command-drawer"][data-open="true"]', timeout=10000
+        )
+        field = page.locator("#inputfield")
+        field.wait_for(state="visible", timeout=10000)
+        field.fill("look")
+        field.press("Enter")
+        page.wait_for_function(
+            "() => document.getElementById('inputfield') &&"
+            " document.getElementById('inputfield').value === ''",
+            timeout=10000,
+        )
+        field.press("Escape")
+        page.wait_for_selector(
+            '[data-testid="command-drawer"][data-open="false"]', timeout=10000
+        )
         self.assertEqual(
-            page.get_attribute("#elosern-offline-overlay", "data-visible"),
-            "false",
-            "the offline alert must stay hidden while the overlay is connecting",
+            page.evaluate(
+                "document.activeElement && "
+                "document.activeElement.getAttribute('data-testid')"
+            ),
+            "narrative-feed",
+            "Escape must return focus to the narrative pane, not body",
         )
         self.assertIsNone(
             page.evaluate("window.jQuery ?? null"),

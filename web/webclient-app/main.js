@@ -24,7 +24,13 @@ function resolveMountPoint() {
   return point;
 }
 
-const app = createApp(AppShell);
+// B1 (offline, mock-driven, design D3): the mounted shell starts in the
+// usable "ready" slice so every required core surface is visible and usable
+// at the supported viewports; the pre-connection splash states
+// (connecting/waiting/offline) are showcase states owned by the
+// ConnectOverlay stories and component tests until the C1 store drives the
+// live status slice.
+const app = createApp(AppShell, { connectionStatus: "ready" });
 app.mount(resolveMountPoint());
 
 window.ElosernVue = {
