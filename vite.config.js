@@ -40,11 +40,24 @@ function elosernCjsInterop() {
 // stable name (design D2/D3), so move it to the stable, dist-root index.css.
 // Asset URLs inside the stylesheet are absolute (base), so no rewriting is
 // needed.
+//
+// The contract holds for the production app build only: build-storybook
+// (which auto-loads this config) splits SFC styles into per-component preview
+// CSS chunks and carries its own preview stylesheet, so it passes through
+// untouched.
 function stableEntryCss() {
   return {
     name: "elosern-stable-entry-css",
     enforce: "post",
     generateBundle(_options, bundle) {
+      // Only the production app build carries our stable `index.js` entry
+      // (entryFileNames: "index.js"); other builds driven through this
+      // config (build-storybook auto-loads it) bundle their own entries and
+      // split SFC styles into per-component preview CSS chunks, so they
+      // pass through untouched.
+      if (!bundle["index.js"]) {
+        return;
+      }
       const cssAssets = Object.values(bundle).filter(
         (item) => item.type === "asset" && item.fileName.endsWith(".css"),
       );

@@ -1,33 +1,35 @@
 import { createApp } from "vue";
-import App from "./App.vue";
+import AppShell from "./components/AppShell.vue";
 import * as elosernLogic from "./logic.js";
 import "./styles/tokens.css";
 import "./styles/fonts.css";
 import "./styles/app-shell.css";
 
-// A2 (webclient-vue-01-foundation) build stub: proves the bundle, its styles,
-// and its self-hosted fonts load from the origin offline. The real AppShell
-// lands in B1 (webclient-vue-02-showcase-core).
+// B1 (webclient-vue-02-showcase-core): the core narrative family is the live
+// app root. The mount target is a dedicated #elosern-app container created
+// inside #main-sub so the stock #messagewindow fallback survives the Vue
+// mount (Vue clears its mount container's children) and is retired by the
+// shell instead — hidden, never removed, so C3 can re-activate the degraded
+// text path. The C2 bridge replaces this transient window.ElosernVue surface
+// with the window.Elosern.* public façades over the same imported modules.
 
-const mountPoint = document.getElementById("main-sub") ?? createFallbackMount();
+function resolveMountPoint() {
+  const host = document.getElementById("main-sub") ?? document.body;
+  let point = document.getElementById("elosern-app");
+  if (!point || !host.contains(point)) {
+    point = document.createElement("div");
+    point.id = "elosern-app";
+    host.appendChild(point);
+  }
+  return point;
+}
 
-const app = createApp(App);
-app.mount(mountPoint);
+const app = createApp(AppShell);
+app.mount(resolveMountPoint());
 
-// Review-window marker for the offline-load browser check; C2 replaces this
-// with the window.Elosern.* public-contract bridge. The imported logic keeps
-// the preserved UMD reducer/router/markup/map modules inside the production
-// bundle (design D1).
 window.ElosernVue = {
-  stage: "foundation-stub",
+  stage: "showcase-core",
   app,
   logic: elosernLogic,
   protocolVersion: elosernLogic.Protocol.PROTOCOL_VERSION,
 };
-
-function createFallbackMount() {
-  const element = document.createElement("div");
-  element.id = "elosern-app";
-  document.body.appendChild(element);
-  return element;
-}

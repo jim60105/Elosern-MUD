@@ -12,7 +12,8 @@ manifest, and the offline design system are all exercised end-to-end.
 
 - **New capability `webclient-component-showcase`** — every required UI component is a Vue SFC with a
   documented Storybook story (props, emitted events/actions, primary states); the required set is the
-  D7 division of the application surfaces, enforced by a code manifest plus a deterministic
+  application-surface division fixed by the roadmap's "Delivers" column (roadmap §5) and
+  `2026-08-02-webclient-ui-design.md` §7, enforced by a code manifest plus a deterministic
   component-coverage check; the showcase is completed **before** live wiring and is a **mandatory CI
   gate**; stories use deterministic offline data only (no live server, LLM, or imagegen). The surface set
   is backed only by the current OOB allowlist or the text stream; a surface with no backing read model

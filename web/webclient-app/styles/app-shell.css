@@ -1,6 +1,8 @@
 /*
- * Minimal page chrome for the A2 foundation stub. B1 (AppShell) replaces the
- * full-viewport mount styling; keep this file scoped to what the stub needs.
+ * Page chrome for the offline Vue shell. B1 (webclient-vue-02-showcase-core)
+ * replaced the A2 stub styling (the A2 handoff note assigned this to B1):
+ * the full-viewport mount skeleton only — the shell's layout grid lives with
+ * the AppShell component, and design tokens come from tokens.css.
  */
 
 html,
@@ -20,4 +22,8 @@ body {
 
 #main-sub {
   height: 100vh;
+}
+
+#elosern-app {
+  height: 100%;
 }

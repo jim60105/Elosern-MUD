@@ -1,11 +1,12 @@
-"""Vue foundation acceptance (A2, webclient-vue-01-foundation).
+"""Vue foundation acceptance (A2, webclient-vue-01-foundation) + B1 core family.
 
 Exercises the mutually-exclusive Vue branch of the WebClient through the
 review-window ``?__vue=1`` fixture (the production default stays legacy):
 the Vite bundle, its styles, and its self-hosted fonts load from the project
-origin while every non-local request is blocked, and the dependency-free
-vanilla text console round-trips commands through ``evennia.js`` without
-jQuery (the D10 transport-bootstrap spike).
+origin while every non-local request is blocked, the dependency-free vanilla
+text console round-trips commands through ``evennia.js`` without jQuery (the
+D10 transport-bootstrap spike), and the B1 core narrative family renders
+bounded at both supported desktop viewports (webclient-vue-02-showcase-core).
 """
 
 from __future__ import annotations
@@ -28,6 +29,18 @@ CONSOLE = '[data-testid="text-console"]'
 CONSOLE_LOG = '[data-testid="text-console-log"]'
 CONSOLE_INPUT = '[data-testid="text-console-input"]'
 VUE_ROOT = '[data-testid="elosern-vue-root"]'
+
+# The B1 core family's top-level surfaces; each must be visible at both
+# supported desktop viewports (the pre-store shell renders all of them with
+# its static slices — the narrative feed is present but empty until the C1
+# store feeds it).
+CORE_SURFACE_TESTIDS = (
+    "topbar",
+    "narrative-feed",
+    "command-drawer",
+    "command-drawer-entry",
+    "connect-overlay",
+)
 
 
 class VueFoundationBrowserTest(BrowserAcceptanceTest):
@@ -58,7 +71,14 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             page.on("response", lambda response: responses.append(response))
         self._login(page)
         page.goto(f"{self.webclient_url}{VUE_QUERY}")
-        page.wait_for_selector(CONSOLE, timeout=30000)
+        # The B1 shell retires the replaced text fallback on mount (hidden,
+        # never removed), so readiness is asserted on transport state, not
+        # visibility.
+        page.wait_for_function(
+            f"() => {{ const c = document.querySelector('{CONSOLE}');"
+            " return c && c.getAttribute('data-status') === 'ready'; }",
+            timeout=30000,
+        )
         return page, responses
 
     @covers_requirement(
@@ -90,8 +110,60 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             page.get_attribute(VUE_ROOT, "data-elosern-stage"),
-            "foundation-stub",
-            "the Vue root build stub must be the mounted stage",
+            "showcase-core",
+            "the B1 core-family AppShell must be the mounted stage",
+        )
+        self.assertEqual(
+            page.get_attribute(VUE_ROOT, "data-elosern-mode"),
+            "explore",
+            "the pre-store shell must mount in the default world mode",
+        )
+
+    def test_core_surfaces_render_bounded_at_supported_viewports(self):
+        """Each required B1 core surface is visible and no layout overflows.
+
+        open_vue_page opens at the default 1440x900 viewport; the page is
+        then resized to the 1280x720 minimum and asserted again, so both
+        supported desktop viewports are bounded with a single login. The
+        traceability annotation for
+        webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa
+        is added at this change's archive, when the requirement ID enters
+        the index with the synced delta specs.
+        """
+        page, _responses = self.open_vue_page()
+        page.wait_for_selector(VUE_ROOT, timeout=30000)
+
+        for viewport in ((1440, 900), (1280, 720)):
+            page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
+            page.wait_for_timeout(300)
+            for testid in CORE_SURFACE_TESTIDS:
+                element = page.locator(f'[data-testid="{testid}"]')
+                self.assertEqual(
+                    element.count(),
+                    1,
+                    f"{testid} is not uniquely present at {viewport[0]}x{viewport[1]}",
+                )
+                self.assertTrue(
+                    element.first.is_visible(),
+                    f"{testid} is not visible at {viewport[0]}x{viewport[1]}",
+                )
+                # The whole required surface stays inside the viewport:
+                # nothing is pushed below the fold or clipped off-screen.
+                bounded = element.first.evaluate(
+                    "(el) => { const r = el.getBoundingClientRect();"
+                    " return r.top >= 0 && r.left >= 0"
+                    " && r.bottom <= window.innerHeight"
+                    " && r.right <= window.innerWidth && r.width > 0; }"
+                )
+                self.assertTrue(
+                    bounded,
+                    f"{testid} is not fully inside the {viewport[0]}x{viewport[1]}"
+                    " viewport",
+                )
+        self.assertEqual(
+            page.get_attribute("#elosern-offline-overlay", "data-visible"),
+            "false",
+            "the offline alert must stay hidden while the overlay is connecting",
         )
         self.assertIsNone(
             page.evaluate("window.jQuery ?? null"),
@@ -102,16 +174,37 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         "webclient-browser-verification::browser-tests-are-localhost-only-and-deterministic"
     )
     def test_text_console_round_trips_commands_without_jquery(self):
-        """D10 spike: evennia.js round-trips text without full jQuery."""
+        """D10 spike: evennia.js round-trips text without full jQuery.
+
+        The B1 shell retires the replaced fallback on mount, so the console
+        is hidden; the round-trip is driven through the hidden element and
+        the retirement itself is asserted. Reactivation on degradation lands
+        with the C3 store wiring.
+        """
         page, _responses = self.open_vue_page()
         page.wait_for_function(
             f"() => {{ const c = document.querySelector('{CONSOLE}');"
             " return c && c.getAttribute('data-status') === 'ready'; }",
             timeout=30000,
         )
+        self.assertFalse(
+            page.locator(CONSOLE).is_visible(),
+            "the B1 shell must retire the replaced text fallback on mount",
+        )
         install_outbound_recorder(page)
-        page.fill(CONSOLE_INPUT, "look")
-        page.press(CONSOLE_INPUT, "Enter")
+        # A retired (display:none) element is not focusable; reveal the
+        # console and its retired #messagewindow host for the duration of the
+        # round-trip so real key events reach the console's listeners.
+        page.evaluate(
+            "() => { for (const sel of ['#messagewindow',"
+            " '[data-testid=\"text-console\"]']) {"
+            " for (const el of document.querySelectorAll(sel)) {"
+            " el.style.display = ''; } } }"
+        )
+        field = page.locator(CONSOLE_INPUT)
+        field.wait_for(state="visible", timeout=10000)
+        field.fill("look")
+        field.press("Enter")
 
         page.wait_for_function(
             "() => (window.__elosernSent || []).some("
