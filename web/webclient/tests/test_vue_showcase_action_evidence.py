@@ -36,6 +36,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from ._showcase_build import showcase_build_lock
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
@@ -101,15 +103,18 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        # The offline showcase renders the static Storybook build; build it
-        # once per process when the checkout has none (CI workspaces only
-        # build the app dist and the Storybook build).
-        if not (STORYBOOK_OUT / "iframe.html").is_file():
-            result = run_npm(["run", "build-storybook"], timeout=900)
-            assert (
-                result.returncode == 0
-            ), "Storybook build failed under action evidence:\n" \
-                + result.stdout + result.stderr
+        # The action family stories are registered in the static Storybook
+        # build; build it once per process when the checkout has none (CI
+        # workspaces only build the app dist). The lock serializes against
+        # the B1 evidence class, which rebuilds the same .storybook-out in
+        # another parallel worker as its gate evidence.
+        with showcase_build_lock():
+            if not (STORYBOOK_OUT / "iframe.html").is_file():
+                result = run_npm(["run", "build-storybook"], timeout=900)
+                assert (
+                    result.returncode == 0
+                ), "Storybook build failed under action evidence:\n" \
+                    + result.stdout + result.stderr
 
     def test_vitest_action_family_suite_passes(self):
         """Every action-dock SFC renders its contract states under Vitest.
@@ -153,12 +158,14 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
 
     def test_action_family_stories_are_registered_in_showcase(self):
         """Every family component has a documented story in the built showcase."""
-        self.assertTrue(
-            (STORYBOOK_OUT / "index.json").is_file(), "missing storybook index.json"
-        )
-        index = json.loads(
-            (STORYBOOK_OUT / "index.json").read_text(encoding="utf-8")
-        )
+        with showcase_build_lock():
+            self.assertTrue(
+                (STORYBOOK_OUT / "index.json").is_file(),
+                "missing storybook index.json",
+            )
+            index = json.loads(
+                (STORYBOOK_OUT / "index.json").read_text(encoding="utf-8")
+            )
         entries = index.get("entries", {})
         missing = ACTION_FAMILY_STORY_IDS - set(entries)
         self.assertEqual(

@@ -54,6 +54,8 @@ from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
+from ._showcase_build import showcase_build_lock
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
 DIST_ROOT = REPO_ROOT / "web/static/webclient/app/dist"
@@ -225,17 +227,30 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only",
     )
     def test_storybook_showcase_build_succeeds(self):
-        """The showcase gate builds the static Storybook from local data."""
-        result = run_npm(["run", "build-storybook"], timeout=900)
-        self.assertEqual(
-            result.returncode,
-            0,
-            "Storybook showcase build failed:\n" + result.stdout + result.stderr,
-        )
-        out_dir = REPO_ROOT / ".storybook-out"
-        self.assertTrue((out_dir / "iframe.html").is_file(), "missing iframe.html")
-        index = (out_dir / "index.html").read_text(encoding="utf-8")
-        self.assertNotIn("https://", index, "the showcase index references a remote URL")
+        """The showcase gate builds the static Storybook from local data.
+
+        The build and the output read run under the shared showcase build
+        lock: the parallel Evennia runner may execute the B2 action-dock
+        evidence class in another worker, and it builds the same
+        ``.storybook-out`` directory on demand.
+        """
+        with showcase_build_lock():
+            result = run_npm(["run", "build-storybook"], timeout=900)
+            self.assertEqual(
+                result.returncode,
+                0,
+                "Storybook showcase build failed:\n"
+                + result.stdout
+                + result.stderr,
+            )
+            out_dir = REPO_ROOT / ".storybook-out"
+            self.assertTrue(
+                (out_dir / "iframe.html").is_file(), "missing iframe.html"
+            )
+            index = (out_dir / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn(
+                "https://", index, "the showcase index references a remote URL"
+            )
 
     @covers_requirement(
         "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story"
