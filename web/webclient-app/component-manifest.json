@@ -5,6 +5,12 @@
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
-    "Core/CommandDrawer"
+    "Core/CommandDrawer",
+    "Action/ActionDock",
+    "Action/DockMenu",
+    "Action/DockMenuItem",
+    "Action/OptionCard",
+    "Action/ChoiceCardRow",
+    "Action/ChoicePointBlock"
   ]
 }
