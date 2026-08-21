@@ -12,7 +12,8 @@ manifest, and the offline design system are all exercised end-to-end.
 
 - **New capability `webclient-component-showcase`** — every required UI component is a Vue SFC with a
   documented Storybook story (props, emitted events/actions, primary states); the required set is the
-  D7 division of the application surfaces, enforced by a code manifest plus a deterministic
+  application-surface division fixed by the roadmap's "Delivers" column (roadmap §5) and
+  `2026-08-02-webclient-ui-design.md` §7, enforced by a code manifest plus a deterministic
   component-coverage check; the showcase is completed **before** live wiring and is a **mandatory CI
   gate**; stories use deterministic offline data only (no live server, LLM, or imagegen). The surface set
   is backed only by the current OOB allowlist or the text stream; a surface with no backing read model
@@ -42,8 +43,12 @@ manifest, and the offline design system are all exercised end-to-end.
 
 - **New:** `web/webclient-app/components/` + `stories/` + Vitest tests for the core family; the
   component-coverage `manifest` (seeded) and its coverage script; the offline design-system wiring
-  (consumes A2's tokens); the two new capability specs.
-- **Depends on (A2):** `package.json`/lock, `vite.config` (stable entry names, CJS interop), `.storybook/`,
-  `web/webclient-app/lib/*` wrappers, the design tokens + fonts, and the npm/Storybook/`dist` CI gates.
+  (consumes A2's tokens); the two new capability specs; the Python evidence tests wrapping the
+  build/Storybook/`dist`/coverage executions (`web/webclient/tests/test_vue_showcase_evidence.py`), and
+  the B1 browser acceptance in the Vue-branch suite (`web/tests/browser/test_vue_foundation.py`: B1
+  stage, retired-fallback round-trip, bounded render at both supported viewports, shard-registered).
+- **Depends on (A2):** `package.json`/lock, `vite.config` (stable entry names, CJS interop — B1 scopes
+  A2's stable-entry-CSS hook to the app build; see design D5), `.storybook/`, `web/webclient-app/lib/*`
+  wrappers, the design tokens + fonts, and the npm/Storybook/`dist` CI gates.
 - **Preserved:** the preserved `js/elosern/*` logic (NarrativeFeed consumes `narrative_markup` via the A2
   wrapper); no server, OOB, transport, or `base.html` change — the app renders offline in Storybook only.

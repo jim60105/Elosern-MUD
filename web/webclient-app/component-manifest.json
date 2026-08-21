@@ -1,3 +1,10 @@
 {
-  "required": []
+  "required": [
+    "Core/AppShell",
+    "Core/TopBar",
+    "Core/ConnectOverlay",
+    "Core/NarrativeFeed",
+    "Core/UnreadIndicator",
+    "Core/CommandDrawer"
+  ]
 }
