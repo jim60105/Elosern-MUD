@@ -69,6 +69,11 @@ WEBSOCKET_CLIENT_ENABLED = True
 WEBSOCKET_CLIENT_PORT = _env_int("ELOSERN_BROWSER_WS_PORT", 4102)
 WEBSOCKET_CLIENT_INTERFACE = "127.0.0.1"
 
+# Portal WebSocket protocol (production parity): preserves the shared-login
+# uid across abnormal closes so the reconnect tests exercise the real
+# reconnect-authentication path, not the client's one-shot page reload.
+WEBSOCKET_PROTOCOL_CLASS = "server.conf.websocket_protocol.WebSocketClient"
+
 # Vue/legacy XOR load flag (webclient-vue-01-foundation). The production
 # default is False (legacy); C3 flips this here so the wiring wave tests can
 # force the Vue branch from test config only.

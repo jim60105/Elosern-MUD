@@ -305,12 +305,14 @@ if (
     var browserState = null;
 
     // When the awaiting-snapshot budget is spent the transport never reached
-    // the active phase, usually because the portal lost the browser's
-    // authenticated uid (the socket closed abnormally before any HTTP request
-    // preserved it), so no further `ui_sync` can ever succeed. One guarded
-    // page reload fires the HTTP request the middleware needs to restore the
-    // uid. The reload is strictly one-shot per tab session: the marker lasts
-    // until a fresh tab, so a persistent failure never enters a reload loop.
+    // the active phase, usually because the browser's authenticated uid is
+    // genuinely gone (the Django session expired or the portal restarted), so
+    // no further `ui_sync` can ever succeed. One guarded page reload fires the
+    // HTTP request the middleware needs to restore the uid. The reload is
+    // strictly one-shot per tab session: the marker lasts until a fresh tab,
+    // so a persistent failure never enters a reload loop. A plain abnormal
+    // close does not reach this point: the portal protocol preserves the
+    // shared-login uid for reconnects (server/conf/websocket_protocol.py).
     var RECOVERY_MARKER = "elosern.sync_recovery_reload";
     function attemptOneShotRecoveryReload() {
       if (

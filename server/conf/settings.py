@@ -53,6 +53,11 @@ EXTRA_LAUNCHER_COMMANDS["xyzgrid"] = "evennia.contrib.grid.xyzgrid.launchcmd.xyz
 # contrib's module is appended without duplicating the project module.
 PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototypes"]
 
+# Portal WebSocket protocol: preserves the shared-login uid across abnormal
+# closes so the same browser tab can re-authenticate on reconnect without a
+# page reload (server/conf/websocket_protocol.py).
+WEBSOCKET_PROTOCOL_CLASS = "server.conf.websocket_protocol.WebSocketClient"
+
 # Generative-layer LLM endpoint profiles (llm-client). Local-first by default:
 # base_url derives from OLLAMA_BASE_URL (the compose runtime) or falls back to a
 # bare-metal localhost endpoint.
