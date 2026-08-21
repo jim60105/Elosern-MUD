@@ -138,12 +138,25 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
         self.assertIn("passed", result.stdout)
 
     def test_component_coverage_gate_passes_with_action_family(self):
-        """The manifest lists the family and the showcase stays in lockstep."""
+        """The manifest is the exact B2 surface and the showcase stays in lockstep.
+
+        The set equality is the B2 baseline for the "extend, don't
+        restructure" contract (design D2): the B1 core family is preserved
+        and exactly the six family keys are added. B5, which freezes the
+        manifest, updates this baseline deliberately.
+        """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
         )["required"]
-        for key in ACTION_FAMILY_KEYS:
-            self.assertIn(key, required)
+        self.assertEqual(
+            set(required),
+            {
+                "Core/AppShell", "Core/TopBar", "Core/ConnectOverlay",
+                "Core/NarrativeFeed", "Core/UnreadIndicator",
+                "Core/CommandDrawer",
+                *ACTION_FAMILY_KEYS,
+            },
+        )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(
             result.returncode,

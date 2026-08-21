@@ -10,6 +10,8 @@
 // C2/C4; the listbox keeps the preserved single-tab-stop row model
 // (`role="listbox"` + `aria-activedescendant`, one `tabindex="-1"` option
 // per cell) so the bridge can keep the keyboard/pointer parity contract.
+// `focus-change` fires on every pointer activation (pointer parity), so the
+// parent may deduplicate an unchanged focused key.
 import { computed } from "vue";
 import DockMenuItem from "./DockMenuItem.vue";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";

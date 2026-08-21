@@ -53,6 +53,34 @@ describe("dockItems (B2 action-dock family)", () => {
     ]);
   });
 
+  it("never emits a duplicate key when a natural key collides with a taken suffix", () => {
+    const foo = {
+      action_id: "foo",
+      label: "甲",
+      params: {},
+      freeform: false,
+      navigation: false,
+      enabled: true,
+      disabled_reason: null,
+    };
+    const foo2 = { ...foo, label: "乙" };
+    const literalFoo2 = { action_id: "foo-2", label: "丙", params: {}, freeform: false, navigation: false, enabled: true, disabled_reason: null };
+    // The natural key action-foo-2 belongs to the literal entry, but the
+    // duplicate takes it first; the literal entry then gets its own
+    // disambiguation suffix instead — the frame stays unique either way.
+    expect(dockItemKeys([foo, foo2, literalFoo2])).toEqual([
+      "action-foo",
+      "action-foo-2",
+      "action-foo-2-2",
+    ]);
+    const t = (identity) => ({ identity, label: identity, enabled: true, disabled_reason: null });
+    expect(dockItemKeys([t("e1"), t("e1"), t("e1-2")])).toEqual([
+      "target-e1",
+      "target-e1-2",
+      "target-e1-2-2",
+    ]);
+  });
+
   it("maps an action entry to the exact OOB action intent without aliasing", () => {
     const intent = actionIntentForItem(ACTION);
     expect(intent).toEqual({

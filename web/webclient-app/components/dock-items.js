@@ -34,19 +34,25 @@ function classify(item) {
 }
 
 // Derive one preserved item key per item, aligned with the input order.
-// Duplicates get a positional suffix (`-2`, `-3`, ...) so a bounded frame can
-// never produce two cells with the same dispatch handle.
+// Every key in the frame is unique: when the natural key is already taken, a
+// positional suffix (`-2`, `-3`, ...) is incremented until it is free, so a
+// bounded frame can never produce two cells with the same dispatch handle —
+// including the corner where an identity or action_id literally ends in a
+// numeric suffix that collides with a taken disambiguated key.
 export function dockItemKeys(items) {
-  const seen = new Map();
+  const used = new Set();
   return items.map((item) => {
     const kind = classify(item);
     const base =
       kind === "target"
         ? TARGET_PREFIX + item.identity
         : ACTION_PREFIX + (kind === "navigation" ? item.surface : item.action_id);
-    const count = (seen.get(base) ?? 0) + 1;
-    seen.set(base, count);
-    return count === 1 ? base : `${base}-${count}`;
+    let key = base;
+    for (let n = 2; used.has(key); n += 1) {
+      key = `${base}-${n}`;
+    }
+    used.add(key);
+    return key;
   });
 }
 

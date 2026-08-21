@@ -104,6 +104,45 @@ describe("ChoicePointBlock (B2 action-dock family)", () => {
     });
   });
 
+  it("survives Vue-owned stream repositioning: newer text keeps it at the stream end", async () => {
+    // The C3 narrative stream owns the block's position: the block is the
+    // stream's last child, and committed narrative text appends before it.
+    // A re-render with newer text must keep the SAME root element and the
+    // block must stay the stream's last child.
+    const stream = document.createElement("div");
+    document.body.appendChild(stream);
+    const host = document.createElement("div");
+    stream.appendChild(host);
+    wrapper = mount(
+      {
+        components: { ChoicePointBlock },
+        data: () => ({
+          lines: ["夜色沉靜，霧燈在街角明滅。"],
+          suggestions: { status: "generating" },
+        }),
+        template:
+          '<div v-for="(line, i) in lines" :key="i" class="line">{{ line }}' +
+          "</div>" +
+          '<ChoicePointBlock :suggestions="suggestions" />',
+      },
+      { attachTo: host },
+    );
+    const initialRoot = wrapper.find('[data-testid="choicepoint-block"]').element;
+    // Newer narrative text commits, and a ready update lands with it.
+    wrapper.vm.lines.push("遠處傳來更鼓。");
+    wrapper.vm.suggestions = READY;
+    await nextTick();
+    const movedRoot = wrapper.find('[data-testid="choicepoint-block"]').element;
+    expect(movedRoot).toBe(initialRoot);
+    const lines = host.querySelectorAll(".line");
+    expect(lines).toHaveLength(2);
+    expect(lines[1].textContent).toBe("遠處傳來更鼓。");
+    // The block is the stream's last child, after the newest text.
+    expect(initialRoot.previousElementSibling).toBe(lines[1]);
+    expect(initialRoot.classList.contains("choicepoint-ready")).toBe(true);
+    expect(wrapper.findAll('[data-testid="option-card"]')).toHaveLength(2);
+  });
+
   it("remains movable: a re-parented root keeps rendering and updating", async () => {
     // The narrative stream owns the block's position (C3): the block is a
     // single stateless root that newer text moves to the stream end.

@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
+import { h, nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
@@ -171,5 +171,31 @@ describe("ActionDock (B2 action-dock family)", () => {
   it("omits the suggestions section entirely when the slice is absent", () => {
     const w = mountDock();
     expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
+  });
+
+  it("reacts to committed slice changes without remounting the dock", async () => {
+    const w = mountDock({ suggestions: { status: "generating" } });
+    const root = w.get('[data-testid="action-dock"]').element;
+    expect(w.get('[data-testid="suggestions-generating"]').exists()).toBe(true);
+    w.setProps({ suggestions: READY });
+    await nextTick();
+    expect(w.find('[data-testid="action-dock"]').element).toBe(root);
+    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(3);
+    w.setProps({ suggestions: { status: "unavailable" } });
+    await nextTick();
+    expect(w.find('[data-testid="action-dock"]').element).toBe(root);
+    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
+  });
+
+  it("refreshes the guidance note when the surface prefix changes", async () => {
+    const w = mountDock({ guidancePrefix: "附近動作" });
+    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
+      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+    );
+    w.setProps({ guidancePrefix: "戰鬥動作" });
+    await nextTick();
+    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
+      "戰鬥動作　方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+    );
   });
 });

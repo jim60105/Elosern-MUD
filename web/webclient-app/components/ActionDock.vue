@@ -13,6 +13,7 @@
 // and `unavailable` renders nothing at all. Card activation and dismiss
 // emit the exact OOB action intent (`action` event) — one card renderer
 // shared with the narrative choice-point.
+import { computed } from "vue";
 import ChoiceCardRow from "./ChoiceCardRow.vue";
 
 const props = defineProps({
@@ -31,16 +32,26 @@ const emit = defineEmits(["action"]);
 const LEGEND = "方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令";
 const SUGGESTION_STATUSES = ["generating", "ready", "degraded"];
 
-const guidanceNote = props.guidancePrefix
-  ? `${props.guidancePrefix}　${LEGEND}`
-  : LEGEND;
+// Derived from the committed slices — reactive, so the store-backed shell
+// at C3 can drive generating→ready transitions, card refreshes, and surface
+// guidance changes without remounting the dock.
+const guidanceNote = computed(
+  () =>
+    props.guidancePrefix
+      ? `${props.guidancePrefix}　${LEGEND}`
+      : LEGEND,
+);
 
-const status = props.suggestions ? props.suggestions.status : null;
-const showsSection = SUGGESTION_STATUSES.includes(status);
-const cards =
-  props.suggestions && Array.isArray(props.suggestions.cards)
-    ? props.suggestions.cards
-    : [];
+const status = computed(
+  () => (props.suggestions ? props.suggestions.status : null),
+);
+const showsSection = computed(() => SUGGESTION_STATUSES.includes(status.value));
+const cards = computed(
+  () =>
+    props.suggestions && Array.isArray(props.suggestions.cards)
+      ? props.suggestions.cards
+      : [],
+);
 </script>
 
 <template>
