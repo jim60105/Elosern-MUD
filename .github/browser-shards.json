@@ -204,7 +204,8 @@
       "name": "vue-foundation",
       "files_a": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_legacy_default_stays_when_flag_is_absent"
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_legacy_default_stays_when_flag_is_absent",
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_storybook_stories_render_offline"
       ],
       "files_b": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_text_console_round_trips_commands_without_jquery",
