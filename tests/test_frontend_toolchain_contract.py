@@ -182,6 +182,16 @@ class VueComponentGateTests(unittest.TestCase):
             [step["name"] for step in jobs["top-level"]["steps"]],
         )
 
+        # The evennia evidence bridges (web.webclient tests under the Evennia
+        # runner) execute the Vue showcase gates as requirement evidence, so
+        # every evennia shard job needs the locked Node toolchain too.
+        evennia_steps = {step["name"]: step for step in jobs["evennia"]["steps"]}
+        self.assertIn(
+            "24",
+            evennia_steps["Install Node.js"]["with"]["node-version"],
+        )
+        self.assertIn("npm ci", evennia_steps["Install locked npm toolchain"]["run"])
+
 
 class FrontendLayoutContractTests(unittest.TestCase):
     @covers_requirement(

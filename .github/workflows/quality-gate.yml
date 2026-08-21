@@ -123,6 +123,19 @@ jobs:
       - name: Sync locked environment
         run: uv sync --locked
 
+      # The web.webclient evidence bridges execute the Vue showcase gates
+      # (Vite build, Vitest, Storybook, component coverage) as requirement
+      # evidence, so the shard needs the same locked Node toolchain the
+      # frontend job installs (webclient-vue-02-showcase-core, B2).
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: true
+
+      - name: Install locked npm toolchain
+        run: npm ci --no-audit --no-fund
+
       - name: Prepare Evennia runtime directories
         run: mkdir -p server/db server/logs
 
