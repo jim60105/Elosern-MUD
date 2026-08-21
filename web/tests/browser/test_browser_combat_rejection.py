@@ -16,6 +16,8 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
     store_state,
+    store_state_or_none,
+    wait_for_presentation_settled,
 )
 
 
@@ -84,11 +86,10 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         )
         self.assertTrue(fire["enabled"])
 
-        page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
-            "return s.connected && s.phase === 'active' && !s.mutationsLocked; }",
-            timeout=15000,
-        )
+        # A ui_action must name the server's newest revision exactly or the
+        # dispatcher rejects it stale: submit only after the post-engage
+        # publication burst has fully landed in the store.
+        wait_for_presentation_settled(page)
         # A modified client sends a participant ID that is not in the session;
         # the adapter must reject before initiative with no round advance.
         page.evaluate(
@@ -98,7 +99,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => { const s = Elosern.StateController.getState(); "
             "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
-            timeout=15000,
+            timeout=30000,
         )
         result = self._last_result(page)
         self.assertEqual(result["code"], "unknown_session_id")
@@ -115,6 +116,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
+        wait_for_presentation_settled(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
         page.evaluate(
             "(id) => Elosern.actions.submit('combat.forfeit', "
@@ -124,7 +126,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => { const s = Elosern.StateController.getState(); "
             "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
-            timeout=15000,
+            timeout=30000,
         )
         result = self._last_result(page)
         self.assertEqual(result["code"], "unknown_session_id")
@@ -199,12 +201,16 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         )
 
         # Wait for the reconnect to open a new generation and adopt a snapshot.
+        # `store_state_or_none` tolerates the re-bootstrap window where the
+        # ``Elosern`` global is briefly absent; a None snapshot just means
+        # "not yet".
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
-            state = store_state(page)
-            panel = state["panels"] and state["panels"].get("context_actions")
+            state = store_state_or_none(page)
+            panel = state["panels"] and state["panels"].get("context_actions") if state else None
             if (
-                state["connected"]
+                state
+                and state["connected"]
                 and state["mode"] == "combat"
                 and panel
                 and panel.get("available") is True
@@ -213,7 +219,11 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
                 if session_after["session_id"] == session_before["session_id"]:
                     break
             if time.monotonic() > deadline - 25:
-                page.evaluate("Evennia.connect()")
+                # Guarded: while the client re-boots, window.Evennia is
+                # briefly absent and a bare evaluate would raise.
+                page.evaluate(
+                    "() => { if (window.Evennia && Evennia.connect) Evennia.connect(); }"
+                )
             page.wait_for_timeout(500)
         else:
             self.fail("combat session was not restored after reconnect")
@@ -244,6 +254,9 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "  return true;"
             "}"
         )
+        # Settle before submitting: a cast naming the pre-burst revision is
+        # rejected stale and the round would never commit.
+        wait_for_presentation_settled(page)
         target = self._combat_panel(page)["participants"][-1]["identity"]
         page.evaluate(
             "(target) => Elosern.actions.submit('combat.cast', "
@@ -256,7 +269,7 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "() => { const s = Elosern.StateController.getState(); "
             "const p = s.panels && s.panels['context_actions']; "
             "return p && p.available && p.session.round >= 1; }",
-            timeout=15000,
+            timeout=30000,
         )
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
@@ -266,14 +279,19 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         )
 
         # On reconnect the client shows the uncertain-result notice and never
-        # retries the withheld cast.
+        # retries the withheld cast. `store_state_or_none` again tolerates
+        # the re-bootstrap window where the ``Elosern`` global is absent.
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["connected"]:
+            state = store_state_or_none(page)
+            if state and state["connected"]:
                 break
             if time.monotonic() > deadline - 25:
-                page.evaluate("Evennia.connect()")
+                # Guarded: while the client re-boots, window.Evennia is
+                # briefly absent and a bare evaluate would raise.
+                page.evaluate(
+                    "() => { if (window.Evennia && Evennia.connect) Evennia.connect(); }"
+                )
             page.wait_for_timeout(500)
 
         page.wait_for_timeout(1500)

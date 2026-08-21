@@ -142,6 +142,50 @@ def store_state(page: Page) -> dict:
     return page.evaluate("Elosern.StateController.getState()")
 
 
+def store_state_or_none(page: Page) -> dict | None:
+    """Store snapshot, or None while the client is re-bootstrapping.
+
+    Polls that span a transport reconnect observe a window in which the
+    ``Elosern`` global is briefly absent while the client re-boots; those
+    polls must treat that as "not yet" instead of letting the evaluate
+    raise.
+    """
+    return page.evaluate(
+        "() => window.Elosern && window.Elosern.StateController ? "
+        "Elosern.StateController.getState() : null"
+    )
+
+
+def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
+    """Wait until the store's accepted presentation revision stops advancing.
+
+    A submitted ``ui_action`` must name the server's newest revision exactly
+    (the dispatcher rejects anything else as ``stale``). Right after a command
+    such as engagement the publication burst may still be in flight, with the
+    store one revision behind the coordinator; a submit in that window is
+    rejected before the adapter runs. Two consecutive reads that agree prove
+    the burst has landed — the same quiet-gap rule the narrative settle uses.
+    Also requires the client to be connected, unlocked, and out of the
+    snapshot/detached phases, i.e. in a state where ``Elosern.actions.submit``
+    will actually dispatch.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    previous = None
+    while time.monotonic() < deadline:
+        revision = page.evaluate(
+            "() => { const c = window.Elosern && window.Elosern.StateController; "
+            "if (!c) { return null; } const s = c.getState(); "
+            "if (!s || !s.connected || s.mutationsLocked) { return null; } "
+            "if (s.phase === 'awaiting_initial_snapshot' || s.phase === 'detached') { return null; } "
+            "return s.revision; }"
+        )
+        if revision is not None and revision == previous:
+            return
+        previous = revision
+        page.wait_for_timeout(200)
+    raise AssertionError("presentation revision never settled")
+
+
 def wait_for_narrative_settled(page: Page, before: int, timeout: int = 30000) -> None:
     """Wait until the narrative exceeds ``before`` characters and stops growing.
 

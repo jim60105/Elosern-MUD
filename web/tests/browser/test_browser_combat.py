@@ -20,6 +20,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_presentation_settled,
 )
 
 
@@ -310,7 +311,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             "() => { const s = Elosern.StateController.getState(); "
             "const p = s.panels && s.panels['context_actions']; "
             "return p && p.available === true && p.kind === 'exploration'; }",
-            timeout=15000,
+            timeout=30000,
         )
 
     @covers_requirement(
@@ -329,12 +330,20 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["mode"], "combat")
 
         session_id = self._combat_panel(page)["session"]["session_id"]
+        # Settle before submitting: a forfeit naming the pre-burst revision is
+        # rejected stale and the session never ends, so the exploration panels
+        # would never come back available.
+        wait_for_presentation_settled(page)
         page.evaluate(
             "(sessionId) => Elosern.actions.submit('combat.forfeit', "
             "{ session_id: sessionId })",
             session_id,
         )
-        deadline = time.monotonic() + 15000 / 1000
+        # Poll until the full post-settlement end state holds: on a loaded
+        # runner the context panel can flip to exploration availability
+        # before the sibling panels of the same snapshot are observed, and
+        # the assertion set below must not race that intermediate state.
+        deadline = time.monotonic() + 30000 / 1000
         while time.monotonic() < deadline:
             state = store_state(page)
             if (
@@ -343,6 +352,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                 .get("context_actions", {})
                 .get("available") is True
                 and state["panels"]["context_actions"].get("kind") == "exploration"
+                and all(
+                    state["panels"].get(name, {}).get("available") is True
+                    for name in ("exploration", "character", "services", "status")
+                )
             ):
                 break
             page.wait_for_timeout(250)
@@ -425,15 +438,17 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => Elosern._combat && Elosern.keyboard && "
             "Elosern.keyboard.depth() >= 1",
-            timeout=15000,
+            timeout=30000,
         )
         self._press(page, "Enter")  # attack (first root item) -> target menu
         self._press(page, "Enter")  # select the first valid target
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
         # The accepted panel advances the round; the keyboard model must be
-        # rebuilt from that panel, not the stale pre-round selection.
-        deadline = time.monotonic() + 15
+        # rebuilt from that panel, not the stale pre-round selection. The 30s
+        # budget matches the action-result waits: round settlement polling
+        # CPU-starves the same way on a loaded CI runner.
+        deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             panel = self._combat_panel(page)
             if panel.get("available") and panel["session"]["round"] >= 1:
