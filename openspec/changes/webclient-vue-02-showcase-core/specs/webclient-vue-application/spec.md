@@ -26,9 +26,9 @@ later changes in this migration; this change establishes the offline build and r
 The Vue application SHALL render with the approved design system derived from the 設計稿: the ink-night
 palette with a single seal-red accent, the self-hosted display, serif, and sans typefaces, and the
 focus, selection, and motion tokens. Status and health information SHALL never be conveyed by color
-alone (an icon or symbol plus a numeric value are required), SHALL honor `prefers-reduced-motion`, and
-SHALL remain legible for common color-vision differences. No design asset or font SHALL be fetched from a
-remote origin at render time.
+alone (an icon or symbol plus a numeric value or an explicit text label is required), SHALL honor
+`prefers-reduced-motion`, and SHALL remain legible for common color-vision differences. No design asset
+or font SHALL be fetched from a remote origin at render time.
 
 #### Scenario: Self-hosted fonts load offline
 - **WHEN** the application loads with remote requests blocked
@@ -36,7 +36,7 @@ remote origin at render time.
 
 #### Scenario: Status is not color-only
 - **WHEN** a gauge, condition, or health state is displayed
-- **THEN** it pairs an icon or symbol with a numeric value instead of relying on color alone
+- **THEN** it pairs an icon or symbol with a numeric value or an explicit text label instead of relying on color alone
 
 #### Scenario: Reduced motion is honored
 - **WHEN** `prefers-reduced-motion` is set

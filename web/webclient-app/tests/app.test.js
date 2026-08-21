@@ -62,6 +62,18 @@ describe("AppShell root (B1 core family)", () => {
     expect(console.getAttribute("data-elosern-retired")).toBe("app-mount");
   });
 
+  it("presents no invented data for surfaces without a backing read model", () => {
+    // B1 has no B2-B4 panel read models yet: the empty side panels render
+    // nothing (no children, no text), so no surface invents data.
+    const w = mountShell();
+    for (const selector of [".app-shell__panel-left", ".app-shell__panel-right"]) {
+      const panel = w.get(selector);
+      expect(panel.element.children.length).toBe(0);
+      expect(panel.text().trim()).toBe("");
+    }
+    expect(w.get("#elosern-action-live").text().trim()).toBe("");
+  });
+
   it("toggles the drawer with `/` and focuses the field; Escape returns focus to the feed; slash stays literal in the field", async () => {
     const w = mountShell();
     pressKey(window, "/");

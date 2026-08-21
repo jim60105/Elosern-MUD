@@ -13,23 +13,29 @@ const renderIndicator = (args) => ({ render: () => h(UnreadIndicator, args) });
 export default {
   title: "Core/UnreadIndicator",
   component: UnreadIndicator,
+  // Storybook 8 vue3 decorators are `(update, context) => story`:
+  // `update()` renders the inner story, which is wrapped in a bounded scroll
+  // area with representative narrative lines behind it.
   decorators: [
-    (Story) => ({
-      render: () =>
-        h(
-          "div",
-          {
-            style:
-              "height: 320px; overflow-y: auto; border: 1px solid var(--ink-700); border-radius: 12px; padding: 12px;",
-          },
-          [
-            h(Story),
-            ...Array.from({ length: 24 }, (_, i) =>
-              h("p", { style: "font-family: var(--f-serif); color: var(--paper-300);" }, `敘事行 ${i + 1} — 夜霧在石板路上流動。`),
-            ),
-          ],
-        ),
-    }),
+    (update) => {
+      const inner = update();
+      return {
+        render: () =>
+          h(
+            "div",
+            {
+              style:
+                "height: 320px; overflow-y: auto; border: 1px solid var(--ink-700); border-radius: 12px; padding: 12px;",
+            },
+            [
+              h(inner),
+              ...Array.from({ length: 24 }, (_, i) =>
+                h("p", { style: "font-family: var(--f-serif); color: var(--paper-300);" }, `敘事行 ${i + 1} — 夜霧在石板路上流動。`),
+              ),
+            ],
+          ),
+      };
+    },
   ],
 };
 

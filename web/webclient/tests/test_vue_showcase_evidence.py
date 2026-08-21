@@ -14,21 +14,26 @@ Intended annotations at archive:
 
 - ``webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa``:
   ``test_vite_build_emits_stable_offline_entries``,
-  ``test_dependency_free_node_gate_still_passes`` (the bounded-render-at-each
-  viewport scenario is evidenced in the browser shard by
-  ``test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_bounded_at_supported_viewports``).
+  ``test_dependency_free_node_gate_still_passes`` (the desktop-only
+  bounded-render-at-each-viewport scenario is evidenced in the browser shard
+  by
+  ``test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports``).
 - ``webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline``:
   ``test_builtin_design_system_is_self_hosted_and_offline``,
   ``test_vitest_core_family_suite_passes`` (the status-is-not-color-only
   scenario is asserted there by the TopBar connection-state test).
 - ``webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story``:
-  ``test_component_coverage_gate_passes``, ``test_vitest_core_family_suite_passes``.
+  ``test_component_coverage_gate_passes``,
+  ``test_component_coverage_gate_fails_for_an_undocumented_required_story``,
+  ``test_vitest_core_family_suite_passes``.
 - ``webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate``:
   ``test_storybook_showcase_build_succeeds``,
   ``test_component_coverage_gate_fails_for_a_missing_required_story``.
 - ``webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only``:
   ``test_story_files_import_only_local_or_bundled_modules``,
-  ``test_storybook_showcase_build_succeeds``.
+  ``test_storybook_showcase_build_succeeds`` (the offline-rendering scenario
+  is evidenced in the browser shard by
+  ``test_vue_foundation.VueFoundationBrowserTest.test_storybook_stories_render_offline``).
 """
 
 from __future__ import annotations
@@ -107,6 +112,14 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             self.assertNotIn(
                 "https://", content, f"{path} references a remote https URL"
             )
+        css = (DIST_ROOT / "index.css").read_text(encoding="utf-8")
+        for token in ("@media (max-width", "@media(max-width"):
+            self.assertNotIn(
+                token,
+                css,
+                "the desktop-only application must not ship mobile-breakpoint "
+                "media queries",
+            )
         template = TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("webclient/app/dist/index.js", template)
         self.assertIn("webclient/app/dist/index.css", template)
@@ -138,10 +151,46 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         ]
         self.assertEqual(remote_urls, [], f"remote font/asset URLs: {remote_urls}")
         self.assertIn(
-            "prefers-reduced-motion",
+            "::selection",
             css,
-            "the reduced-motion tokens must survive into the built stylesheet",
+            "the design-draft selection rule must survive into the built "
+            "stylesheet",
         )
+        # The reduced-motion media query must survive with its disabling rule
+        # intact (nonessential motion forced to 1ms), not merely its keyword.
+        # The minifier emits `@media(prefers-reduced-motion:reduce)`, so anchor
+        # on the keyword and brace-match the block that follows.
+        condition = css.find("prefers-reduced-motion")
+        self.assertNotEqual(
+            condition,
+            -1,
+            "the reduced-motion media query must survive into the built "
+            "stylesheet",
+        )
+        start = css.index("{", condition)
+        depth = 0
+        end = start
+        for i in range(start, len(css)):
+            if css[i] == "{":
+                depth += 1
+            elif css[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        block = re.sub(r"\s+", "", css[start : end + 1])
+        for token in (
+            "--motion-fast:1ms",
+            "--motion-base:1ms",
+            "transition-duration:1ms!important",
+            "animation-duration:1ms!important",
+        ):
+            self.assertIn(
+                token,
+                block,
+                f"reduced motion must disable nonessential motion: {token} "
+                "is not in the media block",
+            )
 
     def test_vitest_core_family_suite_passes(self):
         """Every core-family SFC renders its contract states under Vitest."""
@@ -209,6 +258,41 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             + result.stderr,
         )
         self.assertIn("Core/UnlistedProbe", result.stderr)
+
+    def test_component_coverage_gate_fails_for_an_undocumented_required_story(self):
+        """A listed component whose story binds no props fails the gate.
+
+        The probe story file is a temporary sibling under ``stories/`` (the
+        gate walks that tree) and the probe manifest a temporary path, so
+        parallel processes never observe mutated tracked files.
+        """
+        original = json.loads(
+            (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
+        )
+        probe = dict(original)
+        probe["required"] = list(probe["required"]) + ["Core/DocProbe"]
+        with tempfile.TemporaryDirectory() as tmp:
+            probe_path = Path(tmp) / "manifest.json"
+            probe_path.write_text(json.dumps(probe), encoding="utf-8")
+            with tempfile.TemporaryDirectory(dir=str(APP_ROOT / "stories")) as probe_dir:
+                (Path(probe_dir) / "DocProbe.stories.js").write_text(
+                    "export default { title: 'Core/DocProbe' };\n"
+                    "export const Probe = {};\n",
+                    encoding="utf-8",
+                )
+                result = run_node(
+                    ["scripts/component-coverage.mjs", str(probe_path)],
+                    timeout=120,
+                )
+        self.assertNotEqual(
+            result.returncode,
+            0,
+            "the coverage gate must fail when a listed story is undocumented:\n"
+            + result.stdout
+            + result.stderr,
+        )
+        self.assertIn("undocumented", result.stderr)
+        self.assertIn("Core/DocProbe", result.stderr)
 
     def test_story_files_import_only_local_or_bundled_modules(self):
         """Stories import only relative files or the locked, bundled Vue runtime.

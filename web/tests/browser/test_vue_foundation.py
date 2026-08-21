@@ -5,13 +5,20 @@ review-window ``?__vue=1`` fixture (the production default stays legacy):
 the Vite bundle, its styles, and its self-hosted fonts load from the project
 origin while every non-local request is blocked, the dependency-free vanilla
 text console round-trips commands through ``evennia.js`` without jQuery (the
-D10 transport-bootstrap spike), and the B1 core narrative family renders
-bounded at both supported desktop viewports (webclient-vue-02-showcase-core).
+D10 transport-bootstrap spike), the B1 core narrative family renders visible
+and pointer-usable at both supported desktop viewports, and the Storybook
+showcase stories render from local assets with every non-local request
+blocked (webclient-vue-02-showcase-core).
 """
 
 from __future__ import annotations
 
+import json
+import subprocess
+import threading
 import unittest
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
 
@@ -22,6 +29,14 @@ from .browser_helpers import (
     install_outbound_recorder,
     wait_for_shell_active,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
+
+# The deterministic story rendered by the offline-rendering check: the
+# narrative centerpiece bound to the fixture sample.
+STORY_ID = "core-narrativefeed--world-narrative"
+STORY_SAMPLE_LINE = "你站在測試起點的石板廣場上，夜霧低垂，遠燈明滅。"
 
 VUE_QUERY = "?__vue=1"
 
@@ -46,6 +61,24 @@ CORE_SURFACE_TESTIDS = (
 
 class VueFoundationBrowserTest(BrowserAcceptanceTest):
     """Shared managed server; Vue branch page via the review-window flag."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # The offline story-rendering check serves the static Storybook build;
+        # build it once per process when the checkout has none (CI workspaces
+        # only build the app dist).
+        if not (STORYBOOK_OUT / "iframe.html").is_file():
+            result = subprocess.run(
+                ["npm", "run", "build-storybook"],
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=900,
+            )
+            assert (
+                result.returncode == 0
+            ), "Storybook build failed under browser acceptance:\n" + result.stdout + result.stderr
 
     def _login(self, page) -> None:
         """Log in with the deterministic seeded account (bounded retry)."""
@@ -124,11 +157,12 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         """Each required B1 core surface is visible, in-bounds, and usable.
 
         The B1 shell mounts the usable "ready" slice, so the pre-connection
-        splash must be absent and a real pointer round-trip on the command
-        drawer must succeed (a covered shell would swallow the click). The
-        page then resizes to the 1280x720 minimum, so both supported desktop
-        viewports are bounded with a single login. The traceability
-        annotation for
+        splash must be absent. At BOTH supported desktop viewports the
+        surfaces stay fully in-bounds and a real pointer round-trip on the
+        command drawer must succeed (a covered shell or a surface pushed off
+        the input path would fail): the entry button opens the drawer, the
+        field accepts text, Enter sends (the field clears), and Escape
+        releases back to the narrative pane. The traceability annotation for
         webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa
         is added at this change's archive, when the requirement ID enters
         the index with the synced delta specs.
@@ -176,35 +210,36 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     " viewport",
                 )
 
-        # Usability with a real pointer at the default viewport: the entry
-        # button opens the drawer, the field accepts text, Enter sends (the
-        # field clears), and Escape releases back to the narrative pane.
-        page.set_viewport_size({"width": 1440, "height": 900})
-        page.locator('[data-testid="command-drawer-entry"]').click()
-        page.wait_for_selector(
-            '[data-testid="command-drawer"][data-open="true"]', timeout=10000
-        )
-        field = page.locator("#inputfield")
-        field.wait_for(state="visible", timeout=10000)
-        field.fill("look")
-        field.press("Enter")
-        page.wait_for_function(
-            "() => document.getElementById('inputfield') &&"
-            " document.getElementById('inputfield').value === ''",
-            timeout=10000,
-        )
-        field.press("Escape")
-        page.wait_for_selector(
-            '[data-testid="command-drawer"][data-open="false"]', timeout=10000
-        )
-        self.assertEqual(
-            page.evaluate(
-                "document.activeElement && "
-                "document.activeElement.getAttribute('data-testid')"
-            ),
-            "narrative-feed",
-            "Escape must return focus to the narrative pane, not body",
-        )
+            # Usability with a real pointer at this viewport: the entry
+            # button opens the drawer, the field accepts text, Enter sends
+            # (the field clears), and Escape releases back to the narrative
+            # pane — a covered or clipped surface would fail here.
+            page.locator('[data-testid="command-drawer-entry"]').click()
+            page.wait_for_selector(
+                '[data-testid="command-drawer"][data-open="true"]', timeout=10000
+            )
+            field = page.locator("#inputfield")
+            field.wait_for(state="visible", timeout=10000)
+            field.fill("look")
+            field.press("Enter")
+            page.wait_for_function(
+                "() => document.getElementById('inputfield') &&"
+                " document.getElementById('inputfield').value === ''",
+                timeout=10000,
+            )
+            field.press("Escape")
+            page.wait_for_selector(
+                '[data-testid="command-drawer"][data-open="false"]', timeout=10000
+            )
+            self.assertEqual(
+                page.evaluate(
+                    "document.activeElement && "
+                    "document.activeElement.getAttribute('data-testid')"
+                ),
+                "narrative-feed",
+                "Escape must return focus to the narrative pane, not body",
+            )
+
         self.assertIsNone(
             page.evaluate("window.jQuery ?? null"),
             "the Vue branch must not load full jQuery",
@@ -282,6 +317,54 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertIsNone(
             page.evaluate("window.ElosernVue ?? null"),
             "the Vue bundle must not load on the legacy default page",
+        )
+
+    def test_storybook_stories_render_offline(self):
+        """A story renders from local assets with non-local requests blocked.
+
+        The static Storybook build is served from a local throwaway HTTP
+        origin; the base-class localhost guard aborts every other request, so
+        the story must render entirely from the built local assets. The
+        traceability annotation for
+        webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only
+        is added at this change's archive, when the requirement ID enters the
+        index with the synced delta specs.
+        """
+        index = json.loads((STORYBOOK_OUT / "index.json").read_text(encoding="utf-8"))
+        self.assertIn(
+            STORY_ID,
+            index.get("entries", {}),
+            "the deterministic showcase story must be registered in the build",
+        )
+
+        class _StaticHandler(SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(
+                    *args, directory=str(STORYBOOK_OUT), **kwargs
+                )
+
+            def log_message(self, format, *args):
+                pass
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), _StaticHandler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.shutdown)
+        port = httpd.server_address[1]
+
+        page = self.new_page()
+        failed: list[str] = []
+        page.on("response", lambda response: failed.append(response.url) if response.status >= 400 else None)
+        page.goto(f"http://127.0.0.1:{port}/iframe.html?id={STORY_ID}&viewMode=story")
+        feed = page.locator('[data-testid="narrative-feed"]')
+        feed.wait_for(state="visible", timeout=30000)
+        self.assertIn(
+            STORY_SAMPLE_LINE,
+            feed.inner_text(),
+            "the story must render its bound fixture data through the "
+            "markup pipeline",
+        )
+        self.assertEqual(
+            failed, [], f"the offline story render made failing requests: {failed}"
         )
 
 

@@ -16,18 +16,23 @@ import {
 const renderFeed = (args) => ({ render: () => h(NarrativeFeed, args) });
 
 // A bounded scroll area so the feed's scroll-keep/unread behavior is
-// exercisable in the preview.
-const renderBounded = (Story) => ({
-  render: () =>
-    h(
-      "div",
-      {
-        style:
-          "height: 420px; border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;",
-      },
-      [h(Story)],
-    ),
-});
+// exercisable in the preview. Storybook 8 vue3 decorators are
+// `(update, context) => story`: `update()` renders the inner story, which is
+// then wrapped.
+const renderBounded = (update) => {
+  const inner = update();
+  return {
+    render: () =>
+      h(
+        "div",
+        {
+          style:
+            "height: 420px; border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;",
+        },
+        [h(inner)],
+      ),
+  };
+};
 
 export default {
   title: "Core/NarrativeFeed",

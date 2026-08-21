@@ -32,10 +32,11 @@ Constraints:
 - **D1 — Required set = a code manifest, frozen last.** The "required components" are a checked-in list
   (`web/webclient-app/component-manifest.json`, settled by A2 as the story-title manifest that
   `scripts/component-coverage.mjs` reads), enforced by a deterministic component-coverage script that
-  fails when a listed component has no registered/undocumented story. B1
-  seeds it with the core family; B2–B4 extend it; B5 freezes it. Kept out of the spec text so the
-  requirement ("every manifest component has a documented story") is stable and always true-at-archive,
-  while the *list* evolves in code.
+  fails when a listed component has no registered story, is unlisted for its registered story, or is
+  undocumented — a listed story file is undocumented when it declares no named story export or no
+  story bound to representative prop values (`args:`). B1 seeds it with the core family; B2–B4 extend
+  it; B5 freezes it. Kept out of the spec text so the requirement ("every manifest component has a
+  documented story") is stable and always true-at-archive, while the *list* evolves in code.
 
 - **D2 — Introduce both capabilities now, extend later.** B1 `ADDED`s `webclient-component-showcase`
   (required-set, before-wiring gate, offline stories) and `webclient-vue-application` (offline SPA load +

@@ -3,7 +3,9 @@
 // web/webclient-app/component-manifest.json must be exported by a Storybook
 // story file under web/webclient-app, and every registered story title must be
 // listed in the manifest (the reverse lint enforces that B-wave families keep
-// the manifest in lockstep with the stories they add). B1 seeds the manifest
+// the manifest in lockstep with the stories they add). A listed component is
+// "undocumented" when its story file declares no named story export or no
+// story bound to representative prop values (`args:`). B1 seeds the manifest
 // with the core families, B2-B4 extend it, B5 freezes it to the complete
 // required set; the "showcase is complete before wiring" gate is satisfied at
 // B5, so while the manifest is empty (A2 foundation) this gate passes.
@@ -22,26 +24,28 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 const required = Array.isArray(manifest.required) ? manifest.required : [];
 const requiredTitles = new Set(required);
 
-const collected = new Set();
+const storyFiles = [];
 
-function collectStoryTitles(dir) {
+function collectStoryFiles(dir) {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     const stat = statSync(path);
     if (stat.isDirectory()) {
       if (entry === "node_modules" || entry.startsWith(".")) continue;
-      collectStoryTitles(path);
+      collectStoryFiles(path);
       continue;
     }
     if (!entry.endsWith(".stories.js")) continue;
     const source = readFileSync(path, "utf-8");
     const match = source.match(/title:\s*["'`]([^"'`]+)["'`]/);
-    if (match) collected.add(match[1]);
+    if (!match) continue;
+    storyFiles.push({ title: match[1], source });
   }
 }
 
-collectStoryTitles(appRoot);
+collectStoryFiles(appRoot);
 
+const collected = new Set(storyFiles.map(({ title }) => title));
 const failures = [];
 const missing = required.filter((title) => !collected.has(title));
 if (missing.length > 0) {
@@ -55,6 +59,30 @@ if (unlisted.length > 0) {
 }
 if (failures.length > 0) {
   console.error("component coverage: " + failures.join("\n"));
+  process.exit(1);
+}
+
+// A listed story file documents its component only when it declares at least
+// one named story export bound to representative prop values (`args:`).
+const hasStoryExport = /export\s+const\s+[A-Za-z_$][\w$]*\s*=\s*({|\()/;
+const hasBoundStory = /\bargs\s*:/;
+const undocumented = [
+  ...new Set(
+    storyFiles
+      .filter(
+        ({ title, source }) =>
+          requiredTitles.has(title) &&
+          (!hasStoryExport.test(source) || !hasBoundStory.test(source)),
+      )
+      .map(({ title }) => title),
+  ),
+].sort();
+if (undocumented.length > 0) {
+  console.error(
+    "component coverage: required stories registered but undocumented (no " +
+      'named story export or no `args:`-bound story):\n' +
+      undocumented.map((title) => `  - ${title}`).join("\n"),
+  );
   process.exit(1);
 }
 

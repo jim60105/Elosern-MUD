@@ -119,6 +119,12 @@
   border-radius: var(--radius-sm);
 }
 
+/* Selection carries the single seal accent (design draft ::selection rule). */
+::selection {
+  background: var(--seal-600);
+  color: #fff;
+}
+
 /*
  * Not-color-only status utilities: each pairs the status color with a glyph
  * marker and a border treatment so state is distinguishable without color.
