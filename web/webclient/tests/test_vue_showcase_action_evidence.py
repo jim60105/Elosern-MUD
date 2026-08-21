@@ -8,10 +8,10 @@ component is registered as a documented story. ``covers_requirement`` can
 only attach to a Python ``test_*`` function, so this module executes those
 gates and asserts they pass. Following the B1 precedent, the
 ``@covers_requirement`` import and annotation linking this module to the new
-requirement are applied at this change's archive, when the requirement ID
-enters the traceability index with the synced delta spec.
+requirement are applied at this change's archive, once the requirement ID
+enters the traceability index with the delta spec synced into the main spec.
 
-Test-to-requirement mapping (applied at archive):
+Test-to-requirement mapping:
 
 - ``webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract``:
   ``test_vitest_action_family_suite_passes`` (the finite framed grid, the
@@ -35,6 +35,8 @@ import json
 import subprocess
 import unittest
 from pathlib import Path
+
+from tools.spec_traceability import covers_requirement
 
 from ._showcase_build import showcase_build_lock
 
@@ -116,6 +118,9 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 ), "Storybook build failed under action evidence:\n" \
                     + result.stdout + result.stderr
 
+    @covers_requirement(
+        "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"
+    )
     def test_vitest_action_family_suite_passes(self):
         """Every action-dock SFC renders its contract states under Vitest.
 
@@ -137,6 +142,9 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
         )
         self.assertIn("passed", result.stdout)
 
+    @covers_requirement(
+        "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"
+    )
     def test_component_coverage_gate_passes_with_action_family(self):
         """The manifest is the exact B2 surface and the showcase stays in lockstep.
 
@@ -169,6 +177,9 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
             result.stdout,
         )
 
+    @covers_requirement(
+        "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"
+    )
     def test_action_family_stories_are_registered_in_showcase(self):
         """Every family component has a documented story in the built showcase."""
         with showcase_build_lock():
