@@ -116,7 +116,9 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         return page, responses
 
     @covers_requirement(
-        "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"
+        "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps",
+        "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa",
+        "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline",
     )
     def test_vue_bundle_loads_from_origin_offline(self):
         """The built page makes no remote runtime request (delta scenario)."""
@@ -153,6 +155,9 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             "the pre-store shell must mount in the default world mode",
         )
 
+    @covers_requirement(
+        "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa"
+    )
     def test_core_surfaces_render_usable_at_supported_viewports(self):
         """Each required B1 core surface is visible, in-bounds, and usable.
 
@@ -162,10 +167,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         command drawer must succeed (a covered shell or a surface pushed off
         the input path would fail): the entry button opens the drawer, the
         field accepts text, Enter sends (the field clears), and Escape
-        releases back to the narrative pane. The traceability annotation for
-        webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa
-        is added at this change's archive, when the requirement ID enters
-        the index with the synced delta specs.
+        releases back to the narrative pane.
         """
         page, _responses = self.open_vue_page()
         page.wait_for_selector(VUE_ROOT, timeout=30000)
@@ -246,7 +248,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-browser-verification::browser-tests-are-localhost-only-and-deterministic"
+        "webclient-browser-verification::browser-tests-are-localhost-only-and-deterministic",
+        "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa",
     )
     def test_text_console_round_trips_commands_without_jquery(self):
         """D10 spike: evennia.js round-trips text without full jQuery.
@@ -319,16 +322,18 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             "the Vue bundle must not load on the legacy default page",
         )
 
+    @covers_requirement(
+        "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only",
+        "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story",
+    )
     def test_storybook_stories_render_offline(self):
         """A story renders from local assets with non-local requests blocked.
 
         The static Storybook build is served from a local throwaway HTTP
         origin; the base-class localhost guard aborts every other request, so
         the story must render entirely from the built local assets. The
-        traceability annotation for
-        webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only
-        is added at this change's archive, when the requirement ID enters the
-        index with the synced delta specs.
+        asserted fixture line also establishes that the story is bound to its
+        representative prop values (the documented contract renders).
         """
         index = json.loads((STORYBOOK_OUT / "index.json").read_text(encoding="utf-8"))
         self.assertIn(

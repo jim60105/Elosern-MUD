@@ -123,6 +123,7 @@ class VueComponentGateTests(unittest.TestCase):
     @covers_requirement(
         "webclient-browser-verification::dom-independent-client-behavior-has-an-executable-node-test-gate",
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps",
+        "webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate",
     )
     def test_vitest_component_suite_and_showcase_coverage_run(self):
         vitest = _run(["npm", "test"])
@@ -141,7 +142,8 @@ class VueComponentGateTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"
+        "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps",
+        "webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate",
     )
     def test_quality_workflow_builds_and_gates_the_vue_frontend(self):
         workflow = yaml.safe_load(_read(".github/workflows/quality-gate.yml"))

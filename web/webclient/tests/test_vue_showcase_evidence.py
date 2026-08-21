@@ -4,31 +4,37 @@ The core-family contract of webclient-vue-02-showcase-core is implemented and
 verified in the Node/Vue world: the Vite build, the Vitest component suite,
 the Storybook static build, and the deterministic component-coverage gate.
 ``covers_requirement`` can only attach to a Python ``test_*`` function, so
-this module executes those gates and asserts they pass; the annotations
+this module executes those gates and asserts they pass. The annotations
 linking the two new capabilities (``webclient-vue-application`` and
-``webclient-component-showcase``) are added at this change's archive, when
-the requirement IDs enter the traceability index with the synced delta
+``webclient-component-showcase``) were applied at this change's archive, when
+the requirement IDs entered the traceability index with the synced delta
 specs.
 
-Intended annotations at archive:
+Test-to-requirement mapping (the browser-shard counterparts are listed where
+they evidence the same requirement):
 
 - ``webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa``:
-  ``test_vite_build_emits_stable_offline_entries``,
-  ``test_dependency_free_node_gate_still_passes`` (the desktop-only
-  bounded-render-at-each-viewport scenario is evidenced in the browser shard
-  by
-  ``test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports``).
+  ``test_vite_build_emits_stable_offline_entries`` (the offline-load and
+  bounded-render-at-each-viewport scenarios are additionally evidenced in the
+  browser shard by
+  ``test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline``
+  and
+  ``test_core_surfaces_render_usable_at_supported_viewports``).
 - ``webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline``:
   ``test_builtin_design_system_is_self_hosted_and_offline``,
   ``test_vitest_core_family_suite_passes`` (the status-is-not-color-only
-  scenario is asserted there by the TopBar connection-state test).
+  scenario is asserted there by the TopBar connection-state test; the
+  browser bundle test additionally asserts the self-hosted fonts load from
+  the project origin).
 - ``webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story``:
   ``test_component_coverage_gate_passes``,
   ``test_component_coverage_gate_fails_for_an_undocumented_required_story``,
   ``test_vitest_core_family_suite_passes``.
 - ``webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate``:
   ``test_storybook_showcase_build_succeeds``,
-  ``test_component_coverage_gate_fails_for_a_missing_required_story``.
+  ``test_component_coverage_gate_fails_for_a_missing_required_story`` (the
+  CI wiring of the gate is asserted by
+  ``tests.test_frontend_toolchain_contract.VueComponentGateTests``).
 - ``webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only``:
   ``test_story_files_import_only_local_or_bundled_modules``,
   ``test_storybook_showcase_build_succeeds`` (the offline-rendering scenario
@@ -45,6 +51,8 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
@@ -93,6 +101,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             result.returncode == 0
         ), "vite build failed under evidence:\n" + result.stdout + result.stderr
 
+    @covers_requirement(
+        "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa"
+    )
     def test_vite_build_emits_stable_offline_entries(self):
         """The app dist serves its stable entries from the project origin only."""
         for entry in ("index.js", "index.css"):
@@ -136,6 +147,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline"
+    )
     def test_builtin_design_system_is_self_hosted_and_offline(self):
         """The built stylesheet self-hosts its fonts and ships the motion tokens."""
         css = (DIST_ROOT / "index.css").read_text(encoding="utf-8")
@@ -192,6 +206,10 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
                 "is not in the media block",
             )
 
+    @covers_requirement(
+        "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline",
+        "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story",
+    )
     def test_vitest_core_family_suite_passes(self):
         """Every core-family SFC renders its contract states under Vitest."""
         result = run_npm(["test"], timeout=600)
@@ -202,6 +220,10 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         )
         self.assertIn("passed", result.stdout)
 
+    @covers_requirement(
+        "webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate",
+        "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only",
+    )
     def test_storybook_showcase_build_succeeds(self):
         """The showcase gate builds the static Storybook from local data."""
         result = run_npm(["run", "build-storybook"], timeout=900)
@@ -215,6 +237,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         index = (out_dir / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("https://", index, "the showcase index references a remote URL")
 
+    @covers_requirement(
+        "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story"
+    )
     def test_component_coverage_gate_passes(self):
         """The manifest and the registered stories are in complete lockstep."""
         required = json.loads(
@@ -232,6 +257,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             result.stdout,
         )
 
+    @covers_requirement(
+        "webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate"
+    )
     def test_component_coverage_gate_fails_for_a_missing_required_story(self):
         """A manifest-listed component without a story fails the gate.
 
@@ -259,6 +287,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         )
         self.assertIn("Core/UnlistedProbe", result.stderr)
 
+    @covers_requirement(
+        "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story"
+    )
     def test_component_coverage_gate_fails_for_an_undocumented_required_story(self):
         """A listed component whose story binds no props fails the gate.
 
@@ -294,6 +325,9 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         self.assertIn("undocumented", result.stderr)
         self.assertIn("Core/DocProbe", result.stderr)
 
+    @covers_requirement(
+        "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only"
+    )
     def test_story_files_import_only_local_or_bundled_modules(self):
         """Stories import only relative files or the locked, bundled Vue runtime.
 
