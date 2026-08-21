@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 
-from playwright.sync_api import Page
+from playwright.sync_api import Error, Page
 
 # Deterministic seeded account (see seed.py).
 BROWSER_ACCOUNT = "browserplayer"
@@ -142,17 +142,54 @@ def store_state(page: Page) -> dict:
     return page.evaluate("Elosern.StateController.getState()")
 
 
+def evaluate_tolerating_navigation(page: Page, expression: str, arg=None):
+    """``page.evaluate`` that treats an in-flight navigation as "not yet".
+
+    A page navigation destroys the execution context; an evaluate racing it
+    raises Playwright's ``Execution context was destroyed`` error on the
+    Python side instead of returning a value. Polling loops that must survive
+    a reconnect window treat that as "not ready yet" and keep waiting.
+    """
+    try:
+        return page.evaluate(expression, arg)
+    except Error as exc:
+        if "Execution context was destroyed" not in str(exc):
+            raise
+        return None
+
+
+def suppress_one_shot_recovery_reload(page: Page) -> None:
+    """Pre-consume the client's one-shot recovery reload marker.
+
+    ``elosern_state.js`` reloads the page once per tab session (the marker
+    lives in ``sessionStorage`` under ``elosern.sync_recovery_reload``) when
+    the awaiting-snapshot resync budget (8 x 1.5s) is exhausted without a
+    snapshot. Under a loaded runner a slow portal re-attach can outlast that
+    budget mid-test; the reload would then destroy the in-page outbound
+    recorder and the action client's uncertain-result state that reconnect
+    tests assert on. Setting the marker here scopes the window under test to
+    the client's own reconnect: a genuinely stalled reconnect still fails
+    loudly at the poll deadline instead of self-reloading.
+    """
+    page.evaluate(
+        "() => { try { window.sessionStorage.setItem("
+        "'elosern.sync_recovery_reload', '1'); } catch (e) {} }"
+    )
+
+
 def store_state_or_none(page: Page) -> dict | None:
     """Store snapshot, or None while the client is re-bootstrapping.
 
     Polls that span a transport reconnect observe a window in which the
     ``Elosern`` global is briefly absent while the client re-boots; those
     polls must treat that as "not yet" instead of letting the evaluate
-    raise.
+    raise. An in-flight page navigation is tolerated the same way (see
+    ``evaluate_tolerating_navigation``).
     """
-    return page.evaluate(
+    return evaluate_tolerating_navigation(
+        page,
         "() => window.Elosern && window.Elosern.StateController ? "
-        "Elosern.StateController.getState() : null"
+        "Elosern.StateController.getState() : null",
     )
 
 

@@ -19,11 +19,14 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    evaluate_tolerating_navigation,
     fresh_epoch,
     install_outbound_recorder,
     sent_action_count,
     snapshot_envelope,
     store_state,
+    store_state_or_none,
+    suppress_one_shot_recovery_reload,
     valid_status_panel,
 )
 
@@ -42,16 +45,24 @@ class ReconnectTest(BrowserAcceptanceTest):
         deadline = time.monotonic() + timeout
         reconnects = 0
         while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["generation"] > generation_before:
+            # `store_state_or_none` tolerates the re-bootstrap window (and any
+            # in-flight navigation) where the ``Elosern`` global is absent.
+            state = store_state_or_none(page)
+            if state and state["generation"] > generation_before:
                 return state
             if reconnects == 0 and time.monotonic() > deadline - 25:
-                page.evaluate("Evennia.connect()")
+                evaluate_tolerating_navigation(page, "Evennia.connect()")
                 reconnects += 1
             page.wait_for_timeout(500)
         self.fail("reconnected transport never opened a new generation")
 
     def _disconnect_transport(self, page):
+        # Scope the window under test to the client's own websocket reconnect,
+        # not the one-shot recovery reload: under a loaded runner a slow
+        # puppet re-attach can exhaust the awaiting-snapshot resync budget and
+        # trigger a page reload, which would reset the generation / recorder /
+        # uncertain-notice state these tests assert on.
+        suppress_one_shot_recovery_reload(page)
         # Abnormally close the raw WebSocket: unlike the client's graceful
         # ``websocket_close`` (which clears the Django-session auth), this
         # preserves the login so the reconnected transport is re-authenticated.

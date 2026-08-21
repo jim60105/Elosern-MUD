@@ -14,9 +14,11 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    evaluate_tolerating_navigation,
     install_outbound_recorder,
     store_state,
     store_state_or_none,
+    suppress_one_shot_recovery_reload,
     wait_for_presentation_settled,
 )
 
@@ -187,6 +189,10 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         session_before = store_state(page)["panels"]["context_actions"]["session"]
         round_before = session_before["round"]
+        # Scope the window under test to the client's own reconnect; a
+        # one-shot recovery reload under a loaded runner would wipe the
+        # in-page state these assertions read.
+        suppress_one_shot_recovery_reload(page)
 
         # Abnormally close the transport and wait for the offline overlay.
         page.evaluate(
@@ -202,8 +208,8 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
 
         # Wait for the reconnect to open a new generation and adopt a snapshot.
         # `store_state_or_none` tolerates the re-bootstrap window where the
-        # ``Elosern`` global is briefly absent; a None snapshot just means
-        # "not yet".
+        # ``Elosern`` global is briefly absent and any in-flight navigation;
+        # a None snapshot just means "not yet".
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             state = store_state_or_none(page)
@@ -221,8 +227,10 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             if time.monotonic() > deadline - 25:
                 # Guarded: while the client re-boots, window.Evennia is
                 # briefly absent and a bare evaluate would raise.
-                page.evaluate(
-                    "() => { if (window.Evennia && Evennia.connect) Evennia.connect(); }"
+                evaluate_tolerating_navigation(
+                    page,
+                    "() => { if (window.Evennia && Evennia.connect) "
+                    "Evennia.connect(); }",
                 )
             page.wait_for_timeout(500)
         else:
@@ -271,6 +279,11 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "return p && p.available && p.session.round >= 1; }",
             timeout=30000,
         )
+        # The assertions below read the action client's in-memory
+        # uncertain-notice state and the outbound recorder; a one-shot
+        # recovery reload (fired by a slow re-attach under load) would wipe
+        # both, so scope the window to the client's own reconnect.
+        suppress_one_shot_recovery_reload(page)
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
@@ -280,7 +293,8 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
 
         # On reconnect the client shows the uncertain-result notice and never
         # retries the withheld cast. `store_state_or_none` again tolerates
-        # the re-bootstrap window where the ``Elosern`` global is absent.
+        # the re-bootstrap window where the ``Elosern`` global is absent and
+        # any in-flight navigation.
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             state = store_state_or_none(page)
@@ -289,8 +303,10 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             if time.monotonic() > deadline - 25:
                 # Guarded: while the client re-boots, window.Evennia is
                 # briefly absent and a bare evaluate would raise.
-                page.evaluate(
-                    "() => { if (window.Evennia && Evennia.connect) Evennia.connect(); }"
+                evaluate_tolerating_navigation(
+                    page,
+                    "() => { if (window.Evennia && Evennia.connect) "
+                    "Evennia.connect(); }",
                 )
             page.wait_for_timeout(500)
 
