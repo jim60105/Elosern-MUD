@@ -146,12 +146,13 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
         "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"
     )
     def test_component_coverage_gate_passes_with_action_family(self):
-        """The manifest is the exact B2 surface and the showcase stays in lockstep.
+        """The manifest is the exact B3 surface and the showcase stays in lockstep.
 
-        The set equality is the B2 baseline for the "extend, don't
-        restructure" contract (design D2): the B1 core family is preserved
-        and exactly the six family keys are added. B5, which freezes the
-        manifest, updates this baseline deliberately.
+        The set equality is the baseline for the "extend, don't restructure"
+        contract: the B1 core family is preserved, the six action-dock keys
+        from B2 are intact, and the three data-family keys from B3
+        (webclient-vue-04-showcase-data, manifest design D5) are added. B5,
+        which freezes the manifest, updates this baseline deliberately.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -163,6 +164,7 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 "Core/NarrativeFeed", "Core/UnreadIndicator",
                 "Core/CommandDrawer",
                 *ACTION_FAMILY_KEYS,
+                "Data/StatusPanel", "Data/CharacterPanel", "Data/SkillBook",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
