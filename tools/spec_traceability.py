@@ -320,12 +320,42 @@ def verify(repo_root: Path, evidence_path: Path | None = None) -> TraceabilityRe
     )
 
 
-def _write_report(report: TraceabilityReport, json_output: Path | None) -> None:
-    payload = json.dumps(report.to_json(), ensure_ascii=False, indent=2, sort_keys=True)
+def _print_console(report: TraceabilityReport, show_covered: bool) -> None:
+    """Print a short summary plus the failing requirements to the console."""
+    by_id = requirement_by_id(report.requirements)
+    print(
+        f"spec traceability: {len(report.requirements)} requirements, "
+        f"{len(report.associations)} associations, "
+        f"{len(report.covered)} covered, "
+        f"{len(report.uncovered)} uncovered, "
+        f"{len(report.errors)} errors"
+    )
+    if report.uncovered:
+        print("Uncovered requirements:")
+        for identifier in report.uncovered:
+            location = by_id[identifier].location
+            print(f"  - {identifier} ({location.path}:{location.line})")
+    if report.errors:
+        print("Errors:")
+        for error in report.errors:
+            location = f" ({error.location.path}:{error.location.line})" if error.location else ""
+            print(f"  - [{error.code}] {error.message}{location}")
+    if show_covered:
+        print("Covered requirements:")
+        for identifier in report.covered:
+            print(f"  - {identifier}")
+
+
+def _write_report(
+    report: TraceabilityReport,
+    json_output: Path | None,
+    show_covered: bool = False,
+) -> None:
     if json_output:
+        payload = json.dumps(report.to_json(), ensure_ascii=False, indent=2, sort_keys=True)
         json_output.write_text(f"{payload}\n", encoding="utf-8")
     else:
-        print(payload)
+        _print_console(report, show_covered)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -336,22 +366,31 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--json-output", type=Path)
     check_parser = subparsers.add_parser("check", help="Check static annotations and completeness")
     check_parser.add_argument("--json-output", type=Path)
+    check_parser.add_argument(
+        "--show-covered", action="store_true",
+        help="Also print the full list of covered requirement IDs in the console output",
+    )
     verify_parser = subparsers.add_parser("verify", help="Require successful runtime evidence")
     verify_parser.add_argument("--evidence", type=Path, required=True)
     verify_parser.add_argument("--json-output", type=Path)
+    verify_parser.add_argument(
+        "--show-covered", action="store_true",
+        help="Also print the full list of covered requirement IDs in the console output",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo_root = args.repo_root.resolve()
+    show_covered = bool(getattr(args, "show_covered", False))
     if args.command == "list":
         requirements, errors = parse_requirements(repo_root)
         report = TraceabilityReport(requirements, (), (), (), errors)
-        _write_report(report, args.json_output)
+        _write_report(report, args.json_output, show_covered)
         return bool(errors)
     report = verify(repo_root, getattr(args, "evidence", None))
-    _write_report(report, args.json_output)
+    _write_report(report, args.json_output, show_covered)
     return 0 if report.ok else 1
 
 
