@@ -154,3 +154,311 @@ export const SUGGESTIONS_DEGRADED_EMPTY_SAMPLE = {
 };
 
 export const SUGGESTIONS_UNAVAILABLE_SAMPLE = { status: "unavailable" };
+
+// ---------------------------------------------------------------------------
+// B3 data-family fixtures (webclient-vue-04-showcase-data).
+//
+// Every value mirrors a validated OOB payload — the `status` panel at schema
+// version 1 (web/webclient/presentation/status.py) and the `character` panel
+// at schema version 3 (web/webclient/presentation/character.py) — and the
+// character's skill data keeps the character payload's category/group/
+// {key,label} grouping with the optional OOB skill-descriptor detail fields
+// (the context_actions v5 descriptor shape: cost, target_spec,
+// freeform_scales, shorthands) attached to some rows only. Fixed literals
+// only, so the offline showcase and the live (C1 store) views cannot drift.
+// ---------------------------------------------------------------------------
+
+// A committed `status` v1 payload (design-draft actor at 霧骨渡口): mixed
+// gauge states, one buff with a remaining duration, one deterministic
+// combat-modifier condition carrying its exact applied modifiers, an active
+// disguise, and no combat session.
+export const STATUS_PANEL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  actor: {
+    name: "艾倫·灰誓",
+    identity: "char-42",
+    location: { label: "霧骨渡口", identity: "room-7" },
+  },
+  resources: {
+    hp: { current: 231, maximum: 405 },
+    mp: { current: 139, maximum: 420 },
+    sp: { current: 68, maximum: 68 },
+  },
+  conditions: [
+    {
+      code: "fastwind",
+      label: "疾風",
+      severity: "beneficial",
+      remaining_seconds: 60,
+    },
+    {
+      code: "shame_exposure",
+      label: "高露出",
+      severity: "harmful",
+      modifiers: { defense: -15, agility: -10 },
+    },
+    {
+      code: "fog_veil",
+      label: "霧隱",
+      severity: "informational",
+    },
+  ],
+  disguise_active: true,
+  combat: null,
+};
+
+// The same actor mid-combat (guild examination), for the combat story.
+export const STATUS_PANEL_COMBAT_SAMPLE = {
+  ...STATUS_PANEL_SAMPLE,
+  conditions: [
+    {
+      code: "combat_focus",
+      label: "專注",
+      severity: "warning",
+      remaining_seconds: 10,
+      modifiers: { atk_phys: 5 },
+    },
+  ],
+  disguise_active: false,
+  combat: { mode: "guild_exam", round: 3 },
+};
+
+// The compact, condition-free variant: all gauges full, nothing else.
+export const STATUS_PANEL_MINIMAL_SAMPLE = {
+  ...STATUS_PANEL_SAMPLE,
+  resources: {
+    hp: { current: 405, maximum: 405 },
+    mp: { current: 420, maximum: 420 },
+    sp: { current: 68, maximum: 68 },
+  },
+  conditions: [],
+  disguise_active: false,
+  combat: null,
+};
+
+// The committed `character` v3 payload for the same actor: all eight trait
+// rows (gauges carry max, statics/counters carry null max), grouped active
+// and passive skills, equipped items, an active disguise whose displayed
+// values differ from the true traits, guild rank/merit, wallet, and persona.
+export const CHARACTER_PANEL_SAMPLE = {
+  schema_version: 3,
+  available: true,
+  kind: "character",
+  traits: [
+    { key: "hp", label: "生命", current: 231, max: 405 },
+    { key: "mp", label: "魔力", current: 139, max: 420 },
+    { key: "sp", label: "耐力", current: 68, max: 68 },
+    { key: "atk_phys", label: "攻擊", current: 18, max: null },
+    { key: "agility", label: "敏捷", current: 20, max: null },
+    { key: "defense", label: "防禦", current: 12, max: null },
+    { key: "magic_level", label: "魔法階級", current: 31, max: null },
+    { key: "guild_merit", label: "功績", current: 140, max: null },
+  ],
+  actives: [
+    {
+      category: "elemental_magic",
+      label: "元素魔法",
+      groups: [
+        {
+          group: "fire",
+          label: "火",
+          skills: [{ key: "firebolt", label: "火矢" }, { key: "fireball", label: "火球" }],
+        },
+        {
+          group: "water",
+          label: "水",
+          skills: [{ key: "mend_glow", label: "微光治癒" }],
+        },
+      ],
+    },
+    {
+      category: "martial_arts",
+      label: "武技",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [{ key: "basic_attack", label: "基本攻擊" }, { key: "light_blade", label: "輕劍式" }],
+        },
+      ],
+    },
+  ],
+  passives: [
+    {
+      category: "enhancement",
+      label: "強化",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            { key: "hardened_body", label: "強化身體" },
+            { key: "guard_instinct", label: "防衛本能" },
+          ],
+        },
+      ],
+    },
+  ],
+  equipment: [
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+    { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+    { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+  ],
+  disguise: {
+    active: true,
+    description: "目前以「旅商」身分示人；顯示值只影響外觀與鑑定。",
+    displayed: [
+      { key: "atk_phys", label: "攻擊", value: 25 },
+      { key: "magic_level", label: "魔法階級", value: 12 },
+    ],
+  },
+  guild: { rank: "E", merit: 140 },
+  wallet: 3240,
+  persona: {
+    background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
+  },
+};
+
+// The same actor without a disguise, no guild, no persona background — the
+// honest empty-state story (displayed list must be empty, rank → 未加入公會,
+// persona renders nothing).
+export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
+  ...CHARACTER_PANEL_SAMPLE,
+  equipment: [
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+  ],
+  disguise: { active: false, description: "", displayed: [] },
+  guild: { rank: null, merit: 0 },
+  wallet: 0,
+  persona: { background: null },
+};
+
+// The character's skill data as the SkillBook consumes it: the character
+// payload's actives/passives grouping, with the rows the C1 getter backs from
+// a committed `context_actions` v5 skill descriptor extended with that
+// descriptor's display subset — `cost` (a bounded object, the empty object
+// being the v5 free form), `target_spec`, the optional `freeform_scales`
+// array, and `shorthands`. Rows the getter has no descriptor for stay the
+// character payload's own `{key, label}` shape: `flee` shows the free-cost
+// form, and the unregistered-key `legacy_stance` row (the character payload's
+// own unknown-key degradation) proves detail cells render only when the
+// backing data provides the field.
+export const SKILLS_SLICE_SAMPLE = {
+  actives: [
+    {
+      category: "elemental_magic",
+      label: "元素魔法",
+      groups: [
+        {
+          group: "fire",
+          label: "火",
+          skills: [
+            {
+              key: "firebolt",
+              label: "火矢",
+              cost: { mp: 10 },
+              target_spec: "single",
+            },
+            {
+              key: "fireball",
+              label: "火球",
+              cost: { mp: 14 },
+              target_spec: "single",
+              freeform_scales: [
+                { scale: 0.25, label: "1/4", mp_cost: 4 },
+                { scale: 0.5, label: "1/2", mp_cost: 7 },
+                { scale: 1, label: "1", mp_cost: 14 },
+                { scale: 2, label: "2", mp_cost: 28 },
+                { scale: 4, label: "4", mp_cost: 56 },
+              ],
+            },
+            {
+              key: "firestorm",
+              label: "火風暴",
+              cost: { mp: 30, sp: 5 },
+              target_spec: "area",
+              shorthands: ["all-enemies", "all"],
+            },
+          ],
+        },
+        {
+          group: "water",
+          label: "水",
+          skills: [
+            {
+              key: "mend_glow",
+              label: "微光治癒",
+              cost: { mp: 11 },
+              target_spec: "self",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      category: "martial_arts",
+      label: "武技",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            {
+              key: "basic_attack",
+              label: "基本攻擊",
+              cost: {},
+              target_spec: "single",
+            },
+            {
+              key: "light_blade",
+              label: "輕劍式",
+              cost: { sp: 6 },
+              target_spec: "single",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      category: "movement",
+      label: "移動",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            {
+              key: "flee",
+              label: "逃跑",
+              cost: {},
+              target_spec: "none",
+            },
+            { key: "legacy_stance", label: "legacy_stance" },
+          ],
+        },
+      ],
+    },
+  ],
+  passives: [
+    {
+      category: "enhancement",
+      label: "強化",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            { key: "hardened_body", label: "強化身體" },
+            { key: "guard_instinct", label: "防衛本能" },
+          ],
+        },
+      ],
+    },
+    {
+      category: "innate_gift",
+      label: "天賦",
+      groups: [{ group: null, label: null, skills: [{ key: "elf_longevity", label: "精靈長壽" }] }],
+    },
+  ],
+};

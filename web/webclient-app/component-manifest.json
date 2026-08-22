@@ -11,6 +11,9 @@
     "Action/DockMenuItem",
     "Action/OptionCard",
     "Action/ChoiceCardRow",
-    "Action/ChoicePointBlock"
+    "Action/ChoicePointBlock",
+    "Data/StatusPanel",
+    "Data/CharacterPanel",
+    "Data/SkillBook"
   ]
 }
