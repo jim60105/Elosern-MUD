@@ -307,6 +307,7 @@
           event.stopPropagation();
           self._quantity = null;
           self._quantityItem = null;
+          self._unbindQuantityKeys();
           self._reenterMenu();
           return;
         }
@@ -329,6 +330,7 @@
           }
           self._quantity = null;
           self._quantityItem = null;
+          self._unbindQuantityKeys();
           self._reenterMenu();
           return;
         }

@@ -45,6 +45,7 @@ function isEditable(target) {
   }
   return (
     target.tagName === "INPUT" ||
+    target.tagName === "SELECT" ||
     target.tagName === "TEXTAREA" ||
     target.isContentEditable === true
   );
