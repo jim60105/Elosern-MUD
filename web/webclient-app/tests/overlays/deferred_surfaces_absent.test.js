@@ -30,12 +30,15 @@ function collectStoryTitles(dir) {
 
 // The exact deferred surfaces from roadmap §7, matched against the component
 // set and the registered story titles.
+// Word-boundary matching: a whole deferred-surface word flags the title;
+// bare substrings would false-positive on legitimate names (e.g. "Bag"
+// inside "Baggage").
 const DEFERRED_TITLE_PATTERNS = [
-  /Party/i,
-  /Intimate/i,
-  /Bag/i,
-  /EventLog/i,
-  /Toasts?/i,
+  /\bParty\b/i,
+  /\bIntimate\b/i,
+  /\bBag\b/i,
+  /\bEventLog\b/i,
+  /\bToasts?\b/i,
 ];
 
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
@@ -79,8 +82,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
 
   it("keeps the equipped-only InventoryPanel (never a full bag)", () => {
     expect(manifest.required).toContain("World/InventoryPanel");
-    // The full inventory bag is deferred: no *Bag component or story exists.
+    // The full inventory bag is deferred: no *Bag component or story exists
+    // (word-boundary match, consistent with DEFERRED_TITLE_PATTERNS).
     const titles = collectStoryTitles(APP_ROOT);
-    expect(titles.filter((title) => /Bag/i.test(title))).toEqual([]);
+    expect(titles.filter((title) => /\bBag\b/i.test(title))).toEqual([]);
   });
 });

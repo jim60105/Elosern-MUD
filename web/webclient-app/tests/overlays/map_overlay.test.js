@@ -63,6 +63,20 @@ describe("MapOverlay (B5 overlays family)", () => {
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
   });
 
+  it("re-renders the available/unavailable branch when the local_map payload is replaced", async () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(true);
+    // An OOB read-model update replaces the payload: the frame must track
+    // the new state, never show a stale branch.
+    await wrapper.setProps({ localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE });
+    expect(
+      wrapper.get('[data-testid="map-overlay-unavailable"]').text(),
+    ).toBe("區域地圖目前無法顯示");
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
+    await wrapper.setProps({ localMap: LOCAL_MAP_SAMPLE });
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(true);
+  });
+
   it("hides the overlay root when open is false", () => {
     wrapper = mount(MapOverlay, {
       props: { localMap: LOCAL_MAP_SAMPLE, open: false },

@@ -6,7 +6,7 @@
 // `options.*` OOB action envelope (the OptionCard emit contract) that the
 // C-wave store persists/dispatches — the delta spec's "WHEN a settings
 // control changes → THEN it emits the matching options.* envelope".
-import { computed, watch } from "vue";
+import { computed, onBeforeUnmount, watch } from "vue";
 
 const DEFAULT_OPTIONS = Object.freeze({
   font: "default",
@@ -79,9 +79,20 @@ function onTypeScaleChange(event) {
 
 // Reflect the option on the document root now, and keep it in sync when a
 // new `options` prop arrives (the C-wave store owns persistence; here the
-// client-local state drives the app-wide motion tokens).
+// client-local state drives the app-wide motion tokens). The reduced-motion
+// write is client-local to this overlay: capture the document's prior state
+// before the first apply, and restore it on unmount so a remounted dialog
+// never leaks a state the shell/app level owned.
+const previousMotionState = document.documentElement.dataset.reducedMotion;
 watch(() => opts.value.reduced_motion, applyMotionState);
 applyMotionState();
+onBeforeUnmount(() => {
+  if (previousMotionState === undefined) {
+    delete document.documentElement.dataset.reducedMotion;
+  } else {
+    document.documentElement.dataset.reducedMotion = previousMotionState;
+  }
+});
 </script>
 
 <template>

@@ -8,7 +8,7 @@
 // `close` and hides the overlay (no OOB envelope). When the payload is the
 // registry-owned unavailable form, the frame renders only
 // `localMap.reason.message`; nothing is invented.
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import LocalMap from "./LocalMap.vue";
 
 const props = defineProps({
@@ -31,8 +31,12 @@ watch(
   },
 );
 
-const available = props.localMap.available === true;
-const reasonMessage = props.localMap.reason?.message ?? "";
+// Reactive to OOB read-model updates: when the `local_map` payload is
+// replaced (e.g. the C-wire store publishes a new snapshot), the frame
+// re-renders the available/unavailable branch instead of showing a stale
+// state.
+const available = computed(() => props.localMap.available === true);
+const reasonMessage = computed(() => props.localMap.reason?.message ?? "");
 
 // Re-emit LocalMap's move intent ({ exit_ref, destination }) so the C-wire
 // store can consume the OOB explore.move action.
