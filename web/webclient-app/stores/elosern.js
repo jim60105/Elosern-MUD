@@ -1,0 +1,503 @@
+// C1 (webclient-vue-07-wire-store): the single-writer reactive store over the
+// preserved DOM-independent logic (roadmap Wave C start; the store is the
+// "strict and atomic, subscribers see only committed state" invariant from
+// webclient-desktop-shell). The store is driven in tests by raw reducer
+// inputs (design D5); the live evennia.js OOB binding (C3), the browser-bridge
+// (C2), and the component re-binding (C4) all consume the slices exposed here.
+//
+// Architecture (design D1-D5, the A2 store-slice contract in
+// docs/development/frontend-vue-architecture.md):
+// - D1: the preserved `Protocol` reducer (`lib/protocol.js`) is the store's
+//   core; epoch/revision/panel semantics are delegated to it, never
+//   re-implemented.
+// - D2: every reducer commit publishes one new committed view object, replaced
+//   wholesale — no subscriber ever observes a partially applied panel state.
+// - D4: the remaining preserved modules are consumed through the A2 lib
+//   wrappers (the keyboard router for focus, the narrative markup pipeline for
+//   narrative tokens, the local-map model, and the choice-point / option-card
+//   logic) rather than being re-implemented.
+// - D5: the transport transport is an attachable `setSender` seam; a single
+//   dispatch entry routes every mutation (dispatch-only, one mutation in
+//   flight) with the tested lock semantics.
+
+import { computed, ref } from "vue";
+import { defineStore } from "pinia";
+
+import Protocol from "../lib/protocol.js";
+import KeyboardRouter from "../lib/keyboard_router.js";
+import NarrativeMarkup from "../lib/narrative_markup.js";
+import LocalMap from "../lib/local_map.js";
+import ChoicePointLogic from "../lib/choicepoint.js";
+import OptionCards from "../lib/option_cards.js";
+import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
+
+const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
+const MAX_NARRATIVE_LINES = 500;
+const MAX_COMMAND_HISTORY = 50;
+// The registered production panel allowlist (mirrors the UMD allowlist in
+// elosern/protocol.js and web/webclient/presentation/protocol.py).
+const PANEL_ALLOWLIST = [
+  "art",
+  "status",
+  "context_actions",
+  "local_map",
+  "services",
+  "creation",
+  "exploration",
+  "character",
+];
+
+// Stable JSON with sorted keys: content comparison that is insensitive to
+// key order, so committed panels can be compared across reducer commits. A
+// `seen` set makes it safe on the reactive (proxied) view objects: a cycle
+// is rendered as `~` instead of recursing forever.
+function stableStringify(value, seen) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  seen = seen || new Set();
+  if (seen.has(value)) {
+    return "~";
+  }
+  seen.add(value);
+  let s;
+  if (Array.isArray(value)) {
+    s = "[" + value.map((item) => stableStringify(item, seen)).join(",") + "]";
+  } else {
+    const keys = Object.keys(value).sort();
+    s = "{" + keys.map((key) => JSON.stringify(key) + ":" + stableStringify(value[key], seen)).join(",") + "}";
+  }
+  seen.delete(value);
+  return s;
+}
+
+// Display conversion of the committed `server_time` (unit conversion at
+// display only, mirroring the B1 TopBar `timeLabel` fixture shape).
+function formatTimeLabel(serverTime) {
+  if (!serverTime) {
+    return null;
+  }
+  const hour = String(serverTime.hour).padStart(2, "0");
+  const minute = String(serverTime.minute).padStart(2, "0");
+  return `${serverTime.season_label} ${serverTime.day_in_season} 日 · ${hour}:${minute}`;
+}
+
+// The committed transport phase maps to the ConnectOverlay status slice the
+// B1 component accepts (connecting/waiting/offline/ready).
+function connectionStatusFor(connected, phase) {
+  if (!connected) {
+    return "offline";
+  }
+  if (phase === "active") {
+    return "ready";
+  }
+  if (phase === "detached") {
+    return "waiting";
+  }
+  return "connecting";
+}
+
+// The focus-frame items from the committed `context_actions` panel: the
+// exploration form's affordances (action + navigation entries) or the combat
+// form's participants (target entries).
+function focusItemsFor(panel) {
+  if (!panel || panel.available !== true) {
+    return [];
+  }
+  if (panel.kind === "exploration") {
+    return Array.isArray(panel.affordances) ? panel.affordances : [];
+  }
+  if (panel.kind === "combat") {
+    // Combat participants carry a numeric `identity` and a `display_name`;
+    // normalize them to the preserved target-entry shape the B2 dock-items
+    // contract expects ({ identity, label, enabled }).
+    const participants = Array.isArray(panel.participants) ? panel.participants : [];
+    return participants.map((p) => ({
+      identity: p.identity == null ? "" : String(p.identity),
+      label: p.display_name || p.label || "",
+      enabled: p.enabled !== false,
+    }));
+  }
+  return [];
+}
+
+export const useElosernStore = defineStore("elosern", () => {
+  // D1: the preserved reducer is the store core (CJS-interop import; the UMD
+  // source and its Node gate are never edited).
+  const reducer = Protocol.createStore();
+
+  // D5: client-local dispatch bookkeeping (the tested legacy action-client
+  // semantics; the transport send is an attachable seam).
+  let inFlight = null; // {requestId, presentationRevision}
+  let uncertain = false;
+  let requestCounter = 0;
+  let sender = null; // { sendAction(envelope), sendText(text) } — C3 attaches evennia.js
+  let lastSurface = null;
+  let lastTarget = null;
+  let prompt = "";
+  // The raw committed item behind each focus key (the router's submit event
+  // carries only the projected {label, enabled, description, key}; intents,
+  // surfaces, and identities are read back from the raw item, never invented).
+  let dockRawByKey = {};
+
+  // D4: the imported keyboard router owns the focus state; its events are
+  // routed through the same store actions (a broken renderer must never
+  // break the reducer).
+  const router = KeyboardRouter.createRouter({
+    onEvent: onRouterEvent,
+  });
+
+  const view = ref(initialView());
+  const narrative = ref([]);
+  const commandHistory = ref([]);
+  const seenIndex = ref(0);
+
+  function onRouterEvent(name, payload) {
+    if (name === "focus" || name === "disabled") {
+      publishView();
+      return;
+    }
+    if (name !== "submit") {
+      return;
+    }
+    // The router's submit event carries only the projected menu item
+    // ({label, enabled, description, key}); the OOB intent, navigation
+    // surface, and target identity are read back from the raw committed
+    // item looked up by the preserved focus key — never re-derived from the
+    // projected item (which lacks `action_id`/`surface`/`identity`).
+    const item = payload && payload.item;
+    if (!item) {
+      return;
+    }
+    const raw = (item.key !== undefined && dockRawByKey[item.key]) || item;
+    const intent = actionIntentForItem(raw);
+    if (intent) {
+      dispatchAction(intent.action_id, intent.payload);
+      return;
+    }
+    if (raw.navigation === true && typeof raw.surface === "string") {
+      lastSurface = raw.surface;
+    } else if (raw.identity !== undefined) {
+      lastTarget = String(raw.identity);
+    }
+    publishView();
+  }
+
+  function handleTransportLifecycle(prev, rs) {
+    if (rs.generation !== prev.generation) {
+      inFlight = null;
+      uncertain = false;
+      requestCounter = 0;
+    }
+    if (prev.phase !== "detached" && rs.phase === "detached" && inFlight) {
+      uncertain = true;
+      inFlight = null;
+    }
+  }
+
+  // D5: the in-flight lock releases with the tested legacy action-client
+  // semantics. A matching `ui_action_result` (same request id, same epoch)
+  // sets the declared presentation revision; the lock then releases only
+  // when the committed revision reaches that revision (immediately when none
+  // was declared, unconditionally for a `no_puppet` rejection; a `stale`
+  // outcome keeps the lock until the recovery snapshot commits — the
+  // `ui_sync` re-request itself is the C3 transport's job).
+  function handleActionResult(prev, rs) {
+    if (!inFlight) {
+      return;
+    }
+    const result = rs.lastActionResult;
+    const prevResult = prev ? prev.lastActionResult : null;
+    if (stableStringify(result) === stableStringify(prevResult)) {
+      return;
+    }
+    if (!result || result.requestId !== inFlight.requestId) {
+      return;
+    }
+    if (result.epoch !== rs.activeEpoch) {
+      return;
+    }
+    // A cached duplicate or a result for a foreign request never unlocks.
+    inFlight.presentationRevision = result.presentationRevision;
+    if (result.outcome === "rejected" && result.code === "no_puppet") {
+      // The puppet is gone; no presentation will ever gate this rejection,
+      // so the lock is released unconditionally.
+      inFlight = null;
+    }
+  }
+
+  // The revision-gated release: the lock releases once the committed
+  // revision reaches the in-flight request's declared presentation revision.
+  // A not-yet-declared target (no result received yet) keeps the lock held,
+  // exactly like the legacy action client's `releaseIfReady`/
+  // `onPresentationAccepted` pair.
+  function releaseIfReady(rs) {
+    if (!inFlight) {
+      return;
+    }
+    const target = inFlight.presentationRevision;
+    if (target !== null && rs.revision !== null && rs.revision >= target) {
+      inFlight = null;
+    }
+  }
+
+  // D4: the focus menu is rebuilt only when the committed `context_actions`
+  // content changes (stable-stringified comparison against the signature of
+  // the last built menu — a store-local signature, NOT the stale previous
+  // view, which would re-trigger the rebuild through the router's focus
+  // events and re-enter publishView forever), preserving the component
+  // dock's preserved `action-`/`target-` item keys as the single key
+  // contract.
+  let lastMenuSig = null;
+  function rebuildFocusMenu(prev, rs) {
+    const panel = (rs.panels && rs.panels.context_actions) || null;
+    const sig = stableStringify(panel);
+    if (sig === lastMenuSig) {
+      return;
+    }
+    lastMenuSig = sig;
+    const rawItems = focusItemsFor(panel);
+    const keys = dockItemKeys(rawItems);
+    dockRawByKey = {};
+    const items = rawItems.map((raw, index) => {
+      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
+      item.key = keys[index];
+      dockRawByKey[keys[index]] = raw;
+      return item;
+    });
+    if (items.length === 0) {
+      router.reset();
+      return;
+    }
+    router.replaceMenu({ items, grid: false });
+  }
+
+  function syncRouterGates() {
+    router.setMutationInFlight(!!inFlight);
+    router.setAwaitingRevision(inFlight && inFlight.presentationRevision !== null ? inFlight.presentationRevision : null);
+  }
+
+  function initialView() {
+    return buildView(null, reducer.getState());
+  }
+
+  function buildView(prev, rs) {
+    const panels = rs.panels || {};
+    const panel = panels.context_actions || null;
+    const suggestions = panel && panel.suggestions ? panel.suggestions : null;
+    const prevChoiceState = prev && prev.choicePoint ? prev.choicePoint.state : "absent";
+    const choiceState = ChoicePointLogic.nextChoicePointState(prevChoiceState, suggestions);
+    const currentItem = router.currentItem();
+
+    return {
+      generation: rs.generation,
+      phase: rs.phase,
+      epoch: rs.activeEpoch,
+      revision: rs.revision,
+      mode: rs.mode,
+      layoutVersion: rs.layoutVersion,
+      serverTime: rs.serverTime,
+      panels,
+      mutationsLocked: rs.mutationsLocked,
+      protocolError: rs.protocolError,
+      lastActionResult: rs.lastActionResult,
+      retiredEpochCount: rs.retiredEpochCount,
+      connected: rs.connected,
+
+      connectionStatus: connectionStatusFor(rs.connected, rs.phase),
+      statusSlice: {
+        connected: rs.connected,
+        locationLabel:
+          panels.status && panels.status.actor && panels.status.actor.location
+            ? panels.status.actor.location.label
+            : null,
+        timeLabel: formatTimeLabel(rs.serverTime),
+      },
+      prompt,
+      lastSurface,
+      lastTarget,
+
+      contextActions: panel,
+      suggestions,
+      suggestionsView: OptionCards.buildOptionsView(panel || {}),
+      suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
+      choicePoint: { state: choiceState, suggestions },
+      localMapModel: panels.local_map ? LocalMap.reducePanel(panels.local_map) : null,
+
+      focus: currentItem
+        ? {
+            key: currentItem.key !== undefined ? currentItem.key : currentItem.label,
+            label: currentItem.label,
+            enabled: currentItem.enabled,
+            description: currentItem.description,
+          }
+        : { key: null, label: null, enabled: null, description: null },
+
+      dispatch: {
+        inFlight: inFlight ? { requestId: inFlight.requestId, presentationRevision: inFlight.presentationRevision } : null,
+        uncertain,
+      },
+    };
+  }
+
+  function publishView() {
+    const prev = view.value;
+    const rs = reducer.getState();
+    handleTransportLifecycle(prev, rs);
+    handleActionResult(prev, rs);
+    releaseIfReady(rs);
+    rebuildFocusMenu(prev, rs);
+    syncRouterGates();
+    view.value = buildView(prev, rs);
+  }
+
+  reducer.subscribe(() => {
+    publishView();
+  });
+
+  // ---------------------------------------------------------------- actions
+
+  function receive(messageGeneration, messageName, args, kwargs) {
+    return reducer.receive(messageGeneration, messageName, args || [], kwargs || {});
+  }
+
+  function beginTransport(nextGeneration) {
+    return reducer.beginTransport(nextGeneration);
+  }
+
+  function setConnected(connected) {
+    return reducer.setConnected(connected);
+  }
+
+  function setSender(next) {
+    sender = next || null;
+  }
+
+  function setPrompt(text) {
+    prompt = typeof text === "string" ? text : "";
+    publishView();
+  }
+
+  function appendText(kind, text) {
+    if (NARRATIVE_KINDS.indexOf(kind) === -1) {
+      throw new TypeError("narrative kind must be one of in/out/sys/err");
+    }
+    const line = {
+      kind,
+      text: String(text == null ? "" : text),
+      tokens: kind === "out" ? NarrativeMarkup.tokenize(String(text == null ? "" : text)) : null,
+    };
+    narrative.value.push(line);
+    while (narrative.value.length > MAX_NARRATIVE_LINES) {
+      narrative.value.shift();
+      seenIndex.value = Math.max(0, seenIndex.value - 1);
+    }
+    return line;
+  }
+
+  function sendText(text) {
+    if (!view.value.connected) {
+      return false;
+    }
+    const value = String(text == null ? "" : text);
+    appendText("in", value);
+    commandHistory.value.push(value);
+    while (commandHistory.value.length > MAX_COMMAND_HISTORY) {
+      commandHistory.value.shift();
+    }
+    if (sender && typeof sender.sendText === "function") {
+      sender.sendText(value);
+    }
+    return true;
+  }
+
+  function dispatchAction(actionId, payload) {
+    const v = view.value;
+    if (!v.connected || v.mutationsLocked || v.phase !== "active" || inFlight) {
+      return null;
+    }
+    const requestId = "session:" + (++requestCounter);
+    const envelope = {
+      protocol_version: 1,
+      presentation_epoch: v.epoch,
+      request_id: requestId,
+      base_revision: v.revision,
+      action_id: actionId,
+      payload: payload === undefined || payload === null ? {} : payload,
+    };
+    inFlight = { requestId, presentationRevision: null };
+    router.setMutationInFlight(true);
+    try {
+      if (sender && typeof sender.sendAction === "function") {
+        sender.sendAction(envelope);
+      }
+    } catch (err) {
+      // A synchronous transport failure (a closing WebSocket, a failed
+      // adapter): mark the mutation uncertain, release the in-flight gate
+      // (no declared presentation revision to await) so the dispatch lock
+      // never sticks, and publish so the committed view reflects the failed
+      // send (the C3 transport re-asserts or the `clearUncertain` path
+      // recovers the flag).
+      uncertain = true;
+      inFlight = null;
+      router.setMutationInFlight(false);
+      router.setAwaitingRevision(null);
+    } finally {
+      publishView();
+    }
+    return requestId;
+  }
+
+  function focusPress(key, repeat) {
+    return router.press(key, !!repeat);
+  }
+
+  function focusConfirm(source) {
+    return router.confirm(source ? { source } : { source: "keyboard" });
+  }
+
+  function focusEscape() {
+    return router.escape();
+  }
+
+  function focusItemByKey(key) {
+    return router.focusItemByKey(key);
+  }
+
+  function markNarrativeSeen() {
+    seenIndex.value = narrative.value.length;
+  }
+
+  const unreadCount = computed(() =>
+    narrative.value
+      .slice(seenIndex.value)
+      .filter((line) => line.kind === "out")
+      .length
+  );
+
+  function clearUncertain() {
+    uncertain = false;
+    publishView();
+  }
+
+  return {
+    view,
+    narrative,
+    commandHistory,
+    unreadCount,
+    receive,
+    beginTransport,
+    setConnected,
+    setSender,
+    setPrompt,
+    appendText,
+    sendText,
+    dispatchAction,
+    focusPress,
+    focusConfirm,
+    focusEscape,
+    focusItemByKey,
+    markNarrativeSeen,
+    clearUncertain,
+  };
+});
