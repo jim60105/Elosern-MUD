@@ -462,3 +462,358 @@ export const SKILLS_SLICE_SAMPLE = {
     },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// B4 (webclient-vue-05-showcase-world): world + services family fixtures.
+// Mirror the bounded OOB panel payloads — local_map v1, art v1, and
+// services v1 — so the offline showcase asserts truthfulness: the lattice
+// states, the art placeholder contract, the services-backed shop/quest/
+// lore/inventory surfaces, and the equipped-only inventory (no full bag,
+// no party panel — both deferred, roadmap §7). No live server, LLM, or
+// imagegen data; every value is a fixed literal.
+// ---------------------------------------------------------------------------
+
+// The `local_map` v1 lattice: exactly one current node; adjacent nodes
+// marked unvisited/visited, a remembered far node, edges with traversable
+// states, the legend explaining every visibility state, and an actionable
+// adjacent node whose `action` carries the OOB move intent.
+export const LOCAL_MAP_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:1:2",
+  title: "霧骨渡口",
+  nodes: [
+    {
+      id: "grid:altoria:1:2",
+      label: "霧骨渡口",
+      x: 1,
+      y: 2,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      action: null,
+    },
+    {
+      id: "grid:altoria:2:2",
+      label: "南門",
+      x: 2,
+      y: 2,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: { kind: "move", exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2" },
+    },
+    {
+      id: "grid:altoria:0:2",
+      label: "碼頭",
+      x: 0,
+      y: 2,
+      visibility: "visible_visited",
+      current: false,
+      anchor: true,
+      landmark: false,
+      action: null,
+    },
+    {
+      id: "grid:altoria:5:5",
+      label: "舊街區",
+      x: 5,
+      y: 5,
+      visibility: "remembered",
+      current: false,
+      anchor: false,
+      landmark: true,
+      action: null,
+    },
+  ],
+  edges: [
+    { source: "grid:altoria:1:2", destination: "grid:altoria:2:2", label: "南門", known: true, traversable: true },
+    { source: "grid:altoria:1:2", destination: "grid:altoria:0:2", label: "碼頭", known: true, traversable: false },
+    { source: "grid:altoria:1:2", destination: "grid:altoria:5:5", label: "遠方路網", known: false, traversable: false },
+  ],
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+    "曾經到過、但不在附近的遠方位置",
+  ],
+};
+
+// The reduced lattice state: current node plus a single unvisited adjacent
+// node (no action, one legend line) — the minimal truthful map.
+export const LOCAL_MAP_MINIMAL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:1:2",
+  title: "霧骨渡口",
+  nodes: [
+    {
+      id: "grid:altoria:1:2",
+      label: "霧骨渡口",
+      x: 1,
+      y: 2,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      action: null,
+    },
+    {
+      id: "grid:altoria:1:1",
+      label: "北岸",
+      x: 1,
+      y: 1,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: null,
+    },
+  ],
+  edges: [
+    { source: "grid:altoria:1:2", destination: "grid:altoria:1:1", label: "北岸", known: false, traversable: true },
+  ],
+  legend: ["你目前所在的位置"],
+};
+
+// The registry-owned unavailable form for the map (a broken presenter, or
+// a layer the player has not explored yet).
+export const LOCAL_MAP_UNAVAILABLE_SAMPLE = {
+  schema_version: 1,
+  available: false,
+  reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
+};
+
+// The `art` payload when the scene asset is generated: the 16:9 scene
+// renders cover-style and the 3:4 portrait catalog carries contextual
+// names/roles; labels and alt text stay DOM nodes outside the bitmaps.
+export const ART_PANEL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "scene",
+  scene: {
+    archetype: "river_dawn",
+    label: "河畔清晨",
+    subject_key: "scene_river_dawn",
+    status: "done",
+    url: "/art/scenes/scene_river_dawn.png",
+    aspect_ratio: "16:9",
+    alt: "河畔清晨的場景",
+    placeholder: null,
+  },
+  portrait_catalog: {
+    "101": {
+      subject_key: "port_harbor_master",
+      status: "done",
+      url: "/art/portraits/port_harbor_master.png",
+      aspect_ratio: "3:4",
+      alt: "碼頭船長的肖像",
+      placeholder: null,
+      context: { name: "老周", role: "對話對象" },
+    },
+    "217": {
+      subject_key: "port_river_ogre",
+      status: "done",
+      url: "/art/portraits/port_river_ogre.png",
+      aspect_ratio: "3:4",
+      alt: "河灣巨魔的肖像",
+      placeholder: null,
+      context: { name: "河灣巨魔", role: "敵方" },
+    },
+  },
+};
+
+// The art panel while the scene asset is still generating: the scene is
+// pending, there is no prior image (url/subject_key null), and the panel
+// degrades to the truthful "missing" placeholder — no invented bitmap.
+export const ART_PANEL_PENDING_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "scene",
+  scene: {
+    archetype: "river_dawn",
+    label: "河畔清晨",
+    subject_key: null,
+    status: "pending",
+    url: null,
+    aspect_ratio: null,
+    alt: "河畔清晨的場景",
+    placeholder: { kind: "missing", label: "場景圖像尚未生成" },
+  },
+  portrait_catalog: {
+    "101": {
+      subject_key: "port_harbor_master",
+      status: "pending",
+      url: null,
+      aspect_ratio: null,
+      alt: "碼頭船長的肖像",
+      placeholder: { kind: "missing", label: "肖像圖像尚未生成" },
+      context: { name: "老周", role: "對話對象" },
+    },
+  },
+};
+
+// The registry-owned unavailable form for the art panel.
+export const ART_PANEL_UNAVAILABLE_SAMPLE = {
+  schema_version: 1,
+  available: false,
+  reason: { code: "art_unavailable", message: "場景圖像目前無法顯示" },
+};
+
+// The full `services` payload (guild, shop, and inventory sections all
+// present). Every entry mirrors the exact bounded schema; the integer
+// copper currency is display-formatted, never float money.
+export const SERVICES_PANEL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "services",
+  host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
+  player: {
+    wallet: 3240,
+    guild_registered: true,
+    guild_rank: "C",
+    guild_merit: 140,
+    next_rank: "B",
+    next_threshold: 300,
+  },
+  guild: {
+    registration: {
+      registered: true,
+      register: {
+        action_id: "guild.register",
+        label: "加入公會",
+        enabled: false,
+        disabled_reason: { code: "already_registered", message: "你已經是公會成員" },
+        quantity: null,
+      },
+    },
+    board: [
+      {
+        definition_key: "quest_mill_grain",
+        display_name: "磨坊糧運",
+        objective_summary: "將十袋糧食運往磨坊",
+        reward_summary: "400 銅＋公會功績 25",
+        rank: "C",
+        accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
+      },
+      {
+        definition_key: "quest_harbor_light",
+        display_name: "燈塔值守",
+        objective_summary: "為渡口燈塔補足燈油",
+        reward_summary: "220 銅＋公會功績 15",
+        rank: "B",
+        accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
+      },
+    ],
+    quests: [
+      {
+        quest_id: "q_1042",
+        definition_key: "quest_mill_grain",
+        display_name: "磨坊糧運",
+        state: "in_progress",
+        stage_index: 1,
+        stage_progress: 3,
+        objective_summary: "將十袋糧食運往磨坊",
+        deadline_line: "剩餘 2 日",
+        detail: "老周把三袋糧食交給你，要求天亮前送到磨坊。",
+        abandon: { action_id: "guild.quest_abandon", label: "放棄任務", enabled: true, disabled_reason: null, quantity: null },
+        turnin: { action_id: "guild.quest_turnin", label: "交派任務", enabled: false, disabled_reason: { code: "quest_not_ready", message: "任務目標尚未完成" }, quantity: null },
+      },
+    ],
+    rank: {
+      rank: "C",
+      merit: 140,
+      next_rank: "B",
+      next_threshold: 300,
+      eligible: true,
+      exam_start: { action_id: "guild.exam_start", label: "開始考核", enabled: true, disabled_reason: null, quantity: null },
+    },
+  },
+  shop: {
+    open: true,
+    stock: [
+      {
+        item_key: "item_iron_sword",
+        display_name: "鐵劍",
+        buy_copper: 120,
+        sell_copper: 80,
+        stock: 8,
+        max_stock: 24,
+        buy: { action_id: "shop.buy", label: "購買鐵劍", enabled: true, disabled_reason: null, quantity: { min: 1, max: 8 } },
+      },
+      {
+        item_key: "item_heal_potion",
+        display_name: "治療劑",
+        buy_copper: 45,
+        sell_copper: 30,
+        stock: 30,
+        max_stock: 30,
+        buy: { action_id: "shop.buy", label: "購買治療劑", enabled: false, disabled_reason: { code: "insufficient_funds", message: "錢包餘額不足" }, quantity: { min: 1, max: 30 } },
+      },
+    ],
+    sellable: [
+      {
+        item_key: "item_herb_moon",
+        display_name: "月光草",
+        sell_copper: 25,
+        held: 3,
+        sell: { action_id: "shop.sell", label: "賣出月光草", enabled: true, disabled_reason: null, quantity: { min: 1, max: 3 } },
+      },
+    ],
+  },
+  inventory: {
+    rows: [
+      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true },
+      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true },
+      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false },
+    ],
+    wallet: 3240,
+  },
+  pagination: {
+    board_total: 2,
+    quest_total: 1,
+    stock_total: 2,
+    sellable_total: 1,
+    inventory_total: 3,
+  },
+};
+
+// The registry-owned unavailable form for the services panel: the common
+// `{available: false, reason}` envelope (webclient-oob-protocol), carrying
+// the panel-stable reason — no invented sections or default values.
+export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
+  schema_version: 1,
+  available: false,
+  reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
+};
+
+// The reduced services payload: no host, no guild/shop/inventory sections
+// (all null with zero pagination totals), a bare player summary.
+export const SERVICES_PANEL_MINIMAL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "services",
+  host: null,
+  player: {
+    wallet: 0,
+    guild_registered: false,
+    guild_rank: null,
+    guild_merit: 0,
+    next_rank: null,
+    next_threshold: null,
+  },
+  guild: null,
+  shop: null,
+  inventory: null,
+  pagination: {
+    board_total: 0,
+    quest_total: 0,
+    stock_total: 0,
+    sellable_total: 0,
+    inventory_total: 0,
+  },
+};
