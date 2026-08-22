@@ -20,6 +20,11 @@
     "World/ShopPanel",
     "World/QuestBoard",
     "World/LoreDrawer",
-    "World/InventoryPanel"
-  ]
+    "World/InventoryPanel",
+    "Overlays/MapOverlay",
+    "Overlays/SettingsOverlay",
+    "Overlays/HelpOverlay",
+    "Overlays/CreationOverlay"
+  ],
+  "frozen": true
 }

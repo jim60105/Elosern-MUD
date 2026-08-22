@@ -1,0 +1,72 @@
+import { mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it } from "vitest";
+import MapOverlay from "../../components/MapOverlay.vue";
+import {
+  LOCAL_MAP_MINIMAL_SAMPLE,
+  LOCAL_MAP_SAMPLE,
+  LOCAL_MAP_UNAVAILABLE_SAMPLE,
+} from "../../stories/fixtures.js";
+
+describe("MapOverlay (B5 overlays family)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("renders the full lattice in the dialog frame, reusing the LocalMap panel", () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    const dialog = wrapper.get('[data-testid="map-overlay"]');
+    expect(dialog.attributes("role")).toBe("dialog");
+    expect(dialog.attributes("aria-label")).toBe("區域地圖");
+    // Interactive cells keep LocalMap's preserved item keys.
+    expect(
+      wrapper.find('[data-testid="local-map"]').exists(),
+    ).toBe(true);
+    // The lattice SVG carries the local-map__lattice class (no testid).
+    expect(wrapper.find(".local-map__lattice").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-testid="local-map__node--grid:altoria:1:2"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-testid="local-map__legend"]').exists()).toBe(true);
+  });
+
+  it("forwards the move event when the actionable adjacent node is clicked", async () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    await wrapper
+      .get('[data-testid="local-map__node--grid:altoria:2:2"]')
+      .trigger("click");
+    const emitted = wrapper.emitted("move");
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0][0]).toEqual({
+      exit_ref: "e_altoria_1_2_e",
+      destination: "grid:altoria:2:2",
+    });
+  });
+
+  it("renders only the registry-owned reason for the unavailable payload", () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE } });
+    expect(
+      wrapper.get('[data-testid="map-overlay-unavailable"]').text(),
+    ).toBe("區域地圖目前無法顯示");
+    // The unavailable form never invents a lattice: no LocalMap panel.
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
+  });
+
+  it("emits close and hides the overlay when the close button is clicked", async () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_MINIMAL_SAMPLE } });
+    await wrapper.get('[data-testid="map-overlay-close"]').trigger("click");
+    expect(wrapper.emitted("close")).toBeTruthy();
+    expect(wrapper.find('[data-testid="map-overlay"]').exists()).toBe(false);
+    // No lattice after the client-local close (no OOB envelope).
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
+  });
+
+  it("hides the overlay root when open is false", () => {
+    wrapper = mount(MapOverlay, {
+      props: { localMap: LOCAL_MAP_SAMPLE, open: false },
+    });
+    expect(wrapper.find('[data-testid="map-overlay"]').exists()).toBe(false);
+  });
+});
