@@ -74,10 +74,11 @@ WEBSOCKET_CLIENT_INTERFACE = "127.0.0.1"
 # reconnect-authentication path, not the client's one-shot page reload.
 WEBSOCKET_PROTOCOL_CLASS = "server.conf.websocket_protocol.WebSocketClient"
 
-# Vue/legacy XOR load flag (webclient-vue-01-foundation). The production
-# default is False (legacy); C3 flips this here so the wiring wave tests can
-# force the Vue branch from test config only.
-ELOSERN_VUE_CLIENT = os.environ.get("ELOSERN_BROWSER_VUE_CLIENT") == "1"
+# Vue/legacy XOR load flag (webclient-vue-01-foundation). C4 flipped the
+# production default to the Vue SPA, so the browser-test environment mirrors
+# that: the default is Vue; set ``ELOSERN_BROWSER_VUE_CLIENT=0`` to explicitly
+# select the legacy fallback branch (the rollback / bundle-blocked scenario).
+ELOSERN_VUE_CLIENT = os.environ.get("ELOSERN_BROWSER_VUE_CLIENT") != "0"
 
 # Expose the flag to the webclient templates through the project context
 # processor (this module does not import server.conf.settings, so the

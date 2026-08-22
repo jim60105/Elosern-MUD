@@ -99,7 +99,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
             "{ skill_key: 'fire_ball', target_ids: [999999] })"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
             timeout=30000,
         )
@@ -126,7 +126,7 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
             session_id,
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
             timeout=30000,
         )
@@ -199,7 +199,7 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.wait_for_function(
             "() => document.getElementById('elosern-offline-overlay')"
@@ -274,7 +274,7 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         # The cast is admitted and a round commits; the result reaches the store
         # but the client's in-flight request is never released.
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "const p = s.panels && s.panels['context_actions']; "
             "return p && p.available && p.session.round >= 1; }",
             timeout=30000,
@@ -288,7 +288,7 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
 
         # On reconnect the client shows the uncertain-result notice and never

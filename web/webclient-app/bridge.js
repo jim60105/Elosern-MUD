@@ -196,6 +196,34 @@ export function createWindowBridge(store) {
     lastResult: () => store.view.lastActionResult,
   };
 
+  // One-sync-per-episode resync guard (the legacy requestResync contract):
+  // a renderer that cannot render a panel requests exactly one `ui_sync` for
+  // the same failure episode; a second request in the same episode is blocked
+  // so a malformed panel cannot create a sync loop. The episode resets on a
+  // new transport generation (a reconnect re-arms it).
+  const resyncGuard = {};
+
+  function requestResync(panelName) {
+    const generation = currentGeneration();
+    let entry = resyncGuard[panelName];
+    if (!entry || entry.episode !== generation) {
+      entry = { episode: generation, requested: false };
+      resyncGuard[panelName] = entry;
+    }
+    if (entry.requested) {
+      return false;
+    }
+    entry.requested = true;
+    sync();
+    return true;
+  }
+
+  function resetResyncEpisode(panelName) {
+    // Re-arm the one-sync guard for a panel: the harness uses this to allow
+    // a fresh resync after a reconnect re-armed the transport generation.
+    delete resyncGuard[panelName];
+  }
+
   const actions = {
     client,
     sync,
@@ -204,6 +232,8 @@ export function createWindowBridge(store) {
     handlePresentation,
     handleReconnect,
     handleTransportReset,
+    requestResync,
+    resetResyncEpisode,
   };
 
   // Document keydown routes through the store's single focus entry (the
@@ -245,10 +275,14 @@ export function createWindowBridge(store) {
 
   // The returned object is the installation handle (facade + store + the
   // key-routing uninstall hook); `window.Elosern` itself carries exactly the
-  // four frozen façades (§1) and nothing else.
+  // four frozen façades (§1) and nothing else. The live keyboard-router
+  // instance is exposed through the handle (the C4 harness re-map): browser
+  // slices read `depth()` / `currentItem()` off it instead of the retired
+  // `window.Elosern.keyboard` global.
   return {
     facade: window.Elosern,
     store,
+    router: store.router,
     uninstall: uninstallKeyRouting,
   };
 }

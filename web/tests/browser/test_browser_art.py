@@ -301,7 +301,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             "() => !!document.querySelector('#combat-row-0')", timeout=15000
         )
         page.wait_for_function(
-            "() => !window.Elosern.keyboard.isMutationInFlight()", timeout=15000
+            "() => !window.__elosernBridge.facade.actions.client.isInFlight()", timeout=15000
         )
 
     def _wait_combat_row_key(

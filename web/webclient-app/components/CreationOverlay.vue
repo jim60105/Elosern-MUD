@@ -14,6 +14,10 @@ const props = defineProps({
   // server-persisted wizard draft, or the registry-owned unavailable form).
   creation: { type: Object, required: true },
   open: { type: Boolean, default: true },
+  // The store's last `ui_action_result` (or null): a rejected creation
+  // action renders its code/message in the form message (the legacy
+  // `creation-form-message` hook).
+  result: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action", "close"]);
@@ -145,6 +149,21 @@ const gateError = ref(false);
 const budgetError = ref(false);
 const subraceError = ref(false);
 
+// The legacy `creation-form-message` hook (Phase-0 audit §2.3 REMAP-TO-TESTID):
+// a single form-message element that surfaces a server rejection (result.code /
+// result.message) or the first active local validation error. The element is
+// rendered only while a message is active.
+const formMessage = computed(() => {
+  const r = props.result;
+  if (r && r.outcome === "rejected") {
+    return r.code || r.message || "";
+  }
+  if (gateError.value) return `年齡與外觀年齡皆須 ≥ ${minimumAge.value}`;
+  if (subraceError.value) return "已選擇有血統的種族時，必須先選擇血統";
+  if (budgetError.value) return `點數總和 ${allocationTotal.value} 不等於額度 ${currentProfile.value?.budget}`;
+  return "";
+});
+
 function onRaceChange() {
   const info = races.value.find((r) => r.key === race.value);
   if (!info || !Array.isArray(info.subraces)) subrace.value = null;
@@ -263,7 +282,7 @@ function close() {
       </button>
     </header>
 
-    <div class="creation-overlay__body">
+    <div class="creation-overlay__body" data-testid="creation-body">
       <template v-if="available">
         <nav class="creation-overlay__modes">
           <button
@@ -302,6 +321,7 @@ function close() {
             type="button"
             class="creation-preset-card"
             data-testid="creation-preset-card"
+            :data-preset-key="card.key"
             :data-selected="selectedPresetKey === card.key ? 'true' : 'false'"
             @click="selectPreset(card)"
           >
@@ -327,7 +347,7 @@ function close() {
             <span>名稱</span>
             <input
               type="text"
-              data-testid="creation-name"
+              data-testid="creation-field-displayName"
               :minlength="custom?.name?.min_length ?? 1"
               :maxlength="custom?.name?.max_length ?? 64"
               v-model="name"
@@ -336,11 +356,11 @@ function close() {
 
           <label class="creation-overlay__field">
             <span>年齡</span>
-            <input type="number" data-testid="creation-age" :min="minimumAge" v-model.number="age" />
+            <input type="number" data-testid="creation-field-age" :min="minimumAge" v-model.number="age" />
           </label>
           <label class="creation-overlay__field">
             <span>外觀年齡</span>
-            <input type="number" data-testid="creation-apparent-age" :min="minimumApparentAge" v-model.number="apparentAge" />
+            <input type="number" data-testid="creation-field-apparentAge" :min="minimumApparentAge" v-model.number="apparentAge" />
           </label>
 
           <label class="creation-overlay__field">
@@ -368,7 +388,7 @@ function close() {
                 :min="ax.minimum"
                 :max="ax.maximum"
                 v-model.number="allocations[ax.axis]"
-                :data-testid="`creation-alloc-${ax.axis}`"
+                :data-testid="`creation-field-${ax.axis}`"
               />
             </label>
           </div>
@@ -395,16 +415,8 @@ function close() {
             <textarea data-testid="creation-background" rows="3" v-model="background"></textarea>
           </label>
 
-          <p v-if="gateError" class="creation-gate-error" data-testid="creation-gate-error">
-            年齡與外觀年齡皆須 ≥ {{ minimumAge }}
-          </p>
-          <p v-if="budgetError" class="creation-budget-error" data-testid="creation-budget-error">
-            點數總和 {{ allocationTotal }} 不等於額度 {{ currentProfile?.budget }}
-          </p>
-          <p v-if="subraceError" class="creation-subrace-error" data-testid="creation-subrace-error">
-            已選擇有血統的種族時，必須先選擇血統
-          </p>
-          <button type="button" class="creation-custom-confirm" data-testid="creation-custom-confirm" @click="confirmCustom">
+          <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
+          <button type="button" class="creation-custom-confirm" data-testid="creation-submit" @click="confirmCustom">
             確認自訂
           </button>
         </div>
@@ -420,9 +432,9 @@ function close() {
           </p>
           <label class="creation-overlay__field">
             <span>角色概念</span>
-            <textarea data-testid="creation-concept" rows="4" v-model="conceptText"></textarea>
+            <textarea data-testid="creation-field-concept" rows="4" v-model="conceptText"></textarea>
           </label>
-          <button type="button" class="creation-concept-apply" data-testid="creation-concept-apply" @click="applyConcept">
+          <button type="button" class="creation-concept-apply" data-testid="creation-concept-submit" @click="applyConcept">
             套用概念
           </button>
         </div>
@@ -639,9 +651,7 @@ function close() {
   color: var(--paper-300);
 }
 
-.creation-gate-error,
-.creation-budget-error,
-.creation-subrace-error {
+.creation-form-message {
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
   color: var(--seal-400);
@@ -650,6 +660,8 @@ function close() {
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
 }
+
+
 
 .creation-overlay__footer {
   display: flex;

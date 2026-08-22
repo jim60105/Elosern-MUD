@@ -87,7 +87,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
     def _reset_root(self, page):
         page.evaluate("document.getElementById('action-dock').focus()")
-        page.evaluate("Elosern.explorationDock.resetToRoot()")
+        page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
 
     def _open_root(self, page, index):
@@ -160,14 +160,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         self._open_root(page, 3)  # 角色狀態
         self.assertEqual(
-            page.evaluate("Elosern.explorationDock.isCharacterActive()"),
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
             True,
             "the character panel must own the action dock",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
         self.assertEqual(
-            page.evaluate("Elosern.explorationDock.isCharacterActive()"),
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
             False,
             "Escape must leave the character panel",
         )
@@ -291,7 +291,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         page.keyboard.type("話到嘴邊又吞了回去")
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => !Elosern.drawer.isOpen() && (() => {"
+            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
             "  const dock = document.getElementById('action-dock');"
             "  return document.activeElement === dock || "
             "    (document.activeElement && dock.contains(document.activeElement));"
@@ -377,7 +377,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowDown")  # 休息一段時間 (third grid row)
         _press(page, "Enter")
         page.wait_for_function(
-            "() => document.getElementById('exploration-rest-form') !== null"
+            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
         )
         page.keyboard.type("3600")
         page.keyboard.press("Enter")
@@ -438,11 +438,11 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # stale outcome and performs no traversal.
         page.evaluate(
             """() => {
-              const s = Elosern.StateController.getState();
+              const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               const moveRow = s.panels.exploration.move[0];
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
-                presentation_epoch: s.activeEpoch,
+                presentation_epoch: s.epoch,
                 request_id: 'stale-move-1',
                 base_revision: 0,
                 action_id: 'explore.move',
@@ -467,10 +467,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # A tampered exit_ref fails commit-time revalidation.
         page.evaluate(
             """() => {
-              const s = Elosern.StateController.getState();
+              const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
-                presentation_epoch: s.activeEpoch,
+                presentation_epoch: s.epoch,
                 request_id: 'tampered-move-1',
                 base_revision: s.revision,
                 action_id: 'explore.move',
@@ -527,7 +527,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.evaluate("Evennia.connect()")
         self._wait_exploration_available(page)
@@ -546,7 +546,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # Pointer: open Look, then click its final back cell.
         page.locator('[data-item-key="look"]').click()
         page.wait_for_function(
-            "() => document.getElementById('exploration-detail') !== null"
+            "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
         )
         page.locator('[data-item-key="back"]').click()
         page.wait_for_function(
@@ -563,11 +563,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+            ["action-explore.move", "action-explore.look", "action-explore.interact",
+             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
         )
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
-            page.evaluate("Elosern.keyboard.depth()"),
+            page.evaluate("window.__elosernBridge.router.depth()"),
             1,
             "the back cell pops exactly one router frame",
         )
@@ -584,10 +585,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 2)  # Interact
         _press(page, "Enter")  # the guard (first present target)
         _press(page, "Enter")  # 交談 (first affordance)
-        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 4)
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 4)
         _press(page, "Escape")  # back to the target-affordance menu
         page.wait_for_timeout(80)
-        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 3)
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 3)
         target_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
@@ -596,16 +597,19 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # back cell (the exploration fixture carries no guild navigate entry).
         self.assertEqual(
             target_keys,
-            ["talk-scripted", "back"],
+            ["action-explore.talk_scripted", "back"],
             "the target-affordance cells must render after one Escape",
         )
         self.assertEqual(
-            page.evaluate("Elosern.explorationDock._currentMenuKey"),
-            "target-" + str(guard_identity),
+            page.evaluate(
+                "window.__elosernBridge.router.currentItem() && "
+                "window.__elosernBridge.router.currentItem().key"
+            ),
+            "action-explore.talk_scripted",
         )
         _press(page, "Escape")  # back to the Interact target list
         page.wait_for_timeout(80)
-        self.assertEqual(page.evaluate("Elosern.keyboard.depth()"), 2)
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
         interact_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
@@ -619,7 +623,13 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             expected_interact,
             "the Interact list cells must render after the second Escape",
         )
-        self.assertEqual(page.evaluate("Elosern.explorationDock._currentMenuKey"), "interact")
+        self.assertEqual(
+            page.evaluate(
+                "window.__elosernBridge.router.currentItem() && "
+                "window.__elosernBridge.router.currentItem().key"
+            ),
+            "target-" + str(guard_identity),
+        )
         self.assertEqual(sent_action_count(page), 0)
 
     @covers_requirement("webclient-exploration-menu::the-exploration-dock-is-keyboard-first-and-re-homes-the-service-submenus")
@@ -633,25 +643,29 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # cells (the shared-router regression).
         self._open_root(page, 4)  # Quests
         self.assertEqual(
-            page.evaluate("Elosern.serviceDock.isActive()"),
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"),
             True,
             "the services dock must own the surface inside Quests",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
-        self.assertEqual(page.evaluate("Elosern.serviceDock.isActive()"), False)
+        self.assertEqual(page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"), False)
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+            ["action-explore.move", "action-explore.look", "action-explore.interact",
+             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
             "the exploration root cells must render after Escape from Quests",
         )
         self.assertEqual(
-            page.evaluate("Elosern.explorationDock._currentMenuKey"),
-            "root",
+            page.evaluate(
+                "window.__elosernBridge.router.currentItem() && "
+                "window.__elosernBridge.router.currentItem().key"
+            ),
+            "action-quests",
         )
 
 

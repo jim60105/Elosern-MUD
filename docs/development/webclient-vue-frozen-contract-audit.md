@@ -258,7 +258,9 @@ one action-dispatch entry, respectively.
         "handleActionResult",
         "handlePresentation",
         "handleReconnect",
-        "handleTransportReset"
+        "handleTransportReset",
+        "requestResync",
+        "resetResyncEpisode"
       ],
       "client_members": [
         "sync",
@@ -369,7 +371,7 @@ spec delta is required:
 |---|---|---|---|
 | `combat-detail`, `local-map-detail` | `js/plugins/elosern_ui.js:280`, `goldenlayout.js:726` | C4 | REMAP-TO-TESTID |
 | `creation-body`, `creation-submit`, `creation-concept-indicator`, `creation-reset`, `creation-field-<name>`, `data-preset-key` | `js/plugins/creation_dock.js:330,403-404,514,566,693` | C4 | REMAP-TO-TESTID |
-| `creation-concept-submit`, `creation-form-message`, `creation-race-<i>` (race radio prefix `creation-race-`) | `js/plugins/creation_dock.js:272,343,362`; targets in `test_browser_creation.py:251,300,303,397,533,556` | C4 | REMAP-TO-TESTID |
+| `creation-concept-submit`, `creation-form-message`, `creation-race` + `creation-subrace` (Vue `<select>` testids replacing the legacy `creation-race-<i>` race radios; see the C4 risk note — the Vue overlay renders race/subrace as `<select>`) | `js/plugins/creation_dock.js:272,343,362`; targets in `test_browser_creation.py:251,300,303,397,533,556` | C4 | REMAP-TO-TESTID |
 | `exploration-detail` (element id + `.exploration-detail` class on the same panel) | `js/plugins/exploration_dock.js:264-265,388`; targets in `test_browser_exploration.py:521`, `test_browser_shell.py:621,624-626` | C4 | REMAP-TO-TESTID |
 | `services-quantity`, `services-quantity-value` | `js/plugins/services_dock.js:246,254-257`; targets in `test_browser_services.py:374-376,608,646` | C4 | REMAP-TO-TESTID |
 | `exploration-rest-form` | `js/plugins/exploration_dock.js` (rest form) | C4 | REMAP-TO-TESTID |
@@ -481,7 +483,7 @@ preserve-classified in §2).
       "delta_id": "C4-01",
       "kind": "RENAMED+MODIFIED",
       "capability": "webclient-desktop-shell",
-      "requirement": "The WebClient loads a local desktop GoldenLayout shell",
+      "requirement": "The WebClient loads a local Vue SPA desktop shell",
       "rename_to": "The WebClient loads a local Vue SPA desktop shell",
       "applying_change": "webclient-vue-10-wire-views-browser",
       "binding_identifiers": [

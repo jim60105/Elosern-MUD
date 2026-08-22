@@ -206,7 +206,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), before)
         detail = page.evaluate(
-            "document.getElementById('combat-detail').innerText"
+            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
         )
         self.assertGreater(len(detail.strip()), 0, "disabled row must explain")
 
@@ -289,7 +289,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.wait_for_function(
             "() => document.getElementById('elosern-offline-overlay')"

@@ -62,7 +62,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # The input row is hidden until the player opens the drawer.
         self.assertFalse(page.locator(".inputfieldwrapper").is_visible())
         self.assertFalse(page.locator(".prompt").is_visible())
-        self.assertFalse(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertFalse(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
 
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
@@ -73,7 +73,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertEqual(
             page.evaluate("document.querySelector('.drawer-entry').getAttribute('aria-expanded')"),
             "true",
@@ -91,12 +91,12 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         # With no editable control focused, `/` closes and restores dock focus.
         page.evaluate("document.getElementById('action-dock').focus()")
         page.keyboard.press("/")
         page.wait_for_function(
-            "() => !Elosern.drawer.isOpen() && (() => {"
+            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
             "  const dock = document.getElementById('action-dock');"
             "  return document.activeElement === dock || "
             "    (document.activeElement && dock.contains(document.activeElement));"
@@ -107,7 +107,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
 
     @covers_requirement(
         "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe"
@@ -123,7 +123,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             page.evaluate("document.getElementById('inputfield').value"),
             "whisper /",
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertTrue(
             page.evaluate(
                 "document.activeElement === document.getElementById('inputfield')"
@@ -147,19 +147,19 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowDown")  # 休息一段時間
         _press(page, "Enter")
         page.wait_for_function(
-            "() => document.getElementById('exploration-rest-form') !== null"
+            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
         )
-        self.assertFalse(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertFalse(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         # A slash while the rest form owns the keyboard is claimed: the drawer
         # never opens or closes.
         page.keyboard.press("/")
         page.wait_for_timeout(150)
         self.assertFalse(
-            page.evaluate("Elosern.drawer.isOpen()"),
+            page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"),
             "a slash in the rest form must never open the drawer",
         )
         self.assertTrue(
-            page.evaluate("Elosern.explorationDock.isEditingRestForm()")
+            page.evaluate("document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null")
         )
 
     @covers_requirement(
@@ -189,7 +189,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         # The ordinary send keeps the field open, cleared, and focused; the
         # echoed line is display-only (the command also travelled as text).
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
         )
@@ -209,7 +209,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # Guarantee overflow so the narrative can be scrolled up.
         page.evaluate(
             "() => { for (let i = 0; i < 80; i++) { "
-            "Elosern.goldenlayout.onText(['filler line ' + i], {}); } }"
+            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
         )
         page.wait_for_timeout(300)
         page.evaluate(
@@ -442,7 +442,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
 
     def _reset_root(self, page):
         page.evaluate("document.getElementById('action-dock').focus()")
-        page.evaluate("Elosern.explorationDock.resetToRoot()")
+        page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
 
     def _open_root(self, page, index):
@@ -523,7 +523,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
             "the free-form send echoes exactly one resolved line",
         )
         # The interaction completed: drawer closed, focus back on the dock.
-        page.wait_for_function("() => !Elosern.drawer.isOpen()")
+        page.wait_for_function("() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()")
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         self.assertEqual(
             page.locator(".elosern-narrative .inp").count(),
@@ -555,7 +555,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         # Disconnect: the store locks all mutations while preserving the view.
         page.evaluate("Evennia.connection.close()")
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         speech = "話到嘴邊又吞了回去"
         page.keyboard.type(speech)
@@ -568,7 +568,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
             inp_before,
             "a locked borrowed send must never echo",
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"),
             speech,

@@ -158,11 +158,12 @@ GLOBAL_SCRIPTS = {
 ######################################################################
 
 # Mutually-exclusive Vue/legacy script-load flag for the webclient template
-# (base.html XOR flag, design D4). The production default is the legacy
-# shell; C4 flips this to True in the single atomic production flip. The
-# ``?__vue=1`` query parameter forces the Vue branch per request for the
-# offline-load browser check (the design's test-routed page fixture).
-ELOSERN_VUE_CLIENT = False
+# (base.html XOR flag, design D4). The production default is the Vue SPA
+# (flipped to True by the C4 atomic production flip,
+# webclient-vue-10-wire-views-browser); the ``?__vue=1`` query parameter
+# still forces the Vue branch per request for the offline-load browser check
+# (the design's test-routed page fixture).
+ELOSERN_VUE_CLIENT = True
 
 # Expose the flag to the webclient templates through the project context
 # processor (Evennia's general_context does not carry it).

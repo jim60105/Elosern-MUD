@@ -81,10 +81,10 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         # A stale click sent while the client still held the pre-OOC view.
         page.evaluate(
             "() => {"
-            "  const s = Elosern.StateController.getState();"
+            "  const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);"
             "  Evennia.msg('ui_action', [{"
             "    protocol_version: 1,"
-            "    presentation_epoch: s.activeEpoch,"
+            "    presentation_epoch: s.epoch,"
             "    request_id: 'web:stale:1',"
             "    base_revision: s.revision,"
             "    action_id: 'explore.wait',"
@@ -93,7 +93,7 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
             "}"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return s.lastActionResult && s.lastActionResult.code === 'no_puppet'; }",
             timeout=15000,
         )

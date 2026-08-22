@@ -1,7 +1,8 @@
 """Vue foundation acceptance (A2, webclient-vue-01-foundation) + B1 core family.
 
 Exercises the mutually-exclusive Vue branch of the WebClient through the
-review-window ``?__vue=1`` fixture (the production default stays legacy):
+``?__vue=1`` fixture (the C4 flip makes the Vue SPA the production default;
+the flag remains a per-request test-route override):
 the Vite bundle, its styles, and its self-hosted fonts load from the project
 origin while every non-local request is blocked, the dependency-free vanilla
 text console round-trips commands through ``evennia.js`` without jQuery (the
@@ -311,18 +312,18 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             "the text round-trip must not depend on full jQuery",
         )
 
-    def test_legacy_default_stays_when_flag_is_absent(self):
-        """The XOR flag is off by default: the legacy shell still loads."""
+    def test_vue_default_loads_when_flag_is_absent(self):
+        """The C4 flip: the production default is the Vue SPA (no flag needed)."""
         page = self.new_page()
         self._login(page)
         page.goto(self.webclient_url)
-        # The production default is the legacy shell: full jQuery present and
-        # the shell active.
+        # The production default is now the Vue SPA: the bridge hook exists and
+        # the full legacy jQuery is not loaded (only the scoped ready-shim).
         wait_for_shell_active(page)
-        self.assertIsNotNone(page.evaluate("window.jQuery ?? null"))
-        self.assertIsNone(
+        self.assertIsNone(page.evaluate("window.jQuery ?? null"))
+        self.assertIsNotNone(
             page.evaluate("window.__elosernBridge ?? null"),
-            "the Vue bridge hook must not exist on the legacy default page",
+            "the Vue bridge hook owns the production default (C4 flip)",
         )
 
     @covers_requirement(

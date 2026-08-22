@@ -200,22 +200,23 @@ class FrontendLayoutContractTests(unittest.TestCase):
     def test_base_html_xor_flag_loads_exactly_one_view_stack(self):
         template = _read("web/templates/webclient/base.html")
         self.assertIn("{% if webclient_vue_enabled %}", template)
-        # The Vue branch loads the stable dist entries and the ready shim.
+        # The Vue branch loads the stable dist entries (CSS + module script).
         vue_branch = template.split("{% if webclient_vue_enabled %}", 1)[1].split(
             "{% else %}", 1
         )[0]
         self.assertIn("webclient/app/dist/index.css", vue_branch)
-        self.assertIn("jquery_ready_shim.js", vue_branch)
         self.assertNotIn("jquery-3.2.1.min.js", vue_branch)
         self.assertNotIn("goldenlayout.min.js", vue_branch)
-        # The legacy branch keeps the pinned legacy stack and never the dist.
+        # The legacy branch loads no view stack at all (C4 removed the jQuery /
+        # GoldenLayout / plugin loads); it never carries the Vue dist entries.
         legacy_branch = (
             template.split("{% else %}", 1)[1].split("{% endif %}", 1)[0]
         )
-        self.assertIn("jquery-3.2.1.min.js", legacy_branch)
-        self.assertIn("goldenlayout.min.js", legacy_branch)
+        self.assertNotIn("jquery-3.2.1.min.js", legacy_branch)
+        self.assertNotIn("goldenlayout.min.js", legacy_branch)
         self.assertNotIn("webclient/app/dist/index.js", legacy_branch)
-        # The D10 text console is loaded outside the XOR (both branches).
+        # The D10 text console and the $(document).ready shim are shared (loaded
+        # outside the XOR, in both branches).
         self.assertIn(
             '{% static "webclient/js/text_console.js" %}',
             template,
@@ -224,6 +225,14 @@ class FrontendLayoutContractTests(unittest.TestCase):
             "text_console.js",
             vue_branch + legacy_branch,
             "the text console must not live inside either XOR branch",
+        )
+        # evennia.js's load-time bootstrap needs the $(document).ready shim in
+        # both branches (C4: the legacy fallback branch loads no jQuery).
+        self.assertIn("jquery_ready_shim.js", template)
+        self.assertNotIn(
+            "jquery_ready_shim.js",
+            vue_branch + legacy_branch,
+            "the ready-shim is shared (both branches), not inside either XOR branch",
         )
 
 

@@ -32,7 +32,7 @@ async function switchToCustom(wrapper) {
 
 function setAllocations(wrapper, values) {
   for (const [axis, value] of Object.entries(values)) {
-    wrapper.get(`[data-testid="creation-alloc-${axis}"`).setValue(value);
+    wrapper.get(`[data-testid="creation-field-${axis}"`).setValue(value);
   }
 }
 
@@ -59,16 +59,16 @@ describe("CreationOverlay (B5 overlays family)", () => {
   it("custom confirm emits creation.custom with the exact payload fields", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-name"]').setValue("測試者");
-    wrapper.get('[data-testid="creation-age"]').setValue(21);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("測試者");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
     wrapper.get('[data-testid="creation-background"]').setValue("測試背景。");
     wrapper.get('[data-testid="creation-affinity-fire"]').element.checked = true;
     wrapper.get('[data-testid="creation-affinity-fire"]').trigger("change");
     wrapper.get('[data-testid="creation-affinity-wind"]').element.checked = true;
     wrapper.get('[data-testid="creation-affinity-wind"]').trigger("change");
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     expect(lastAction(wrapper, "creation.custom")).toEqual({
       action_id: "creation.custom",
       payload: {
@@ -87,39 +87,39 @@ describe("CreationOverlay (B5 overlays family)", () => {
   it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-age"]').setValue(17);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(17);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-gate-error"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
   });
 
   it("the adult gate rejects apparent_age below 18 (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-age"]').setValue(21);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(17);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(17);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-gate-error"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
   });
 
   it("both ages at or above 18 pass the gate and emit creation.custom", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-age"]').setValue(30);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(25);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(30);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(25);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const event = lastAction(wrapper, "creation.custom");
     expect(event).not.toBeNull();
     expect(event.payload.age).toBe(30);
     expect(event.payload.apparent_age).toBe(25);
-    expect(wrapper.find('[data-testid="creation-gate-error"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="creation-form-message"]').exists()).toBe(false);
   });
 
   // -- Concept state ----------------------------------------------------------
@@ -127,8 +127,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     wrapper.get('[data-testid="creation-mode-concept"]').trigger("click");
     await nextTick();
-    wrapper.get('[data-testid="creation-concept"]').setValue("在燈下研讀古籍的學士。");
-    wrapper.get('[data-testid="creation-concept-apply"]').trigger("click");
+    wrapper.get('[data-testid="creation-field-concept"]').setValue("在燈下研讀古籍的學士。");
+    wrapper.get('[data-testid="creation-concept-submit"]').trigger("click");
     expect(lastAction(wrapper, "creation.concept")).toEqual({
       action_id: "creation.concept",
       payload: { concept: "在燈下研讀古籍的學士。" },
@@ -172,15 +172,15 @@ describe("CreationOverlay (B5 overlays family)", () => {
   it("resumes a custom draft with the form pre-filled", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE } });
     expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("custom");
-    expect(wrapper.get('[data-testid="creation-name"]').element.value).toBe("林楓");
-    expect(wrapper.get('[data-testid="creation-age"]').element.value).toBe("21");
-    expect(wrapper.get('[data-testid="creation-apparent-age"]').element.value).toBe("21");
-    expect(wrapper.get('[data-testid="creation-alloc-hp"]').element.value).toBe("8");
-    expect(wrapper.get('[data-testid="creation-alloc-mp"]').element.value).toBe("4");
-    expect(wrapper.get('[data-testid="creation-alloc-sp"]').element.value).toBe("4");
-    expect(wrapper.get('[data-testid="creation-alloc-atk_phys"]').element.value).toBe("4");
-    expect(wrapper.get('[data-testid="creation-alloc-agility"]').element.value).toBe("2");
-    expect(wrapper.get('[data-testid="creation-alloc-defense"]').element.value).toBe("2");
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe("林楓");
+    expect(wrapper.get('[data-testid="creation-field-age"]').element.value).toBe("21");
+    expect(wrapper.get('[data-testid="creation-field-apparentAge"]').element.value).toBe("21");
+    expect(wrapper.get('[data-testid="creation-field-hp"]').element.value).toBe("8");
+    expect(wrapper.get('[data-testid="creation-field-mp"]').element.value).toBe("4");
+    expect(wrapper.get('[data-testid="creation-field-sp"]').element.value).toBe("4");
+    expect(wrapper.get('[data-testid="creation-field-atk_phys"]').element.value).toBe("4");
+    expect(wrapper.get('[data-testid="creation-field-agility"]').element.value).toBe("2");
+    expect(wrapper.get('[data-testid="creation-field-defense"]').element.value).toBe("2");
     expect(wrapper.get('[data-testid="creation-background"]').element.value).toBe("從渡口學來運貨的年輕人。");
     expect(wrapper.get('[data-testid="creation-affinity-fire"]').element.checked).toBe(true);
     expect(wrapper.get('[data-testid="creation-affinity-wind"]').element.checked).toBe(true);
@@ -192,7 +192,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
   it("resumes a concept draft: pre-filled concept, background preview with the generated indicator", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_CONCEPT_DRAFT_SAMPLE } });
     expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("concept");
-    expect(wrapper.get('[data-testid="creation-concept"]').element.value).toBe("燈下讀書的年輕學者。");
+    expect(wrapper.get('[data-testid="creation-field-concept"]').element.value).toBe("燈下讀書的年輕學者。");
     const preview = wrapper.get('[data-testid="creation-background"]');
     expect(preview.attributes("data-background-generated")).toBe("true");
     expect(preview.text()).toBe("燈下讀書的年輕學者。");
@@ -205,7 +205,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-unavailable-reason"]').text()).toBe("角色創建目前無法顯示");
     // No wizard surfaces render in the unavailable form.
     expect(wrapper.find('[data-testid="creation-preset-card"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="creation-age"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="creation-field-age"]').exists()).toBe(false);
   });
 
   // -- Frame: close + open prop ---------------------------------------------
@@ -213,8 +213,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
   it("a subrace-bearing race without a subrace cannot confirm (field error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-age"]').setValue(21);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
     // Pick the subrace-bearing race (beastfolk advertises subraces).
     wrapper.get('[data-testid="creation-race"]').setValue("beastfolk");
     await nextTick();
@@ -222,19 +222,19 @@ describe("CreationOverlay (B5 overlays family)", () => {
     // and no strict (race, subrace) profile match exists, so the allocation
     // inputs are not rendered.
     expect(wrapper.find('[data-testid="creation-subrace"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="creation-alloc-hp"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="creation-field-hp"]').exists()).toBe(false);
     // Confirming surfaces the subrace-required field error and emits no envelope.
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-subrace-error"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
     // Selecting the subrace exposes the allocation inputs; the total must equal
     // the beastfolk/wolf profile budget (26) or confirm stays blocked.
     wrapper.get('[data-testid="creation-subrace"]').setValue("subrace_wolf");
     await nextTick();
-    expect(wrapper.find('[data-testid="creation-alloc-hp"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="creation-field-hp"]').exists()).toBe(true);
     setAllocations(wrapper, { hp: 9, mp: 4, sp: 4, atk_phys: 3, agility: 3, defense: 3 });
-    wrapper.get('[data-testid="creation-custom-confirm"]').trigger("click");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const ev = lastAction(wrapper, "creation.custom");
     expect(ev).not.toBeNull();
     expect(ev.payload.race).toBe("beastfolk");
@@ -251,8 +251,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     wrapper.setProps({ creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE });
     await nextTick();
     expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("custom");
-    expect(wrapper.get('[data-testid="creation-name"]').element.value).toBe("林楓");
-    expect(wrapper.get('[data-testid="creation-alloc-hp"]').element.value).toBe("8");
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe("林楓");
+    expect(wrapper.get('[data-testid="creation-field-hp"]').element.value).toBe("8");
     expect(wrapper.get('[data-testid="creation-background"]').element.value).toBe("從渡口學來運貨的年輕人。");
   });
 
@@ -268,8 +268,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     await nextTick();
     expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBe("");
     // Bumping both ages to 18+ re-enables activation from the same mounted overlay.
-    wrapper.get('[data-testid="creation-age"]').setValue(18);
-    wrapper.get('[data-testid="creation-apparent-age"]').setValue(18);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(18);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(18);
     await nextTick();
     expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBeUndefined();
   });

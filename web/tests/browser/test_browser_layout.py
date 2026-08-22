@@ -64,8 +64,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self._set_layout(page, wrapper)
         page.reload()
         page.wait_for_function(
-            "() => { const s = Elosern.StateController && "
-            "Elosern.StateController.getState(); return s && s.connected; }"
+            "() => { const s = (window.__elosernBridge && window.__elosernBridge.store.view) || null; return s && s.connected; }"
         )
         for component in REQUIRED_COMPONENTS:
             count = self._count_component(page, component)
@@ -80,7 +79,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self.assertTrue(saved["tabs"]["status"])
 
     @covers_requirement(
-        "webclient-desktop-shell::the-webclient-loads-a-local-desktop-goldenlayout-shell"
+        "webclient-desktop-shell::the-webclient-loads-a-local-vue-spa-desktop-shell"
     )
     def test_mounted_shell_renders_no_goldenlayout_tab_strip(self):
         page = self.logged_in_page()
@@ -216,7 +215,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True, "actor": "nope"}},
         )
         result = page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )
@@ -226,10 +225,10 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         # The panel renderer requests one resync; a second request in the same
         # episode is blocked, so a malformed panel cannot create a sync loop.
         first = page.evaluate(
-            "() => Elosern.StateController.requestResync('status')"
+            "() => Elosern.actions.requestResync('status')"
         )
         second = page.evaluate(
-            "() => Elosern.StateController.requestResync('status')"
+            "() => Elosern.actions.requestResync('status')"
         )
         self.assertTrue(first)
         self.assertFalse(second)
@@ -262,7 +261,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
             protocol_version=2,
         )
         rejected = page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": v2},
         )
@@ -271,7 +270,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
 
         # The server's protocol-error reply locks every graphical mutation.
         page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_protocol_error', [args.envelope], {})",
             {
                 "generation": generation,

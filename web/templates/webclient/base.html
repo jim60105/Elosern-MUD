@@ -8,15 +8,17 @@ the evennia.js transport, and loads ONLY locally served assets. The page must
 make no remote request for a runtime UI dependency.
 
 Mutually-exclusive script-load flag (webclient-vue-01-foundation, design D4):
-exactly one view stack loads per page — the legacy pinned jQuery 3.2.1 +
-GoldenLayout 1.x plugin shell, or the Vue SPA bundle from
-web/static/webclient/app/dist. ``webclient_vue_enabled`` is a review-window
-switch: the production default is the legacy shell (C4 flips it), and
-``?__vue=1`` forces the Vue branch for the offline-load check.
+exactly one view stack loads per page. The production default is the Vue SPA
+branch (flipped by webclient-vue-10-wire-views-browser, the C4 atomic flip):
+the Vite-built bundle + stable entry names from web/static/webclient/app/dist.
+The legacy branch (flag False, only reachable by a rollback) loads no view code
+at all: the dependency-free vanilla text console (D10) is the fallback client,
+so the game stays fully playable when the Vue bundle is blocked. The
+``?__vue=1`` query parameter still forces the Vue branch per request for the
+offline-load browser check (the design's test-routed page fixture).
 
-The dependency-free vanilla text console (D10) loads in both branches,
-independent of Vue and jQuery; it is activated in the Vue branch (the legacy
-branch's shell owns the DOM until the wiring wave lands).
+The dependency-free vanilla text console loads in both branches, independent
+of the Vue bundle; it is activated in whichever branch renders.
 -->
 
 {% load static %}
@@ -33,30 +35,15 @@ branch's shell owns the DOM until the wiring wave lands).
     <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/css/ansi_palette.css" %}>
 
     {% if webclient_vue_enabled %}
-      <!-- Vue SPA branch: bundle styles + scripts from the built dist (stable,
-           non-hashed entry names, served from the project origin). -->
+      <!-- Vue SPA branch (the production default since C4): bundle styles +
+           scripts from the built dist (stable, non-hashed entry names, served
+           from the project origin). -->
       <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/app/dist/index.css" %}>
-      <!-- Minimal $(document).ready shim: the only jQuery surface evennia.js
-           touches (D10 spike result). Never loaded alongside full jQuery. -->
-      <script src={% static "webclient/js/jquery_ready_shim.js" %}></script>
     {% else %}
-      <!-- Legacy branch: pinned local jQuery + GoldenLayout 1.x runtime and
-           theme (the Vue bundle is NOT loaded in this branch). -->
-      {% block jquery_import %}
-      <script src={% static "webclient/vendor/js/jquery-3.2.1.min.js" %}></script>
-      {% endblock %}
-
-      <script type="text/javascript" charset="utf-8">
-          if(!window.jQuery) {
-              document.write("<div class='err'>jQuery library not found. Check so Javascript is not blocked in your browser.</div>");
-          }
-      </script>
-
-      <script type="text/javascript" src={% static "webclient/vendor/js/goldenlayout.min.js" %}></script>
-      <link type="text/css" rel="stylesheet" href={% static "webclient/vendor/css/goldenlayout-base.css" %} />
-      <link type="text/css" rel="stylesheet" href={% static "webclient/vendor/css/goldenlayout-dark-theme.css" %} />
-      <link type="text/css" rel="stylesheet" href={% static "webclient/css/goldenlayout.css" %} />
-      <link rel='stylesheet' type="text/css" media="screen" href={% static "webclient/css/elosern.css" %}>
+      <!-- Legacy rollback branch (flag False): no view code loads; the D10
+           vanilla text console below is the client. The legacy jQuery /
+           GoldenLayout / plugin view files remain on disk but are unreferenced
+           in the load path (deleted by the D1 finalize change). -->
     {% endif %}
 
     <!-- Generate a low-quality UID to uniquely identify client tabs -->
@@ -88,6 +75,12 @@ branch's shell owns the DOM until the wiring wave lands).
             var wsurl = "ws://" + this.location.hostname + ":{{websocket_port}}";
         {% endif %}
     </script>
+    <!-- Minimal $(document).ready shim (shared by both branches): evennia.js's
+         load-time bootstrap calls $(document).ready() once to start
+         Evennia.init(). The shim supplies that single jQuery surface and is a
+         no-op when full jQuery (window.jQuery) is already present, so it is
+         safe to load in both the Vue and the legacy fallback branch. -->
+    <script src={% static "webclient/js/jquery_ready_shim.js" %}></script>
     <script src={% static "webclient/js/evennia.js" %} language="javascript" type="text/javascript" charset="utf-8"></script>
 
     <!-- Dependency-free vanilla text console (D10): loaded in both branches,
@@ -101,44 +94,9 @@ branch's shell owns the DOM until the wiring wave lands).
     </script>
 
     {% if webclient_vue_enabled %}
-      <!-- Vue SPA entry (build stub in A2; the live AppShell mounts in the
-           wiring wave). Module scripts are deferred, so the transport above
-           is already defined when it runs. -->
+      <!-- Vue SPA entry: the live store-bound AppShell mounts into the
+           #main-sub container (the C3 live client, the C4 production default). -->
       <script type="module" src={% static "webclient/app/dist/index.js" %}></script>
-    {% else %}
-      <!-- Legacy gui library: the jQuery + GoldenLayout plugin shell. -->
-      {% block guilib_import %}
-          <script src={% static "webclient/js/webclient_gui.js" %} language="javascript" type="text/javascript" charset="utf-8"></script>
-          <script src={% static "webclient/js/elosern/protocol.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/layout_store.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/keyboard_router.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/command_echo.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/combat_menu.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/service_menu.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/creation_menu.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/exploration_menu.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/option_cards.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/choicepoint_logic.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/stream_end_block.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/character_menu.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/local_map.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/narrative_markup.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/art_panel.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/elosern/art_focus.js" %} type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/elosern_state.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/elosern_actions.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/dock_surface.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/goldenlayout.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/history.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/default_out.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/combat_dock.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/services_dock.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/creation_dock.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/exploration_dock.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/character_dock.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/elosern_ui.js" %} language="javascript" type="text/javascript"></script>
-          <script src={% static "webclient/js/plugins/choice_points.js" %} language="javascript" type="text/javascript"></script>
-      {% endblock %}
     {% endif %}
 
     {% block scripts %}
@@ -157,15 +115,9 @@ branch's shell owns the DOM until the wiring wave lands).
             <p>Turn off eventual script blockers and/or switch to a
             web browser supporting javascript. <p>
         <!-- This is will only fire if javascript is actually active -->
-        {% if webclient_vue_enabled %}
         <script type="text/javascript">
             document.getElementById('noscript').remove();
         </script>
-        {% else %}
-        <script language="javascript" type="text/javascript">
-            $('#noscript').remove();
-        </script>
-        {% endif %}
     </div>
 
     <!-- main client -->
@@ -174,22 +126,19 @@ branch's shell owns the DOM until the wiring wave lands).
         {% endblock %}
     </div>
 
-    {% if webclient_vue_enabled %}
     <script type="text/javascript">
       document.getElementById('clientwrapper').classList.remove('d-none');
-      // Activate the D10 text console in the Vue branch; the legacy branch's
-      // shell owns the DOM. The hide-on-mount / re-activate-on-degradation
-      // lifecycle lands with the store wiring (C3).
+      // Activate the D10 text console in whichever branch renders; the hide-on-mount
+      // / re-activate-on-degradation lifecycle is owned by the store (C3).
       document.addEventListener('DOMContentLoaded', function () {
         var consoleApi = window.__elosernTextConsole;
         if (!consoleApi || !window.Evennia) {
           return;
         }
         // evennia.js's ready bootstrap only calls Evennia.init() (it is
-        // idempotent and deferred 500 ms); the legacy GUI shell is the
-        // component that opens the socket. The Vue branch opens it here:
-        // init synchronously (emitter + connection exist), bind the console
-        // listeners, then connect.
+        // idempotent and deferred 500 ms). Init the transport synchronously
+        // (emitter + connection exist), bind the console listeners, then
+        // connect.
         window.Evennia.init();
         var root = document.getElementById('messagewindow') ||
             document.getElementById('main-sub');
@@ -200,19 +149,12 @@ branch's shell owns the DOM until the wiring wave lands).
         // attached, so this coordinator owns the shared lifecycle event
         // names (the evennia emitter keeps one listener per name). The hook
         // is exposed by the Vue bundle (main.js) and stays a no-op if the
-        // bundle is blocked (the degradation path leaves the text console live).
+        // bundle is blocked (the degradation path leaves the text console
+        // live). Absent in the legacy branch (no Vue bundle loaded).
         if (typeof window.__elosernTransportBind === "function") {
           window.__elosernTransportBind(consoleHandle);
         }
       });
     </script>
-    {% else %}
-    <script language="javascript" type="text/javascript">
-      $(document).ready(function() {
-        $('#noscript').remove();
-        $('#clientwrapper').removeClass('d-none');
-      })
-    </script>
-    {% endif %}
   </body>
 </html>

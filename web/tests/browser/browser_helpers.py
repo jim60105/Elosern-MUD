@@ -127,19 +127,21 @@ def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
     page.wait_for_selector(".resource-value", timeout=timeout)
     page.wait_for_function(
         """() => {
-          var c = window.Elosern && window.Elosern.StateController;
-          if (!c) { return false; }
-          var s = c.getState();
+          var b = window.__elosernBridge;
+          if (!b || !b.store) { return false; }
+          var s = b.store.view;
           return s && s.connected && s.phase === 'active' &&
-                 !!s.activeEpoch && !s.mutationsLocked && s.mode;
+                 !!s.epoch && !s.mutationsLocked && s.mode;
         }""",
         timeout=timeout,
     )
 
 
 def store_state(page: Page) -> dict:
-    """Return the current client store state."""
-    return page.evaluate("Elosern.StateController.getState()")
+    """Return the current client store state (the C4 bridge hook)."""
+    return page.evaluate(
+        "(window.__elosernBridge && window.__elosernBridge.store.view) || null"
+    )
 
 
 def evaluate_tolerating_navigation(page: Page, expression: str, arg=None):
@@ -188,8 +190,8 @@ def store_state_or_none(page: Page) -> dict | None:
     """
     return evaluate_tolerating_navigation(
         page,
-        "() => window.Elosern && window.Elosern.StateController ? "
-        "Elosern.StateController.getState() : null",
+        "() => window.__elosernBridge && window.__elosernBridge.store "
+        "? window.__elosernBridge.store.view : null",
     )
 
 
@@ -210,8 +212,8 @@ def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:
     previous = None
     while time.monotonic() < deadline:
         revision = page.evaluate(
-            "() => { const c = window.Elosern && window.Elosern.StateController; "
-            "if (!c) { return null; } const s = c.getState(); "
+            "() => { const b = window.__elosernBridge; "
+            "if (!b || !b.store) { return null; } const s = b.store.view; "
             "if (!s || !s.connected || s.mutationsLocked) { return null; } "
             "if (s.phase === 'awaiting_initial_snapshot' || s.phase === 'detached') { return null; } "
             "return s.revision; }"

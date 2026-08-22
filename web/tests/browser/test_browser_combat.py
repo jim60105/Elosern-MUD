@@ -308,7 +308,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # The confirmed forfeit ends the session; the panel reverts to the
         # exploration available form.
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "const p = s.panels && s.panels['context_actions']; "
             "return p && p.available === true && p.kind === 'exploration'; }",
             timeout=30000,
@@ -414,7 +414,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowRight")  # items (disabled)
         detail = page.evaluate(
-            "document.getElementById('combat-detail').innerText"
+            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
         )
         self.assertIn("道具功能尚未開放", detail)
         self._press(page, "Enter")  # disabled confirm -> explanation, no packet
@@ -423,7 +423,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
         detail = page.evaluate(
-            "document.getElementById('combat-detail').innerText"
+            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
         )
         self.assertIn("防禦功能尚未開放", detail)
 
@@ -436,8 +436,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # subscription that installs it may not have run the moment combat mode
         # becomes available.
         page.wait_for_function(
-            "() => Elosern._combat && Elosern.keyboard && "
-            "Elosern.keyboard.depth() >= 1",
+            "() => { const b = window.__elosernBridge; "
+            "const s = b && b.store.view; "
+            "const p = s && s.panels && s.panels['context_actions']; "
+            "return p && p.available === true && p.kind === 'combat' && b.router.depth() >= 1; }",
             timeout=30000,
         )
         self._press(page, "Enter")  # attack (first root item) -> target menu
@@ -453,9 +455,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             panel = self._combat_panel(page)
             if panel.get("available") and panel["session"]["round"] >= 1:
                 rebuilt = page.evaluate(
-                    "() => { const p = Elosern.StateController.getState()"
-                    ".panels['context_actions']; return Elosern._combat && "
-                    "Elosern._combat.panel.session.round === p.session.round; }"
+                    "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);"
+                    "const p = s && s.panels && s.panels['context_actions']; "
+                    "return p && p.available === true && p.kind === 'combat'; }"
                 )
                 if rebuilt:
                     break
@@ -501,7 +503,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # items (disabled)
         self.assertIn(
             "道具功能尚未開放",
-            page.evaluate("document.getElementById('combat-detail').innerText"),
+            page.evaluate("document.querySelector('[data-testid=\"combat-detail\"]')).innerText"),
         )
         self.assertEqual(
             page.evaluate("document.getElementById('action-dock').scrollWidth <= "
@@ -520,7 +522,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             # right.
             self.assertEqual(page.locator(".combat-layout").count(), 1)
             self.assertTrue(page.locator(".combat-controls").is_visible())
-            self.assertTrue(page.locator("#combat-detail").is_visible())
+            self.assertTrue(page.locator('[data-testid="combat-detail"]').is_visible())
             # The skills submenu renders a 2-column grid with a detail pane
             # naming the focused skill's cost and the next key action.
             self._press(page, "ArrowRight")  # skills
@@ -543,7 +545,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             )
             page.wait_for_timeout(150)
             detail = page.evaluate(
-                "document.getElementById('combat-detail').innerText"
+                "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
             )
             self.assertIn("MP ", detail, "the detail pane names the skill cost")
             self.assertIn("Enter → 開啟", detail, "the detail pane names the next key action")
@@ -601,7 +603,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(marker.count(), 1)
         self.assertTrue(marker.first.inner_text().startswith("✓"))
         selected_count = page.evaluate(
-            "() => Elosern._combat.skillByKey['wind_blade'].selected.length"
+            "() => document.querySelectorAll('.combat-controls .dock-row.selected').length"
         )
         self.assertEqual(selected_count, 1)
 
@@ -616,7 +618,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(150)
         selected_count = page.evaluate(
-            "() => Elosern._combat.skillByKey['wind_blade'].selected.length"
+            "() => document.querySelectorAll('.combat-controls .dock-row.selected').length"
         )
         self.assertEqual(
             selected_count, 1, "held Space must not repeatedly toggle candidates"

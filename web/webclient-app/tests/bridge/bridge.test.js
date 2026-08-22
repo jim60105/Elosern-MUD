@@ -18,15 +18,17 @@ const NARRATIVE_INPUT_MEMBERS = [
   "replaceChoicePoint",
   "unmountChoicePoint",
 ];
-const ACTIONS_MEMBERS = [
-  "client",
-  "sync",
-  "submit",
-  "handleActionResult",
-  "handlePresentation",
-  "handleReconnect",
-  "handleTransportReset",
-];
+ const ACTIONS_MEMBERS = [
+   "client",
+   "sync",
+   "submit",
+   "handleActionResult",
+   "handlePresentation",
+   "handleReconnect",
+   "handleTransportReset",
+   "requestResync",
+   "resetResyncEpisode",
+ ];
 const ACTIONS_CLIENT_MEMBERS = [
   "sync",
   "submit",

@@ -2,11 +2,14 @@
 
 {% block client %}
 
-<!-- GoldenLayout mounts the version-1 shell into #main-sub. -->
+<!-- The Vite-built Vue SPA mounts live into #main-sub (the C4 production
+     flip): main.js's resolveMountPoint() appends the #elosern-app mount
+     point inside it. -->
 <div id="main">
   <div id="main-sub">
-    <!-- Degraded text fallback: if the shell plugins fail to initialize, the
-         stock default_out plugin still appends narrative output here. -->
+    <!-- Degraded text fallback: the D10 vanilla text console appends
+         narrative output here when the Vue bundle is blocked or the OOB
+         channel is incompatible (the graphical lock keeps text playable). -->
     <div id="messagewindow" class="content"></div>
   </div>
 </div>
