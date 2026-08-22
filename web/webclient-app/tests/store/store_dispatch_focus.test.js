@@ -104,11 +104,22 @@ describe("store dispatch + focus", () => {
         {},
       );
       // A no_puppet rejection is never gated on a presentation revision.
-      expect(store.view.dispatch.inFlight).toBe(null);
-      expect(store.dispatchAction("explore.wait", { sleep: true })).toBe("session:2");
-    });
+       expect(store.view.dispatch.inFlight).toBe(null);
+       expect(store.dispatchAction("explore.wait", { sleep: true })).toBe("session:2");
+     });
 
-    it("marks an in-flight mutation uncertain when the puppet detaches", () => {
+     it("releases the in-flight gate immediately when no presentation revision is declared", () => {
+       openSession();
+       store.dispatchAction("explore.wait", { daypart: "dusk" });
+       // A result that declares no presentation revision (0) cannot be gated
+       // on any future recovery, so the lock releases on result receipt.
+       store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: 0 })], {});
+       expect(store.view.dispatch.inFlight).toBe(null);
+       // The gate is free again right away (no recovery snapshot needed).
+       expect(store.dispatchAction("explore.wait", { sleep: true })).toBe("session:2");
+     });
+
+     it("marks an in-flight mutation uncertain when the puppet detaches", () => {
       openSession();
       store.dispatchAction("explore.wait", { daypart: "dusk" });
       store.receive(1, "ui_protocol_error", [fx.protocolError()], {});

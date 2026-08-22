@@ -7,11 +7,11 @@ bundles the store into the stable offline dist. ``covers_requirement`` can
 only attach to a Python ``test_*`` function, so this module executes those
 gates and asserts they pass.
 
-Following the B1/B2 precedent, the ``@covers_requirement`` import and the
-annotation linking this module to the C1 requirement (
-``webclient-vue-application::the-vue-app-binds-the-preserved-strict-dom-independent-logic-to-a-reactive-store``)
-are applied at this change's archive, once the requirement ID enters the
-traceability index when the delta spec syncs into the main spec.
+Following the B1/B2 precedent, this module carries the
+``@covers_requirement`` annotation linking it to the C1 requirement
+(``webclient-vue-application::the-vue-app-binds-the-preserved-strict-dom-independent-logic-to-a-reactive-store``),
+applied at archive time once the delta spec synced into the main spec and
+the requirement ID entered the traceability index.
 
 Test-to-requirement mapping:
 
@@ -28,6 +28,8 @@ from __future__ import annotations
 import subprocess
 import unittest
 from pathlib import Path
+
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DIST_ROOT = REPO_ROOT / "web/static/webclient/app/dist"
@@ -54,6 +56,9 @@ class VueStoreEvidenceTest(unittest.TestCase):
             result.returncode == 0
         ), "vite build failed under C1 evidence:\n" + result.stdout + result.stderr
 
+    @covers_requirement(
+        "webclient-vue-application::the-vue-app-binds-the-preserved-strict-dom-independent-logic-to-a-reactive-store"
+    )
     def test_store_suite_passes(self):
         """The C1 store Vitest suites (store/*) pass."""
         result = run_npm(["test", "--", "store"], timeout=600)
@@ -64,6 +69,9 @@ class VueStoreEvidenceTest(unittest.TestCase):
         )
         self.assertIn("passed", result.stdout)
 
+    @covers_requirement(
+        "webclient-vue-application::the-vue-app-binds-the-preserved-strict-dom-independent-logic-to-a-reactive-store"
+    )
     def test_app_dist_entries_still_exist(self):
         """The C1 store bundles into the same stable offline dist entries."""
         for entry in ("index.js", "index.css"):
