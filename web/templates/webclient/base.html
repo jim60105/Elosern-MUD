@@ -193,8 +193,17 @@ branch's shell owns the DOM until the wiring wave lands).
         window.Evennia.init();
         var root = document.getElementById('messagewindow') ||
             document.getElementById('main-sub');
-        consoleApi.attach(root, window.Evennia);
+        var consoleHandle = consoleApi.attach(root, window.Evennia);
+        window.__elosernConsole = consoleHandle;
         window.Evennia.connect();
+        // C3: wire the live evennia.js transport after the D10 console is
+        // attached, so this coordinator owns the shared lifecycle event
+        // names (the evennia emitter keeps one listener per name). The hook
+        // is exposed by the Vue bundle (main.js) and stays a no-op if the
+        // bundle is blocked (the degradation path leaves the text console live).
+        if (typeof window.__elosernTransportBind === "function") {
+          window.__elosernTransportBind(consoleHandle);
+        }
       });
     </script>
     {% else %}

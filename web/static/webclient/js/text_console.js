@@ -186,7 +186,10 @@
       });
     }
     paint();
-    return { model: model, wrapper: wrapper, send: send };
+    // C3: expose the repaint handle so the live transport coordinator can
+    // repaint the console DOM after driving the model (the evennia emitter
+    // keeps one listener per name, so the coordinator owns the shared events).
+    return { model: model, wrapper: wrapper, send: send, paint: paint };
   }
 
   return {
