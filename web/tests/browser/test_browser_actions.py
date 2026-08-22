@@ -35,7 +35,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
         page.evaluate("Evennia.connection.close()")
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return !s.connected; }"
         )
         page.wait_for_function(
@@ -56,7 +56,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
         # A reload-required protocol error locks all graphical mutations.
         accepted = page.evaluate(
-            """(args) => Elosern.StateController.receive(
+            """(args) => Elosern.Protocol.receive(
               args.generation, 'ui_protocol_error', [{
                 protocol_version: 1,
                 code: 'unsupported_version',
@@ -111,7 +111,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
             "&amp; plain text"
         )
         page.evaluate(
-            "(text) => Elosern.goldenlayout.onText([text], {})", payload
+            "(text) => window.__elosernConsole.model.appendIn(text)", payload
         )
         narrative = page.locator(".elosern-narrative").inner_text()
         self.assertIn("plain text", narrative)
@@ -142,7 +142,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True}},
         )
         result = page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )
@@ -159,7 +159,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
         # the blocked second request.
         first, second = page.evaluate(
             """() => {
-                const controller = Elosern.StateController;
+                const controller = Elosern.actions;
                 return [
                     controller.requestResync('status'),
                     controller.requestResync('status'),

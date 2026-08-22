@@ -70,7 +70,7 @@ class ReconnectTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.wait_for_function(
             "() => document.getElementById('elosern-offline-overlay')"
@@ -157,11 +157,11 @@ class ReconnectTest(BrowserAcceptanceTest):
         # cut the inflation short and let the new epoch's revision race past it.
         page.evaluate(
             "() => { for (let i = 0; i < 4; i++) { "
-            "Elosern.StateController.requestResync('status'); "
-            "Elosern.StateController.resetResyncEpisode('status'); } }"
+            "Elosern.actions.requestResync('status'); "
+            "Elosern.actions.resetResyncEpisode('status'); } }"
         )
         page.wait_for_function(
-            "(r) => { const s = Elosern.StateController.getState(); "
+            "(r) => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return s.revision >= r; }",
             arg=revision_before + 4,
         )
@@ -184,7 +184,7 @@ class ReconnectTest(BrowserAcceptanceTest):
             # The server re-auth lagged; drive the wired reducer to adopt the
             # new generation's lower-revision snapshot (the rule under test).
             adopted = page.evaluate(
-                "(args) => Elosern.StateController.receive("
+                "(args) => Elosern.Protocol.receive("
                 "args.generation, 'ui_snapshot', [args.envelope], {})",
                 {
                     "generation": state["generation"],
@@ -210,7 +210,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         revision = state["revision"]
 
         prior_generation = page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {
                 "generation": generation - 1,
@@ -224,7 +224,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         self.assertEqual(prior_generation["reason"], "stale_generation")
 
         different_epoch = page.evaluate(
-            "(args) => Elosern.StateController.receive("
+            "(args) => Elosern.Protocol.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {
                 "generation": generation,

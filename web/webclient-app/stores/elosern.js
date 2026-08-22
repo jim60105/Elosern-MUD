@@ -151,6 +151,10 @@ export const useElosernStore = defineStore("elosern", () => {
   const narrative = ref([]);
   const commandHistory = ref([]);
   const seenIndex = ref(0);
+  // C4: the last OOB `ui_snapshot` / `ui_update` receive result. A rejected
+  // (malformed) presentation is the "renderer cannot render" signal that
+  // triggers the one-sync-per-episode auto-resync.
+  const lastPanelRejection = ref(null);
 
   function onRouterEvent(name, payload) {
     if (name === "focus" || name === "disabled") {
@@ -358,11 +362,36 @@ export const useElosernStore = defineStore("elosern", () => {
   // ---------------------------------------------------------------- actions
 
   function receive(messageGeneration, messageName, args, kwargs) {
-    return reducer.receive(messageGeneration, messageName, args || [], kwargs || {});
+    const result = reducer.receive(messageGeneration, messageName, args || [], kwargs || {});
+    // Track presentation receive results. A genuine "cannot render" rejection
+    // — a malformed `ui_snapshot` / `ui_update` the reducer refused to commit
+    // (`reason === "invalid"`), or a transport-corruption missing-envelope
+    // rejection (`reason === "missing_envelope") — drives the C4 one-sync-
+    // per-episode auto-resync. Ordering / lifecycle rejections
+    // (stale_generation, not_newer, different_epoch, retired_epoch,
+    // update_cannot_establish_epoch) and an accepted presentation do NOT set
+    // the signal.
+    if (messageName === "ui_snapshot" || messageName === "ui_update") {
+      if (result && result.accepted) {
+        lastPanelRejection.value = null;
+      } else if (
+        result &&
+        !result.accepted &&
+        (result.reason === "invalid" || result.reason === "missing_envelope")
+      ) {
+        lastPanelRejection.value = { messageName, reason: result.reason, detail: result.detail || null };
+      }
+    }
+    return result;
   }
 
   function beginTransport(nextGeneration) {
-    return reducer.beginTransport(nextGeneration);
+    const res = reducer.beginTransport(nextGeneration);
+    // A new transport generation is a fresh failure episode: clear the
+    // presentation-rejection signal so the next generation's malformed initial
+    // snapshot can auto-request one ui_sync.
+    lastPanelRejection.value = null;
+    return res;
   }
 
   function setConnected(connected) {
@@ -517,5 +546,13 @@ export const useElosernStore = defineStore("elosern", () => {
     clearUncertain,
     getSender,
     refreshView,
+    // The live keyboard-router instance (C4 harness re-map): the managed
+    // browser suite reads `depth()` / `currentItem()` off it; the store owns
+    // the focus router (design D4), so it is exposed read-only for the harness.
+    router,
+    // C4: the last rejected `ui_snapshot` / `ui_update` (the "renderer cannot
+    // render" signal) so the AppClient auto-resync watcher can request one
+    // ui_sync per failure episode.
+    lastPanelRejection,
   };
 });

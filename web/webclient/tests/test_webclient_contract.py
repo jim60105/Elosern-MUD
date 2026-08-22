@@ -32,7 +32,7 @@ class WebclientShellContractTest(unittest.TestCase):
     """Assert the shell loads every runtime UI dependency from the project origin."""
 
     @covers_requirement(
-        "webclient-desktop-shell::the-webclient-loads-a-local-desktop-goldenlayout-shell"
+        "webclient-desktop-shell::the-webclient-loads-a-local-vue-spa-desktop-shell"
     )
     def test_templates_reference_no_remote_url(self):
         """No http:// or https:// URL appears in a project WebClient template."""

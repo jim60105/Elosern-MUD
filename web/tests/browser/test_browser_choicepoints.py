@@ -143,7 +143,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
 
     def _section(self, page):
         return page.evaluate(
-            "document.getElementById('suggestions-section') !== null"
+            "document.querySelector('[data-testid=\"suggestions-section\"]')) !== null"
         )
 
     def _wait_section_gone(self, page, timeout=30000):
@@ -189,17 +189,17 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
 
     def _dismiss(self, page):
-        page.locator("#suggestions-section .suggestions-dismiss").click()
+        page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').click()
 
     def _move_to_empty_ground(self, page):
         """Walk through the dock from the plaza to the empty-ground room (the
         scripted transport-failure room, same journey as the surface file)."""
         page.evaluate("document.getElementById('action-dock').focus()")
-        page.evaluate("Elosern.explorationDock.resetToRoot()")
+        page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
         page.keyboard.press("Enter")  # Move (the first root row)
         page.wait_for_timeout(80)
@@ -394,7 +394,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         # the store lock is stable for the whole click window.
         self._disconnect_transport(page)
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return !s.connected && s.mutationsLocked; }"
         )
 
@@ -424,10 +424,10 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             if self._section(page):
                 break
             page.wait_for_timeout(250)
-        note = page.locator("#suggestions-section .suggestions-note").inner_text()
+        note = page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text()
         self.assertEqual(note, DEGRADED_NOTE)
         self.assertGreaterEqual(
-            page.locator("#suggestions-section .option-card").count(),
+            page.locator('[data-testid="suggestions-section"] .option-card').count(),
             1,
             "the v1 exploration derivation always yields at least one rule card",
         )
@@ -458,9 +458,9 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             """() => {
                 window.__resetBlockCount = null;
-                Elosern.StateController.subscribe((s) => {
+                Elosern.Protocol.subscribe((s) => {
                     if (window.__resetBlockCount === null
-                        && s.activeEpoch === null
+                        && s.epoch === null
                         && Object.keys(s.panels).length === 0) {
                         window.__resetBlockCount = 'pending';
                         Promise.resolve().then(() => {

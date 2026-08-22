@@ -106,6 +106,8 @@ EXPECTED_ACTIONS_MEMBERS = (
     "handlePresentation",
     "handleReconnect",
     "handleTransportReset",
+    "requestResync",
+    "resetResyncEpisode",
 )
 EXPECTED_ACTIONS_CLIENT_MEMBERS = (
     "sync",
@@ -350,6 +352,13 @@ class WebClientFrozenContractAudit(unittest.TestCase):
             ):
                 targets.add(match.group(1))
             for match in re.finditer(r"['\"]#(\w[\w-]*)['\"]", source):
+                targets.add(match.group(1))
+            # C4 re-map: the Vue surfaces carry the legacy identifier string
+            # as a `data-testid`; the managed-browser slices retarget to
+            # `document.querySelector('[data-testid="..."]')`.
+            for match in re.finditer(
+                r"data-testid=['\"]([\w-]+)['\"]", source
+            ):
                 targets.add(match.group(1))
         self.assertGreater(
             len(targets),

@@ -91,7 +91,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _section(self, page):
         return page.evaluate(
-            "document.getElementById('suggestions-section') !== null"
+            "document.querySelector('[data-testid=\"suggestions-section\"]')) !== null"
         )
 
     def _wait_section(self, page, timeout=30000):
@@ -116,7 +116,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             text = page.evaluate(
                 """() => {
                     const line = document.querySelector(
-                        '#suggestions-section .suggestions-generating');
+                        '[data-testid="suggestions-section"] .suggestions-generating');
                     return line ? line.innerText : null;
                 }"""
             )
@@ -129,7 +129,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         return page.evaluate(
             """() => Array.from(
                 document.querySelectorAll(
-                    '#suggestions-section .option-card .option-card-label'))
+                    '[data-testid="suggestions-section"] .option-card .option-card-label'))
                 .map((el) => el.innerText)"""
         )
 
@@ -155,7 +155,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         )
 
     def _dismiss(self, page):
-        page.locator("#suggestions-section .suggestions-dismiss").click()
+        page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').click()
 
     def _open_plaza_page(self):
         """A logged-in page whose session displays the ready plaza card set."""
@@ -168,7 +168,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _open_root(self, page, index):
         page.evaluate("document.getElementById('action-dock').focus()")
-        page.evaluate("Elosern.explorationDock.resetToRoot()")
+        page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
         for _ in range(index):
             _press(page, "ArrowRight")
@@ -201,12 +201,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self.assertEqual(
-            page.locator("#suggestions-section .option-card").count(),
+            page.locator('[data-testid="suggestions-section"] .option-card').count(),
             0,
             "the generating render carries no cards and no dismiss control",
         )
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-dismiss").count(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
             0,
         )
 
@@ -214,7 +214,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
         self.assertEqual(self._ready_card_labels(page), list(EXPECTED_READY_LABELS))
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-dismiss").count(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
             1,
             "the ready render carries the section-corner dismiss control",
         )
@@ -245,7 +245,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertTrue(captured, "the exploration menu must be mounted")
-        depth = page.evaluate("Elosern.keyboard.depth()")
+        depth = page.evaluate("window.__elosernBridge.router.depth()")
 
         self._wait_suggestions(page, "ready")
         stable = page.evaluate(
@@ -261,7 +261,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             "never rebuild the dock",
         )
         self.assertEqual(
-            page.evaluate("Elosern.keyboard.depth()"),
+            page.evaluate("window.__elosernBridge.router.depth()"),
             depth,
             "the keyboard router must not be reset by a suggestions-only update",
         )
@@ -275,7 +275,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         inp_before = self._narrative_inp_count(page)
 
         # Keyboard activation works natively on the focused card button.
-        page.locator("#suggestions-section .option-card").nth(0).focus()
+        page.locator('[data-testid="suggestions-section"] .option-card').nth(0).focus()
         page.keyboard.press("Enter")
 
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
@@ -306,7 +306,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             if entry["action_id"] == "explore.talk_freeform"
         )
         page.locator(
-            "#suggestions-section .option-card",
+            "[data-testid=\"suggestions-section\"] .option-card",
             has_text="我們聊聊好嗎？",
         ).click()
 
@@ -360,14 +360,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # service's async republishes, which re-commit presentation state).
         page.evaluate("Evennia.connection.close()")
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return !s.connected && s.mutationsLocked; }"
         )
         # The non-dismissible offline overlay covers the dock (the lock UX);
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what
         # rejects the submit.
-        card = page.locator("#suggestions-section .option-card").nth(0)
+        card = page.locator('[data-testid="suggestions-section"] .option-card').nth(0)
         card.scroll_into_view_if_needed()
         card.click(force=True)
         page.wait_for_timeout(300)
@@ -390,10 +390,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # no server push can slip a revision between the read and the receive.
         accepted = page.evaluate(
             """() => {
-                const s = Elosern.StateController.getState();
+                const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
                 const envelope = {
                     protocol_version: 1,
-                    presentation_epoch: s.activeEpoch,
+                    presentation_epoch: s.epoch,
                     revision: s.revision + 1,
                     mode: 'exploration',
                     layout_version: 1,
@@ -408,7 +408,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                         },
                     },
                 };
-                return Elosern.StateController.receive(
+                return Elosern.Protocol.receive(
                     s.generation, 'ui_update', [envelope], {});
             }"""
         )
@@ -419,20 +419,20 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         self._wait_section(page)
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-empty").inner_text(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-empty').inner_text(),
             EMPTY_STATE_LINE,
         )
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-note").inner_text(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text(),
             DEGRADED_NOTE,
         )
         self.assertEqual(
-            page.locator("#suggestions-section .option-card").count(),
+            page.locator('[data-testid="suggestions-section"] .option-card').count(),
             0,
             "a zero-card degraded payload renders no card container",
         )
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-dismiss").count(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
             1,
             "the empty-state render keeps the dismiss control",
         )
@@ -445,15 +445,15 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._move_to_empty_ground(page)
 
         self._wait_section(page)
-        note = page.locator("#suggestions-section .suggestions-note").inner_text()
+        note = page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text()
         self.assertEqual(note, DEGRADED_NOTE)
         self.assertGreaterEqual(
-            page.locator("#suggestions-section .option-card").count(),
+            page.locator('[data-testid="suggestions-section"] .option-card').count(),
             1,
             "the v1 exploration derivation always yields at least one rule card",
         )
         self.assertEqual(
-            page.locator("#suggestions-section .suggestions-dismiss").count(),
+            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
             1,
             "the degraded render carries the same dismiss control",
         )
@@ -502,7 +502,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # must never render under it.
         self._open_root(page, 3)  # 角色狀態
         self.assertEqual(
-            page.evaluate("Elosern.explorationDock.isCharacterActive()"),
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
             True,
             "the character panel must own the action dock",
         )

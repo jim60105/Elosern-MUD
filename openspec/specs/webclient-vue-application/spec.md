@@ -1,6 +1,6 @@
 ## Purpose
 
-Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor. It also preserves the client DOM contract hooks (action-dock target, item keys, `data-testid` hooks) and the stable public façades as browser-bridge shims.
+Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor. It also preserves the client DOM contract hooks (action-dock target, item keys, `data-testid` hooks) and the stable public façades as browser-bridge shims. It also fixes the C4 flip contract: the view layer is fully reactive and store-bound, no legacy imperative view-plugin code remains in the load path, and every activation emits at most one request.
 
 ## Requirements
 
@@ -115,3 +115,23 @@ cannot be fully tokenized to readable literal text rather than suppressing the l
 #### Scenario: Unparseable message degrades to literal text
 - **WHEN** a message cannot be fully tokenized by the markup pipeline
 - **THEN** the narrative shows readable literal text rather than being suppressed
+
+### Requirement: The view layer is fully reactive and store-bound with no legacy imperative view plugin
+Every player-facing Vue surface SHALL be a reactive component that renders committed state from the Pinia
+store and dispatches only through the allowlisted action path; no component SHALL mutate store or server
+state directly, and no legacy imperative view-plugin code (the retired GoldenLayout/jQuery dock and
+`elosern_ui` view files) SHALL remain in the client load path. The keyboard router SHALL keep focusing the
+preserved action-dock target, and every activation SHALL emit at most one request.
+
+#### Scenario: A control emits one dispatch only
+- **WHEN** the player activates a dock item, verb, skill, or target control
+- **THEN** exactly one allowlisted OOB action envelope is dispatched and no local model mutation occurs
+
+#### Scenario: No legacy view code is loaded
+- **WHEN** the production client load path is inspected
+- **THEN** the retired GoldenLayout/jQuery dock and `elosern_ui` view files are not loaded and every
+  interactive surface is a store-bound Vue component
+
+#### Scenario: Single request per deliberate activation
+- **WHEN** a mutation control is activated rapidly or a held key repeats while a submission is in flight
+- **THEN** at most one request is emitted until the action's declared presentation revision is accepted

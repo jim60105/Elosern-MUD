@@ -9,11 +9,10 @@ a real managed Evennia server:
   blocked keeps the text path live);
 - an incompatible OOB presentation (``ui_protocol_error`` / unsupported_version)
   locks the graphical controls while the text path keeps working;
-- the production ``base.html`` default stays on the legacy shell (the
-  production flip is C4).
+- the C4 production flip: the ``base.html`` default is now the Vue SPA.
 
-The Vue branch is forced in the test config only (the ``?__vue=1`` review
-fixture); the production ``base.html`` default is asserted unchanged here.
+The ``?__vue=1`` fixture forces the Vue branch in the test config; the
+production ``base.html`` default (now Vue) is asserted unchanged here.
 """
 
 from __future__ import annotations
@@ -112,6 +111,9 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
             timeout=45000,
         )
 
+    @covers_requirement(
+        "webclient-vue-application::the-view-layer-is-fully-reactive-and-store-bound-with-no-legacy-imperative-view-plugin"
+    )
     def test_dispatch_via_bridge(self):
         """C3 task 2.2: dispatch-only ui_action through the C2 bridge."""
         page, _ = self.open_vue_page()
@@ -215,19 +217,64 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
             timeout=45000,
         )
 
-    def test_production_base_html_default_stays_legacy(self):
-        """C3 task 2.4: the production base.html default is UNCHANGED (legacy)."""
-        # The logged_in_page helper opens the production webclient_url (no Vue
-        # flag) and waits for the legacy GoldenLayout shell (task 2.4).
+    @covers_requirement(
+        "webclient-vue-application::the-view-layer-is-fully-reactive-and-store-bound-with-no-legacy-imperative-view-plugin"
+    )
+    def test_production_base_html_default_is_vue(self):
+        """C4: the production base.html default is the Vue SPA (the C4 flip)."""
+        # The logged_in_page helper opens the production webclient_url (no
+        # forced-Vue flag needed anymore) and waits for the Vue shell.
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The legacy shell is active; the Vue bundle is NOT loaded under the
-        # production default.
-        self.assertIsNone(
-            page.evaluate("window.__elosernBridge ?? null"),
-            "the Vue bridge only exists in the Vue branch (test config)",
-        )
+        # The Vue bridge is active under the production default; the legacy
+        # GoldenLayout shell globals and jQuery are retired from the load path.
         self.assertIsNotNone(
-            page.evaluate("window.Elosern && window.Elosern.StateController ? window.Elosern.StateController : null"),
-            "the legacy GoldenLayout shell owns the production default",
+            page.evaluate("window.__elosernBridge ?? null"),
+            "the Vue bridge owns the production default (C4 flip)",
         )
+        self.assertIsNone(
+            page.evaluate("window.Elosern && window.Elosern.StateController ? window.Elosern.StateController : null"),
+            "the legacy GoldenLayout shell is retired from the load path",
+        )
+        self.assertIsNone(
+            page.evaluate("window.jQuery ?? null"),
+            "the legacy jQuery view plugin is retired from the C4 load path",
+        )
+
+    @covers_requirement(
+        "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline"
+    )
+    def test_reduced_motion_and_status_not_color_only(self):
+        """C4 task 3.2: reduced-motion is honored; status is never color-only."""
+        page, _ = self.open_vue_page()
+        self._store_active(page)
+
+        # Reduced motion: emulate prefers-reduced-motion: reduce; the tokens.css
+        # @media block must resolve the motion tokens to 1ms.
+        page.emulate_media(reduce_motion="reduce")
+        motion_base = page.evaluate(
+            "() => getComputedStyle(document.documentElement)."
+            "getPropertyValue('--motion-base').trim()"
+        )
+        self.assertEqual(
+            motion_base,
+            "1ms",
+            "prefers-reduced-motion must resolve the motion tokens to 1ms",
+        )
+
+        # Not color-only: each vitals gauge carries a symbol glyph, a text
+        # label, and a numeric current/maximum value, so health is never
+        # conveyed by the colored bar alone.
+        for key in ("hp", "mp", "sp"):
+            value_el = page.locator(f'[data-testid="status-panel__gauge-value--{key}"]')
+            self.assertEqual(
+                value_el.count(),
+                1,
+                f"the {key} gauge numeric value element must be present",
+            )
+            text = value_el.inner_text().strip()
+            self.assertRegex(
+                text,
+                r"\d+\s*/\s*\d+",
+                f"the {key} gauge value must show a numeric current/maximum, not color alone",
+            )

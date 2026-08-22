@@ -7,7 +7,7 @@
 // (`shop === null`) the panel shows only the honest wallet line plus an
 // absence marker (design D2: services are hosts, not data sources — no
 // invented stock/sellable rows).
-import { computed, reactive } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 
 const props = defineProps({
   // The committed `services` v1 panel payload (or the unavailable form).
@@ -68,6 +68,38 @@ function quantityBounds(action) {
 // are owned by the C1 store). Only payload values are carried: the row's
 // own item_key and a quantity validated against the action's quantity.min/
 // max bounds.
+// The per-row quantity form (Phase-0 audit §2.3 REMAP-TO-TESTID): the
+// `services-quantity` wrapper and `services-quantity-value` display are
+// served as `data-testid` on the Vue quantity control. The form is open for
+// the activated row only; submit closes it. A reconnect replaces the
+// `services` panel and discards the unsubmitted quantity (local state
+// resets on panel identity change).
+const selectedKey = ref(null);
+
+watch(
+  () => props.services,
+  () => {
+    selectedKey.value = null;
+    for (const key of Object.keys(quantities)) {
+      delete quantities[key];
+    }
+    for (const row of stock.value) {
+      if (!(row.item_key in quantities)) {
+        quantities[row.item_key] = row.buy?.quantity?.min ?? 1;
+      }
+    }
+    for (const row of sellable.value) {
+      if (!(row.item_key in quantities)) {
+        quantities[row.item_key] = row.sell?.quantity?.min ?? 1;
+      }
+    }
+  }
+);
+
+function activateRow(row) {
+  selectedKey.value = row.item_key;
+}
+
 function buyNow(row) {
   const action = row.buy;
   if (!action || !action.enabled) return;
@@ -75,6 +107,7 @@ function buyNow(row) {
   const qty = Number(quantities[row.item_key]);
   if (!Number.isInteger(qty) || qty < min || qty > max) return;
   emit("buy", { action_id: action.action_id, payload: { item_key: row.item_key, quantity: qty } });
+  selectedKey.value = null;
 }
 
 function sellNow(row) {
@@ -84,6 +117,7 @@ function sellNow(row) {
   const qty = Number(quantities[row.item_key]);
   if (!Number.isInteger(qty) || qty < min || qty > max) return;
   emit("sell", { action_id: action.action_id, payload: { item_key: row.item_key, quantity: qty } });
+  selectedKey.value = null;
 }
 </script>
 
@@ -121,24 +155,34 @@ function sellNow(row) {
         :key="row.item_key"
         class="shop-row"
         :data-testid="`shop-panel__stock--${row.item_key}`"
+        @click="activateRow(row)"
       >
         <span class="shop-row__name">{{ row.display_name }}</span>
         <span class="shop-row__price">購買 {{ formatCopper(row.buy_copper) }} 銅</span>
         <span class="shop-row__price">出賣 {{ formatCopper(row.sell_copper) }} 銅</span>
         <span class="shop-row__stock">{{ row.stock }} / {{ row.max_stock }}</span>
-        <input
-          v-model="quantities[row.item_key]"
-          class="shop-row__qty"
-          type="number"
-          min="1"
-          :max="row.buy?.quantity?.max ?? 1"
-          aria-label="購買數量"
-        />
+        <span
+          class="shop-row__qty-wrap"
+          :data-testid="selectedKey === row.item_key ? 'services-quantity' : undefined"
+        >
+          <input
+            v-model="quantities[row.item_key]"
+            class="shop-row__qty"
+            type="number"
+            min="1"
+            :max="row.buy?.quantity?.max ?? 1"
+            aria-label="購買數量"
+          />
+          <span
+            class="shop-row__qty-value"
+            :data-testid="selectedKey === row.item_key ? 'services-quantity-value' : undefined"
+          >{{ quantities[row.item_key] }}</span>
+        </span>
         <button
           type="button"
           class="shop-row__buy"
           :disabled="!(row.buy && row.buy.enabled)"
-          @click="buyNow(row)"
+          @click.stop="buyNow(row)"
         >
           {{ row.buy?.label ?? "購買" }}
         </button>
@@ -156,23 +200,33 @@ function sellNow(row) {
         :key="row.item_key"
         class="shop-row"
         :data-testid="`shop-panel__sellable--${row.item_key}`"
+        @click="activateRow(row)"
       >
         <span class="shop-row__name">{{ row.display_name }}</span>
         <span class="shop-row__price">出賣 {{ formatCopper(row.sell_copper) }} 銅</span>
         <span class="shop-row__held">{{ row.held }}</span>
-        <input
-          v-model="quantities[row.item_key]"
-          class="shop-row__qty"
-          type="number"
-          min="1"
-          :max="row.sell?.quantity?.max ?? 1"
-          aria-label="賣出數量"
-        />
+        <span
+          class="shop-row__qty-wrap"
+          :data-testid="selectedKey === row.item_key ? 'services-quantity' : undefined"
+        >
+          <input
+            v-model="quantities[row.item_key]"
+            class="shop-row__qty"
+            type="number"
+            min="1"
+            :max="row.sell?.quantity?.max ?? 1"
+            aria-label="賣出數量"
+          />
+          <span
+            class="shop-row__qty-value"
+            :data-testid="selectedKey === row.item_key ? 'services-quantity-value' : undefined"
+          >{{ quantities[row.item_key] }}</span>
+        </span>
         <button
           type="button"
           class="shop-row__sell"
           :disabled="!(row.sell && row.sell.enabled)"
-          @click="sellNow(row)"
+          @click.stop="sellNow(row)"
         >
           {{ row.sell?.label ?? "賣出" }}
         </button>

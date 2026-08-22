@@ -105,13 +105,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         wait_for_narrative_settled(page, narrative_before.__len__())
         # Focus retained in the field, drawer still open, field cleared.
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertTrue(
             page.evaluate(
                 "document.activeElement === document.getElementById('inputfield')"
@@ -129,7 +129,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         wait_for_narrative_settled(page, narrative_after.__len__())
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertTrue(
             page.evaluate(
                 "document.activeElement === document.getElementById('inputfield')"
@@ -141,7 +141,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # forwards focus to the mounted listbox row container).
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => !Elosern.drawer.isOpen() && (() => {"
+            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
             "  const dock = document.getElementById('action-dock');"
             "  return document.activeElement === dock || "
             "    (document.activeElement && dock.contains(document.activeElement));"
@@ -156,7 +156,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         narrative_before_cancel = page.locator(".elosern-narrative").inner_text()
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => !Elosern.drawer.isOpen() && (() => {"
+            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
             "  const dock = document.getElementById('action-dock');"
             "  return document.activeElement === dock || "
             "    (document.activeElement && dock.contains(document.activeElement));"
@@ -198,8 +198,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # A converted colored line renders with a palette class, never as
         # markup source.
         page.evaluate(
-            "() => Elosern.goldenlayout.onText("
-            "['|r南大道|n|g 綠|n'], {})"
+            "() => window.__elosernConsole.model.appendIn('|r南大道|n|g 綠|n')"
         )
         page.wait_for_function(
             "() => document.querySelectorAll("
@@ -230,7 +229,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # inside the pane: no clipping, no additional page-level scroll.
         wide = "X" * 400 + " 尾部"
         page.evaluate(
-            "(text) => Elosern.goldenlayout.onText([text], {})", wide
+            "(text) => window.__elosernConsole.model.appendIn(text)", wide
         )
         page.wait_for_function(
             "(text) => {"
@@ -303,7 +302,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # Guarantee overflow so the narrative can be scrolled up.
         page.evaluate(
             "() => { for (let i = 0; i < 80; i++) { "
-            "Elosern.goldenlayout.onText(['filler line ' + i], {}); } }"
+            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
         )
         page.wait_for_timeout(300)
         page.evaluate(
@@ -317,7 +316,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(scroll_top, 0)
 
         page.evaluate(
-            "() => Elosern.goldenlayout.onText(['unread probe line'], {})"
+            "() => window.__elosernConsole.model.appendIn('unread probe line')"
         )
         page.wait_for_function(
             "() => document.getElementById('narrative-unread')"
@@ -352,7 +351,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # Guarantee overflow and scroll up so an unread count accumulates.
         page.evaluate(
             "() => { for (let i = 0; i < 80; i++) { "
-            "Elosern.goldenlayout.onText(['filler line ' + i], {}); } }"
+            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
         )
         page.wait_for_timeout(300)
         page.evaluate(
@@ -360,7 +359,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             "el.scrollTop = 0; }"
         )
         page.evaluate(
-            "() => Elosern.goldenlayout.onText(['unread probe line'], {})"
+            "() => window.__elosernConsole.model.appendIn('unread probe line')"
         )
         page.wait_for_function(
             "() => document.getElementById('narrative-unread')"
@@ -415,7 +414,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # the field; Enter must send exactly one ordinary text message through
         # the single drawer-owned path, clear the field, and keep focus in it.
         page.locator(".drawer-entry").click()
-        self.assertTrue(page.evaluate("Elosern.drawer.isOpen()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
@@ -490,7 +489,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.keyboard.press("ArrowDown")  # 休息一段時間
         page.keyboard.press("Enter")
         page.wait_for_function(
-            "() => document.getElementById('exploration-rest-form') !== null"
+            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
         )
         # Open the drawer through its entry button and send: the rest form's
         # capture-phase handler must yield, and the command travels as
@@ -595,7 +594,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 }"""
             )
             self.assertEqual(frame["borderTop"], "rgb(169, 50, 42)")
-            guidance = page.locator("#action-dock-guidance").inner_text()
+            guidance = page.locator('[data-testid="action-dock-guidance"]').inner_text()
             for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 開啟指令"):
                 self.assertIn(keyword, guidance)
             # The root is one equal-width row of grid cells with the mockup
@@ -621,9 +620,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertEqual(page.locator(".exploration-detail").count(), 0)
             page.keyboard.press("Enter")  # Move
             page.wait_for_function(
-                "() => document.getElementById('exploration-detail') !== null"
+                "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
             )
-            detail = page.locator("#exploration-detail")
+            detail = page.locator('[data-testid="exploration-detail"]')
             self.assertTrue(detail.is_visible())
             self.assertEqual(
                 page.evaluate(
@@ -634,7 +633,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 "submenu item lists render as a CSS grid",
             )
             # The detail pane names the focused item's next key action.
-            page.evaluate("Elosern.keyboard.focusItemByKey('back')")
+            page.evaluate("window.__elosernBridge.router.focusItemByKey('back')")
             page.wait_for_timeout(120)
             self.assertIn(
                 "返回上一層",

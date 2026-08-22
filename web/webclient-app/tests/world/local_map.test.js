@@ -110,24 +110,24 @@ describe("LocalMap (B4 world family)", () => {
 
   it("defaults the detail line to the current node and follows hover", async () => {
     const w = mountMap();
-    const detail = w.get('[data-testid="local-map__detail"]');
+    const detail = w.get('[data-testid="local-map-detail"]');
     expect(detail.text()).toContain("霧骨渡口");
     expect(detail.text()).toContain("current");
     expect(detail.text()).toContain("(1, 2)");
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("mouseenter");
-    const hovered = w.get('[data-testid="local-map__detail"]');
+    const hovered = w.get('[data-testid="local-map-detail"]');
     expect(hovered.text()).toContain("南門");
     expect(hovered.text()).toContain("visible_unvisited");
     expect(hovered.text()).toContain("(2, 2)");
     expect(hovered.text()).toContain("grid:altoria:2:2");
 
     await w.find(".local-map__lattice").trigger("mouseleave");
-    expect(w.get('[data-testid="local-map__detail"]').text()).toContain("霧骨渡口");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("click");
     // Selection persists after the interaction.
-    expect(w.get('[data-testid="local-map__detail"]').text()).toContain("南門");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("南門");
   });
 
   it("renders every edge of the payload with its own traversability styling", () => {
@@ -147,6 +147,6 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.get('[data-testid="local-map__edge--0"]').classes()).toContain("local-map__edge--unknown");
     expect(w.findAll('[data-testid="local-map__actionable"]')).toHaveLength(0);
     expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(1);
-    expect(w.get('[data-testid="local-map__detail"]').text()).toContain("霧骨渡口");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
   });
 });

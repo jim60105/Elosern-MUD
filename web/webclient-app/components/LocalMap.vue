@@ -162,6 +162,8 @@ function activateNode(node) {
           class="local-map__node"
           :class="`local-map__node--${node.visibility}`"
           :data-testid="`local-map__node--${node.id}`"
+          :data-node="node.id"
+          :data-node-id="node.id"
           :data-visibility="node.visibility"
           :transform="`translate(${nodePos(node).x}, ${nodePos(node).y})`"
           @click="activateNode(node)"
@@ -233,7 +235,7 @@ function activateNode(node) {
         </li>
       </ul>
 
-      <p class="local-map__detail" data-testid="local-map__detail">
+      <p class="local-map__detail" data-testid="local-map-detail">
         {{ detailParts.join(" · ") }}
       </p>
     </template>

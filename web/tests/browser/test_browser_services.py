@@ -371,13 +371,13 @@ class ShopJourneys(ServicesBrowserTest):
         debug = page.evaluate(
             """() => ({
               sent: window.__elosernSent || [],
-              quantityOpen: document.getElementById('services-quantity') !== null,
-              quantityValue: document.getElementById('services-quantity-value')
-                ? document.getElementById('services-quantity-value').textContent
+              quantityOpen: document.querySelector('[data-testid=\"services-quantity\"]')) !== null,
+              quantityValue: document.querySelector('[data-testid=\"services-quantity-value\"]'))
+                ? document.querySelector('[data-testid=\"services-quantity-value\"]')).textContent
                 : null,
-              depth: window.Elosern.keyboard.depth(),
-              current: window.Elosern.keyboard.currentItem() &&
-                       window.Elosern.keyboard.currentItem().label,
+              depth: window.__elosernBridge.router.depth(),
+              current: window.__elosernBridge.router.currentItem() &&
+                       window.__elosernBridge.router.currentItem().label,
             })"""
         )
         self.assertEqual(
@@ -481,10 +481,10 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
     def _raw_ui_action(self, page, action_id, payload, request_id, base_revision):
         page.evaluate(
             """({action_id, payload, request_id, base_revision}) => {
-              const s = Elosern.StateController.getState();
+              const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
-                presentation_epoch: s.activeEpoch,
+                presentation_epoch: s.epoch,
                 request_id,
                 base_revision,
                 action_id,
@@ -605,7 +605,7 @@ class ReconnectJourney(ServicesBrowserTest):
         _press(page, "Enter")  # 貨架
         _press(page, "Enter")  # meal buy row
         _press(page, "5", wait_ms=40)
-        self.assertTrue(page.evaluate("document.getElementById('services-quantity') !== null"))
+        self.assertTrue(page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]')) !== null"))
 
         # Abnormally close the raw WebSocket (preserves login) and wait for the
         # offline overlay.
@@ -613,7 +613,7 @@ class ReconnectJourney(ServicesBrowserTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.wait_for_function(
             "() => document.getElementById('elosern-offline-overlay')"
@@ -632,7 +632,7 @@ class ReconnectJourney(ServicesBrowserTest):
                 reconnects += 1
             page.wait_for_timeout(500)
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); "
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
             "return s.connected && s.phase === 'active'; }",
             timeout=30000,
         )
@@ -643,7 +643,7 @@ class ReconnectJourney(ServicesBrowserTest):
         self.assertTrue(panel["available"])
         # The unsubmitted quantity was discarded and nothing was retried.
         self.assertEqual(
-            page.evaluate("document.getElementById('services-quantity') === null"),
+            page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]')) === null"),
             True,
             "unsubmitted quantity must be discarded on reconnect",
         )

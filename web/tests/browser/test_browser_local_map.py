@@ -97,14 +97,14 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(remembered.count(), 1)
         remembered.first.click()
         page.wait_for_function(
-            "() => (document.getElementById('local-map-detail').textContent || '')"
+            "() => (document.querySelector('[data-testid=\"local-map-detail\"]')).textContent || '')"
             ".indexOf('已探索') !== -1"
         )
-        detail = page.locator("#local-map-detail").inner_text()
+        detail = page.locator('[data-testid="local-map-detail"]').inner_text()
         self.assertIn("已探索", detail)
         self.assertIn("北門", detail)
         # No travel control appears for a remembered remote node.
-        self.assertEqual(page.locator("#local-map-detail button").count(), 0)
+        self.assertEqual(page.locator('[data-testid="local-map-detail"] button').count(), 0)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_unknown_nodes_never_appear_in_the_dom(self):
@@ -132,7 +132,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
-            "() => { const s = Elosern.StateController.getState(); return !s.connected; }"
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
         )
         page.evaluate("Evennia.connect()")
         deadline = time.monotonic() + 45
@@ -215,7 +215,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
                 # The legend and detail line remain visible below the canvas.
                 self.assertTrue(page.locator(".local-map-legend").is_visible())
-                detail = page.locator("#local-map-detail")
+                detail = page.locator('[data-testid="local-map-detail"]')
                 self.assertTrue(detail.is_visible())
                 page.close()
 
