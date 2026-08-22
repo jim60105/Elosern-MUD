@@ -24,12 +24,23 @@ bridge preserves the existing set only).
   and re-points its traceability test in the same change, so every re-expressed requirement has a passing
   test at C2's archive. C2 surfaces any A1 omission rather than silently leaving a bound spec broken.
 
+- **D3 — Stale-callback and claim guards are recorded, owned by C3.** The C2 bridge stamps
+  `ui_action_result` / `ui_update` receives with `currentGeneration()`; a callback delivered late from an
+  already-reconnected (stale) transport thus lands in the new generation. C3's transport MUST capture the
+  generation the sender attached and stamp (or discard) each callback accordingly — the UMD reducer's
+  epoch/revision checks are only the backstop. The bridge's key-claim double guard
+  (`claimed && CLAIMED_KEYS.includes(key)`) is deliberate: the keyboard router's consumed-key set is
+  pinned by its UMD test, and the guard prevents a future router drift from claiming new keys silently.
+
 ## Risks / Trade-offs
 
 - **A missing façade/contract reference** → A1's grep-based enumeration is the net and C2 re-checks the
   Playwright suite before flipping the shell (C3/C4).
 - **A second append or dispatch path appears** → `narrativeInput`/`actions.submit` are store-owned single
   entry points asserted by a browser test.
+- **Stale callbacks from a reconnected transport** → C2 stamps them with the current generation; C3 binds
+  each callback to the attached generation and discards stale ones before they reach the store (the UMD
+  epoch/revision gates are the backstop).
 - **Traceability re-point churn across several capabilities** → confined to C2 (where the bridge + tests
   exist), so no requirement is left without a test.
 

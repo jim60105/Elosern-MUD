@@ -26,7 +26,10 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     BROWSER_ACCOUNT,
     BROWSER_PASSWORD,
+    fresh_epoch,
     install_outbound_recorder,
+    snapshot_envelope,
+    valid_status_panel,
     wait_for_shell_active,
 )
 
@@ -318,8 +321,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         wait_for_shell_active(page)
         self.assertIsNotNone(page.evaluate("window.jQuery ?? null"))
         self.assertIsNone(
-            page.evaluate("window.ElosernVue ?? null"),
-            "the Vue bundle must not load on the legacy default page",
+            page.evaluate("window.__elosernBridge ?? null"),
+            "the Vue bridge hook must not exist on the legacy default page",
         )
 
     @covers_requirement(
@@ -371,6 +374,253 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             failed, [], f"the offline story render made failing requests: {failed}"
         )
+
+
+    @covers_requirement(
+        "webclient-vue-application::the-app-preserves-the-client-dom-contract-hooks-and-exposes-stable-test-hooks",
+        "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe",
+        "webclient-pointer-activation::keyboard-input-is-dispatched-through-the-webclient-plugin-contract",
+    )
+    def test_window_elosern_bridge_facades_resolve_and_route(self):
+        """C2: the window.Elosern public-contract bridge resolves and routes.
+
+        The A1 frozen façade surface (four façades, exact member sets) resolves
+        on the Vue test-config page; narrative input routes through the store's
+        single append path; the action-dispatch entry is single (one mutation in
+        flight); and document key events are claimed exactly when the router
+        consumes the key, with unclaimed keys falling through to the text path
+        (the live transport's text round-trip is proven by C3).
+        """
+        page, _responses = self.open_vue_page()
+        page.wait_for_selector(VUE_ROOT, timeout=30000)
+
+        surface = page.evaluate(
+            """() => {
+                const e = window.Elosern;
+                return {
+                    facades: e ? Object.keys(e).sort() : null,
+                    protocolVersion: e && e.Protocol ? e.Protocol.PROTOCOL_VERSION : null,
+                    hasRouter: e && e.KeyboardRouter ? typeof e.KeyboardRouter.createRouter === "function" : false,
+                    narrativeMembers: e && e.narrativeInput ? Object.keys(e.narrativeInput).sort() : null,
+                    actionMembers: e && e.actions ? Object.keys(e.actions).sort() : null,
+                    clientMembers: e && e.actions.client ? Object.keys(e.actions.client).sort() : null,
+                };
+            }"""
+        )
+        self.assertEqual(
+            surface["facades"],
+            ["KeyboardRouter", "Protocol", "actions", "narrativeInput"],
+            "the bridge exposes exactly the four frozen façades (A1 audit §1)",
+        )
+        self.assertEqual(surface["protocolVersion"], 1)
+        self.assertTrue(surface["hasRouter"])
+        self.assertEqual(
+            surface["narrativeMembers"],
+            [
+                "appendInput",
+                "mountChoicePoint",
+                "replaceChoicePoint",
+                "unmountChoicePoint",
+            ],
+        )
+        self.assertEqual(
+            surface["actionMembers"],
+            [
+                "client",
+                "handleActionResult",
+                "handlePresentation",
+                "handleReconnect",
+                "handleTransportReset",
+                "submit",
+                "sync",
+            ],
+        )
+        self.assertEqual(
+            surface["clientMembers"],
+            [
+                "inFlightRequestId",
+                "isInFlight",
+                "isLocked",
+                "lastResult",
+                "onActionResult",
+                "onDetached",
+                "onPresentationAccepted",
+                "onReconnect",
+                "onTransportReset",
+                "submit",
+                "sync",
+                "uncertain",
+            ],
+        )
+
+        # Drive the store to an active session through the stable test hook
+        # (the live OOB delivery of these envelopes is C3's transport work).
+        context_actions = {
+            "schema_version": 5,
+            "available": True,
+            "kind": "exploration",
+            "affordances": [
+                {
+                    "action_id": "explore.wait",
+                    "label": "等待",
+                    "params": {"daypart": "dusk"},
+                    "freeform": False,
+                    "navigation": False,
+                    "enabled": True,
+                    "disabled_reason": None,
+                },
+                {
+                    "surface": "guild",
+                    "label": "公會",
+                    "navigation": True,
+                    "enabled": True,
+                    "disabled_reason": None,
+                },
+            ],
+            "suggestions": {"status": "generating"},
+        }
+        envelope = snapshot_envelope(
+            fresh_epoch(),
+            1,
+            {
+                "status": valid_status_panel("測試起點", "p1"),
+                "context_actions": context_actions,
+            },
+        )
+        established = page.evaluate(
+            """(envelope) => {
+                const { store } = window.__elosernBridge;
+                store.beginTransport(1);
+                store.setConnected(true);
+                const result = store.receive(1, "ui_snapshot", [envelope]);
+                return result.accepted;
+            }""",
+            envelope,
+        )
+        self.assertTrue(established, "the new-epoch snapshot must be adopted")
+
+        # The narrative append path is single: one appendInput call echoes one
+        # `.inp` line (no duplicated append path).
+        append = page.evaluate(
+            """() => {
+                const { store, facade } = window.__elosernBridge;
+                const accepted = facade.narrativeInput.appendInput("look");
+                return { accepted, lines: store.narrative.length };
+            }"""
+        )
+        self.assertTrue(append["accepted"])
+        self.assertEqual(append["lines"], 1)
+
+        # The action dispatch entry is single: the first submit returns a
+        # request id; a second submit while one mutation is in flight
+        # dispatches nothing.
+        dispatch = page.evaluate(
+            """() => {
+                const { facade } = window.__elosernBridge;
+                const first = facade.actions.submit("explore.wait", { daypart: "dusk" });
+                const second = facade.actions.submit("explore.wait", { daypart: "dusk" });
+                return {
+                    first,
+                    second,
+                    isInFlight: facade.actions.client.isInFlight(),
+                    requestId: facade.actions.client.inFlightRequestId(),
+                    uncertain: facade.actions.client.uncertain(),
+                };
+            }"""
+        )
+        self.assertEqual(dispatch["first"], "session:1")
+        self.assertIsNone(dispatch["second"], "no duplicate action path")
+        self.assertTrue(dispatch["isInFlight"])
+        self.assertEqual(dispatch["requestId"], "session:1")
+        self.assertFalse(dispatch["uncertain"])
+
+        # The release gate: feed the presentation revision through the bridge
+        # entry point; the in-flight lock releases once the committed revision
+        # reaches the declared presentation revision.
+        released = page.evaluate(
+            """() => {
+                const { store, facade } = window.__elosernBridge;
+                const result = store.receive(
+                    1,
+                    "ui_action_result",
+                    [{
+                        protocol_version: 1,
+                        presentation_epoch: store.view.epoch,
+                        request_id: "session:1",
+                        outcome: "success",
+                        code: "completed",
+                        message: "完成",
+                        presentation_revision: 2,
+                    }],
+                );
+                facade.actions.handlePresentation({
+                    protocol_version: 1,
+                    presentation_epoch: store.view.epoch,
+                    revision: 2,
+                    mode: "exploration",
+                    panels: { status: store.view.panels.status },
+                    layout_version: 1,
+                    server_time: {
+                        year: 1204,
+                        season_index: 0,
+                        season_label: "春季",
+                        day_in_season: 3,
+                        hour: 12,
+                        minute: 0,
+                        second: 0,
+                    },
+                });
+                return {
+                    resultAccepted: result.accepted,
+                    stillInFlight: facade.actions.client.isInFlight(),
+                };
+            }"""
+        )
+        self.assertTrue(released["resultAccepted"])
+        self.assertFalse(released["stillInFlight"])
+
+        # Document key events route through the bridge's key routing: the
+        # router claims ArrowDown; unclaimed letter keys fall through.
+        keys = page.evaluate(
+            """() => {
+                const { store, facade } = window.__elosernBridge;
+                const down = new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true });
+                document.dispatchEvent(down);
+                const letter = new KeyboardEvent("keydown", { key: "g", cancelable: true });
+                document.dispatchEvent(letter);
+                return {
+                    focusKey: store.view.focus.key,
+                    focusEnabled: store.view.focus.enabled,
+                    downClaimed: down.defaultPrevented,
+                    letterSwallowed: letter.defaultPrevented,
+                    inFlight: facade.actions.client.isInFlight(),
+                };
+            }"""
+        )
+        self.assertEqual(keys["focusKey"], "action-guild")
+        self.assertTrue(keys["focusEnabled"])
+        self.assertTrue(keys["downClaimed"])
+        self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
+
+        # Enter on the focused navigation item pushes the local guild surface
+        # (no ui_action is dispatched for navigation items).
+        enter_result = page.evaluate(
+            """() => {
+                const { store, facade } = window.__elosernBridge;
+                const enter = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
+                document.dispatchEvent(enter);
+                return {
+                    surface: store.view.lastSurface,
+                    focusKey: store.view.focus.key,
+                    inFlight: facade.actions.client.isInFlight(),
+                    prevented: enter.defaultPrevented,
+                };
+            }"""
+        )
+        self.assertEqual(enter_result["surface"], "guild")
+        self.assertEqual(enter_result["focusKey"], "action-guild")
+        self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
+        self.assertTrue(enter_result["prevented"])
 
 
 if __name__ == "__main__":

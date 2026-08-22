@@ -1,6 +1,6 @@
 ## Purpose
 
-Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor.
+Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor. It also preserves the client DOM contract hooks (action-dock target, item keys, `data-testid` hooks) and the stable public façades as browser-bridge shims.
 
 ## Requirements
 
@@ -68,3 +68,31 @@ components to this store are established by later changes.
 #### Scenario: The store holds only backed data
 - **WHEN** the store receives panel data
 - **THEN** it holds only data sourced from the OOB allowlist or the transport text stream and holds no invented data
+
+### Requirement: The app preserves the client DOM contract hooks and exposes stable test hooks
+The Vue application SHALL preserve the DOM contract identifiers that the OOB and browser contract depend
+on: the focusable action-dock target that the keyboard router dispatches into, the `action-` and `target-`
+item keys selected by pointer or keyboard, and the identity of the required panel surfaces. The application
+SHALL expose a stable `data-testid` hook on every remaining interactive surface so behavioral browser
+acceptance targets deterministic hooks rather than styling selectors. The application SHALL also preserve
+the stable public façades that existing OOB and browser contracts reference — the narrative input/append
+path (`window.Elosern.narrativeInput`), the action submission entry point (`window.Elosern.actions.submit`),
+and the keyboard-router consumption contract — implemented as browser-bridge shims over the store and the
+imported logic, so existing behavioral tests and the choice-point/narrative append path keep their single,
+non-duplicated entry points while the DOM is implemented in Vue.
+
+#### Scenario: Keyboard router reaches the same dock
+- **WHEN** the application renders the active menu frame and the player focuses the preserved action-dock target
+- **THEN** a key press dispatches through the keyboard router to the focused item
+
+#### Scenario: Pointer chooses by the stored key with keyboard parity
+- **WHEN** the player clicks an action or target row
+- **THEN** the `action-` or `target-` item key is used and the chosen item equals the item a keyboard journey would reach
+
+#### Scenario: Interactive surfaces carry stable hooks
+- **WHEN** any required interactive surface renders
+- **THEN** it exposes a stable, unique `data-testid` identifier usable by automation
+
+#### Scenario: Existing façade contracts hold
+- **WHEN** an existing browser test or spec references the `window.Elosern.narrativeInput` narrative append path or the `window.Elosern.actions.submit` action entry point
+- **THEN** those contracts resolve and route through the store and the single bridge dispatch path (the live transport round-trip is proven by a later change) with no duplicated append or action path

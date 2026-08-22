@@ -368,3 +368,45 @@ class WebClientFrozenContractAudit(unittest.TestCase):
                     f"browser-suite target #{identifier} is not in the frozen audit "
                     "§2.3 list (or an explicit exemption)",
                 )
+
+    @covers_requirement(
+        "webclient-browser-verification::the-implementation-bound-public-contract-is-frozen-before-the-shell-is-swapped",
+    )
+    def test_c2_delta_specs_match_the_frozen_list(self):
+        """The C2 change's delta specs apply exactly the frozen C2 entries.
+
+        Every entry in the frozen list whose ``applying_change`` is
+        ``webclient-vue-08-wire-bridge-contracts`` must have its delta spec
+        present under the change's ``specs/`` tree, re-expressing the frozen
+        requirement by name; the ADDED ``webclient-vue-application`` spec
+        (the bridge-façade requirement) is applied in the same change. Any C2
+        capability missing a delta spec surfaces here (a C2 omission in the
+        A1 net), and a delta spec for a C4 (or unknown) capability fails the
+        exact-set assertion.
+        """
+        entries = self.delta_block[DELTA_LIST_KEY]
+        c2_entries = [
+            entry
+            for entry in entries
+            if entry["applying_change"] == "webclient-vue-08-wire-bridge-contracts"
+        ]
+        self.assertTrue(c2_entries, "the frozen list must carry C2 delta entries")
+        specs_dir = (
+            REPO_ROOT / "openspec" / "changes" / "webclient-vue-08-wire-bridge-contracts"
+            / "specs"
+        )
+        delta_files = sorted(path.parent.name for path in specs_dir.glob("*/spec.md"))
+        self.assertEqual(
+            delta_files,
+            sorted({entry["capability"] for entry in c2_entries} | {"webclient-vue-application"}),
+            "the C2 delta spec set must equal the frozen list's C2 capabilities plus the ADDED webclient-vue-application spec",
+        )
+        for entry in c2_entries:
+            with self.subTest(delta_id=entry["delta_id"]):
+                spec = specs_dir / entry["capability"] / "spec.md"
+                source = spec.read_text(encoding="utf-8")
+                self.assertIn(
+                    f"### Requirement: {entry['requirement']}\n",
+                    source,
+                    f"C2 delta spec must re-express the frozen requirement {entry['requirement']}",
+                )
