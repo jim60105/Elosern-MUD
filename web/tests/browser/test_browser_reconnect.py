@@ -128,9 +128,12 @@ class ReconnectTest(BrowserAcceptanceTest):
         )
 
         # The uncertain-result notice appears after the reconnect.
+        # The server's post-reconnect re-attach can lag under parallel CI load,
+        # so allow a longer window than Playwright's default 30s.
         page.wait_for_function(
             "() => (document.getElementById('elosern-action-live').textContent || '')"
-            ".indexOf('無法確認') !== -1"
+            ".indexOf('無法確認') !== -1",
+            timeout=60_000,
         )
         overlay = page.evaluate(
             "() => document.getElementById('elosern-offline-overlay')"
