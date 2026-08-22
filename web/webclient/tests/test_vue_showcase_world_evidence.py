@@ -82,7 +82,10 @@ WORLD_FAMILY_STORY_IDS = {
 }
 
 # The exact manifest baseline before this change (B1 core, B2 action-dock,
-# B3 data families).
+# B3 data families). The four full-overlays keys from B5
+# (webclient-vue-06-showcase-overlays) are added at the manifest freeze
+# (design D3): after B5 the frozen manifest carries the complete required
+# set, so this baseline must extend — not restructure.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -99,6 +102,10 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/StatusPanel",
     "Data/CharacterPanel",
     "Data/SkillBook",
+    "Overlays/CreationOverlay",
+    "Overlays/HelpOverlay",
+    "Overlays/MapOverlay",
+    "Overlays/SettingsOverlay",
 }
 
 
