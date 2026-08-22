@@ -809,11 +809,216 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
   guild: null,
   shop: null,
   inventory: null,
-  pagination: {
-    board_total: 0,
-    quest_total: 0,
-    stock_total: 0,
-    sellable_total: 0,
-    inventory_total: 0,
+    pagination: {
+      board_total: 0,
+      quest_total: 0,
+      stock_total: 0,
+      sellable_total: 0,
+      inventory_total: 0,
+    },
+};
+
+// B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
+// `creation` panel (schema v1) mirrors web/webclient/presentation/creation.py
+// exactly: presets (at most 8 cards), the custom descriptor (name/adult
+// bounds, races, subraces, profiles, affinity), and the optional saved
+// wizard draft (preset/custom/concept + background + affinity). The adult
+// bounds advertise the 18 minimum on BOTH age and apparent_age (the
+// deterministic adult gate, webclient-character-creation-ui).
+const ELEMENTS = [
+  { key: "fire", label: "火" },
+  { key: "water", label: "水" },
+  { key: "wind", label: "風" },
+  { key: "earth", label: "土" },
+  { key: "lightning", label: "雷" },
+  { key: "ice", label: "冰" },
+  { key: "light", label: "光" },
+  { key: "dark", label: "暗" },
+];
+
+export const CREATION_PANEL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "creation",
+  draft: null,
+  presets: [
+    {
+      key: "preset_wandering_blade",
+      display_name: "流浪劍客",
+      race: "beastfolk",
+      race_description: "獸民：堅韌、忠實，長於戰技。",
+      subrace: "subrace_wolf",
+      emphasis: "重擊與近戰",
+      background: "一位尋找冒險者公會試煉的流浪劍客。",
+    },
+    {
+      key: "preset_lantern_scholar",
+      display_name: "燈下學士",
+      race: "elf",
+      race_description: "精靈：長壽、敏銳，長於學藝。",
+      subrace: null,
+      emphasis: "法術與研究",
+      background: "在燈下研讀古籍的學士。",
+    },
+    {
+      key: "preset_harbor_hauler",
+      display_name: "碼頭腳夫",
+      race: "human",
+      race_description: "人族：均衡、勤奮，長於商貿。",
+      subrace: null,
+      emphasis: "搬運與交易",
+      background: "在霧骨渡口搬運貨物的腳夫。",
+    },
+  ],
+  custom: {
+    name: { min_length: 1, max_length: 64 },
+    adult: {
+      age_minimum: 18,
+      age_maximum: 10000,
+      apparent_age_minimum: 18,
+      apparent_age_maximum: 10000,
+    },
+    races: [
+      {
+        key: "human",
+        description: "人族：均衡、勤奮，商貿立族。",
+        subraces: null,
+      },
+      {
+        key: "beastfolk",
+        description: "獸民：堅韌、忠實，戰技立族。",
+        subraces: ["subrace_wolf", "subrace_bear"],
+      },
+      {
+        key: "elf",
+        description: "精靈：長壽、敏銳，學藝立族。",
+        subraces: null,
+      },
+    ],
+    subraces: {
+      subrace_wolf: {
+        display_name_zh: "狼裔",
+        common_name_zh: "狼",
+        specialty: "追獵與近戰",
+      },
+      subrace_bear: {
+        display_name_zh: "熊裔",
+        common_name_zh: "熊",
+        specialty: "耐力與防護",
+      },
+    },
+    profiles: [
+      {
+        race: "human",
+        subrace: null,
+        budget: 24,
+        axes: [
+          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 8 },
+          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
+          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
+          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 4 },
+          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
+          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+        ],
+      },
+      {
+        race: "beastfolk",
+        subrace: "subrace_wolf",
+        budget: 26,
+        axes: [
+          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 9 },
+          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
+          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
+          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 5 },
+          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
+          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+        ],
+      },
+      {
+        race: "elf",
+        subrace: null,
+        budget: 22,
+        axes: [
+          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 6 },
+          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 6 },
+          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
+          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 3 },
+          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 5 },
+          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+        ],
+      },
+    ],
+    affinity: {
+      human: { maximum: 2, elements: ELEMENTS },
+      beastfolk: { maximum: 1, elements: ELEMENTS },
+      elf: { maximum: 0, elements: ELEMENTS },
+    },
   },
+};
+
+// The created-draft forms the wizard can resume at reconnect: the
+// server-persisted stages (preset_selected, custom_filled, concept_filled),
+// mirroring the wire shapes in creation.py.
+export const CREATION_PANEL_PRESET_DRAFT_SAMPLE = {
+  ...CREATION_PANEL_SAMPLE,
+  draft: { mode: "preset", stage: "preset_selected", preset_key: "preset_lantern_scholar" },
+};
+
+export const CREATION_PANEL_CUSTOM_DRAFT_SAMPLE = {
+  ...CREATION_PANEL_SAMPLE,
+  draft: {
+    mode: "custom",
+    stage: "custom_filled",
+    display_name: "林楓",
+    age: 21,
+    apparent_age: 21,
+    race: "human",
+    subrace: null,
+    allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 },
+    background: "從渡口學來運貨的年輕人。",
+    background_generated: false,
+    affinity_elements: ["fire", "wind"],
+  },
+};
+
+export const CREATION_PANEL_CONCEPT_DRAFT_SAMPLE = {
+  ...CREATION_PANEL_SAMPLE,
+  draft: {
+    mode: "concept",
+    stage: "concept_filled",
+    race: "elf",
+    subrace: null,
+    allocations: { hp: 6, mp: 6, sp: 2, atk_phys: 2, agility: 4, defense: 2 },
+    background: "燈下讀書的年輕學者。",
+    background_generated: true,
+  },
+};
+
+// The `creation` panel unavailable form (registry-owned reason, the common
+// unavailable envelope).
+export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
+  schema_version: 1,
+  available: false,
+  reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
+};
+
+// The onboarding guide content (help surface): the authored arrival prose,
+// the South-Gate guard's scripted guidance, and the keyword Q&A set, as
+// carried by the onboarding-guide capability (the game-authored help copy,
+// rendered verbatim, no invented content).
+export const ONBOARDING_GUIDE_SAMPLE = {
+  arrival: {
+    prose: "晨霧未散的聖潔王都，南城門在你身後緩緩合攏。城牆上的石磚磨出了細紋，守衛的腳步聲由遠而近。",
+    prompt: "守衛低聲說：「先試試「看」，看看你身處之處。」",
+  },
+  guard: {
+    name: "南門守衛",
+    guidance: "先北行至南大道，再東行至冒險者公會外。公會可接取任務、購買物資、登記會員。",
+  },
+  qna: [
+    { question: "看", answer: "「看」會描繪你眼前的景象，是探索的第一步。" },
+    { question: "公會", answer: "冒險者公會就在南東側，是接取任務與登記會員之處。" },
+    { question: "任務", answer: "公會任務榜上有可接取的任務，完成後可領取報酬。" },
+    { question: "商店", answer: "公會旁的商店可購買基本物資，價格以銅幣計。" },
+  ],
 };

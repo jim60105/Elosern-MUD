@@ -23,6 +23,18 @@ const manifestPath =
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 const required = Array.isArray(manifest.required) ? manifest.required : [];
 const requiredTitles = new Set(required);
+// B5 freezes the manifest at the complete required set (design D3): the
+// `frozen` flag turns the lockstep check into a complete-set check — a new
+// story title or manifest entry still fails the gate, and the "showcase is
+// complete" state fails closed on an empty set.
+const frozen = manifest.frozen === true;
+if (frozen && required.length === 0) {
+  console.error(
+    "component coverage: the frozen required-component manifest is empty " +
+      "(the complete set cannot be empty while frozen)",
+  );
+  process.exit(1);
+}
 
 const storyFiles = [];
 
@@ -49,12 +61,18 @@ const collected = new Set(storyFiles.map(({ title }) => title));
 const failures = [];
 const missing = required.filter((title) => !collected.has(title));
 if (missing.length > 0) {
-  failures.push("required stories missing a story file:");
+  const prefix = frozen
+    ? `required stories (frozen manifest) missing a story file:`
+    : "required stories missing a story file:";
+  failures.push(prefix);
   for (const title of missing) failures.push(`  - ${title}`);
 }
 const unlisted = [...collected].filter((title) => !requiredTitles.has(title));
 if (unlisted.length > 0) {
-  failures.push("registered stories missing from the required-component manifest:");
+  const prefix = frozen
+    ? `registered stories missing from the frozen required-component manifest (unfreezing required to add one):`
+    : "registered stories missing from the required-component manifest:";
+  failures.push(prefix);
   for (const title of unlisted) failures.push(`  - ${title}`);
 }
 if (failures.length > 0) {
@@ -89,5 +107,6 @@ if (undocumented.length > 0) {
 console.log(
   `component coverage: all ${required.length} required component(s) have stories ` +
     `and every one of the ${collected.size} registered story title(s) is listed ` +
-    `(${collected.size} story title(s) total)`,
+    `(${collected.size} story title(s) total)` +
+    (frozen ? ` — enforcing the frozen manifest (complete required set)` : ""),
 );
