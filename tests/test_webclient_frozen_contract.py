@@ -391,10 +391,23 @@ class WebClientFrozenContractAudit(unittest.TestCase):
             if entry["applying_change"] == "webclient-vue-08-wire-bridge-contracts"
         ]
         self.assertTrue(c2_entries, "the frozen list must carry C2 delta entries")
-        specs_dir = (
-            REPO_ROOT / "openspec" / "changes" / "webclient-vue-08-wire-bridge-contracts"
-            / "specs"
-        )
+        change = "webclient-vue-08-wire-bridge-contracts"
+        active_dir = REPO_ROOT / "openspec" / "changes" / change / "specs"
+        if active_dir.is_dir():
+            specs_dir = active_dir
+        else:
+            archive_root = REPO_ROOT / "openspec" / "changes" / "archive"
+            archived = sorted(archive_root.glob(f"*-{change}"))
+            self.assertTrue(
+                archived,
+                "the C2 change must exist either active or archived under openspec/changes",
+            )
+            self.assertEqual(
+                len(archived),
+                1,
+                "exactly one dated archive directory may exist for the C2 change",
+            )
+            specs_dir = archived[0] / "specs"
         delta_files = sorted(path.parent.name for path in specs_dir.glob("*/spec.md"))
         self.assertEqual(
             delta_files,
