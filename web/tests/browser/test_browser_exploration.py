@@ -109,12 +109,40 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         self._open_root(page, 0)  # Move
         _press(page, "Enter")  # first exit
-        self._wait_panel(
-            page,
-            "local_map",
-            lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
-        )
-        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        try:
+            self._wait_panel(
+                page,
+                "local_map",
+                lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
+                timeout=10000,
+            )
+            moves_sent = 1
+        except AssertionError:
+            state = store_state(page)
+            last = state.get("lastActionResult")
+            self.assertIsNotNone(
+                last,
+                "no action result was recorded before the map could refresh",
+            )
+            self.assertEqual(
+                last["outcome"],
+                "stale",
+                "the move did not land and the last result is not a stale rejection",
+            )
+            # A presentation revision advanced between the client building the
+            # action and the server admitting it, so the dispatcher rejected
+            # the move as stale (no state change). The client re-synchronizes
+            # and asks the user to re-operate; the test emulates that retry
+            # by re-selecting the same exit.
+            self._open_root(page, 0)
+            _press(page, "Enter")
+            self._wait_panel(
+                page,
+                "local_map",
+                lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
+            )
+            moves_sent = 2
+        self.assertEqual(sent_action_count(page, "explore.move"), moves_sent)
         after = store_state(page)
         self.assertNotEqual(after["panels"]["local_map"]["current_node"], "grid:capital_altoria:2:0")
         self.assertNotEqual(

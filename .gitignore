@@ -61,6 +61,9 @@ toolbox/*.lock
 # ==========================================
 node_modules/
 .storybook-out/
+# Showcase build lock: lives outside .storybook-out so a rebuild's
+# directory wipe cannot unlink the locked inode (sees _showcase_build.py).
+.storybook-out.lock
 
 # ==========================================
 # Misc

@@ -3,11 +3,17 @@
 The Evennia test runner is parallel (``--parallel 4`` in CI): multiple
 worker processes share one checkout, and more than one worker may need the
 ``.storybook-out`` build — the B1 evidence class rebuilds it unconditionally
-as its gate evidence, while the B2 action-dock class builds it on demand.
-Two concurrent ``storybook build -o`` runs into the same output directory
-can interleave file writes (a partially written ``index.json`` is not
-parseable), so every showcase build — and every read of build outputs —
+as its gate evidence, while the B2 action-dock and B3 data-family classes
+build it on demand. Two concurrent ``storybook build -o`` runs into the same
+output directory can interleave file writes (a partially written ``index.json``
+is not parseable), so every showcase build — and every read of build outputs —
 runs under one process-wide exclusive ``fcntl`` lock.
+
+The lock file lives at the repo root (``.storybook-out.lock``), OUTSIDE the
+build output directory: ``storybook build`` wipes ``.storybook-out`` at the
+start of a build, so locking a file inside it means the build itself unlinks
+the very inode that is locked; a second worker recreating the lock file
+would then "acquire" the lock concurrently and the two builds interleave.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-LOCK_PATH = REPO_ROOT / ".storybook-out" / ".build.lock"
+LOCK_PATH = REPO_ROOT / ".storybook-out.lock"
 
 
 @contextlib.contextmanager
