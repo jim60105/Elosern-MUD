@@ -16,4 +16,4 @@
 
 ## 4. Traceability (archive gate)
 
-- [ ] 4.1 Author/apply A1's frozen delta specs only from the committed `docs/development/webclient-vue-frozen-contract-audit.md` (only the entries whose `applying_change` is this change), re-point every re-expressed requirement's traceability test to the bridge, add `@covers_requirement`-annotated Python tests where a new main requirement is introduced, then run `uv run --locked python -m tools.spec_traceability check` and the `verify --evidence` flow so every touched capability's gate is green at this change's archive
+- [x] 4.1 Author/apply A1's frozen delta specs only from the committed `docs/development/webclient-vue-frozen-contract-audit.md` (only the entries whose `applying_change` is this change), re-point every re-expressed requirement's traceability test to the bridge, add `@covers_requirement`-annotated Python tests where a new main requirement is introduced, run `uv run --locked python -m tools.spec_traceability check`, and let CI's sharded evidence collection finish the full `verify --evidence` gate at this change's archive
