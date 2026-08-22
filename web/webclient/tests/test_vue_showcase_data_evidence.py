@@ -139,8 +139,10 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
 
         The set equality asserts the extend-don't-restructure contract at
         this change's step: the B1 core and B2 action-dock keys are
-        preserved and exactly the three data-family keys are added. B5,
-        which freezes the manifest, updates the baseline deliberately.
+        preserved and exactly the three data-family keys are added; the six
+        world-family keys from B4 (webclient-vue-05-showcase-world) joined
+        the baseline at its merge. B5, which freezes the manifest, updates
+        the baseline deliberately.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -156,6 +158,8 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 "Core/CommandDrawer",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
                 "Action/OptionCard", "Action/ChoiceCardRow", "Action/ChoicePointBlock",
+                "World/LocalMap", "World/ArtPanel", "World/ShopPanel",
+                "World/QuestBoard", "World/LoreDrawer", "World/InventoryPanel",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
