@@ -33,6 +33,39 @@ preserved reducer. The store is the single writer the roadmap's "strict and atom
   `frontend-vue-architecture.md` contract so B's mock-driven props and C1's store slices agree; B
   components bind to these slices in C4, not here.
 
+- **D4 — Every preserved module is consumed through its lib wrapper; none is reimplemented.**
+  Beyond the reducer core (D1) and the keyboard router for focus state, the store derives the
+  remaining view slices through the A2 `lib/*` wrappers:
+  - the **choice-point state** slice (`absent | generating | ready`) is driven by
+    `ChoicePointLogic.nextChoicePointState` over the committed `context_actions.suggestions`
+    envelope, so the stream state machine stays the tested pure function;
+  - the **suggestions view** (status/cards/visible/emptyState plus the content-change signature)
+    is derived with `OptionCards.buildOptionsView` / `suggestionsSignature`;
+  - the **local-map model** slice is `LocalMap.reducePanel(panel)` when the committed
+    `local_map` panel is present, `null` otherwise;
+  - the **narrative slice** holds the transport text-stream lines, and each `out` line has its
+    renderable token view attached at commit time by the preserved `NarrativeMarkup.tokenize`
+    allowlist pipeline (degraded-to-literal-text behavior included);
+  - the **focus slice** is the imported `KeyboardRouter` loaded with the committed
+    `context_actions` frame (exploration affordances, combat participants), using the
+    component dock's preserved `action-`/`target-` item keys as the single key contract.
+
+  Alternatives: (a) components derive these slices at render time — rejected, the contract is
+  passive components over store slices, and per-component derivation would let B (mock) and
+  live (wired) views drift; (b) the store re-implements each model — rejected by D1/D2.
+
+- **D5 — One dispatch entry, the tested lock semantics.** Components emit only user-intent
+  dispatches; the store is the single writer and routes every mutation through one entry
+  (`dispatchAction`) that mirrors the Node-gated legacy action-client semantics: the exact
+  `ui_action` envelope (`protocol_version` / `presentation_epoch` / `request_id` /
+  `base_revision` / `action_id` / `payload`), dispatch only while
+  `connected && !mutationsLocked && phase === "active"` and no mutation is in flight, and the
+  in-flight lock releases only on a matching `ui_action_result` once the committed revision
+  reaches the result's declared `presentation_revision` (immediately when none was declared, or
+  unconditionally for a `no_puppet` rejection). Ordinary text (`sendText`) never holds the
+  mutation lock. The transport send is an attachable seam (`setSender`); C3 attaches it to
+  `evennia.js`, C1 drives it in tests by raw reducer inputs plus a captured sender.
+
 ## Risks / Trade-offs
 
 - **CJS-interop edge cases importing the UMD reducer** → covered by the store adoption integration tests

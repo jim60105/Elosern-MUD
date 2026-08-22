@@ -12,13 +12,16 @@ stays offline and fully testable.
 ## What Changes
 
 - A **Pinia store** that uses the preserved `js/elosern` protocol reducer (imported via A2's Vite CJS
-  interop) as its core and publishes committed view state **atomically** — no subscriber ever observes
-  partially applied state. The store enforces a single writer.
+  interop) as its core, consumes **every** preserved DOM-independent logic module through A2's `lib/*`
+  ES-module wrappers (protocol reducer, keyboard router, narrative markup pipeline, local-map model,
+  choice-point and option-card logic), and publishes committed view state **atomically** — no subscriber
+  ever observes partially applied state. The store enforces a single writer.
 - **Store integration tests** verify the reducer ordering the migration relies on: atomic new-epoch
   snapshot adoption, active-epoch revision ordering, old-epoch / stale-revision rejection, and panel
   replacement.
 - No evennia.js OOB binding (that is C3), no `window.Elosern.*` façade bridge (C2), and no re-binding of
-  the B-wave components (C4). The store is driven in tests by raw reducer inputs.
+  the B-wave components (C4). The store is driven in tests by raw reducer inputs through a captured
+  sender seam.
 
 ## Capabilities
 
@@ -31,9 +34,9 @@ stays offline and fully testable.
 
 ## Impact
 
-- **New:** `web/webclient-app/stores/*` and store integration tests. Consumes A2's `lib/*` reducer
-  wrapper (a consumer, not an edit).
-- **Depends on (A2):** the reducer `lib` wrapper, `vitest`, and the store-slice contract in the A2
+- **New:** `web/webclient-app/stores/*` and store integration tests. Consumes A2's `lib/*` wrappers for
+  all six preserved modules (a consumer, not an edit).
+- **Depends on (A2):** the `lib/*` wrappers, `vitest`, and the store-slice contract in the A2
   architecture reference.
 - **Preserved:** the preserved reducer/keyboard/markup/map logic (unchanged); no transport, OOB, server,
   `base.html`, or template change.
