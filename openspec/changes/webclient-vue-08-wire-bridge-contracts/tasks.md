@@ -1,18 +1,18 @@
 ## 1. Public-contract bridge
 
-- [ ] 1.1 Implement the browser-bridge shims: `window.Elosern.Protocol` and `.KeyboardRouter` = the imported UMD modules; `window.Elosern.narrativeInput` = the store's single narrative/choice-point append path; `window.Elosern.actions.submit` = the single action-dispatch entry
-- [ ] 1.2 Route document key events through the KeyboardRouter, claimed exactly when consumed (unconsumed keys fall through to the text path)
-- [ ] 1.3 Add a browser check that the façades resolve and route through the store/bridge dispatch path (live transport is C3's) with no duplicated append or action path
+- [x] 1.1 Implement the browser-bridge shims: `window.Elosern.Protocol` and `.KeyboardRouter` = the imported UMD modules; `window.Elosern.narrativeInput` = the store's single narrative/choice-point append path; `window.Elosern.actions.submit` = the single action-dispatch entry
+- [x] 1.2 Route document key events through the KeyboardRouter, claimed exactly when consumed (unconsumed keys fall through to the text path)
+- [x] 1.3 Add a browser check that the façades resolve and route through the store/bridge dispatch path (live transport is C3's) with no duplicated append or action path
 
 ## 2. Apply the frozen contract deltas (per A1's list)
 
-- [ ] 2.1 Apply A1's frozen `MODIFIED`/`RENAMED` deltas to the façade-referencing `webclient-*` capabilities (the audit's list), editing each requirement to preserve the façade/keyboard contract
-- [ ] 2.2 Re-point the affected capabilities' traceability tests to the bridge (so each re-expressed requirement has a passing test at this change's archive)
-- [ ] 2.3 Confirm the applied delta set matches A1's frozen list and surfaces any omission
+- [x] 2.1 Apply A1's frozen `MODIFIED`/`RENAMED` deltas to the façade-referencing `webclient-*` capabilities (the audit's list), editing each requirement to preserve the façade/keyboard contract
+- [x] 2.2 Re-point the affected capabilities' traceability tests to the bridge (so each re-expressed requirement has a passing test at this change's archive)
+- [x] 2.3 Confirm the applied delta set matches A1's frozen list and surfaces any omission
 
 ## 3. Gate
 
-- [ ] 3.1 The existing façade + keyboard Playwright/Node contracts stay green through the bridge; `openspec validate` for every touched capability passes `--strict`
+- [x] 3.1 The existing façade + keyboard Playwright/Node contracts stay green through the bridge; `openspec validate` for every touched capability passes `--strict`
 
 ## 4. Traceability (archive gate)
 

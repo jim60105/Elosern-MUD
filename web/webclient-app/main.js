@@ -1,6 +1,8 @@
 import { createApp } from "vue";
+import { createPinia, setActivePinia } from "pinia";
 import AppShell from "./components/AppShell.vue";
-import * as elosernLogic from "./logic.js";
+import { useElosernStore } from "./stores/elosern.js";
+import { createWindowBridge } from "./bridge.js";
 import "./styles/tokens.css";
 import "./styles/fonts.css";
 import "./styles/app-shell.css";
@@ -30,12 +32,22 @@ function resolveMountPoint() {
 // (connecting/waiting/offline) are showcase states owned by the
 // ConnectOverlay stories and component tests until the C1 store drives the
 // live status slice.
+
+// C1 (webclient-vue-07-wire-store) + C2 (webclient-vue-08-wire-bridge-
+// contracts): the C1 store is the single writer of client view state; the
+// C2 browser-bridge re-exposes the window.Elosern.* public façades over the
+// store and the imported UMD modules (design D5: single transport seam, one
+// action-dispatch entry).
+const pinia = createPinia();
+setActivePinia(pinia);
 const app = createApp(AppShell, { connectionStatus: "ready" });
+app.use(pinia);
 app.mount(resolveMountPoint());
 
-window.ElosernVue = {
-  stage: "showcase-core",
-  app,
-  logic: elosernLogic,
-  protocolVersion: elosernLogic.Protocol.PROTOCOL_VERSION,
-};
+const store = useElosernStore();
+const bridge = createWindowBridge(store);
+
+// Stable test hook (the repository's `__`-prefixed harness-hook convention,
+// cf. __elosernWs / __elosernSent): the managed-browser check drives the
+// bridge's façade entry points through this handle.
+window.__elosernBridge = { store: store, facade: bridge.facade };

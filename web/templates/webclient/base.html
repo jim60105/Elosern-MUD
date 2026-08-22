@@ -93,6 +93,12 @@ branch's shell owns the DOM until the wiring wave lands).
     <!-- Dependency-free vanilla text console (D10): loaded in both branches,
          independent of Vue and jQuery. -->
     <script src={% static "webclient/js/text_console.js" %} type="text/javascript"></script>
+    <script type="text/javascript">
+        // The C2 browser-bridge (inside the deferred Vue SPA bundle) replaces the
+        // window.Elosern object with the four frozen public façades. Capture the
+        // D10 console API before that overwrite so the activation below still runs.
+        window.__elosernTextConsole = (window.Elosern && window.Elosern.TextConsole) || null;
+    </script>
 
     {% if webclient_vue_enabled %}
       <!-- Vue SPA entry (build stub in A2; the live AppShell mounts in the
@@ -175,8 +181,8 @@ branch's shell owns the DOM until the wiring wave lands).
       // shell owns the DOM. The hide-on-mount / re-activate-on-degradation
       // lifecycle lands with the store wiring (C3).
       document.addEventListener('DOMContentLoaded', function () {
-        var elosern = window.Elosern;
-        if (!elosern || !elosern.TextConsole || !window.Evennia) {
+        var consoleApi = window.__elosernTextConsole;
+        if (!consoleApi || !window.Evennia) {
           return;
         }
         // evennia.js's ready bootstrap only calls Evennia.init() (it is
@@ -187,7 +193,7 @@ branch's shell owns the DOM until the wiring wave lands).
         window.Evennia.init();
         var root = document.getElementById('messagewindow') ||
             document.getElementById('main-sub');
-        elosern.TextConsole.attach(root, window.Evennia);
+        consoleApi.attach(root, window.Evennia);
         window.Evennia.connect();
       });
     </script>

@@ -480,6 +480,22 @@ export const useElosernStore = defineStore("elosern", () => {
     publishView();
   }
 
+  // Expose the attached transport seam so the C2 browser-bridge can route the
+  // OOB entry points (ui_sync requests, reconnect resync) through the same
+  // sender C3 will later attach (the store's sender is the single transport
+  // seam; the bridge never re-implements sending).
+  function getSender() {
+    return sender;
+  }
+
+  // Re-run the committed-view publish (releaseIfReady + router-gate sync) so
+  // the presentation gate is re-evaluated on a new committed state; the C2
+  // bridge calls it from the `handlePresentation`/`onPresentationAccepted`
+  // entry points.
+  function refreshView() {
+    publishView();
+  }
+
   return {
     view,
     narrative,
@@ -499,5 +515,7 @@ export const useElosernStore = defineStore("elosern", () => {
     focusItemByKey,
     markNarrativeSeen,
     clearUncertain,
+    getSender,
+    refreshView,
   };
 });
