@@ -154,8 +154,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             page.get_attribute(VUE_ROOT, "data-elosern-mode"),
-            "explore",
-            "the pre-store shell must mount in the default world mode",
+            "exploration",
+            "the live shell mounts in the server's contextual world mode",
         )
 
     @covers_requirement(
@@ -487,29 +487,43 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 "context_actions": context_actions,
             },
         )
+        # The live C3 transport (bound by base.html) already advanced the
+        # transport generation on `connection_open`, so the driven generation
+        # must be strictly greater than the store's current generation.
         established = page.evaluate(
             """(envelope) => {
                 const { store } = window.__elosernBridge;
-                store.beginTransport(1);
+                const nextGen = store.view.generation + 1;
+                store.beginTransport(nextGen);
                 store.setConnected(true);
-                const result = store.receive(1, "ui_snapshot", [envelope]);
-                return result.accepted;
+                const result = store.receive(nextGen, "ui_snapshot", [envelope]);
+                return { accepted: result.accepted, gen: nextGen };
             }""",
             envelope,
         )
-        self.assertTrue(established, "the new-epoch snapshot must be adopted")
+        self.assertTrue(
+            established["accepted"], "the new-epoch snapshot must be adopted"
+        )
+        gen = established["gen"]
 
-        # The narrative append path is single: one appendInput call echoes one
-        # `.inp` line (no duplicated append path).
+        # The narrative append path is single: one appendInput call adds exactly
+        # one `.inp` line (no duplicated append path). The live C3 transport also
+        # appends the server's own text lines to the store, so compare against
+        # the pre-append count rather than assuming an empty narrative.
         append = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
+                const before = store.narrative.length;
                 const accepted = facade.narrativeInput.appendInput("look");
-                return { accepted, lines: store.narrative.length };
+                return { accepted, before: before, lines: store.narrative.length };
             }"""
         )
         self.assertTrue(append["accepted"])
-        self.assertEqual(append["lines"], 1)
+        self.assertEqual(
+            append["lines"],
+            append["before"] + 1,
+            "one appendInput must add exactly one narrative line",
+        )
 
         # The action dispatch entry is single: the first submit returns a
         # request id; a second submit while one mutation is in flight
@@ -528,6 +542,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 };
             }"""
         )
+        # The request id is the action-dispatch session counter (session:1 is the
+        # first dispatched action), independent of the transport generation.
         self.assertEqual(dispatch["first"], "session:1")
         self.assertIsNone(dispatch["second"], "no duplicate action path")
         self.assertTrue(dispatch["isInFlight"])
@@ -538,10 +554,10 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         # entry point; the in-flight lock releases once the committed revision
         # reaches the declared presentation revision.
         released = page.evaluate(
-            """() => {
+            """(gen) => {
                 const { store, facade } = window.__elosernBridge;
                 const result = store.receive(
-                    1,
+                    gen,
                     "ui_action_result",
                     [{
                         protocol_version: 1,
@@ -574,7 +590,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     resultAccepted: result.accepted,
                     stillInFlight: facade.actions.client.isInFlight(),
                 };
-            }"""
+            }""",
+            gen,
         )
         self.assertTrue(released["resultAccepted"])
         self.assertFalse(released["stillInFlight"])

@@ -96,8 +96,8 @@ function onSubmitCommand(text) {
 
 <template>
   <div class="elosern-root" data-testid="elosern-client-root">
-    <AppShell
-      :mode="store.view.mode || 'exploration'"
+      <AppShell
+        :mode="store.view.mode || 'explore'"
       :connected="store.view.connected"
       :location-label="store.view.statusSlice.locationLabel"
       :time-label="store.view.statusSlice.timeLabel"
@@ -130,7 +130,8 @@ function onSubmitCommand(text) {
       </template>
       <template #action-dock>
         <ActionDock
-          :mode="store.view.mode || 'exploration'"
+          v-if="dockItems.length > 0 || !!store.view.suggestions"
+          :mode="store.view.mode || 'explore'"
           :suggestions="store.view.suggestions"
           @action="onAction"
         >
@@ -151,3 +152,13 @@ function onSubmitCommand(text) {
     />
   </div>
 </template>
+
+<style>
+/* Carry the mount container's viewport height down to the shell so the
+   shell grid's 1fr row clamps to the available space (the root div broke
+   the 100% height chain, letting the shell grow to its content height). */
+.elosern-root {
+  height: 100%;
+  width: 100%;
+}
+</style>

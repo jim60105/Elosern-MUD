@@ -200,9 +200,21 @@ onBeforeUnmount(() => {
 
 .elosern-app-shell .app-shell__main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr) minmax(0, 300px);
+  grid-template-rows: 100%;
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
+}
+
+/* The side panels own their content within the bounded main row: they scroll
+   internally instead of forcing the 1fr row to grow (which pushed the
+   action-dock and command-drawer below the supported viewports). */
+.elosern-app-shell .app-shell__panel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Empty in B1: the B2–B4 panel families own their own slots at wiring; an
@@ -221,6 +233,8 @@ onBeforeUnmount(() => {
 .elosern-app-shell .app-shell__center .elosern-narrative {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .elosern-app-shell .elosern-live {

@@ -219,11 +219,11 @@
       "files_a": [
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_live_transport_round_trips_and_store_adopts_snapshot",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_dispatch_via_bridge",
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_stays_legacy"
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_bundle_blocked_keeps_text_playable"
       ],
       "files_b": [
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_bundle_blocked_keeps_text_playable",
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text"
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text",
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_stays_legacy"
       ]
     }
   ]
