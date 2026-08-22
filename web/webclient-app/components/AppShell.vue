@@ -158,6 +158,11 @@ onBeforeUnmount(() => {
       data-testid="action-live-region"
     ></div>
 
+    <!-- C3 (webclient-vue-09-wire-transport-mount): the store-bound
+         ActionDock mounts here; the keyboard router keeps focusing the
+         preserved #action-dock target rendered by the dock. -->
+    <slot name="action-dock" />
+
     <CommandDrawer
       ref="drawer"
       :open="drawerOpen"

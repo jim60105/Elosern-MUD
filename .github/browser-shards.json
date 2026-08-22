@@ -212,6 +212,19 @@
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports",
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_window_elosern_bridge_facades_resolve_and_route"
       ]
+    },
+    {
+      "index": 15,
+      "name": "vue-transport",
+      "files_a": [
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_live_transport_round_trips_and_store_adopts_snapshot",
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_dispatch_via_bridge",
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_stays_legacy"
+      ],
+      "files_b": [
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_bundle_blocked_keeps_text_playable",
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text"
+      ]
     }
   ]
 }
