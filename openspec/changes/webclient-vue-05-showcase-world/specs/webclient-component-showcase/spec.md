@@ -22,3 +22,7 @@ bag and a dedicated party panel are not built here).
 #### Scenario: Services and inventory are backed only
 - **WHEN** the shop, quest, lore, or inventory panel renders
 - **THEN** the shop/quest/lore render only the `services` payload and the inventory renders only equipped items, with no invented stock, quest, lore, or bag contents
+
+#### Scenario: Services unavailable surfaces render only the registry-owned reason
+- **WHEN** the `services` OOB channel is unavailable
+- **THEN** the shop, quest-board, lore, and inventory panels render only the registry-owned reason message, with no fabricated wallet, stock, quest, lore, rank, or equipped-item values

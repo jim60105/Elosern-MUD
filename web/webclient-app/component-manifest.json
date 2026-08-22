@@ -14,6 +14,12 @@
     "Action/ChoicePointBlock",
     "Data/StatusPanel",
     "Data/CharacterPanel",
-    "Data/SkillBook"
+    "Data/SkillBook",
+    "World/LocalMap",
+    "World/ArtPanel",
+    "World/ShopPanel",
+    "World/QuestBoard",
+    "World/LoreDrawer",
+    "World/InventoryPanel"
   ]
 }
