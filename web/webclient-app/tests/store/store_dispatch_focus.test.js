@@ -117,9 +117,42 @@ describe("store dispatch + focus", () => {
       expect(store.view.dispatch.inFlight).toBe(null);
       // The in-flight mutation can never be confirmed after the OOC detach.
       expect(store.view.dispatch.uncertain).toBe(true);
-      store.clearUncertain();
-      expect(store.view.dispatch.uncertain).toBe(false);
-    });
+       store.clearUncertain();
+       expect(store.view.dispatch.uncertain).toBe(false);
+     });
+
+     it("recovers from a synchronous sender failure without keeping the dispatch lock", () => {
+       openSession();
+       const flaky = {
+         actions: [],
+         texts: [],
+         failNext: true,
+         sendAction(envelope) {
+           if (flaky.failNext) {
+             throw new Error("transport closed");
+           }
+           flaky.actions.push(envelope);
+         },
+         sendText(text) {
+           flaky.texts.push(text);
+         },
+       };
+       store.setSender(flaky);
+       // The failing send marks the mutation uncertain and releases the
+       // in-flight lock, so a later dispatch still works (duck finding:
+       // a synchronous transport failure must not stick the lock).
+       expect(store.dispatchAction("explore.wait", { daypart: "dusk" })).toBe("session:1");
+       expect(flaky.actions.length).toBe(0);
+       expect(store.view.dispatch.inFlight).toBe(null);
+       expect(store.view.dispatch.uncertain).toBe(true);
+
+       flaky.failNext = false;
+       expect(store.dispatchAction("explore.wait", { daypart: "dusk" })).toBe("session:2");
+       expect(flaky.actions.length).toBe(1);
+       expect(flaky.actions[0].request_id).toBe("session:2");
+       store.clearUncertain();
+       expect(store.view.dispatch.uncertain).toBe(false);
+     });
   });
 
   describe("text dispatch", () => {

@@ -427,10 +427,24 @@ export const useElosernStore = defineStore("elosern", () => {
     };
     inFlight = { requestId, presentationRevision: null };
     router.setMutationInFlight(true);
-    if (sender && typeof sender.sendAction === "function") {
-      sender.sendAction(envelope);
+    try {
+      if (sender && typeof sender.sendAction === "function") {
+        sender.sendAction(envelope);
+      }
+    } catch (err) {
+      // A synchronous transport failure (a closing WebSocket, a failed
+      // adapter): mark the mutation uncertain, release the in-flight gate
+      // (no declared presentation revision to await) so the dispatch lock
+      // never sticks, and publish so the committed view reflects the failed
+      // send (the C3 transport re-asserts or the `clearUncertain` path
+      // recovers the flag).
+      uncertain = true;
+      inFlight = null;
+      router.setMutationInFlight(false);
+      router.setAwaitingRevision(null);
+    } finally {
+      publishView();
     }
-    publishView();
     return requestId;
   }
 

@@ -64,7 +64,10 @@ preserved reducer. The store is the single writer the roadmap's "strict and atom
   reaches the result's declared `presentation_revision` (immediately when none was declared, or
   unconditionally for a `no_puppet` rejection). Ordinary text (`sendText`) never holds the
   mutation lock. The transport send is an attachable seam (`setSender`); C3 attaches it to
-  `evennia.js`, C1 drives it in tests by raw reducer inputs plus a captured sender.
+  `evennia.js`, C1 drives it in tests by raw reducer inputs plus a captured sender. A
+  synchronous `sender.sendAction` failure marks the mutation `uncertain`, releases the
+  in-flight gate (the `uncertain` flag is cleared via `clearUncertain`, or re-asserted by the
+  C3 transport), so a failed send never sticks the dispatch lock.
 
 ## Risks / Trade-offs
 
