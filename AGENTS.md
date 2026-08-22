@@ -94,76 +94,32 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 uv sync --locked
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands server typeclasses world web.webclient
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 commands server typeclasses world web.webclient
-uv run --locked python -m unittest discover -s web/tests/browser -t .
-uv run --locked -m unittest discover -s tests -t .
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
 
-The three Python commands have disjoint ownership: the Evennia command runs
-non-browser package tests, browser discovery owns managed Playwright tests, and
-`unittest discover -s tests -t .` owns repository-wide contracts. Run focused
-dotted labels while iterating, but run every affected ownership domain before
-handoff. The retained database is `server/db/evennia-test.sqlite3`; omit
-`--keepdb` and add `--noinput`, or remove only that file, after migration changes or unexplained
-retained-state failures. See `docs/development/evennia-test-performance.md` for
-profiling and parallel-evaluation commands.
+The Evennia commands run non-browser package tests. Managed Playwright tests,
+repository-wide contracts, and complete evidence verification are CI-owned.
+The retained database is `server/db/evennia-test.sqlite3`; after migration
+changes or unexplained retained-state failures, omit `--keepdb` and add
+`--noinput`, or remove only that file.
 
-### Test runtime budget (measured, do not waste wall-clock)
+### Testing
 
-The full Evennia suite (`evennia test ... commands server typeclasses web
-world`) is now **4,263 tests**: ~45 s with `--parallel 16` on the 24-core
-development machine, and ~152 s with `--parallel 4` including coverage
-instrumentation (the CI worker profile). `--parallel 16 --noinput` is the
-full-suite command during development; never run the full suite in serial
-locally (it takes more than 20 minutes). The managed browser suite is the slowest thing in the repo
-and dominates total runtime (measured 3,465 s locally for the full 148-test
-run):
+- Run the smallest focused test label, Node file, or browser class that covers
+  the change. A local command estimated above 10 minutes is forbidden.
+- The full non-browser Evennia suite is allowed once only when needed, under 10
+  minutes, and run with `--parallel 16 --noinput`; never run it serially.
+- The full managed browser suite and `tools.spec_traceability verify --evidence`
+  are CI-only. Local browser testing uses one class or file within the budget.
+- Do not run CI shard commands locally. They share database and pidfile paths.
+- Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are fast;
+  `tools.spec_traceability check` is the local traceability gate.
+- A browser test file that exceeds five minutes in CI must be split.
 
-- Each Playwright test boots a real Evennia server. Foundation browser tests
-  share one server per process (~30–40s each); **combat browser tests boot one
-  server per test** because a live combat session (or an abnormal transport
-  close during combat) leaves the shared Evennia server in a state that corrupts
-  later fresh logins. A combat test therefore takes ~35–70s each.
-- The CI quality gate packs the managed browser suite into 11 two-process
-  shards by `.github/browser-shards.json`; each shard job runs two isolated
-  test processes from two separate checkouts (`w-a`/`w-b`) because the Evennia
-  launcher writes GAMEDIR-relative pidfiles (`server/server.pid`,
-  `server/portal.pid`) and two harnesses in one working tree would race on
-  them. Every test method has exactly one serial execution owner across the
-  22 process lists (enforced by a top-level AST-based contract test).
-- The CI quality gate machine-shards the non-browser Evennia suite across six
-  parallel jobs by `.github/evennia-shards.json`; each test module has exactly
-  one serial execution owner (enforced by a top-level contract test). The
-  evennia shard commands are **CI-only**: every invocation writes to the same
-  local test database path (`server/db/evennia-test.sqlite3`), so never run
-  shard invocations concurrently on one machine. Locally, run the full suite
-  once with the full label set.
-- Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are ~1s.
-- `tools/spec_traceability check` is seconds; the `verify --evidence` gate needs
-  the full evidence run only at final handoff.
-
-During iteration, run **only the package tests your change touches** (e.g.
-`uv run --locked evennia test --settings settings.py world.rules.tests.test_combat_session_flow`)
-or the specific Node/browser file. Run the full Evennia suite and the browser
-suite only (a) after a large cross-cutting change, or (b) once, as part of the
-final pre-handoff check. When a browser test needs to be re-run, prefer a single
-test class or file over the whole suite, and reuse a still-running managed
-server rather than booting another.
-
-### Test run discipline (hard rules)
-
-- Never run the full Evennia test suite in serial: the measured serial run
-  exceeds 20 minutes. If the full suite is genuinely needed, use
-  `--parallel 16 --noinput` or let CI shards run it.
-- Avoid any test command estimated to take more than 10 minutes. If a run would
-  cross that threshold, it is too broad — narrow it before launching.
-- If a single test file would take more than 5 minutes in CI, the file is too
-  big: slice it into smaller, focused test files before it lands.
-- Always run specific tests instead of whole suites: target the exact package,
-  module, class, or test method your change touches (a dotted Evennia label, one
-  Node test file, or a single browser test class/file). Never start a broad
-  suite as a shortcut.
+See `docs/development/evennia-test-performance.md` and
+`docs/development/evennia-testing-guide.md` before broadening or restructuring
+test runs.
 
 For guidance on why tests get slow and how to keep them fast — fixture
 selection (`unittest.TestCase` / `EvenniaTestCase` / `EvenniaTest` /
@@ -219,9 +175,7 @@ requirement or its tests.
   discoverable `test_*` function or method whose assertions establish the
   requirement. Arguments must be literal IDs.
 - Run `uv run --locked python -m tools.spec_traceability check` while editing.
-  Before handoff, run both required test entry points with the same
-  `OPENSPEC_TEST_EVIDENCE` path, then run the verifier's `verify --evidence`
-  mode.
+  Local handoff uses focused tests; CI owns complete `verify --evidence`.
 - An annotation is a traceability claim, not a substitute for a behavior test.
   Never associate an unrelated, skipped, placeholder, or assertion-free test.
   There is no waiver or allowlist for an uncovered main requirement.
