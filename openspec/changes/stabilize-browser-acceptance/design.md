@@ -82,10 +82,11 @@ failing files (`test_browser_exploration.py`, `test_browser_services.py`, `test_
 `test_browser_reconnect.py`, `test_browser_art.py`, `test_vue_foundation.py`,
 `test_vue_transport_mount.py`, `test_browser_options_surface.py`, `test_browser_choicepoints.py`,
 `test_browser_combat_rejection.py`) AND the currently-passing files with raw waits
-(`test_browser_shell.py`, `test_browser_input_narrative.py`, `test_browser_pointer.py`), plus the
-other files that still gate on disconnected/locked store states or raw DOM readiness
-(`test_browser_actions.py`, `test_browser_local_map.py`, `test_browser_session_lifecycle.py`), and
-the shared helpers `wait_for_shell_active` and `focus_action_dock` in `browser_helpers.py`.
+(`test_browser_shell.py`, `test_browser_input_narrative.py`, `test_browser_pointer.py`), the creation
+journey file (`test_browser_creation.py`), the other files that still gate on disconnected/locked
+store states or raw DOM readiness (`test_browser_actions.py`, `test_browser_local_map.py`,
+`test_browser_session_lifecycle.py`), and the shared helpers `wait_for_shell_active`, `focus_action_dock`
+and `focus_creation_action_dock` in `browser_helpers.py`.
 
 Important: NOT every `wait_for_function` is a readiness gate. Pure store-result waits (polling
 `revision`/`mode`/panel availability) and pure assertion waits (a specific string appears, the input
@@ -112,13 +113,15 @@ cannot succeed on a stale snapshot.
 *Alternative considered:* a loose store predicate that may be true before the action is applied.
 *Rejected:* it can pass on a stale snapshot and misattribute later failures.
 
-**Decision 4: Register the missing method in the shard manifest.**
-Add `web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice`
-to shard 3 `combat-rejection`'s `files_a` (or `files_b`), so every discovered method is in
-exactly one process list. This is a one-line manifest fix that unblocks the top-level gate.
+**Decision 4: Confirm the discovered method's shard ownership.**
+`web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice`
+is already registered under shard 3 `combat-rejection` (`.github/browser-shards.json`, line 46), so
+every discovered method is in exactly one process list; verify ownership rather than re-appending it
+(a second registration would violate the exact-ownership contract). If a shard-3 process list
+approaches the shard budget, move one equally-independent class to a shard with headroom.
 
-*Alternative considered:* remove the method. *Rejected:* it is a real behavior test; the
-ownership contract requires it to be owned by a shard, not deleted.
+*Alternative considered:* re-add the method to another shard. *Rejected:* it is already owned by
+shard 3; the ownership contract requires each discovered method to be in exactly one process list.
 
 ## Risks / Trade-offs
 

@@ -1,16 +1,18 @@
 ## 1. Shared deterministic-state wait helper
 
-- [ ] 1.1 Add `wait_for_store_state(page, predicate, dom_readiness=None, timeout=30000,
-  interval_ms=250)` to `web/tests/browser/browser_helpers.py`: a bounded Python-side polling loop
-  that reads the committed store view via `store_state_or_none` (navigation-tolerant). `dom_readiness`
-  is a structured descriptor `{"selector", "predicate", "description"}` whose JS `predicate` is
-  evaluated in the SAME loop under one monotonic deadline (store gate + DOM readiness share one bounded
-  window). A `None` store read is logged and polling continues (the store predicate is not invoked on
-  `None`); a DOM `page.evaluate` that races an in-flight navigation is routed through the same
-  navigation-tolerating path (recoverable "execution context destroyed" error is recorded and the wait
-  continues to the deadline). On timeout, raise an `AssertionError` carrying `last_non_none_state`,
-  `none_observed`, the last evaluation error, and — when a `dom_readiness` descriptor is supplied — the
-  selector's connected/visible/enabled state and the `activeElement`.
+- [ ] 1.1 Confirm the existing `wait_for_store_state(page, predicate, dom_readiness=None,
+  timeout=30000, interval_ms=250)` in `web/tests/browser/browser_helpers.py` matches the spec, and
+  close the one gap the delta spec requires but the current implementation misses: `last_eval_error` is
+  never assigned, so a non-navigation DOM-predicate JS/selector error currently escapes the polling loop
+  instead of being surfaced in the timeout diagnostic. Fix: in the polling loop, wrap the
+  `dom_readiness` predicate evaluation so a non-navigation error is recorded as `last_eval_error` and
+  polling continues to the deadline (a recoverable navigation error stays `None`). The store view is read
+  via `store_state_or_none` (navigation-tolerant); `dom_readiness` is a structured descriptor
+  `{"selector", "predicate", "description"}` whose JS `predicate` is evaluated in the SAME loop under one
+  monotonic deadline; a `None` store read is "not ready yet" (predicate not invoked on `None`); on timeout
+  raise an `AssertionError` carrying `last_non_none_state`, `none_observed`, the last evaluation error, and
+  — when a `dom_readiness` descriptor is supplied — the selector's connected/visible/enabled state and the
+  `activeElement`.
 - [ ] 1.2 Convert the shared helpers `wait_for_shell_active` and `focus_action_dock` in
   `browser_helpers.py` from raw DOM waits to the store-state gate. Retarget `REQUIRED_SURFACES`
   from the stale legacy selectors (`.elosern-header` / `.elosern-narrative` / `.elosern-drawer`)
@@ -23,6 +25,11 @@
 - [ ] 1.3 In every failing test file, retarget DOM-bound assertions from the stale legacy
   selectors to the Vue `data-testid` hooks (`narrative-feed`, `command-drawer`, `action-dock`,
   `art-panel`, `creation-overlay`), so assertions target the interface the Vue SPA actually renders.
+- [ ] 1.4 Add `document.activeElement` verification to `focus_creation_action_dock` in
+  `browser_helpers.py`: after `locator.focus()`, verify `document.activeElement` is the `#action-dock`
+  itself or a focusable descendant; on mismatch raise a diagnostic `AssertionError` naming the
+  `activeElement`. This closes the creation-journey gap flagged by the reviewer (the creation dock focus
+  currently focuses without confirming the focus actually landed).
 
 ## 2. Convert ALL raw DOM-visibility waits in `web/tests/browser/`
 
@@ -54,6 +61,10 @@
   / `.local-map__lattice`, `test_browser_session_lifecycle.py` session waits) to the store-state gate.
   Preserve pure store-result and pure assertion waits; only readiness waits that need both the store
   state and surface DOM readiness get converted.
+- [ ] 2.10 `test_browser_creation.py`: convert the creation-journey raw DOM-visibility waits (the
+  `#action-dock` / `creation-overlay` readiness) to the store-state gate, and retarget DOM-bound
+  assertions to the `creation-overlay` / `action-dock` `data-testid` hooks so the creation journey targets
+  the Vue interface (closes the creation-scope gap flagged by the reviewer).
 
 ## 5. Helper behavior test
 
@@ -65,12 +76,12 @@
 
 ## 3. Register the missing shard-manifest method
 
-- [ ] 3.1 Add `web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice`
-  to `.github/browser-shards.json` under shard 3 `combat-rejection` (append to `files_a` or
-  `files_b`). After adding, run the full shard-3 process list under CI-equivalent parallel
-  conditions and record the duration; if it approaches the shard budget, move one
-  equally-independent class to a shard with headroom, keeping each discovered method in exactly
-  one process list.
+- [ ] 3.1 Verify the discovered method
+  `web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice`
+  is registered under shard 3 `combat-rejection` in `.github/browser-shards.json` — it already is (line
+  46), so confirm exactly-one-process ownership and do NOT append it a second time. If a shard-3 process
+  list approaches the shard budget, move one equally-independent class to a shard with headroom, keeping each
+  discovered method in exactly one process list.
 
 ## 4. Verify (CI-based, specific tests only — not the full local suite)
 
