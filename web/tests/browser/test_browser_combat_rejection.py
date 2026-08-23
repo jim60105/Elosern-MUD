@@ -267,6 +267,23 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         # Settle before submitting: a cast naming the pre-burst revision is
         # rejected stale and the round would never commit.
         wait_for_presentation_settled(page)
+        # Arm a JS timer that re-applies the no-op on the current client
+        # instance every 100ms: a re-attach re-bootstraps window.Elosern and
+        # re-creates the action client, losing the one-shot override. The timer
+        # keeps the cast's result out of the client so its in-flight request
+        # stays unconfirmed.
+        page.evaluate(
+            "() => {"
+            "  if (window.__elosernNoOpTimer) clearInterval(window.__elosernNoOpTimer);"
+            "  window.__elosernNoOpTimer = setInterval(() => {"
+            "    const c = Elosern && Elosern.actions && Elosern.actions.client;"
+            "    if (c) {"
+            "      c.onActionResult = function () { return undefined; };"
+            "      c.isInFlight = function () { return true; };"
+            "    }"
+            "  }, 100);"
+            "}"
+        )
         target = self._combat_panel(page)["participants"][-1]["identity"]
         page.evaluate(
             "(target) => Elosern.actions.submit('combat.cast', "
@@ -274,11 +291,12 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             target,
         )
         # The cast is admitted and a round commits; the result reaches the store
-        # but the client's in-flight request is never released.
+        # but the client's in-flight request is never released (the no-op timer
+        # keeps the result out of the client).
         page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "const p = s.panels && s.panels['context_actions']; "
-            "return p && p.available && p.session.round >= 1; }",
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "const p = s && s.view && s.view.panels && s.view.panels['context_actions']; "
+            "return !!(p && p.available && p.session && p.session.round >= 1); }",
             timeout=30000,
         )
         # The assertions below read the action client's in-memory
@@ -286,11 +304,40 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         # recovery reload (fired by a slow re-attach under load) would wipe
         # both, so scope the window to the client's own reconnect.
         suppress_one_shot_recovery_reload(page)
+        # Keep the no-op timer running across the transport close: the
+        # `isInFlight` override must still be in effect when the store's
+        # `setConnected(false)` runs on the close event, so the mutation is
+        # marked uncertain. The timer is stopped only after the disconnect is
+        # observed.
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
         page.wait_for_function(
             "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        )
+        # Capture the client's in-flight gate and result-observation state at the
+        # disconnect moment (before the resync releases it), for diagnostics of
+        # whether the mutation was unconfirmed at the loss.
+        disconnect_gate = evaluate_tolerating_navigation(
+            page,
+            "() => { const c = window.Elosern && window.Elosern.actions && window.Elosern.actions.client; "
+            "return c && c.isInFlight ? c.isInFlight() : null; }",
+        )
+        disconnect_observed = evaluate_tolerating_navigation(
+            page,
+            "() => { const c = window.Elosern && window.Elosern.actions && window.Elosern.actions.client; "
+            "const r = c && c.lastResult ? c.lastResult() : null; "
+            "return r ? r.requestId : null; }",
+        )
+        disconnect_submitted_id = evaluate_tolerating_navigation(
+            page,
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "return s ? s.view.dispatch.submittedRequestId : null; }",
+        )
+        # The disconnect is observed; stop the no-op timer now that the
+        # `isInFlight` override has done its job at the store's setConnected.
+        page.evaluate(
+            "() => { if (window.__elosernNoOpTimer) { clearInterval(window.__elosernNoOpTimer); window.__elosernNoOpTimer = null; } }"
         )
 
         # On reconnect the client shows the uncertain-result notice and never
@@ -343,14 +390,90 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             )
             raise AssertionError(
                 "uncertain-result notice never shown within 30s; "
-                "state=%r; inFlight=%r; dispatch=%r; sent=%r"
-                % (state, in_flight, dispatch, outbound_messages(page))
+                "state=%r; inFlight=%r; disconnectGate=%r; disconnectObservedId=%r; "
+                "disconnectSubmittedId=%r; dispatch=%r; sent=%r"
+                % (
+                    state, in_flight, disconnect_gate, disconnect_observed,
+                    disconnect_submitted_id, dispatch, outbound_messages(page),
+                )
             ) from exc
 
         # No automatic replacement cast after reconnect (the original request
         # was already sent once before the disconnect).
         from .browser_helpers import sent_action_count
 
+        self.assertEqual(sent_action_count(page, "combat.cast"), 1)
+
+        # Leave the shared server clean for subsequent tests.
+        page.evaluate("Evennia.msg('text', ['combat forfeit'], {})")
+        page.wait_for_timeout(1200)
+
+    @covers_requirement("webclient-combat-menu::reconnect-rebuilds-combat-without-replaying-intent")
+    def test_confirmed_action_disconnect_shows_no_uncertain_notice(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+
+        # A normal cast whose result IS observed (no override): the mutation is
+        # confirmed, so a later transport loss must NOT show the uncertain
+        # notice. This control proves the uncertain flag is set only for
+        # genuinely unconfirmed mutations.
+        wait_for_presentation_settled(page)
+        target = self._combat_panel(page)["participants"][-1]["identity"]
+        page.evaluate(
+            "(target) => Elosern.actions.submit('combat.cast', "
+            "{ skill_key: 'basic_attack', target_ids: [target] });",
+            target,
+        )
+        page.wait_for_function(
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
+            "const p = s.panels && s.panels['context_actions']; "
+            "return p && p.available && p.session.round >= 1; }",
+            timeout=30000,
+        )
+        # The in-flight gate releases once the committed revision reaches the
+        # declared presentation revision: the mutation is confirmed.
+        page.wait_for_function(
+            "() => { const d = (window.__elosernBridge && window.__elosernBridge.store.view.dispatch) || null; "
+            "return d && d.inFlight === null; }",
+            timeout=30000,
+        )
+        suppress_one_shot_recovery_reload(page)
+        page.evaluate("() => { if (window.__elosernWs) window.__elosernWs.close(4001); }")
+        page.wait_for_function(
+            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        )
+
+        deadline = time.monotonic() + 60
+        reconnected = False
+        while time.monotonic() < deadline:
+            state = store_state_or_none(page)
+            if state and state["connected"]:
+                reconnected = True
+                break
+            if time.monotonic() > deadline - 25:
+                evaluate_tolerating_navigation(
+                    page,
+                    "() => { if (window.Evennia && Evennia.connect) "
+                    "Evennia.connect(); }",
+                )
+            page.wait_for_timeout(500)
+        self.assertTrue(
+            reconnected,
+            "client did not reconnect within 60s; state=%r"
+            % (store_state_or_none(page),),
+        )
+
+        # A confirmed mutation must NOT show the uncertain-result notice.
+        page.wait_for_function(
+            """() => {
+              const o = document.getElementById('elosern-offline-overlay');
+              return o && o.getAttribute('data-uncertain') === 'false';
+            }""",
+            timeout=30000,
+        )
+
+        from .browser_helpers import sent_action_count
         self.assertEqual(sent_action_count(page, "combat.cast"), 1)
 
         # Leave the shared server clean for subsequent tests.

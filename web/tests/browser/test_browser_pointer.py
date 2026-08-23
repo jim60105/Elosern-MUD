@@ -24,7 +24,9 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
+    outbound_messages,
     sent_action_count,
     store_state,
 )
@@ -181,6 +183,29 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         )
         self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
         self.assertEqual(sent_action_count(page), before)
+
+        # The "identical path" proof: after the client-local pointer selection,
+        # a keyboard confirm (Enter) on the same focused target row dispatches
+        # exactly one combat.cast carrying the selected target id — the pointer
+        # selection feeds the same submission path as keyboard confirmation.
+        focus_action_dock(page)
+        cast_before = sent_action_count(page, "combat.cast")
+        page.keyboard.press("Enter")
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "combat.cast") > cast_before:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(sent_action_count(page, "combat.cast") - cast_before, 1)
+        casts = [
+            m for m in outbound_messages(page)
+            if m[0] == "ui_action" and m[1] and m[1][0].get("action_id") == "combat.cast"
+        ]
+        self.assertEqual(
+            casts[-1][1][0]["payload"]["target_ids"],
+            [int(target_keys[0].removeprefix("target-"))],
+            "keyboard confirm must cast the pointer-selected target",
+        )
 
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"

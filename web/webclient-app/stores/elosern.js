@@ -146,6 +146,10 @@ export const useElosernStore = defineStore("elosern", () => {
   // is set marks the mutation uncertain (spec: submitted-but-unconfirmed
   // before transport loss is treated as unconfirmed, shown by the notice).
   let mutationSubmitted = false;
+  // The request ID of the last dispatched OOB mutation, used to correlate the
+  // client's observed result with the specific in-flight request (a prior
+  // result for a different request ID does not confirm the current one).
+  let lastSubmittedRequestId = null;
   let prompt = "";
   // The raw committed item behind each focus key (the router's submit event
   // carries only the projected {label, enabled, description, key}; intents,
@@ -362,7 +366,23 @@ export const useElosernStore = defineStore("elosern", () => {
       // The puppet is gone; no presentation will ever gate this rejection,
       // so the lock is released unconditionally.
       inFlight = null;
+      // A no-puppet rejection is terminal: the mutation is resolved, so a later
+      // transport loss must not re-flag it as uncertain.
+      mutationSubmitted = false;
     }
+  }
+
+  // Read the legacy action client's in-flight gate. Returns true while a
+  // submitted mutation is unconfirmed (its result has not been observed by the
+  // client), false when confirmed (result observed, gate released), or null
+  // when the client is unavailable (mid re-bootstrap).
+  function clientInFlight() {
+    const c =
+      typeof window !== "undefined" &&
+      window.Elosern &&
+      window.Elosern.actions &&
+      window.Elosern.actions.client;
+    return c && c.isInFlight ? c.isInFlight() : null;
   }
 
   // The revision-gated release: the lock releases once the committed
@@ -377,6 +397,13 @@ export const useElosernStore = defineStore("elosern", () => {
     const target = inFlight.presentationRevision;
     if (target !== null && rs.revision !== null && rs.revision >= target) {
       inFlight = null;
+      // The store's gate releasing means the committed revision reached the
+      // declared presentation revision. If the client's gate is also released
+      // (the client observed the result = confirmed), the mutation is resolved,
+      // so a later transport loss must not re-flag it as uncertain.
+      if (clientInFlight() === false) {
+        mutationSubmitted = false;
+      }
     }
   }
 
@@ -520,6 +547,7 @@ export const useElosernStore = defineStore("elosern", () => {
       dispatch: {
         inFlight: inFlight ? { requestId: inFlight.requestId, presentationRevision: inFlight.presentationRevision } : null,
         uncertain,
+        submittedRequestId: lastSubmittedRequestId,
       },
     };
   }
@@ -577,13 +605,17 @@ export const useElosernStore = defineStore("elosern", () => {
   function setConnected(connected) {
     const res = reducer.setConnected(connected);
     // A transport disconnect (connection_close) while an OOB mutation was
-    // submitted but unconfirmed: the outcome may or may not have been applied
-    // server-side, so the mutation is marked uncertain (client-local; released
-    // only when the result is observed or by `clearUncertain`).
-    if (!connected && mutationSubmitted) {
+    // submitted and the client's in-flight gate is still held (the result has
+    // NOT been observed by the client): the outcome may or may not have been
+    // applied server-side, so the mutation is marked uncertain (client-local;
+    // released only when the result is observed or by `clearUncertain`).
+    // The client's gate is held (true) or the client is unavailable mid
+    // re-bootstrap (null): the mutation is unconfirmed, so a transport loss
+    // marks it uncertain. Only a released gate (false, result observed)
+    // means the mutation is confirmed and must not be re-flagged.
+    if (!connected && mutationSubmitted && clientInFlight() !== false) {
       uncertain = true;
       inFlight = null;
-      mutationSubmitted = false;
       router.setMutationInFlight(false);
       router.setAwaitingRevision(null);
       publishView();
@@ -649,6 +681,7 @@ export const useElosernStore = defineStore("elosern", () => {
     };
     inFlight = { requestId, presentationRevision: null };
     mutationSubmitted = true;
+    lastSubmittedRequestId = requestId;
     router.setMutationInFlight(true);
     try {
       if (sender && typeof sender.sendAction === "function") {
@@ -672,6 +705,11 @@ export const useElosernStore = defineStore("elosern", () => {
   }
 
   function focusPress(key, repeat) {
+    // A keyboard confirm (Enter) records the keyboard source so the target-row
+    // submit path can distinguish it from a pointer confirm.
+    if (key === "Enter") {
+      lastConfirmSource = "keyboard";
+    }
     return router.press(key, !!repeat);
   }
 
