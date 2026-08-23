@@ -19,6 +19,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -296,7 +297,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         subsequent Enter press reaches the KeyboardRouter and is never
         swallowed by the command-drawer field or an unfocused editable target.
         """
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.wait_for_function(
             "() => !!document.querySelector('#combat-row-0')", timeout=15000
         )

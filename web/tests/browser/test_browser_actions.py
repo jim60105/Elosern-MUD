@@ -13,6 +13,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     fresh_epoch,
     install_outbound_recorder,
     sent_action_count,
@@ -77,7 +78,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
     def test_disabled_controls_do_not_send(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         for key in ("ArrowDown", "Enter", " "):
             page.keyboard.press(key)
         page.wait_for_timeout(300)

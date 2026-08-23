@@ -266,6 +266,7 @@ function onSubmitCommand(text) {
       :narrative="store.narrative"
       :connection-status="store.view.connectionStatus"
       :offline="!store.view.connected"
+      :uncertain="store.view.dispatch.uncertain"
       :prompt="store.view.prompt"
       :command-history="store.commandHistory"
       @submit-command="onSubmitCommand"

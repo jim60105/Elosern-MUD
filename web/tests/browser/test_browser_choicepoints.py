@@ -26,6 +26,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -198,7 +199,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
     def _move_to_empty_ground(self, page):
         """Walk through the dock from the plaza to the empty-ground room (the
         scripted transport-failure room, same journey as the surface file)."""
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
         page.keyboard.press("Enter")  # Move (the first root row)

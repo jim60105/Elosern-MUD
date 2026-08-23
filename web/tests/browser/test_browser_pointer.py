@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import time
 
+from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -141,13 +142,31 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         self._click_row(page, "action-explore.engage")
         self._wait_mode(page, "combat")
 
-        # The Vue combat dock renders participants as target entries. Pointer
-        # activation uses the same router submit path as keyboard confirmation:
-        # it records the selected identity without inventing an OOB action.
-        page.wait_for_function(
-            "() => document.querySelectorAll('#action-dock [data-item-key]').length >= 1",
-            timeout=15000,
-        )
+        # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
+        # target rows; opening the basic-attack skill renders the participant
+        # target frame. Pointer activation uses the same router submit path as
+        # keyboard confirmation: it records the selected identity without
+        # inventing an OOB action.
+        self._click_row(page, "attack")
+        try:
+            page.wait_for_function(
+                "() => document.querySelectorAll("
+                "'#action-dock [data-item-key^=\"target-\"]').length >= 1",
+                timeout=30000,
+            )
+        except Error as exc:
+            state = store_state(page)
+            panel = state.get("panels", {}).get("context_actions")
+            raise AssertionError(
+                "combat target rows never appeared within 30s; "
+                "context_actions=%r; combatMenu=%r; rows=%r; lastTarget=%r"
+                % (
+                    panel,
+                    state.get("combatMenu"),
+                    self._rows(page),
+                    state.get("lastTarget"),
+                )
+            ) from exc
         target_keys = [k for k in self._rows(page) if k.startswith("target-")]
         self.assertGreaterEqual(len(target_keys), 1)
         before = sent_action_count(page)

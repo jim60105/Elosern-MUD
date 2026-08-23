@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import time
 
+from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     evaluate_tolerating_navigation,
     install_outbound_recorder,
+    outbound_messages,
     store_state,
     store_state_or_none,
     suppress_one_shot_recovery_reload,
@@ -296,9 +298,11 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         # the re-bootstrap window where the ``Elosern`` global is absent and
         # any in-flight navigation.
         deadline = time.monotonic() + 60
+        reconnected = False
         while time.monotonic() < deadline:
             state = store_state_or_none(page)
             if state and state["connected"]:
+                reconnected = True
                 break
             if time.monotonic() > deadline - 25:
                 # Guarded: while the client re-boots, window.Evennia is
@@ -309,13 +313,39 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
                     "Evennia.connect(); }",
                 )
             page.wait_for_timeout(500)
-
-        page.wait_for_timeout(1500)
-        uncertain = page.evaluate(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-uncertain') === 'true'"
+        self.assertTrue(
+            reconnected,
+            "client did not reconnect within 60s; state=%r"
+            % (store_state_or_none(page),),
         )
-        self.assertTrue(uncertain, "uncertain-result notice must be shown")
+
+        # Wait (bounded) for the offline overlay's uncertain-result notice
+        # instead of a fixed 1.5s sleep that races a slow re-attach.
+        try:
+            page.wait_for_function(
+                """() => {
+                  const o = document.getElementById('elosern-offline-overlay');
+                  return o && o.getAttribute('data-uncertain') === 'true';
+                }""",
+                timeout=30000,
+            )
+        except Error as exc:
+            state = store_state_or_none(page)
+            in_flight = evaluate_tolerating_navigation(
+                page,
+                "() => { const c = Elosern.actions && Elosern.actions.client; "
+                "return c && c.isInFlight ? c.isInFlight() : null; }",
+            )
+            dispatch = evaluate_tolerating_navigation(
+                page,
+                "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+                "return s ? s.view.dispatch : null; }",
+            )
+            raise AssertionError(
+                "uncertain-result notice never shown within 30s; "
+                "state=%r; inFlight=%r; dispatch=%r; sent=%r"
+                % (state, in_flight, dispatch, outbound_messages(page))
+            ) from exc
 
         # No automatic replacement cast after reconnect (the original request
         # was already sent once before the disconnect).

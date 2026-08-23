@@ -17,6 +17,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -75,9 +76,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         raise AssertionError("combat mode never became available")
 
     def _dock_mode(self, page):
-        return page.evaluate(
-            "document.getElementById('action-dock').getAttribute('data-mode')"
-        )
+        return page.locator("#action-dock").get_attribute("data-mode")
 
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]
@@ -114,7 +113,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         self.assertEqual(self._dock_mode(page), "combat")
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         # The action dock remains the documented focus target and forwards
         # focus to the mounted listbox row container (composite widget).
         self.assertEqual(
@@ -506,8 +505,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             page.evaluate("document.querySelector('[data-testid=\"combat-detail\"]').innerText"),
         )
         self.assertEqual(
-            page.evaluate("document.getElementById('action-dock').scrollWidth <= "
-                          "document.getElementById('action-dock').clientWidth"),
+            page.locator("#action-dock").evaluate("el => el.scrollWidth <= el.clientWidth"),
             True,
         )
 

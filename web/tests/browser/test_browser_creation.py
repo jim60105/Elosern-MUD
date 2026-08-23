@@ -22,6 +22,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     outbound_messages,
     sent_action_count,
@@ -99,9 +100,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         return panels.get("creation")
 
     def _dock_mode(self, page):
-        return page.evaluate(
-            "document.getElementById('action-dock').getAttribute('data-mode')"
-        )
+        return page.locator("#action-dock").get_attribute("data-mode")
 
     def _wait_creation_available(self, page, timeout=60000):
         deadline = time.monotonic() + timeout / 1000
@@ -170,7 +169,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         raise AssertionError("action result predicate never became true")
 
     def _focus_dock(self, page):
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
 
     def _sent_payloads(self, page, action_id):
         payloads = []

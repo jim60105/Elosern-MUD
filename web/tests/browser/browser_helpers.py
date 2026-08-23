@@ -139,6 +139,31 @@ def store_state(page: Page) -> dict:
     )
 
 
+def focus_action_dock(page: Page, timeout: int = 60000) -> None:
+    """Robustly focus the ``#action-dock`` element.
+
+    The action dock is a conditional surface (rendered only when its backing
+    ``context_actions`` panel or ``suggestions`` envelope is available), so a
+    raw ``document.getElementById('action-dock').focus()`` raises
+    ``TypeError: Cannot read properties of null (reading 'focus')`` in a loaded
+    CI runner where the dock has not mounted yet. This helper waits for the
+    DOM element to become visible, then focuses it via Playwright's auto-waiting
+    locator. On timeout it raises a diagnosable ``AssertionError`` carrying the
+    current store state so a missing dock is not mistaken for a plain locator
+    timeout.
+    """
+    dock = page.locator("#action-dock")
+    try:
+        dock.wait_for(state="visible", timeout=timeout)
+    except Error as exc:
+        state = store_state_or_none(page)
+        raise AssertionError(
+            "#action-dock never became visible within %dms; store=%r"
+            % (timeout, state)
+        ) from exc
+    dock.focus()
+
+
 def evaluate_tolerating_navigation(page: Page, expression: str, arg=None):
     """``page.evaluate`` that treats an in-flight navigation as "not yet".
 

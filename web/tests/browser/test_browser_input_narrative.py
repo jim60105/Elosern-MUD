@@ -23,6 +23,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -40,7 +41,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     """Drawer default-close, toggle, and input-echo acceptance (no mutation)."""
 
     def _open_drawer(self, page):
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.keyboard.press("/")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
@@ -86,14 +87,14 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_slash_toggles_the_drawer_and_restores_dock_focus(self):
         page = self.logged_in_page()
         # `/` over the action dock opens and focuses the field.
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.keyboard.press("/")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
         )
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         # With no editable control focused, `/` closes and restores dock focus.
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.keyboard.press("/")
         page.wait_for_function(
             "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
@@ -136,7 +137,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_slash_while_the_rest_form_is_open_never_toggles_the_drawer(self):
         page = self.logged_in_page()
         # Open the rest form (Wait/休息 → 休息一段時間).
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         cell_count = page.evaluate(
             "document.querySelectorAll('#action-dock [data-item-key]').length"
         )
@@ -441,7 +442,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         raise AssertionError("panel %s predicate never became true" % name)
 
     def _reset_root(self, page):
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
 

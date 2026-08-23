@@ -20,6 +20,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -86,7 +87,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
 
     def _reset_root(self, page):
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
 
@@ -343,7 +344,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(store_state(page)["mode"], "combat")
         self.assertEqual(sent_action_count(page, "explore.engage"), 1)
         self.assertEqual(
-            page.evaluate("document.getElementById('action-dock').getAttribute('data-mode')"),
+            page.locator("#action-dock").get_attribute("data-mode"),
             "combat",
         )
 

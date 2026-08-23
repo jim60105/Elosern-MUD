@@ -6,6 +6,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -99,7 +100,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # Open the drawer with `/` and send an ordinary command. The field
         # clears, the drawer stays open, and focus remains in the field so
         # consecutive commands need no pointer interaction.
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.keyboard.press("/")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
@@ -146,7 +147,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             "    (document.activeElement && dock.contains(document.activeElement));"
             "})()"
         )
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.keyboard.press("/")
         page.wait_for_function(
             "() => document.activeElement === document.getElementById('inputfield')"
@@ -262,7 +263,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         # Navigate the action dock with the keyboard: arrows, Enter, Escape,
         # and drawer typing must never report an unhandled keydown.
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         for _ in range(3):
             page.keyboard.press("ArrowDown")
         page.keyboard.press("ArrowUp")
@@ -477,7 +478,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         # The Wait/休息 entry is always the last root cell (5-7 cells
         # depending on quest/inventory capability availability).
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         cell_count = page.evaluate(
             "document.querySelectorAll('#action-dock [data-item-key]').length"
         )
@@ -585,9 +586,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())
             # Seal-red frame + guidance line naming the shortcuts.
-            frame = page.evaluate(
-                """() => {
-                  const style = getComputedStyle(document.getElementById('action-dock'));
+            frame = dock.evaluate(
+                """el => {
+                  const style = getComputedStyle(el);
                   return { borderTop: style.borderTopColor,
                            background: style.backgroundColor };
                 }"""

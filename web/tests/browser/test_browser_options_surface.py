@@ -24,6 +24,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -167,7 +168,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         return page
 
     def _open_root(self, page, index):
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         page.evaluate("window.__elosernBridge.router.reset()")
         page.wait_for_timeout(60)
         for _ in range(index):

@@ -135,6 +135,17 @@ export const useElosernStore = defineStore("elosern", () => {
   let sender = null; // { sendAction(envelope), sendText(text) } — C3 attaches evennia.js
   let lastSurface = null;
   let lastTarget = null;
+  // The confirm source ("pointer" or "keyboard") of the latest router confirm;
+  // a pointer confirm is a client-local target selection (no OOB dispatch),
+  // while a keyboard confirm submits the OOB cast (spec: selection is
+  // client-local until submission).
+  let lastConfirmSource = "keyboard";
+  // A dispatched OOB mutation that has not yet been confirmed (its result
+  // was withheld or the presentation has not committed). Set on dispatch,
+  // cleared only when the in-flight gate releases; a transport loss while it
+  // is set marks the mutation uncertain (spec: submitted-but-unconfirmed
+  // before transport loss is treated as unconfirmed, shown by the notice).
+  let mutationSubmitted = false;
   let prompt = "";
   // The raw committed item behind each focus key (the router's submit event
   // carries only the projected {label, enabled, description, key}; intents,
@@ -180,6 +191,22 @@ export const useElosernStore = defineStore("elosern", () => {
 
   function onRouterEvent(name, payload) {
     if (name === "focus" || name === "disabled") {
+      if (name === "focus" && combat) {
+        // A combat target-row focus is a client-local selection (spec: focus
+        // and selection remain client-local until submission); record the
+        // selected identity without dispatching any OOB action.
+        const item = payload && payload.item;
+        if (
+          item &&
+          typeof item.key === "string" &&
+          item.key.startsWith("target-") &&
+          item.payload &&
+          Array.isArray(item.payload.target_ids) &&
+          item.payload.target_ids.length > 0
+        ) {
+          lastTarget = String(item.payload.target_ids[0]);
+        }
+      }
       publishView();
       return;
     }
@@ -249,6 +276,24 @@ export const useElosernStore = defineStore("elosern", () => {
           return;
         }
       }
+      // SINGLE-target rows: the selection is client-local (records the
+      // identity). A keyboard confirm submits the OOB cast; a pointer confirm
+      // is a selection only (no OOB dispatch, per the spec's client-local
+      // selection-until-submission rule).
+      if (
+        typeof item.key === "string" &&
+        item.key.startsWith("target-") &&
+        item.payload &&
+        Array.isArray(item.payload.target_ids) &&
+        item.payload.target_ids.length > 0
+      ) {
+        lastTarget = String(item.payload.target_ids[0]);
+        if (lastConfirmSource === "keyboard") {
+          dispatchAction("combat.cast", item.payload);
+        }
+        publishView();
+        return;
+      }
       // Real OOB action items (combat.cast / combat.flee / combat.forfeit).
       if (item.actionId) {
         dispatchAction(item.actionId, item.payload || {});
@@ -277,8 +322,11 @@ export const useElosernStore = defineStore("elosern", () => {
   function handleTransportLifecycle(prev, rs) {
     if (rs.generation !== prev.generation) {
       inFlight = null;
-      uncertain = false;
       requestCounter = 0;
+      // `uncertain` is intentionally NOT cleared here: a mutation whose result
+      // was withheld by a mid-flight detach stays flagged across the
+      // reconnect (the C3 transport's `clearUncertain` releases it only when
+      // the result is observed).
     }
     if (prev.phase !== "detached" && rs.phase === "detached" && inFlight) {
       uncertain = true;
@@ -527,7 +575,20 @@ export const useElosernStore = defineStore("elosern", () => {
   }
 
   function setConnected(connected) {
-    return reducer.setConnected(connected);
+    const res = reducer.setConnected(connected);
+    // A transport disconnect (connection_close) while an OOB mutation was
+    // submitted but unconfirmed: the outcome may or may not have been applied
+    // server-side, so the mutation is marked uncertain (client-local; released
+    // only when the result is observed or by `clearUncertain`).
+    if (!connected && mutationSubmitted) {
+      uncertain = true;
+      inFlight = null;
+      mutationSubmitted = false;
+      router.setMutationInFlight(false);
+      router.setAwaitingRevision(null);
+      publishView();
+    }
+    return res;
   }
 
   function setSender(next) {
@@ -587,6 +648,7 @@ export const useElosernStore = defineStore("elosern", () => {
       payload: payload === undefined || payload === null ? {} : payload,
     };
     inFlight = { requestId, presentationRevision: null };
+    mutationSubmitted = true;
     router.setMutationInFlight(true);
     try {
       if (sender && typeof sender.sendAction === "function") {
@@ -614,7 +676,8 @@ export const useElosernStore = defineStore("elosern", () => {
   }
 
   function focusConfirm(source) {
-    return router.confirm(source ? { source } : { source: "keyboard" });
+    lastConfirmSource = source || "keyboard";
+    return router.confirm({ source: lastConfirmSource });
   }
 
   function focusEscape() {
@@ -638,6 +701,7 @@ export const useElosernStore = defineStore("elosern", () => {
 
   function clearUncertain() {
     uncertain = false;
+    mutationSubmitted = false;
     publishView();
   }
 

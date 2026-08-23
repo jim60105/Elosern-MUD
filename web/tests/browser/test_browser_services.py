@@ -22,6 +22,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    focus_action_dock,
     install_outbound_recorder,
     outbound_messages,
     sent_action_count,
@@ -70,9 +71,7 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         return panels["services"]
 
     def _dock_mode(self, page):
-        return page.evaluate(
-            "document.getElementById('action-dock').getAttribute('data-mode')"
-        )
+        return page.locator("#action-dock").get_attribute("data-mode")
 
     def _wait_services_available(self, page, timeout=30000):
         deadline = time.monotonic() + timeout / 1000
@@ -110,7 +109,7 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         is a single seven-column row (grid geometry), so horizontal arrows
         move across it; submenus are 2-column grids.
         """
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         if surface_key == "inventory":
             # Move, Look, Interact, Character, Quests, Inventory
             for _ in range(5):
@@ -270,7 +269,7 @@ class GuildDialogueTurninJourneys(ServicesBrowserTest):
         self.assertEqual(panel["guild"]["quests"][0]["state"], "completed")
 
         # Interact -> the guild staff (first present target) -> 交談 -> 回報.
-        page.evaluate("document.getElementById('action-dock').focus()")
+        focus_action_dock(page)
         _press(page, "ArrowRight")  # Look
         _press(page, "ArrowRight")  # Interact
         _press(page, "Enter")  # open Interact

@@ -37,6 +37,10 @@ const props = defineProps({
       ["connecting", "waiting", "offline", "ready"].includes(value),
   },
   offline: { type: Boolean, default: false },
+  // The action client's uncertain-mutation flag (a dispatched mutation whose
+  // result was withheld by a mid-flight detach). Exposed on the offline
+  // overlay as `data-uncertain` so the uncertain-result notice is DOM-observable.
+  uncertain: { type: Boolean, default: false },
   prompt: { type: String, default: "" },
   commandHistory: { type: Array, default: () => [] },
 });
@@ -179,6 +183,7 @@ onBeforeUnmount(() => {
       role="alert"
       aria-live="assertive"
       :data-visible="offline ? 'true' : 'false'"
+      :data-uncertain="uncertain ? 'true' : 'false'"
     >
       <div class="offline-title">連線中斷</div>
       <div class="offline-note">已暫停圖形化操作，等待重新連線。</div>
