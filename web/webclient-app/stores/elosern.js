@@ -255,7 +255,11 @@ export const useElosernStore = defineStore("elosern", () => {
   let lastMenuSig = null;
   function rebuildFocusMenu(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
-    const sig = stableStringify(panel);
+    // The menu frame depends only on the dock items (affordances or
+    // participants), never on the sibling ``suggestions`` envelope: a
+    // generating→ready suggestions transition must not rebuild the menu and
+    // reset the router focus to the first row.
+    const sig = stableStringify(focusItemsFor(panel));
     if (sig === lastMenuSig) {
       return;
     }

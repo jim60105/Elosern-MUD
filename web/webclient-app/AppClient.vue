@@ -195,23 +195,17 @@ function onAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
-// DockMenu (B2 dock family) pointer intents: an action entry carries the
-// exact OOB action intent (dispatch through the store), a local
-// navigation/target entry (``intent === null``) only updates the store's
-// last-surface / last-target state.
+// DockMenu pointer activation follows the same router confirmation path as
+// Enter. The rest-duration form is the sole local UI exception: confirming
+// its action opens the form before any OOB action is dispatched.
 function onDockActivate(payload) {
   const intent = payload && payload.intent;
-  if (!intent) {
-    return;
-  }
-  // The `explore.wait` rest item opens the bounded rest-duration form
-  // (legacy `openRestForm`); other items dispatch immediately.
-  if (intent.action_id === "explore.wait") {
+  if (intent && intent.action_id === "explore.wait") {
     restFormOpen.value = true;
     restFormError.value = null;
     return;
   }
-  store.dispatchAction(intent.action_id, intent.payload);
+  store.focusConfirm("pointer");
 }
 
 function onDockFocusChange(key) {
