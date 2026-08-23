@@ -9,10 +9,16 @@
   `last_non_none_state`, `none_observed`, the last evaluation error, and — when a `dom_predicate`
   is supplied — the selector's connected/visible/enabled state and the `activeElement`.
 - [ ] 1.2 Convert the shared helpers `wait_for_shell_active` and `focus_action_dock` in
-  `browser_helpers.py` from raw DOM waits to the store-state gate. For `focus_action_dock`: gate on
-  the store state (connected + dock panel available), poll the `#action-dock` DOM readiness in the
-  same bounded loop, call `locator.focus()`, then verify `document.activeElement` is the dock or
-  its delegated focus target.
+  `browser_helpers.py` from raw DOM waits to the store-state gate. Retarget `REQUIRED_SURFACES`
+  from the stale legacy selectors (`.elosern-header` / `.elosern-narrative` / `.elosern-drawer`)
+  to the Vue app's `data-testid` hooks (`.elosern-header` still renders; the narrative and drawer
+  surfaces are now `data-testid="narrative-feed"` and `data-testid="command-drawer"`). For
+  `focus_action_dock`: gate on the store state (connected + dock panel available), poll the
+  `#action-dock` DOM readiness in the same bounded loop, call `locator.focus()`, then verify
+  `document.activeElement` is the dock or its delegated focus target.
+- [ ] 1.3 In every failing test file, retarget DOM-bound assertions from the stale legacy
+  selectors to the Vue `data-testid` hooks (`narrative-feed`, `command-drawer`, `action-dock`,
+  `art-panel`, `creation-overlay`), so assertions target the interface the Vue SPA actually renders.
 
 ## 2. Convert ALL raw DOM-visibility waits in `web/tests/browser/`
 

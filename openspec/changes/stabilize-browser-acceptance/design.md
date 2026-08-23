@@ -9,15 +9,20 @@ ports, deterministic account/character fixtures) and drives the UI with keyboard
 writes requirement-coverage evidence into `OPENSPEC_TEST_EVIDENCE`.
 
 On the `fix/browser-creation-ci` branch (CI run 32634654248) eleven browser shards fail, almost
-entirely with Playwright `TimeoutError`. The root cause is that most waits in the failing test
-files gate on **raw DOM visibility** (`page.wait_for_selector`, `page.wait_for_function`,
-`locator.click`). Under a loaded CI runner — two parallel workspaces each starting an Evennia
-server plus Chromium — the server publish + client render path slows down, and a single
-raw-visibility wait (default 30s, or explicit 20/60s) exhausts its budget. The spec already
-mandates: "Test waits SHALL gate on deterministic state — polling the committed store view and
-the surface DOM with a bounded deadline — rather than on the raw `#action-dock` element becoming
-visible, so the suite stays stable under a loaded CI runner." Only the creation surface has been
-converted so far; the rest still uses raw waits. Separately, the top-level contract
+entirely with Playwright `TimeoutError`.
+
+The root cause is the frontend rewrite: the WebClient shell was replaced by the Vue SPA (the Vue
+C4 flip). The managed browser tests were written against the old GoldenLayout/jQuery shell and
+still wait on **now-stale legacy selectors** (e.g. the shared `wait_for_shell_active` gate polls
+`.elosern-narrative` / `.elosern-drawer`, and `REQUIRED_SURFACES` lists `.elosern-header` /
+`.elosern-narrative` / `.elosern-drawer`). After the Vue flip the narrative and drawer surfaces
+are exposed through `data-testid` hooks (`narrative-feed`, `command-drawer`, `action-dock`,
+`creation-overlay`, `art-panel`), so the legacy `.elosern-narrative` / `.elosern-drawer` selectors
+no longer render and the waits time out waiting for an interface that no longer exists. The spec
+already mandates: "Test waits SHALL gate on deterministic state — polling the committed store view
+and the surface DOM with a bounded deadline — rather than on the raw `#action-dock` element
+becoming visible, so the suite stays stable under a loaded CI runner." Only the creation surface has
+been converted so far; the rest still waits on legacy DOM. Separately, the top-level contract
 `test_browser_method_labels_preserve_exact_ownership` fails because
 `CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice` is not
 registered in any shard manifest entry.

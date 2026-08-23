@@ -1,16 +1,20 @@
 ## Why
 
 The managed browser acceptance shards (`browser (3/5/6/7/8/10/11/12/13/14/15)`) have been
-failing on the `fix/browser-creation-ci` branch (CI run 32634654248). The failures are
-almost all Playwright `TimeoutError` on raw DOM waits (`wait_for_selector`,
-`wait_for_function`, `locator.click`). The suite boots a real isolated Evennia server plus
-Chromium under a loaded CI runner (two parallel workspaces), and the raw-visibility waits
-exhaust their 20/30/60s budgets. The existing spec already mandates that test waits SHALL
-gate on deterministic state with a bounded deadline "rather than on the raw `#action-dock`
-element becoming visible, so the suite stays stable under a loaded CI runner," but only the
-creation surface has been converted; the rest of the suite still waits on raw DOM. A
-top-level contract test (`test_browser_method_labels_preserve_exact_ownership`) also fails
-because one discovered browser test method is not registered in any shard manifest entry.
+failing on the `fix/browser-creation-ci` branch (CI run 32634654248), almost entirely with
+Playwright `TimeoutError`.
+
+The underlying cause is the frontend rewrite: the WebClient shell was replaced by the Vue SPA
+(Vue C4 flip). The managed browser tests were written against the old GoldenLayout/jQuery shell
+and still wait on now-stale legacy selectors (e.g. `.elosern-narrative`, `.elosern-drawer` in
+the shared `wait_for_shell_active` gate) that the Vue app no longer renders under those exact
+classes. So every journey times out waiting for an interface that no longer exists, regardless
+of CI load. The existing spec already mandates that test waits SHALL gate on deterministic
+state (the committed store view + surface DOM) with a bounded deadline "rather than on the raw
+`#action-dock` element becoming visible," but only the creation surface has been converted; the
+rest of the suite still waits on legacy DOM. A top-level contract test
+(`test_browser_method_labels_preserve_exact_ownership`) also fails because one discovered browser
+test method is not registered in any shard manifest entry.
 
 ## What Changes
 
@@ -24,6 +28,10 @@ because one discovered browser test method is not registered in any shard manife
   `focus_action_dock`) to the deterministic-state gate, so a slow server publish or a delayed
   client render no longer burns the whole timeout budget on a single raw-visibility wait. Focus
   operations verify `document.activeElement` after focusing.
+- Retarget the DOM-bound assertions from the stale legacy selectors (`.elosern-narrative`,
+  `.elosern-drawer`, etc.) to the Vue app's `data-testid` hooks (`narrative-feed`,
+  `command-drawer`, `action-dock`, `art-panel`, `creation-overlay`), so waits and assertions
+  target the interface the Vue SPA actually renders.
 - Register the unregistered discovered method
   `test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice`
   into `.github/browser-shards.json` (shard 3 `combat-rejection`) so the top-level ownership
