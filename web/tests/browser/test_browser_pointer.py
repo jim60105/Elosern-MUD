@@ -240,13 +240,12 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         row = page.locator(f'#action-dock [data-item-key="{disabled_key}"]')
         row.scroll_into_view_if_needed()
         row.click(force=True)
-        page.wait_for_timeout(300)
-        self.assertEqual(sent_action_count(page), before)
-        self.assertEqual(
-            store_state(page)["focus"]["key"],
-            disabled_key,
-            "clicking a disabled row must focus it",
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("focus") or {}).get("key") == disabled_key,
+            timeout=5000,
         )
+        self.assertEqual(sent_action_count(page), before)
         detail = page.evaluate(
             "document.querySelector('[data-testid=\"exploration-detail\"]').innerText"
         )

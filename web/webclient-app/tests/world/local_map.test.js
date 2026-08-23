@@ -112,13 +112,13 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap();
     const detail = w.get('[data-testid="local-map-detail"]');
     expect(detail.text()).toContain("霧骨渡口");
-    expect(detail.text()).toContain("current");
+    expect(detail.text()).toContain("目前所在");
     expect(detail.text()).toContain("(1, 2)");
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("mouseenter");
     const hovered = w.get('[data-testid="local-map-detail"]');
     expect(hovered.text()).toContain("南門");
-    expect(hovered.text()).toContain("visible_unvisited");
+    expect(hovered.text()).toContain("未探索");
     expect(hovered.text()).toContain("(2, 2)");
     expect(hovered.text()).toContain("grid:altoria:2:2");
 

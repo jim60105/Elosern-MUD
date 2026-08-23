@@ -2,6 +2,7 @@
 import { h, nextTick, onMounted, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import UnreadIndicator from "./UnreadIndicator.vue";
+import ChoicePointBlock from "./ChoicePointBlock.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
 
 // Narrative feed (the story centerpiece): renders the narrative log slice.
@@ -23,8 +24,13 @@ export default {
   name: "NarrativeFeed",
   props: {
     lines: { type: Array, default: () => [] },
+    // The committed `context_actions.suggestions` envelope (or null). The
+    // stream-end choice-point block renders from this slice (the AI-only
+    // surface — generating and ready only).
+    suggestions: { type: Object, default: null },
   },
-  setup(props, { expose }) {
+  emits: ["choice-action"],
+  setup(props, { expose, emit }) {
     const feedRoot = ref(null);
     const unread = ref(0);
 
@@ -154,6 +160,14 @@ export default {
             },
           }),
           ...props.lines.flatMap((line, index) => lineNodes(line, index)),
+          // The stream-end choice-point block (webclient-action-choicepoints):
+          // rendered after the lines so it stays at the stream end and is
+          // re-parented (moved down) when newer narrative text lands, exactly
+          // like the legacy `appendNode` insertBefore-the-block semantics.
+          h(ChoicePointBlock, {
+            suggestions: props.suggestions,
+            onAction: (intent) => emit("choice-action", intent),
+          }),
         ],
       );
   },

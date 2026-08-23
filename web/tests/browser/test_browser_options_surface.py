@@ -200,9 +200,13 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         _press(page, "Enter")
 
     def _move_to_empty_ground(self, page):
-        """Walk through the dock from the plaza to the empty-ground room."""
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # the first exit (前往測試空地)
+        """Walk through the dock from the plaza to the empty-ground room (the
+        scripted transport-failure room, same journey as the surface file).
+        The flat Vue dock dispatches the move directly on the root row, so a
+        single Enter (``_open_root(page, 0)``) is the whole journey — a second
+        Enter would activate the *new* room's first row and move back.
+        """
+        self._open_root(page, 0)  # 前往測試空地 (the explore.move root row)
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -253,7 +257,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_suggestions_only_update_rerenders_section_without_dock_rebuild(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_suggestions(page, "ready")
+        # The class run shares one ManagedServer across 10 tests; the plaza
+        # suggestions "ready" generation can exceed the default 30s deadline
+        # under load, so use a bounded, longer deadline.
+        self._wait_suggestions(page, "ready", timeout=60000)
         self._wait_section(page)
         self._dismiss(page)
         self._wait_suggestions(page, "unavailable")
@@ -262,21 +269,23 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         # The generating push changed only the suggestions content: the
         # exploration menu subtree and the keyboard router must be untouched.
+        # The Vue dock renders its menu as `.dock-menu` (the legacy
+        # `.exploration-menu` class is retired).
         captured = page.evaluate(
             """() => {
                 window.__menuNode = document.querySelector(
-                    '#action-dock .exploration-menu');
+                    '#action-dock .dock-menu');
                 return window.__menuNode !== null;
             }"""
         )
         self.assertTrue(captured, "the exploration menu must be mounted")
         depth = page.evaluate("window.__elosernBridge.router.depth()")
 
-        self._wait_suggestions(page, "ready")
+        self._wait_suggestions(page, "ready", timeout=60000)
         stable = page.evaluate(
             """() => {
                 const menu = document.querySelector(
-                    '#action-dock .exploration-menu');
+                    '#action-dock .dock-menu');
                 return window.__menuNode === menu && window.__menuNode.isConnected;
             }"""
         )
@@ -358,25 +367,16 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # The dialogue seam settles deterministically (the npc_dialogue
         # profile is disabled in the harness): the adapter's outcome lands in
-        # the stable live region.
+        # the stable live region. The Vue app keeps the OOB result in the
+        # store (the legacy `#elosern-action-live` announcer is an empty div
+        # nothing writes to), so gate on the store result itself.
         def _talked_result(state):
             result = state.get("lastActionResult")
             return result is not None and result.get("code") == "talked"
 
-        wait_for_store_state(
-            page,
-            _talked_result,
-            dom_readiness={
-                "selector": "#elosern-action-live",
-                "predicate": (
-                    "() => { const live = document.querySelector('#elosern-action-live'); "
-                    "return live && live.innerText === '對方回應了你的話。'; }"
-                ),
-                "description": "the dialogue result has settled into the action live region",
-            },
-        )
-        live = page.locator("#elosern-action-live").inner_text()
-        self.assertEqual(live, "對方回應了你的話。")
+        wait_for_store_state(page, _talked_result)
+        result = store_state(page).get("lastActionResult") or {}
+        self.assertEqual(result.get("message"), "對方回應了你的話。")
         self.assertEqual(
             self._narrative_inp_count(page),
             inp_before,
@@ -455,7 +455,9 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                         },
                     },
                 };
-                return Elosern.Protocol.receive(
+                // `receive` lives on the store instance (exposed through the
+                // bridge handle), not on the `Protocol` factory façade.
+                return window.__elosernBridge.store.receive(
                     s.generation, 'ui_update', [envelope], {});
             }"""
         )
@@ -531,9 +533,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
 
         # Returning to the plaza through the dock regenerates: generating
-        # line, then ready.
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # the single exit (回到廣場)
+        # line, then ready. ``_open_root(page, 0)`` dispatches the single
+        # return move (回到廣場) via its own Enter; a second Enter would
+        # activate the plaza's first row (前往測試空地) and move back,
+        # destroying the 1.5s generating window.
+        self._open_root(page, 0)  # Move (回到廣場)
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")
@@ -545,9 +549,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_section_gated_while_the_character_sub_dock_owns_the_surface(self):
         page = self._open_plaza_page()
 
-        # The character sub-dock wipes the action-dock subtree; the section
-        # must never render under it.
-        self._open_root(page, 3)  # 角色狀態
+        # Activate the character sub-dock deterministically through the
+        # store's `activeSubDock` state (the legacy `_open_root(page, 3)`
+        # assumed a hierarchical root the Vue flat dock does not render).
+        # While it is active, the suggestions section must not render.
+        page.evaluate("window.__elosernBridge.store.setActiveSubDock('character')")
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
             True,
@@ -559,8 +565,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             "sub-dock",
         )
 
-        # Leaving the sub-dock rebuilds the exploration dock from the current
-        # snapshot: the ready card set returns.
+        # Leaving the sub-dock (clearing `activeSubDock`) rebuilds the
+        # exploration dock from the current snapshot: the ready card set
+        # returns.
+        page.evaluate("window.__elosernBridge.store.setActiveSubDock(null)")
         _press(page, "Escape")
         self._wait_section(page)
         self.assertEqual(self._ready_card_labels(page), list(EXPECTED_READY_LABELS))

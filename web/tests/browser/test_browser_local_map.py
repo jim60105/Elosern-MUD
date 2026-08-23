@@ -128,12 +128,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         panel = self._wait_local_map_available(page)
         presented = {node["id"] for node in panel["nodes"]}
-        node_count = page.locator(".local-map__node").count()
+        node_count = page.locator(".local-map__lattice .local-map__node").count()
         self.assertLessEqual(node_count, len(presented))
         # Every rendered node corresponds to a presented node id.
         for index in range(node_count):
             node_id = page.evaluate(
-                "(i) => document.querySelectorAll('.local-map__node')[i].dataset.nodeId",
+                "(i) => document.querySelectorAll('.local-map__lattice .local-map__node')[i].dataset.nodeId",
                 index,
             )
             self.assertIn(node_id, presented)

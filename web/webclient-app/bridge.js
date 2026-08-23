@@ -250,6 +250,15 @@ export function createWindowBridge(store) {
     if (event.ctrlKey || event.metaKey || event.altKey) {
       return;
     }
+    // A focused native button (a choice-point card, a dock menu item)
+    // activates itself on Enter; the router must not claim that Enter
+    // (spec webclient-options-surface: card click handlers are native; the
+    // router ignores keyboard-synthesized clicks). Arrow keys still route
+    // through the router so keyboard navigation keeps working.
+    const target = event.target;
+    if (event.key === "Enter" && target && target.closest && target.closest("button, [role=button]")) {
+      return;
+    }
     const claimed = store.focusPress(event.key, !!event.repeat);
     if (claimed && CLAIMED_KEYS.includes(event.key)) {
       event.preventDefault();

@@ -43,9 +43,13 @@ const props = defineProps({
   uncertain: { type: Boolean, default: false },
   prompt: { type: String, default: "" },
   commandHistory: { type: Array, default: () => [] },
+  // The committed `context_actions.suggestions` envelope — the narrative
+  // stream-end choice-point block (webclient-action-choicepoints) renders
+  // at the feed's end through this slice.
+  suggestions: { type: Object, default: null },
 });
 
-const emit = defineEmits(["submit-command"]);
+const emit = defineEmits(["submit-command", "choice-action"]);
 
 const drawerOpen = ref(false);
 const drawer = ref(null);
@@ -69,7 +73,14 @@ function openDrawer() {
 function closeDrawer(restoreFocus) {
   drawerOpen.value = false;
   if (restoreFocus) {
-    feed.value?.focus();
+    // Spec (webclient-desktop-shell): Escape closes the drawer and restores
+    // the `#action-dock` focus (the preserved focus target), not the feed.
+    const dock = document.getElementById("action-dock");
+    if (dock && typeof dock.focus === "function") {
+      dock.focus();
+    } else {
+      feed.value?.focus();
+    }
   }
 }
 
@@ -90,6 +101,12 @@ function onSubmit(text) {
   // One deliberate send through the single dispatch entry (the store routes
   // it at C1; the transport carries ordinary text, never ui_action).
   emit("submit-command", text);
+}
+
+function onChoiceAction(intent) {
+  // The narrative stream-end choice-point card/dismiss actions route through
+  // the same single dispatch entry as the dock (store is the sole writer).
+  emit("choice-action", intent);
 }
 
 // The shell-wide key claims before the wiring wave: `/` toggles the drawer,
@@ -146,7 +163,12 @@ onBeforeUnmount(() => {
         <slot name="panel-left" />
       </aside>
       <main class="app-shell__center">
-        <NarrativeFeed ref="feed" :lines="props.narrative" />
+        <NarrativeFeed
+          ref="feed"
+          :lines="props.narrative"
+          :suggestions="props.suggestions"
+          @choice-action="onChoiceAction"
+        />
       </main>
       <aside class="app-shell__panel app-shell__panel-right" aria-label="右側面板">
         <slot name="panel-right" />

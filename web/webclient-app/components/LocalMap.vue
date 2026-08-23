@@ -28,6 +28,18 @@ const title = computed(() => props.localMap.title ?? "");
 const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
 const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
 const legend = computed(() => (Array.isArray(props.localMap.legend) ? props.localMap.legend : []));
+// The bounded, focusable remembered-remote-node list (spec: presented
+// outside the coordinate canvas; focus-only, no travel action).
+const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
+
+// The detail line localizes the raw visibility token: previously entered
+// nodes (visible_visited / remembered) both read as 已探索.
+const STATE_LABELS = {
+  current: "目前所在",
+  visible_unvisited: "未探索",
+  visible_visited: "已探索",
+  remembered: "已探索",
+};
 
 const nodeById = computed(() => {
   const byId = {};
@@ -90,13 +102,19 @@ const hoveredId = ref(null);
 
 const activeNode = computed(() => {
   const id = hoveredId.value ?? selectedId.value;
-  return nodes.value.find((n) => n.id === id) ?? null;
+  // The active node may be an in-view lattice node or a remembered remote
+  // node (the bounded focusable list), so search both collections.
+  return (
+    nodes.value.find((n) => n.id === id) ??
+    remembered.value.find((n) => n.id === id) ??
+    null
+  );
 });
 
 const detailParts = computed(() => {
   const node = activeNode.value;
   if (!node) return [];
-  const parts = [node.label, node.visibility, `(${node.x}, ${node.y})`];
+  const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility, `(${node.x}, ${node.y})`];
   if (node.action) parts.push(`→ ${node.action.destination}`);
   return parts;
 });
@@ -210,6 +228,36 @@ function activateNode(node) {
           <text class="local-map__node-label" y="24" text-anchor="middle">{{ node.label }}</text>
         </g>
       </svg>
+
+      <!-- The spec's bounded, focusable remembered-remote-node list (outside
+           the coordinate canvas): each entry keeps its non-color diamond
+           state indicator and selects (focuses) the node without emitting a
+           travel action. -->
+      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered">
+        <li
+          v-for="node in remembered"
+          :key="node.id"
+          class="local-map__node local-map__node--remembered"
+          :data-testid="`local-map__node--${node.id}`"
+          :data-node="node.id"
+          :data-node-id="node.id"
+          :data-visibility="node.visibility"
+          tabindex="0"
+          @click="selectNode(node)"
+          @focus="selectNode(node)"
+        >
+          <svg
+            class="local-map__marker local-map__marker--remembered"
+            viewBox="-16 -16 32 32"
+            width="14"
+            height="14"
+            aria-hidden="true"
+          >
+            <rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
+          </svg>
+          <span class="local-map__node-label">{{ node.label }}</span>
+        </li>
+      </ul>
 
       <ul class="local-map__legend" data-testid="local-map__legend">
         <li
@@ -382,5 +430,30 @@ function activateNode(node) {
   border-radius: var(--radius-sm);
   font-family: var(--f-mono);
   font-size: var(--text-sm);
+}
+
+.local-map__remembered {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.local-map__remembered .local-map__node {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--paper-300);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.local-map__remembered .local-map__marker--remembered rect {
+  fill: var(--paper-500);
 }
 </style>

@@ -173,6 +173,35 @@ export const useElosernStore = defineStore("elosern", () => {
     onEvent: onRouterEvent,
   });
 
+  // G1 re-home: the test helpers (and a user Escape at the root frame) call
+  // `router.reset()` with no menu, which empties the frame stack and leaves
+  // Arrow/Enter as no-ops. Wrap the preserved router's `reset` so a menu-less
+  // reset immediately re-homes the root frame from the committed
+  // `context_actions` panel — a dead keyboard frame can never survive a reset.
+  {
+    const originalReset = router.reset;
+    router.reset = function (menu) {
+      const depth = originalReset.call(router, menu);
+      if (!menu && router.depth() === 0) {
+        rehomeFrame(reducer.getState());
+      }
+      return depth;
+    };
+  }
+
+  // The active sub-dock surface (null | "character" | "services"): which
+  // re-homed sub-dock currently owns the action-dock surface. The
+  // suggestions section must never render while one is active (spec
+  // webclient-options-surface). Set by the sub-dock panels on mount/unmount.
+  // Declared before the initial view so `buildView` can read it.
+  const activeSubDock = ref(null);
+  function setActiveSubDock(value) {
+    activeSubDock.value = value;
+    // Publish so `store.view.activeSubDock` (read by the action dock)
+    // reflects the change; the view is a rebuilt snapshot, not live-bound.
+    publishView();
+  }
+
   const view = ref(initialView());
   const narrative = ref([]);
   const commandHistory = ref([]);
@@ -434,6 +463,46 @@ export const useElosernStore = defineStore("elosern", () => {
   // dock's preserved `action-`/`target-` item keys as the single key
   // contract.
   let lastMenuSig = null;
+  // G1 re-home: repopulate the root frame from the committed `context_actions`
+  // panel after a menu-less `router.reset()` emptied the stack. Called by the
+  // wrapped `router.reset` (synchronous) and by `rebuildFocusMenu`'s re-home
+  // path (the commit-driven safety net).
+  function rehomeFrame(rs) {
+    const panel = (rs.panels && rs.panels.context_actions) || null;
+    if (panel && panel.kind === "combat") {
+      const previous = combat
+        ? { skillKey: combat.focusSkillKey, page: combat.page || 0, skillByKey: combat.skillByKey }
+        : {};
+      combat = CombatMenu.rebuildForPanel(combat, panel, previous);
+      lastMenuSig = stableStringify(combat.menus.root.items);
+      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      return;
+    }
+    const rawItems = panel ? focusItemsFor(panel) : [];
+    lastMenuSig = stableStringify(panel);
+    // Leaving combat mode: the exploration root frame owns the keyboard
+    // router now.
+    combat = null;
+    if (rawItems.length === 0) {
+      if (router.depth() > 0) {
+        // A committed panel without focusable items clears the frame stack
+        // (the wrapped reset re-homes synchronously; the depth guard keeps
+        // the re-home from recursing).
+        router.reset();
+      }
+      return;
+    }
+    const keys = dockItemKeys(rawItems);
+    dockRawByKey = {};
+    const items = rawItems.map((raw, index) => {
+      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
+      item.key = keys[index];
+      dockRawByKey[keys[index]] = raw;
+      return item;
+    });
+    router.replaceMenu({ items, grid: false });
+  }
+
   function rebuildFocusMenu(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
     const kind = (panel && panel.kind) || null;
@@ -453,18 +522,18 @@ export const useElosernStore = defineStore("elosern", () => {
         : {};
       const probe = CombatMenu.buildMenus(panel, { skillKey: previous.skillKey, page: previous.page || 0 });
       const sig = stableStringify(probe.menus.root.items);
-      if (sig === lastMenuSig) {
-        // Panel unchanged: keep the existing combat tree so the in-progress
-        // client-local selection state (chosen skill, 威力 scale, AREA
-        // shorthand/candidates) set by the keyboard flow survives publishView
-        // cycles. Only a genuine panel replacement rebuilds (rebuildForPanel
-        // deterministically preserves a still-valid scale, and prunes vanished
-        // selections).
+      const rehomeNeeded = router.depth() === 0;
+      if (sig === lastMenuSig && !rehomeNeeded) {
+        // Panel unchanged and the router frame is alive: keep the existing
+        // combat tree so the in-progress client-local selection state
+        // (chosen skill, 威力 scale, AREA shorthand/candidates) set by the
+        // keyboard flow survives publishView cycles. Only a genuine panel
+        // replacement — or a router reset (depth 0, the test helper's
+        // `router.reset()` re-home) — rebuilds.
         return;
       }
       lastMenuSig = sig;
-      combat = CombatMenu.rebuildForPanel(combat, panel, previous);
-      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      rehomeFrame(rs);
       return;
     }
     // The committed `context_actions` panel (affordances/participants AND the
@@ -472,25 +541,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // to the committed panel resets the router focus to the first item, while
     // an identical re-commit preserves the focus position.
     const sig = stableStringify(panel);
-    if (sig === lastMenuSig) {
+    const rehomeNeeded = router.depth() === 0 && focusItemsFor(panel).length > 0;
+    if (sig === lastMenuSig && !rehomeNeeded) {
       return;
     }
-    lastMenuSig = sig;
-    combat = null;
-    const rawItems = focusItemsFor(panel);
-    const keys = dockItemKeys(rawItems);
-    dockRawByKey = {};
-    const items = rawItems.map((raw, index) => {
-      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
-      item.key = keys[index];
-      dockRawByKey[keys[index]] = raw;
-      return item;
-    });
-    if (items.length === 0) {
-      router.reset();
-      return;
-    }
-    router.replaceMenu({ items, grid: false });
+    rehomeFrame(rs);
   }
 
   // ------------------------------------------------------------------ creation
@@ -735,13 +790,16 @@ export const useElosernStore = defineStore("elosern", () => {
       prompt,
       lastSurface,
       lastTarget,
+      activeSubDock: activeSubDock.value,
 
       contextActions: panel,
       suggestions,
       suggestionsView: OptionCards.buildOptionsView(panel || {}),
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
       choicePoint: { state: choiceState, suggestions },
-      localMapModel: panels.local_map ? LocalMap.reducePanel(panels.local_map) : null,
+      localMapModel: panels.local_map
+        ? { ...LocalMap.reducePanel(panels.local_map), available: panels.local_map.available !== false }
+        : null,
       // The keyboard router's current combat menu frame (root/skills/scale/
       // target) so the visible dock follows keyboard navigation (Option B).
       combatMenu: router.currentMenu(),
@@ -1033,5 +1091,13 @@ export const useElosernStore = defineStore("elosern", () => {
     // render" signal) so the AppClient auto-resync watcher can request one
     // ui_sync per failure episode.
     lastPanelRejection,
+    // The protocol store's subscription seam (the C4 harness re-map): browser
+    // tests observe `beginTransport` notifications (the transport-reset state
+    // with a null epoch and empty panels) to gate on deterministic state.
+    subscribe: (listener) => reducer.subscribe(listener),
+    // Set which re-homed sub-dock currently owns the action-dock surface
+    // (null clears). The sub-dock panels set/clear this on mount/unmount;
+    // the suggestions section hides while one is active.
+    setActiveSubDock,
   };
 });

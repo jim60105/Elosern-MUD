@@ -200,10 +200,12 @@ function onShopSell(intent) {
 
 function onMapMove(moveData) {
   // The minimap node action carries `exit_ref` + `destination`; the
-  // `explore.move` payload requires exactly `{ exit_ref, current_node }`.
+  // `explore.move` payload requires exactly `{ exit_ref, current_node }`,
+  // where `current_node` is the actor's current node (the committed
+  // `local_map.current_node`), not the destination.
   store.dispatchAction("explore.move", {
     exit_ref: moveData.exit_ref,
-    current_node: moveData.destination,
+    current_node: store.view.localMapModel?.currentNode ?? null,
   });
 }
 
@@ -262,6 +264,12 @@ function onSubmitCommand(text) {
   // seam (`sender.sendText` -> `Evennia.msg("text", ...)`).
   return store.sendText(text);
 }
+
+function onChoiceAction(intent) {
+  // The narrative stream-end choice-point card/dismiss intents (C4): the
+  // same single dispatch entry as the dock (store is the sole writer).
+  store.dispatchAction(intent.action_id, intent.payload);
+}
 </script>
 
 <template>
@@ -277,7 +285,9 @@ function onSubmitCommand(text) {
       :uncertain="store.view.dispatch.uncertain"
       :prompt="store.view.prompt"
       :command-history="store.commandHistory"
+      :suggestions="store.view.suggestions"
       @submit-command="onSubmitCommand"
+      @choice-action="onChoiceAction"
     >
       <template #panel-left>
         <StatusPanel
@@ -318,6 +328,7 @@ function onSubmitCommand(text) {
           v-if="dockItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'explore'"
           :suggestions="store.view.suggestions"
+          :active-sub-dock="store.view.activeSubDock"
           @action="onAction"
         >
           <DockMenu

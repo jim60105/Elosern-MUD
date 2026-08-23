@@ -309,16 +309,17 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
 
         # A look command lands narrative text after the ready commit; the
         # block must relocate to the new stream end (text between the older
-        # content and the block).
+        # content and the block). The look goes through the transport text
+        # path (not a `ui_action`), so the deterministic gate is the result
+        # text itself in the feed — `lastActionResult` stays null on this path.
         page.evaluate("Evennia.msg('text', ['look'], {})")
 
-        def _looked_result(state):
-            result = state.get("lastActionResult")
-            return result is not None and result.get("code") == "looked"
+        def _connected(state):
+            return bool(state.get("connected"))
 
         wait_for_store_state(
             page,
-            _looked_result,
+            _connected,
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
@@ -412,20 +413,12 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             result = state.get("lastActionResult")
             return result is not None and result.get("code") == "talked"
 
-        wait_for_store_state(
-            page,
-            _talked_result,
-            dom_readiness={
-                "selector": "#elosern-action-live",
-                "predicate": (
-                    "() => { const live = document.querySelector('#elosern-action-live'); "
-                    "return live && live.innerText === '對方回應了你的話。'; }"
-                ),
-                "description": "the dialogue result has settled into the action live region",
-            },
-        )
-        live = page.locator("#elosern-action-live").inner_text()
-        self.assertEqual(live, "對方回應了你的話。")
+        # The Vue app keeps the OOB action result in the store (the legacy
+        # `#elosern-action-live` announcer is an empty div nothing writes to),
+        # so the deterministic gate is the store result itself.
+        wait_for_store_state(page, _talked_result)
+        result = store_state(page).get("lastActionResult") or {}
+        self.assertEqual(result.get("message"), "對方回應了你的話。")
         self.assertEqual(
             self._narrative_inp_count(page),
             inp_before,
@@ -538,9 +531,9 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             """() => {
                 window.__resetBlockCount = null;
-                Elosern.Protocol.subscribe((s) => {
+                window.__elosernBridge.store.subscribe((s) => {
                     if (window.__resetBlockCount === null
-                        && s.epoch === null
+                        && s.activeEpoch === null
                         && Object.keys(s.panels).length === 0) {
                         window.__resetBlockCount = 'pending';
                         Promise.resolve().then(() => {
