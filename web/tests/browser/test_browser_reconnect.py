@@ -95,12 +95,18 @@ class ReconnectTest(BrowserAcceptanceTest):
         # Deterministically keep the submitted action's result out of the
         # client so the request is provably still in flight when the transport
         # dies: the server can answer a test-only ``proof.noop`` in the same
-        # tick, which would otherwise race the disconnect.
+        # tick, which would otherwise race the disconnect. The Vue transport
+        # feeds ``ui_action_result`` to ``store.receive`` through its OOB
+        # listener, so we also swallow the emitter's ``ui_action_result``
+        # listener to keep the result from reaching the store.
         page.evaluate(
             "() => {"
             "  const client = Elosern.actions && Elosern.actions.client;"
-            "  if (!client) return false;"
-            "  client.onActionResult = function () { return undefined; };"
+            "  if (client) { client.onActionResult = function () { return undefined; };"
+            "  }"
+            "  if (window.Evennia && window.Evennia.emitter) {"
+            "    window.Evennia.emitter.on('ui_action_result', function () {});"
+            "  }"
             "  return true;"
             "}"
         )
@@ -136,17 +142,19 @@ class ReconnectTest(BrowserAcceptanceTest):
 
         # The uncertain-result notice appears after the reconnect.
         # The server's post-reconnect re-attach can lag under parallel CI load,
-        # so allow a longer window than Playwright's default 30s.
+        # so allow a longer window than Playwright's default 30s. Gate on the
+        # transport being re-opened (connected) plus the offline overlay's
+        # `data-uncertain` flag — the DOM-observable uncertain-result signal.
         wait_for_store_state(
             page,
-            lambda s: s.get("connected") and bool(s.get("lastActionResult")),
+            lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": "#elosern-action-live",
+                "selector": "#elosern-offline-overlay",
                 "predicate": (
-                    "() => { const el = document.getElementById('elosern-action-live'); "
-                    "return el && (el.textContent || '').indexOf('無法確認') !== -1; }"
+                    "() => { const el = document.getElementById('elosern-offline-overlay'); "
+                    "return el && el.getAttribute('data-uncertain') === 'true'; }"
                 ),
-                "description": "uncertain-result notice visible in the action live region",
+                "description": "uncertain-result flag set on the offline overlay",
             },
             timeout=60000,
         )
@@ -163,7 +171,7 @@ class ReconnectTest(BrowserAcceptanceTest):
     def test_lower_revision_adoption_in_new_generation(self):
         page = self.logged_in_page()
         before = store_state(page)
-        epoch_before = before["activeEpoch"]
+        epoch_before = before["epoch"]
         revision_before = before["revision"]
 
         # Inflate the active revision so the new epoch's lower revision is real.
@@ -192,13 +200,13 @@ class ReconnectTest(BrowserAcceptanceTest):
         if state["phase"] == "active":
             # The server re-auth won the race: the real new-epoch snapshot was
             # adopted at a lower revision than the prior epoch's.
-            self.assertNotEqual(state["activeEpoch"], epoch_before)
+            self.assertNotEqual(state["epoch"], epoch_before)
             self.assertLess(state["revision"], revision_inflated)
         else:
             # The server re-auth lagged; drive the wired reducer to adopt the
             # new generation's lower-revision snapshot (the rule under test).
             adopted = page.evaluate(
-                "(args) => Elosern.Protocol.receive("
+                "(args) => window.__elosernBridge.store.receive("
                 "args.generation, 'ui_snapshot', [args.envelope], {})",
                 {
                     "generation": state["generation"],
@@ -213,18 +221,18 @@ class ReconnectTest(BrowserAcceptanceTest):
             state = store_state(page)
             self.assertEqual(state["phase"], "active")
             self.assertLess(state["revision"], revision_inflated)
-            self.assertNotEqual(state["activeEpoch"], epoch_before)
+            self.assertNotEqual(state["epoch"], epoch_before)
 
     def test_rejects_prior_generation_and_different_epoch_on_active_socket(self):
         """The live active store discards foreign generations and epochs."""
         page = self.logged_in_page()
         state = store_state(page)
         generation = state["generation"]
-        epoch_active = state["activeEpoch"]
+        epoch_active = state["epoch"]
         revision = state["revision"]
 
         prior_generation = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {
                 "generation": generation - 1,
@@ -238,7 +246,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         self.assertEqual(prior_generation["reason"], "stale_generation")
 
         different_epoch = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {
                 "generation": generation,
@@ -251,7 +259,7 @@ class ReconnectTest(BrowserAcceptanceTest):
 
         after = store_state(page)
         self.assertEqual(after["generation"], generation)
-        self.assertEqual(after["activeEpoch"], epoch_active)
+        self.assertEqual(after["epoch"], epoch_active)
         self.assertEqual(after["revision"], revision)
 
     def test_retired_epoch_rejected_while_awaiting_first_snapshot(self):

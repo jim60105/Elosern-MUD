@@ -161,10 +161,24 @@ describe("store dispatch + focus", () => {
        expect(store.dispatchAction("explore.wait", { daypart: "dusk" })).toBe("session:2");
        expect(flaky.actions.length).toBe(1);
        expect(flaky.actions[0].request_id).toBe("session:2");
-       store.clearUncertain();
-       expect(store.view.dispatch.uncertain).toBe(false);
-     });
-  });
+        store.clearUncertain();
+        expect(store.view.dispatch.uncertain).toBe(false);
+      });
+
+      it("marks an in-flight mutation uncertain on a plain transport loss", () => {
+        openSession();
+        store.dispatchAction("explore.wait", { daypart: "dusk" });
+        expect(store.view.dispatch.uncertain).toBe(false);
+        // A plain disconnect (no puppet-detach protocol error) while a
+        // mutation is in flight and unconfirmed must mark it uncertain —
+        // the offline-locking + uncertain-notice contract (shard 5).
+        store.setConnected(false);
+        expect(store.view.dispatch.inFlight).toBe(null);
+        expect(store.view.dispatch.uncertain).toBe(true);
+        store.clearUncertain();
+        expect(store.view.dispatch.uncertain).toBe(false);
+      });
+   });
 
   describe("text dispatch", () => {
     it("sends ordinary text through the sender and records the command history", () => {

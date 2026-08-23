@@ -837,6 +837,10 @@ export const useElosernStore = defineStore("elosern", () => {
         inFlight: inFlight ? { requestId: inFlight.requestId, presentationRevision: inFlight.presentationRevision } : null,
         uncertain,
         submittedRequestId: lastSubmittedRequestId,
+        // Whether a mutation was submitted and its result not yet confirmed
+        // (the client-local uncertain-marking precondition, exposed for the
+        // browser harness).
+        mutationSubmitted,
       },
     };
   }
