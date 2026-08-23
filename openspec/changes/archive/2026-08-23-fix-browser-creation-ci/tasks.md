@@ -99,4 +99,4 @@ failing since the flip. Port the flow following the combat-menu pattern (`45a27f
 - [x] 5.3 Run only the browser creation-shard tests locally (shard 4: `PresetCreationJourneys`,
       `ResetAndDraftJourneys`, `CreationDispatchJourneys`, `PointerCreationJourneys`,
       `ReconnectCreationJourney`), confirming they pass (Chromium + real Evennia server).
-- [ ] 5.4 Confirm the browser creation shard (shard 4) is green in CI.
+- [x] 5.4 Confirm the browser creation shard (shard 4) is green in CI.
