@@ -7,15 +7,20 @@ bounded monotonic deadline. Waits SHALL NOT depend on a single raw DOM-visibilit
 delayed server publish or client render would exhaust under a loaded CI runner. The shared wait
 helper in `web/tests/browser/browser_helpers.py` SHALL expose one bounded polling loop that
 reads the committed store view (via `store_state_or_none`, tolerating a one-shot recovery reload),
-SHALL accept an optional DOM-readiness predicate that is evaluated within the same polling loop
-under the same monotonic deadline (so the store gate and the DOM gate share one bounded window),
-SHALL treat a `None` store read (mid-reload) as "not ready yet" without invoking the store
-predicate on `None`, and SHALL raise an `AssertionError` on timeout carrying the last non-`None`
-store state, whether any `None` reads occurred, the last evaluation error, and — where a
-DOM-readiness predicate is supplied — the relevant selector's connected/visible/enabled state and
-the current `activeElement`. Focus operations (e.g. `focus_action_dock`) SHALL gate on the store
-state first, then poll the target element's DOM readiness in the same loop, then verify
-`document.activeElement` is the target or its delegated focus target.
+SHALL accept an optional DOM-readiness descriptor (a structured `{selector, predicate, description}`)
+whose predicate is evaluated within the same polling loop under the same monotonic deadline (so the
+store gate and the DOM gate share one bounded window). A DOM-readiness `page.evaluate` that races an
+in-flight navigation SHALL be routed through the same navigation-tolerating path as the store read: a
+recoverable "execution context was destroyed" error is recorded as the last evaluation error and the
+wait continues to the deadline; a non-navigation JavaScript/selector error SHALL be surfaced in the
+timeout diagnostic. The helper SHALL treat a `None` store read (mid-reload) as "not ready yet" without
+invoking the store predicate on `None`, and SHALL raise an `AssertionError` on timeout carrying the
+last non-`None` store state, whether any `None` reads occurred, the last evaluation error, and — where
+a DOM-readiness descriptor is supplied — the selector's connected/visible/enabled state and the current
+`activeElement`. Focus operations (e.g. `focus_action_dock`) SHALL gate on the store state first, then
+poll the target element's DOM readiness in the same loop, focus it using the remaining deadline, and
+verify `document.activeElement` is the target itself or a focusable descendant (or an explicitly allowed
+delegated-focus target).
 
 #### Scenario: A journey wait is gated on the store state
 - **WHEN** a browser journey waits for a gameplay surface to become available or a mode to change
@@ -33,5 +38,11 @@ state first, then poll the target element's DOM readiness in the same loop, then
 #### Scenario: A focus wait verifies the focused element
 - **WHEN** a journey focuses the action dock
 - **THEN** it first gates on the store state, then polls the dock's DOM readiness in the same
-  bounded loop, focuses it, and verifies `document.activeElement` is the dock or its delegated
-  focus target, so a swallowed focus fails with a precise diagnostic instead of a bare timeout
+  bounded loop, focuses it, and verifies `document.activeElement` is the dock itself or a focusable
+  descendant, so a swallowed focus fails with a precise diagnostic instead of a bare timeout
+
+#### Scenario: A DOM-readiness descriptor drives a single bounded wait
+- **WHEN** a journey waits for a surface to be both present in the store view AND visible in the DOM
+- **THEN** the shared helper accepts a structured `{selector, predicate, description}` descriptor and
+  evaluates the DOM predicate in the same polling loop under the same monotonic deadline, so the store
+  gate and the DOM gate share one bounded window

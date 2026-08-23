@@ -1,21 +1,25 @@
 ## 1. Shared deterministic-state wait helper
 
-- [ ] 1.1 Add `wait_for_store_state(page, predicate, dom_predicate=None, timeout=30000,
+- [ ] 1.1 Add `wait_for_store_state(page, predicate, dom_readiness=None, timeout=30000,
   interval_ms=250)` to `web/tests/browser/browser_helpers.py`: a bounded Python-side polling loop
-  that reads the committed store view via `store_state_or_none` (navigation-tolerant). The optional
-  `dom_predicate` is evaluated in the SAME loop under one monotonic deadline (store gate + DOM
-  readiness share one bounded window). A `None` store read is logged and polling continues (the
-  store predicate is not invoked on `None`). On timeout, raise an `AssertionError` carrying
-  `last_non_none_state`, `none_observed`, the last evaluation error, and — when a `dom_predicate`
-  is supplied — the selector's connected/visible/enabled state and the `activeElement`.
+  that reads the committed store view via `store_state_or_none` (navigation-tolerant). `dom_readiness`
+  is a structured descriptor `{"selector", "predicate", "description"}` whose JS `predicate` is
+  evaluated in the SAME loop under one monotonic deadline (store gate + DOM readiness share one bounded
+  window). A `None` store read is logged and polling continues (the store predicate is not invoked on
+  `None`); a DOM `page.evaluate` that races an in-flight navigation is routed through the same
+  navigation-tolerating path (recoverable "execution context destroyed" error is recorded and the wait
+  continues to the deadline). On timeout, raise an `AssertionError` carrying `last_non_none_state`,
+  `none_observed`, the last evaluation error, and — when a `dom_readiness` descriptor is supplied — the
+  selector's connected/visible/enabled state and the `activeElement`.
 - [ ] 1.2 Convert the shared helpers `wait_for_shell_active` and `focus_action_dock` in
   `browser_helpers.py` from raw DOM waits to the store-state gate. Retarget `REQUIRED_SURFACES`
   from the stale legacy selectors (`.elosern-header` / `.elosern-narrative` / `.elosern-drawer`)
   to the Vue app's `data-testid` hooks (`.elosern-header` still renders; the narrative and drawer
   surfaces are now `data-testid="narrative-feed"` and `data-testid="command-drawer"`). For
   `focus_action_dock`: gate on the store state (connected + dock panel available), poll the
-  `#action-dock` DOM readiness in the same bounded loop, call `locator.focus()`, then verify
-  `document.activeElement` is the dock or its delegated focus target.
+  `#action-dock` DOM readiness in the same bounded loop, call `locator.focus()` using the remaining
+  deadline, then verify `document.activeElement` is the dock itself or a focusable descendant (or an
+  explicitly allowed delegated-focus target).
 - [ ] 1.3 In every failing test file, retarget DOM-bound assertions from the stale legacy
   selectors to the Vue `data-testid` hooks (`narrative-feed`, `command-drawer`, `action-dock`,
   `art-panel`, `creation-overlay`), so assertions target the interface the Vue SPA actually renders.
@@ -44,6 +48,20 @@
 - [ ] 2.8 The currently-passing files with raw waits — `test_browser_shell.py`,
   `test_browser_input_narrative.py`, `test_browser_pointer.py` — convert their raw DOM-visibility
   waits to the store-state gate so no residual raw-wait population remains.
+- [ ] 2.9 `test_browser_actions.py`, `test_browser_local_map.py`, and `test_browser_session_lifecycle.py`:
+  convert the remaining raw DOM-visibility waits (e.g. `test_browser_actions.py` disconnected/offline
+  overlay waits, `test_browser_local_map.py` `wait_for_selector` on `[data-testid='local-map__title']`
+  / `.local-map__lattice`, `test_browser_session_lifecycle.py` session waits) to the store-state gate.
+  Preserve pure store-result and pure assertion waits; only readiness waits that need both the store
+  state and surface DOM readiness get converted.
+
+## 5. Helper behavior test
+
+- [ ] 5.1 Add a focused Playwright test for `wait_for_store_state` itself, covering: recovers after a
+  `None` (mid-reload) read, the store predicate is never invoked on `None`, the store gate and the
+  DOM-readiness descriptor must both hold, and the timeout `AssertionError` carries the last state, the
+  `none_observed` flag, the last evaluation error, and (when a descriptor is present) the selector's
+  connected/visible/enabled state + `activeElement`.
 
 ## 3. Register the missing shard-manifest method
 

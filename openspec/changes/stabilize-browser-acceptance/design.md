@@ -50,20 +50,25 @@ registered in any shard manifest entry.
 
 ## Decisions
 
-**Decision 1: One shared bounded deterministic-state wait helper with an optional DOM-readiness
-predicate under a single monotonic deadline.**
-Add `wait_for_store_state(page, predicate, dom_predicate=None, timeout=30000, interval_ms=250)`
-to `browser_helpers.py`. It runs a Python-side bounded polling loop that reads the committed store
-view via the existing `store_state_or_none` (which already tolerates a one-shot recovery reload
-via `evaluate_tolerating_navigation`). A caller passes a small predicate over the store view
-(e.g. `connected`, `mode`, `revision`, a panel's `available`). An optional `dom_predicate` is
-evaluated in the SAME polling loop under one monotonic deadline, so the store gate and the
-DOM-readiness gate share a single bounded window (no two-stage race, no double timeout budget).
-`None` store states (mid-reload) are logged and polling continues (the store predicate is not
-invoked on `None`); on timeout the helper raises an `AssertionError` carrying
-`last_non_none_state`, `none_observed`, and the last evaluation error, plus (when a
-`dom_predicate` is present) the relevant selector's connected/visible/enabled state and the
-`activeElement`.
+**Decision 1: One shared bounded deterministic-state wait helper with a structured DOM-readiness
+descriptor under a single monotonic deadline.**
+Add `wait_for_store_state(page, predicate, dom_readiness=None, timeout=30000, interval_ms=250)`
+to `browser_helpers.py`. `dom_readiness` is a structured descriptor
+`{"selector": str, "predicate": str (JS expression), "description": str}` so a timeout diagnostic can
+name the selector and report its connected/visible/enabled state plus the current `activeElement`.
+It runs a Python-side bounded polling loop that reads the committed store view via the existing
+`store_state_or_none` (which already tolerates a one-shot recovery reload via
+`evaluate_tolerating_navigation`). A caller passes a small predicate over the store view (e.g.
+`connected`, `mode`, `revision`, a panel's `available`). The DOM-readiness `predicate` is evaluated
+in the SAME polling loop under one monotonic deadline, so the store gate and the DOM-readiness gate
+share a single bounded window (no two-stage race, no double timeout budget). A DOM `page.evaluate`
+that races an in-flight navigation is routed through the same navigation-tolerating path as the store
+read: a recoverable "execution context was destroyed" error is recorded as the last evaluation error
+and the wait continues to the deadline; a non-navigation JavaScript/selector error is surfaced in the
+timeout diagnostic. `None` store states (mid-reload) are logged and polling continues (the store
+predicate is not invoked on `None`); on timeout the helper raises an `AssertionError` carrying
+`last_non_none_state`, `none_observed`, the last evaluation error, and (when a `dom_readiness`
+descriptor is present) the selector's connected/visible/enabled state and the `activeElement`.
 
 *Alternative considered:* keep per-call `page.wait_for_function` with longer explicit timeouts.
 *Rejected:* that only delays the same slowness and still couples to a single raw render. The
@@ -78,13 +83,22 @@ failing files (`test_browser_exploration.py`, `test_browser_services.py`, `test_
 `test_vue_transport_mount.py`, `test_browser_options_surface.py`, `test_browser_choicepoints.py`,
 `test_browser_combat_rejection.py`) AND the currently-passing files with raw waits
 (`test_browser_shell.py`, `test_browser_input_narrative.py`, `test_browser_pointer.py`), plus the
-shared helpers `wait_for_shell_active` and `focus_action_dock` in `browser_helpers.py`.
+other files that still gate on disconnected/locked store states or raw DOM readiness
+(`test_browser_actions.py`, `test_browser_local_map.py`, `test_browser_session_lifecycle.py`), and
+the shared helpers `wait_for_shell_active` and `focus_action_dock` in `browser_helpers.py`.
+
+Important: NOT every `wait_for_function` is a readiness gate. Pure store-result waits (polling
+`revision`/`mode`/panel availability) and pure assertion waits (a specific string appears, the input
+gains focus) may be left as-is; only readiness waits that need BOTH the store state AND surface DOM
+readiness get converted to the new helper. Tests that assert a disconnected/locked state must keep
+their store predicate targeting that expected state, not the active-shell condition.
 
 For `focus_action_dock` (a DOM focus operation) do NOT gate on the store predicate alone: gate on
 the store state (connected + the dock panel available), then within the SAME bounded loop poll the
-`#action-dock` DOM readiness (visible + focusable) via the optional `dom_predicate`, call
-`locator.focus()`, and verify `document.activeElement` is the dock or its internal delegated focus
-target. This avoids re-introducing the `null.focus()` failure mode.
+`#action-dock` DOM readiness (visible + focusable) via the optional `dom_readiness` descriptor, call
+`locator.focus()` using the remaining deadline, and verify `document.activeElement` is the dock itself
+or a focusable descendant (or an explicitly allowed delegated-focus target). This avoids re-introducing
+the `null.focus()` failure mode and tolerates a dock that delegates focus to an inner control.
 
 *Alternative considered:* a global Playwright `default_timeout` increase. *Rejected:* it hides
 slowness instead of decoupling the wait from render latency.
