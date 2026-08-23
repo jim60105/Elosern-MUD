@@ -9,6 +9,7 @@ scripted sequence of store views and DOM-readiness results.
 
 from __future__ import annotations
 
+import json
 import time
 import unittest
 
@@ -50,6 +51,10 @@ class _FakePage:
     possibly ``None`` to model a mid-reload). ``dom_queue`` (or the scalar
     ``dom_result``) supplies the DOM-readiness predicate results. ``active_element``
     is what the ``document.activeElement`` diagnostic returns.
+
+    The bridge read is served as a JSON string (``json.dumps``), mirroring the
+    real page contract: the helper's store read evaluates
+    ``JSON.stringify(store.view)`` in-page and parses it in Python.
     """
 
     def __init__(self) -> None:
@@ -85,7 +90,8 @@ class _FakePage:
 
     def evaluate(self, expression: str, arg=None):
         if "__elosernBridge" in expression:
-            return self._next_store_view()
+            value = self._next_store_view()
+            return json.dumps(value) if value is not None else None
         if "activeElement" in expression:
             return self.active_element
         return self._next_dom_result(arg)
@@ -149,6 +155,7 @@ class WaitForStoreStateTest(unittest.TestCase):
         }
         wait_for_store_state(page, _active_shell, dom_readiness=dom, timeout=300)
 
+    @covers_requirement("webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline")
     def test_timeout_diagnostic_carries_required_fields(self) -> None:
         page = _FakePage()
         page.store_queue = [{"connected": True, "phase": "detached"}]
@@ -165,6 +172,7 @@ class WaitForStoreStateTest(unittest.TestCase):
         self.assertIn("dom_readiness=", message)
         self.assertIn("activeElement=", message)
 
+    @covers_requirement("webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline")
     def test_none_read_flagged_in_timeout(self) -> None:
         page = _FakePage()
         page.store_queue = [None, {"connected": True, "phase": "detached"}]
@@ -172,6 +180,7 @@ class WaitForStoreStateTest(unittest.TestCase):
             wait_for_store_state(page, lambda s: s.get("phase") == "active", timeout=300)
         self.assertIn("none_observed=True", str(ctx.exception))
 
+    @covers_requirement("webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline")
     def test_non_navigation_dom_error_surfaced_in_diagnostic(self) -> None:
         page = _FakePage()
         page.store_queue = [{"connected": True, "phase": "active"}]
