@@ -518,7 +518,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
     def test_window_elosern_bridge_facades_resolve_and_route(self):
         """C2: the window.Elosern public-contract bridge resolves and routes.
 
-        The A1 frozen façade surface (four façades, exact member sets) resolves
+        The A1 frozen façade surface (five façades, exact member sets) resolves
         on the Vue test-config page; narrative input routes through the store's
         single append path; the action-dispatch entry is single (one mutation in
         flight); and document key events are claimed exactly when the router
@@ -554,8 +554,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             surface["facades"],
-            ["KeyboardRouter", "Protocol", "actions", "narrativeInput"],
-            "the bridge exposes exactly the four frozen façades (A1 audit §1)",
+            ["KeyboardRouter", "LayoutStore", "Protocol", "actions", "narrativeInput"],
+            "the bridge exposes exactly the five frozen façades (A1 audit §1)",
         )
         self.assertEqual(surface["protocolVersion"], 1)
         self.assertTrue(surface["hasRouter"])
