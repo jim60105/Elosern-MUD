@@ -12,9 +12,9 @@
 //
 // Shell-owned view behavior (pre-store): the `/` key toggles the drawer and
 // focuses the field (slash-as-text inside editables is untouched), Escape
-// releases a focused drawer back to the narrative pane, and the mount
-// retires the replaced text fallback (hidden, not removed) so the shell
-// cannot stack below the viewport.
+// closes the open drawer and restores action-dock focus (webclient-desktop-
+// shell), and the mount retires the replaced text fallback (hidden, not
+// removed) so the shell cannot stack below the viewport.
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandDrawer from "./CommandDrawer.vue";

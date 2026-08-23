@@ -85,13 +85,15 @@ describe("window.Elosern bridge", () => {
     const { facade } = installBridge();
     expect(window.Elosern).toBe(facade);
     expect(Object.keys(facade).sort()).toEqual(
-      ["KeyboardRouter", "Protocol", "actions", "narrativeInput"].sort(),
+      ["KeyboardRouter", "Protocol", "LayoutStore", "actions", "narrativeInput"].sort(),
     );
 
     // Protocol = the imported UMD module, byte-identical re-exposure (D1).
     expect(facade.Protocol.PROTOCOL_VERSION).toBe(1);
     expect(typeof facade.Protocol.createStore).toBe("function");
     expect(typeof facade.Protocol.validateSnapshot).toBe("function");
+    // LayoutStore = the imported versioned layout-persistence UMD (D1).
+    expect(typeof facade.LayoutStore.createStore).toBe("function");
 
     // KeyboardRouter = the imported UMD module (claim-contract constants).
     expect(typeof facade.KeyboardRouter.createRouter).toBe("function");

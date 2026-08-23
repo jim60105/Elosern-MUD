@@ -269,7 +269,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True, "actor": "nope"}},
         )
         result = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )
@@ -323,7 +323,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
             protocol_version=2,
         )
         rejected = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": v2},
         )
@@ -332,7 +332,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
 
         # The server's protocol-error reply locks every graphical mutation.
         page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_protocol_error', [args.envelope], {})",
             {
                 "generation": generation,

@@ -11,6 +11,9 @@
 // - `window.Elosern.Protocol` / `window.Elosern.KeyboardRouter` are the
 //   imported UMD modules, re-exposed byte-identical (design D1: re-exposure,
 //   not re-implementation).
+// - `window.Elosern.LayoutStore` is the imported versioned layout-persistence
+//   UMD (browser-persistence-is-versioned-and-presentation-only), so the
+//   browser-acceptance layout tests can construct a storage-bound store.
 // - `window.Elosern.narrativeInput` is the store's single narrative/choice-
 //   point append path: `appendInput` echoes exactly one `.inp` line through
 //   `store.sendText`; the choice-point stream-end block is owned by the
@@ -30,6 +33,7 @@
 import Protocol from "./lib/protocol.js";
 import KeyboardRouter from "./lib/keyboard_router.js";
 import StreamEndBlock from "./lib/stream_end_block.js";
+import LayoutStore from "./lib/layout_store.js";
 
 // The claimed-when-consumed key set (webclient-desktop-shell keyboard
 // routing): arrows move within the active finite menu, Enter confirms the
@@ -278,6 +282,7 @@ export function createWindowBridge(store) {
   window.Elosern = {
     Protocol,
     KeyboardRouter,
+    LayoutStore,
     narrativeInput,
     actions,
   };

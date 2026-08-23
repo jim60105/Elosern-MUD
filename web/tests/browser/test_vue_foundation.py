@@ -255,8 +255,10 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
 
             # Usability with a real pointer at this viewport: the entry
             # button opens the drawer, the field accepts text, Enter sends
-            # (the field clears), and Escape releases back to the narrative
-            # pane — a covered or clipped surface would fail here.
+            # (the field clears), and Escape releases the drawer back to the
+            # action dock (webclient-desktop-shell: closing the open drawer
+            # restores action-dock focus) — a covered or clipped surface
+            # would fail here.
             page.locator('[data-testid="command-drawer-entry"]').click()
             wait_for_store_state(
                 page,
@@ -316,13 +318,13 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 },
                 timeout=10000,
             )
-            self.assertEqual(
+            self.assertTrue(
                 page.evaluate(
-                    "document.activeElement && "
-                    "document.activeElement.getAttribute('data-testid')"
+                    "() => { const a = document.activeElement; "
+                    "const dock = document.getElementById('action-dock'); "
+                    "return !!dock && !!a && (a === dock || dock.contains(a)); }"
                 ),
-                "narrative-feed",
-                "Escape must return focus to the narrative pane, not body",
+                "Escape must return focus to the action dock, not body",
             )
 
         self.assertIsNone(
