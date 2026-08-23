@@ -66,6 +66,12 @@ node_modules/
 .storybook-out.lock
 
 # ==========================================
+# CodeGraph
+# ==========================================
+# Local codegraph index (SQLite + runtime metadata); rebuilt by `codegraph init`
+.codegraph/
+
+# ==========================================
 # Misc
 # ==========================================
 tmp/
