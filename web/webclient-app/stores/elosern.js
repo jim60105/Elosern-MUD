@@ -700,6 +700,32 @@ export const useElosernStore = defineStore("elosern", () => {
         panelSig: null,
       };
     }
+    // Resolve a pending save's confirmation BEFORE the panel-signature
+    // refresh (the legacy dock's ordering): the just-saved draft's panel
+    // arrives with or right after the save result, so the refresh must open
+    // — and never clobber — the confirmation for the just-saved draft
+    // (fix-creation-finalization-safety D1): success opens the confirmation;
+    // rejection or error stays on the current view.
+    if (creation.pendingSaveRequestId !== null) {
+      const result = rs.lastActionResult || null;
+      const prevResult = prev ? prev.lastActionResult || null : null;
+      if (result && result !== prevResult && result.requestId === creation.pendingSaveRequestId) {
+        creation.pendingSaveRequestId = null;
+        if (result.outcome === "success") {
+          const kind = creation.pendingActivate || "preset";
+          // A successful preset save opens the confirmation from the preset
+          // list; a custom/concept save from the form.
+          openCreationConfirm(
+            kind,
+            creation.pendingActivateKey,
+            kind === "preset" ? "presets" : "custom",
+          );
+          return;
+        }
+        creation.pendingActivate = null;
+        creation.pendingActivateKey = null;
+      }
+    }
     const sig = creationPanelSignature(panel);
     if (creation.panelSig !== sig) {
       creation.panelSig = sig;
@@ -708,42 +734,15 @@ export const useElosernStore = defineStore("elosern", () => {
       if (draft && draft.mode === "preset") {
         openCreationConfirm("preset", draft.preset_key || null, "presets");
       } else if (draft && (draft.mode === "custom" || draft.mode === "concept")) {
-        creation.view = "custom";
-        router.reset({ items: [], focusKey: null });
-      } else {
+        if (creation.view !== "confirm") {
+          creation.view = "custom";
+          router.reset({ items: [], focusKey: null });
+        }
+      } else if (creation.view !== "confirm") {
         creation.view = "root";
         router.reset({ items: creation.menus.menus.root.items, focusKey: null });
       }
-      return;
     }
-    // A new action result for the pending save resolves the confirmation
-    // (fix-creation-finalization-safety D1): success opens the confirmation
-    // for the just-saved draft; rejection or error stays on the current view.
-    if (creation.pendingSaveRequestId === null) {
-      return;
-    }
-    const result = rs.lastActionResult || null;
-    const prevResult = prev ? prev.lastActionResult || null : null;
-    if (!result || result === prevResult) {
-      return;
-    }
-    if (result.requestId !== creation.pendingSaveRequestId) {
-      return;
-    }
-    creation.pendingSaveRequestId = null;
-    if (result.outcome === "success") {
-      const kind = creation.pendingActivate || "preset";
-      // A successful preset save opens the confirmation from the preset list; a
-      // custom/concept save from the form.
-      openCreationConfirm(
-        kind,
-        creation.pendingActivateKey,
-        kind === "preset" ? "presets" : "custom",
-      );
-      return;
-    }
-    creation.pendingActivate = null;
-    creation.pendingActivateKey = null;
   }
 
   function syncRouterGates() {
@@ -976,6 +975,14 @@ export const useElosernStore = defineStore("elosern", () => {
     inFlight = { requestId, presentationRevision: null };
     mutationSubmitted = true;
     lastSubmittedRequestId = requestId;
+    // A custom save tracks its request so the result resolution opens the
+    // confirmation for the just-saved draft (fix-creation-finalization-safety
+    // D1); the preset path records the same markers on router submit.
+    if (actionId === CreationMenu.CUSTOM_ACTION && creation) {
+      creation.pendingSaveRequestId = requestId;
+      creation.pendingActivate = "custom";
+      creation.pendingActivateKey = null;
+    }
     router.setMutationInFlight(true);
     try {
       if (sender && typeof sender.sendAction === "function") {

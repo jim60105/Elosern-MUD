@@ -310,27 +310,27 @@ class CustomCreationJourneys(CreationBrowserTest):
         page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
             "Tab must move focus from the name field to the age field",
         )
         page.keyboard.type("24")
         _press(page, "Tab")  # actual age -> apparent age
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-apparentAge",
             "Tab must move focus to the apparent age field",
         )
         page.keyboard.type("24")
         _press(page, "Shift+Tab")  # apparent age -> actual age
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
             "Shift+Tab must move focus back to the age field",
         )
         _press(page, "Tab")  # back to apparent age, values preserved
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-apparentAge",
         )
 
@@ -343,10 +343,13 @@ class CustomCreationJourneys(CreationBrowserTest):
             "beastfolk",
             "beastfolk race must be selected",
         )
-        # Select the foxkin subrace with keyboard arrows from the first
-        # beastfolk subrace (beastfolk has seven subraces; foxkin is the last,
-        # so six ArrowDown presses from the first reach it).
+        # Select the foxkin subrace with keyboard arrows. The select starts
+        # unselected (the form opens fresh, without a draft), so Home anchors
+        # the journey at the first beastfolk subrace; beastfolk has seven
+        # subraces, foxkin is the last, so six ArrowDown presses reach it.
+        # Anchoring with Home keeps the count independent of draft state.
         page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').focus()")
+        _press(page, "Home")
         for _ in range(6):
             _press(page, "ArrowDown")
         page.wait_for_timeout(150)
@@ -593,7 +596,7 @@ class ConceptCreationJourneys(CreationBrowserTest):
         page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
         self.assertEqual(
-            page.evaluate("document.activeElement.id"),
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
             "Tab must move focus from the name field to the age field",
         )

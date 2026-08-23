@@ -84,6 +84,30 @@ describe("CreationOverlay (B5 overlays family)", () => {
     });
   });
 
+  it("the custom payload always carries the exact eight keys (blank background and no affinity emit JSON-safe defaults)", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    const event = lastAction(wrapper, "creation.custom");
+    expect(event).not.toBeNull();
+    expect(Object.keys(event.payload).sort()).toEqual([
+      "affinity_elements",
+      "age",
+      "allocations",
+      "apparent_age",
+      "background",
+      "display_name",
+      "race",
+      "subrace",
+    ]);
+    expect(event.payload.background).toBeNull();
+    expect(event.payload.affinity_elements).toEqual([]);
+  });
+
   it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);

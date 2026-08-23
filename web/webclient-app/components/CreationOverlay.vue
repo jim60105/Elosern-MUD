@@ -249,6 +249,11 @@ function confirmCustom() {
     apparent_age: Number(apparentAge.value),
     race: race.value,
     subrace: subrace.value,
+    // The wire payload always carries the exact eight keys (the server
+    // revalidates the set); blank fields emit their JSON-safe defaults, the
+    // same convention as the legacy creation menu.
+    background: background.value.trim() !== "" ? background.value.trim() : null,
+    affinity_elements: [...affinitySelected.value],
     allocations: {
       hp: Number(allocations.hp),
       mp: Number(allocations.mp),
@@ -258,12 +263,6 @@ function confirmCustom() {
       defense: Number(allocations.defense),
     },
   };
-  if (affinityMax.value > 0) {
-    payload.affinity_elements = [...affinitySelected.value];
-  }
-  if (background.value.trim() !== "") {
-    payload.background = background.value;
-  }
   emit("action", { action_id: "creation.custom", payload });
 }
 
