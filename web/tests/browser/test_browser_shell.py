@@ -15,8 +15,7 @@ from .browser_helpers import (
 REQUIRED_SURFACES = (
     ".elosern-header",
     ".elosern-narrative",
-    ".elosern-status",
-    ".elosern-action-dock",
+    ".status-panel",
     ".elosern-drawer",
     "#action-dock",
     "#inputfield",
@@ -67,16 +66,16 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # art placeholder inside the art surface.
         placeholders = page.locator(".elosern-placeholder").all_inner_texts()
         self.assertEqual(len(placeholders), 0, "no foundation placeholder remains")
-        art_surface = page.locator(".elosern-art")
+        art_surface = page.locator(".art-panel")
         self.assertEqual(art_surface.count(), 1, "art surface present")
         self.assertTrue(art_surface.is_visible())
         # The minimap surface renders (or gracefully reports unavailable) and
         # is no longer a placeholder.
-        local_map_surface = page.locator(".elosern-local-map")
+        local_map_surface = page.locator(".local-map")
         self.assertEqual(local_map_surface.count(), 1, "local-map surface present")
         self.assertTrue(local_map_surface.is_visible())
 
-        resources = page.locator(".resource-value").all_inner_texts()
+        resources = page.locator(".status-gauge__value").all_inner_texts()
         self.assertEqual(len(resources), 3, "hp, mp, sp resource rows")
         for value in resources:
             current, maximum = value.split(" / ")
@@ -84,7 +83,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertTrue(maximum.isdigit(), f"maximum not numeric: {maximum!r}")
 
         # The mockup gauge bars complement the mandated numeric text.
-        bars = page.locator(".resource-bar").all_inner_texts()
+        bars = page.locator(".status-gauge__bar").all_inner_texts()
         self.assertEqual(len(bars), 3, "hp, mp, sp gauge bars")
 
         header_conn = page.locator(".header-conn").inner_text()
@@ -603,7 +602,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             cells = page.locator("#action-dock [data-item-key]")
             self.assertGreaterEqual(cells.count(), 5)
             self.assertLessEqual(cells.count(), 7)
-            focused = page.locator("#action-dock .dock-row.focused").first
+            focused = page.locator("#action-dock .dock-menu-item--focused").first
             self.assertEqual(
                 focused.evaluate(
                     "el => getComputedStyle(el).backgroundColor"

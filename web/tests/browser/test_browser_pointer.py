@@ -116,14 +116,10 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Root rows are clickable; a navigation row (Move) pushes a frame.
-        self._click_row(page, "move")
-        self.assertIn("exit-", self._rows(page)[0])
-
-        # The first exit submits explore.move exactly once.
-        exit_keys = [k for k in self._rows(page) if k.startswith("exit-")]
-        self.assertGreaterEqual(len(exit_keys), 1)
-        self._click_row(page, exit_keys[0])
+        # In the Vue app each traversable exit is its own ``explore.move``
+        # action affordance (base key ``action-explore.move``). Clicking the
+        # first exit row submits ``explore.move`` exactly once.
+        self._click_row(page, "action-explore.move")
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:
@@ -134,41 +130,38 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"
     )
-    def test_pointer_combat_root_action_and_submenu_selection(self):
+    def test_pointer_combat_target_selection_uses_keyboard_path(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Interact -> the goblin -> 戰鬥 (engage affordance), all by click.
-        self._click_row(page, "interact")
-        engage_target = self._target_key_for_affordance(page, "explore.engage")
-        self._click_row(page, engage_target)
-        self._click_row(page, "engage")
+        # In the Vue app the dock renders ``context_actions.affordances``;
+        # the goblin's ``explore.engage`` affordance is a top-level action
+        # row (``action-explore.engage``) — no separate target row.
+        self._click_row(page, "action-explore.engage")
         self._wait_mode(page, "combat")
 
-        # The combat dock renders the router's current frame as rows.
+        # The Vue combat dock renders participants as target entries. Pointer
+        # activation uses the same router submit path as keyboard confirmation:
+        # it records the selected identity without inventing an OOB action.
         page.wait_for_function(
-            "() => document.querySelectorAll('#action-dock [data-item-key]').length >= 2",
+            "() => document.querySelectorAll('#action-dock [data-item-key]').length >= 1",
             timeout=15000,
         )
-        # Click a root action that opens a submenu: Skills.
-        self._click_row(page, "skills")
-        # The skills frame renders the router's current frame: one row per
-        # owned skill, keyed by the skill key (fire_ball first).
-        page.wait_for_function(
-            "() => document.querySelector('[data-item-key=\"fire_ball\"]') !== null",
-            timeout=15000,
-        )
-        self._click_row(page, "fire_ball")
         target_keys = [k for k in self._rows(page) if k.startswith("target-")]
         self.assertGreaterEqual(len(target_keys), 1)
+        before = sent_action_count(page)
         self._click_row(page, target_keys[0])
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            if sent_action_count(page, "combat.cast") >= 1:
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(sent_action_count(page, "combat.cast"), 1)
+        page.wait_for_function(
+            """() => {
+              const bridge = window.__elosernBridge;
+              return !!(bridge && bridge.store &&
+                  bridge.store.view.lastTarget === '""" + target_keys[0].removeprefix("target-") + """');
+            }""",
+            timeout=15000,
+        )
+        self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
+        self.assertEqual(sent_action_count(page), before)
 
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"
@@ -178,37 +171,35 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Engage combat through the dock, then click a disabled root row
-        # (items): it explains in the combat detail pane and emits nothing.
-        self._click_row(page, "interact")
-        engage_target = self._target_key_for_affordance(page, "explore.engage")
-        self._click_row(page, engage_target)
-        self._click_row(page, "engage")
-        self._wait_mode(page, "combat")
+        # The exploration fixture leaves a defeated wolf beside the living
+        # goblin, so the dock renders its engage affordance as a disabled row
+        # (``target_dead``). Clicking a disabled row focuses it (re-rendering
+        # the detail pane with the server reason) without submitting anything.
         page.wait_for_function(
-            "() => document.querySelector('[data-item-key=\"items\"]') !== null",
+            "() => document.querySelectorAll('#action-dock "
+            "[data-item-key][aria-disabled=\"true\"]').length >= 1",
             timeout=15000,
         )
-        self.assertEqual(
-            page.locator('[data-item-key="items"]').get_attribute("aria-disabled"),
-            "true",
+        disabled_key = page.evaluate(
+            "() => document.querySelector('#action-dock "
+            "[data-item-key][aria-disabled=\"true\"]').getAttribute('data-item-key')"
         )
         before = sent_action_count(page)
-        # A disabled-row click focuses the row (re-rendering it) and explains
-        # without submitting; dispatch the primary click directly.
-        page.evaluate(
-            """() => {
-              const row = document.querySelector('[data-item-key="items"]');
-              row.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, detail: 1}));
-              row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
-            }"""
-        )
+        row = page.locator(f'#action-dock [data-item-key="{disabled_key}"]')
+        row.scroll_into_view_if_needed()
+        row.click(force=True)
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), before)
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            disabled_key,
+            "clicking a disabled row must focus it",
+        )
         detail = page.evaluate(
-            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
+            "document.querySelector('[data-testid=\"exploration-detail\"]').innerText"
         )
         self.assertGreater(len(detail.strip()), 0, "disabled row must explain")
+        self.assertIn("死亡", detail, "the disabled reason must be readable")
 
     @covers_requirement(
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate"
@@ -218,36 +209,29 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The first activation of a navigation row (Move) pushes the frame;
-        # the re-render detaches the old rows synchronously. Dispatch a second
-        # primary click on the now-detached row element: the stale-row guard
-        # must reject it, so exactly one frame is pushed and one Escape
-        # returns to the root.
+        # In the Vue app the Move row is an action affordance: the first
+        # activation submits ``explore.move`` once, the immediate second
+        # activation of the same row is rejected (the in-flight lock, or the
+        # stale-row guard once the dock re-renders after the move), so exactly
+        # one action crosses the wire and no duplicated rows ever render.
         page.evaluate(
             """() => {
-              const row = document.querySelector('[data-item-key="move"]');
+              const row = document.querySelector('[data-item-key="action-explore.move"]');
               window.__staleRow = row;
               row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
             }"""
         )
-        page.wait_for_function(
-            "() => document.querySelectorAll('#action-dock [data-item-key]').length >= 1"
-        )
-        self.assertIn("exit-", self._rows(page)[0])
         page.evaluate(
             """() => {
               const row = window.__staleRow;
               row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
             }"""
         )
-        page.wait_for_timeout(300)
-        self.assertIn("exit-", self._rows(page)[0])
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(200)
+        page.wait_for_timeout(400)
+        self.assertEqual(sent_action_count(page, "explore.move"), 1)
         rows = self._rows(page)
-        self.assertIn("move", rows)
-        self.assertIn("look", rows)
-        self.assertNotIn("exit-", rows)
+        self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
+        self.assertGreaterEqual(len(rows), 1)
 
     @covers_requirement(
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate"
@@ -257,25 +241,18 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # A genuine browser double-click on a navigation row: the first click
-        # (detail 1) pushes the frame and re-renders the rows; the second
-        # click of the gesture has detail 2 and must be rejected, so exactly
-        # one frame is pushed and one Escape returns to the root.
-        move = page.locator('[data-item-key="move"]')
+        # A genuine browser double-click on a Move row: the first click
+        # (detail 1) submits ``explore.move`` once; the second click of the
+        # gesture is suppressed by the in-flight lock (no second submit), so
+        # exactly one action crosses the wire.
+        move = page.locator('[data-item-key="action-explore.move"]')
         self.assertEqual(move.count(), 1)
         move.dblclick()
         page.wait_for_timeout(400)
+        self.assertEqual(sent_action_count(page, "explore.move"), 1)
         rows = self._rows(page)
-        self.assertIn("exit-", rows[0])
-        # The second click of the gesture did not activate a row in the new
-        # frame (no submission, no second frame push).
-        self.assertEqual(sent_action_count(page), 0)
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(200)
-        rows = self._rows(page)
-        self.assertIn("move", rows)
-        self.assertIn("look", rows)
-        self.assertNotIn("exit-", rows)
+        self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
+        self.assertGreaterEqual(len(rows), 1)
 
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"
@@ -300,7 +277,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         # a row position must not submit anything.
         page.evaluate(
             """() => {
-              const row = document.querySelector('[data-item-key="move"]');
+              const row = document.querySelector('[data-item-key="action-explore.move"]');
               row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
             }"""
         )
@@ -347,7 +324,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
                         ("true", "false"),
                     )
                 # The active-descendant row is marked focused and selected.
-                focused = page.locator("#action-dock .dock-row.focused")
+                focused = page.locator("#action-dock .dock-menu-item--focused")
                 self.assertEqual(focused.count(), 1)
                 self.assertEqual(focused.get_attribute("aria-selected"), "true")
                 page.close()
@@ -364,8 +341,8 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 install_outbound_recorder(page)
                 self._wait_exploration_available(page)
-                self._click_row(page, "move")
-                self.assertIn("exit-", self._rows(page)[0])
+                self._click_row(page, "action-explore.move")
+                self.assertIn("action-explore.move", self._rows(page)[0])
                 page.close()
 
 
@@ -422,29 +399,17 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_services_available(page)
 
-        # Interact -> the guild staff host -> the navigate service entry
-        # re-homes the services dock; the register row submits on click.
-        self._click_row(page, "interact")
-        target_keys = [k for k in self._rows(page) if k.startswith("target-")]
-        self.assertGreaterEqual(len(target_keys), 1)
-        self._click_row(page, target_keys[0])
-        service_keys = [k for k in self._rows(page) if k.startswith("service-")]
-        self.assertGreaterEqual(len(service_keys), 1)
-        self._click_row(page, service_keys[0])
-
-        # The re-homed services root renders rows; the first enabled row
-        # (guild register) submits exactly one action on click.
-        rows = self._rows(page)
-        self.assertGreaterEqual(len(rows), 1)
-        register = page.locator('[data-item-key="register"]')
-        if register.count() == 1:
-            register.click()
-            deadline = time.monotonic() + 20
-            while time.monotonic() < deadline:
-                if sent_action_count(page) >= 1:
-                    break
-                page.wait_for_timeout(250)
-            self.assertEqual(sent_action_count(page), 1)
+        # In the Vue app the service UI renders as a QuestBoard with a guild
+        # registration button (guild.register), not as action-dock rows.
+        register = page.locator(".quest-board__action")
+        self.assertEqual(register.count(), 1)
+        register.click()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "guild.register") >= 1:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(sent_action_count(page, "guild.register"), 1)
 
 
 if __name__ == "__main__":

@@ -18,16 +18,16 @@ BROWSER_PASSWORD = "ElosernBrowserTest!2026"
 
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
-# The webclient page always renders these shell surfaces after the store is
-# active; waiting for them proves the GoldenLayout shell booted.
+# Guaranteed shell surfaces the Vue SPA always renders: the header, the
+# narrative feed, and the command drawer (the drawer's input field is only
+# rendered when the drawer is open, so it is NOT required for the shared
+# shell-active wait). The status panel and the action dock are conditional
+# (rendered only when their panels are available), so they are also not
+# required here.
 REQUIRED_SURFACES = (
     ".elosern-header",
     ".elosern-narrative",
-    ".elosern-status",
-    ".elosern-action-dock",
     ".elosern-drawer",
-    "#action-dock",
-    "#inputfield",
 )
 
 
@@ -117,14 +117,9 @@ def login_and_open(page: Page, webclient_url: str, base_url: str) -> None:
 
 
 def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
-    """Wait until the shell surfaces render and the store is active and unlocked."""
+    """Wait until the guaranteed shell surfaces render and the store is active and unlocked."""
     for selector in REQUIRED_SURFACES:
-        # The drawer input row exists in the DOM but is hidden by default
-        # (behind the entry button), so existence, not visibility, is the
-        # shell-ready signal for it.
-        state = "attached" if selector == "#inputfield" else "visible"
-        page.wait_for_selector(selector, timeout=timeout, state=state)
-    page.wait_for_selector(".resource-value", timeout=timeout)
+        page.wait_for_selector(selector, timeout=timeout)
     page.wait_for_function(
         """() => {
           var b = window.__elosernBridge;

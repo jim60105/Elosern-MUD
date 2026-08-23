@@ -131,7 +131,7 @@
       "name": "pointer",
       "files_a": [
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_combat_root_action_and_submenu_selection",
+        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_combat_target_selection_uses_keyboard_path",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_disabled_row_explains_without_submitting",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame"
       ],
@@ -204,7 +204,7 @@
       "name": "vue-foundation",
       "files_a": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_legacy_default_stays_when_flag_is_absent",
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_default_loads_when_flag_is_absent",
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_storybook_stories_render_offline"
       ],
       "files_b": [
@@ -223,7 +223,8 @@
       ],
       "files_b": [
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text",
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_stays_legacy"
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_is_vue",
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_reduced_motion_and_status_not_color_only"
       ]
     }
   ]

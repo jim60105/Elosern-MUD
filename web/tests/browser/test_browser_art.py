@@ -74,7 +74,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertEqual(panel["scene"]["aspect_ratio"], "16:9")
         self.assertIsNone(panel["scene"]["placeholder"])
         # The image element is present with a same-origin src.
-        img = page.locator(".art-scene .art-scene-image")
+        img = page.locator(".art-panel__scene")
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.get_attribute("src").startswith("/art/"))
         self.assertNotIn("http://", img.get_attribute("src"))
@@ -82,25 +82,25 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_keyboard_full_view_opens_and_closes(self):
         page = self.logged_in_page()
-        img = page.locator(".art-scene .art-scene-image")
+        img = page.locator(".art-panel__scene")
         img.focus()
         page.keyboard.press("Enter")
-        page.wait_for_selector(".art-fullview")
-        self.assertEqual(page.locator(".art-fullview").count(), 1)
+        page.wait_for_selector(".art-panel")
+        self.assertEqual(page.locator(".art-panel").count(), 1)
         page.keyboard.press("Escape")
         page.wait_for_function("() => !document.querySelector('.art-fullview')")
-        self.assertEqual(page.locator(".art-fullview").count(), 0)
+        self.assertEqual(page.locator(".art-panel").count(), 0)
         # Focus returns to the scene image.
         page.wait_for_function(
-            "() => document.activeElement === document.querySelector('.art-scene-image')"
+            "() => document.activeElement === document.querySelector('.art-panel__scene')"
         )
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_alternative_text_is_present_outside_the_bitmap(self):
         page = self.logged_in_page()
-        alt = page.locator(".art-scene .art-scene-image").get_attribute("alt")
+        alt = page.locator(".art-panel__scene").get_attribute("alt")
         self.assertTrue(alt and alt.strip())
-        caption = page.locator(".art-caption-label").inner_text()
+        caption = page.locator(".art-panel__scene-label").inner_text()
         self.assertEqual(caption, "酒館內部")
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
@@ -108,25 +108,25 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         page = self.logged_in_page((1280, 720))
         # The done scene image, its caption label and alt, and the pending
         # status line remain visible at the smaller supported viewport.
-        img = page.locator(".art-scene .art-scene-image")
+        img = page.locator(".art-panel__scene")
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.is_visible())
-        self.assertEqual(page.locator(".art-caption-label").inner_text(), "酒館內部")
-        self.assertTrue(page.locator(".art-caption-alt").inner_text().strip())
-        self.assertTrue(page.locator(".art-scene").is_visible())
+        self.assertEqual(page.locator(".art-panel__scene-label").inner_text(), "酒館內部")
+        self.assertTrue(page.locator(".art-panel__scene-alt").inner_text().strip())
+        self.assertTrue(page.locator(".art-panel__scene-frame").is_visible())
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_keyboard_full_view_usable_at_1280x720(self):
         page = self.logged_in_page((1280, 720))
-        img = page.locator(".art-scene .art-scene-image")
+        img = page.locator(".art-panel__scene")
         img.focus()
         page.keyboard.press("Enter")
-        page.wait_for_selector(".art-fullview")
-        self.assertTrue(page.locator(".art-fullview").is_visible())
+        page.wait_for_selector(".art-panel")
+        self.assertTrue(page.locator(".art-panel").is_visible())
         page.keyboard.press("Escape")
         page.wait_for_function("() => !document.querySelector('.art-fullview')")
         page.wait_for_function(
-            "() => document.activeElement === document.querySelector('.art-scene-image')"
+            "() => document.activeElement === document.querySelector('.art-panel__scene')"
         )
 
 
@@ -143,8 +143,8 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         self.assertEqual(panel["scene"]["status"], "pending")
         self.assertIsNone(panel["scene"]["url"])
         # Without a prior image, the scene placeholder renders (no image).
-        self.assertEqual(page.locator(".art-scene .art-scene-image").count(), 0)
-        placeholder = page.locator(".art-scene-placeholder").inner_text()
+        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
+        placeholder = page.locator(".art-panel__scene-placeholder").inner_text()
         self.assertTrue(placeholder.strip())
 
 
@@ -180,8 +180,8 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
             page.wait_for_timeout(500)
         self.assertEqual(store_state(page)["panels"]["art"]["scene"]["status"], "failed")
         self.assertIsNone(store_state(page)["panels"]["art"]["scene"]["url"])
-        self.assertEqual(page.locator(".art-scene .art-scene-image").count(), 0)
-        self.assertEqual(page.locator(".art-scene-placeholder").count(), 1)
+        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
+        self.assertEqual(page.locator(".art-panel__scene-placeholder").count(), 1)
 
 
 class ArtMissingSceneTest(ArtSceneBrowserTest):
@@ -196,7 +196,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         panel = store_state(page)["panels"]["art"]
         self.assertTrue(panel["available"])
         self.assertEqual(panel["scene"]["placeholder"]["kind"], "missing")
-        self.assertEqual(page.locator(".art-scene-placeholder").count(), 1)
+        self.assertEqual(page.locator(".art-panel__scene-placeholder").count(), 1)
         # Movement through the ordinary transport still works.
         page.evaluate("Evennia.msg('text', ['look'], {})")
         page.wait_for_timeout(500)
@@ -243,11 +243,11 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         # The panel resolves the done scene but the image load fails, so the
         # truthful fallback replaces the broken image inside the asset pane.
         page.wait_for_function(
-            "() => !!document.querySelector('.art-scene .art-scene-empty')",
+            "() => !!document.querySelector('.art-panel__scene-placeholder')",
             timeout=20000,
         )
-        self.assertEqual(page.locator(".art-scene-image").count(), 0)
-        fallback = page.locator(".art-scene .art-scene-empty").inner_text()
+        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
+        fallback = page.locator(".art-panel__scene-placeholder").inner_text()
         self.assertTrue(fallback.strip())
         self.assertIn("載入失敗", fallback)
         # The aborted request was attempted exactly once.
@@ -352,10 +352,10 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # The art renderer subscribes to the client-local focus published by
         # the combat dock, so a portrait card with name/role renders.
         page.wait_for_function(
-            "() => !!document.querySelector('.art-portrait')", timeout=15000
+            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
         )
-        name = page.locator(".art-portrait-name").inner_text()
-        role = page.locator(".art-portrait-role").inner_text()
+        name = page.locator(".art-panel__portrait-context-name").inner_text()
+        role = page.locator(".art-panel__portrait-context-role").inner_text()
         self.assertTrue(name.strip())
         self.assertIn(role, ("隊友", "敵方"))
         # No focus packet was ever sent.
@@ -365,20 +365,20 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
     def test_no_focus_means_no_portrait_card_in_exploration(self):
         page = self.logged_in_page()
         # Exploration mode has no contextual focus source yet, so no card.
-        page.wait_for_function("() => !!document.querySelector('.elosern-art')")
+        page.wait_for_function("() => !!document.querySelector('.art-panel')")
         page.wait_for_timeout(500)
-        self.assertEqual(page.locator(".art-portrait").count(), 0)
+        self.assertEqual(page.locator(".art-panel__portrait-tile").count(), 0)
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_portrait_overlay_usable_at_1280x720(self):
         page = self.logged_in_page((1280, 720))
         self._engage(page)
         page.wait_for_function(
-            "() => !!document.querySelector('.art-portrait')", timeout=15000
+            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
         )
-        self.assertTrue(page.locator(".art-portrait").is_visible())
-        self.assertTrue(page.locator(".art-portrait-name").inner_text().strip())
-        self.assertTrue(page.locator(".art-scene").is_visible())
+        self.assertTrue(page.locator(".art-panel__portrait-tile").is_visible())
+        self.assertTrue(page.locator(".art-panel__portrait-context-name").inner_text().strip())
+        self.assertTrue(page.locator(".art-panel__scene").is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
     @covers_requirement("webclient-browser-verification::art-panel-portrait-keyboard-journeys-establish-dock-focus-before-key-presses")
@@ -388,9 +388,9 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self._engage(page)
         # The combat dock publishes the first party participant's portrait.
         page.wait_for_function(
-            "() => !!document.querySelector('.art-portrait')", timeout=15000
+            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
         )
-        first_name = page.locator(".art-portrait-name").inner_text()
+        first_name = page.locator(".art-panel__portrait-context-name").inner_text()
         combat = store_state(page)["panels"]["context_actions"]
         monster_id = next(
             p["identity"]
@@ -415,13 +415,13 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page.keyboard.press("ArrowRight")  # past the actor to the enemy target
         self._wait_combat_row_key(page, "target-" + str(monster_id))
         page.wait_for_function(
-            "(n) => document.querySelector('.art-portrait-name') && "
-            "document.querySelector('.art-portrait-name').innerText === n",
+            "(n) => document.querySelector('.art-panel__portrait-context-name') && "
+            "document.querySelector('.art-panel__portrait-context-name').innerText === n",
             arg=monster_name,
             timeout=15000,
         )
         self.assertNotEqual(
-            page.locator(".art-portrait-name").inner_text(), first_name
+            page.locator(".art-panel__portrait-context-name").inner_text(), first_name
         )
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)

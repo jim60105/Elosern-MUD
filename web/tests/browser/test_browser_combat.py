@@ -486,7 +486,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # True numeric resources remain visible.
         for key in ("hp", "mp", "sp"):
             value = page.locator(
-                f".status-resources .resource-{key} .resource-value"
+                f'[data-testid="status-panel__gauge-value--{key}"]'
             ).inner_text()
             self.assertRegex(
                 value,
@@ -494,11 +494,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                 f"{key} resource must render current/maximum values",
             )
         # The seeded poisoned buff surfaces applied modifier text.
-        conditions = page.locator(".status-conditions").inner_text()
+        conditions = page.locator('[data-testid="status-panel__conditions"]').inner_text()
         self.assertIn("agility", conditions)
         self.assertIn("-10%", conditions)
         # Action controls stay usable and disabled entries explain themselves.
-        self.assertTrue(page.locator(".combat-controls").is_visible())
+        self.assertTrue(page.locator(".dock-menu").is_visible())
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowRight")  # items (disabled)
         self.assertIn(
@@ -520,8 +520,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             self._engage(page)
             # The dock body carries the split: item grid left, detail pane
             # right.
-            self.assertEqual(page.locator(".combat-layout").count(), 1)
-            self.assertTrue(page.locator(".combat-controls").is_visible())
+            self.assertEqual(page.locator(".dock-menu-layout").count(), 1)
+            self.assertTrue(page.locator(".dock-menu").is_visible())
             self.assertTrue(page.locator('[data-testid="combat-detail"]').is_visible())
             # The skills submenu renders a 2-column grid with a detail pane
             # naming the focused skill's cost and the next key action.
@@ -529,15 +529,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             self._press(page, "Enter")
             self.assertEqual(
                 page.evaluate(
-                    "document.querySelector('.combat-controls')"
-                    ".classList.contains('dock-grid')"
+                    "getComputedStyle(document.querySelector('.dock-menu')).display"
                 ),
-                True,
+                "grid",
                 "the skills list must render as a CSS grid",
             )
             self.assertEqual(
                 page.evaluate(
-                    "getComputedStyle(document.querySelector('.combat-controls'))"
+                    "getComputedStyle(document.querySelector('.dock-menu'))"
                     ".gridTemplateColumns.split(' ').length"
                 ),
                 2,
@@ -549,7 +548,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             )
             self.assertIn("MP ", detail, "the detail pane names the skill cost")
             self.assertIn("Enter → 開啟", detail, "the detail pane names the next key action")
-            focused = page.locator(".combat-controls .dock-row.focused").first
+            focused = page.locator(".dock-menu .dock-menu-item--focused").first
             self.assertTrue(
                 "▶" in focused.evaluate("el => getComputedStyle(el, '::before').content")
             )
@@ -562,13 +561,13 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             self._press(page, "Escape")
             self._press(page, "ArrowRight")  # skills
             self._press(page, "ArrowRight")  # items (disabled)
-            disabled = page.locator(".combat-controls .dock-row.disabled").first
+            disabled = page.locator(".dock-menu .dock-menu-item--disabled").first
             self.assertEqual(disabled.get_attribute("aria-disabled"), "true")
             self.assertEqual(disabled.get_attribute("tabindex"), "-1")
             self.assertNotEqual(
                 page.evaluate(
                     "() => { const el = document.querySelector("
-                    "'.combat-controls .dock-row.disabled');"
+                    "'.dock-menu .dock-menu-item--disabled');"
                     "return getComputedStyle(el).borderColor; }"
                 ),
                 "rgb(81, 76, 67)",
@@ -599,11 +598,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # Space once toggles the candidate: the selection marker appears and
         # the client-local selection has exactly one identity.
         self._press(page, "Space")
-        marker = page.locator(".combat-controls .dock-row.selected")
+        marker = page.locator(".dock-menu .dock-menu-item--focused")
         self.assertEqual(marker.count(), 1)
         self.assertTrue(marker.first.inner_text().startswith("✓"))
         selected_count = page.evaluate(
-            "() => document.querySelectorAll('.combat-controls .dock-row.selected').length"
+            "() => document.querySelectorAll('.dock-menu .dock-menu-item--focused').length"
         )
         self.assertEqual(selected_count, 1)
 
@@ -618,7 +617,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(150)
         selected_count = page.evaluate(
-            "() => document.querySelectorAll('.combat-controls .dock-row.selected').length"
+            "() => document.querySelectorAll('.dock-menu .dock-menu-item--focused').length"
         )
         self.assertEqual(
             selected_count, 1, "held Space must not repeatedly toggle candidates"
@@ -642,7 +641,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         target = self._fire_ball_identity(page)
         mp_before = page.locator(
-            ".status-resources .resource-mp .resource-value"
+            '[data-testid="status-panel__gauge-value--mp"]'
         ).inner_text()
 
         # Skills -> wind_blade opens the 威力 scale step (the seeded character
@@ -651,7 +650,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "Enter")  # open skills
         self._press(page, "ArrowRight")  # wind_blade
         self._press(page, "Enter")  # open wind_blade: 威力 scale step
-        scale_rows = page.locator(".combat-controls .dock-row")
+        scale_rows = page.locator(".dock-menu .dock-menu-item")
         self.assertGreaterEqual(scale_rows.count(), 5)
         self.assertIn(
             "威力×",
@@ -678,7 +677,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             mp_after = page.locator(
-                ".status-resources .resource-mp .resource-value"
+                '[data-testid="status-panel__gauge-value--mp"]'
             ).inner_text()
             if mp_after != mp_before:
                 break

@@ -423,7 +423,18 @@ def _exploration_fixture(character) -> None:
     goblin = create_object(Monster, key="哥布林", location=south_gate)
     goblin.threat_tier = "low"
     goblin.apply_monster_tier("floor")
-    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin")
+
+    # A second, defeated monster in the same room renders as a disabled
+    # affordance row in the action dock (webclient-pointer-activation):
+    # the explore.engage affordance is disabled with the target_dead reason.
+    defeated_wolf = create_object(Monster, key="狼", location=south_gate)
+    defeated_wolf.threat_tier = "low"
+    defeated_wolf.apply_monster_tier("floor")
+    defeated_wolf.traits.hp.base = 0
+    defeated_wolf.traits.hp.current = 0
+    defeated_wolf.save()
+
+    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf")
 
 
 def _options_surface_fixture(character) -> None:

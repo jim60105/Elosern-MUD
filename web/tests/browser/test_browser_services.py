@@ -165,11 +165,11 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         page = self.logged_in_page((1280, 720))
         panel = self._wait_services_available(page)
         self._open_guild_menu(page)
-        controls = page.locator(".dock-row")
+        controls = page.locator(".dock-menu-item")
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
-        heading = page.locator(".services-heading")
+        heading = page.locator(".quest-board__title")
         self.assertTrue(heading.is_visible())
 
 
@@ -428,7 +428,7 @@ class ShopJourneys(ServicesBrowserTest):
         inventory_menu = page.evaluate(
             """() => {
               const controls = Array.from(
-                document.querySelectorAll('.dock-row')
+                document.querySelectorAll('.dock-menu-item')
               );
               return controls.map((el) => el.getAttribute('data-item-key'));
             }"""
@@ -442,7 +442,7 @@ class ShopJourneys(ServicesBrowserTest):
         # control is a bounded submenu/action row, never a dbref or a host
         # identity, and no submitted payload carries a host/branch/actor field.
         control_keys = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.dock-row'))
+            """() => Array.from(document.querySelectorAll('.dock-menu-item'))
               .map((el) => el.getAttribute('data-item-key'))"""
         )
         host_like = [k for k in control_keys if k and "#" in k or (k and k.isdigit())]
@@ -576,7 +576,7 @@ class ShopClosedJourneys(ServicesBrowserTest):
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page), 0)
         stock = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.dock-row'))
+            """() => Array.from(document.querySelectorAll('.dock-menu-item'))
               .map((el) => ({ key: el.getAttribute('data-item-key'),
                               disabled: el.getAttribute('aria-disabled') === 'true' }))"""
         )

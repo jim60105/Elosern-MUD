@@ -74,17 +74,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(panel["current_node"].startswith("grid:capital_altoria:"))
 
         # The surface renders legend text as text nodes and a current node.
-        page.wait_for_selector(".elosern-local-map .local-map-title")
-        legend_text = page.locator(".local-map-legend").inner_text()
+        page.wait_for_selector("[data-testid='local-map__title']")
+        legend_text = page.locator(".local-map__legend").inner_text()
         self.assertIn("你目前所在的位置", legend_text)
 
         # The seeded knowledge includes wilderness, interior, and instance
         # visits, so the grid layer carries remembered grid-adjacent nodes and
         # the current node is distinguishable by non-color indicators.
-        current = page.locator(".local-map-node.node-current")
+        current = page.locator(".local-map__node.local-map__node--current")
         self.assertEqual(current.count(), 1)
-        self.assertIn("node-shape-circle", current.get_attribute("class"))
-        self.assertIn("node-border-double", current.get_attribute("class"))
+        self.assertIn("local-map__node--current", current.get_attribute("class"))
+        self.assertTrue(current.locator(".local-map__marker--current").count() == 1)
         self.assertTrue(current.is_visible())
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
@@ -93,7 +93,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self._wait_local_map_available(page)
         # The seeded fixture recorded 北門 (2,4), which is outside the visual
         # range from 南門, so the grid layer carries a remembered remote node.
-        remembered = page.locator(".local-map-node.node-remembered")
+        remembered = page.locator(".local-map__node.local-map__node--remembered")
         self.assertGreaterEqual(remembered.count(), 1)
         remembered.first.click()
         page.wait_for_function(
@@ -111,12 +111,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         panel = self._wait_local_map_available(page)
         presented = {node["id"] for node in panel["nodes"]}
-        node_count = page.locator(".local-map-node").count()
+        node_count = page.locator(".local-map__node").count()
         self.assertLessEqual(node_count, len(presented))
         # Every rendered node corresponds to a presented node id.
         for index in range(node_count):
             node_id = page.evaluate(
-                "(i) => document.querySelectorAll('.local-map-node')[i].dataset.nodeId",
+                "(i) => document.querySelectorAll('.local-map__node')[i].dataset.nodeId",
                 index,
             )
             self.assertIn(node_id, presented)
@@ -158,23 +158,23 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
-                page.wait_for_selector(".local-map-canvas")
+                page.wait_for_selector(".local-map__lattice")
 
                 # Every node marker's bounding box is inside the map canvas.
                 # (Remembered remote nodes render in the bounded list below
                 # the canvas and are excluded here.)
-                canvas_box = page.locator(".local-map-canvas").bounding_box()
+                canvas_box = page.locator(".local-map__lattice").bounding_box()
                 canvas_nodes = page.locator(
-                    ".local-map-canvas .local-map-node"
+                    ".local-map__lattice .local-map__node"
                 )
                 node_count = canvas_nodes.count()
                 self.assertGreaterEqual(node_count, 1)
                 for index in range(node_count):
                     inside = page.evaluate(
                         """(i) => {
-                          const canvas = document.querySelector('.local-map-canvas');
+                          const canvas = document.querySelector('.local-map__lattice');
                           const node = document.querySelectorAll(
-                            '.local-map-canvas .local-map-node')[i];
+                            '.local-map__lattice .local-map__node')[i];
                           const cr = canvas.getBoundingClientRect();
                           const nr = node.getBoundingClientRect();
                           return nr.left >= cr.left - 1 && nr.right <= cr.right + 1 &&
@@ -194,7 +194,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     box = page.evaluate(
                         """(i) => {
                           const r = document.querySelectorAll(
-                            '.local-map-canvas .local-map-node')[i]
+                            '.local-map__lattice .local-map__node')[i]
                             .getBoundingClientRect();
                           return {left: r.left, top: r.top, right: r.right, bottom: r.bottom};
                         }""",
@@ -214,7 +214,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                         )
 
                 # The legend and detail line remain visible below the canvas.
-                self.assertTrue(page.locator(".local-map-legend").is_visible())
+                self.assertTrue(page.locator(".local-map__legend").is_visible())
                 detail = page.locator('[data-testid="local-map-detail"]')
                 self.assertTrue(detail.is_visible())
                 page.close()
@@ -229,7 +229,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
         install_outbound_recorder(page)
         self._wait_local_map_available(page)
-        action_ready = page.locator(".local-map-node.node-action-ready")
+        action_ready = page.locator(".local-map__actionable")
         self.assertGreaterEqual(action_ready.count(), 1)
         action_ready.first.click()
         deadline = time.monotonic() + 20
@@ -258,8 +258,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self._wait_local_map_available(page)
                 for selector in (
                     ".elosern-narrative",
-                    ".elosern-status",
-                    ".elosern-local-map",
+                    ".status-panel",
+                    ".local-map",
                 ):
                     self.assertTrue(
                         page.locator(selector).is_visible(),
