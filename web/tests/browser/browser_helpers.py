@@ -23,11 +23,15 @@ _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 # rendered when the drawer is open, so it is NOT required for the shared
 # shell-active wait). The status panel and the action dock are conditional
 # (rendered only when their panels are available), so they are also not
-# required here.
+# required here. The narrative feed and command drawer are addressed through
+# the Vue SPA's stable `data-testid` hooks (the legacy `.elosern-narrative`
+# / `.elosern-drawer` class hooks are preserved by the Vue app, but the
+# `data-testid` hooks are the stable contract); the header still renders under
+# its legacy `.elosern-header` class.
 REQUIRED_SURFACES = (
     ".elosern-header",
-    ".elosern-narrative",
-    ".elosern-drawer",
+    '[data-testid="narrative-feed"]',
+    '[data-testid="command-drawer"]',
 )
 
 
@@ -118,16 +122,29 @@ def login_and_open(page: Page, webclient_url: str, base_url: str) -> None:
 
 def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
     """Wait until the guaranteed shell surfaces render and the store is active and unlocked."""
-    for selector in REQUIRED_SURFACES:
-        page.wait_for_selector(selector, timeout=timeout)
-    page.wait_for_function(
-        """() => {
-          var b = window.__elosernBridge;
-          if (!b || !b.store) { return false; }
-          var s = b.store.view;
-          return s && s.connected && s.phase === 'active' &&
-                 !!s.epoch && !s.mutationsLocked && s.mode;
-        }""",
+
+    def _shell_active(state: dict) -> bool:
+        return (
+            bool(state.get("connected"))
+            and state.get("phase") == "active"
+            and bool(state.get("epoch"))
+            and state.get("mutationsLocked") is not True
+            and bool(state.get("mode"))
+        )
+
+    surfaces_js = ", ".join(repr(s) for s in REQUIRED_SURFACES)
+    wait_for_store_state(
+        page,
+        _shell_active,
+        dom_readiness={
+            "selector": REQUIRED_SURFACES[0],
+            "predicate": (
+                "() => { const sels = [" + surfaces_js + "]; "
+                "for (const sel of sels) { if (!document.querySelector(sel)) { return false; } } "
+                "return true; }"
+            ),
+            "description": "guaranteed shell surfaces rendered",
+        },
         timeout=timeout,
     )
 
@@ -140,28 +157,76 @@ def store_state(page: Page) -> dict:
 
 
 def focus_action_dock(page: Page, timeout: int = 60000) -> None:
-    """Robustly focus the ``#action-dock`` element.
+    """Robustly focus the ``#action-dock`` element, gated on deterministic state.
 
     The action dock is a conditional surface (rendered only when its backing
     ``context_actions`` panel or ``suggestions`` envelope is available), so a
     raw ``document.getElementById('action-dock').focus()`` raises
     ``TypeError: Cannot read properties of null (reading 'focus')`` in a loaded
-    CI runner where the dock has not mounted yet. This helper waits for the
-    DOM element to become visible, then focuses it via Playwright's auto-waiting
-    locator. On timeout it raises a diagnosable ``AssertionError`` carrying the
-    current store state so a missing dock is not mistaken for a plain locator
-    timeout.
+    CI runner where the dock has not mounted yet. This helper gates on the
+    committed store state (the dock render condition) and the dock's DOM
+    readiness in one bounded loop, then focuses it via Playwright's auto-waiting
+    locator and verifies ``document.activeElement`` is the dock or a focusable
+    descendant, so a swallowed focus fails with a precise diagnostic.
     """
-    dock = page.locator("#action-dock")
-    try:
-        dock.wait_for(state="visible", timeout=timeout)
-    except Error as exc:
-        state = store_state_or_none(page)
+
+    def _dock_ready(state: dict) -> bool:
+        if not state.get("connected"):
+            return False
+        if state.get("suggestions"):
+            return True
+        panels = state.get("panels") or {}
+        ca = panels.get("context_actions") or {}
+        if ca.get("available"):
+            kind = ca.get("kind")
+            if kind == "exploration":
+                return len(ca.get("affordances") or []) > 0
+            if kind == "combat":
+                menu = state.get("combatMenu") or {}
+                return len(menu.get("items") or []) > 0
+        if state.get("mode") == "creation":
+            creation = panels.get("creation") or {}
+            if creation.get("available"):
+                return True
+        return False
+
+    deadline = time.monotonic() + timeout / 1000
+    wait_for_store_state(
+        page,
+        _dock_ready,
+        dom_readiness={
+            "selector": "#action-dock",
+            "predicate": (
+                "() => { const d = document.querySelector('#action-dock'); "
+                "if (!d) { return false; } "
+                "const r = d.getBoundingClientRect(); "
+                "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+            ),
+            "description": "#action-dock visible + focusable",
+        },
+        timeout=timeout,
+    )
+    remaining_ms = int((deadline - time.monotonic()) * 1000)
+    if remaining_ms <= 0:
+        raise AssertionError("#action-dock focus: no deadline budget remains after the store-state gate")
+    page.locator("#action-dock").focus(timeout=remaining_ms)
+    landed = page.evaluate(
+        """() => {
+          const dock = document.querySelector('#action-dock');
+          const active = document.activeElement;
+          if (!dock || !active) { return false; }
+          return dock === active || dock.contains(active);
+        }"""
+    )
+    if not landed:
+        active = page.evaluate(
+            "() => { const a = document.activeElement; "
+            "return a ? (a.id || a.className || a.tagName || 'unknown') : null; }"
+        )
         raise AssertionError(
-            "#action-dock never became visible within %dms; store=%r"
-            % (timeout, state)
-        ) from exc
-    dock.focus()
+            "focus did not land on #action-dock or a focusable descendant; activeElement=%r"
+            % active
+        )
 
 
 def focus_creation_action_dock(page: Page, timeout: int = 30000) -> None:
@@ -204,7 +269,27 @@ def focus_creation_action_dock(page: Page, timeout: int = 30000) -> None:
             and dock["mode"] == "creation"
             and dock["visible"]
         ):
-            page.locator("#action-dock").focus()
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                raise AssertionError("creation dock focus: no deadline budget remains after the store-state gate")
+            page.locator("#action-dock").focus(timeout=remaining_ms)
+            landed = page.evaluate(
+                """() => {
+                  const dock = document.querySelector('#action-dock');
+                  const active = document.activeElement;
+                  if (!dock || !active) { return false; }
+                  return dock === active || dock.contains(active);
+                }"""
+            )
+            if not landed:
+                active = page.evaluate(
+                    "() => { const a = document.activeElement; "
+                    "return a ? (a.id || a.className || a.tagName || 'unknown') : null; }"
+                )
+                raise AssertionError(
+                    "creation dock focus did not land on #action-dock or a focusable descendant; activeElement=%r"
+                    % active
+                )
             return
         page.wait_for_timeout(250)
     raise AssertionError(
@@ -262,6 +347,98 @@ def store_state_or_none(page: Page) -> dict | None:
         "() => window.__elosernBridge && window.__elosernBridge.store "
         "? window.__elosernBridge.store.view : null",
     )
+
+
+def wait_for_store_state(
+    page: Page,
+    predicate,
+    dom_readiness: dict | None = None,
+    timeout: int = 30000,
+    interval_ms: int = 250,
+) -> None:
+    """Gate a test wait on deterministic store state within a single bounded deadline.
+
+    Polls the committed store view via ``store_state_or_none`` (tolerating a
+    one-shot recovery reload / in-flight navigation) and, when a
+    ``dom_readiness`` descriptor is provided, also polls the surface DOM in the
+    SAME loop under the SAME monotonic deadline.
+
+    ``dom_readiness`` is a structured descriptor ``{"selector", "predicate",
+    "description"}``. Its ``predicate`` is a JavaScript arrow function returning
+    a truthiness result; the helper evaluates it in the polling loop. A ``None``
+    store read (mid-reload) is treated as "not ready yet" and the store
+    ``predicate`` is not invoked on ``None``. A DOM ``page.evaluate`` that races
+    an in-flight navigation is routed through the same navigation-tolerating
+    path as the store read: a recoverable "execution context was destroyed"
+    error is recorded as the last evaluation error and the wait continues to the
+    deadline; a non-navigation JavaScript/selector error is surfaced in the
+    timeout diagnostic. On timeout the helper raises a diagnostic
+    ``AssertionError`` carrying the last non-``None`` store state, whether any
+    ``None`` reads occurred, the last evaluation error, and — when a
+    ``dom_readiness`` descriptor is supplied — the selector's connected/visible/
+    enabled state and the current ``activeElement``.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    last_state = None
+    none_observed = False
+    last_eval_error = None
+    dom_selector = (dom_readiness or {}).get("selector")
+    dom_predicate_js = (dom_readiness or {}).get("predicate")
+    dom_description = (dom_readiness or {}).get("description") or dom_selector or ""
+
+    while time.monotonic() < deadline:
+        state = store_state_or_none(page)
+        if state is None:
+            none_observed = True
+        else:
+            last_state = state
+            store_ok = bool(predicate(state))
+            if dom_readiness is not None and dom_predicate_js:
+                dom_ok = False
+                try:
+                    dom_result = page.evaluate(dom_predicate_js)
+                    dom_ok = dom_result is not None and bool(dom_result)
+                except Error as exc:
+                    if "Execution context was destroyed" in str(exc):
+                        last_eval_error = "Execution context was destroyed (in-flight navigation)"
+                    else:
+                        last_eval_error = "DOM predicate evaluate error: " + repr(exc)
+            else:
+                dom_ok = True
+            if store_ok and dom_ok:
+                return
+            page.wait_for_timeout(interval_ms)
+
+    dom_diag = None
+    if dom_readiness is not None and dom_selector:
+        dom_diag = evaluate_tolerating_navigation(
+            page,
+            """(selector) => {
+                const el = document.querySelector(selector);
+                if (!el) { return { connected: false, visible: false, enabled: null }; }
+                const r = el.getBoundingClientRect();
+                const visible = r.width > 0 && r.height > 0 && el.offsetParent !== null;
+                const enabled = el.hasAttribute('disabled') ? false : (el.disabled === undefined ? null : !el.disabled);
+                return { connected: true, visible: visible, enabled: enabled };
+              }""",
+            dom_selector,
+        )
+    active_element = evaluate_tolerating_navigation(
+        page,
+        "() => { const a = document.activeElement; "
+        "return a ? (a.id || a.className || a.tagName || 'unknown') : null; }",
+    )
+    parts = [
+        "store-state gate not satisfied within %dms",
+        "last_state=%r",
+        "none_observed=%s",
+        "last_eval_error=%r",
+    ]
+    args = [timeout, last_state, none_observed, last_eval_error]
+    if dom_readiness is not None:
+        parts.extend(["dom_readiness=%r", "dom_diag=%r", "activeElement=%r"])
+        args.extend([dom_description, dom_diag, active_element])
+    raise AssertionError(" ".join(parts) % tuple(args))
 
 
 def wait_for_presentation_settled(page: Page, timeout: int = 30000) -> None:

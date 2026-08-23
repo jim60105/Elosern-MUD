@@ -22,6 +22,7 @@ from .browser_helpers import (
     store_state_or_none,
     suppress_one_shot_recovery_reload,
     wait_for_presentation_settled,
+    wait_for_store_state,
 )
 
 
@@ -55,18 +56,11 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         self._wait_combat_mode(page)
 
     def _wait_combat_mode(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            panel = state["panels"] and state["panels"].get("context_actions")
-            if (
-                state["mode"] == "combat"
-                and panel
-                and panel.get("available") is True
-            ):
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("combat mode never became available")
+        def _combat_panel_ready(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            return state.get("mode") == "combat" and panel.get("available") is True
+
+        wait_for_store_state(page, _combat_panel_ready, timeout=timeout)
 
     def _press(self, page, key):
         page.keyboard.press(key)
@@ -96,15 +90,20 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         wait_for_presentation_settled(page)
         # A modified client sends a participant ID that is not in the session;
         # the adapter must reject before initiative with no round advance.
+        prev_result = store_state(page)["lastActionResult"]
         page.evaluate(
             "() => Elosern.actions.submit('combat.cast', "
             "{ skill_key: 'fire_ball', target_ids: [999999] })"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
-            timeout=30000,
-        )
+        def _fresh_rejected(state: dict) -> bool:
+            result = state.get("lastActionResult")
+            if not result or result.get("outcome") != "rejected":
+                return False
+            if prev_result is not None:
+                return result.get("requestId") != prev_result.get("requestId")
+            return True
+
+        wait_for_store_state(page, _fresh_rejected)
         result = self._last_result(page)
         self.assertEqual(result["code"], "unknown_session_id")
         self.assertEqual(
@@ -122,16 +121,21 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         wait_for_presentation_settled(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
+        prev_result = store_state(page)["lastActionResult"]
         page.evaluate(
             "(id) => Elosern.actions.submit('combat.forfeit', "
             "{ session_id: 'hostile:999:0' })",
             session_id,
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.lastActionResult && s.lastActionResult.outcome === 'rejected'; }",
-            timeout=30000,
-        )
+        def _fresh_rejected(state: dict) -> bool:
+            result = state.get("lastActionResult")
+            if not result or result.get("outcome") != "rejected":
+                return False
+            if prev_result is not None:
+                return result.get("requestId") != prev_result.get("requestId")
+            return True
+
+        wait_for_store_state(page, _fresh_rejected)
         result = self._last_result(page)
         self.assertEqual(result["code"], "unknown_session_id")
         panel = self._combat_panel(page)
@@ -171,18 +175,11 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         self._wait_combat_mode(page)
 
     def _wait_combat_mode(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            panel = state["panels"] and state["panels"].get("context_actions")
-            if (
-                state["mode"] == "combat"
-                and panel
-                and panel.get("available") is True
-            ):
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("combat mode never became available")
+        def _combat_panel_ready(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            return state.get("mode") == "combat" and panel.get("available") is True
+
+        wait_for_store_state(page, _combat_panel_ready, timeout=timeout)
 
     @covers_requirement("webclient-combat-menu::reconnect-rebuilds-combat-without-replaying-intent")
     def test_reconnect_resumes_same_session_without_new_round(self):
@@ -200,12 +197,21 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => { const o = document.querySelector('#elosern-offline-overlay'); "
+                    "return o && o.getAttribute('data-visible') === 'true'; }"
+                ),
+                "description": "offline overlay visible",
+            },
         )
 
         # Wait for the reconnect to open a new generation and adopt a snapshot.
@@ -293,12 +299,12 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         # The cast is admitted and a round commits; the result reaches the store
         # but the client's in-flight request is never released (the no-op timer
         # keeps the result out of the client).
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
-            "const p = s && s.view && s.view.panels && s.view.panels['context_actions']; "
-            "return !!(p && p.available && p.session && p.session.round >= 1); }",
-            timeout=30000,
-        )
+        def _round_committed(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            session = panel.get("session") or {}
+            return bool(panel.get("available")) and int(session.get("round") or 0) >= 1
+
+        wait_for_store_state(page, _round_committed)
         # The assertions below read the action client's in-memory
         # uncertain-notice state and the outbound recorder; a one-shot
         # recovery reload (fired by a slow re-attach under load) would wipe
@@ -312,8 +318,9 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
         # Capture the client's in-flight gate and result-observation state at the
         # disconnect moment (before the resync releases it), for diagnostics of
@@ -367,16 +374,23 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         )
 
         # Wait (bounded) for the offline overlay's uncertain-result notice
-        # instead of a fixed 1.5s sleep that races a slow re-attach.
+        # instead of a fixed 1.5s sleep that races a slow re-attach. The
+        # gate polls the committed store view and the overlay's `data-uncertain`
+        # attribute in one bounded loop under a single monotonic deadline.
         try:
-            page.wait_for_function(
-                """() => {
-                  const o = document.getElementById('elosern-offline-overlay');
-                  return o && o.getAttribute('data-uncertain') === 'true';
-                }""",
-                timeout=30000,
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": "#elosern-offline-overlay",
+                    "predicate": (
+                        "() => { const o = document.querySelector('#elosern-offline-overlay'); "
+                        "return o && o.getAttribute('data-uncertain') === 'true'; }"
+                    ),
+                    "description": "uncertain-result notice shown",
+                },
             )
-        except Error as exc:
+        except (Error, AssertionError) as exc:
             state = store_state_or_none(page)
             in_flight = evaluate_tolerating_navigation(
                 page,
@@ -425,23 +439,24 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
             "{ skill_key: 'basic_attack', target_ids: [target] });",
             target,
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "const p = s.panels && s.panels['context_actions']; "
-            "return p && p.available && p.session.round >= 1; }",
-            timeout=30000,
-        )
+        def _round_committed(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            session = panel.get("session") or {}
+            return bool(panel.get("available")) and int(session.get("round") or 0) >= 1
+
+        wait_for_store_state(page, _round_committed)
         # The in-flight gate releases once the committed revision reaches the
         # declared presentation revision: the mutation is confirmed.
-        page.wait_for_function(
-            "() => { const d = (window.__elosernBridge && window.__elosernBridge.store.view.dispatch) || null; "
-            "return d && d.inFlight === null; }",
-            timeout=30000,
-        )
+        def _in_flight_released(state: dict) -> bool:
+            dispatch = state.get("dispatch") or {}
+            return dispatch.get("inFlight") is None
+
+        wait_for_store_state(page, _in_flight_released)
         suppress_one_shot_recovery_reload(page)
         page.evaluate("() => { if (window.__elosernWs) window.__elosernWs.close(4001); }")
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
 
         deadline = time.monotonic() + 60
@@ -465,12 +480,17 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
         )
 
         # A confirmed mutation must NOT show the uncertain-result notice.
-        page.wait_for_function(
-            """() => {
-              const o = document.getElementById('elosern-offline-overlay');
-              return o && o.getAttribute('data-uncertain') === 'false';
-            }""",
-            timeout=30000,
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => { const o = document.querySelector('#elosern-offline-overlay'); "
+                    "return o && o.getAttribute('data-uncertain') === 'false'; }"
+                ),
+                "description": "no uncertain-result notice",
+            },
         )
 
         from .browser_helpers import sent_action_count

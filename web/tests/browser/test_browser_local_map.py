@@ -17,7 +17,7 @@ import time
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import store_state
+from .browser_helpers import store_state, wait_for_store_state
 
 
 class LocalMapBrowserTest(BrowserAcceptanceTest):
@@ -47,13 +47,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         return store_state(page)["panels"].get("local_map")
 
     def _wait_local_map_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = self._local_map_panel(page)
-            if panel is not None and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("local_map never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return self._local_map_panel(page)
 
     def _local_map_nodes(self, page):
         return self._wait_local_map_available(page)["nodes"]
@@ -74,8 +73,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(panel["current_node"].startswith("grid:capital_altoria:"))
 
         # The surface renders legend text as text nodes and a current node.
-        page.wait_for_selector("[data-testid='local-map__title']")
-        legend_text = page.locator(".local-map__legend").inner_text()
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("available") is True,
+            dom_readiness={
+                "selector": '[data-testid="local-map__title"]',
+                "predicate": "() => !!document.querySelector('[data-testid=\"local-map__title\"]')",
+                "description": "local map title rendered",
+            },
+            timeout=30000,
+        )
+        legend_text = page.locator('[data-testid="local-map__legend"]').inner_text()
         self.assertIn("你目前所在的位置", legend_text)
 
         # The seeded knowledge includes wilderness, interior, and instance
@@ -96,9 +104,18 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         remembered = page.locator(".local-map__node.local-map__node--remembered")
         self.assertGreaterEqual(remembered.count(), 1)
         remembered.first.click()
-        page.wait_for_function(
-            "() => (document.querySelector('[data-testid=\"local-map-detail\"]')).textContent || '')"
-            ".indexOf('已探索') !== -1"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="local-map-detail"]',
+                "predicate": (
+                    "() => { const d = document.querySelector('[data-testid=\"local-map-detail\"]'); "
+                    "return (d && d.textContent || '').indexOf('已探索') !== -1; }"
+                ),
+                "description": "map detail shows the explored state",
+            },
+            timeout=30000,
         )
         detail = page.locator('[data-testid="local-map-detail"]').inner_text()
         self.assertIn("已探索", detail)
@@ -131,16 +148,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            timeout=30000,
         )
         page.evaluate("Evennia.connect()")
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline:
-            panel = self._local_map_panel(page)
-            if panel is not None and panel.get("available") is True:
-                break
-            page.wait_for_timeout(500)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("available") is True,
+            timeout=45000,
+        )
         nodes_after = self._local_map_nodes(page)
         # No client map cache is authoritative: the rebuilt map carries the
         # same server-persisted current node and knowledge.
@@ -158,7 +176,16 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
-                page.wait_for_selector(".local-map__lattice")
+                wait_for_store_state(
+                    page,
+                    lambda s: (s.get("panels") or {}).get("local_map", {}).get("available") is True,
+                    dom_readiness={
+                        "selector": ".local-map__lattice",
+                        "predicate": "() => !!document.querySelector('.local-map__lattice')",
+                        "description": "map lattice canvas rendered",
+                    },
+                    timeout=30000,
+                )
 
                 # Every node marker's bounding box is inside the map canvas.
                 # (Remembered remote nodes render in the bounded list below
@@ -214,7 +241,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                         )
 
                 # The legend and detail line remain visible below the canvas.
-                self.assertTrue(page.locator(".local-map__legend").is_visible())
+                self.assertTrue(page.locator('[data-testid="local-map__legend"]').is_visible())
                 detail = page.locator('[data-testid="local-map-detail"]')
                 self.assertTrue(detail.is_visible())
                 page.close()
@@ -257,9 +284,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
                 for selector in (
-                    ".elosern-narrative",
+                    '[data-testid="narrative-feed"]',
                     ".status-panel",
-                    ".local-map",
+                    '[data-testid="local-map"]',
                 ):
                     self.assertTrue(
                         page.locator(selector).is_visible(),

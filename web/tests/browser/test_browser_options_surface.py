@@ -18,8 +18,6 @@ transport failure for the degraded path), and journeys wait on the store's
 
 from __future__ import annotations
 
-import time
-
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -28,6 +26,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -79,52 +78,77 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         return panel.get("suggestions") if panel else None
 
     def _wait_suggestions(self, page, status, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            suggestions = self._suggestions(page)
-            if suggestions and suggestions.get("status") == status:
-                return suggestions
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "suggestions status never became %r; state=%r"
-            % (status, store_state(page))
-        )
+        def _status_reached(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == status
+
+        wait_for_store_state(page, _status_reached, timeout=timeout)
 
     def _section(self, page):
         return page.evaluate(
-            "document.querySelector('[data-testid=\"suggestions-section\"]')) !== null"
+            "document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
         )
 
     def _wait_section(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if self._section(page):
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError("the suggestions section never rendered")
+        def _section_shown(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") in ("generating", "ready", "degraded")
+
+        wait_for_store_state(
+            page,
+            _section_shown,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
+                ),
+                "description": "the suggestions section is rendered in the action dock",
+            },
+            timeout=timeout,
+        )
 
     def _wait_section_gone(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if not self._section(page):
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError("the suggestions section never disappeared")
+        def _section_hidden(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is None or suggestions.get("status") == "unavailable"
+
+        wait_for_store_state(
+            page,
+            _section_hidden,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') === null"
+                ),
+                "description": "the suggestions section has disappeared from the action dock",
+            },
+            timeout=timeout,
+        )
 
     def _wait_generating_line(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            text = page.evaluate(
-                """() => {
-                    const line = document.querySelector(
-                        '[data-testid="suggestions-section"] .suggestions-generating');
-                    return line ? line.innerText : null;
-                }"""
-            )
-            if text:
-                return text
-            page.wait_for_timeout(150)
-        raise AssertionError("the generating line never rendered")
+        def _generating(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == "generating"
+
+        wait_for_store_state(
+            page,
+            _generating,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-generating"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-generating\"]') !== null"
+                ),
+                "description": "the generating line is rendered in the dock suggestions section",
+            },
+            timeout=timeout,
+        )
+        return page.evaluate(
+            """() => {
+                const line = document.querySelector(
+                    '[data-testid="suggestions-section"] .suggestions-generating');
+                return line ? line.innerText : null;
+            }"""
+        )
 
     def _ready_card_labels(self, page):
         return page.evaluate(
@@ -143,7 +167,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         ]
 
     def _narrative_inp_count(self, page):
-        return page.locator(".elosern-narrative .inp").count()
+        return page.locator('[data-testid="narrative-feed"] .inp').count()
 
     # -- journey helpers -----------------------------------------------------
 
@@ -282,10 +306,21 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         # The look result settles into the narrative.
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative')"
-            ".innerText.indexOf(s) !== -1",
-            arg="燈籠",
+        def _looked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "looked"
+
+        wait_for_store_state(
+            page,
+            _looked_result,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const feed = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return feed && feed.innerText.indexOf('燈籠') !== -1; }"
+                ),
+                "description": "the look result has settled into the narrative feed",
+            },
         )
         self.assertEqual(
             self._narrative_inp_count(page),
@@ -324,13 +359,23 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # The dialogue seam settles deterministically (the npc_dialogue
         # profile is disabled in the harness): the adapter's outcome lands in
         # the stable live region.
-        deadline = time.monotonic() + 30
-        live = ""
-        while time.monotonic() < deadline:
-            live = page.locator("#elosern-action-live").inner_text()
-            if live == "對方回應了你的話。":
-                break
-            page.wait_for_timeout(250)
+        def _talked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "talked"
+
+        wait_for_store_state(
+            page,
+            _talked_result,
+            dom_readiness={
+                "selector": "#elosern-action-live",
+                "predicate": (
+                    "() => { const live = document.querySelector('#elosern-action-live'); "
+                    "return live && live.innerText === '對方回應了你的話。'; }"
+                ),
+                "description": "the dialogue result has settled into the action live region",
+            },
+        )
+        live = page.locator("#elosern-action-live").inner_text()
         self.assertEqual(live, "對方回應了你的話。")
         self.assertEqual(
             self._narrative_inp_count(page),
@@ -360,10 +405,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # window (the protocol-error lock is racy against the trigger
         # service's async republishes, which re-commit presentation state).
         page.evaluate("Evennia.connection.close()")
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return !s.connected && s.mutationsLocked; }"
-        )
+
+        def _locked(state):
+            return (not state.get("connected")) and bool(state.get("mutationsLocked"))
+
+        wait_for_store_state(page, _locked)
         # The non-dismissible offline overlay covers the dock (the lock UX);
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what
@@ -461,7 +507,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # Degraded cards live in the dock only: the narrative stream never
         # renders suggestion cards (choice-points are the later slice).
         self.assertEqual(
-            page.locator(".elosern-narrative .option-card").count(),
+            page.locator('[data-testid="narrative-feed"] .option-card').count(),
             0,
             "degraded rule cards must never appear in the narrative stream",
         )

@@ -11,27 +11,127 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     wait_for_narrative_settled,
+    wait_for_store_state,
 )
 
 REQUIRED_SURFACES = (
     ".elosern-header",
-    ".elosern-narrative",
-    ".status-panel",
-    ".elosern-drawer",
-    "#action-dock",
-    "#inputfield",
+    '[data-testid="narrative-feed"]',
+    '[data-testid="command-drawer"]',
 )
+
+
+def _wait_field_focused(page, timeout=30000):
+    """Gate on the drawer's ``#inputfield`` being focused (after ``/`` or entry click)."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#inputfield",
+            "predicate": (
+                "() => document.activeElement === "
+                "document.getElementById('inputfield')"
+            ),
+            "description": "#inputfield focused",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_drawer_closed_dock_focused(page, timeout=30000):
+    """Gate on the command drawer being closed and the action dock holding focus."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#action-dock",
+            "predicate": (
+                "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
+                " const open = d && d.getAttribute('data-open') === 'true';"
+                " const dock = document.getElementById('action-dock');"
+                " return !open && dock && "
+                "(document.activeElement === dock || "
+                "(document.activeElement && dock.contains(document.activeElement))); }"
+            ),
+            "description": "command-drawer closed and #action-dock focused",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_narrative_grew(page, before_len, timeout=30000):
+    """Gate on the narrative feed's text length exceeding a previous length."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="narrative-feed"]',
+            "predicate": (
+                "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                " return n && n.innerText.length > %d; }" % before_len
+            ),
+            "description": "narrative feed text grew past the previous length",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_unread_count_nonzero(page, timeout=30000):
+    """Gate on the unread marker's ``data-count`` becoming non-zero."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#narrative-unread",
+            "predicate": (
+                "() => document.getElementById('narrative-unread')"
+                ".getAttribute('data-count') !== '0'"
+            ),
+            "description": "narrative-unread count non-zero",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_unread_count_zero(page, timeout=30000):
+    """Gate on the unread marker's ``data-count`` clearing to zero."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#narrative-unread",
+            "predicate": (
+                "() => document.getElementById('narrative-unread')"
+                ".getAttribute('data-count') === '0'"
+            ),
+            "description": "narrative-unread count cleared to zero",
+        },
+        timeout=timeout,
+    )
 
 
 class ShellAcceptanceTest(BrowserAcceptanceTest):
     """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
 
     def assert_surfaces_visible(self, page):
+        surfaces_js = ", ".join(repr(s) for s in REQUIRED_SURFACES)
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": REQUIRED_SURFACES[0],
+                "predicate": (
+                    "() => { const sels = [" + surfaces_js + "]; "
+                    "for (const sel of sels) { if (!document.querySelector(sel)) { return false; } } "
+                    "return true; }"
+                ),
+                "description": "guaranteed shell surfaces rendered",
+            },
+        )
         for selector in REQUIRED_SURFACES:
             locator = page.locator(selector)
             self.assertEqual(locator.count(), 1, f"missing surface {selector}")
-            if selector != "#inputfield":
-                self.assertTrue(locator.is_visible(), f"{selector} is not visible")
+            self.assertTrue(locator.is_visible(), f"{selector} is not visible")
         # The command drawer defaults to closed: the input row exists in the
         # DOM but is hidden behind the actionable entry button (D2).
         self.assertFalse(
@@ -95,16 +195,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_keyboard_drawer_open_send_cancel_and_focus_restoration(self):
         page = self.logged_in_page()
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
 
         # Open the drawer with `/` and send an ordinary command. The field
         # clears, the drawer stays open, and focus remains in the field so
         # consecutive commands need no pointer interaction.
         focus_action_dock(page)
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
 
         page.keyboard.type("look")
@@ -120,7 +218,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"), ""
         )
-        narrative_after = page.locator(".elosern-narrative").inner_text()
+        narrative_after = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertNotEqual(
             narrative_after, narrative_before, "drawer send produced no narrative"
         )
@@ -140,30 +238,16 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # drawer closes and action-dock focus is restored (the action dock
         # forwards focus to the mounted listbox row container).
         page.keyboard.press("Escape")
-        page.wait_for_function(
-            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
-            "  const dock = document.getElementById('action-dock');"
-            "  return document.activeElement === dock || "
-            "    (document.activeElement && dock.contains(document.activeElement));"
-            "})()"
-        )
+        _wait_drawer_closed_dock_focused(page)
         focus_action_dock(page)
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         page.keyboard.type("look")
-        narrative_before_cancel = page.locator(".elosern-narrative").inner_text()
+        narrative_before_cancel = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.keyboard.press("Escape")
-        page.wait_for_function(
-            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
-            "  const dock = document.getElementById('action-dock');"
-            "  return document.activeElement === dock || "
-            "    (document.activeElement && dock.contains(document.activeElement));"
-            "})()"
-        )
+        _wait_drawer_closed_dock_focused(page)
         self.assertEqual(
-            page.locator(".elosern-narrative").inner_text(),
+            page.locator('[data-testid="narrative-feed"]').inner_text(),
             narrative_before_cancel,
             "Escape must not send drawer text",
         )
@@ -176,20 +260,16 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_narrative_renders_styled_prose_not_markup_source(self):
         page = self.logged_in_page()
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
 
         # A real room look through the server; the narrative must grow with
         # the room's prose. The *visible text* must never show element or
         # entity source characters (the DOM may legitimately contain rendered
         # span elements -- that is the pipeline working).
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_function(
-            "(before) => document.querySelector('.elosern-narrative')"
-            ".innerText.length > before",
-            arg=narrative_before.__len__(),
-        )
+        _wait_narrative_grew(page, narrative_before.__len__())
         page.wait_for_timeout(300)
-        narrative_text = page.locator(".elosern-narrative").inner_text()
+        narrative_text = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertNotIn("&lt;", narrative_text)
         self.assertNotIn("&amp;", narrative_text)
         self.assertNotIn("<span", narrative_text)
@@ -200,17 +280,25 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => window.__elosernConsole.model.appendIn('|r南大道|n|g 綠|n')"
         )
-        page.wait_for_function(
-            "() => document.querySelectorAll("
-            "'.elosern-narrative span[class*=\"color-\"]').length >= 2"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.querySelectorAll("
+                    "'[data-testid=\"narrative-feed\"] span[class*=\"color-\"]').length >= 2"
+                ),
+                "description": "colored palette spans rendered in the narrative feed",
+            },
         )
-        colored = page.locator(".elosern-narrative span[class*='color-']")
+        colored = page.locator('[data-testid="narrative-feed"] span[class*="color-"]')
         self.assertGreaterEqual(colored.count(), 2)
         for index in range(colored.count()):
             cls = colored.nth(index).get_attribute("class")
             self.assertRegex(cls, r"(?:^|\s)color-\d{3}(?:\s|$)")
         # The styled text is visible, not its source.
-        text = page.locator(".elosern-narrative").inner_text()
+        text = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertIn("南大道", text)
         self.assertNotIn("<span", text)
 
@@ -231,16 +319,22 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate(
             "(text) => window.__elosernConsole.model.appendIn(text)", wide
         )
-        page.wait_for_function(
-            "(text) => {"
-            "  const outs = document.querySelectorAll('.elosern-narrative .out');"
-            "  const last = outs[outs.length - 1];"
-            "  return last && last.innerText.indexOf('尾部') !== -1;"
-            "}",
-            arg=wide,
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const outs = document.querySelectorAll("
+                    "'[data-testid=\"narrative-feed\"] .out');"
+                    " const last = outs[outs.length - 1];"
+                    " return last && last.innerText.indexOf('尾部') !== -1; }"
+                ),
+                "description": "wide narrative row rendered in the feed",
+            },
         )
         # The full text is present (nothing clipped from the DOM).
-        text = page.locator(".elosern-narrative .out").last.inner_text()
+        text = page.locator('[data-testid="narrative-feed"] .out').last.inner_text()
         self.assertIn("尾部", text)
         # The wide row did not widen the page.
         horizontal_scroll = page.evaluate(
@@ -269,9 +363,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.keyboard.press("ArrowUp")
         page.keyboard.press("Escape")
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_timeout(300)
@@ -292,7 +384,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_scrollback_unread_behavior(self):
         page = self.logged_in_page()
-        narrative = page.locator(".elosern-narrative")
+        narrative = page.locator('[data-testid="narrative-feed"]')
 
         # The marker is absent entirely while the count is zero.
         marker = page.locator("#narrative-unread")
@@ -306,38 +398,32 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(300)
         page.evaluate(
-            "() => { const el = document.querySelector('.elosern-narrative'); "
+            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
             "el.scrollTop = 0; }"
         )
         page.wait_for_timeout(100)
         scroll_top = page.evaluate(
-            "() => document.querySelector('.elosern-narrative').scrollTop"
+            "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
         )
         self.assertEqual(scroll_top, 0)
 
         page.evaluate(
             "() => window.__elosernConsole.model.appendIn('unread probe line')"
         )
-        page.wait_for_function(
-            "() => document.getElementById('narrative-unread')"
-            ".getAttribute('data-count') !== '0'"
-        )
+        _wait_unread_count_nonzero(page)
         unread = page.locator("#narrative-unread .narrative-unread-button").inner_text()
         self.assertRegex(unread, r"↓ \d+ 則新訊息（點擊返回最新）")
 
         # The viewport must not have been forced to the bottom.
         scroll_top_after = page.evaluate(
-            "() => document.querySelector('.elosern-narrative').scrollTop"
+            "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
         )
         self.assertEqual(scroll_top_after, 0)
 
         # Clicking the marker jumps to the bottom, clears the count, and hides
         # the marker.
         page.locator(".narrative-unread-button").click()
-        page.wait_for_function(
-            "() => document.getElementById('narrative-unread')"
-            ".getAttribute('data-count') === '0'"
-        )
+        _wait_unread_count_zero(page)
         self.assertEqual(
             page.locator("#narrative-unread").get_attribute("data-count"),
             "0",
@@ -355,23 +441,28 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(300)
         page.evaluate(
-            "() => { const el = document.querySelector('.elosern-narrative'); "
+            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
             "el.scrollTop = 0; }"
         )
         page.evaluate(
             "() => window.__elosernConsole.model.appendIn('unread probe line')"
         )
-        page.wait_for_function(
-            "() => document.getElementById('narrative-unread')"
-            ".getAttribute('data-count') !== '0'"
-        )
+        _wait_unread_count_nonzero(page)
         # Keyboard activation (Enter on the focused marker button) jumps to the
         # bottom and parks focus on the narrative pane, never a hidden element.
         page.locator(".narrative-unread-button").focus()
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "() => document.activeElement === "
-            "document.querySelector('.elosern-narrative')"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.activeElement === "
+                    "document.querySelector('[data-testid=\"narrative-feed\"]')"
+                ),
+                "description": "narrative feed holds focus",
+            },
         )
         self.assertEqual(
             page.locator("#narrative-unread").get_attribute("data-count"),
@@ -408,22 +499,17 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_pointer_focused_field_sends_on_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
 
         # A pointer activation of the drawer's entry button opens and focuses
         # the field; Enter must send exactly one ordinary text message through
         # the single drawer-owned path, clear the field, and keep focus in it.
         page.locator(".drawer-entry").click()
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_before.__len__(),
-        )
+        _wait_narrative_grew(page, narrative_before.__len__())
         self.assertEqual(
             page.evaluate("document.getElementById('inputfield').value"),
             "",
@@ -449,19 +535,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_shift_enter_in_field_inserts_newline_without_sending(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.locator(".drawer-entry").click()
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         page.keyboard.type("first line")
         page.keyboard.press("Shift+Enter")
         page.keyboard.type("second line")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_before.__len__(),
-        )
+        _wait_narrative_grew(page, narrative_before.__len__())
         sends = [
             args[0]
             for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
@@ -488,16 +569,22 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.keyboard.press("ArrowDown")  # 等待至正午
         page.keyboard.press("ArrowDown")  # 休息一段時間
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="exploration-rest-form"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+                ),
+                "description": "rest form rendered",
+            },
         )
         # Open the drawer through its entry button and send: the rest form's
         # capture-phase handler must yield, and the command travels as
         # ordinary text (never an explore.wait submission).
         page.locator(".drawer-entry").click()
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         page.wait_for_timeout(300)
@@ -525,9 +612,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             # The field is hidden until the drawer opens; open it through the
             # entry button before measuring the field/button alignment.
             page.locator(".drawer-entry").click()
-            page.wait_for_function(
-                "() => document.activeElement === document.getElementById('inputfield')"
-            )
+            _wait_field_focused(page)
             page.wait_for_timeout(200)
             geometry = page.evaluate(
                 """() => {
@@ -617,10 +702,18 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             )
             # The mockup root draws no visible detail pane; opening a submenu
             # reveals the grid + detail split.
-            self.assertEqual(page.locator(".exploration-detail").count(), 0)
+            self.assertEqual(page.locator('[data-testid="exploration-detail"]').count(), 0)
             page.keyboard.press("Enter")  # Move
-            page.wait_for_function(
-                "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": '[data-testid="exploration-detail"]',
+                    "predicate": (
+                        "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
+                    ),
+                    "description": "exploration detail pane rendered",
+                },
             )
             detail = page.locator('[data-testid="exploration-detail"]')
             self.assertTrue(detail.is_visible())

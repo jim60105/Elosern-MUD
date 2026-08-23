@@ -27,6 +27,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -37,15 +38,81 @@ def _press(page, key, wait_ms=80):
     page.wait_for_timeout(wait_ms)
 
 
+def _wait_field_focused(page, timeout=30000):
+    """Gate on the drawer's ``#inputfield`` being focused (after ``/`` or entry click)."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#inputfield",
+            "predicate": (
+                "() => document.activeElement === "
+                "document.getElementById('inputfield')"
+            ),
+            "description": "#inputfield focused",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_drawer_closed_dock_focused(page, timeout=30000):
+    """Gate on the command drawer being closed and the action dock holding focus."""
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": "#action-dock",
+            "predicate": (
+                "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
+                " const open = d && d.getAttribute('data-open') === 'true';"
+                " const dock = document.getElementById('action-dock');"
+                " return !open && dock && "
+                "(document.activeElement === dock || "
+                "(document.activeElement && dock.contains(document.activeElement))); }"
+            ),
+            "description": "command-drawer closed and #action-dock focused",
+        },
+        timeout=timeout,
+    )
+
+
+def _wait_inp_line(page, count, text=None, exact=False, timeout=30000):
+    """Gate on the narrative feed's player-input (``.inp``) line count (optionally matching text)."""
+    if text is None:
+        predicate_js = (
+            "() => document.querySelectorAll("
+            "'[data-testid=\"narrative-feed\"] .inp').length === %d" % count
+        )
+    else:
+        js_text = json.dumps(text)
+        if exact:
+            cmp = "lines[lines.length - 1].innerText === %s" % js_text
+        else:
+            cmp = "lines[lines.length - 1].innerText.indexOf(%s) !== -1" % js_text
+        predicate_js = (
+            "() => { const lines = document.querySelectorAll("
+            "'[data-testid=\"narrative-feed\"] .inp');"
+            " return lines.length === %d && %s; }" % (count, cmp)
+        )
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected")),
+        dom_readiness={
+            "selector": '[data-testid="narrative-feed"]',
+            "predicate": predicate_js,
+            "description": "narrative feed input lines",
+        },
+        timeout=timeout,
+    )
+
+
 class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     """Drawer default-close, toggle, and input-echo acceptance (no mutation)."""
 
     def _open_drawer(self, page):
         focus_action_dock(page)
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
 
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
@@ -57,7 +124,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(entry.is_visible(), "the entry button is the visible drawer element")
         self.assertEqual(entry.get_attribute("aria-expanded"), "false")
         self.assertEqual(
-            page.evaluate("document.querySelector('.elosern-drawer').getAttribute('data-open')"),
+            page.evaluate("document.querySelector('[data-testid=\"command-drawer\"]').getAttribute('data-open')"),
             "false",
         )
         # The input row is hidden until the player opens the drawer.
@@ -71,9 +138,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_entry_button_opens_and_focuses_the_field(self):
         page = self.logged_in_page()
         page.locator(".drawer-entry").click()
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         self.assertEqual(
             page.evaluate("document.querySelector('.drawer-entry').getAttribute('aria-expanded')"),
@@ -89,25 +154,15 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # `/` over the action dock opens and focuses the field.
         focus_action_dock(page)
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         # With no editable control focused, `/` closes and restores dock focus.
         focus_action_dock(page)
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
-            "  const dock = document.getElementById('action-dock');"
-            "  return document.activeElement === dock || "
-            "    (document.activeElement && dock.contains(document.activeElement));"
-            "})()"
-        )
+        _wait_drawer_closed_dock_focused(page)
         # And `/` reopens it.
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
 
     @covers_requirement(
@@ -147,8 +202,16 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowDown")  # 等待至正午
         _press(page, "ArrowDown")  # 休息一段時間
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="exploration-rest-form"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+                ),
+                "description": "rest form rendered",
+            },
         )
         self.assertFalse(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
         # A slash while the rest form owns the keyboard is claimed: the drawer
@@ -172,17 +235,15 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self._open_drawer(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "() => document.querySelectorAll('.elosern-narrative .inp').length === 1"
-        )
-        inp = page.locator(".elosern-narrative .inp").first
+        _wait_inp_line(page, 1)
+        inp = page.locator('[data-testid="narrative-feed"] .inp').first
         self.assertEqual(inp.inner_text(), "look")
         # The echo line is preceded by exactly one divider hairline.
-        self.assertEqual(page.locator(".elosern-narrative .narrative-divider").count(), 1)
+        self.assertEqual(page.locator('[data-testid="narrative-feed"] .narrative-divider').count(), 1)
         self.assertTrue(
             page.evaluate(
                 "() => {"
-                "  const line = document.querySelector('.elosern-narrative .inp');"
+                "  const line = document.querySelector('[data-testid=\"narrative-feed\"] .inp');"
                 "  return line.previousElementSibling !== null && "
                 "    line.previousElementSibling.classList.contains('narrative-divider');"
                 "}"
@@ -206,7 +267,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     )
     def test_scrolled_away_input_preserves_scroll_and_increments_unread_by_one(self):
         page = self.logged_in_page()
-        narrative = page.locator(".elosern-narrative")
+        narrative = page.locator('[data-testid="narrative-feed"]')
         # Guarantee overflow so the narrative can be scrolled up.
         page.evaluate(
             "() => { for (let i = 0; i < 80; i++) { "
@@ -214,7 +275,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(300)
         page.evaluate(
-            "() => { const el = document.querySelector('.elosern-narrative'); "
+            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
             "el.scrollTop = 0; }"
         )
         page.wait_for_timeout(100)
@@ -227,13 +288,21 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "  Elosern.narrativeInput.appendInput('probe');"
             "}"
         )
-        page.wait_for_function(
-            "() => parseInt(document.getElementById('narrative-unread')"
-            ".getAttribute('data-count')) === window.__unreadBefore + 1"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#narrative-unread",
+                "predicate": (
+                    "() => parseInt(document.getElementById('narrative-unread')"
+                    ".getAttribute('data-count')) === window.__unreadBefore + 1"
+                ),
+                "description": "narrative-unread count incremented by one",
+            },
         )
         self.assertEqual(
             page.evaluate(
-                "() => document.querySelector('.elosern-narrative').scrollTop"
+                "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
             ),
             0,
             "an input line must never force the viewport to the bottom",
@@ -241,9 +310,17 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator(".narrative-divider").count(), 1)
         # The marker still clears on activation.
         page.locator(".narrative-unread-button").click()
-        page.wait_for_function(
-            "() => document.getElementById('narrative-unread')"
-            ".getAttribute('data-count') === '0'"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#narrative-unread",
+                "predicate": (
+                    "() => document.getElementById('narrative-unread')"
+                    ".getAttribute('data-count') === '0'"
+                ),
+                "description": "narrative-unread count cleared to zero",
+            },
         )
 
     @covers_requirement(
@@ -255,32 +332,39 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # line is the log's first line.
         page.evaluate(
             "() => {"
-            "  const n = document.querySelector('.elosern-narrative');"
+            "  const n = document.querySelector('[data-testid=\"narrative-feed\"]');"
             "  Array.from(n.children).forEach(function (child) {"
             "    if (!child.classList.contains('narrative-unread')) { n.removeChild(child); }"
             "  });"
             "  Elosern.narrativeInput.appendInput('first');"
             "}"
         )
-        page.wait_for_function(
-            "() => document.querySelectorAll('.elosern-narrative .inp').length === 1"
-        )
+        _wait_inp_line(page, 1)
         self.assertEqual(
-            page.locator(".elosern-narrative .narrative-divider").count(),
+            page.locator('[data-testid="narrative-feed"] .narrative-divider').count(),
             0,
             "the first log line carries no divider",
         )
         page.evaluate("() => Elosern.narrativeInput.appendInput('second')")
-        page.wait_for_function(
-            "() => document.querySelectorAll('.elosern-narrative .narrative-divider').length === 1"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.querySelectorAll("
+                    "'[data-testid=\"narrative-feed\"] .narrative-divider').length === 1"
+                ),
+                "description": "narrative divider rendered",
+            },
         )
         self.assertEqual(
-            page.locator(".elosern-narrative .inp").count(), 2
+            page.locator('[data-testid="narrative-feed"] .inp').count(), 2
         )
         self.assertTrue(
             page.evaluate(
                 "() => {"
-                "  const lines = document.querySelectorAll('.elosern-narrative .inp');"
+                "  const lines = document.querySelectorAll('[data-testid=\"narrative-feed\"] .inp');"
                 "  const second = lines[lines.length - 1];"
                 "  return second.previousElementSibling !== null && "
                 "    second.previousElementSibling.classList.contains('narrative-divider');"
@@ -302,13 +386,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "{ skillLabel: '火球術', targetLabel: '哥布林' })",
             payload,
         )
-        page.wait_for_function(
-            "() => {"
-            "  const lines = document.querySelectorAll('.elosern-narrative .inp');"
-            "  return lines.length === 1 && "
-            "    lines[lines.length - 1].innerText.indexOf('cast 火球術=哥布林') !== -1;"
-            "}"
-        )
+        _wait_inp_line(page, 1, "cast 火球術=哥布林")
         envelopes = [
             args[0]
             for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
@@ -342,20 +420,14 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             json.dumps(envelopes[1]["payload"], sort_keys=True),
         )
         self.assertEqual(
-            page.locator(".elosern-narrative .inp").count(),
+            page.locator('[data-testid="narrative-feed"] .inp').count(),
             1,
             "a cast without a resolvable skill label must not echo",
         )
         # A mutation the catalog can resolve without any display descriptor
         # still echoes exactly once at dispatch (forfeit needs no label).
         page.evaluate("() => Elosern.actions.submit('combat.forfeit')")
-        page.wait_for_function(
-            "() => {"
-            "  const lines = document.querySelectorAll('.elosern-narrative .inp');"
-            "  return lines.length === 2 && "
-            "    lines[lines.length - 1].innerText === 'combat forfeit';"
-            "}"
-        )
+        _wait_inp_line(page, 2, "combat forfeit", exact=True)
 
     def _wait_action_idle(self, page, timeout=20000):
         deadline = time.monotonic() + timeout / 1000
@@ -376,24 +448,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "{ monster_id: 'no_such_monster' }, "
             "{ targetLabel: '<script>alert(1)</script>' })"
         )
-        page.wait_for_function(
-            "() => {"
-            "  const lines = document.querySelectorAll('.elosern-narrative .inp');"
-            "  return lines.length === 1 && "
-            "    lines[lines.length - 1].innerText.indexOf('<script>alert(1)</script>') !== -1;"
-            "}"
-        )
+        _wait_inp_line(page, 1, "<script>alert(1)</script>")
         # The line is a single literal text node: no element was created.
         self.assertEqual(
             page.evaluate(
                 "() => {"
-                "  const lines = document.querySelectorAll('.elosern-narrative .inp');"
+                "  const lines = document.querySelectorAll('[data-testid=\"narrative-feed\"] .inp');"
                 "  return lines[lines.length - 1].childElementCount;"
                 "}"
             ),
             0,
         )
-        self.assertEqual(page.locator(".elosern-narrative .inp script").count(), 0)
+        self.assertEqual(page.locator('[data-testid="narrative-feed"] .inp script').count(), 0)
 
 
 class InputEchoExplorationTest(BrowserAcceptanceTest):
@@ -421,25 +487,19 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
                 self.server = None
 
     def _wait_exploration_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = store_state(page)["panels"].get("exploration")
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("exploration panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("exploration", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return store_state(page)["panels"].get("exploration")
 
     def _wait_panel(self, page, name, predicate, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            try:
-                panel = store_state(page)["panels"].get(name)
-                if panel and predicate(panel):
-                    return panel
-            except Exception:
-                pass
-            page.wait_for_timeout(250)
-        raise AssertionError("panel %s predicate never became true" % name)
+        def _panel_ready(state):
+            panel = (state.get("panels") or {}).get(name)
+            return panel is not None and predicate(panel)
+        wait_for_store_state(page, _panel_ready, timeout=timeout)
+        return store_state(page)["panels"].get(name)
 
     def _reset_root(self, page):
         focus_action_dock(page)
@@ -475,16 +535,14 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
             and p["current_node"] != "grid:capital_altoria:2:0",
         )
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
-        page.wait_for_function(
-            "() => document.querySelectorAll('.elosern-narrative .inp').length === 1"
-        )
-        inp = page.locator(".elosern-narrative .inp").first
+        _wait_inp_line(page, 1)
+        inp = page.locator('[data-testid="narrative-feed"] .inp').first
         self.assertEqual(
             inp.inner_text(),
             first_exit_label,
             "exit traversal echoes the server-authored exit label, never a guessed command",
         )
-        self.assertEqual(page.locator(".elosern-narrative .narrative-divider").count(), 1)
+        self.assertEqual(page.locator('[data-testid="narrative-feed"] .narrative-divider').count(), 1)
 
     @covers_requirement(
         "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
@@ -508,26 +566,33 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         _press(page, "Enter")
         _press(page, "ArrowRight")  # 自由交談 (second grid column)
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
+        _wait_field_focused(page)
         speech = "你好，詩人"
         page.keyboard.type(speech)
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "() => document.querySelectorAll('.elosern-narrative .inp').length === 1"
-        )
-        inp = page.locator(".elosern-narrative .inp").first
+        _wait_inp_line(page, 1)
+        inp = page.locator('[data-testid="narrative-feed"] .inp').first
         self.assertEqual(
             inp.inner_text(),
             "talk %s %s" % (bard["display_name"], speech),
             "the free-form send echoes exactly one resolved line",
         )
         # The interaction completed: drawer closed, focus back on the dock.
-        page.wait_for_function("() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()")
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="command-drawer"]',
+                "predicate": (
+                    "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); "
+                    "return !d || d.getAttribute('data-open') !== 'true'; }"
+                ),
+                "description": "command-drawer closed",
+            },
+        )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         self.assertEqual(
-            page.locator(".elosern-narrative .inp").count(),
+            page.locator('[data-testid="narrative-feed"] .inp').count(),
             1,
             "no second raw-text echo may appear",
         )
@@ -548,15 +613,14 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         _press(page, "Enter")
         _press(page, "ArrowRight")  # 自由交談
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
-        )
-        inp_before = page.locator(".elosern-narrative .inp").count()
+        _wait_field_focused(page)
+        inp_before = page.locator('[data-testid="narrative-feed"] .inp').count()
 
         # Disconnect: the store locks all mutations while preserving the view.
         page.evaluate("Evennia.connection.close()")
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
         speech = "話到嘴邊又吞了回去"
         page.keyboard.type(speech)
@@ -565,7 +629,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         # Nothing dispatched, nothing echoed, and the speech is not lost.
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         self.assertEqual(
-            page.locator(".elosern-narrative .inp").count(),
+            page.locator('[data-testid="narrative-feed"] .inp').count(),
             inp_before,
             "a locked borrowed send must never echo",
         )

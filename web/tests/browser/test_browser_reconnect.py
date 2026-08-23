@@ -28,6 +28,7 @@ from .browser_helpers import (
     store_state_or_none,
     suppress_one_shot_recovery_reload,
     valid_status_panel,
+    wait_for_store_state,
 )
 
 
@@ -69,12 +70,18 @@ class ReconnectTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
-        )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(page, lambda s: not s.get("connected"))
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => { const o = document.getElementById('elosern-offline-overlay'); "
+                    "return o && o.getAttribute('data-visible') === 'true'; }"
+                ),
+                "description": "offline overlay visible",
+            },
         )
 
     @covers_requirement(
@@ -130,10 +137,18 @@ class ReconnectTest(BrowserAcceptanceTest):
         # The uncertain-result notice appears after the reconnect.
         # The server's post-reconnect re-attach can lag under parallel CI load,
         # so allow a longer window than Playwright's default 30s.
-        page.wait_for_function(
-            "() => (document.getElementById('elosern-action-live').textContent || '')"
-            ".indexOf('無法確認') !== -1",
-            timeout=60_000,
+        wait_for_store_state(
+            page,
+            lambda s: s.get("connected") and bool(s.get("lastActionResult")),
+            dom_readiness={
+                "selector": "#elosern-action-live",
+                "predicate": (
+                    "() => { const el = document.getElementById('elosern-action-live'); "
+                    "return el && (el.textContent || '').indexOf('無法確認') !== -1; }"
+                ),
+                "description": "uncertain-result notice visible in the action live region",
+            },
+            timeout=60000,
         )
         overlay = page.evaluate(
             "() => document.getElementById('elosern-offline-overlay')"
@@ -160,10 +175,9 @@ class ReconnectTest(BrowserAcceptanceTest):
             "Elosern.actions.requestResync('status'); "
             "Elosern.actions.resetResyncEpisode('status'); } }"
         )
-        page.wait_for_function(
-            "(r) => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.revision >= r; }",
-            arg=revision_before + 4,
+        wait_for_store_state(
+            page,
+            lambda s: s.get("revision") is not None and s["revision"] >= revision_before + 4,
         )
         revision_inflated = store_state(page)["revision"]
         self.assertGreaterEqual(revision_inflated, revision_before + 4)

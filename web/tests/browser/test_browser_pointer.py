@@ -29,6 +29,7 @@ from .browser_helpers import (
     outbound_messages,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -64,21 +65,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         return store_state(page)["panels"]["exploration"]
 
     def _wait_exploration_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = self._exploration_panel(page)
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("exploration panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("exploration", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return self._exploration_panel(page)
 
     def _wait_mode(self, page, mode, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if store_state(page)["mode"] == mode:
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError(f"mode never became {mode}")
+        def _mode_ready(state):
+            return state.get("mode") == mode
+        wait_for_store_state(page, _mode_ready, timeout=timeout)
 
     def _click_row(self, page, key):
         """Click the row carrying `data-item-key` == key with the mouse only."""
@@ -151,9 +148,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         # inventing an OOB action.
         self._click_row(page, "attack")
         try:
-            page.wait_for_function(
-                "() => document.querySelectorAll("
-                "'#action-dock [data-item-key^=\"target-\"]').length >= 1",
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": "#action-dock",
+                    "predicate": (
+                        "() => document.querySelectorAll("
+                        "'#action-dock [data-item-key^=\"target-\"]').length >= 1"
+                    ),
+                    "description": "combat target rows present in the action dock",
+                },
                 timeout=30000,
             )
         except Error as exc:
@@ -173,14 +178,9 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(target_keys), 1)
         before = sent_action_count(page)
         self._click_row(page, target_keys[0])
-        page.wait_for_function(
-            """() => {
-              const bridge = window.__elosernBridge;
-              return !!(bridge && bridge.store &&
-                  bridge.store.view.lastTarget === '""" + target_keys[0].removeprefix("target-") + """');
-            }""",
-            timeout=15000,
-        )
+        def _last_target_set(state):
+            return state.get("lastTarget") == target_keys[0].removeprefix("target-")
+        wait_for_store_state(page, _last_target_set, timeout=15000)
         self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
         self.assertEqual(sent_action_count(page), before)
 
@@ -219,9 +219,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         # goblin, so the dock renders its engage affordance as a disabled row
         # (``target_dead``). Clicking a disabled row focuses it (re-rendering
         # the detail pane with the server reason) without submitting anything.
-        page.wait_for_function(
-            "() => document.querySelectorAll('#action-dock "
-            "[data-item-key][aria-disabled=\"true\"]').length >= 1",
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => document.querySelectorAll('#action-dock "
+                    "[data-item-key][aria-disabled=\"true\"]').length >= 1"
+                ),
+                "description": "a disabled dock row is rendered",
+            },
             timeout=15000,
         )
         disabled_key = page.evaluate(
@@ -309,12 +317,21 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => document.getElementById('elosern-offline-overlay')"
+                    ".getAttribute('data-visible') === 'true'"
+                ),
+                "description": "offline overlay visible",
+            },
         )
         before = sent_action_count(page)
         # The overlay intercepts pointer events; a primary click dispatched on
@@ -415,13 +432,12 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
                 self.server = None
 
     def _wait_services_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = store_state(page)["panels"].get("services")
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("services panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("services", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return store_state(page)["panels"].get("services")
 
     def _rows(self, page):
         return page.evaluate(

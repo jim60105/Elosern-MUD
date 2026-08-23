@@ -27,6 +27,8 @@ from .browser_helpers import (
     outbound_messages,
     sent_action_count,
     store_state,
+    store_state_or_none,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -74,31 +76,31 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         return page.locator("#action-dock").get_attribute("data-mode")
 
     def _wait_services_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = self._services_panel(page)
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("services panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("services") or {}).get("available") is True,
+            dom_readiness={
+                "selector": '[data-testid="quest-board"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"quest-board\"]'); "
+                    "if (!el) { return false; } "
+                    "const r = el.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
+                ),
+                "description": "services surface (quest-board) rendered and visible",
+            },
+            timeout=timeout,
+        )
+        return self._services_panel(page)
 
     def _wait_panel(self, page, predicate, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
+        def _panel_ready(state):
+            panel = (state.get("panels") or {}).get("services") or {}
             try:
-                panel = self._services_panel(page)
-                if predicate(panel):
-                    return panel
-            except Exception:
-                pass
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "services panel predicate never became true; sent=%r; state=%r"
-            % (
-                page.evaluate("window.__elosernSent || []"),
-                store_state(page),
-            )
-        )
+                return bool(predicate(panel))
+            except (KeyError, TypeError):
+                return False
+        wait_for_store_state(page, _panel_ready, timeout=timeout)
 
     def _open_surface(self, page, surface_key):
         """From the exploration root, open the re-homed services surface.
@@ -267,6 +269,8 @@ class GuildDialogueTurninJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self.assertEqual(panel["player"]["wallet"], 1000)
         self.assertEqual(panel["guild"]["quests"][0]["state"], "completed")
+        _talk_before = store_state(page).get("lastActionResult")
+        _talk_before_request = _talk_before["requestId"] if _talk_before else None
 
         # Interact -> the guild staff (first present target) -> 交談 -> 回報.
         focus_action_dock(page)
@@ -278,9 +282,21 @@ class GuildDialogueTurninJourneys(ServicesBrowserTest):
         _press(page, "ArrowDown")  # 公會 (second keyword row)
         _press(page, "ArrowDown")  # 回報 (third keyword row)
         _press(page, "Enter")  # tap the 回報 chip
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
-            arg="可以交回",
+        wait_for_store_state(
+            page,
+            lambda s: (
+                s.get("lastActionResult") is not None
+                and s["lastActionResult"]["requestId"] != _talk_before_request
+            ),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!n && n.innerText.indexOf('可以交回') !== -1; }"
+                ),
+                "description": "narrative-feed shows 可以交回",
+            },
+            timeout=30000,
         )
         sent = page.evaluate("window.__elosernSent || []")
         talk = [
@@ -331,14 +347,28 @@ class GuildExamJourney(ServicesBrowserTest):
         self.assertNotIn("guild", services)
 
     def _wait_combat_mode(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            panel = state["panels"].get("context_actions")
-            if state["mode"] == "combat" and panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("combat mode never became available")
+        def _combat_ready(state):
+            if state.get("mode") != "combat":
+                return False
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            return panel.get("available") is True
+        wait_for_store_state(
+            page,
+            _combat_ready,
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.querySelector('#action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible in combat mode",
+            },
+            timeout=timeout,
+        )
+        state = store_state_or_none(page) or {}
+        return (state.get("panels") or {}).get("context_actions")
 
 
 class ShopJourneys(ServicesBrowserTest):
@@ -370,9 +400,9 @@ class ShopJourneys(ServicesBrowserTest):
         debug = page.evaluate(
             """() => ({
               sent: window.__elosernSent || [],
-              quantityOpen: document.querySelector('[data-testid=\"services-quantity\"]')) !== null,
-              quantityValue: document.querySelector('[data-testid=\"services-quantity-value\"]'))
-                ? document.querySelector('[data-testid=\"services-quantity-value\"]')).textContent
+              quantityOpen: document.querySelector('[data-testid=\"services-quantity\"]') !== null,
+              quantityValue: document.querySelector('[data-testid=\"services-quantity-value\"]')
+                ? document.querySelector('[data-testid=\"services-quantity-value\"]').textContent
                 : null,
               depth: window.__elosernBridge.router.depth(),
               current: window.__elosernBridge.router.currentItem() &&
@@ -494,16 +524,10 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         )
 
     def _wait_result(self, page, predicate, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result is not None and predicate(result):
-                return result
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "action result predicate never became true; sent=%r; state=%r"
-            % (page.evaluate("window.__elosernSent || []"), store_state(page))
-        )
+        def _result_ready(state):
+            result = state.get("lastActionResult")
+            return result is not None and bool(predicate(result))
+        wait_for_store_state(page, _result_ready, timeout=timeout)
 
     @covers_requirement("webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
     def test_stale_revision_returns_stale_without_mutation(self):
@@ -604,35 +628,41 @@ class ReconnectJourney(ServicesBrowserTest):
         _press(page, "Enter")  # 貨架
         _press(page, "Enter")  # meal buy row
         _press(page, "5", wait_ms=40)
-        self.assertTrue(page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]')) !== null"))
+        self.assertTrue(page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]') !== null"))
 
         # Abnormally close the raw WebSocket (preserves login) and wait for the
         # offline overlay.
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
-        )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => { const o = document.getElementById('elosern-offline-overlay'); "
+                    "return !!o && o.getAttribute('data-visible') === 'true'; }"
+                ),
+                "description": "offline overlay visible while disconnected",
+            },
+            timeout=30000,
         )
         # Wait for the reconnected transport to open a new generation, nudging
         # the stock reconnection path once if the socket did not reopen.
         deadline = time.monotonic() + 30
         reconnects = 0
         while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["generation"] > generation_before:
+            state = store_state_or_none(page)
+            if state and state["generation"] > generation_before:
                 break
             if reconnects == 0 and time.monotonic() > deadline - 20:
                 page.evaluate("Evennia.connect()")
                 reconnects += 1
             page.wait_for_timeout(500)
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.connected && s.phase === 'active'; }",
+        wait_for_store_state(
+            page,
+            lambda s: s.get("connected") and s.get("phase") == "active",
             timeout=30000,
         )
         self._wait_services_available(page)
@@ -642,7 +672,7 @@ class ReconnectJourney(ServicesBrowserTest):
         self.assertTrue(panel["available"])
         # The unsubmitted quantity was discarded and nothing was retried.
         self.assertEqual(
-            page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]')) === null"),
+            page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]') === null"),
             True,
             "unsubmitted quantity must be discarded on reconnect",
         )

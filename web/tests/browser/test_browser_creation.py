@@ -27,6 +27,7 @@ from .browser_helpers import (
     outbound_messages,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -100,36 +101,44 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         return panels.get("creation")
 
     def _dock_mode(self, page):
-        return page.locator("#action-dock").get_attribute("data-mode")
+        return page.locator("#action-dock").get_attribute("data-mode", timeout=5000)
 
     def _wait_creation_available(self, page, timeout=60000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            panel = state["panels"].get("creation")
-            if (
-                state["mode"] == "creation"
-                and panel
-                and panel.get("available") is True
-            ):
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "creation panel never became available; sent=%r; state=%r"
-            % (page.evaluate("window.__elosernSent || []"), store_state(page))
+        captured = {}
+
+        def _creation_ready(state):
+            if not state.get("connected") or state.get("mode") != "creation":
+                return False
+            panel = (state.get("panels") or {}).get("creation")
+            if panel and panel.get("available") is True:
+                captured["panel"] = panel
+                return True
+            return False
+
+        wait_for_store_state(
+            page,
+            _creation_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-overlay"]',
+                "predicate": (
+                    "() => { const o = document.querySelector('[data-testid=\"creation-overlay\"]'); "
+                    "const d = document.querySelector('#action-dock'); "
+                    "if (!o) { return false; } "
+                    "if (!d || d.getAttribute('data-mode') !== 'creation') { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "creation overlay mounted and creation-mode action-dock visible",
+            },
+            timeout=timeout,
         )
+        return captured["panel"]
 
     def _wait_exploration(self, page, timeout=60000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["mode"] == "exploration":
-                return state
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "exploration mode never arrived; sent=%r; state=%r"
-            % (page.evaluate("window.__elosernSent || []"), store_state(page))
-        )
+        def _exploration_ready(state):
+            return state.get("connected") and state.get("mode") == "exploration"
+
+        wait_for_store_state(page, _exploration_ready, timeout=timeout)
 
     def _wait_confirm_ready(self, page, timeout=30000):
         """Wait until the confirmation frame is mounted and the router unlocked.
@@ -139,34 +148,43 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         (``confirm()`` emits ``locked``); on a loaded runner the server
         response can arrive after the test's fixed delay and swallow the
         confirmation. Polling for an unlocked router with the confirm frame
-        mounted makes the confirmation deterministic.
+        mounted makes the confirmation deterministic. The store gate covers
+        the deterministic side: connected, phase active, mutations unlocked,
+        and the just-sent action result committed to ``lastActionResult``.
         """
-        page.wait_for_function(
-            """() => {
-                const b = window.__elosernBridge;
-                const router = b && b.router;
-                const client = b && b.facade.actions.client;
-                if (!router || !client || !router.isAwaitingRevision) {
-                    return false;
-                }
-                if (client.isInFlight() || router.isAwaitingRevision()) {
-                    return false;
-                }
-                const menu = router.currentMenu && router.currentMenu();
-                const confirm = document.querySelector('.creation-confirm');
-                return !!confirm && !!menu && !!menu.items && menu.items.length > 0;
-            }""",
+        def _confirm_ready(state):
+            if not state.get("connected") or state.get("phase") != "active":
+                return False
+            if state.get("mutationsLocked") is True:
+                return False
+            return state.get("lastActionResult") is not None
+
+        wait_for_store_state(
+            page,
+            _confirm_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-confirm"]',
+                "predicate": (
+                    "() => { const c = document.querySelector('[data-testid=\"creation-confirm\"]'); "
+                    "return c !== null; }"
+                ),
+                "description": "creation confirmation frame mounted",
+            },
             timeout=timeout,
         )
 
     def _wait_result(self, page, predicate, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
+        captured = {}
+
+        def _result_ready(state):
+            result = state.get("lastActionResult")
             if result is not None and predicate(result):
-                return result
-            page.wait_for_timeout(250)
-        raise AssertionError("action result predicate never became true")
+                captured["result"] = result
+                return True
+            return False
+
+        wait_for_store_state(page, _result_ready, timeout=timeout)
+        return captured["result"]
 
     def _focus_dock(self, page):
         focus_creation_action_dock(page)
@@ -177,6 +195,26 @@ class CreationBrowserTest(BrowserAcceptanceTest):
             if cmd == "ui_action" and args and args[0].get("action_id") == action_id:
                 payloads.append(args[0].get("payload"))
         return payloads
+
+    def _wait_draft_name_restored(self, page, timeout=30000):
+        def _draft_restored(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            draft = panel.get("draft")
+            return bool(draft and draft.get("display_name") == "草稿角色")
+
+        wait_for_store_state(
+            page,
+            _draft_restored,
+            dom_readiness={
+                "selector": '[data-testid="creation-field-displayName"]',
+                "predicate": (
+                    "() => { const f = document.querySelector('[data-testid=\"creation-field-displayName\"]'); "
+                    "return f && f.value === '草稿角色'; }"
+                ),
+                "description": "creation name field shows the restored draft",
+            },
+            timeout=timeout,
+        )
 
 
 class PresetCreationJourneys(CreationBrowserTest):
@@ -437,17 +475,11 @@ class CustomCreationJourneys(CreationBrowserTest):
               }], {});
             }"""
         )
-        deadline = time.monotonic() + 15
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if (
-                result
-                and result["outcome"] == "rejected"
-                and result["code"] in ("underage_age", "malformed_payload")
-            ):
-                break
-            page.wait_for_timeout(250)
+        result = self._wait_result(
+            page,
+            lambda r: r["outcome"] == "rejected" and r["code"] in ("underage_age", "malformed_payload"),
+            timeout=15000,
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "underage_age")
         panel = self._creation_panel(page)
@@ -491,17 +523,11 @@ class CustomCreationJourneys(CreationBrowserTest):
               }], {});
             }"""
         )
-        deadline = time.monotonic() + 15
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if (
-                result
-                and result["outcome"] == "rejected"
-                and result["code"] in ("underage_apparent_age", "malformed_payload")
-            ):
-                break
-            page.wait_for_timeout(250)
+        result = self._wait_result(
+            page,
+            lambda r: r["outcome"] == "rejected" and r["code"] in ("underage_apparent_age", "malformed_payload"),
+            timeout=15000,
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "underage_apparent_age")
         self.assertIsNone(self._creation_panel(page)["draft"])
@@ -539,14 +565,12 @@ class ConceptCreationJourneys(CreationBrowserTest):
 
         # The concept draft lands: the panel refresh pre-fills the finite
         # controls and shows the non-content background indicator.
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            panel = self._creation_panel(page)
-            if panel and panel.get("draft") and panel["draft"].get("mode") == "concept":
-                break
-            page.wait_for_timeout(250)
-        else:
-            raise AssertionError("concept draft never appeared")
+        def _concept_draft(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            draft = panel.get("draft")
+            return bool(draft and draft.get("mode") == "concept")
+
+        wait_for_store_state(page, _concept_draft, timeout=30000)
         panel = self._creation_panel(page)
         self.assertEqual(panel["draft"]["race"], "human")
         self.assertNotIn("persona", panel["draft"])
@@ -613,23 +637,19 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")  # 自訂角色
         _press(page, "Enter")
         # The saved draft restored the form.
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
-        )
+        self._wait_draft_name_restored(page)
         # Open the destructive reset confirmation; no mutation may be sent yet.
         page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Enter")  # 確認清除
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            panel = self._creation_panel(page)
-            if panel and panel.get("draft") is None:
-                break
-            page.wait_for_timeout(250)
-        self.assertIsNone(panel["draft"])
+        def _draft_cleared(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            return panel.get("draft") is None
+
+        wait_for_store_state(page, _draft_cleared, timeout=15000)
+        self.assertIsNone(self._creation_panel(page)["draft"])
         self.assertEqual(sent_action_count(page, "creation.reset"), 1)
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
@@ -644,10 +664,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")  # 自訂角色
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
-        )
+        self._wait_draft_name_restored(page)
         # Open the destructive reset confirmation, then Escape instead of
         # confirming: exactly one menu level pops and the draft is preserved.
         page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]').focus()")
@@ -655,9 +672,24 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
         _press(page, "Escape")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null && "
-            "document.querySelector('.creation-confirm') === null"
+        def _back_on_form(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            draft = panel.get("draft")
+            return bool(draft and draft.get("mode") == "custom")
+
+        wait_for_store_state(
+            page,
+            _back_on_form,
+            dom_readiness={
+                "selector": '[data-testid="creation-submit"]',
+                "predicate": (
+                    "() => { const s = document.querySelector('[data-testid=\"creation-submit\"]'); "
+                    "const c = document.querySelector('[data-testid=\"creation-confirm\"]'); "
+                    "return s !== null && c === null; }"
+                ),
+                "description": "creation submit control back on the form (confirm gone)",
+            },
+            timeout=30000,
         )
         # No reset or activation was sent; the saved draft is still intact.
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
@@ -674,13 +706,23 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
-        )
+        self._wait_draft_name_restored(page)
         _press(page, "Escape")  # pop back to root; values stay on the server
-        page.wait_for_function(
-            "() => document.querySelectorAll('.creation-preset-card').length >= 2"
+        def _preset_list(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            return len(panel.get("presets") or []) >= 2
+
+        wait_for_store_state(
+            page,
+            _preset_list,
+            dom_readiness={
+                "selector": '[data-testid="creation-preset-card"]',
+                "predicate": (
+                    "() => document.querySelectorAll('[data-testid=\"creation-preset-card\"]').length >= 2"
+                ),
+                "description": "preset list rendered with at least two preset cards",
+            },
+            timeout=30000,
         )
         # The saved server draft was never cleared and no mutation was sent.
         self.assertEqual(sent_action_count(page, "creation.custom"), 0)
@@ -761,11 +803,11 @@ class CreationDispatchJourneys(CreationBrowserTest):
             page, lambda r: r["requestId"] == "dup-custom-1" and r["outcome"] == "success"
         )
         self.assertEqual(first["outcome"], "success")
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if self._creation_panel(page).get("draft"):
-                break
-            page.wait_for_timeout(250)
+        def _draft_present(state):
+            panel = (state.get("panels") or {}).get("creation") or {}
+            return panel.get("draft") is not None
+
+        wait_for_store_state(page, _draft_present, timeout=30000)
         self.assertEqual(self._creation_panel(page)["draft"]["display_name"], "重複角色")
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
 
@@ -842,9 +884,7 @@ class ReconnectCreationJourney(CreationBrowserTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
-        )
+        wait_for_store_state(page, lambda s: not s.get("connected"), timeout=30000)
         deadline = time.monotonic() + 30
         reconnects = 0
         while time.monotonic() < deadline:
@@ -855,10 +895,8 @@ class ReconnectCreationJourney(CreationBrowserTest):
                 page.evaluate("Evennia.connect()")
                 reconnects += 1
             page.wait_for_timeout(500)
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.connected && s.phase === 'active'; }",
-            timeout=30000,
+        wait_for_store_state(
+            page, lambda s: s.get("connected") and s.get("phase") == "active", timeout=30000
         )
         self._wait_creation_available(page)
         panel = self._creation_panel(page)
@@ -883,9 +921,7 @@ class ReconnectPresetCreationJourney(CreationBrowserTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
-        )
+        wait_for_store_state(page, lambda s: not s.get("connected"), timeout=30000)
         deadline = time.monotonic() + 30
         reconnects = 0
         while time.monotonic() < deadline:
@@ -896,10 +932,8 @@ class ReconnectPresetCreationJourney(CreationBrowserTest):
                 page.evaluate("Evennia.connect()")
                 reconnects += 1
             page.wait_for_timeout(500)
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.connected && s.phase === 'active'; }",
-            timeout=30000,
+        wait_for_store_state(
+            page, lambda s: s.get("connected") and s.get("phase") == "active", timeout=30000
         )
         self._wait_creation_available(page)
         panel = self._creation_panel(page)
@@ -922,15 +956,32 @@ class ViewportCreationJourney(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null"
+        def _custom_form_ready(state):
+            if not state.get("connected") or state.get("mode") != "creation":
+                return False
+            panel = (state.get("panels") or {}).get("creation")
+            return bool(panel and panel.get("available") is True)
+
+        wait_for_store_state(
+            page,
+            _custom_form_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-submit"]',
+                "predicate": (
+                    "() => { const s = document.querySelector('[data-testid=\"creation-submit\"]'); "
+                    "return s !== null; }"
+                ),
+                "description": "creation submit control rendered",
+            },
+            timeout=30000,
         )
-        controls = page.locator(".creation-control")
+        # The finite controls are the Vue app's creation-field-* data-testid hooks.
+        controls = page.locator('[data-testid^="creation-field-"]')
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
         # Narrative and status-unavailable surfaces remain visible.
-        self.assertTrue(page.locator(".elosern-narrative").is_visible())
+        self.assertTrue(page.locator('[data-testid="narrative-feed"]').is_visible())
         placeholder_texts = page.locator(".elosern-placeholder").all_inner_texts()
         self.assertTrue(
             all("尚未開放" in text for text in placeholder_texts),
@@ -963,8 +1014,24 @@ class PointerCreationJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null"
+        def _custom_form_ready(state):
+            if not state.get("connected") or state.get("mode") != "creation":
+                return False
+            panel = (state.get("panels") or {}).get("creation")
+            return bool(panel and panel.get("available") is True)
+
+        wait_for_store_state(
+            page,
+            _custom_form_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-submit"]',
+                "predicate": (
+                    "() => { const s = document.querySelector('[data-testid=\"creation-submit\"]'); "
+                    "return s !== null; }"
+                ),
+                "description": "creation submit control rendered",
+            },
+            timeout=30000,
         )
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("滑鼠角色")
@@ -984,8 +1051,9 @@ class PointerCreationJourneys(CreationBrowserTest):
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
             )
             page.keyboard.type(value)
-        # Pointer click (not keyboard Enter) on the submit button.
-        page.locator('[data-testid="creation-submit"]').click()
+        # Pointer click (not keyboard Enter) on the submit button; the gate above
+        # already proved the control is rendered, so the click auto-wait is bounded.
+        page.locator('[data-testid="creation-submit"]').click(timeout=5000)
         page.wait_for_timeout(200)
         self.assertEqual(
             sent_action_count(page, "creation.custom"), 1,
@@ -1003,10 +1071,26 @@ class PointerCreationJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-reset\"]') !== null"
+        def _custom_form_ready(state):
+            if not state.get("connected") or state.get("mode") != "creation":
+                return False
+            panel = (state.get("panels") or {}).get("creation")
+            return bool(panel and panel.get("available") is True)
+
+        wait_for_store_state(
+            page,
+            _custom_form_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-reset"]',
+                "predicate": (
+                    "() => { const r = document.querySelector('[data-testid=\"creation-reset\"]'); "
+                    "return r !== null; }"
+                ),
+                "description": "creation reset control rendered",
+            },
+            timeout=30000,
         )
-        page.locator('[data-testid="creation-reset"]').click()
+        page.locator('[data-testid="creation-reset"]').click(timeout=5000)
         page.wait_for_timeout(200)
         self.assertEqual(
             page.locator(".creation-confirm").count(), 1,

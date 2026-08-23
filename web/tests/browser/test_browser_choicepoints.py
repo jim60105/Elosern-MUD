@@ -30,6 +30,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -42,7 +43,7 @@ EXPECTED_READY_LABELS = ("查看四周", "前往南門", "我們聊聊好嗎？"
 
 
 def _narrative(page):
-    return page.locator(".elosern-narrative")
+    return page.locator('[data-testid="narrative-feed"]')
 
 
 class ChoicePointsBrowserTest(BrowserAcceptanceTest):
@@ -79,39 +80,47 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         return panel.get("suggestions") if panel else None
 
     def _wait_suggestions(self, page, status, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            suggestions = self._suggestions(page)
-            if suggestions and suggestions.get("status") == status:
-                return suggestions
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "suggestions status never became %r; state=%r"
-            % (status, store_state(page))
-        )
+        def _status_reached(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == status
+
+        wait_for_store_state(page, _status_reached, timeout=timeout)
 
     def _stream_block(self, page):
         return page.evaluate(
             "() => document.querySelectorAll("
-            "'.elosern-narrative .choicepoint-block').length"
+            "'[data-testid=\"narrative-feed\"] .choicepoint-block').length"
         )
 
     def _wait_stream_block_count(self, page, expected, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if self._stream_block(page) == expected:
-                return
-            page.wait_for_timeout(150)
-        raise AssertionError(
-            "stream choice-point block count never became %r (is %r)"
-            % (expected, self._stream_block(page))
+        if expected == 0:
+            def _store_predicate(state):
+                suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+                return suggestions is None or suggestions.get("status") == "unavailable"
+        else:
+            def _store_predicate(state):
+                suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+                return suggestions is not None and suggestions.get("status") in ("generating", "ready")
+
+        wait_for_store_state(
+            page,
+            _store_predicate,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"] .choicepoint-block',
+                "predicate": (
+                    "() => document.querySelectorAll('[data-testid=\"narrative-feed\"] .choicepoint-block')"
+                    ".length === %d" % expected
+                ),
+                "description": "the narrative stream-end choice-point block count is %d" % expected,
+            },
+            timeout=timeout,
         )
 
     def _stream_generating_text(self, page):
         return page.evaluate(
             """() => {
                 const line = document.querySelector(
-                    '.elosern-narrative .choicepoint-generating');
+                    '[data-testid="narrative-feed"] .choicepoint-generating');
                 return line ? line.innerText : null;
             }"""
         )
@@ -120,7 +129,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         return page.evaluate(
             """() => Array.from(
                 document.querySelectorAll(
-                    '.elosern-narrative .choicepoint-ready .option-card '
+                    '[data-testid="narrative-feed"] .choicepoint-ready .option-card '
                     + '.option-card-label'))
                 .map((el) => el.innerText)"""
         )
@@ -128,7 +137,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
     def _stream_is_last_element(self, page):
         return page.evaluate(
             """() => {
-                const narrative = document.querySelector('.elosern-narrative');
+                const narrative = document.querySelector('[data-testid="narrative-feed"]');
                 const last = narrative && narrative.lastElementChild;
                 return !!last && last.classList.contains('choicepoint-block');
             }"""
@@ -137,23 +146,33 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
     def _narrative_at_bottom(self, page):
         return page.evaluate(
             """() => {
-                const n = document.querySelector('.elosern-narrative');
+                const n = document.querySelector('[data-testid="narrative-feed"]');
                 return n.scrollHeight - n.scrollTop - n.clientHeight < 8;
             }"""
         )
 
     def _section(self, page):
         return page.evaluate(
-            "document.querySelector('[data-testid=\"suggestions-section\"]')) !== null"
+            "document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
         )
 
     def _wait_section_gone(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if not self._section(page):
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError("the suggestions section never disappeared")
+        def _section_hidden(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is None or suggestions.get("status") == "unavailable"
+
+        wait_for_store_state(
+            page,
+            _section_hidden,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') === null"
+                ),
+                "description": "the suggestions section has disappeared from the action dock",
+            },
+            timeout=timeout,
+        )
 
     def _sent_actions(self, page, action_id):
         sent = page.evaluate("window.__elosernSent || []")
@@ -164,7 +183,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         ]
 
     def _narrative_inp_count(self, page):
-        return page.locator(".elosern-narrative .inp").count()
+        return page.locator('[data-testid="narrative-feed"] .inp').count()
 
     # -- journey helpers -----------------------------------------------------
 
@@ -189,9 +208,11 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
-        )
+
+        def _disconnected(state):
+            return not state.get("connected")
+
+        wait_for_store_state(page, _disconnected)
 
     def _dismiss(self, page):
         page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').click()
@@ -225,13 +246,23 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         self._wait_stream_block_count(page, 0)
 
         self._teleport_to_plaza(page)
-        deadline = time.monotonic() + 30
-        line = None
-        while time.monotonic() < deadline:
-            line = self._stream_generating_text(page)
-            if line:
-                break
-            page.wait_for_timeout(150)
+
+        def _generating(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == "generating"
+
+        wait_for_store_state(
+            page,
+            _generating,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"] .choicepoint-generating',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"] .choicepoint-generating') !== null"
+                ),
+                "description": "the generating line has been appended at the narrative stream end",
+            },
+        )
+        line = self._stream_generating_text(page)
         self.assertEqual(line, GENERATING_LINE)
         self.assertEqual(
             self._stream_block(page),
@@ -239,7 +270,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             "the generating commit appends exactly one stream-end line",
         )
         self.assertEqual(
-            page.locator(".elosern-narrative .choicepoint-ready").count(),
+            page.locator('[data-testid="narrative-feed"] .choicepoint-ready').count(),
             0,
             "no card group exists while generating",
         )
@@ -247,7 +278,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         self._wait_suggestions(page, "ready")
         self._wait_stream_block_count(page, 1)
         self.assertEqual(
-            page.locator(".elosern-narrative .choicepoint-generating").count(),
+            page.locator('[data-testid="narrative-feed"] .choicepoint-generating').count(),
             0,
             "the ready commit replaces the generating line in place",
         )
@@ -256,7 +287,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             page.locator(
-                ".elosern-narrative .choicepoint-ready .suggestions-dismiss"
+                '[data-testid="narrative-feed"] .choicepoint-ready .suggestions-dismiss'
             ).count(),
             1,
             "the stream ready group carries the dismiss control",
@@ -280,10 +311,22 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         # block must relocate to the new stream end (text between the older
         # content and the block).
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_function(
-            "() => document.querySelector('.elosern-narrative')"
-            ".innerText.indexOf('燈籠') !== -1",
-            timeout=30000,
+
+        def _looked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "looked"
+
+        wait_for_store_state(
+            page,
+            _looked_result,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const feed = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return feed && feed.innerText.indexOf('燈籠') !== -1; }"
+                ),
+                "description": "the look result text has settled into the narrative feed",
+            },
         )
         self.assertTrue(
             self._stream_is_last_element(page),
@@ -307,16 +350,28 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
 
         # Keyboard activation works natively on the focused stream card button.
         page.locator(
-            ".elosern-narrative .choicepoint-ready .option-card"
+            '[data-testid="narrative-feed"] .choicepoint-ready .option-card'
         ).nth(0).focus()
         page.keyboard.press("Enter")
 
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        page.wait_for_function(
-            "() => document.querySelector('.elosern-narrative')"
-            ".innerText.indexOf('燈籠') !== -1",
-            timeout=30000,
+
+        def _looked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "looked"
+
+        wait_for_store_state(
+            page,
+            _looked_result,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const feed = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return feed && feed.innerText.indexOf('燈籠') !== -1; }"
+                ),
+                "description": "the look result text has settled into the narrative feed",
+            },
         )
         self.assertEqual(
             self._narrative_inp_count(page),
@@ -338,7 +393,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             if entry["action_id"] == "explore.talk_freeform"
         )
         page.locator(
-            ".elosern-narrative .choicepoint-ready .option-card",
+            '[data-testid="narrative-feed"] .choicepoint-ready .option-card',
             has_text="我們聊聊好嗎？",
         ).click()
 
@@ -352,13 +407,24 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             ],
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
-        deadline = time.monotonic() + 30
-        live = ""
-        while time.monotonic() < deadline:
-            live = page.locator("#elosern-action-live").inner_text()
-            if live == "對方回應了你的話。":
-                break
-            page.wait_for_timeout(250)
+
+        def _talked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "talked"
+
+        wait_for_store_state(
+            page,
+            _talked_result,
+            dom_readiness={
+                "selector": "#elosern-action-live",
+                "predicate": (
+                    "() => { const live = document.querySelector('#elosern-action-live'); "
+                    "return live && live.innerText === '對方回應了你的話。'; }"
+                ),
+                "description": "the dialogue result has settled into the action live region",
+            },
+        )
+        live = page.locator("#elosern-action-live").inner_text()
         self.assertEqual(live, "對方回應了你的話。")
         self.assertEqual(
             self._narrative_inp_count(page),
@@ -377,7 +443,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
     def test_stream_dismiss_clears_both_surfaces(self):
         page = self._open_plaza_stream_page()
         page.locator(
-            ".elosern-narrative .choicepoint-ready .suggestions-dismiss"
+            '[data-testid="narrative-feed"] .choicepoint-ready .suggestions-dismiss'
         ).click()
 
         self._wait_suggestions(page, "unavailable")
@@ -394,12 +460,15 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         # Lock through a real transport close; no server push can arrive, so
         # the store lock is stable for the whole click window.
         self._disconnect_transport(page)
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return !s.connected && s.mutationsLocked; }"
-        )
 
-        card = page.locator(".elosern-narrative .choicepoint-ready .option-card").nth(0)
+        def _locked(state):
+            return (not state.get("connected")) and bool(state.get("mutationsLocked"))
+
+        wait_for_store_state(page, _locked)
+
+        card = page.locator(
+            '[data-testid="narrative-feed"] .choicepoint-ready .option-card'
+        ).nth(0)
         card.scroll_into_view_if_needed()
         card.click(force=True)
         page.wait_for_timeout(300)
@@ -420,11 +489,21 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         # Walk through the dock into the scripted-transport-failure room.
         self._move_to_empty_ground(page)
 
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if self._section(page):
-                break
-            page.wait_for_timeout(250)
+        def _section_shown(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") in ("generating", "ready", "degraded")
+
+        wait_for_store_state(
+            page,
+            _section_shown,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
+                ),
+                "description": "the suggestions section is rendered in the action dock",
+            },
+        )
         note = page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text()
         self.assertEqual(note, DEGRADED_NOTE)
         self.assertGreaterEqual(
@@ -438,7 +517,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             "degraded rule cards must never enter the narrative stream",
         )
         self.assertEqual(
-            page.locator(".elosern-narrative .option-card").count(),
+            page.locator('[data-testid="narrative-feed"] .option-card').count(),
             0,
             "no stream card DOM exists for the degraded state",
         )
@@ -466,7 +545,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
                         window.__resetBlockCount = 'pending';
                         Promise.resolve().then(() => {
                             window.__resetBlockCount = document
-                                .querySelectorAll('.elosern-narrative '
+                                .querySelectorAll('[data-testid="narrative-feed"] '
                                     + '.choicepoint-block').length;
                         });
                     }
@@ -503,10 +582,10 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         )
 
         # The fresh generation regenerates and mounts a fresh block.
-        while time.monotonic() < deadline + 30:
-            if store_state(page)["generation"] > generation_before:
-                break
-            page.wait_for_timeout(500)
+        def _fresh_generation(state):
+            return state.get("generation") is not None and state.get("generation") > generation_before
+
+        wait_for_store_state(page, _fresh_generation, timeout=30000)
         self._wait_suggestions(page, "ready")
         self._wait_stream_block_count(page, 1)
         self.assertEqual(
