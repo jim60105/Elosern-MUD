@@ -8,6 +8,7 @@ service.
 
 from __future__ import annotations
 
+import json
 import time
 
 from playwright.sync_api import Error, Page
@@ -150,10 +151,18 @@ def wait_for_shell_active(page: Page, timeout: int = 60000) -> None:
 
 
 def store_state(page: Page) -> dict:
-    """Return the current client store state (the C4 bridge hook)."""
-    return page.evaluate(
-        "(window.__elosernBridge && window.__elosernBridge.store.view) || null"
+    """Return the current client store state (the C4 bridge hook).
+
+    The committed store view is a deeply nested object graph; returning it
+    directly can exceed Playwright's result-serialization limit ("object
+    reference chain is too long"). Serialize it to a JSON string in-page and
+    parse it in Python.
+    """
+    raw = page.evaluate(
+        "(window.__elosernBridge && window.__elosernBridge.store"
+        " ? JSON.stringify(window.__elosernBridge.store.view) : null)"
     )
+    return json.loads(raw) if raw is not None else {}
 
 
 def focus_action_dock(page: Page, timeout: int = 60000) -> None:
@@ -342,11 +351,14 @@ def store_state_or_none(page: Page) -> dict | None:
     raise. An in-flight page navigation is tolerated the same way (see
     ``evaluate_tolerating_navigation``).
     """
-    return evaluate_tolerating_navigation(
+    raw = evaluate_tolerating_navigation(
         page,
         "() => window.__elosernBridge && window.__elosernBridge.store "
-        "? window.__elosernBridge.store.view : null",
+        "? JSON.stringify(window.__elosernBridge.store.view) : null",
     )
+    if raw is None:
+        return None
+    return json.loads(raw)
 
 
 def wait_for_store_state(

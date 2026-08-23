@@ -82,22 +82,12 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         page.goto(f"{self.webclient_url}{VUE_QUERY}")
         # If the bundle is blocked, the Vue app never mounts (main.js does not
         # run), so the console is NOT retired and drives the live transport.
-        # The degraded (bundle-blocked) page has no C4 bridge or store, so the
-        # deterministic readiness is the D10 console's data-status (DOM); the
-        # store predicate is trivially true and the DOM descriptor carries the
-        # actual gate.
+        # The degraded (bundle-blocked) page has no C4 bridge or store, so
+        # readiness is purely DOM-based: wait for the D10 console's data-status.
         if block_bundle:
-            wait_for_store_state(
-                page,
-                lambda state: True,
-                dom_readiness={
-                    "selector": CONSOLE,
-                    "predicate": (
-                        f"() => {{ const c = document.querySelector('{CONSOLE}');"
-                        " return c && c.getAttribute('data-status') === 'ready'; }}"
-                    ),
-                    "description": "the D10 text console reports data-status=ready",
-                },
+            page.wait_for_function(
+                f"() => {{ const c = document.querySelector('{CONSOLE}');"
+                " return c && c.getAttribute('data-status') === 'ready'; }",
                 timeout=30000,
             )
         else:
@@ -208,32 +198,16 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         field.press("Enter")
 
         # The degraded (bundle-blocked) page has no Vue store/bridge, so the
-        # deterministic readiness is the D10 console and the ``__elosernSent``
-        # outbound recorder; the store predicate is trivially true and the
-        # gate is carried by the recorder closure and the console-log DOM check.
-        def _text_command_crossed(state: dict) -> bool:
-            return bool(evaluate_tolerating_navigation(
-                page,
-                "() => (window.__elosernSent || []).some("
-                "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
-            ))
-
-        wait_for_store_state(
-            page,
-            _text_command_crossed,
+        # deterministic readiness is carried by the ``__elosernSent`` outbound
+        # recorder and the console-log DOM check (pure JS/DOM waits).
+        page.wait_for_function(
+            "() => (window.__elosernSent || []).some("
+            "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
             timeout=20000,
         )
-        wait_for_store_state(
-            page,
-            lambda state: True,
-            dom_readiness={
-                "selector": CONSOLE_LOG,
-                "predicate": (
-                    f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
-                    " return log && log.textContent.length > 0; }"
-                ),
-                "description": "the D10 console log is non-empty",
-            },
+        page.wait_for_function(
+            f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
+            " return log && log.textContent.length > 0; }",
             timeout=45000,
         )
 
@@ -288,7 +262,7 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         # The Vue bridge is active under the production default; the legacy
         # GoldenLayout shell globals and jQuery are retired from the load path.
         self.assertIsNotNone(
-            page.evaluate("window.__elosernBridge ?? null"),
+            page.evaluate("window.__elosernBridge ? true : null"),
             "the Vue bridge owns the production default (C4 flip)",
         )
         self.assertIsNone(
@@ -310,7 +284,7 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
 
         # Reduced motion: emulate prefers-reduced-motion: reduce; the tokens.css
         # @media block must resolve the motion tokens to 1ms.
-        page.emulate_media(reduce_motion="reduce")
+        page.emulate_media(reduced_motion="reduce")
         motion_base = page.evaluate(
             "() => getComputedStyle(document.documentElement)."
             "getPropertyValue('--motion-base').trim()"

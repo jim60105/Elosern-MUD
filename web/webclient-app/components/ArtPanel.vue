@@ -6,7 +6,7 @@
 // Design D1 truthfulness: a not-yet-generated asset degrades to the
 // payload's own placeholder frame, and a pending scene keeps its prior
 // image with an explicit generating note; nothing is invented.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps({
   // The committed `art` v1 panel payload: `available: true` carries
@@ -36,6 +36,14 @@ const sceneUrl = computed(() => scene.value?.url ?? null);
 const sceneLabel = computed(() => scene.value?.label ?? "");
 const sceneAlt = computed(() => scene.value?.alt ?? "");
 const scenePlaceholder = computed(() => (scene.value?.placeholder ?? null));
+// A scene image that fails to load in the browser degrades to a truthful
+// fallback frame (spec: art degradation never blocks gameplay). The failure
+// flag resets only when the scene URL changes, so a stale URL is never
+// re-fetched without a new URL or a user reload.
+const imageLoadFailed = ref(false);
+watch(sceneUrl, () => {
+  imageLoadFailed.value = false;
+});
 const sceneNote = computed(() =>
   scene.value && scene.value.status === "pending" && scene.value.url
     ? "場景圖像生成中，顯示上一版圖像"
@@ -70,24 +78,25 @@ const portraitEntries = computed(() => {
     <section v-else class="art-panel__section" data-testid="art-panel__section">
       <div class="art-panel__scene-frame" data-testid="art-panel__scene-frame">
         <img
-          v-if="sceneUrl"
+          v-if="sceneUrl && !imageLoadFailed"
           class="art-panel__scene"
           data-testid="art-panel__scene"
           :src="sceneUrl"
           aria-hidden="true"
           :style="SCENE_STYLE"
+          @error="imageLoadFailed = true"
         />
         <div
-          v-else-if="scenePlaceholder"
+          v-else-if="imageLoadFailed || scenePlaceholder"
           class="art-panel__scene-placeholder"
           data-testid="art-panel__scene-placeholder"
-          :data-kind="scenePlaceholder.kind"
+          :data-kind="imageLoadFailed ? 'load_failed' : (scenePlaceholder?.kind ?? 'unavailable')"
         >
           <span class="art-panel__placeholder-kind" data-testid="art-panel__scene-placeholder-kind">
-            {{ scenePlaceholder.kind }}
+            {{ imageLoadFailed ? 'load_failed' : scenePlaceholder.kind }}
           </span>
           <p class="art-panel__placeholder-label" data-testid="art-panel__scene-placeholder-label">
-            {{ scenePlaceholder.label }}
+            {{ imageLoadFailed ? '載入失敗' : scenePlaceholder.label }}
           </p>
         </div>
         <p v-if="sceneNote" class="art-panel__generating" data-testid="art-panel__generating">

@@ -126,7 +126,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 "selector": CONSOLE,
                 "predicate": (
                     f"() => {{ const c = document.querySelector('{CONSOLE}');"
-                    " return c && c.getAttribute('data-status') === 'ready'; }}"
+                    " return c && c.getAttribute('data-status') === 'ready'; }"
                 ),
                 "description": "the D10 text console reports data-status=ready",
             },
@@ -350,7 +350,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 "selector": CONSOLE,
                 "predicate": (
                     f"() => {{ const c = document.querySelector('{CONSOLE}');"
-                    " return c && c.getAttribute('data-status') === 'ready'; }}"
+                    " return c && c.getAttribute('data-status') === 'ready'; }"
                 ),
                 "description": "the D10 text console reports data-status=ready",
             },
@@ -444,7 +444,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         wait_for_shell_active(page)
         self.assertIsNone(page.evaluate("window.jQuery ?? null"))
         self.assertIsNotNone(
-            page.evaluate("window.__elosernBridge ?? null"),
+            page.evaluate("window.__elosernBridge ? true : null"),
             "the Vue bridge hook owns the production default (C4 flip)",
         )
 
@@ -487,23 +487,13 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         page.on("response", lambda response: failed.append(response.url) if response.status >= 400 else None)
         page.goto(f"http://127.0.0.1:{port}/iframe.html?id={STORY_ID}&viewMode=story")
         # The Storybook story page is a pure component render with no C4 bridge
-        # or store, so the deterministic readiness is the narrative-feed's
-        # visibility (the stable `data-testid` hook). The store predicate is
-        # trivially true (any committed view); the DOM descriptor carries the
-        # actual readiness check.
-        wait_for_store_state(
-            page,
-            lambda state: True,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "if (!f) { return false; } "
-                    "const r = f.getBoundingClientRect(); "
-                    "return r.width > 0 && r.height > 0 && f.offsetParent !== null; }"
-                ),
-                "description": "the story's narrative feed is visible",
-            },
+        # or store, so readiness is purely DOM-based: wait for the
+        # narrative-feed's visibility (the stable `data-testid` hook).
+        page.wait_for_function(
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+            "if (!f) { return false; } "
+            "const r = f.getBoundingClientRect(); "
+            "return r.width > 0 && r.height > 0 && f.offsetParent !== null; }",
             timeout=30000,
         )
         feed = page.locator('[data-testid="narrative-feed"]')
@@ -584,6 +574,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 "handlePresentation",
                 "handleReconnect",
                 "handleTransportReset",
+                "requestResync",
+                "resetResyncEpisode",
                 "submit",
                 "sync",
             ],
