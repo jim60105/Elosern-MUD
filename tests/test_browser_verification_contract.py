@@ -116,14 +116,27 @@ class BrowserVerificationContractTests(unittest.TestCase):
         )
         self.assertIn('wait "$pid1" || status1=$?', browser_run)
         self.assertIn('wait "$pid2" || status2=$?', browser_run)
+        # The per-process evidence files are merged only when they exist: a
+        # failing process that never wrote its file must not abort the step
+        # with a `cat` error, masking the real test status.
         self.assertIn(
-            "cat w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl "
-            "w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl "
-            "> evidence.browser-shard-${{ matrix.index }}.jsonl",
+            'for f in "w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl" '
+            '"w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl"; do',
             browser_run,
         )
+        self.assertIn('if [ -f "$f" ]; then', browser_run)
+        self.assertIn("warning: missing evidence file: $f", browser_run)
+        # When either process failed, the step exits with the real test status
+        # (not a missing-file error).
+        self.assertIn('if [ "$status1" -ne 0 ]; then', browser_run)
+        self.assertIn('exit "$status1"', browser_run)
+        self.assertIn('if [ "$status2" -ne 0 ]; then', browser_run)
+        self.assertIn('exit "$status2"', browser_run)
+        # Only when BOTH processes succeeded does a missing evidence file become
+        # a clear infrastructure error, so a successful run is never silently
+        # missing its evidence.
         self.assertIn(
-            'test "$status1" -eq 0 && test "$status2" -eq 0',
+            "evidence file missing despite a successful run: $f",
             browser_run,
         )
 
