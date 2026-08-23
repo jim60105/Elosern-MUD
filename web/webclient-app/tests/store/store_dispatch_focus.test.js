@@ -218,7 +218,7 @@ describe("store dispatch + focus", () => {
       expect(store.view.focus.label).toBe("公會");
     });
 
-    it("navigates a combat target frame with preserved target keys", () => {
+    it("navigates the combat root grid with preserved action keys", () => {
       openSession();
       store.receive(
         1,
@@ -226,11 +226,11 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { context_actions: fx.combatActions() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("target-7");
-      expect(store.view.focus.label).toBe("灰袍盜賊");
+      expect(store.view.focus.key).toBe("attack");
+      expect(store.view.focus.label).toBe("攻擊");
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("target-8");
-      expect(store.view.focus.label).toBe("同行劍士");
+      expect(store.view.focus.key).toBe("forfeit");
+      expect(store.view.focus.label).toBe("投降");
     });
 
     it("rebuilds the frame only when the committed panel content changes", () => {
@@ -320,17 +320,55 @@ describe("store dispatch + focus", () => {
       expect(sender.sent.actions.length).toBe(0);
     });
 
-    it("records a target identity intent for combat participants", () => {
+    it("submits a SINGLE-target skill as a combat.cast action", () => {
       openSession();
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 2, panels: { context_actions: fx.combatActions() } })],
+        [fx.update({
+          revision: 2,
+          panels: {
+            context_actions: fx.combatActions({
+              skills: [
+                {
+                  category: "innate_gift",
+                  label: "天賦",
+                  groups: [
+                    {
+                      group: null,
+                      label: null,
+                      skills: [
+                        {
+                          key: "basic_attack",
+                          label: "攻擊",
+                          description: "基本攻擊，對單一目標造成傷害。",
+                          cost: {},
+                          target_spec: "single",
+                          element: null,
+                          enabled: true,
+                          disabled_reason: null,
+                          targets: [7, 8],
+                          shorthands: [],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        })],
         {},
       );
+      // Confirm the focused root "attack" to open the target frame, then
+      // confirm the first target (identity 7) — this submits a real
+      // combat.cast ui_action envelope (never a bare identity intent).
+      expect(store.focusPress("Enter")).toBe(true);
       expect(store.focusConfirm("keyboard")).toBe(true);
-      expect(store.view.lastTarget).toBe("7");
-      expect(sender.sent.actions.length).toBe(0);
+      expect(sender.sent.actions.length).toBe(1);
+      expect(sender.sent.actions[0].action_id).toBe("combat.cast");
+      expect(sender.sent.actions[0].payload.skill_key).toBe("basic_attack");
+      expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
     });
   });
 });

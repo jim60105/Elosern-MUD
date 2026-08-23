@@ -29,6 +29,7 @@ import NarrativeMarkup from "../lib/narrative_markup.js";
 import LocalMap from "../lib/local_map.js";
 import ChoicePointLogic from "../lib/choicepoint.js";
 import OptionCards from "../lib/option_cards.js";
+import CombatMenu from "../lib/combat_menu.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
@@ -139,6 +140,9 @@ export const useElosernStore = defineStore("elosern", () => {
   // carries only the projected {label, enabled, description, key}; intents,
   // surfaces, and identities are read back from the raw item, never invented).
   let dockRawByKey = {};
+  // The preserved CombatMenu tree for the active combat panel (client-local
+  // skill/scale/target selection state), or null outside combat mode.
+  let combat = null;
 
   // D4: the imported keyboard router owns the focus state; its events are
   // routed through the same store actions (a broken renderer must never
@@ -156,23 +160,106 @@ export const useElosernStore = defineStore("elosern", () => {
   // triggers the one-sync-per-episode auto-resync.
   const lastPanelRejection = ref(null);
 
+  // Open one skill's target (or 威力 scale) menu from the root/skills menu,
+  // mirroring the legacy plugin's `openCombatSkill`.
+  function openCombatSkill(skillKey) {
+    if (!combat) {
+      return;
+    }
+    combat.focusSkillKey = skillKey;
+    const menu = CombatMenu.openSkill(combat, skillKey);
+    if (menu) {
+      router.pushMenu(menu);
+      if (menu.items.length > 0 && menu.items[0].scaleChoice) {
+        // The freeform scale step preselects 威力×1 (the default behavior).
+        router.focusItemByKey("scale-1");
+      }
+    }
+    publishView();
+  }
+
   function onRouterEvent(name, payload) {
     if (name === "focus" || name === "disabled") {
       publishView();
       return;
     }
-    if (name !== "submit") {
+    if (name !== "submit" && name !== "space") {
       return;
+    }
+    const item = payload && payload.item;
+    if (!item) {
+      return;
+    }
+    // Combat keyboard hierarchy (the preserved CombatMenu model, mirroring the
+    // legacy elosern_ui plugin's routing): open-skill / attack open a skill's
+    // scale or target frame, skills / forfeit open their submenus, Space
+    // toggles AREA candidates, and confirm submits the exact payload.
+    if (combat) {
+      if (name === "space") {
+        if (item.actionId === "toggle-target" && item.payload && combat.focusSkillKey) {
+          CombatMenu.toggleArea(combat, combat.focusSkillKey, item.payload.identity);
+          publishView();
+        }
+        return;
+      }
+      // "open" items push a submenu (no OOB packet is sent).
+      if (item.actionId === "open-skill" && item.payload) {
+        openCombatSkill(item.payload.skillKey);
+        return;
+      }
+      if (item.actionId === "choose-scale" && item.payload) {
+        if (combat.focusSkillKey && CombatMenu.chooseScale(combat, combat.focusSkillKey, item.payload.scale)) {
+          const targetMenu = CombatMenu.openSkillTargets(combat, combat.focusSkillKey);
+          if (targetMenu) {
+            router.pushMenu(targetMenu);
+            publishView();
+          }
+        }
+        return;
+      }
+      if (item.actionId === "choose-shorthand" && item.payload) {
+        if (combat.focusSkillKey) {
+          CombatMenu.chooseShorthand(combat, combat.focusSkillKey, item.payload.shorthand);
+          publishView();
+        }
+        return;
+      }
+      if (item.key === "attack") {
+        openCombatSkill(CombatMenu.BASIC_ATTACK_KEY);
+        return;
+      }
+      if (item.key === "skills") {
+        router.pushMenu(combat.menus.skills);
+        publishView();
+        return;
+      }
+      if (item.key === "forfeit") {
+        router.pushMenu(combat.menus.forfeit);
+        publishView();
+        return;
+      }
+      // AREA confirm: build the exact payload from the live selection.
+      if (item.confirm && combat.focusSkillKey) {
+        const skill = combat.skillByKey[combat.focusSkillKey];
+        if (skill && skill.targetSpec === "area") {
+          const areaPayload = CombatMenu.areaPayload(skill);
+          if (areaPayload) {
+            dispatchAction("combat.cast", areaPayload);
+          }
+          return;
+        }
+      }
+      // Real OOB action items (combat.cast / combat.flee / combat.forfeit).
+      if (item.actionId) {
+        dispatchAction(item.actionId, item.payload || {});
+        return;
+      }
     }
     // The router's submit event carries only the projected menu item
     // ({label, enabled, description, key}); the OOB intent, navigation
     // surface, and target identity are read back from the raw committed
     // item looked up by the preserved focus key — never re-derived from the
     // projected item (which lacks `action_id`/`surface`/`identity`).
-    const item = payload && payload.item;
-    if (!item) {
-      return;
-    }
     const raw = (item.key !== undefined && dockRawByKey[item.key]) || item;
     const intent = actionIntentForItem(raw);
     if (intent) {
@@ -255,15 +342,47 @@ export const useElosernStore = defineStore("elosern", () => {
   let lastMenuSig = null;
   function rebuildFocusMenu(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
-    // The menu frame depends only on the dock items (affordances or
-    // participants), never on the sibling ``suggestions`` envelope: a
-    // generating→ready suggestions transition must not rebuild the menu and
-    // reset the router focus to the first row.
-    const sig = stableStringify(focusItemsFor(panel));
+    const kind = (panel && panel.kind) || null;
+    if (kind === "combat") {
+      // The combat keyboard hierarchy (root/skills/forfeit menus) is built by
+      // the preserved CombatMenu model; selection state (skill/scale/target)
+      // is rebuilt deterministically across a panel replacement. The signature
+      // guard is essential: without it, replaceMenu -> notifyFocus ->
+      // publishView -> rebuildFocusMenu would recurse (replaceMenu resets
+      // focus, which re-enters publishView).
+      const previous = combat
+        ? {
+            skillKey: combat.focusSkillKey,
+            page: combat.page || 0,
+            skillByKey: combat.skillByKey,
+          }
+        : {};
+      const probe = CombatMenu.buildMenus(panel, { skillKey: previous.skillKey, page: previous.page || 0 });
+      const sig = stableStringify(probe.menus.root.items);
+      if (sig === lastMenuSig) {
+        // Panel unchanged: keep the existing combat tree so the in-progress
+        // client-local selection state (chosen skill, 威力 scale, AREA
+        // shorthand/candidates) set by the keyboard flow survives publishView
+        // cycles. Only a genuine panel replacement rebuilds (rebuildForPanel
+        // deterministically preserves a still-valid scale, and prunes vanished
+        // selections).
+        return;
+      }
+      lastMenuSig = sig;
+      combat = CombatMenu.rebuildForPanel(combat, panel, previous);
+      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      return;
+    }
+    // The committed `context_actions` panel (affordances/participants AND the
+    // sibling `suggestions` envelope) is the menu frame's content: any change
+    // to the committed panel resets the router focus to the first item, while
+    // an identical re-commit preserves the focus position.
+    const sig = stableStringify(panel);
     if (sig === lastMenuSig) {
       return;
     }
     lastMenuSig = sig;
+    combat = null;
     const rawItems = focusItemsFor(panel);
     const keys = dockItemKeys(rawItems);
     dockRawByKey = {};
@@ -331,6 +450,15 @@ export const useElosernStore = defineStore("elosern", () => {
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
       choicePoint: { state: choiceState, suggestions },
       localMapModel: panels.local_map ? LocalMap.reducePanel(panels.local_map) : null,
+      // The keyboard router's current combat menu frame (root/skills/scale/
+      // target) so the visible dock follows keyboard navigation (Option B).
+      combatMenu: router.currentMenu(),
+      // The focused AREA skill's selected candidate identities (the client-
+      // local selection the Space toggle mutates); drives the "✓" marker.
+      combatSelected:
+        combat && combat.focusSkillKey && combat.skillByKey[combat.focusSkillKey]
+          ? combat.skillByKey[combat.focusSkillKey].selected
+          : [],
 
       focus: currentItem
         ? {

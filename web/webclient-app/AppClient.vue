@@ -112,12 +112,48 @@ const dockItems = computed(() => {
     return Array.isArray(p.affordances) ? p.affordances : [];
   }
   if (p.kind === "combat") {
-    const parts = Array.isArray(p.participants) ? p.participants : [];
-    return parts.map((participant) => ({
-      identity: participant.identity == null ? "" : String(participant.identity),
-      label: participant.display_name || participant.label || "",
-      enabled: participant.enabled !== false,
-    }));
+    // The combat dock follows the preserved keyboard hierarchy (Option B):
+    // it renders the keyboard router's current menu frame (root / skills /
+    // scale / target), normalized to the DockMenu item contract.
+    const menu = store.view.combatMenu;
+    const items = (menu && menu.items) || [];
+    const selectedIds = store.view.combatSelected || [];
+    return items.map((item) => {
+      const normalized = {
+        key: item.key,
+        label: item.label,
+        enabled: item.enabled !== false,
+      };
+      // AREA candidate cells (actionId "toggle-target") show the "✓" marker
+      // when their identity is in the client-local selected set.
+      if (item.actionId === "toggle-target" && item.payload) {
+        normalized.selected = selectedIds.includes(item.payload.identity);
+      }
+      if (item.disabledReason) {
+        normalized.disabled_reason = {
+          code: item.disabledReason.code,
+          message: item.disabledReason.message,
+        };
+      }
+      if (item.actionId) {
+        normalized.action_id = item.actionId;
+        normalized.params = item.payload || {};
+      } else {
+        // Open items (Attack / Skills / Forfeit) drive local submenus, not an
+        // OOB action — classify them as local navigation cells.
+        normalized.navigation = true;
+        normalized.surface = item.key;
+      }
+      if (item.description) {
+        normalized.description = item.description;
+      }
+      // A skill item's cost text (e.g. "MP 20") — the detail pane names the
+      // focused skill's cost.
+      if (item.costText) {
+        normalized.cost_text = item.costText;
+      }
+      return normalized;
+    });
   }
   return [];
 });
@@ -282,6 +318,7 @@ function onSubmitCommand(text) {
             :id-prefix="rowPrefix"
             :detail-test-id="detailTestId"
             :detail-message="restFormError"
+            :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
             @focus-change="onDockFocusChange"
             @activate="onDockActivate"
           />

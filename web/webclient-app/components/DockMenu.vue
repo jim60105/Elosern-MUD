@@ -83,6 +83,7 @@ function onCellActivate(key, row) {
         :item-key="row.key"
         :label="row.item.label"
         :enabled="row.item.enabled !== false"
+        :selected="row.item.selected === true"
         :reason="row.reason"
         :focused="row.key === props.focusedKey"
         :row-id="row.rowId"
@@ -103,6 +104,9 @@ function onCellActivate(key, row) {
       </template>
       <template v-else>
         <div class="dock-detail__label">{{ focusedRow.item.label }}</div>
+        <div v-if="focusedRow.item.cost_text" class="dock-detail__cost">
+          {{ focusedRow.item.cost_text }}
+        </div>
         <div v-if="focusedRow.item.enabled !== false" class="dock-detail__action">
           Enter → 開啟
         </div>
@@ -149,6 +153,11 @@ function onCellActivate(key, row) {
 
 .dock-detail__label {
   font-weight: 600;
+  margin-bottom: var(--sp-1);
+}
+
+.dock-detail__cost {
+  color: var(--paper-300);
   margin-bottom: var(--sp-1);
 }
 

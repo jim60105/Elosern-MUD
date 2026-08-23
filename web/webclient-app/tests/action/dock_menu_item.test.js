@@ -43,7 +43,10 @@ describe("DockMenuItem (B2 action-dock family)", () => {
     const cell = w.get('[data-testid="dock-item"]');
     expect(cell.classes()).toContain("dock-menu-item--focused");
     expect(cell.attributes("aria-selected")).toBe("true");
-    expect(w.get(".dock-menu-item__caret").text()).toBe("▶");
+    // The focus glyph "▶" is a CSS ::before pseudo-element (not a child
+    // node), so the cell's text is just the label — the glyph is styled in
+    // `.dock-menu-item--focused::before`.
+    expect(cell.text()).toBe("走往北岸大道");
   });
 
   it("renders the disabled cell with the preserved suffix and readable reason", () => {

@@ -13,10 +13,11 @@
 const props = defineProps({
   itemKey: { type: String, required: true },
   label: { type: String, required: true },
-  enabled: { type: Boolean, default: true },
-  reason: { type: String, default: null },
-  focused: { type: Boolean, default: false },
-  rowId: { type: String, required: true },
+   enabled: { type: Boolean, default: true },
+   selected: { type: Boolean, default: false },
+   reason: { type: String, default: null },
+   focused: { type: Boolean, default: false },
+   rowId: { type: String, required: true },
 });
 
 const emit = defineEmits(["focus", "activate"]);
@@ -52,10 +53,10 @@ function onActivate() {
     @click="onActivate"
   >
     <span
-      v-if="focused"
-      class="dock-menu-item__caret"
+      v-if="selected"
+      class="dock-menu-item__checked"
       aria-hidden="true"
-    >▶</span>
+    >✓</span>
     <span class="dock-menu-item__label">{{ label }}</span
     ><span
       v-if="!enabled"
@@ -99,9 +100,21 @@ function onActivate() {
   box-shadow: var(--focus);
 }
 
-.dock-menu-item__caret {
+/* The focus caret is a leading glyph via ::before (not color alone), so the
+   managed-browser contract `getComputedStyle(el, '::before').content` sees
+   the "▶" glyph. */
+.dock-menu-item--focused::before {
+  content: "▶";
   color: var(--gold-400);
   font-size: 0.8em;
+}
+
+/* The AREA selection marker: a green check prefix on a selected candidate,
+   distinct from the gold focus caret (not color alone — it's a glyph). */
+.dock-menu-item__checked {
+  color: var(--ok);
+  font-size: 0.9em;
+  font-weight: 700;
 }
 
 /* Disabled: dim text, dashed frame, dimmed fill — the `（無法使用）`

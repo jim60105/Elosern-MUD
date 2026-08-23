@@ -414,7 +414,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowRight")  # items (disabled)
         detail = page.evaluate(
-            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
+            "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
         )
         self.assertIn("道具功能尚未開放", detail)
         self._press(page, "Enter")  # disabled confirm -> explanation, no packet
@@ -423,7 +423,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
         detail = page.evaluate(
-            "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
+            "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
         )
         self.assertIn("防禦功能尚未開放", detail)
 
@@ -503,7 +503,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # items (disabled)
         self.assertIn(
             "道具功能尚未開放",
-            page.evaluate("document.querySelector('[data-testid=\"combat-detail\"]')).innerText"),
+            page.evaluate("document.querySelector('[data-testid=\"combat-detail\"]').innerText"),
         )
         self.assertEqual(
             page.evaluate("document.getElementById('action-dock').scrollWidth <= "
@@ -544,7 +544,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             )
             page.wait_for_timeout(150)
             detail = page.evaluate(
-                "document.querySelector('[data-testid=\"combat-detail\"]')).innerText"
+                "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
             )
             self.assertIn("MP ", detail, "the detail pane names the skill cost")
             self.assertIn("Enter → 開啟", detail, "the detail pane names the next key action")

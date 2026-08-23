@@ -42,14 +42,27 @@ function classify(item) {
 export function dockItemKeys(items) {
   const used = new Set();
   return items.map((item) => {
-    const kind = classify(item);
-    const base =
-      kind === "target"
-        ? TARGET_PREFIX + item.identity
-        : ACTION_PREFIX + (kind === "navigation" ? item.surface : item.action_id);
-    let key = base;
-    for (let n = 2; used.has(key); n += 1) {
-      key = `${base}-${n}`;
+    // An item may carry its own stable `key` (the preserved combat-menu item
+    // keys, e.g. `attack`, `fire_ball`, `scale-1`, `area-confirm`). When
+    // present it is used verbatim so the visible dock's row keys match the
+    // keyboard router's focus keys. Otherwise the key is derived from the
+    // item's action_id / surface / identity.
+    let key;
+    if (typeof item.key === "string" && item.key) {
+      key = item.key;
+      for (let n = 2; used.has(key); n += 1) {
+        key = `${item.key}-${n}`;
+      }
+    } else {
+      const kind = classify(item);
+      const base =
+        kind === "target"
+          ? TARGET_PREFIX + item.identity
+          : ACTION_PREFIX + (kind === "navigation" ? item.surface : item.action_id);
+      key = base;
+      for (let n = 2; used.has(key); n += 1) {
+        key = `${base}-${n}`;
+      }
     }
     used.add(key);
     return key;
