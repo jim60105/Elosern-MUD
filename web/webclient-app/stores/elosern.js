@@ -30,6 +30,7 @@ import LocalMap from "../lib/local_map.js";
 import ChoicePointLogic from "../lib/choicepoint.js";
 import OptionCards from "../lib/option_cards.js";
 import CombatMenu from "../lib/combat_menu.js";
+import CreationMenu from "../lib/creation_menu.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
@@ -159,6 +160,12 @@ export const useElosernStore = defineStore("elosern", () => {
   // skill/scale/target selection state), or null outside combat mode.
   let combat = null;
 
+  // The legacy character-creation dock port (the preserved CreationMenu model
+  // driving the keyboard router in creation mode, design D4): the current dock
+  // stage (root/presets/custom/confirm), the built menus, and the save awaiting
+  // its confirmation. Null outside creation mode.
+  let creation = null; // {view, menus, confirmItems, pendingActivate, pendingActivateKey, pendingSaveRequestId, panelSig}
+
   // D4: the imported keyboard router owns the focus state; its events are
   // routed through the same store actions (a broken renderer must never
   // break the reducer).
@@ -214,11 +221,23 @@ export const useElosernStore = defineStore("elosern", () => {
       publishView();
       return;
     }
+    if (name === "menu-closed" || name === "escape-root") {
+      if (creation) {
+        handleCreationMenuEvent(name);
+      }
+      return;
+    }
     if (name !== "submit" && name !== "space") {
       return;
     }
     const item = payload && payload.item;
     if (!item) {
+      return;
+    }
+    // The creation dock owns the router in creation mode (the legacy
+    // creation_dock.js keyboard journey): submenu opens, preset-card saves,
+    // confirmation dispatches, and cancel pops one level.
+    if (creation && handleCreationItem(item)) {
       return;
     }
     // Combat keyboard hierarchy (the preserved CombatMenu model, mirroring the
@@ -474,6 +493,204 @@ export const useElosernStore = defineStore("elosern", () => {
     router.replaceMenu({ items, grid: false });
   }
 
+  // ------------------------------------------------------------------ creation
+
+  // The committed `creation` panel, or null unless the session is in creation
+  // mode with an available panel (the legacy `panelAvailable` check).
+  function creationPanelOf(rs) {
+    const panel = (rs.panels && rs.panels.creation) || null;
+    if (!panel || panel.available !== true || rs.mode !== "creation") {
+      return null;
+    }
+    return panel;
+  }
+
+  // The legacy `_panelSignature`: the preset keys, the race keys, and the
+  // canonical draft. Any change rebuilds the creation menus and resumes the
+  // server-persisted stage.
+  function creationPanelSignature(panel) {
+    const custom = panel.custom || {};
+    return stableStringify({
+      presets: (panel.presets || []).map((card) => card.key),
+      races: (custom.races || []).map((race) => race.key),
+      draft: panel.draft || null,
+    });
+  }
+
+  // Open the confirmation stage for the just-saved draft (preset/custom) or
+  // the destructive reset, pushing the confirm items as the single router
+  // frame (the legacy `_openPendingConfirm` / `_openResetConfirm`). The stage
+  // the player was on is remembered so cancel restores exactly that view.
+  function openCreationConfirm(kind, presetKey, returnStage) {
+    if (!creation || creation.view === "confirm") {
+      return;
+    }
+    creation.pendingActivate = kind;
+    creation.pendingActivateKey = kind === "preset" ? presetKey || null : null;
+    creation.pendingSaveRequestId = null;
+    creation.returnStage = returnStage || creation.view || "root";
+    const menu =
+      kind === "reset"
+        ? CreationMenu.confirmMenu("確認清除角色草稿？此操作無法回復。", CreationMenu.RESET_ACTION, {}, null)
+        : CreationMenu.activateConfirm(kind === "preset" ? presetKey : null);
+    creation.confirmItems = menu.items;
+    creation.view = "confirm";
+    router.pushMenu({ items: creation.confirmItems, focusKey: null });
+  }
+
+  // Router submit for a creation item (the legacy `handleItem`): submenu opens,
+  // preset-card saves, confirm dispatches, and cancel pops one level. Returns
+  // true when the item belonged to the creation dock.
+  function handleCreationItem(item) {
+    if (!creation || !creation.menus) {
+      return false;
+    }
+    if (item.openSubmenu === "presets") {
+      creation.view = "presets";
+      router.pushMenu(creation.menus.menus.presets);
+      return true;
+    }
+    if (item.openSubmenu === "custom") {
+      creation.view = "custom";
+      // A marker menu gives Escape a level to pop without discarding values.
+      router.pushMenu({ items: [], focusKey: null });
+      return true;
+    }
+    if (item.presetKey) {
+      const requestId = dispatchAction(CreationMenu.PRESET_ACTION, {
+        preset_key: item.presetKey,
+      });
+      if (requestId !== null) {
+        creation.pendingSaveRequestId = requestId;
+        creation.pendingActivate = "preset";
+        creation.pendingActivateKey = item.presetKey;
+      }
+      return true;
+    }
+    if (
+      item.actionId === CreationMenu.ACTIVATE_ACTION ||
+      item.actionId === CreationMenu.RESET_ACTION
+    ) {
+      dispatchAction(item.actionId, item.payload || {});
+      return true;
+    }
+    if (item.key && item.key.indexOf("cancel-") === 0) {
+      router.popMenu();
+      creation.view = creation.pendingActivate === "preset" ? "presets" : "custom";
+      creation.pendingActivate = null;
+      creation.pendingActivateKey = null;
+      return true;
+    }
+    return false;
+  }
+
+  // Router escape/menu-closed for creation: pop exactly one menu level and
+  // restore the matching view without discarding the server draft (the legacy
+  // `onRouterEvent` menu handling). The custom form's marker menu and the
+  // confirm screens all restore to root / presets / custom.
+  function handleCreationMenuEvent(name) {
+    if (!creation) {
+      return;
+    }
+    if (creation.view === "presets") {
+      creation.view = "root";
+    } else if (creation.view === "confirm") {
+      // Restore exactly the stage the confirmation was opened from (a reset
+      // confirm opened on the preset page returns to presets, one opened on
+      // the custom form returns to custom, ...).
+      creation.view = creation.returnStage || "root";
+      creation.returnStage = null;
+      creation.pendingActivate = null;
+      creation.pendingActivateKey = null;
+      creation.confirmItems = [];
+    } else if (creation.view === "custom") {
+      creation.view = "root";
+    }
+    if (name === "escape-root") {
+      // escape-root does not pop a router level: re-sync the router to the
+      // menu matching the restored view.
+      const menus = creation.menus;
+      if (creation.view === "presets") {
+        router.replaceMenu(menus.menus.presets);
+      } else if (creation.view === "custom") {
+        router.replaceMenu({ items: [], focusKey: null });
+      } else {
+        router.replaceMenu(menus.menus.root);
+      }
+    }
+    publishView();
+  }
+
+  // Rebuild the creation dock state for the committed view (the legacy
+  // creation_dock.js subscribe/mount logic): mount on entering creation mode,
+  // rebuild menus when the panel signature changes, resume the server-
+  // persisted draft stage, and resolve the pending save's confirmation.
+  function rebuildCreationDock(prev, rs) {
+    const panel = creationPanelOf(rs);
+    if (!panel) {
+      if (creation) {
+        creation = null;
+      }
+      return;
+    }
+    if (!creation) {
+      creation = {
+        view: "root",
+        menus: null,
+        confirmItems: [],
+        pendingActivate: null,
+        pendingActivateKey: null,
+        pendingSaveRequestId: null,
+        returnStage: null,
+        panelSig: null,
+      };
+    }
+    const sig = creationPanelSignature(panel);
+    if (creation.panelSig !== sig) {
+      creation.panelSig = sig;
+      creation.menus = CreationMenu.buildMenus(panel);
+      const draft = panel.draft || null;
+      if (draft && draft.mode === "preset") {
+        openCreationConfirm("preset", draft.preset_key || null, "presets");
+      } else if (draft && (draft.mode === "custom" || draft.mode === "concept")) {
+        creation.view = "custom";
+        router.reset({ items: [], focusKey: null });
+      } else {
+        creation.view = "root";
+        router.reset({ items: creation.menus.menus.root.items, focusKey: null });
+      }
+      return;
+    }
+    // A new action result for the pending save resolves the confirmation
+    // (fix-creation-finalization-safety D1): success opens the confirmation
+    // for the just-saved draft; rejection or error stays on the current view.
+    if (creation.pendingSaveRequestId === null) {
+      return;
+    }
+    const result = rs.lastActionResult || null;
+    const prevResult = prev ? prev.lastActionResult || null : null;
+    if (!result || result === prevResult) {
+      return;
+    }
+    if (result.requestId !== creation.pendingSaveRequestId) {
+      return;
+    }
+    creation.pendingSaveRequestId = null;
+    if (result.outcome === "success") {
+      const kind = creation.pendingActivate || "preset";
+      // A successful preset save opens the confirmation from the preset list; a
+      // custom/concept save from the form.
+      openCreationConfirm(
+        kind,
+        creation.pendingActivateKey,
+        kind === "preset" ? "presets" : "custom",
+      );
+      return;
+    }
+    creation.pendingActivate = null;
+    creation.pendingActivateKey = null;
+  }
+
   function syncRouterGates() {
     router.setMutationInFlight(!!inFlight);
     router.setAwaitingRevision(inFlight && inFlight.presentationRevision !== null ? inFlight.presentationRevision : null);
@@ -535,6 +752,20 @@ export const useElosernStore = defineStore("elosern", () => {
           ? combat.skillByKey[combat.focusSkillKey].selected
           : [],
 
+      // The character-creation dock stage (the legacy creation dock port): the
+      // keyboard-router menu the overlay mirrors. Null outside creation mode.
+      creationView: creation
+        ? {
+            stage: creation.view,
+            confirmItems: creation.confirmItems,
+            confirmLabel:
+              creation.confirmItems.length > 0 ? creation.confirmItems[0].label : null,
+            confirmAction:
+              creation.confirmItems.length > 0 ? creation.confirmItems[0].actionId : null,
+            pendingPresetKey: creation.pendingActivateKey,
+          }
+        : null,
+
       focus: currentItem
         ? {
             key: currentItem.key !== undefined ? currentItem.key : currentItem.label,
@@ -559,6 +790,7 @@ export const useElosernStore = defineStore("elosern", () => {
     handleActionResult(prev, rs);
     releaseIfReady(rs);
     rebuildFocusMenu(prev, rs);
+    rebuildCreationDock(prev, rs);
     syncRouterGates();
     view.value = buildView(prev, rs);
   }
@@ -704,6 +936,18 @@ export const useElosernStore = defineStore("elosern", () => {
     return requestId;
   }
 
+  // Open the destructive-reset confirmation (the creation dock's reset button
+  // never dispatches `creation.reset` directly): the confirm stage renders the
+  // `creation-confirm` screen and the router carries the confirm menu.
+  function requestCreationReset() {
+    if (!creation || !creation.menus) {
+      return false;
+    }
+    openCreationConfirm("reset", null, creation.view);
+    publishView();
+    return true;
+  }
+
   function focusPress(key, repeat) {
     // A keyboard confirm (Enter) records the keyboard source so the target-row
     // submit path can distinguish it from a pointer confirm.
@@ -772,6 +1016,7 @@ export const useElosernStore = defineStore("elosern", () => {
     appendText,
     sendText,
     dispatchAction,
+    requestCreationReset,
     focusPress,
     focusConfirm,
     focusEscape,

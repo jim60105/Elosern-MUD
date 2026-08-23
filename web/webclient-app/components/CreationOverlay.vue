@@ -18,9 +18,13 @@ const props = defineProps({
   // action renders its code/message in the form message (the legacy
   // `creation-form-message` hook).
   result: { type: Object, default: null },
+  // The store-driven creation dock stage (the legacy creation dock port):
+  // null outside creation mode, otherwise the dock stage the keyboard router
+  // and the confirmation screens mirror (root/presets/custom/confirm).
+  stage: { type: Object, default: null },
 });
 
-const emit = defineEmits(["action", "close"]);
+const emit = defineEmits(["action", "close", "request-reset", "cancel-confirm"]);
 
 const available = computed(() => props.creation.available === true);
 const reason = computed(() => props.creation.reason?.message ?? "");
@@ -57,36 +61,73 @@ function zeroAllocations() {
   allocations.defense = 0;
 }
 
+// Tracks any local form input since the last server draft: a no-draft
+// snapshot must never discard typed values (e.g. a pointer-opened custom form
+// hit by a reconnect snapshot without a draft). Draft-driven field fills are
+// guarded by `syncingDraft` so they never count as user input, and leaving
+// the form (preset mode) clears the flag.
+const formTouched = ref(false);
+let syncingDraft = false;
+function markFormTouched() {
+  if (!syncingDraft) {
+    formTouched.value = true;
+  }
+}
+watch(
+  [name, age, apparentAge, race, subrace, background, conceptText, allocations],
+  markFormTouched,
+  { deep: true, flush: "sync" },
+);
+watch(mode, (m) => {
+  if (m === "preset") {
+    formTouched.value = false;
+  }
+});
+
 // Re-sync every wizard field from the server-confirmed draft carried by the
 // latest `creation` panel payload; with no draft, reset to the preset state
 // with default field values.
 function syncFromDraft() {
   const d = props.creation.draft;
   if (!d) {
-    mode.value = "preset";
-    selectedPresetKey.value = null;
-    return;
-  }
-  mode.value = stageMode(d.stage);
-  if (d.mode === "preset") {
-    selectedPresetKey.value = d.preset_key ?? null;
-    return;
-  }
-  name.value = d.display_name ?? "";
-  age.value = d.age ?? 18;
-  apparentAge.value = d.apparent_age ?? 18;
-  race.value = d.race ?? "human";
-  subrace.value = d.subrace ?? null;
-  zeroAllocations();
-  if (d.allocations) {
-    for (const axis of Object.keys(allocations)) {
-      allocations[axis] = d.allocations[axis] ?? 0;
+    // With no server draft the wizard resets to the preset state UNLESS the
+    // store-driven dock stage is already on a form (keyboard navigation into
+    // the custom/concept form must survive a fresh snapshot that carries no
+    // draft, e.g. a stale-save rejection) or the player has typed into the
+    // local form (a pointer-opened form must survive a no-draft snapshot too).
+    const stage = props.stage ? props.stage.stage : null;
+    if (stage !== "custom" && stage !== "concept" && !formTouched.value) {
+      mode.value = "preset";
+      selectedPresetKey.value = null;
     }
+    return;
   }
-  background.value = d.background ?? "";
-  affinitySelected.value = new Set(d.affinity_elements ?? []);
-  if (d.mode === "concept") {
-    conceptText.value = d.background ?? "";
+  syncingDraft = true;
+  try {
+    mode.value = stageMode(d.stage);
+    if (d.mode === "preset") {
+      selectedPresetKey.value = d.preset_key ?? null;
+      return;
+    }
+    name.value = d.display_name ?? "";
+    age.value = d.age ?? 18;
+    apparentAge.value = d.apparent_age ?? 18;
+    race.value = d.race ?? "human";
+    subrace.value = d.subrace ?? null;
+    zeroAllocations();
+    if (d.allocations) {
+      for (const axis of Object.keys(allocations)) {
+        allocations[axis] = d.allocations[axis] ?? 0;
+      }
+    }
+    background.value = d.background ?? "";
+    affinitySelected.value = new Set(d.affinity_elements ?? []);
+    if (d.mode === "concept") {
+      conceptText.value = d.background ?? "";
+    }
+    formTouched.value = false;
+  } finally {
+    syncingDraft = false;
   }
 }
 
@@ -232,30 +273,51 @@ function applyConcept() {
 }
 
 // -- Frame actions -----------------------------------------------------------
-// Activation eligibility follows the server-owned wizard draft when one is
-// carried by the committed panel (reconnect at any saved stage); without a
-// draft it falls back to the local wizard state (the B5 offline contract).
-const activateEnabled = computed(() => {
-  const d = draft.value;
-  if (d) {
-    if (d.stage === "custom_filled") return gatePassed.value;
-    return true;
-  }
-  if (mode.value === "preset") return selectedPresetKey.value !== null;
-  if (mode.value === "custom") return gatePassed.value;
-  return true;
-});
-
-function activate() {
-  emit("action", { action_id: "creation.activate", payload: {} });
-}
-
-function reset() {
-  emit("action", { action_id: "creation.reset", payload: {} });
+// Activation and the destructive reset always traverse the confirmation
+// screen (the legacy creation dock contract): the store opens the confirm
+// stage after a successful save or on a reset request, and only the confirm
+// screen's 確認 button dispatches `creation.activate` / `creation.reset`.
+function requestReset() {
+  emit("request-reset");
 }
 
 function close() {
   emit("close");
+}
+
+// The store-driven creation dock stage mirrors the wizard's mode so keyboard
+// and pointer share one flow: root/presets -> preset, custom -> custom,
+// concept -> concept, confirm -> the confirmation screen overlays the body.
+// Only a stage VALUE change re-syncs (a pointer tab click must not be
+// overridden by an unchanged root stage re-publish).
+let lastStage = null;
+watch(
+  () => props.stage,
+  (s) => {
+    const value = s ? s.stage : null;
+    if (value === null || value === lastStage) {
+      return;
+    }
+    lastStage = value;
+    if (value === "custom") {
+      mode.value = "custom";
+    } else if (value === "concept") {
+      mode.value = "concept";
+    } else if (value === "root" || value === "presets") {
+      mode.value = "preset";
+    }
+  },
+);
+
+function confirmCurrent() {
+  const actionId = props.stage && props.stage.confirmAction;
+  if (actionId) {
+    emit("action", { action_id: actionId, payload: {} });
+  }
+}
+
+function cancelConfirm() {
+  emit("cancel-confirm");
 }
 </script>
 
@@ -284,35 +346,61 @@ function close() {
 
     <div class="creation-overlay__body" data-testid="creation-body">
       <template v-if="available">
-        <nav class="creation-overlay__modes">
-          <button
-            type="button"
-            class="creation-overlay__mode"
-            :class="{ 'is-active': mode === 'preset' }"
-            data-testid="creation-mode-preset"
-            @click="setMode('preset')"
-          >
-            預設
-          </button>
-          <button
-            type="button"
-            class="creation-overlay__mode"
-            :class="{ 'is-active': mode === 'custom' }"
-            data-testid="creation-mode-custom"
-            @click="setMode('custom')"
-          >
-            自訂
-          </button>
-          <button
-            type="button"
-            class="creation-overlay__mode"
-            :class="{ 'is-active': mode === 'concept' }"
-            data-testid="creation-mode-concept"
-            @click="setMode('concept')"
-          >
-            概念
-          </button>
-        </nav>
+        <template v-if="stage && stage.stage === 'confirm'">
+          <div class="creation-confirm" data-testid="creation-confirm">
+            <div class="creation-confirm-title" data-testid="creation-confirm-title">
+              {{ stage.confirmLabel }}
+            </div>
+            <div class="creation-confirm-actions">
+              <button
+                type="button"
+                class="creation-confirm-ok"
+                data-testid="creation-confirm-ok"
+                @click="confirmCurrent"
+              >
+                確認
+              </button>
+              <button
+                type="button"
+                class="creation-confirm-cancel"
+                data-testid="creation-confirm-cancel"
+                @click="cancelConfirm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <nav class="creation-overlay__modes">
+            <button
+              type="button"
+              class="creation-overlay__mode"
+              :class="{ 'is-active': mode === 'preset' }"
+              data-testid="creation-mode-preset"
+              @click="setMode('preset')"
+            >
+              預設
+            </button>
+            <button
+              type="button"
+              class="creation-overlay__mode"
+              :class="{ 'is-active': mode === 'custom' }"
+              data-testid="creation-mode-custom"
+              @click="setMode('custom')"
+            >
+              自訂
+            </button>
+            <button
+              type="button"
+              class="creation-overlay__mode"
+              :class="{ 'is-active': mode === 'concept' }"
+              data-testid="creation-mode-concept"
+              @click="setMode('concept')"
+            >
+              概念
+            </button>
+          </nav>
 
         <div v-if="mode === 'preset'" class="creation-overlay__presets">
           <button
@@ -332,6 +420,7 @@ function close() {
             <span class="creation-preset-card__emphasis">{{ card.emphasis }}</span>
             <span class="creation-preset-card__background">{{ card.background }}</span>
           </button>
+          <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
         </div>
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
@@ -440,19 +529,11 @@ function close() {
         </div>
 
         <footer class="creation-overlay__footer">
-          <button
-            type="button"
-            class="creation-activate"
-            data-testid="creation-activate"
-            :disabled="!activateEnabled"
-            @click="activate"
-          >
-            啟用角色
-          </button>
-          <button type="button" class="creation-reset" data-testid="creation-reset" @click="reset">
+          <button type="button" class="creation-reset" data-testid="creation-reset" @click="requestReset">
             重設
           </button>
         </footer>
+        </template>
       </template>
 
       <p v-else class="creation-unavailable-reason" data-testid="creation-unavailable-reason">
@@ -668,7 +749,6 @@ function close() {
   gap: var(--sp-2);
 }
 
-.creation-activate,
 .creation-reset {
   color: var(--paper-50);
   background: var(--seal-600);
@@ -679,10 +759,43 @@ function close() {
   cursor: pointer;
 }
 
-.creation-activate:disabled {
-  color: var(--paper-700);
+.creation-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-md);
+  background: var(--panel-hi);
+}
+
+.creation-confirm-title {
+  margin: 0;
+  color: var(--paper-50);
+  font-size: var(--text-lg);
+}
+
+.creation-confirm-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.creation-confirm-ok,
+.creation-confirm-cancel {
+  color: var(--paper-50);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.creation-confirm-ok {
+  background: var(--seal-600);
+}
+
+.creation-confirm-cancel {
   background: var(--ink-820);
-  cursor: not-allowed;
 }
 
 .creation-unavailable-reason {

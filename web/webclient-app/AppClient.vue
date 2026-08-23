@@ -211,6 +211,14 @@ function onCreationAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
+function onCreationRequestReset() {
+  store.requestCreationReset();
+}
+
+function onCreationCancelConfirm() {
+  store.focusEscape();
+}
+
 function onQuestAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
@@ -307,7 +315,7 @@ function onSubmitCommand(text) {
       </template>
       <template #action-dock>
         <ActionDock
-          v-if="dockItems.length > 0 || !!store.view.suggestions"
+          v-if="dockItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'explore'"
           :suggestions="store.view.suggestions"
           @action="onAction"
@@ -332,7 +340,10 @@ function onSubmitCommand(text) {
       v-if="panelAvailable('creation')"
       :creation="panel('creation')"
       :result="store.view.lastActionResult"
+      :stage="store.view.creationView"
       @action="onCreationAction"
+      @request-reset="onCreationRequestReset"
+      @cancel-confirm="onCreationCancelConfirm"
     />
   </div>
 </template>

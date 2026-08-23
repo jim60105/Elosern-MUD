@@ -164,6 +164,55 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
     dock.focus()
 
 
+def focus_creation_action_dock(page: Page, timeout: int = 30000) -> None:
+    """Focus the shared ``#action-dock`` while in creation mode.
+
+    Gates the focus on deterministic state with a single bounded polling loop: the
+    committed store view reports creation mode and is connected and not mutation-locked;
+    the creation surface (``[data-testid="creation-overlay"]``) is mounted; and exactly
+    one ``#action-dock`` element with ``data-mode="creation"`` exists and is visible.
+    Reuses ``evaluate_tolerating_navigation`` / ``store_state_or_none`` so a reconnect
+    window (the ``Elosern`` global briefly absent, or an in-flight navigation destroying
+    the execution context) is treated as "not ready yet".
+    """
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        state = store_state_or_none(page)
+        surface_mounted = evaluate_tolerating_navigation(
+            page,
+            "() => !!document.querySelector('[data-testid=\"creation-overlay\"]')",
+        )
+        dock = evaluate_tolerating_navigation(
+            page,
+            """() => {
+              const d = document.querySelector('#action-dock');
+              if (!d) { return { count: 0, mode: null, visible: false }; }
+              const count = document.querySelectorAll('#action-dock').length;
+              const r = d.getBoundingClientRect();
+              const visible = r.width > 0 && r.height > 0 && d.offsetParent !== null;
+              return { count: count, mode: d.getAttribute('data-mode'), visible: visible };
+            }""",
+        )
+        if (
+            state
+            and state.get("mode") == "creation"
+            and state.get("connected")
+            and state.get("mutationsLocked") is not True
+            and surface_mounted is True
+            and dock is not None
+            and dock["count"] == 1
+            and dock["mode"] == "creation"
+            and dock["visible"]
+        ):
+            page.locator("#action-dock").focus()
+            return
+        page.wait_for_timeout(250)
+    raise AssertionError(
+        "creation dock readiness gate not satisfied within %dms; store=%r"
+        % (timeout, store_state_or_none(page))
+    )
+
+
 def evaluate_tolerating_navigation(page: Page, expression: str, arg=None):
     """``page.evaluate`` that treats an in-flight navigation as "not yet".
 

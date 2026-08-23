@@ -232,16 +232,48 @@ jobs:
           pid2=$!
           wait "$pid1" || status1=$?
           wait "$pid2" || status2=$?
-          cp w-a/coverage-browser-shard-${{ matrix.index }}-p1* .
-          cp w-b/coverage-browser-shard-${{ matrix.index }}-p2* .
-          cat w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl > evidence.browser-shard-${{ matrix.index }}.jsonl
-          test "$status1" -eq 0 && test "$status2" -eq 0
+          # Merge only the evidence files that exist (a process that fails early may not
+          # write its file); missing files on a failed run are warnings, not errors.
+          : > "evidence.browser-shard-${{ matrix.index }}.jsonl"
+          for f in "w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl" "w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl"; do
+            if [ -f "$f" ]; then
+              cat "$f" >> "evidence.browser-shard-${{ matrix.index }}.jsonl"
+            else
+              echo "warning: missing evidence file: $f" >&2
+            fi
+          done
+          # Copy only the coverage files that exist.
+          for f in w-a/coverage-browser-shard-${{ matrix.index }}-p1* w-b/coverage-browser-shard-${{ matrix.index }}-p2*; do
+            if [ -f "$f" ]; then
+              cp "$f" .
+            else
+              echo "warning: missing coverage file: $f" >&2
+            fi
+          done
+          # If either process failed, report the real test status (p1 takes precedence).
+          if [ "$status1" -ne 0 ]; then
+            echo "browser shard ${{ matrix.index }} p1 failed with status $status1" >&2
+            exit "$status1"
+          fi
+          if [ "$status2" -ne 0 ]; then
+            echo "browser shard ${{ matrix.index }} p2 failed with status $status2" >&2
+            exit "$status2"
+          fi
+          # Both processes succeeded: any missing evidence file is an infrastructure error.
+          for f in "w-a/evidence.browser-shard-${{ matrix.index }}-p1.jsonl" "w-b/evidence.browser-shard-${{ matrix.index }}-p2.jsonl"; do
+            if [ ! -f "$f" ]; then
+              echo "evidence file missing despite a successful run: $f" >&2
+              exit 1
+            fi
+          done
+          exit 0
 
       - name: Upload coverage and evidence artifacts
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: browser-shard-${{ matrix.index }}-artifacts
-          if-no-files-found: error
+          if-no-files-found: warn
           path: |
             coverage-browser-shard-${{ matrix.index }}-p1*
             coverage-browser-shard-${{ matrix.index }}-p2*

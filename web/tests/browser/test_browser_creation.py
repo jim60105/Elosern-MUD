@@ -22,7 +22,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
+    focus_creation_action_dock,
     install_outbound_recorder,
     outbound_messages,
     sent_action_count,
@@ -169,7 +169,7 @@ class CreationBrowserTest(BrowserAcceptanceTest):
         raise AssertionError("action result predicate never became true")
 
     def _focus_dock(self, page):
-        focus_action_dock(page)
+        focus_creation_action_dock(page)
 
     def _sent_payloads(self, page, action_id):
         payloads = []
@@ -248,7 +248,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertGreaterEqual(page.locator('[data-testid="creation-body"] .creation-preset-card').count(), 1)
         self.assertIn(
             result["code"],
-            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]')).textContent"),
+            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]').textContent"),
         )
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
@@ -268,7 +268,7 @@ class CustomCreationJourneys(CreationBrowserTest):
 
         # Name and adult age fields: focus the name field, then Tab/Shift+Tab
         # through the text/numeric fields exactly as a keyboard-only player does.
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
         self.assertEqual(
@@ -318,21 +318,21 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertEqual(foxkin_selected, "foxkin", "foxkin subrace must be selected")
 
         # Fill the six allocation inputs deterministically for beastfolk/foxkin.
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').focus()")
         page.keyboard.type("25")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-mp\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-mp\"]').focus()")
         page.keyboard.type("10")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-sp\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-sp\"]').focus()")
         page.keyboard.type("25")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-atk_phys\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-atk_phys\"]').focus()")
         page.keyboard.type("15")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-agility\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-agility\"]').focus()")
         page.keyboard.type("15")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-defense\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-defense\"]').focus()")
         page.keyboard.type("15")
 
         # Submit the custom form (keyboard-only Enter on the submit button).
-        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
         payloads = self._sent_payloads(page, "creation.custom")
@@ -362,7 +362,7 @@ class CustomCreationJourneys(CreationBrowserTest):
 
         # A name containing the Evennia markup delimiter passes the advisory
         # client validation but is rejected by the deterministic server gate.
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("壞|名字")
         _press(page, "Tab")
         page.keyboard.type("24")
@@ -378,10 +378,10 @@ class CustomCreationJourneys(CreationBrowserTest):
             ("atk_phys", "10"), ("agility", "10"), ("defense", "11"),
         ):
             page.evaluate(
-                "document.querySelector('[data-testid=\"creation-field-%s\"]')).focus()" % axis
+                "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
             )
             page.keyboard.type(value)
-        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
 
@@ -395,7 +395,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertIsNotNone(page.locator('[data-testid="creation-submit"]'))
         self.assertIn(
             "markup_delimiter",
-            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]')).textContent"),
+            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]').textContent"),
         )
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
@@ -412,7 +412,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         # Bypass client-side constraints entirely: remove the HTML minimums and
         # submit a raw ui_action (the dock's advisory check never sees it).
         page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"creation-field-age\"]')); "
+            "() => { const f = document.querySelector('[data-testid=\"creation-field-age\"]'); "
             "f.min = ''; f.max = ''; }"
         )
         page.evaluate(
@@ -466,7 +466,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")
         _press(page, "Enter")
         page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"creation-field-apparentAge\"]')); "
+            "() => { const f = document.querySelector('[data-testid=\"creation-field-apparentAge\"]'); "
             "f.min = ''; f.max = ''; }"
         )
         page.evaluate(
@@ -529,9 +529,9 @@ class ConceptCreationJourneys(CreationBrowserTest):
         _press(page, "Enter")
 
         # Concept field: keyboard-first entry and apply (bounded text field).
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-concept\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-concept\"]').focus()")
         page.keyboard.type("流浪的精靈劍士")
-        page.evaluate("document.querySelector('[data-testid=\"creation-concept-submit\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-concept-submit\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.concept"), 1)
         payloads = self._sent_payloads(page, "creation.concept")
@@ -559,13 +559,13 @@ class ConceptCreationJourneys(CreationBrowserTest):
             "the concept race must be pre-selected",
         )
         self.assertEqual(
-            page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]')).value"),
+            page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').value"),
             "50",
         )
 
         # Complete the form keyboard-only: name and both adult ages only; the
         # finite controls are already filled from the concept draft.
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
         self.assertEqual(
@@ -576,7 +576,7 @@ class ConceptCreationJourneys(CreationBrowserTest):
         page.keyboard.type("24")
         _press(page, "Tab")  # actual age -> apparent age
         page.keyboard.type("24")
-        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
         payloads = self._sent_payloads(page, "creation.custom")
@@ -614,11 +614,11 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         _press(page, "Enter")
         # The saved draft restored the form.
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]')) && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]')).value === '草稿角色'"
+            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
+            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
         )
         # Open the destructive reset confirmation; no mutation may be sent yet.
-        page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
@@ -645,18 +645,18 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")  # 自訂角色
         _press(page, "Enter")
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]')) && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]')).value === '草稿角色'"
+            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
+            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
         )
         # Open the destructive reset confirmation, then Escape instead of
         # confirming: exactly one menu level pops and the draft is preserved.
-        page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
         _press(page, "Escape")
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]')) !== null && "
+            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null && "
             "document.querySelector('.creation-confirm') === null"
         )
         # No reset or activation was sent; the saved draft is still intact.
@@ -675,8 +675,8 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]')) && "
-            "document.querySelector('[data-testid=\"creation-field-displayName\"]')).value === '草稿角色'"
+            "() => document.querySelector('[data-testid=\"creation-field-displayName\"]') && "
+            "document.querySelector('[data-testid=\"creation-field-displayName\"]').value === '草稿角色'"
         )
         _press(page, "Escape")  # pop back to root; values stay on the server
         page.wait_for_function(
@@ -787,7 +787,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
         self._focus_dock(page)
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("尚未送出")
 
         # A stale custom save cannot resubmit automatically: the server returns
@@ -820,7 +820,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
         self.assertEqual(result["outcome"], "stale")
         # The typed unsent value was preserved and no action was auto-submitted.
         self.assertEqual(
-            page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).value"),
+            page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').value"),
             "尚未送出",
         )
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
@@ -923,7 +923,7 @@ class ViewportCreationJourney(CreationBrowserTest):
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]')) !== null"
+            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null"
         )
         controls = page.locator(".creation-control")
         self.assertGreaterEqual(controls.count(), 1)
@@ -964,9 +964,9 @@ class PointerCreationJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-submit\"]')) !== null"
+            "() => document.querySelector('[data-testid=\"creation-submit\"]') !== null"
         )
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]')).focus()")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("滑鼠角色")
         _press(page, "Tab")
         page.keyboard.type("20")
@@ -981,7 +981,7 @@ class PointerCreationJourneys(CreationBrowserTest):
             ("atk_phys", "0"), ("agility", "0"), ("defense", "0"),
         ):
             page.evaluate(
-                "document.querySelector('[data-testid=\"creation-field-%s\"]')).focus()" % axis
+                "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
             )
             page.keyboard.type(value)
         # Pointer click (not keyboard Enter) on the submit button.
@@ -1004,7 +1004,7 @@ class PointerCreationJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")
         _press(page, "Enter")  # 自訂角色
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"creation-reset\"]')) !== null"
+            "() => document.querySelector('[data-testid=\"creation-reset\"]') !== null"
         )
         page.locator('[data-testid="creation-reset"]').click()
         page.wait_for_timeout(200)
