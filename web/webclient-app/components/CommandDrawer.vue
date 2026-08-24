@@ -23,10 +23,12 @@ import { renderNarrativeTokens } from "./narrative-renderer.js";
 // directly (setup returns the render function).
 export default {
   name: "CommandDrawer",
-  props: {
+   props: {
     open: { type: Boolean, default: false },
     prompt: { type: String, default: "" },
     history: { type: Array, default: () => [] },
+    connected: { type: Boolean, default: true },
+    mutationsLocked: { type: Boolean, default: false },
   },
   emits: ["toggle", "submit", "focus-parent"],
   setup(props, { emit, expose }) {
@@ -57,7 +59,11 @@ export default {
         return false;
       }
       emit("submit", text);
-      draft.value = "";
+      // Preserve the typed speech when the send is rejected (disconnected or
+      // mutations locked); clear the draft only when the send is dispatched.
+      if (props.connected && !props.mutationsLocked) {
+        draft.value = "";
+      }
       resetHistoryWalk();
       return true;
     }
@@ -232,14 +238,17 @@ export default {
   max-width: 72ch;
   margin: 0 auto;
   display: flex;
-  align-items: flex-end;
-  gap: var(--sp-2);
-  padding: 0 var(--sp-4) var(--sp-3);
+  align-items: stretch;
+  /* The field and button abut directly; the legacy ragged gap is gone. */
+  gap: 0;
+  padding: 0 0 var(--sp-3) var(--sp-4);
 }
 
 .elosern-drawer .inputfield {
+  box-sizing: border-box;
   flex: 1 1 auto;
   resize: none;
+  height: 38px;
   min-height: 38px;
   max-height: 120px;
   padding: var(--sp-2) var(--sp-3);
@@ -252,6 +261,7 @@ export default {
 }
 
 .elosern-drawer .inputsend {
+  box-sizing: border-box;
   font-family: var(--f-mono);
   font-size: var(--text-body);
   color: var(--paper-50);

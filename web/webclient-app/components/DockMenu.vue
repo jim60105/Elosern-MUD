@@ -26,9 +26,13 @@ const props = defineProps({
   // retarget to (`combat-detail` in combat mode, `exploration-detail` in
   // exploration mode).
   detailTestId: { type: String, default: "dock-detail" },
-  // An optional message (e.g. the rest form's validation error) that
-  // overrides the pane's default focused-item content.
-  detailMessage: { type: String, default: null },
+   // An optional message (e.g. the rest form's validation error) that
+   // overrides the pane's default focused-item content.
+   detailMessage: { type: String, default: null },
+   // Gate the detail pane's rendering: the exploration root draws no detail
+   // pane (only submenus and combat do), so the parent passes false at the
+   // exploration root and true in a submenu or combat mode.
+   showDetail: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["activate", "focus-change"]);
@@ -92,7 +96,7 @@ function onCellActivate(key, row) {
       />
     </div>
     <aside
-      v-if="focusedRow || props.detailMessage"
+      v-if="(props.showDetail && focusedRow) || props.detailMessage"
       class="dock-detail"
       :class="{ 'exploration-detail': props.detailTestId === 'exploration-detail' }"
       :data-testid="props.detailTestId"

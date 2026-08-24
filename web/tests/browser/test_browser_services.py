@@ -528,6 +528,8 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
             result = state.get("lastActionResult")
             return result is not None and bool(predicate(result))
         wait_for_store_state(page, _result_ready, timeout=timeout)
+        # The store-state gate returns None; read the committed result directly.
+        return store_state(page).get("lastActionResult")
 
     @covers_requirement("webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
     def test_stale_revision_returns_stale_without_mutation(self):

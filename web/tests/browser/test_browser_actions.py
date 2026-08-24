@@ -63,7 +63,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
         # A reload-required protocol error locks all graphical mutations.
         accepted = page.evaluate(
-            """(args) => Elosern.Protocol.receive(
+            """(args) => window.__elosernBridge.store.receive(
               args.generation, 'ui_protocol_error', [{
                 protocol_version: 1,
                 code: 'unsupported_version',
@@ -128,7 +128,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
             "&amp; plain text"
         )
         page.evaluate(
-            "(text) => window.__elosernConsole.model.appendIn(text)", payload
+            "(text) => window.__elosernBridge.store.appendText('in', text)", payload
         )
         narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertIn("plain text", narrative)
@@ -159,7 +159,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True}},
         )
         result = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )

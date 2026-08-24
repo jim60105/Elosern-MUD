@@ -34,7 +34,13 @@ function openActiveSession(store) {
   store.beginTransport(1);
   store.setConnected(true);
   const result = store.receive(1, "ui_snapshot", [
-    fx.snapshot({ panels: { status: fx.statusPanel(), context_actions: fx.explorationActions() } }),
+    fx.snapshot({
+      panels: {
+        status: fx.statusPanel(),
+        exploration: fx.explorationPanel(),
+        local_map: fx.localMapPanel(),
+      },
+    }),
   ]);
   expect(result.accepted).toBe(true);
   expect(store.view.phase).toBe("active");
@@ -110,6 +116,6 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     expect(event.defaultPrevented).toBe(true);
     expect(wrapper.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("false");
     expect(document.activeElement).toBe(wrapper.get('[data-testid="narrative-feed"]').element);
-    expect(store.view.focus.key).toBe("action-explore.wait");
+    expect(store.view.focus.key).toBe("move");
   });
 });

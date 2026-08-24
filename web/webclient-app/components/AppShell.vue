@@ -47,9 +47,13 @@ const props = defineProps({
   // stream-end choice-point block (webclient-action-choicepoints) renders
   // at the feed's end through this slice.
   suggestions: { type: Object, default: null },
+  // The store's mutation-lock flag (connection-loss or a reload-required
+  // protocol error locks all graphical mutations). Passed to the drawer so a
+  // rejected send preserves the typed speech.
+  mutationsLocked: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["submit-command", "choice-action"]);
+const emit = defineEmits(["submit-command", "choice-action", "drawer-closed"]);
 
 const drawerOpen = ref(false);
 const drawer = ref(null);
@@ -72,6 +76,9 @@ function openDrawer() {
 
 function closeDrawer(restoreFocus) {
   drawerOpen.value = false;
+  // A closed drawer (Escape / cancel) must release the pending freeform
+  // dialogue target so later ordinary commands travel as text, not speech.
+  emit("drawer-closed");
   if (restoreFocus) {
     // Spec (webclient-desktop-shell): Escape closes the drawer and restores
     // the `#action-dock` focus (the preserved focus target), not the feed.
@@ -143,6 +150,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onWindowKeydown);
 });
+
+// Expose the drawer open/close so the store-driven freeform dialogue entry
+// (a freeform affordance activation) can open and focus the command drawer.
+defineExpose({ openDrawer, closeDrawer });
 </script>
 
 <template>
@@ -194,6 +205,8 @@ onBeforeUnmount(() => {
       :open="drawerOpen"
       :prompt="props.prompt"
       :history="props.commandHistory"
+      :connected="props.connected"
+      :mutations-locked="props.mutationsLocked"
       @submit="onSubmit"
       @toggle="toggleDrawer"
       @focus-parent="onFocusParent"

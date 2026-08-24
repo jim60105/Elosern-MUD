@@ -202,11 +202,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def _move_to_empty_ground(self, page):
         """Walk through the dock from the plaza to the empty-ground room (the
         scripted transport-failure room, same journey as the surface file).
-        The flat Vue dock dispatches the move directly on the root row, so a
-        single Enter (``_open_root(page, 0)``) is the whole journey — a second
-        Enter would activate the *new* room's first row and move back.
+
+        The flat Vue dock opens the Move submenu on the first Enter (the
+        exploration root's first item is "移動"), so the journey needs a second
+        Enter to select the focused destination row (前往測試空地, ``exit-44``)
+        and dispatch ``explore.move`` into the empty ground.
         """
-        self._open_root(page, 0)  # 前往測試空地 (the explore.move root row)
+        self._open_root(page, 0)  # opens the Move submenu, focus on 前往測試空地
+        _press(page, "Enter")     # select the focused move row -> dispatch explore.move
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -520,6 +523,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_move_into_room_shows_generating_then_ready(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        # The class shares one ManagedServer across all 10 tests; a prior test
+        # may have left the character at the empty-ground room (degraded state).
+        # Teleport back to the seeded plaza so the journey starts from the
+        # ready card set.
+        self._teleport_to_plaza(page)
         self._wait_suggestions(page, "ready")
         self._wait_section(page)
         self._dismiss(page)
@@ -533,11 +541,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
 
         # Returning to the plaza through the dock regenerates: generating
-        # line, then ready. ``_open_root(page, 0)`` dispatches the single
-        # return move (回到廣場) via its own Enter; a second Enter would
-        # activate the plaza's first row (前往測試空地) and move back,
-        # destroying the 1.5s generating window.
-        self._open_root(page, 0)  # Move (回到廣場)
+        # line, then ready. The flat Vue dock opens the Move submenu on the
+        # first Enter (the empty-ground root's first item is "移動"), so the
+        # journey needs a second Enter to select the focused "回到廣場" row and
+        # dispatch the return move. The generating line is transient (~1.5s),
+        # so the dispatch must happen while the Move submenu is open (before
+        # the menu re-homes to the plaza).
+        self._open_root(page, 0)  # opens the empty-ground Move submenu
+        _press(page, "Enter")     # select the focused 回到廣場 row -> dispatch explore.move
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")

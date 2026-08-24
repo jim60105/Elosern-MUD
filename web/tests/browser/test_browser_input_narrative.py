@@ -106,6 +106,24 @@ def _wait_inp_line(page, count, text=None, exact=False, timeout=30000):
     )
 
 
+def _clear_narrative(page):
+    """Reset the store's narrative log so the next input line is the log's first line.
+
+    The store is a Pinia store, so ``store.narrative`` is the unwrapped array;
+    clear it in place (``.length = 0``) to keep the reactive reference intact.
+    """
+    page.evaluate("() => { window.__elosernBridge.store.narrative.length = 0; }")
+
+
+def _append_narrative_fillers(page, count=80):
+    """Seed the store's narrative with server-text filler lines (the scroll-keep test needs overflow)."""
+    page.evaluate(
+        "(count) => { const store = window.__elosernBridge.store;"
+        " for (let i = 0; i < count; i++) { store.appendText('out', 'filler line ' + i); } }",
+        count,
+    )
+
+
 class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     """Drawer default-close, toggle, and input-echo acceptance (no mutation)."""
 
@@ -267,18 +285,26 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     )
     def test_scrolled_away_input_preserves_scroll_and_increments_unread_by_one(self):
         page = self.logged_in_page()
-        narrative = page.locator('[data-testid="narrative-feed"]')
         # Guarantee overflow so the narrative can be scrolled up.
+        _append_narrative_fillers(page, 80)
+        # Scroll to the top, then gate on the scroll actually reaching the top
+        # (the feed uses smooth scrolling, so a fixed timeout can race the
+        # animation and the at-bottom decision is captured mid-scroll).
         page.evaluate(
-            "() => { for (let i = 0; i < 80; i++) { "
-            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
+            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
         )
-        page.wait_for_timeout(300)
-        page.evaluate(
-            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-            "el.scrollTop = 0; }"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                ),
+                "description": "narrative feed scrolled to the top",
+            },
+            timeout=30000,
         )
-        page.wait_for_timeout(100)
         # One input event (divider + line) is exactly one unread increment and
         # one scroll-keep event.
         page.evaluate(
@@ -328,16 +354,16 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     )
     def test_first_log_line_needs_no_divider(self):
         page = self.logged_in_page()
-        # Wipe every narrative line (the unread marker stays); the next input
-        # line is the log's first line.
+        # Reset the store's narrative log so the next input line is the log's
+        # first line (no divider hairline before the very first line). The store is
+        # a Pinia store: clear the unwrapped array in place; the clear and the
+        # append run in ONE evaluate so no server update can interleave.
         page.evaluate(
-            "() => {"
-            "  const n = document.querySelector('[data-testid=\"narrative-feed\"]');"
-            "  Array.from(n.children).forEach(function (child) {"
-            "    if (!child.classList.contains('narrative-unread')) { n.removeChild(child); }"
-            "  });"
-            "  Elosern.narrativeInput.appendInput('first');"
-            "}"
+            """() => {
+              const store = window.__elosernBridge.store;
+              store.narrative.length = 0;
+              Elosern.narrativeInput.appendInput('first');
+            }"""
         )
         _wait_inp_line(page, 1)
         self.assertEqual(
@@ -379,11 +405,16 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         # A staged submit with a display descriptor echoes its resolved line,
-        # while the wire envelope carries exactly the action payload.
+        # while the wire envelope carries exactly the action payload. The clear
+        # and the dispatch run in ONE evaluate (Pinia store: clear the unwrapped
+        # array in place) so no server update interleaves.
         payload = {"skill_key": "fire_ball", "target_ids": [1]}
         page.evaluate(
-            "(p) => Elosern.actions.submit('combat.cast', p, "
-            "{ skillLabel: '火球術', targetLabel: '哥布林' })",
+            """(p) => {
+              window.__elosernBridge.store.narrative.length = 0;
+              return Elosern.actions.submit('combat.cast', p,
+                { skillLabel: '火球術', targetLabel: '哥布林' });
+            }""",
             payload,
         )
         _wait_inp_line(page, 1, "cast 火球術=哥布林")
@@ -443,10 +474,14 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_markup_like_labels_render_as_literal_text(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        # Clear the store's narrative and dispatch in one evaluate so no server
+        # update interleaves. (Pinia store: clear the unwrapped array in place.)
         page.evaluate(
-            "() => Elosern.actions.submit('explore.engage', "
-            "{ monster_id: 'no_such_monster' }, "
-            "{ targetLabel: '<script>alert(1)</script>' })"
+            """() => {
+              window.__elosernBridge.store.narrative.length = 0;
+              Elosern.actions.submit('explore.engage', { monster_id: 'no_such_monster' },
+              { targetLabel: '<script>alert(1)</script>' });
+            }"""
         )
         _wait_inp_line(page, 1, "<script>alert(1)</script>")
         # The line is a single literal text node: no element was created.

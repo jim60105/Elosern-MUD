@@ -156,15 +156,15 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         self._open_root(page, 3)  # 角色狀態
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
-            True,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            "character",
             "the character panel must own the action dock",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
-            False,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            None,
             "Escape must leave the character panel",
         )
 
@@ -674,8 +674,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             keys,
-            ["action-explore.move", "action-explore.look", "action-explore.interact",
-             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
         )
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
@@ -708,7 +707,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # back cell (the exploration fixture carries no guild navigate entry).
         self.assertEqual(
             target_keys,
-            ["action-explore.talk_scripted", "back"],
+            ["talk-scripted", "back"],
             "the target-affordance cells must render after one Escape",
         )
         self.assertEqual(
@@ -716,7 +715,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "action-explore.talk_scripted",
+            "talk-scripted",
         )
         _press(page, "Escape")  # back to the Interact target list
         page.wait_for_timeout(80)
@@ -754,21 +753,24 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # cells (the shared-router regression).
         self._open_root(page, 4)  # Quests
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"),
-            True,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            "services",
             "the services dock must own the surface inside Quests",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
-        self.assertEqual(page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"), False)
+        self.assertEqual(
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            None,
+            "Escape must leave the services sub-dock",
+        )
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         self.assertEqual(
             keys,
-            ["action-explore.move", "action-explore.look", "action-explore.interact",
-             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
             "the exploration root cells must render after Escape from Quests",
         )
         self.assertEqual(
@@ -776,7 +778,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "action-quests",
+            "move",
         )
 
 

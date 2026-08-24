@@ -110,6 +110,15 @@ def _wait_unread_count_zero(page, timeout=30000):
     )
 
 
+def _append_narrative_fillers(page, count=80):
+    """Seed the store's narrative with server-text filler lines (the scroll-keep tests need overflow)."""
+    page.evaluate(
+        "(count) => { const store = window.__elosernBridge.store;"
+        " for (let i = 0; i < count; i++) { store.appendText('out', 'filler line ' + i); } }",
+        count,
+    )
+
+
 class ShellAcceptanceTest(BrowserAcceptanceTest):
     """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
 
@@ -278,7 +287,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # A converted colored line renders with a palette class, never as
         # markup source.
         page.evaluate(
-            "() => window.__elosernConsole.model.appendIn('|r南大道|n|g 綠|n')"
+            "() => window.__elosernBridge.store.appendText('out', '|r南大道|n|g 綠|n')"
         )
         wait_for_store_state(
             page,
@@ -317,7 +326,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # inside the pane: no clipping, no additional page-level scroll.
         wide = "X" * 400 + " 尾部"
         page.evaluate(
-            "(text) => window.__elosernConsole.model.appendIn(text)", wide
+            "(text) => window.__elosernBridge.store.appendText('out', text)", wide
         )
         wait_for_store_state(
             page,
@@ -392,23 +401,32 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(marker.get_attribute("data-count"), "0")
 
         # Guarantee overflow so the narrative can be scrolled up.
+        _append_narrative_fillers(page, 80)
+        # Scroll to the top, then gate on the scroll actually reaching the top
+        # (the feed uses smooth scrolling, so a fixed timeout can race the
+        # animation and the at-bottom decision is captured mid-scroll).
         page.evaluate(
-            "() => { for (let i = 0; i < 80; i++) { "
-            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
+            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
         )
-        page.wait_for_timeout(300)
-        page.evaluate(
-            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-            "el.scrollTop = 0; }"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                ),
+                "description": "narrative feed scrolled to the top",
+            },
+            timeout=30000,
         )
-        page.wait_for_timeout(100)
         scroll_top = page.evaluate(
             "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
         )
         self.assertEqual(scroll_top, 0)
 
         page.evaluate(
-            "() => window.__elosernConsole.model.appendIn('unread probe line')"
+            "() => window.__elosernBridge.store.appendText('out', 'unread probe line')"
         )
         _wait_unread_count_nonzero(page)
         unread = page.locator("#narrative-unread .narrative-unread-button").inner_text()
@@ -435,17 +453,24 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_unread_marker_keyboard_activation_moves_focus_to_narrative(self):
         page = self.logged_in_page()
         # Guarantee overflow and scroll up so an unread count accumulates.
+        _append_narrative_fillers(page, 80)
         page.evaluate(
-            "() => { for (let i = 0; i < 80; i++) { "
-            "window.__elosernConsole.model.appendIn('filler line ' + i); } }"
+            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
         )
-        page.wait_for_timeout(300)
-        page.evaluate(
-            "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-            "el.scrollTop = 0; }"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                ),
+                "description": "narrative feed scrolled to the top",
+            },
+            timeout=30000,
         )
         page.evaluate(
-            "() => window.__elosernConsole.model.appendIn('unread probe line')"
+            "() => window.__elosernBridge.store.appendText('out', 'unread probe line')"
         )
         _wait_unread_count_nonzero(page)
         # Keyboard activation (Enter on the focused marker button) jumps to the
@@ -719,8 +744,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertTrue(detail.is_visible())
             self.assertEqual(
                 page.evaluate(
-                    "document.querySelector('.exploration-menu')"
-                    ".classList.contains('dock-grid')"
+                    "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
+                    " return el && getComputedStyle(el).display === 'grid'; }"
                 ),
                 True,
                 "submenu item lists render as a CSS grid",

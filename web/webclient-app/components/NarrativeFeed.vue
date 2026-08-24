@@ -92,15 +92,14 @@ export default {
       }
     }
 
-    let previousLength = props.lines.length;
-
     // The at-bottom decision is taken against the old DOM (pre-render),
     // exactly like the legacy single-owner check around each insertion.
+    // Watch the array length (not the array reference) so a push or a trim
+    // both trigger the auto-scroll / unread logic.
     watch(
-      () => props.lines,
-      () => {
-        const added = Math.max(0, props.lines.length - previousLength);
-        previousLength = props.lines.length;
+      () => props.lines.length,
+      (newLen, oldLen) => {
+        const added = Math.max(0, newLen - (oldLen ?? 0));
         if (added === 0) {
           return;
         }

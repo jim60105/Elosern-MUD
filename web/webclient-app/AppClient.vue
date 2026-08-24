@@ -23,6 +23,41 @@ import StatusPanel from "./components/StatusPanel.vue";
 
 const store = useElosernStore();
 
+// The shell instance handle: the store-driven freeform dialogue entry point
+// (a freeform affordance) requests the command drawer open + field focus
+// through the exposed AppShell method.
+const shellRef = ref(null);
+watch(
+  () => store.view.drawerRequest,
+  (request) => {
+    if (request > 0) {
+      shellRef.value?.openDrawer();
+    }
+  },
+);
+// A successful dock-borrowed send (freeform dialogue) closes the drawer and
+// restores action-dock focus (webclient-desktop-shell: the borrowed-drawer
+// send returns focus to the dock).
+watch(
+  () => store.view.drawerCloseRequest,
+  (request) => {
+    if (request > 0) {
+      shellRef.value?.closeDrawer(true);
+    }
+  },
+);
+// The wait/rest entry point (openRestForm) requests the bounded rest-duration
+// form open (the exploration rest form, `exploration-rest-form`).
+watch(
+  () => store.view.restFormRequest,
+  (request) => {
+    if (request > 0) {
+      restFormOpen.value = true;
+      restFormError.value = null;
+    }
+  },
+);
+
 function panel(name) {
   return (store.view.panels && store.view.panels[name]) || null;
 }
@@ -109,7 +144,41 @@ const dockItems = computed(() => {
     return [];
   }
   if (p.kind === "exploration") {
-    return Array.isArray(p.affordances) ? p.affordances : [];
+    // G2: the exploration dock renders the keyboard router's current frame —
+    // the stable hierarchical root (Move/Look/Interact/Character/Quests/
+    // Inventory/Wait) or an active submenu (move exits / look targets /
+    // interact targets / wait dayparts). It is never a flat affordance list,
+    // so pointer and keyboard users navigate the identical router path.
+    const menu = store.view.combatMenu;
+    const items = (menu && menu.items) || [];
+    return items.map((item) => {
+      const normalized = {
+        key: item.key,
+        label: item.label,
+        enabled: item.enabled !== false,
+      };
+      if (item.actionId) {
+        normalized.action_id = item.actionId;
+        normalized.params = item.payload || {};
+      } else {
+        // A local cell (submenu opener, target/keyword opener, freeform row,
+        // confirmation cancel, or a disabled placeholder such as
+        // `interact-empty` / `target-empty`) is never an OOB action — classify
+        // it as a navigation cell so `classify` never throws.
+        normalized.navigation = true;
+        normalized.surface = item.key;
+      }
+      if (item.disabledReason) {
+        normalized.disabled_reason = {
+          code: item.disabledReason.code,
+          message: item.disabledReason.message,
+        };
+      }
+      if (item.description) {
+        normalized.description = item.description;
+      }
+      return normalized;
+    });
   }
   if (p.kind === "combat") {
     // The combat dock follows the preserved keyboard hierarchy (Option B):
@@ -155,7 +224,7 @@ const dockItems = computed(() => {
       return normalized;
     });
   }
-  return [];
+   return [];
 });
 
 // Phase-0 audit §2.3: the preserved `#combat-row-<i>` row frames and the
@@ -166,12 +235,47 @@ const contextActionsPanel = computed(() => panel("context_actions"));
 const dockKind = computed(() => (contextActionsPanel.value && contextActionsPanel.value.kind) || null);
 const rowPrefix = computed(() => (dockKind.value === "combat" ? "combat-row" : "exploration-row"));
 const detailTestId = computed(() => (dockKind.value === "combat" ? "combat-detail" : "exploration-detail"));
+// The detail pane renders only in combat mode or while a submenu frame is
+// active (router depth 2+); the exploration root (depth 1) draws no visible
+// detail pane (the shell mockup contract).
+const showDetail = computed(() => {
+  const v = store.view;
+  return v.mode === "combat" || v.dockDepth > 1;
+});
+
+// The re-homed services confirmation screen (webclient-service-menus: an explicit
+// confirm/cancel screen in front of the destructive `guild.quest_abandon`). When
+// the keyboard router's current frame is the service confirm menu (item keys
+// `confirm-*` / `cancel-*`) and the services sub-dock is active, render the
+// `.services-confirm` element. No mutation is dispatched until the player
+// confirms.
+const servicesConfirm = computed(() => {
+  if (store.view.activeSubDock !== "services") {
+    return null;
+  }
+  const menu = store.view.combatMenu;
+  if (!menu || !Array.isArray(menu.items) || menu.items.length === 0) {
+    return null;
+  }
+  const isConfirmMenu = menu.items.every(
+    (i) => i.key && (i.key.startsWith("confirm-") || i.key.startsWith("cancel-"))
+  );
+  if (!isConfirmMenu) {
+    return null;
+  }
+  const confirmItem = menu.items.find((i) => i.key && i.key.startsWith("confirm-"));
+  return {
+    label: confirmItem ? confirmItem.label : "確認",
+    actionId: confirmItem ? confirmItem.actionId : null,
+    payload: confirmItem ? confirmItem.payload : null,
+  };
+});
+
 
 // C4: the rest-duration form opens when the activated dock item is the
 // `explore.wait` rest item (the legacy `openRestForm` behavior).
 const restFormOpen = ref(false);
 const restFormError = ref(null);
-
 function onRestFormSubmit(seconds) {
   restFormOpen.value = false;
   restFormError.value = null;
@@ -265,6 +369,12 @@ function onSubmitCommand(text) {
   return store.sendText(text);
 }
 
+function onDrawerClosed() {
+  // A cancelled command drawer releases the pending freeform dialogue target
+  // so later ordinary commands are never captured as dialogue speech.
+  store.clearFreeformTarget();
+}
+
 function onChoiceAction(intent) {
   // The narrative stream-end choice-point card/dismiss intents (C4): the
   // same single dispatch entry as the dock (store is the sole writer).
@@ -275,6 +385,7 @@ function onChoiceAction(intent) {
 <template>
   <div class="elosern-root" data-testid="elosern-client-root">
       <AppShell
+        ref="shellRef"
         :mode="store.view.mode || 'explore'"
       :connected="store.view.connected"
       :location-label="store.view.statusSlice.locationLabel"
@@ -286,8 +397,10 @@ function onChoiceAction(intent) {
       :prompt="store.view.prompt"
       :command-history="store.commandHistory"
       :suggestions="store.view.suggestions"
+      :mutations-locked="store.view.mutationsLocked"
       @submit-command="onSubmitCommand"
       @choice-action="onChoiceAction"
+      @drawer-closed="onDrawerClosed"
     >
       <template #panel-left>
         <StatusPanel
@@ -336,13 +449,19 @@ function onChoiceAction(intent) {
             :items="dockItems"
             :focused-key="store.view.focus.key"
             :id-prefix="rowPrefix"
-            :detail-test-id="detailTestId"
-            :detail-message="restFormError"
+             :detail-test-id="detailTestId"
+             :show-detail="showDetail"
+             :detail-message="restFormError"
             :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
             @focus-change="onDockFocusChange"
             @activate="onDockActivate"
           />
           <RestForm v-if="restFormOpen" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+          <div v-if="servicesConfirm" class="services-confirm">
+            <div class="services-confirm-title" data-testid="services-confirm-title">
+              {{ servicesConfirm.label }}
+            </div>
+          </div>
         </ActionDock>
       </template>
     </AppShell>

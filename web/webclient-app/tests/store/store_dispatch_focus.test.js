@@ -206,30 +206,25 @@ describe("store dispatch + focus", () => {
   });
 
   describe("the keyboard-router focus slice", () => {
-    it("loads the committed context_actions frame with the preserved dock keys", () => {
+    it("loads the committed exploration frame with the G2 root keys", () => {
       openSession();
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 2, panels: { context_actions: fx.explorationActions() } })],
+        [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
       const view = store.view;
-      expect(view.focus.key).toBe("action-explore.wait");
-      expect(view.focus.label).toBe("等待");
+      expect(view.focus.key).toBe("move");
+      expect(view.focus.label).toBe("移動");
       expect(view.focus.enabled).toBe(true);
-
-      // Arrow navigation over the committed affordances.
-      expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("action-explore.wait-2");
-      expect(store.view.focus.label).toBe("調息");
-      expect(store.view.focus.enabled).toBe(false);
-      // A disabled item exposes its server-authored disabled reason.
-      expect(store.view.focus.description).toBe("正在調息，未能行動");
-
-      expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("action-guild");
-      expect(store.view.focus.label).toBe("公會");
+      // The G2 root is a single-row 7-column grid; navigate horizontally.
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("look");
+      expect(store.view.focus.label).toBe("查看");
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("interact");
+      expect(store.view.focus.label).toBe("互動");
     });
 
     it("navigates the combat root grid with preserved action keys", () => {
@@ -249,46 +244,69 @@ describe("store dispatch + focus", () => {
 
     it("rebuilds the frame only when the committed panel content changes", () => {
       openSession();
-      const actions = fx.explorationActions();
-      store.receive(1, "ui_update", [fx.update({ revision: 2, panels: { context_actions: actions } })], {});
-      expect(store.view.focus.key).toBe("action-explore.wait");
-      store.focusPress("ArrowDown");
-      expect(store.view.focus.key).toBe("action-explore.wait-2");
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+        {},
+      );
+      expect(store.view.focus.key).toBe("move");
+      store.focusPress("ArrowRight");
+      expect(store.view.focus.key).toBe("look");
 
       // An identical update must not reset the focus position.
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 2, panels: { context_actions: fx.explorationActions() } })],
+        [fx.update({ revision: 3, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("action-explore.wait-2");
+      expect(store.view.focus.key).toBe("look");
 
-      // A changed panel resets the frame focus to the first item.
+      // A changed panel (the inventory surface disappears) resets the frame
+      // focus to the first root item.
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 4, panels: { context_actions: fx.explorationActions({ suggestions: { status: "ready", cards: readyCards() } }) } })],
+        [
+          fx.update({
+            revision: 4,
+            panels: {
+              exploration: fx.explorationPanel({ inventory: { available: false } }),
+              local_map: fx.localMapPanel(),
+            },
+          }),
+        ],
         {},
       );
-      expect(store.view.focus.key).toBe("action-explore.wait");
-    });
-
-    function readyCards() {
-      return [
-        { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
-        { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
-        { kind: "freeform", action_code: "explore.talk_freeform", label: "我們聊聊好嗎？", params: { npc_id: 9 } },
-      ];
-    }
+      expect(store.view.focus.key).toBe("move");
+     });
 
     it("routes a confirmed action item through the single dispatch entry", () => {
       openSession();
-      store.receive(1, "ui_update", [fx.update({ revision: 2, panels: { context_actions: fx.explorationActions() } })], {});
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+        {},
+      );
+      // Navigate the G2 root to the "wait" entry (col 6): ArrowRight x6 from "move".
+      for (let i = 0; i < 6; i += 1) {
+        store.focusPress("ArrowRight");
+      }
+      expect(store.view.focus.key).toBe("wait");
+      // Confirming "wait" opens the wait submenu (openSubmenu).
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      // Within the wait submenu (2-column grid), reach "wait-dusk":
+      // ArrowDown → wait-noon (row 1 col 0), ArrowRight → wait-dusk (row 1 col 1).
+      expect(store.focusPress("ArrowDown")).toBe(true);
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("wait-dusk");
+      // Confirming the leaf dispatches the exact `explore.wait` action.
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
       // `base_revision` is the committed revision at dispatch time (the
-      // context_actions update advanced it to 2).
+      // exploration update advanced it to 2).
       expect(sender.sent.actions[0]).toEqual({
         protocol_version: 1,
         presentation_epoch: fx.EPOCH_A,
@@ -301,15 +319,24 @@ describe("store dispatch + focus", () => {
 
     it("never submits a disabled or locked item", () => {
       openSession();
-      store.receive(1, "ui_update", [fx.update({ revision: 2, panels: { context_actions: fx.explorationActions() } })], {});
-      // Move focus to the disabled "調息" item and confirm: a disabled item
-      // emits a `disabled` notice and never dispatches.
-      store.focusPress("ArrowDown");
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+        {},
+      );
+      // Confirming the "move" root entry opens the move submenu.
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      // Move focus to the disabled "exit-north" (row 0, col 1) and confirm:
+      // a disabled item emits a `disabled` notice and never dispatches.
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.enabled).toBe(false);
       expect(store.focusConfirm("keyboard")).toBe(false);
       expect(sender.sent.actions.length).toBe(0);
 
       // Pointer activation shares the same gates (mutation-lock + enabled).
-      store.focusPress("ArrowUp");
+      store.focusPress("ArrowLeft"); // back to the enabled "exit-east"
       store.dispatchAction("explore.wait", { daypart: "dusk" });
       expect(store.focusConfirm("pointer")).toBe(false);
       expect(store.view.dispatch.inFlight).not.toEqual(null);
@@ -323,14 +350,18 @@ describe("store dispatch + focus", () => {
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 2, panels: { context_actions: fx.explorationActions() } })],
+        [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      store.focusPress("ArrowDown");
-      store.focusPress("ArrowDown");
-      expect(store.view.focus.key).toBe("action-guild");
+      // Navigate the G2 root to "character" (col 3): ArrowRight x3 from "move".
+      for (let i = 0; i < 3; i += 1) {
+        store.focusPress("ArrowRight");
+      }
+      expect(store.view.focus.key).toBe("character");
       expect(store.focusConfirm("keyboard")).toBe(true);
-      expect(store.view.lastSurface).toBe("guild");
+      // The character entry re-homes the character sub-dock; no OOB action is
+      // invented (the surface intent is client-local).
+      expect(store.view.activeSubDock).toBe("character");
       expect(sender.sent.actions.length).toBe(0);
     });
 

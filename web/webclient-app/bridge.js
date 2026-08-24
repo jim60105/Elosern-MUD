@@ -105,7 +105,7 @@ export function createWindowBridge(store) {
   // submits dispatch nothing (the store's `dispatchAction` gates on
   // connected / mutationsLocked / in-flight, design D5).
   function submit(actionId, payload, display) {
-    return store.dispatchAction(actionId, payload);
+    return store.dispatchAction(actionId, payload, display);
   }
 
   function sync() {
