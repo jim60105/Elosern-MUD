@@ -104,9 +104,9 @@ PORTRAIT_TILE_DOM = {
 }
 
 SCENE_PLACEHOLDER_DOM = {
-    "selector": '[data-testid="art-panel__scene-placeholder"]',
+    "selector": '[data-testid="scene-backdrop-placeholder"]',
     "predicate": (
-        "() => { const p = document.querySelector('[data-testid=\"art-panel__scene-placeholder\"]'); "
+        "() => { const p = document.querySelector('[data-testid=\"scene-backdrop-placeholder\"]'); "
         "if (!p) { return false; } "
         "const r = p.getBoundingClientRect(); "
         "return r.width > 0 && r.height > 0; }"
@@ -164,7 +164,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertEqual(panel["scene"]["aspect_ratio"], "16:9")
         self.assertIsNone(panel["scene"]["placeholder"])
         # The image element is present with a same-origin src.
-        img = page.locator(".art-panel__scene")
+        img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.get_attribute("src").startswith("/art/"))
         self.assertNotIn("http://", img.get_attribute("src"))
@@ -173,12 +173,13 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
     def test_alternative_text_is_present_outside_the_bitmap(self):
         page = self.logged_in_page()
         # Requirement: the scene label and alternative text SHALL remain visible
-        # outside the bitmap. The Vue panel renders them as DOM text nodes
-        # (`.art-panel__scene-label`, `.art-panel__scene-alt`), so the alt text
-        # is the `.art-panel__scene-alt` node, not the img `alt` attribute.
-        alt = page.locator(".art-panel__scene-alt").inner_text()
+        # outside the bitmap. The scene moved to the full-bleed `SceneBackdrop`
+        # (H1); the label/alt render as DOM text nodes
+        # (`[data-testid="scene-backdrop-label"]`, `[data-testid="scene-backdrop-alt"]`),
+        # so the alt text is the `scene-backdrop-alt` node, not the img `alt` attribute.
+        alt = page.locator('[data-testid="scene-backdrop-alt"]').inner_text()
         self.assertTrue(alt.strip(), "scene alternative text must be meaningful and non-empty")
-        caption = page.locator(".art-panel__scene-label").inner_text()
+        caption = page.locator('[data-testid="scene-backdrop-label"]').inner_text()
         self.assertEqual(caption, "酒館內部")
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
@@ -186,12 +187,12 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         page = self.logged_in_page((1280, 720))
         # The done scene image, its caption label and alt, and the pending
         # status line remain visible at the smaller supported viewport.
-        img = page.locator(".art-panel__scene")
+        img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.is_visible())
-        self.assertEqual(page.locator(".art-panel__scene-label").inner_text(), "酒館內部")
-        self.assertTrue(page.locator(".art-panel__scene-alt").inner_text().strip())
-        self.assertTrue(page.locator(".art-panel__scene-frame").is_visible())
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), "酒館內部")
+        self.assertTrue(page.locator('[data-testid="scene-backdrop-alt"]').inner_text().strip())
+        self.assertTrue(page.locator('[data-testid="scene-backdrop"]').is_visible())
 
 
 
@@ -208,8 +209,8 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         self.assertEqual(panel["scene"]["status"], "pending")
         self.assertIsNone(panel["scene"]["url"])
         # Without a prior image, the scene placeholder renders (no image).
-        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
-        placeholder = page.locator(".art-panel__scene-placeholder").inner_text()
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-image"]').count(), 0)
+        placeholder = page.locator('[data-testid="scene-backdrop-placeholder"]').inner_text()
         self.assertTrue(placeholder.strip())
 
 
@@ -237,11 +238,30 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
         page.evaluate("Evennia.msg('text', ['@art run --limit 1'], {})")
         page.wait_for_timeout(1500)
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        wait_for_store_state(page, _art_scene_failed, timeout=20000)
+        # The failed-scene placeholder-count assertion is gated on the shared
+        # bounded-wait helper: the committed art-panel store state plus a
+        # single-node DOM-readiness descriptor, within one bounded deadline —
+        # not a single raw `.count()` sample that a snapshot-refresh or Vue
+        # re-render double-node window under a loaded runner would race.
+        wait_for_store_state(
+            page,
+            _art_scene_failed,
+            {
+                "selector": '[data-testid="scene-backdrop"] [data-testid="scene-backdrop-placeholder"]',
+                "predicate": (
+                    "() => { const els = document.querySelectorAll('[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]'); "
+                    "if (els.length !== 1) { return false; } "
+                    "const el = els[0]; const r = el.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }",
+                ),
+                "description": "single visible scene placeholder inside the scene frame",
+            },
+            timeout=20000,
+        )
         self.assertEqual(store_state(page)["panels"]["art"]["scene"]["status"], "failed")
         self.assertIsNone(store_state(page)["panels"]["art"]["scene"]["url"])
-        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
-        self.assertEqual(page.locator(".art-panel__scene-placeholder").count(), 1)
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-image"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-placeholder"]').count(), 1)
 
 
 class ArtMissingSceneTest(ArtSceneBrowserTest):
@@ -265,9 +285,9 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
             page,
             _art_missing_placeholder,
             dom_readiness={
-                "selector": ".art-panel__scene-frame .art-panel__scene-placeholder",
+                "selector": "[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]",
                 "predicate": (
-                    "() => { const els = document.querySelectorAll('.art-panel__scene-frame .art-panel__scene-placeholder'); "
+                    "() => { const els = document.querySelectorAll('[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]'); "
                     "if (els.length !== 1) { return false; } "
                     "const el = els[0]; const r = el.getBoundingClientRect(); "
                     "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
@@ -340,10 +360,14 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
             SCENE_PLACEHOLDER_DOM,
             timeout=20000,
         )
-        self.assertEqual(page.locator(".art-panel__scene").count(), 0)
-        fallback = page.locator(".art-panel__scene-placeholder").inner_text()
-        self.assertTrue(fallback.strip())
-        self.assertIn("載入失敗", fallback)
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-image"]').count(), 0)
+        placeholder = page.locator('[data-testid="scene-backdrop-placeholder"]')
+        self.assertTrue(placeholder.inner_text().strip())
+        self.assertEqual(
+            placeholder.get_attribute("data-kind"),
+            "load_failed",
+            "an image load failure shows the load_failed placeholder kind",
+        )
         # The aborted request was attempted exactly once.
         self.assertEqual(len(self._art_requests), 1)
         # A later snapshot refresh must not re-request the failed URL.
@@ -469,7 +493,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # assertions to the first (focused) tile to avoid a strict-mode violation.
         self.assertTrue(page.locator(".art-panel__portrait-tile").first.is_visible())
         self.assertTrue(page.locator(".art-panel__portrait-context-name").first.inner_text().strip())
-        self.assertTrue(page.locator(".art-panel__scene").is_visible())
+        self.assertTrue(page.locator('[data-testid="scene-backdrop-image"]').is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
     @covers_requirement("webclient-browser-verification::art-panel-portrait-keyboard-journeys-establish-dock-focus-before-key-presses")

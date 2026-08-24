@@ -123,6 +123,52 @@ vignette and the combat pulse are *driven by* HP state, which is H2's island wor
 hooks (`[data-lowhp="true"]`, `elosern-combat-pulse` bound to the combat stage) and H2 supplies the
 state. Splitting it this way keeps H1 free of any `status` payload dependency.
 
+### D8 — The scene full-view moves to the backdrop; ArtPanel keeps only its portrait catalog
+
+The MODIFIED `webclient-art-panel` requirement keeps the keyboard-first full-view contract: *the
+scene full view opens on click or Enter on the backdrop's scene control and closes on Escape with
+focus restored; the portrait keeps its own full-view control.* H1 migrates the scene full-view
+onto `SceneBackdrop` (a full-screen view of the same-origin image or the gradient stage), and the
+`ArtPanel` scene frame is removed — the panel is reduced to its portrait-catalog section, which keeps
+the unmodified requirements: catalog focus flow, missing-image placeholder, the portrait full-view
+control, and literal rendering of HTML-like labels. The image load-failure behaviour (`imageLoadFailed`
++ no-refetch of a failed URL) migrates into the backdrop as well.
+
+*Alternative rejected:* keep the full-view inside the panel and open it from the backdrop control.
+Two owners of the same view contract would split the keyboard/Escape/focus-restoration logic across
+two components, and the draft's scene control lives on the backdrop.
+
+### D9 — One open-surface registry drives the stage recession
+
+The `menu-open` mark (stage recession behind open surfaces) is computed from a single reactive
+registry of open surfaces: the `CommandDrawer`, the new `FullLogOverlay`, and the mounted
+`CreationOverlay`. H4's drawers will register into the same set later. A mode transition into
+creation closes any open `FullLogOverlay` (a non-creation surface must not persist into creation)
+and rescues focus to the dock via the group-3 rescue path.
+
+*Alternative rejected:* a boolean `menuOpen = drawerOpen || overlayMounted` per surface. A registry
+keeps "clear only when no surface remains open" correct when two surfaces are open at once.
+
+### D10 — Anchor geometry is bounded; the right stack scrolls internally
+
+Each anchor gets a bounded rectangle: `hud-left` (262px wide, top-left, `max-height` above the
+dock + caption reserved space, `overflow-y: auto`), `hud-right` (230px wide, top-right, same
+bound), `feed` (`width:min(880px,90vw)`, `max-height:30vh`), `dock` (`--dock-h`), `command-line`
+(46px tall). The right stack — CharacterPanel, SkillBook, ShopPanel, QuestBoard, LoreDrawer,
+InventoryPanel — is tall; it must scroll within its anchor's bound rather than push into the dock or
+the caption. The browser acceptance in group 8 asserts non-intersection at both supported viewports.
+
+*Alternative rejected:* let the stacks grow freely and clip at the viewport. At 1280×720 the right
+stack would collide with the dock; the measured 41px margin only holds while the stack is short.
+
+### D11 — The command-line anchor hosts the drawer entry in H1
+
+The H1 matrix requires the command line *visible* in exploration/combat and *hidden* in creation.
+The always-visible command field itself is H5's deliverable; in H1 the `command-line` anchor hosts the
+`CommandDrawer`'s visible entry control (the collapsed drawer entry, opened by `/`), which is the
+H1 "command line" surface. H5 replaces the entry chrome with the persistent 46px line. This keeps
+the H1 requirement satisfiable inside H1's own scope.
+
 ## Risks / Trade-offs
 
 - **A 30vh caption card is a large reduction in visible narrative, and the server currently emits raw
@@ -141,6 +187,11 @@ state. Splitting it this way keeps H1 free of any `status` payload dependency.
   them, so no window exists where the spec and the DOM disagree.
 - **Scope creep into H2–H5.** → The file-ownership table (roadmap §7) makes `StatusPanel`, `LocalMap`,
   `ActionDock`, the drawers and the command line off-limits here; H1 only re-parents them.
+- **In creation mode the caption card is `display:none`, so the `#narrative-unread` live region leaves
+  the accessibility tree and screen-reader announcements pause until the card returns.** The unread
+  counter is component state, not DOM — it survives the mode switch and the indicator reappears with the
+  accumulated count when the card renders again. This matches the spec's "the unread indicator remains on
+  the caption card"; the announcement gap in creation is recorded, not silently closed.
 
 ## Migration Plan
 

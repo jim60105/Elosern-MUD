@@ -1,8 +1,9 @@
 /*
- * Page chrome for the offline Vue shell. B1 (webclient-vue-02-showcase-core)
- * replaced the A2 stub styling (the A2 handoff note assigned this to B1):
- * the full-viewport mount skeleton only — the shell's layout grid lives with
- * the AppShell component, and design tokens come from tokens.css.
+ * Page chrome for the offline Vue shell (H1, webclient-hud-01-shell-and-scene):
+ * the full-viewport mount skeleton. The shell's cinematic stage (HudFrame)
+ * fills the mount container; the height chain carries the viewport height
+ * down to the stage so no page-level scrollbar appears. Design tokens come
+ * from tokens.css.
  */
 
 html,

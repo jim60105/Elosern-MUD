@@ -1,9 +1,7 @@
 ## Purpose
 
 Establishes the component-showcase contract for the Vue migration: every UI component named in the required-component manifest is implemented as a Vue single-file component with at least one documented Storybook story, and every story is driven only by fixed, deterministic offline mock data. The showcase is completed before the application is wired to the live WebSocket transport, and the quality gate makes it a mandatory step by building Storybook and running a deterministic component-coverage check.
-
 ## Requirements
-
 ### Requirement: Every required UI component is a Vue SFC with a documented Storybook story
 Every UI component named in the required-component manifest SHALL be implemented as a Vue
 single-file component and SHALL have at least one Storybook story that documents its props, the
@@ -168,3 +166,24 @@ manifest SHALL be frozen at the complete set and the component-coverage gate SHA
 #### Scenario: The manifest is frozen
 - **WHEN** the showcase wave completes
 - **THEN** the required-component manifest is frozen at the complete set and the component-coverage gate enforces it
+
+### Requirement: The frozen component set grows only through a governed redesign wave
+The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
+through a change named in the WebClient Contextual HUD Redesign roadmap's delivery table. A wave that
+adds a component SHALL, in the same change, add its title to the manifest, ship its Storybook story
+with deterministic offline args, and extend this capability's spec in lockstep — never a manifest edit
+alone. A component SHALL NOT be wired into the live application before its story exists. On completion
+of the redesign the manifest SHALL be re-frozen at the complete new set.
+
+#### Scenario: A wave adds a component with its story in the same change
+- **WHEN** a roadmap wave introduces a new component
+- **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
+
+#### Scenario: A manifest edit without a story fails the gate
+- **WHEN** a manifest title is added without a matching registered story
+- **THEN** the component-coverage gate fails and the change cannot land
+
+#### Scenario: A story without a manifest entry fails the gate
+- **WHEN** a story is registered whose title is absent from the manifest
+- **THEN** the component-coverage gate fails, so the frozen set cannot grow silently
+

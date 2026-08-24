@@ -5,9 +5,7 @@ exploration and combat modes, a validated scene payload with truthful
 placeholders, a server-authored adult-gated portrait catalog, client-local
 contextual portrait focus, targeted worker-completion pushes, deterministic
 offline degradation, and keyboard-first desktop-bounded browser acceptance.
-
 ## Requirements
-
 ### Requirement: The art panel is an exact read-only panel available in exploration and combat modes
 The production presentation registry SHALL register `art` schema version 1. Its available payload
 SHALL contain exactly `schema_version`, `available`, `kind`, `scene`, and `portrait_catalog`;
@@ -44,12 +42,13 @@ session, map knowledge, quests, location, art records, or world time.
 The art panel scene SHALL resolve through `world.art.presenter.resolve_scene` from the current room's
 validated `scene_archetype` and SHALL contain the subject key, asset status, same-origin media URL,
 aspect ratio, and alternative text for a `done` record, or a truthful placeholder kind and
-explanatory label otherwise. The scene SHALL use the 16:9 area with cover-style cropping and SHALL
-display its label and alternative text outside the bitmap. When the current scene is pending and a
-prior scene is already rendered, the panel SHALL retain that prior image visibly dimmed and labelled
-`目前場景圖片生成中`; without a prior image, and for failed or invalid assets, it SHALL use the scene
-placeholder. The panel SHALL NOT silently present old art as current, SHALL NOT expose `out_path` or
-the store root, and SHALL derive its URL only from a validated stored identity.
+explanatory label otherwise. The scene SHALL render as the client's full-bleed stage backdrop with
+cover-style cropping, and SHALL display its label and alternative text as text outside the bitmap.
+When the current scene is pending and a prior scene is already rendered, the client SHALL retain that
+prior image visibly dimmed and labelled `目前場景圖片生成中`; without a prior image, and for failed or
+invalid assets, it SHALL render the current mode's gradient stage together with the scene placeholder
+label. The panel SHALL NOT silently present old art as current, SHALL NOT expose `out_path` or the
+store root, and SHALL derive its URL only from a validated stored identity.
 
 #### Scenario: Done scene serves the same-origin media URL
 - **WHEN** a room's scene archetype has a `done` asset record with an existing validated output
@@ -58,13 +57,13 @@ the store root, and SHALL derive its URL only from a validated stored identity.
 
 #### Scenario: Pending scene retains a labelled prior image
 - **WHEN** the current scene is pending and a prior scene image is already rendered
-- **THEN** the panel keeps that prior image dimmed with the explicit `目前場景圖片生成中` label and the
+- **THEN** the backdrop keeps that prior image dimmed with the explicit `目前場景圖片生成中` label and the
   pending status rather than presenting it as current art
 
-#### Scenario: Failed, missing, or invalid scene uses the placeholder
+#### Scenario: Failed, missing, or invalid scene uses the gradient stage and placeholder label
 - **WHEN** the scene asset is failed, missing, scheduler-disabled, or its output file is absent
-- **THEN** the scene payload is the scene placeholder with its truthful label and no URL, and no
-  stale image is substituted
+- **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as
+  text and no URL, and no stale image is substituted
 
 ### Requirement: The portrait catalog is server-authored, adult-gated, and bounded
 The art panel `portrait_catalog` SHALL be a bounded object keyed by the opaque IDs of currently
@@ -180,22 +179,22 @@ for a done record, invalid output identity, OOB disconnect during completion, an
 failure SHALL each degrade presentation only and log bounded diagnostics. A browser image load
 failure SHALL show fallback text/placeholder and SHALL NOT repeatedly fetch without a new URL or
 user reload. OOB errors SHALL contain no traceback, local path, unescaped player content, or rejected
-prompt content. A missing/pending/failed scene SHALL degrade to a single
-`.art-panel__scene-placeholder` node inside the `.art-panel__scene-frame`. Because a snapshot
-refresh or a Vue re-render can open a transient double-node window under a loaded runner, the browser
-acceptance test SHALL gate its placeholder-count assertion on the shared bounded wait helper (the
-committed art-panel store state plus a DOM-readiness descriptor, within one bounded deadline) rather
-than a single raw `.count()` sample, so the assertion observes the single visible placeholder node
-deterministically.
+prompt content. A missing/pending/failed scene SHALL degrade to a single truthful placeholder label
+on the stage backdrop, identified by a stable `data-testid` hook, with the mode gradient as the
+rendered stage. Because a snapshot refresh or a Vue re-render can open a transient double-node window
+under a loaded runner, the browser acceptance test SHALL gate its placeholder-count assertion on the
+shared bounded wait helper (the committed art-panel store state plus a DOM-readiness descriptor,
+within one bounded deadline) rather than a single raw `.count()` sample, so the assertion observes the
+single visible placeholder node deterministically.
 
 #### Scenario: Offline art never blocks play
 - **WHEN** the worker command is fixed to fail and the scheduler is disabled
-- **THEN** the player can move, talk, fight, trade, and turn in quests while the art panel shows only
-  placeholders and no gameplay action waits on a job
+- **THEN** the player can move, talk, fight, trade, and turn in quests while the stage shows only the
+  gradient and its placeholder label, and no gameplay action waits on a job
 
 #### Scenario: Image load failure degrades to fallback
 - **WHEN** a rendered scene URL fails to load in the browser
-- **THEN** the panel shows its fallback text/placeholder and does not repeatedly refetch the same URL
+- **THEN** the backdrop shows its fallback gradient and placeholder label and does not repeatedly refetch the same URL
 
 #### Scenario: Rejected content stays out of every error surface
 - **WHEN** an art or presentation error occurs
@@ -205,27 +204,27 @@ deterministically.
 #### Scenario: The missing-scene placeholder gate observes a single node
 - **WHEN** the art panel is available with a missing scene and a snapshot refresh or Vue re-render
   opens a transient double-node window under a loaded runner
-- **THEN** the acceptance test's bounded gate keeps polling the scoped selector
-  `.art-panel__scene-frame .art-panel__scene-placeholder` until it observes exactly one visible
-  placeholder node, so the assertion is deterministic rather than a single raw `.count()` sample
+- **THEN** the acceptance test's bounded gate keeps polling the scene backdrop's placeholder
+  `data-testid` hook until it observes exactly one visible placeholder node, so the assertion is
+  deterministic rather than a single raw `.count()` sample
 
 ### Requirement: Art panel browser acceptance is keyboard-first, accessible, and desktop-bounded
-The scene full view SHALL open by click on the image or Enter on the focused image and SHALL close on
-Escape; the portrait SHALL have its own accessible full-view control. The scene label and alternative
-text SHALL remain visible outside the bitmap, alternative text SHALL be meaningful, and no required
-information SHALL exist only inside an image. Server-authored labels SHALL be inserted as text, not
-trusted HTML, and reduced-motion preference SHALL disable nonessential transitions. The 16:9 scene
-and 3:4 portrait SHALL remain usable at both 1440x900 and 1280x720 without covering the scene label
-or required status.
+The scene full view SHALL open by click on the backdrop's scene control or Enter on that focused
+control and SHALL close on Escape; the portrait SHALL have its own accessible full-view control. The
+scene label and alternative text SHALL remain visible as text outside the bitmap, alternative text
+SHALL be meaningful, and no required information SHALL exist only inside an image. Server-authored
+labels SHALL be inserted as text, not trusted HTML, and reduced-motion preference SHALL disable
+nonessential transitions. The stage backdrop and the 3:4 portrait SHALL remain usable at both
+1440x900 and 1280x720 without the backdrop covering the scene label, the HUD islands, or required
+status.
 
 #### Scenario: Keyboard-only full view opens and closes
-- **WHEN** the player focuses the scene image and presses Enter, then Escape
+- **WHEN** the player focuses the scene control and presses Enter, then Escape
 - **THEN** the full view opens on Enter and closes on Escape with focus restored
 
 #### Scenario: Both supported viewports keep art usable
-- **WHEN** the art panel renders at 1440x900 and at 1280x720
-- **THEN** the scene, its label and alternative text, the portrait overlay, and the status text remain
-  visible and non-overlapping
+- **WHEN** the stage renders at 1440x900 and at 1280x720
+- **THEN** the backdrop, the scene label and alternative text, the portrait presentation, and the status text remain visible and non-overlapping
 
 #### Scenario: Player-authored text is not executed as markup
 - **WHEN** a display name or label contains HTML-like player text
@@ -240,3 +239,4 @@ instead of degrading the panel.
 - **WHEN** a WebClient receives an art panel payload whose scene or catalog entry carries the
   normalized in-flight status
 - **THEN** the panel renders a placeholder and remains available
+

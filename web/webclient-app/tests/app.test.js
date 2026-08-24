@@ -1,5 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import { h } from "vue";
+import ActionDock from "../components/ActionDock.vue";
 import AppShell from "../components/AppShell.vue";
 
 function pressKey(target, key, options = {}) {
@@ -30,17 +32,26 @@ describe("AppShell root (B1 core family)", () => {
   it("renders every required core surface in the pre-connection state", () => {
     const w = mountShell();
     const root = w.get('[data-testid="elosern-vue-root"]');
-    expect(root.attributes("data-elosern-stage")).toBe("showcase-core");
-    expect(root.attributes("data-elosern-mode")).toBe("explore");
+    expect(root.attributes("data-elosern-stage")).toBe("contextual-hud");
+    expect(root.attributes("data-elosern-mode")).toBe("exploration");
     expect(w.get('[data-testid="topbar"]')).toBeTruthy();
+    expect(w.get('[data-testid="topbar-title"]').text()).toBe("伊洛瑟恩");
     expect(w.get('[data-testid="connection-state"]').text()).toBe("○ 未連線");
     expect(w.get('[data-testid="narrative-feed"]')).toBeTruthy();
+    expect(w.get('[data-testid="narrative-fulllog-control"]')).toBeTruthy();
     const drawer = w.get('[data-testid="command-drawer"]');
     expect(drawer.attributes("data-open")).toBe("false");
     expect(w.get('[data-testid="command-drawer-entry"]').attributes("aria-expanded")).toBe("false");
     expect(w.get('[data-testid="connect-overlay"]').attributes("data-status")).toBe("connecting");
     expect(w.get("#elosern-action-live").attributes("aria-live")).toBe("polite");
     expect(w.get("#elosern-offline-overlay").attributes("data-visible")).toBe("false");
+    // The cinematic stage (H1): the full-bleed root carries the mode attribute
+    // and the named anchors; the top band carries the brand + meta pill.
+    expect(w.get('[data-testid="elosern-stage"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-hud-left"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-feed"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-dock"]').exists()).toBe(true);
+    expect(w.get('[data-testid="anchor-command-line"]').exists()).toBe(true);
   });
 
   it("retires the replaced text fallback on mount (hidden, not removed)", async () => {
@@ -63,10 +74,11 @@ describe("AppShell root (B1 core family)", () => {
   });
 
   it("presents no invented data for surfaces without a backing read model", () => {
-    // B1 has no B2-B4 panel read models yet: the empty side panels render
-    // nothing (no children, no text), so no surface invents data.
+    // H1: the empty HUD anchors render nothing (no children, no text), so no
+    // surface invents data (a surface with no backing read model is never
+    // shown).
     const w = mountShell();
-    for (const selector of [".app-shell__panel-left", ".app-shell__panel-right"]) {
+    for (const selector of ['[data-anchor="hud-left"]', '[data-anchor="hud-right"]']) {
       const panel = w.get(selector);
       expect(panel.element.children.length).toBe(0);
       expect(panel.text().trim()).toBe("");
@@ -74,8 +86,17 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get("#elosern-action-live").text().trim()).toBe("");
   });
 
-  it("toggles the drawer with `/` and focuses the field; Escape returns focus to the feed; slash stays literal in the field", async () => {
-    const w = mountShell();
+  it("toggles the drawer with `/` and focuses the field; Escape returns focus to the action dock; slash stays literal in the field", async () => {
+    // H1: the preserved focus target on drawer-close is the action dock
+    // (`#action-dock`), so mount the dock into the shell's action-dock slot.
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    const w = mount(AppShell, {
+      attachTo: host,
+      slots: { "action-dock": () => h(ActionDock) },
+    });
+    wrapper = w;
     pressKey(window, "/");
     await w.vm.$nextTick();
     expect(w.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("true");
@@ -85,7 +106,7 @@ describe("AppShell root (B1 core family)", () => {
     pressKey(input.element, "Escape");
     await w.vm.$nextTick();
     expect(w.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("false");
-    expect(document.activeElement).toBe(w.get('[data-testid="narrative-feed"]').element);
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
 
     // Slash stays literal text inside the focused field (the shell does not
     // claim it there). jsdom performs no default text insertion, so the
