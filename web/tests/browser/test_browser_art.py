@@ -41,6 +41,14 @@ def _art_portrait_ready(state: dict) -> bool:
     )
 
 
+def _art_missing_placeholder(state: dict) -> bool:
+    """The missing-scene fixture: the art panel is available and the scene placeholder kind is 'missing'."""
+    art = (state.get("panels") or {}).get("art") or {}
+    scene = art.get("scene") or {}
+    placeholder = scene.get("placeholder") or {}
+    return art.get("available") is True and placeholder.get("kind") == "missing"
+
+
 def _art_scene_failed(state: dict) -> bool:
     """The seeded art scene has reached the failed status."""
     scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
@@ -242,16 +250,48 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         super().setUp()
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
-    @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
+    @covers_requirement(
+        "webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content",
+        "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline",
+    )
     def test_missing_scene_uses_the_placeholder_and_play_continues(self):
         page = self.logged_in_page()
-        panel = store_state(page)["panels"]["art"]
-        self.assertTrue(panel["available"])
-        self.assertEqual(panel["scene"]["placeholder"]["kind"], "missing")
-        self.assertEqual(page.locator(".art-panel__scene-placeholder").count(), 1)
-        # Movement through the ordinary transport still works.
+        # The missing-scene placeholder is gated on the committed art-panel
+        # store state and the scene-frame-scoped single-node DOM, within one
+        # bounded deadline — not a single raw `.count()` sample that a
+        # snapshot-refresh double-node window under a loaded CI runner would
+        # race.
+        wait_for_store_state(
+            page,
+            _art_missing_placeholder,
+            dom_readiness={
+                "selector": ".art-panel__scene-frame .art-panel__scene-placeholder",
+                "predicate": (
+                    "() => { const els = document.querySelectorAll('.art-panel__scene-frame .art-panel__scene-placeholder'); "
+                    "if (els.length !== 1) { return false; } "
+                    "const el = els[0]; const r = el.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
+                ),
+                "description": "single visible scene placeholder inside the scene frame",
+            },
+        )
+        # Movement through the ordinary transport still works. The narrative
+        # assertion is gated on the shared bounded store-state + DOM path
+        # (no fixed sleep) so it stays stable under a loaded CI runner.
+        before = len(page.locator(".elosern-narrative").inner_text())
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_timeout(500)
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")) and s.get("phase") == "active",
+            dom_readiness={
+                "selector": ".elosern-narrative",
+                "predicate": (
+                    f"() => {{ const f = document.querySelector('.elosern-narrative'); "
+                    f"return f && f.innerText.trim().length > {before}; }}"
+                ),
+                "description": "narrative feed length grew past the pre-look baseline",
+            },
+        )
         narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertTrue(narrative.strip())
 

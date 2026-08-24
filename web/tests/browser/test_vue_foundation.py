@@ -743,8 +743,13 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(released["resultAccepted"])
         self.assertFalse(released["stillInFlight"])
 
-        # Document key events route through the bridge's key routing: the
-        # router claims ArrowDown; unclaimed letter keys fall through.
+        # Document key events route through the bridge's key routing. The
+        # keyboard router's exploration focus frame is the G2 hierarchical
+        # root (Move / Look / Interact / Character / Quests / Inventory /
+        # Wait), rendered as a single-row grid — so ArrowDown is a no-op and
+        # focus stays on the first cell (`move`). This replaces the legacy
+        # B2 flat `action-`/`target-` affordance-list key contract. Unclaimed
+        # letter keys fall through to the text path.
         keys = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
@@ -761,28 +766,33 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 };
             }"""
         )
-        self.assertEqual(keys["focusKey"], "action-guild")
+        self.assertEqual(keys["focusKey"], "move")
         self.assertTrue(keys["focusEnabled"])
         self.assertTrue(keys["downClaimed"])
         self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
 
-        # Enter on the focused navigation item pushes the local guild surface
-        # (no ui_action is dispatched for navigation items).
+        # Enter on the G2 exploration root's focused item (`move`) pushes its
+        # client-local move submenu (the dock depth becomes 2) without
+        # dispatching a ui_action. With no traversal exits in the committed
+        # exploration panel, the pushed move submenu's first row is the
+        # disabled `move-empty` item.
         enter_result = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
                 const enter = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
                 document.dispatchEvent(enter);
                 return {
-                    surface: store.view.lastSurface,
+                    dockDepth: store.view.dockDepth,
                     focusKey: store.view.focus.key,
+                    focusEnabled: store.view.focus.enabled,
                     inFlight: facade.actions.client.isInFlight(),
                     prevented: enter.defaultPrevented,
                 };
             }"""
         )
-        self.assertEqual(enter_result["surface"], "guild")
-        self.assertEqual(enter_result["focusKey"], "action-guild")
+        self.assertEqual(enter_result["dockDepth"], 2)
+        self.assertEqual(enter_result["focusKey"], "move-empty")
+        self.assertFalse(enter_result["focusEnabled"], "the pushed move submenu's first row is the disabled move-empty item")
         self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
         self.assertTrue(enter_result["prevented"])
 
