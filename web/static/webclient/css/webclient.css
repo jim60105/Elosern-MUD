@@ -2,11 +2,11 @@
 
   Base style sheet for the Elosern WebClient.
 
-   Replaces the stock Evennia sheet: the Bootstrap `d-none` utility and the
-   minimal text classes that the text transport still emits. The ink-night /
-   vermilion desktop theme now lives in the Vue bundle's authored styles
-   (web/webclient-app/styles/); this file only anchors the page and the
-   degraded text fallback surface.
+  Replaces the stock Evennia sheet: the Bootstrap `d-none` utility and the
+  minimal text classes that the text transport still emits. The ink-night /
+  vermilion desktop theme now lives in the Vue bundle's authored styles
+  (web/webclient-app/styles/); this file only anchors the page and the
+  degraded text fallback surface.
 
 --- */
 

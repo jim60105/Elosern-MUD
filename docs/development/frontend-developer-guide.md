@@ -53,13 +53,13 @@ web/webclient-app/
   tests/*.test.js                               Vitest component gate
   stories/**                                    Storybook stories (B wave onward)
 web/static/webclient/
-   js/elosern/*                                 preserved DOM-independent logic (re-exposed via lib/*)
-   js/text_console.js                           D10 vanilla console (both branches)
-   js/jquery_ready_shim.js                      the evennia.js ready bootstrap shim
-   css/webclient.css  css/ansi_palette.css      shared page + ANSI theme
-   app/dist/                                     Vite output (gitignored, built everywhere it's served)
-   (the retired `js/plugins/*` view plugins, `vendor/*` runtimes, and dead CSS
-    goldenlayout.css / elosern.css were deleted at D1)
+  js/elosern/*                                  preserved DOM-independent logic (re-exposed via lib/*)
+  js/text_console.js                            D10 vanilla console (both branches)
+  js/jquery_ready_shim.js                       the evennia.js ready bootstrap shim
+  css/webclient.css  css/ansi_palette.css       shared page + ANSI theme
+  app/dist/                                     Vite output (gitignored, built everywhere it's served)
+  (the retired `js/plugins/*` view plugins, `vendor/*` runtimes, and dead CSS
+   goldenlayout.css / elosern.css were deleted at D1)
 web/templates/webclient/base.html               XOR-flag script loading (A2)
 web/webclient/context_processors.py             webclient_vue_enabled context value
 ```
