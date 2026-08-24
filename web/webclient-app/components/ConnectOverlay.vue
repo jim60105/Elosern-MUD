@@ -34,7 +34,7 @@ defineProps({
     :data-status="status"
   >
     <div class="connect-overlay__brand" data-testid="connect-overlay-brand">
-      霧落
+      伊洛瑟恩
     </div>
     <div class="connect-overlay__status" data-testid="connect-overlay-status">
       {{ STATUS_TEXT[status] }}
