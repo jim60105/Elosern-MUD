@@ -80,7 +80,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::the-webclient-loads-a-local-vue-spa-desktop-shell"
     )
-    def test_mounted_shell_renders_no_goldenlayout_tab_strip(self):
+    def test_mounted_shell_renders_no_tab_strip(self):
         page = self.logged_in_page()
         wait_for_store_state(
             page,
@@ -96,14 +96,14 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
                 "description": "#action-dock rendered and visible",
             },
         )
-        # `settings.hasHeaders: false` hides the tab strip entirely: no
-        # visible `.lm_header` element exists anywhere (GoldenLayout keeps the
-        # hidden header nodes in the DOM), while every required surface is
-        # present and self-identifying.
+        # The Vue SPA desktop shell renders no tab strip: no visible
+        # `.lm_header` element exists anywhere (the legacy GoldenLayout header
+        # classes are gone), while every required surface is present and
+        # self-identifying.
         self.assertEqual(
             page.locator(".lm_header:visible").count(),
             0,
-            "the GoldenLayout tab strip must not render visibly",
+            "the tab strip must not render visibly",
         )
         for component in REQUIRED_COMPONENTS:
             count = self._count_component(page, component)

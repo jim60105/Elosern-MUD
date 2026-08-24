@@ -14,15 +14,19 @@ change's focused design never duplicates it.
 ## Context: the current-state constraints the migration must preserve
 
 The Elosern web client is served from the Django/Evennia template pair
-`web/templates/webclient/{base.html, webclient.html}`. Today `base.html` loads
-a pinned local jQuery 3.2.1, the Evennia-provided `evennia.js` WebSocket
-transport, the GoldenLayout 1.x runtime, and about 30 project `<script>`
-files: DOM-independent logic in `web/static/webclient/js/elosern/*`
-(protocol reducer, keyboard router, narrative markup pipeline, command echo,
-local-map model, choice-point/option-card logic, art focus) and imperative
-view plugins in `web/static/webclient/js/plugins/*`. GoldenLayout mounts the
-version-1 shell into `#main-sub`; `#messagewindow` is the degraded text
-fallback.
+`web/templates/webclient/{base.html, webclient.html}`. After the Vue
+migration (C4 flip, finalized by D1), `base.html` loads the Evennia-provided
+`evennia.js` WebSocket transport and the Vite-built Vue 3 SPA bundle
+(`web/static/webclient/app/dist/index.js`), the dependency-free vanilla text
+console (`js/text_console.js`, the D10 offline fallback), and the `$(document).ready`
+shim (`js/jquery_ready_shim.js`, supplying the single jQuery surface evennia.js
+needs at bootstrap). The retired legacy jQuery/GoldenLayout view files and their
+dead CSS were deleted at D1. The preserved DOM-independent logic lives in
+`web/static/webclient/js/elosern/*` (protocol reducer, keyboard router,
+narrative markup pipeline, command echo, local-map model, choice-point/option-card
+logic, art focus); the Vue app re-exposes it through `webclient-app/lib/*` ESM
+wrappers via Vite's CommonJS interop. The Vue `AppShell` mounts into `#main-sub`;
+`#messagewindow` remains the degraded text fallback.
 
 - **Offline invariant:** the page makes no remote request for a runtime UI
   dependency. Every runtime asset is served from the project origin.

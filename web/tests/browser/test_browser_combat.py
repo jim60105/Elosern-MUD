@@ -1,7 +1,7 @@
 """Keyboard-only combat menu browser acceptance (webclient-combat-menu 5.2-5.5).
 
 These journeys drive the real Evennia server's combat sessions through the
-GoldenLayout action dock: the seeded character owns fire_ball (SINGLE),
+Vue action dock (ActionDock): the seeded character owns fire_ball (SINGLE),
 wind_blade (AREA), status_disguise (SELF), concentration (NONE), and the innate
 basic_attack (SINGLE) and flee (SELF). Each test starts combat by engaging a
 fixture monster through the ordinary drawer, then drives the combat dock with

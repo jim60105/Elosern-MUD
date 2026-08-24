@@ -98,6 +98,39 @@ uv run --locked -m world.imports.validate world/imports/examples/example_charact
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
 
+### Frontend (npm)
+
+The Vue 3 SPA webclient (view layer only) builds to `web/static/webclient/app/dist`
+from `web/webclient-app/` sources plus locked npm dependencies. The npm toolchain
+is a dev/CI-time dependency only (no runtime npm dependency); the built page is
+served entirely from the project origin.
+
+```sh
+npm ci --no-audit --no-fund
+npm run build
+npm test
+npm run build-storybook
+npm run showcase-coverage
+```
+
+- `npm run build` → the Vite production bundle (`web/static/webclient/app/dist`).
+- `npm test` → the Vitest component suite under `web/webclient-app/tests/`.
+- `npm run build-storybook` → the offline component showcase (Storybook).
+- `npm run showcase-coverage` → the component-coverage check against the frozen
+  required-set manifest.
+
+## Python-vs-npm split
+
+- **Python gates (uv-managed):** the non-browser Evennia suite, top-level
+  regression tests, and the aggregate Python branch-coverage gate (exact-root,
+  ≥80%).
+- **JS gates (npm/dev-time only):** the dependency-free Node gate
+  (`node --test web/static/webclient/js/tests/*.test.js`), the Vitest component
+  suite (`npm test`), and the Storybook component-coverage gate
+  (`npm run build-storybook` + `npm run showcase-coverage`).
+- The browser-test workspaces and the container image build the `dist` bundle
+  from the authored sources plus locked npm dependencies (never hand-authored).
+
 The Evennia commands run non-browser package tests. Managed Playwright tests,
 repository-wide contracts, and complete evidence verification are CI-owned.
 The retained database is `server/db/evennia-test.sqlite3`; after migration
@@ -115,6 +148,11 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 - Do not run CI shard commands locally. They share database and pidfile paths.
 - Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are fast;
   `tools.spec_traceability check` is the local traceability gate.
+- JS gates: the dependency-free Node gate, the Vitest component suite
+  (`npm test`), and the Storybook build + component-coverage
+  (`npm run build-storybook`, `npm run showcase-coverage`) are the applicable JS
+  gates. The full managed browser suite, `tools.spec_traceability verify
+  --evidence`, and the aggregate Python branch-coverage gate are CI-owned.
 - A browser test file that exceeds five minutes in CI must be split.
 - Save CPU time: capture a long command's output to a temp file once, then inspect that file with whichever read or search tool is available — the `read` tool, `grep` (`rg`), or `bash` (`head`/`tail`/`sed`/`awk`). Do not re-run the test just to recapture its output.
 

@@ -2,8 +2,9 @@
 // live evennia.js OOB transport. This is the single transport seam (design
 // D5): the store only dispatches mutations (dispatch-only, one mutation in
 // flight) and adopts server presentation (snapshot/update), exactly like the
-// preserved `web/static/webclient/js/plugins/elosern_state.js` but driving
-// the Pinia store instead of the legacy Protocol store.
+// preserved `web/static/webclient/js/elosern/protocol.js` logic (re-exposed
+// through `lib/protocol.js`) but driving the Pinia store instead of the
+// legacy Protocol store.
 //
 // Wiring contract:
 // - The `ui_snapshot` / `ui_update` / `ui_action_result` / `ui_protocol_error`

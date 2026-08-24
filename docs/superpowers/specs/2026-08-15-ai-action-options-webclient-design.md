@@ -87,7 +87,8 @@ deterministic affordance list itself is always computed fresh from room state; o
 ## 2. Dock Rendering
 
 The exploration dock adopts the same `state.panels["context_actions"]` read the combat dock
-already uses (`web/static/webclient/js/plugins/combat_dock.js:117` pattern) and renders a
+already uses (the `webclient-app/stores/elosern.js` store + `ActionDock.vue` pattern, the legacy
+`js/plugins/combat_dock.js` now deleted) and renders a
 suggestions section:
 
 | `suggestions.status` | Rendering |
@@ -119,7 +120,8 @@ Dual placement (overview A-6): beside the dock section, `ready` cards also appea
 inserted into the narrative stream.
 
 - The narrative stream appends through the single-owner facade
-  `window.Elosern.narrativeInput` (`web/static/webclient/js/plugins/goldenlayout.js:1282`). The
+  `window.Elosern.narrativeInput`, now owned by the C2 bridge
+  (`webclient-app/bridge.js`; the legacy `js/plugins/goldenlayout.js` is deleted). The
   choice-point layer hooks presentation commits: when `suggestions.status` flips to `generating`,
   it appends the muted "AI 正在構思建議…" line at the stream end; a later `ready` commit replaces
   it in place with the card group; `unavailable`/dismiss removes it.

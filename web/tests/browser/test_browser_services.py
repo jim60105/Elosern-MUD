@@ -1,7 +1,8 @@
 """Keyboard-only services browser acceptance (webclient-service-menus 5.2-5.5).
 
 These journeys drive the real Evennia server's guild/quest/shop/inventory
-services through the GoldenLayout services dock: registration and idempotent
+services through the Vue services panels (ShopPanel, QuestBoard, InventoryPanel):
+registration and idempotent
 re-registration, board accept, abandon behind an explicit confirmation,
 completed-quest turn-in, exam-to-combat mode transition with the service dock
 torn down, shop open/closed at fixed world times, buy/sell quantity validation

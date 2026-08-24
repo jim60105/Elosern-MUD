@@ -7,7 +7,9 @@ SHALL install Chromium with `uv run --locked playwright install --with-deps chro
 runner, run `node --test web/static/webclient/js/tests/*.test.js`, build the Vue application with the
 locked npm toolchain (`npm ci` and the Vite production build), run the Vue component (Vitest) test suite,
 build the Storybook component showcase with its component-coverage check against the frozen required set,
-and run the explicit `web/tests/browser/` discovery once, serially, under coverage. The Vue `dist` artifact
+and run the explicit `web/tests/browser/` discovery once, under coverage, with the enumerated test files executed
+serially within each browser workspace; concurrent browser workspaces SHALL own isolated server lifecycles
+(unique ephemeral ports, a private SQLite database, and dedicated log/media/static roots). The Vue `dist` artifact
 SHALL be built in the browser test workspaces and in the container image. The managed browser acceptance
 SHALL assert against the preserved DOM contract hooks (`#action-dock`, the `action-`/`target-` keys,
 `#combat-row-0`, panel ids) and the re-mapped `data-testid` hooks, and SHALL include the

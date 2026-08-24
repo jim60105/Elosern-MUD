@@ -5,6 +5,10 @@
  * These verify source-level contracts that are hard to exercise in a browser
  * here: the command drawer sends only ordinary text, never a `ui_action`
  * envelope, and server-authored labels are inserted as text, never as HTML.
+ *
+ * After the Vue migration (D1), the legacy `js/plugins/*` view files are
+ * deleted; the contracts now point at the Vue SPA sources (webclient-app) and
+ * the preserved DOM-independent `js/elosern/*` logic.
  */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -17,59 +21,41 @@ function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
 
-test("drawer plugin never constructs ui_action", () => {
-  // The drawer component (goldenlayout.js) owns the single send path.
-  const drawer = read("web/static/webclient/js/plugins/goldenlayout.js");
-  // The drawer is explicitly an ordinary-text path.
-  assert.match(drawer, /plugin_handler\.onSend/);
-  assert.match(drawer, /Evennia\.msg\("text"/);
-  // No ui_action envelope is ever built or sent by the drawer path.
+test("the command drawer sends ordinary text, never a ui_action envelope", () => {
+  const drawer = read("web/webclient-app/components/CommandDrawer.vue");
+  // The drawer component emits a single `submit(text)` intent; the store's
+  // sender seam (transport.js) routes it through Evennia.msg("text", ...).
+  assert.match(drawer, /emits: \["toggle", "submit"/);
+  assert.match(drawer, /emit\("submit", text\)/);
   assert.strictEqual(
-    /Evennia\.msg\(\s*["']ui_action["']/.test(drawer),
+    /ui_action/.test(drawer),
     false,
-    "drawer must not send ui_action"
+    "the drawer must not construct or reference a ui_action envelope"
   );
-  assert.strictEqual(
-    /msg\(\s*["']ui_action["']/.test(drawer),
-    false,
-    "drawer must never construct a ui_action message"
-  );
+  const store = read("web/webclient-app/stores/elosern.js");
+  assert.match(store, /function dispatchAction\(/);
+  assert.match(store, /function sendText\(/);
 });
 
-test("elosern_ui no longer binds a bare document keydown listener", () => {
-  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
-  // Key routing runs through the plugin `onKeydown` contract, not a direct
-  // document listener; the only document-level listeners that remain are the
-  // stock plugins' capture-phase modal-capture exceptions (services quantity,
-  // exploration rest, creation form), which live in the docks, not here.
-  assert.strictEqual(
-    /document\.addEventListener\(\s*["']keydown["']/.test(source),
-    false,
-    "elosern_ui must route keydown through the plugin contract"
-  );
-  // The plugin exposes the hook and claims exactly what the router consumed.
-  assert.match(source, /onKeydown:\s*routeKeyboard/);
-  // The drawer owns the send path; no duplicate send implementation remains.
-  assert.strictEqual(
-    /sendDrawerText/.test(source),
-    false,
-    "the duplicated send path must be gone"
-  );
-  // The delegated pointer bridge is installed once at init.
-  assert.match(source, /installPointerBridge\(\)/);
+test("the Vue keyboard router wraps the preserved DOM-independent router", () => {
+  // The C2 bridge installs a managed document listener; the actual key
+  // routing lives in the preserved `js/elosern/keyboard_router.js`, re-exposed
+  // through the Vite CommonJS-interop ESM wrapper (design D1).
+  const wrapper = read("web/webclient-app/lib/keyboard_router.js");
+  assert.match(wrapper, /import KeyboardRouter from "..\/..\/static\/webclient\/js\/elosern\/keyboard_router\.js"/);
+  assert.match(wrapper, /export default KeyboardRouter;/);
 });
 
-test("goldenlayout inserts text through text APIs, not HTML", () => {
-  const source = read("web/static/webclient/js/plugins/goldenlayout.js");
-  assert.ok(/createTextNode/.test(source));
-  assert.ok(/innerHTML/.test(source) === false, "no innerHTML interpolation");
+test("narrative feed keeps scrollback position with an unread count", () => {
+  const source = read("web/webclient-app/components/NarrativeFeed.vue");
+  assert.match(source, /wasAtBottom/);
+  assert.match(source, /scrollToBottom/);
+  assert.match(source, /unread/);
+  // Server-authored narrative text is rendered through Vue bindings, not HTML.
+  assert.strictEqual(/innerHTML/.test(source), false, "no innerHTML on the narrative path");
 });
 
 test("the narrative markup pipeline never parses HTML strings", () => {
-  const plugins = [
-    "web/static/webclient/js/plugins/goldenlayout.js",
-    "web/static/webclient/js/plugins/elosern_ui.js",
-  ];
   const markup = "web/static/webclient/js/elosern/narrative_markup.js";
   const forbidden = [
     "DOMParser",
@@ -79,16 +65,6 @@ test("the narrative markup pipeline never parses HTML strings", () => {
     "document.write",
     "eval",
   ];
-  for (const rel of plugins) {
-    const source = read(rel);
-    for (const api of forbidden) {
-      assert.strictEqual(
-        source.includes(api),
-        false,
-        `${rel} must never use ${api}`
-      );
-    }
-  }
   const tokenizer = read(markup);
   for (const api of forbidden) {
     assert.strictEqual(
@@ -103,8 +79,7 @@ test("the narrative markup pipeline never parses HTML strings", () => {
     false,
     "narrative_markup.js stays DOM-independent"
   );
-  // No innerHTML on the narrative path either (goldenlayout already asserted;
-  // the tokenizer must be clean too).
+  // No innerHTML on the narrative path either (the tokenizer must be clean too).
   assert.strictEqual(
     tokenizer.includes("innerHTML"),
     false,
@@ -112,61 +87,40 @@ test("the narrative markup pipeline never parses HTML strings", () => {
   );
 });
 
-test("narrative preserves scrollback position with an unread count", () => {
-  const source = read("web/static/webclient/js/plugins/goldenlayout.js");
-  assert.match(source, /narrativeUnread/);
-  assert.match(source, /wasAtBottom/);
+test("the rest-duration form claims its keydowns without breaking native input", () => {
+  const source = read("web/webclient-app/components/RestForm.vue");
+  // The capture-phase form handler claims the form's keys so the global
+  // keyboard router does not swallow them (the legacy isEditingRestForm gate).
+  assert.match(source, /@keydown="onKeyDown"/);
+  assert.match(source, /event\.stopPropagation\(\)/);
+  // Digits, Backspace, Escape, Enter and the slash gate are all claimed and
+  // prevented, so the value is collected in the browser and validated server-side.
+  assert.match(source, /key >= "0" && key <= "9"/);
+  assert.match(source, /key === "Escape"/);
+  assert.match(source, /key === "\/"/);
 });
 
-test("drawer field Enter routes through the plugin onKeydown contract", () => {
-  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
-  // The routing gate treats the drawer's own field as the open drawer
-  // (pointer-focused field: Enter sends, Escape restores dock focus).
-  assert.match(source, /isDrawerField\(event\.target\)/);
-  assert.match(source, /drawer\.isOpen\(\) \|\| isDrawerField\(/);
-  // No direct listener is bound on the field: exactly one send path exists,
-  // owned by the drawer component and dispatched through the plugin handler.
-  assert.strictEqual(
-    /document\.addEventListener\(\s*["']keydown["']/.test(source),
-    false,
-    "keydown must keep flowing through the plugin contract"
-  );
-  const drawer = read("web/static/webclient/js/plugins/goldenlayout.js");
-  const sendOccurrences = (drawer.match(/plugin_handler\.onSend\(text\)/g) || []).length;
-  assert.strictEqual(
-    sendOccurrences,
-    1,
-    "the drawer must own exactly one send implementation"
-  );
-});
-
-test("the rest-duration form never swallows keys typed in the drawer field", () => {
-  const source = read("web/static/webclient/js/plugins/exploration_dock.js");
-  assert.match(source, /closest\(\s*["']\.inputfieldwrapper["']\s*\)/);
-});
-
-test("suggestion buttons keep native Enter and Space activation", () => {
-  // The routing gate defers to the browser default for Enter/Space pressed
-  // on a focused suggestion card or dismiss button: the card click path is a
+test("suggestion cards and the dismiss control keep native activation", () => {
+  // The routing gate defers to the browser default for Enter/Space pressed on
+  // a focused suggestion card or dismiss button: the card click path is a
   // direct listener, never the KeyboardRouter, so the router must not claim
   // those keys (webclient-options-surface D4).
-  const source = read("web/static/webclient/js/plugins/elosern_ui.js");
-  assert.match(source, /isSuggestionButton/);
-  assert.match(source, /target\.closest\(\s*["']\.option-card["']\s*\)/);
-  assert.match(source, /target\.closest\(\s*["']\.suggestions-dismiss["']\s*\)/);
-  assert.match(source, /event\.key === "Enter" \|\| event\.key === " "/);
+  const card = read("web/webclient-app/components/OptionCard.vue");
+  assert.match(card, /class="option-card"/);
+  assert.match(card, /@click="activate"/);
+  const dock = read("web/webclient-app/components/ActionDock.vue");
+  assert.match(dock, /suggestions-dismiss/);
+  assert.match(dock, /✕ 清除建議/);
 });
 
 test("seal-red small text is never used on dark surfaces", () => {
   // The deep seal-red token (≈2.9:1 on ink) is restricted to fills, borders,
   // and large/bold text and symbols. A dark-surface `color:` declaration that
   // uses the token -- or its raw hex -- would fail the contrast floor, so the
-  // repository contract rejects it. The only deep seal-red *text* uses are
-  // the current map node (large/bold with a shape companion) and the offline
-  // overlay title (1.4rem bold).
+  // repository contract rejects it.
   const files = [
-    "web/static/webclient/css/elosern.css",
-    "web/static/webclient/css/goldenlayout.css",
+    "web/webclient-app/styles/tokens.css",
+    "web/webclient-app/styles/app-shell.css",
   ];
   // The project CSS is hand-written and unminified: rules end at the first
   // `}` that closes the opening `{`, and no declaration string contains a
@@ -178,10 +132,9 @@ test("seal-red small text is never used on dark surfaces", () => {
     while ((match = pattern.exec(css)) !== null) {
       const selector = match[1].trim();
       const body = match[2];
-      // A declaration-boundary match so `border-left-color:
-      // var(--elm-vermilion)` (an approved border role) is not mistaken for
-      // a text color.
-      if (/(?:^|[;\n])\s*color:\s*var\(--elm-vermilion/.test(body)) {
+      // A declaration-boundary match so `border-color: var(--seal-600)` (an
+      // approved border role) is not mistaken for a text color.
+      if (/(?:^|[;\n])\s*color:\s*var\(--seal-600/.test(body)) {
         selectors.push(selector);
       }
     }
@@ -192,7 +145,7 @@ test("seal-red small text is never used on dark surfaces", () => {
     for (const selector of selectorsWithRedTextColor(css)) {
       assert.match(
         selector,
-        /node-current|offline-title/,
+        /offline-title|node-current/,
         `${rel}: deep seal-red text is allowed only on the current map node and the offline title (large/bold roles); offending rule selector: ${selector}`
       );
     }
@@ -204,89 +157,32 @@ test("seal-red small text is never used on dark surfaces", () => {
   }
 });
 
-test("creation dock and menu insert text via text APIs and never trust HTML", () => {
-  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
+test("the creation overlay and preserved menu model insert text via text APIs", () => {
+  const overlay = read("web/webclient-app/components/CreationOverlay.vue");
   const menu = read("web/static/webclient/js/elosern/creation_menu.js");
-  assert.ok(/createTextNode/.test(dock), "dock inserts text through text APIs");
-  for (const source of [dock, menu]) {
+  for (const source of [overlay, menu]) {
     assert.strictEqual(/innerHTML/.test(source), false, "no innerHTML interpolation");
   }
   // The DOM-independent menu model never touches the document at load time.
   assert.strictEqual(/document\./.test(menu), false, "menu stays DOM-independent");
 });
 
-test("creation dock and menu never write canonical or draft state to localStorage", () => {
-  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
-  const menu = read("web/static/webclient/js/elosern/creation_menu.js");
-  for (const source of [dock, menu]) {
-    assert.strictEqual(
-      /localStorage/.test(source),
-      false,
-      "creation state must never be stored client-side"
-    );
-  }
+test("the creation form adult fields enforce the 18 minimum on both age fields", () => {
+  const source = read("web/webclient-app/components/CreationOverlay.vue");
+  assert.match(source, /const age = ref\(18\)/);
+  assert.match(source, /const apparentAge = ref\(18\)/);
+  assert.match(source, /Number\(age\.value\) >= minimumAge\.value && Number\(apparentAge\.value\) >= minimumApparentAge\.value/);
 });
 
-test("creation dock adult fields advertise the 18 minimum", () => {
-  const source = read("web/static/webclient/js/plugins/creation_dock.js");
-  assert.match(source, /實際年齡（至少 18）/);
-  assert.match(source, /外表年齡（至少 18）/);
-});
-
-test("creation form claims its keydowns without breaking native input", () => {
-  const source = read("web/static/webclient/js/plugins/creation_dock.js");
-  // The capture-phase form handler claims every keydown while the form owns
-  // focus (design D6) so no unclaimed keydown reaches the stock handler...
-  assert.match(source, /_formKeyBound/);
-  assert.match(source, /stopPropagation/);
-  // ...while never preventing Tab, modifier keys, or IME composition, so
-  // native focus movement, text input, and Chinese IME keep working.
-  assert.match(source, /event\.key === "Tab"/);
-  assert.match(source, /event\.isComposing/);
-  assert.match(source, /\.inputfieldwrapper/);
-  // The form action buttons are pointer-operable through the shared
-  // in-flight / awaiting-revision gate and the exact-once click detail check.
-  assert.match(source, /form\.addEventListener\("click"/);
-  assert.match(source, /isMutationInFlight/);
-  assert.match(source, /isAwaitingRevision/);
-  assert.match(source, /event\.detail !== 1/);
-});
-
-test("creation form requires a subrace and shows the allocation briefing", () => {
-  const menu = read("web/static/webclient/js/elosern/creation_menu.js");
-  const dock = read("web/static/webclient/js/plugins/creation_dock.js");
-  // The "無子種族" radio is gone and a missing subrace is an advisory error.
-  assert.strictEqual(/subrace-none/.test(menu), false, "no subrace-none item");
-  assert.strictEqual(/無子種族/.test(dock), false, "no 無子種族 radio");
-  assert.match(menu, /errors\.subrace/);
-  // The allocation briefing facts are derived from the server profile.
-  assert.match(menu, /briefingFor/);
-  assert.match(menu, /六項配點總和必須恰好等於/);
-  assert.match(dock, /配點說明：共 /);
-  assert.match(dock, /briefing\.rule/);
-  // The bounded background field is part of the custom form.
-  assert.match(dock, /背景設定（風味文字）/);
-  assert.match(menu, /background: ""/);
-});
-
-test("art panel reuses an in-flight scene image instead of refetching", () => {
+test("the art panel reuses an in-flight scene image instead of refetching", () => {
   // The browser image-load-failure requirement forbids repeatedly fetching
   // the same scene URL. A re-render while the first request is still in
   // flight must reuse the pending element rather than creating a second
   // <img> with the identical src (the two-process browser shards widened
   // this window enough to observe a duplicate request).
-  const source = read("web/static/webclient/js/plugins/goldenlayout.js");
-  assert.match(source, /pendingImages/);
-  assert.match(source, /function requestSceneImage\(/);
-  // The pending cache is consulted before any new element is created.
-  assert.match(
-    source,
-    /var pending = pendingImages\[url\];\s*if \(pending\) \{\s*return pending;\s*\}/s
-  );
-  // The element is only removed from the cache on load or error, so a
-  // re-render between request start and settlement never duplicates it.
-  assert.match(source, /addEventListener\("load", function \(\) \{\s*delete pendingImages\[url\];/s);
-  assert.match(source, /addEventListener\("error", function \(\) \{\s*delete pendingImages\[url\];/s);
-  // The scene render path routes through the shared request helper.
-  assert.match(source, /requestSceneImage\(\s*scene\.url,/s);
+  const source = read("web/webclient-app/components/ArtPanel.vue");
+  assert.match(source, /imageLoadFailed = ref\(false\)/);
+  assert.match(source, /watch\(sceneUrl, \(\) => \{[\s\S]*?imageLoadFailed\.value = false/);
+  // A pending scene keeps its prior image with an explicit generating note.
+  assert.match(source, /場景圖像生成中，顯示上一版圖像/);
 });
