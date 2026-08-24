@@ -9,13 +9,15 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
+    snapshot_envelope,
     store_state,
+    valid_local_map_panel,
     wait_for_narrative_settled,
     wait_for_store_state,
 )
 
 REQUIRED_SURFACES = (
-    ".elosern-header",
+    '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
     '[data-testid="command-drawer"]',
 )
@@ -196,7 +198,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         bars = page.locator(".status-gauge__bar").all_inner_texts()
         self.assertEqual(len(bars), 3, "hp, mp, sp gauge bars")
 
-        header_conn = page.locator(".header-conn").inner_text()
+        header_conn = page.locator(".meta-conn").inner_text()
         self.assertIn("已連線", header_conn)
 
     @covers_requirement(
@@ -506,14 +508,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         # The header identifies location, world time, and the connected state;
         # the raw mode label is gone (the dock content identifies the mode).
-        header = page.locator(".elosern-header")
+        header = page.locator('[data-testid="topbar"]')
         self.assertEqual(header.evaluate("el => el.classList.contains('connected')"), True)
-        location = page.locator(".header-location").inner_text()
+        location = page.locator('[data-testid="topbar-location"]').inner_text()
         self.assertNotEqual(location, "位置：--", "location must be synced")
         self.assertTrue(location.strip())
-        clock = page.locator(".header-clock").inner_text()
+        clock = page.locator('[data-testid="topbar-clock"]').inner_text()
         self.assertRegex(clock, r"\d+ 日 · \d{2}:\d{2}")
-        conn = page.locator(".header-conn").inner_text()
+        conn = page.locator(".meta-conn").inner_text()
         self.assertIn("●", conn)
         self.assertIn("已連線", conn)
         self.assertEqual(page.locator(".header-mode").count(), 0, "no raw mode label")
@@ -758,6 +760,157 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 detail.inner_text(),
                 "the detail pane names the back cell's next key action",
             )
+
+    @covers_requirement(
+        "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
+    )
+    def test_stage_anchors_do_not_intersect_at_both_viewports(self):
+        """H1 group 8.3: the full-bleed stage's named HUD anchors must not overlap.
+
+        The stage anchors (``hud-left``, ``hud-right``, ``feed``, ``dock``,
+        ``command-line``) are absolutely positioned; any pair of *visible*
+        anchors sharing a non-zero-area intersection would visually collide,
+        breaking the "surfaces remain usable" contract. Verified at both
+        supported desktop viewports.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            overlap = page.evaluate(
+                """() => {
+                  const testids = ["anchor-hud-left", "anchor-hud-right", "anchor-feed",
+                                   "anchor-dock", "anchor-command-line"];
+                  const anchors = testids
+                    .map((t) => {
+                      const el = document.querySelector('[data-testid="' + t + '"]');
+                      if (!el) { return null; }
+                      const r = el.getBoundingClientRect();
+                      const visible = r.width > 0 && r.height > 0 && el.offsetParent !== null;
+                      return { testid: t, r: r, visible: visible };
+                    })
+                    .filter(Boolean)
+                    .filter((a) => a.visible);
+                  const intersecting = [];
+                  for (let i = 0; i < anchors.length; i++) {
+                    for (let j = i + 1; j < anchors.length; j++) {
+                      const a = anchors[i].r, b = anchors[j].r;
+                      const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+                      const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+                      if (xOverlap > 0 && yOverlap > 0) {
+                        intersecting.push(anchors[i].testid + " <-> " + anchors[j].testid);
+                      }
+                    }
+                  }
+                  return { intersecting: intersecting };
+                }"""
+            )
+            self.assertEqual(
+                overlap["intersecting"],
+                [],
+                f"stage anchors intersect at {viewport[0]}x{viewport[1]}: {overlap['intersecting']}",
+            )
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+    )
+    def test_minimap_present_in_exploration_absent_in_combat(self):
+        """H1 group 8.4: the minimap is visible in exploration and hidden in combat.
+
+        The seeded exploration scene does not always carry a map-knowledge
+        record, so the test injects a valid local_map panel through the
+        wired reducer. The HUD mode-gating matrix (design D2) hides the
+        minimap in combat (and creation) via ``display:none !important`` on
+        ``data-elosern-mode``.
+        """
+        page = self.logged_in_page()
+        state = store_state(page)
+
+        # Exploration: inject an available local_map panel; the minimap renders.
+        expl = page.evaluate(
+            "(args) => window.__elosernBridge.store.receive("
+            "args.generation, 'ui_snapshot', [args.envelope], {})",
+            {
+                "generation": state["generation"],
+                "envelope": snapshot_envelope(
+                    state["epoch"],
+                    state["revision"] + 1,
+                    {"local_map": valid_local_map_panel()},
+                    mode="exploration",
+                ),
+            },
+        )
+        self.assertTrue(expl["accepted"], "the exploration snapshot was accepted")
+        page.wait_for_timeout(150)
+        lm = page.locator(".local-map")
+        self.assertEqual(lm.count(), 1, "minimap renders in exploration mode")
+        self.assertTrue(lm.is_visible(), "minimap is visible in exploration mode")
+
+        # Combat: force combat mode; the minimap is hidden by the CSS mode-gate.
+        state = store_state(page)
+        combat = page.evaluate(
+            "(args) => window.__elosernBridge.store.receive("
+            "args.generation, 'ui_snapshot', [args.envelope], {})",
+            {
+                "generation": state["generation"],
+                "envelope": snapshot_envelope(
+                    state["epoch"],
+                    state["revision"] + 1,
+                    {"local_map": valid_local_map_panel()},
+                    mode="combat",
+                ),
+            },
+        )
+        self.assertTrue(combat["accepted"], "the combat-mode snapshot was accepted")
+        page.wait_for_timeout(150)
+        lm = page.locator(".local-map")
+        self.assertEqual(lm.count(), 1, "the minimap element remains in the DOM")
+        hidden = page.evaluate(
+            "() => { const el = document.querySelector('.local-map'); "
+            "return el ? (el.offsetParent === null) : false; }"
+        )
+        self.assertTrue(hidden, "the minimap is hidden (display:none) in combat mode")
+
+    @covers_requirement(
+        "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
+    )
+    def test_full_log_opens_in_one_action_and_escapes_with_focus_restoration(self):
+        """H1 group 8.5: the full log is a one-action escape hatch.
+
+        Clicking the caption card's `完整日誌` control opens the full-screen,
+        scrollable view of the complete retained narrative. While open, focus
+        is trapped in the overlay; pressing Escape closes it and focus is
+        restored to the control that opened it (design D4).
+        """
+        page = self.logged_in_page()
+        control = page.locator('[data-testid="narrative-fulllog-control"]')
+        self.assertEqual(control.count(), 1, "the full-log control renders in the feed head")
+        # One action: click the control and the full log must open.
+        control.click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        overlay = page.locator('[data-testid="fulllog-overlay"]')
+        self.assertTrue(overlay.is_visible(), "the full log overlay is visible after one click")
+        # While open, focus is trapped in the overlay.
+        focused_overlay = page.evaluate(
+            "() => { const o = document.querySelector('[data-testid=\"fulllog-overlay\"]'); "
+            "const a = document.activeElement; return o && (o === a || (o && o.contains(a))); }"
+        )
+        self.assertTrue(focused_overlay, "focus is trapped in the full log overlay while open")
+        # Escape closes the overlay and restores focus to the opener control.
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"fulllog-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.locator('[data-testid="fulllog-overlay"]').count(),
+            0,
+            "the full log overlay is removed after Escape",
+        )
+        focus_restored = page.evaluate(
+            "() => { const c = document.querySelector('[data-testid=\"narrative-fulllog-control\"]'); "
+            "const a = document.activeElement; return c && c === a; }"
+        )
+        self.assertTrue(focus_restored, "focus is restored to the control that opened the full log")
+
 
 
 if __name__ == "__main__":

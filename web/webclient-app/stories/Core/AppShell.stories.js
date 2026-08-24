@@ -56,7 +56,7 @@ export const ReadyOfflinePreview = {
   args: {
     ...STATUS_SLICE_SAMPLE,
     connectionStatus: "ready",
-    mode: "explore",
+    mode: "exploration",
     narrative: NARRATIVE_SAMPLE,
     prompt: PROMPT_SAMPLE,
     commandHistory: COMMAND_HISTORY_SAMPLE,

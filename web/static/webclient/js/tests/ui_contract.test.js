@@ -174,15 +174,19 @@ test("the creation form adult fields enforce the 18 minimum on both age fields",
   assert.match(source, /Number\(age\.value\) >= minimumAge\.value && Number\(apparentAge\.value\) >= minimumApparentAge\.value/);
 });
 
-test("the art panel reuses an in-flight scene image instead of refetching", () => {
+test("the scene backdrop reuses an in-flight scene image instead of refetching", () => {
   // The browser image-load-failure requirement forbids repeatedly fetching
-  // the same scene URL. A re-render while the first request is still in
-  // flight must reuse the pending element rather than creating a second
-  // <img> with the identical src (the two-process browser shards widened
-  // this window enough to observe a duplicate request).
-  const source = read("web/webclient-app/components/ArtPanel.vue");
+  // the same scene URL. H1 moved the scene frame out of ArtPanel into
+  // SceneBackdrop (the stage backdrop), so the no-refetch contract lives
+  // there: a failed URL is remembered in `failedUrls` and not re-fetched;
+  // a new scene URL resets the load-failure flag.
+  const source = read("web/webclient-app/components/SceneBackdrop.vue");
   assert.match(source, /imageLoadFailed = ref\(false\)/);
-  assert.match(source, /watch\(sceneUrl, \(\) => \{[\s\S]*?imageLoadFailed\.value = false/);
-  // A pending scene keeps its prior image with an explicit generating note.
-  assert.match(source, /場景圖像生成中，顯示上一版圖像/);
+  assert.match(source, /const failedUrls = new Set\(\)/);
+  assert.match(source, /failedUrls\.add\(url\)/);
+  // A failed URL resolves to null so the image element is not re-requested.
+  assert.match(source, /if \(url && failedUrls\.has\(url\)/);
+  // A new scene resets the load-failure flag (the generating prior image).
+  assert.match(source, /imageLoadFailed\.value = false/);
+  assert.match(source, /目前場景圖片生成中/);
 });

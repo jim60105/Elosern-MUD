@@ -33,18 +33,29 @@ function collectStoryTitles(dir) {
 // Word-boundary matching: a whole deferred-surface word flags the title;
 // bare substrings would false-positive on legitimate names (e.g. "Bag"
 // inside "Baggage").
+//
+// H1 (webclient-hud-01-shell-and-scene): the stage reserves no anchor for
+// a companion strip, a toast queue, or a persistent objective tracker
+// (roadmap §2.4 — no backing read model; deferred surfaces are absent, not
+// mocked).
 const DEFERRED_TITLE_PATTERNS = [
   /\bParty\b/i,
   /\bIntimate\b/i,
   /\bBag\b/i,
   /\bEventLog\b/i,
   /\bToasts?\b/i,
+  /\bCompanions?\b/i,
+  /\bObjectives?\b/i,
 ];
 
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
-    expect(manifest.required).toHaveLength(25);
+    // H1 grows the frozen set by three (the contextual-HUD foundation
+    // components) plus the C4-wired RestForm (a live-wired component that
+    // must have its story in the same change); H6 re-freezes at the complete
+    // new set.
+    expect(manifest.required).toHaveLength(29);
     // The four full overlays complete the required set (B5's new family).
     for (const title of [
       "Overlays/MapOverlay",

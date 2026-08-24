@@ -5,6 +5,15 @@ import UnreadIndicator from "./UnreadIndicator.vue";
 import ChoicePointBlock from "./ChoicePointBlock.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
 
+// Bounded narrative caption card (H1, design D4): the narrative is a
+// bounded caption at the visual centre of the stage — `width:min(880px,90vw)`,
+// `max-height:30vh` (set by the `feed` anchor), blurred panel chrome. The
+// card carries a single labelled control (`完整日誌`) that opens the
+// full-log surface presenting the complete retained narrative through the
+// same markup renderer (never a second markup path). The `#narrative-unread`
+// indicator, its polite live region, and the jump-to-latest behaviour
+// remain on the card, unchanged.
+
 // Narrative feed (the story centerpiece): renders the narrative log slice.
 // Server-transformed lines (out/sys/err) render through the preserved
 // NarrativeMarkup allowlist pipeline (tokens → vnodes, the
@@ -29,7 +38,7 @@ export default {
     // surface — generating and ready only).
     suggestions: { type: Object, default: null },
   },
-  emits: ["choice-action"],
+  emits: ["choice-action", "open-full-log"],
   setup(props, { expose, emit }) {
     const feedRoot = ref(null);
     const unread = ref(0);
@@ -152,12 +161,28 @@ export default {
           onScroll,
         },
         [
-          h(UnreadIndicator, {
-            count: unread.value,
-            onJump: () => {
-              jumpToLatest();
-            },
-          }),
+          h(
+            "div",
+            { class: "narrative-head", "data-testid": "narrative-head" },
+            [
+              h(UnreadIndicator, {
+                count: unread.value,
+                onJump: () => {
+                  jumpToLatest();
+                },
+              }),
+              h(
+                "button",
+                {
+                  type: "button",
+                  class: "narrative-fulllog-control",
+                  "data-testid": "narrative-fulllog-control",
+                  onClick: () => emit("open-full-log"),
+                },
+                "完整日誌",
+              ),
+            ],
+          ),
           ...props.lines.flatMap((line, index) => lineNodes(line, index)),
           // The stream-end choice-point block (webclient-action-choicepoints):
           // rendered after the lines so it stays at the stream end and is
@@ -174,12 +199,58 @@ export default {
 </script>
 
 <style>
+/* Bounded caption card (design D4): the card takes the `feed` anchor's
+   geometry (`width:min(880px,90vw)`, `max-height:30vh`), carries the
+   draft's blurred panel chrome, and never grows to fill the stage. The
+   card scrolls internally when the narrative outgrows its bounded height. */
 .elosern-narrative {
   position: relative;
   box-sizing: border-box;
+  max-height: 30vh;
   overflow-y: auto;
-  padding: var(--sp-4) 0 calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  padding: 14px 20px 15px;
   scroll-behavior: smooth;
+  background: var(--panel);
+  backdrop-filter: blur(7px);
+  border: var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* The caption's head row: the unread indicator and the `完整日誌` control
+   (the one-action escape hatch to the complete log). */
+.elosern-narrative .narrative-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+  background: var(--panel-solid);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--paper-500);
+  text-transform: uppercase;
+}
+
+.elosern-narrative .narrative-head .narrative-fulllog-control {
+  margin-left: auto;
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-radius: 99px;
+  color: var(--paper-300);
+  cursor: pointer;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 3px 10px;
+  text-transform: none;
+}
+
+.elosern-narrative .narrative-head .narrative-fulllog-control:hover {
+  border-color: var(--gold-500);
+  color: var(--paper-50);
 }
 
 .elosern-narrative .narrative-line {

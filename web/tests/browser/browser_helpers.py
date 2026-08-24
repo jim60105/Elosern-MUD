@@ -30,7 +30,7 @@ _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 # `data-testid` hooks are the stable contract); the header still renders under
 # its legacy `.elosern-header` class.
 REQUIRED_SURFACES = (
-    ".elosern-header",
+    '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
     '[data-testid="command-drawer"]',
 )

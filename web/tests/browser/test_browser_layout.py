@@ -64,7 +64,20 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         }
         self._set_layout(page, wrapper)
         page.reload()
-        wait_for_store_state(page, lambda s: bool(s.get("connected")))
+        # Wait for the connected state AND the status panel to be mounted, so
+        # the DOM count is not taken before the panel renders.
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="status-panel"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                    "return el !== null; }"
+                ),
+                "description": "status panel mounted after reload",
+            },
+        )
         for component in REQUIRED_COMPONENTS:
             count = self._count_component(page, component)
             self.assertEqual(
@@ -242,20 +255,24 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             count = self._count_component(page, component)
             self.assertEqual(count, 1, f"required component {component} missing")
 
+    # H1 re-map (task 8.1): the layout's required components are now
+    # identified by the stage anchors' DOM `data-testid` / id hooks rather than
+    # the stale GoldenLayout `LayoutStore.createStore().load().config` walk.
+    COMPONENT_SELECTORS = {
+        "header": '[data-testid="topbar"]',
+        "narrative": '[data-testid="narrative-feed"]',
+        "art": '[data-testid="scene-backdrop"]',
+        "status": '[data-testid="status-panel"]',
+        "local-map": ".local-map",
+        "action-dock": "#action-dock",
+        "command-drawer": '[data-testid="command-drawer"]',
+    }
+
     def _count_component(self, page, component) -> int:
+        selector = self.COMPONENT_SELECTORS[component]
         return page.evaluate(
-            """(c) => {
-              const store = Elosern.LayoutStore.createStore(
-                { storage: window.localStorage });
-              const config = store.load().config;
-              let found = 0;
-              (function walk(item) {
-                if (item.type === 'component' && item.componentName === c) found++;
-                if (item.content) item.content.forEach(walk);
-              })(config);
-              return found;
-            }""",
-            component,
+            "(sel) => document.querySelectorAll(sel).length",
+            selector,
         )
 
     def test_one_sync_malformed_panel_degrades_without_loop(self):

@@ -4,7 +4,7 @@
 // reads the C1 store's committed slices; panels render only when their
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model).
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
@@ -12,11 +12,13 @@ import ArtPanel from "./components/ArtPanel.vue";
 import CharacterPanel from "./components/CharacterPanel.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
+import FullLogOverlay from "./components/FullLogOverlay.vue";
 import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreDrawer from "./components/LoreDrawer.vue";
 import QuestBoard from "./components/QuestBoard.vue";
 import RestForm from "./components/RestForm.vue";
+import SceneBackdrop from "./components/SceneBackdrop.vue";
 import ShopPanel from "./components/ShopPanel.vue";
 import SkillBook from "./components/SkillBook.vue";
 import StatusPanel from "./components/StatusPanel.vue";
@@ -66,6 +68,54 @@ function panelAvailable(name) {
   const p = panel(name);
   return !!p && p.available !== false;
 }
+
+// H1 contextual HUD (design D4/D9): the bounded caption card's `完整日誌`
+// control opens the full-log overlay; the overlay presents the complete
+// retained narrative through the same markup renderer (one markup path).
+const fullLogOpen = ref(false);
+const fullLogRef = ref(null);
+
+function openFullLog() {
+  fullLogOpen.value = true;
+  void nextTick().then(() => fullLogRef.value?.focusSelf());
+}
+
+function closeFullLog(restoreFocus) {
+  fullLogOpen.value = false;
+  if (restoreFocus) {
+    // Focus is restored to the caption card's control (the opener) by the
+    // overlay itself (it remembers the opener element internally); the
+    // shell's mode watcher routes focus to the dock when a mode change hides
+    // a focused surface.
+  }
+}
+
+// The open-surface registry (design D9): a single reactive set of open
+// surfaces drives the stage recession; the mark clears only when no
+// surface remains open. The registry carries the full-log overlay and the
+// mounted creation overlay; H4's drawers will register into the same set.
+const openSurfaces = computed(() => {
+  const surfaces = [];
+  if (fullLogOpen.value) {
+    surfaces.push("full-log");
+  }
+  if (panelAvailable("creation")) {
+    surfaces.push("creation");
+  }
+  return surfaces;
+});
+
+// A mode transition into creation closes the full-log overlay (a
+// non-creation surface must not persist into creation) — task 5.8. The
+// shell's mode watcher handles the focus rescue to the dock.
+watch(
+  () => store.view.mode,
+  (mode) => {
+    if (mode === "creation" && fullLogOpen.value) {
+      fullLogOpen.value = false;
+    }
+  },
+);
 
 // C4: one-sync-per-episode resync (the legacy requestResync contract). The
 // real "renderer cannot render" signal is the committed view's `protocolError`
@@ -386,23 +436,32 @@ function onChoiceAction(intent) {
   <div class="elosern-root" data-testid="elosern-client-root">
       <AppShell
         ref="shellRef"
-        :mode="store.view.mode || 'explore'"
-      :connected="store.view.connected"
-      :location-label="store.view.statusSlice.locationLabel"
-      :time-label="store.view.statusSlice.timeLabel"
-      :narrative="store.narrative"
-      :connection-status="store.view.connectionStatus"
-      :offline="!store.view.connected"
-      :uncertain="store.view.dispatch.uncertain"
-      :prompt="store.view.prompt"
-      :command-history="store.commandHistory"
-      :suggestions="store.view.suggestions"
-      :mutations-locked="store.view.mutationsLocked"
-      @submit-command="onSubmitCommand"
-      @choice-action="onChoiceAction"
-      @drawer-closed="onDrawerClosed"
-    >
-      <template #panel-left>
+        :mode="store.view.mode || 'exploration'"
+        :connected="store.view.connected"
+        :location-label="store.view.statusSlice.locationLabel"
+        :time-label="store.view.statusSlice.timeLabel"
+        :narrative="store.narrative"
+        :connection-status="store.view.connectionStatus"
+        :offline="!store.view.connected"
+        :uncertain="store.view.dispatch.uncertain"
+        :prompt="store.view.prompt"
+        :command-history="store.commandHistory"
+        :suggestions="store.view.suggestions"
+        :mutations-locked="store.view.mutationsLocked"
+        :open-surfaces="openSurfaces"
+        @submit-command="onSubmitCommand"
+        @choice-action="onChoiceAction"
+        @drawer-closed="onDrawerClosed"
+        @open-full-log="openFullLog"
+      >
+        <!-- The scene backdrop is the lowest stage layer (design D3/D8):
+             it renders the committed `art` panel's scene truthfully — the
+             done image, the dimmed prior image, or the mode gradient with a
+             truthful placeholder. -->
+        <template #backdrop>
+          <SceneBackdrop :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
+        </template>
+        <template #panel-left>
         <StatusPanel
           v-if="panelAvailable('status') || panelAvailable('character')"
           :status="panel('status') || {}"
@@ -440,7 +499,7 @@ function onChoiceAction(intent) {
       <template #action-dock>
         <ActionDock
           v-if="dockItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
-          :mode="store.view.mode || 'explore'"
+          :mode="store.view.mode || 'exploration'"
           :suggestions="store.view.suggestions"
           :active-sub-dock="store.view.activeSubDock"
           @action="onAction"
@@ -475,6 +534,18 @@ function onChoiceAction(intent) {
       @action="onCreationAction"
       @request-reset="onCreationRequestReset"
       @cancel-confirm="onCreationCancelConfirm"
+    />
+
+    <!-- The full-log surface (design D4): the complete retained narrative,
+         reachable in one action from the caption card's control; focus-
+         trapped, Escape-closing, with focus restored to the opener. -->
+    <FullLogOverlay
+      v-if="fullLogOpen"
+      ref="fullLogRef"
+      :lines="store.narrative"
+      :suggestions="store.view.suggestions"
+      @close="closeFullLog(true)"
+      @choice-action="onChoiceAction"
     />
   </div>
 </template>

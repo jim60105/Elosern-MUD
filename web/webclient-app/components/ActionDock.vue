@@ -129,10 +129,11 @@ const cards = computed(
   flex-direction: column;
   gap: var(--sp-2);
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--panel);
-  border-top: 1px solid var(--seal-600);
-  font-family: var(--f-sans);
+   padding: var(--sp-3) var(--sp-4);
+   background: var(--panel);
+   border: 1px solid var(--seal-600);
+   border-radius: var(--radius);
+   font-family: var(--f-sans);
 }
 
 .action-dock__guidance {
