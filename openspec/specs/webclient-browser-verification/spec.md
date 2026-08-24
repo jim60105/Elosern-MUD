@@ -142,7 +142,10 @@ a DOM-readiness descriptor is supplied — the selector's connected/visible/enab
 `activeElement`. Focus operations (e.g. `focus_action_dock`) SHALL gate on the store state first, then
 poll the target element's DOM readiness in the same loop, focus it using the remaining deadline, and
 verify `document.activeElement` is the target itself or a focusable descendant (or an explicitly allowed
-delegated-focus target).
+delegated-focus target). DOM-bound acceptance assertions that count or check visibility of a surface
+(e.g. a placeholder node) SHALL be gated by this bounded helper with a scoped selector and a DOM-
+readiness descriptor, rather than a single raw `.count()` or visibility sample that a delayed render
+under a loaded CI runner would race.
 
 #### Scenario: A journey wait is gated on the store state
 - **WHEN** a browser journey waits for a gameplay surface to become available or a mode to change
@@ -168,3 +171,9 @@ delegated-focus target).
 - **THEN** the shared helper accepts a structured `{selector, predicate, description}` descriptor and
   evaluates the DOM predicate in the same polling loop under the same monotonic deadline, so the store
   gate and the DOM gate share one bounded window
+
+#### Scenario: A DOM-bound count assertion is gated and scoped
+- **WHEN** a browser journey asserts the count of a DOM surface (e.g. the art scene placeholder node)
+- **THEN** it gates the count through the bounded wait helper with a scoped selector (the surface's
+  container) and a DOM-readiness predicate, polling until the expected count is stable, so a transient
+  double-node window during a snapshot refresh no longer fails the shard under a loaded CI runner
