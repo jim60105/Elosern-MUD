@@ -116,6 +116,7 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 - Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are fast;
   `tools.spec_traceability check` is the local traceability gate.
 - A browser test file that exceeds five minutes in CI must be split.
+- Save CPU time: capture a long command's output to a temp file once, then inspect that file with whichever read or search tool is available — the `read` tool, `grep` (`rg`), or `bash` (`head`/`tail`/`sed`/`awk`). Do not re-run the test just to recapture its output.
 
 See `docs/development/evennia-test-performance.md` and
 `docs/development/evennia-testing-guide.md` before broadening or restructuring
