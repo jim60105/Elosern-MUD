@@ -1,6 +1,6 @@
 """Art panel browser acceptance (webclient-art-panel 8.1-8.2).
 
-Drives the real Evennia server's art panel through the GoldenLayout scene
+Drives the real Evennia server's art panel through the Vue SPA scene
 renderer and contextual portrait overlay. The seed fixture (``ELOSERN_BROWSER_ART``)
 places the character in a validated scene room with a done/pending/failed scene
 record and a named-policy NPC plus a living monster. Journeys assert same-origin

@@ -316,7 +316,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_narrative_wide_row_soft_wraps_inside_the_pane(self):
         page = self.logged_in_page()
-        # Baseline: the GoldenLayout shell itself may carry a small fixed
+        # Baseline: the Vue SPA desktop shell itself may carry a small fixed
         # layout overflow; the wide row must not add to it.
         baseline_scroll = page.evaluate(
             "() => document.documentElement.scrollWidth - "

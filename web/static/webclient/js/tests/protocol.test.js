@@ -3,8 +3,8 @@
  *
  * Runs with Node 24's built-in test runner and node:assert; no npm packages.
  * Covers the exact server envelope schemas/discriminators, atomic rejection,
- * transport-generation lifecycle, epoch/revision ordering, complete panel
- * replacement, and bounded one-sync renderer recovery.
+ * transport-generation lifecycle, epoch/revision ordering, and complete panel
+ * replacement.
  */
 
 "use strict";
@@ -13,7 +13,6 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
-const State = require("../plugins/elosern_state.js");
 
 const EPOCH_A = "a".repeat(22);
 const EPOCH_B = "b".repeat(22);
@@ -780,163 +779,6 @@ test("no_puppet is a registered protocol error code", () => {
     Protocol.validateProtocolError({ protocol_version: 1, code: "no_puppet", message: "你已離開角色（OOC）。", reload_required: false }),
     { protocolVersion: 1, code: "no_puppet", message: "你已離開角色（OOC）。", reloadRequired: false, correlationId: null }
   );
-});
-
-// ---------------------------------------------------------------------------
-// Bounded one-sync renderer recovery.
-// ---------------------------------------------------------------------------
-
-test("a renderer failure requests at most one resync per episode", () => {
-  const sends = [];
-  const controller = State.createStateController(Protocol, () => sends.push(1));
-
-  assert.equal(controller.requestResync("status"), true, "first failure syncs once");
-  assert.equal(sends.length, 1);
-  assert.equal(controller.requestResync("status"), false, "repeated failure does not loop");
-  assert.equal(sends.length, 1);
-
-  // A successful render ends the episode and allows one fresh resync.
-  controller.resetResyncEpisode("status");
-  assert.equal(controller.requestResync("status"), true);
-  assert.equal(sends.length, 2);
-});
-
-test("one-sync guard tracks episodes per panel independently", () => {
-  const guard = State.createOneSyncGuard();
-  assert.equal(guard.request("status"), true);
-  assert.equal(guard.request("status"), false);
-  assert.equal(guard.request("art"), true, "a different panel has its own episode");
-  assert.equal(guard.isBlocked("status"), true);
-  assert.equal(guard.isBlocked("art"), true);
-  guard.resetEpisode("status");
-  assert.equal(guard.isBlocked("status"), false);
-  assert.equal(guard.request("status"), true);
-  assert.equal(guard.isBlocked("art"), true);
-  guard.clearAll();
-  assert.equal(guard.isBlocked("art"), false);
-});
-
-test("state controller forwards beginTransport and receive to the reducer", () => {
-  const sends = [];
-  const controller = State.createStateController(Protocol, () => sends.push(1));
-  controller.beginTransport(1);
-  const result = controller.receive(1, "ui_snapshot", [snapshot()], {});
-  assert.equal(result.accepted, true);
-  assert.equal(controller.getState().phase, "active");
-  assert.equal(controller.store.getState().activeEpoch, VALID_EPOCH);
-});
-
-test("browser state requests a sync and re-tags receivers per connection_open", () => {
-  const sent = [];
-  const listeners = {};
-  const fakeEvennia = {
-    isConnected: () => true,
-    emitter: {
-      on(name, listener) {
-        listeners[name] = listener;
-      },
-    },
-    msg(cmd, args, kwargs) {
-      sent.push([cmd, args, kwargs]);
-    },
-  };
-
-  const browserState = State.createBrowserState(Protocol);
-  browserState.wire(fakeEvennia);
-
-  // First connection_open: generation 1, sync requested, receivers re-tagged.
-  listeners["connection_open"]([], {});
-  assert.deepEqual(sent[0][0], "ui_sync");
-  assert.deepEqual(sent[0][1], [{ protocol_version: 1 }]);
-  assert.equal(browserState.getState().generation, 1);
-
-  // A snapshot delivered to the re-tagged receiver is accepted.
-  const adopted = listeners["ui_snapshot"]([snapshot({ presentation_epoch: EPOCH_A, revision: 1 })], {});
-  assert.equal(browserState.getState().activeEpoch, EPOCH_A);
-
-  // Reconnect: generation 2, old state cleared, then a new-epoch snapshot adopts.
-  listeners["connection_open"]([], {});
-  assert.equal(browserState.getState().generation, 2);
-  assert.equal(browserState.getState().activeEpoch, null);
-  listeners["ui_snapshot"]([snapshot({ presentation_epoch: EPOCH_B, revision: 1 })], {});
-  assert.equal(browserState.getState().activeEpoch, EPOCH_B);
-
-  // A message delivered through the pre-reconnect receiver is discarded.
-  assert.equal(browserState.requestResync("status"), true);
-  assert.equal(sent.length, 3);
-  assert.equal(browserState.requestResync("status"), false, "no sync loop");
-  assert.equal(sent.length, 3);
-});
-
-test("awaiting-snapshot resync is bounded and self-terminating", () => {
-  const sent = [];
-  const listeners = {};
-  const fakeEvennia = {
-    isConnected: () => true,
-    emitter: {
-      on(name, listener) {
-        listeners[name] = listener;
-      },
-    },
-    msg(cmd, args, kwargs) {
-      sent.push([cmd, args, kwargs]);
-    },
-  };
-  const browserState = State.createBrowserState(Protocol);
-  browserState.wire(fakeEvennia);
-
-  // After a reconnect the first sync is immediate; the retry is disarmed.
-  listeners["connection_open"]([], {});
-  assert.equal(sent.length, 1);
-  assert.equal(browserState.isSyncRetryArmed(), true);
-
-  // While the transport is stuck awaiting, a hundred ticks send only the
-  // bounded budget; the retry then stays disarmed and reports exhaustion.
-  for (let i = 0; i < 100; i += 1) {
-    browserState.syncRetryTick();
-  }
-  assert.equal(sent.length, 1 + State.SYNC_RETRY_MAX_ATTEMPTS);
-  assert.equal(browserState.isSyncRetryExhausted(), true);
-  assert.equal(browserState.isSyncRetryArmed(), false);
-
-  // Adoption before the budget is spent disarms the retry without a flag.
-  listeners["connection_open"]([], {});
-  assert.equal(browserState.syncRetryTick(), "sent");
-  listeners["ui_snapshot"]([snapshot({ presentation_epoch: EPOCH_B, revision: 1 })], {});
-  assert.equal(browserState.getState().phase, "active");
-  for (let i = 0; i < 100; i += 1) {
-    assert.equal(browserState.syncRetryTick(), "idle");
-  }
-  assert.equal(browserState.isSyncRetryExhausted(), false);
-  assert.equal(browserState.syncRetryAttempts(), 1, "no further attempts");
-
-  // Disconnect stops the retry without exhausting it, and the next reconnect
-  // gets a fresh bounded budget.
-  listeners["connection_open"]([], {});
-  assert.equal(browserState.syncRetryTick(), "sent");
-  assert.equal(browserState.syncRetryAttempts(), 1);
-  listeners["connection_close"]([], {});
-  assert.equal(browserState.syncRetryTick(), "idle");
-  assert.equal(browserState.isSyncRetryExhausted(), false);
-  listeners["connection_open"]([], {});
-  assert.equal(browserState.syncRetryAttempts(), 0, "re-arm resets the budget");
-  assert.equal(browserState.syncRetryTick(), "sent");
-  assert.equal(browserState.syncRetryAttempts(), 1);
-
-  // The standalone factory honors an explicit budget and never exceeds it.
-  let standaloneState = { connected: true, phase: "awaiting_initial_snapshot" };
-  const standalone = State.createAwaitingSyncRetry(
-    () => standaloneState,
-    () => sent.push(["ui_sync", [Protocol.syncEnvelope()], {}]),
-    2
-  );
-  standalone.arm();
-  assert.equal(standalone.tick(), "sent");
-  assert.equal(standalone.tick(), "sent");
-  assert.equal(standalone.tick(), "idle");
-  assert.equal(standalone.isExhausted(), true);
-  assert.equal(standalone.tick(), "idle");
-  assert.equal(standalone.attempts(), 2);
 });
 
 test("sync envelope is exactly { protocol_version: 1 }", () => {

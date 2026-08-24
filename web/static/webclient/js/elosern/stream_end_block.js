@@ -7,10 +7,11 @@
  * append flows through this controller so the stream's end geometry,
  * scroll-keep, and the polite unread marker stay one owner.
  *
- * The controller is DOM-abstracted (`container` with appendChild/removeChild/
- * insertBefore/lastChild plus the three callbacks) so Node tests exercise the
- * full geometry and unread semantics without a browser; goldenlayout.js binds
- * it to the real narrative container and its scroll/unread state.
+  * The controller is DOM-abstracted (`container` with appendChild/removeChild/
+  * insertBefore/lastChild plus the three callbacks) so Node tests exercise the
+  * full geometry and unread semantics without a browser; the Vue shell
+  * (NarrativeFeed + the C2/C3 bridge and transport) binds it to the real
+  * narrative container and its scroll/unread state.
  *
  * Geometry contract:
  * - `appendNode` inserts before the mounted block (the block always stays

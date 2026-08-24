@@ -42,8 +42,8 @@ of the Vue bundle; it is activated in whichever branch renders.
     {% else %}
       <!-- Legacy rollback branch (flag False): no view code loads; the D10
            vanilla text console below is the client. The legacy jQuery /
-           GoldenLayout / plugin view files remain on disk but are unreferenced
-           in the load path (deleted by the D1 finalize change). -->
+           GoldenLayout / plugin view files were deleted at the D1 finalize
+           change, so the fallback is the dependency-free text console. -->
     {% endif %}
 
     <!-- Generate a low-quality UID to uniquely identify client tabs -->

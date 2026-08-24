@@ -1,10 +1,12 @@
-"""Evidence bridge: run the DOM-independent Node suite as requirement evidence.
+"""Evidence bridge: run the DOM-independent Node suite and the Vue Vitest
+component suite as requirement evidence.
 
 The client state-reduction and keyboard-routing contracts are implemented and
 verified in DOM-independent JavaScript. ``covers_requirement`` can only attach
-to a Python ``test_*`` function, so this module executes the Node suite and
-asserts every test passes; the annotation then links the main-spec requirement
-to a substantively matching, executed evidence record.
+to a Python ``test_*`` function, so this module executes the Node suite (and,
+for the choice-point requirements re-pointed to the Vue layer, the Vitest
+component files) and asserts every test passes; the annotation then links the
+main-spec requirement to a substantively matching, executed evidence record.
 """
 
 from pathlib import Path
@@ -70,11 +72,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )
     def test_actions_client_node_suite_passes(self):
+        # The legacy `actions.test.js` Node file was retired with the Vue
+        # migration (D1); the command-drawer ordinary-text contract is now
+        # covered by the re-pointed `ui_contract.test.js`.
         result = subprocess.run(
             [
                 "node",
                 "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/actions.test.js"),
+                str(REPO_ROOT / "web/static/webclient/js/tests/ui_contract.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -84,7 +89,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "action client Node suite failed:\n" + result.stdout + result.stderr,
+            "command-drawer text-contract Node suite failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
@@ -139,11 +144,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate",
     )
     def test_dock_surface_node_suite_passes(self):
+        # The legacy `dock_surface.test.js` Node file was retired with the Vue
+        # migration (D1); the pointer-activation / dock-surface menu-frame
+        # contract is now covered by `keyboard_router.test.js`.
         result = subprocess.run(
             [
                 "node",
                 "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/dock_surface.test.js"),
+                str(REPO_ROOT / "web/static/webclient/js/tests/keyboard_router.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -153,7 +161,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "dock surface Node suite failed:\n" + result.stdout + result.stderr,
+            "keyboard-router Node suite failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
@@ -294,14 +302,22 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-action-choicepoints::the-choice-point-renders-generating-and-ready-states-at-the-stream-end",
         "webclient-action-choicepoints::degraded-rule-cards-never-enter-the-stream",
-        "webclient-action-choicepoints::the-choice-point-recovers-deterministically-across-sessions",
     )
     def test_choicepoint_node_suite_passes(self):
+        # The choice-point behavior moved to the Vue layer: the
+        # generating/ready rendering lives in choice_point_block.test.js and
+        # the degraded-card dock behavior in action_dock.test.js. The
+        # cross-session recovery assertion is owned by the managed browser
+        # acceptance (web/tests/browser/test_browser_choicepoints.py), so it
+        # is not claimed by this Node-level evidence.
         result = subprocess.run(
             [
-                "node",
-                "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/choicepoint.test.js"),
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -311,7 +327,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "choice-point Node suite failed:\n" + result.stdout + result.stderr,
+            "choice-point Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
@@ -320,11 +336,19 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-action-choicepoints::choice-point-cards-share-the-dock-card-component-and-click-path",
     )
     def test_choicepoint_block_node_suite_passes(self):
+        # The movable stream-end block (choice_point_block.test.js), the
+        # shared dock-card click path (option_card.test.js), and the
+        # narrative facade ownership (bridge.test.js) carry the block and
+        # card requirements in the Vue layer.
         result = subprocess.run(
             [
-                "node",
-                "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/choicepoint.test.js"),
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/action/option_card.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/bridge/bridge.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -334,7 +358,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "choice-point block Node suite failed:\n" + result.stdout + result.stderr,
+            "choice-point block Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

@@ -14,8 +14,11 @@
 - 專案設計
   - [引擎架構設計](/superpowers/specs/2026-07-29-ai-mud-engine-design)
   - [Vue WebClient 設計稿](/design/elosern-redesign/index)
+  - [Vue 元件展示](/development/frontend-vue-architecture)
 
 - Developer guides
   - [新增魔法指南](/development/adding-spells)
   - [OpenSpec test traceability](/development/spec-test-traceability)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
+  - [Vue 前端架構](/development/frontend-vue-architecture)
+  - [Vue 前端開發指南](/development/frontend-developer-guide)

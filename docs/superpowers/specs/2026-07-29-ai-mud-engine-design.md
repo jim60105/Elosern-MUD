@@ -55,7 +55,7 @@ These were settled during design. Do not relitigate them inside a change.
 > removed. The single-slot serialization, lease reclaim, scheduler, and offline degrade path are
 > unchanged.
 | D12 | **Guild advancement requires cumulative merit plus a nonlethal combat examination; shops use finite stock and clock-driven restocking.** Every registrant starts at F, regardless of displayed power. | Preserves the world's stated merit-plus-exam progression, gives Phase 4 a real combat milestone, and makes the reserved caravan/shop clock stages meaningful. |
-| D13 | **The browser WebClient is the first-class graphical client; Telnet remains fully playable as text.** | The project already uses Evennia's WebSocket/GoldenLayout extension points. A second Mudlet/Lua UI would duplicate distribution and compatibility work. |
+| D13 | **The browser WebClient is the first-class graphical client; Telnet remains fully playable as text.** | The project already uses Evennia's WebSocket extension points; the view layer is a Vue 3 SPA (Vite + Pinia) on the same Evennia extension points. A second Mudlet/Lua UI would duplicate distribution and compatibility work. |
 | D14 | **Finite ordinary player choices use server-authored, versioned OOB menus.** Free-form values remain text. | Players should not memorize skill, target, Exit, quest, or shop keys; the browser must not parse prose or duplicate rules to discover them. |
 | D15 | **Portrait art is a separate subject type.** Players and explicitly named NPCs have unique portraits; generic monsters share one by archetype. | Preserves D10's scene reuse while bounding portrait GPU/storage cost and giving important characters identity. |
 | D16 | **The local minimap remembers visited nodes and may render coordinate-free Exit graphs.** Instance/interior rooms gain no invented coordinates, world-map membership, or pathfinding. | A truthful local navigation aid can cover every current room type without weakening the four-layer map model. |
@@ -68,7 +68,7 @@ These were settled during design. Do not relitigate them inside a change.
 
 ```
 ┌─ Presentation ───────────────────────────────┐
-│  WebClient / GoldenLayout / OOB push          │  read-only
+│  WebClient (Vue SPA) / OOB push               │  read-only
 └───────────────────────────────────────────────┘
 ┌─ Generative  (world/ai/) ────────────────────┐
 │  ScenarioDirector   SceneBuilder              │  reads state
@@ -178,7 +178,7 @@ from-scratch engine.
 | `ai/npc_dialogue.py` | `evennia.contrib.rpg.llm` — `LLMNPC(DefaultCharacter)` (module `llm_npc.py`) | **Subclass.** Chat memory, prompt priority chain, thinking state are done |
 | `rules/combat.py` | `evennia.contrib.tutorials.evadventure` — **corrected path; it is not under `contrib.rpg`** (`EvAdventureRollEngine` in `rules.py`, `CombatAction` subclasses and `EvAdventureCombatBaseHandler` in `combat_base.py`) | **Reference only.** It is d20 (confirmed: `EvAdventureRollEngine.roll()` rolls `1d20`/`2d20` against a target of 15); we are linear. Borrow its *structure*, not its *formulas* |
 | `rules/dice.py` | `evennia.contrib.rpg.dice` — `roll()` (module `dice.py`) | **Use directly** for the d100 roller — `roll(1, 100, ...)` or the string form `"1d100"` |
-| Front-end suite | WebClient GoldenLayout — `evennia/web/static/webclient/js/plugins/goldenlayout_default_config.js` (path confirmed); project input functions in `server/conf/inputfuncs.py` | **Configure + plugins.** Add a versioned OOB state store, keyboard router, panel renderers, and allowlisted UI action input while retaining normal text commands |
+| Front-end suite | WebClient Vue 3 SPA (Vite + Pinia) — the built bundle at `web/static/webclient/app/dist`; project input functions in `server/conf/inputfuncs.py` | **Configure + plugins.** Add a versioned OOB state store, keyboard router, panel renderers, and allowlisted UI action input while retaining normal text commands |
 
 > **Verified.** Confirmed 2026-07-29 against Evennia **6.1.0** (imports and CLI both verified in an
 > isolated uv environment; requires Python >=3.12) — the version that was actually
@@ -959,7 +959,7 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 | # | Change | Depends on | Content |
 |---|---|---|---|
 | 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, internal sd-webui worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
-| 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
+| 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, Vue SPA shell, status panel |
 | 23b | `webclient-combat-menu` | 16, 23a | Skill/action/target menus, multi-target combat-session facade, Telnet target parity, reconnect UI |
 | 23c | `map-knowledge-minimap` | 12, 13, 14, 23a | Persistent visited nodes, grid/wilderness minimaps, coordinate-free instance/interior local graphs |
 | 23d | `webclient-exploration-menu` | 19, 23a, 23c | Movement, look, local interaction, scripted and free-form NPC dialogue, rest, and wait menus |

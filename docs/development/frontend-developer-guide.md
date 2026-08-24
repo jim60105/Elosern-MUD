@@ -53,10 +53,13 @@ web/webclient-app/
   tests/*.test.js                               Vitest component gate
   stories/**                                    Storybook stories (B wave onward)
 web/static/webclient/
-  js/elosern/*  js/plugins/*  css/*  vendor/*   legacy shell (deleted at D1)
-  js/text_console.js                           D10 vanilla console (both branches)
-  js/jquery_ready_shim.js                      the D10 spike shim (Vue branch only)
-  app/dist/                                     Vite output (gitignored, built everywhere it's served)
+   js/elosern/*                                 preserved DOM-independent logic (re-exposed via lib/*)
+   js/text_console.js                           D10 vanilla console (both branches)
+   js/jquery_ready_shim.js                      the evennia.js ready bootstrap shim
+   css/webclient.css  css/ansi_palette.css      shared page + ANSI theme
+   app/dist/                                     Vite output (gitignored, built everywhere it's served)
+   (the retired `js/plugins/*` view plugins, `vendor/*` runtimes, and dead CSS
+    goldenlayout.css / elosern.css were deleted at D1)
 web/templates/webclient/base.html               XOR-flag script loading (A2)
 web/webclient/context_processors.py             webclient_vue_enabled context value
 ```
@@ -76,10 +79,11 @@ web/webclient/context_processors.py             webclient_vue_enabled context va
    checks fail. (CI builds it in both workspaces automatically.)
 5. **The XOR flag is mutually exclusive.** One view stack per page:
    `webclient_vue_enabled` (context) picks the Vue bundle **or** the legacy
-   jQuery/GoldenLayout plugins. Production default is legacy until C4 flips
-   it; `?__vue=1` forces the Vue branch for review/offline-load checks;
-   `ELOSERN_BROWSER_VUE_CLIENT=1` (browser test settings) is the test-config
-   switch C3 uses.
+   rollback branch (the D10 vanilla text console, no view code). Production
+   default is the **Vue bundle** (flipped at C4); the legacy branch is only
+   reachable by rollback. `?__vue=1` forces the Vue branch for review /
+   offline-load checks; `ELOSERN_BROWSER_VUE_CLIENT=1` (browser test settings)
+   is the test-config switch C3 uses.
 
 ## Browser (managed-runtime) tests
 

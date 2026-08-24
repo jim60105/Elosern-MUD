@@ -1,7 +1,7 @@
 """Keyboard-only character-creation browser acceptance (webclient-character-creation-ui).
 
 These journeys drive the real Evennia server's creation surface through the
-GoldenLayout creation dock: preset selection → confirmation → activation →
+Vue creation overlay (CreationOverlay): preset selection → confirmation → activation →
 exploration snapshot with the creation dock torn down, custom form via
 keyboard-only finite controls and free-text fields, server rejection of both
 underage fields despite bypassed client validation, the destructive reset

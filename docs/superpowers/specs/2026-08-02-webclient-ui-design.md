@@ -29,7 +29,7 @@ The deterministic game is playable, but its current player interface is command-
 combat session tells the player to type `cast <skill>[=<target>]` without showing the character's
 active skills. The player cannot see combat resources, active modifiers, a persistent local map, or
 the scene art anticipated by the engine design. The project contains the stock Evennia WebClient
-extension points, but no project-authored GoldenLayout configuration, OOB state protocol, or panel
+extension points, but no project-authored OOB state protocol or panel
 implementation.
 
 The intended experience keeps the readable history and command vocabulary of a MUD while removing
@@ -72,8 +72,8 @@ viewport of 1280x720. Mobile usability is not an acceptance criterion for this s
   separately specified deterministic APIs exist.
 - No equipment-use behavior where the deterministic engine currently provides none.
 - No generated art in tests and no network dependency in the required suite.
-- No replacement SPA framework. The implementation extends Evennia's existing GoldenLayout and
-  plugin model with small project-authored JavaScript modules.
+- No competing second client. The view layer is a Vue 3 SPA (Vite + Pinia) on the same Evennia
+  extension points; the preserved dependency-free logic stays under `web/static/webclient/js/elosern/*`.
 
 ---
 
@@ -81,7 +81,7 @@ viewport of 1280x720. Mobile usability is not an acceptance criterion for this s
 
 | ID | Decision | Rationale |
 |---|---|---|
-| U1 | **Browser-first graphical client; Telnet text fallback.** | The existing design already selects WebClient, GoldenLayout, WebSocket, and OOB. A Mudlet-first client would add a separately distributed Lua UI and a second compatibility matrix. |
+| U1 | **Browser-first graphical client; Telnet text fallback.** | The existing design already selects the WebClient (Vue SPA), WebSocket, and OOB. A Mudlet-first client would add a separately distributed Lua UI and a second compatibility matrix. |
 | U2 | **Classic MUD console layout.** | The narrative log receives the largest area. Art, map, and status support it rather than displacing it. |
 | U3 | **Ink-night and vermilion visual language.** | Charcoal black, paper gray, and seal red fit the setting and remain readable for long sessions. Focus and status never rely on color alone. |
 | U4 | **Menu-first keyboard focus.** | Arrow keys navigate, Enter confirms, Escape returns, and `/` opens the command drawer. Mouse input invokes the same controls, not a separate flow. |
@@ -106,7 +106,7 @@ viewport of 1280x720. Mobile usability is not an acceptance criterion for this s
 
 ```text
 ┌─ Desktop WebClient ────────────────────────────────────────────────┐
-│ GoldenLayout shell                                                │
+│ Vue SPA shell                                                     │
 │ narrative | art+portrait | status | local map | action dock       │
 │                                                                   │
 │ ClientStateStore       KeyboardRouter       panel renderers       │
@@ -138,7 +138,7 @@ Telnet or command drawer → existing Evennia Commands → same public APIs
 |---|---|---|
 | `ClientStateStore` | Validate protocol versions, hold the newest revision, replace panel payloads, expose render subscriptions | OOB transport only |
 | `KeyboardRouter` | Maintain one menu focus stack; route arrows, Enter, Escape, Space, and `/`; prevent repeated submission | state store and action dock |
-| GoldenLayout shell | Create required panels, persist dimensions, migrate layout versions, prevent required panels from being permanently closed | Evennia GoldenLayout plugin |
+| `AppShell` (Vue) | Create required panels, persist dimensions, migrate layout versions, prevent required panels from being permanently closed | Vue AppShell + Pinia store |
 | Narrative renderer | Preserve the existing text stream, scroll history, and unread marker | Evennia text output plugins |
 | Panel renderers | Render status, map, art, menu, services, and creation payloads | state store; no direct transport |
 | Command drawer | Send normal text input for free-form and advanced commands | existing `text` input function |
@@ -171,7 +171,7 @@ The default layout has five required surfaces:
 4. The lower right rail splits character status and the local minimap.
 5. A non-closable action dock spans the bottom.
 
-Players may resize panels. The saved GoldenLayout configuration includes a project layout version.
+Players may resize panels. The saved layout configuration (the Vue layout store) includes a project layout version.
 When required component names or layout structure change, known old versions are migrated. An
 unrecognized version is reset to the approved default. The action dock, connection state, and command
 drawer entry point cannot be removed by a stale localStorage layout.
@@ -637,7 +637,7 @@ The suite is intentionally not one implementation plan.
 
 | Order | OpenSpec change | Depends on | Delivers |
 |---|---|---|---|
-| Wave 1 | `webclient-oob-foundation` | current deterministic milestone | protocol, input functions, snapshot coordinator, state store, keyboard router, GoldenLayout shell, status panel |
+| Wave 1 | `webclient-oob-foundation` | current deterministic milestone | protocol, input functions, snapshot coordinator, state store, keyboard router, Vue SPA shell, status panel |
 | Wave 2A | `webclient-combat-menu` | foundation, player combat sessions | combat presenters/actions, targets-list session facade, Telnet target parity, combat browser tests |
 | Wave 2B | `map-knowledge-minimap` | foundation, all current map layers | persistent visited nodes, four layer adapters, local map presenter, instance amendment |
 | Wave 2C | `webclient-service-menus` | foundation, guild/economy/quest APIs | guild, quest, shop, inventory menus |
@@ -678,7 +678,7 @@ for a unit must be based on both this document and its focused design.
 
 ## 15. Risks and Trade-offs
 
-- **GoldenLayout localStorage can preserve obsolete structures.** Layout versions and required-panel
+- **The Vue layout-store localStorage can preserve obsolete structures.** Layout versions and required-panel
   migration prevent an old configuration from hiding the action dock.
 - **Enumerating every skill-target combination can become expensive.** Presenters build bounded,
   context-specific menus and may load a submenu lazily. They never enumerate unbounded room contents.
