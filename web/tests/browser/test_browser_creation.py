@@ -555,6 +555,7 @@ class ConceptCreationJourneys(CreationBrowserTest):
         self._wait_creation_available(page)
         self._focus_dock(page)
         _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "ArrowDown")  # 角色概念 (dedicated concept entry point)
         _press(page, "Enter")
 
         # Concept field: keyboard-first entry and apply (bounded text field).

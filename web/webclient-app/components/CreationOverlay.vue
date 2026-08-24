@@ -104,7 +104,11 @@ function syncFromDraft() {
   }
   syncingDraft = true;
   try {
-    mode.value = stageMode(d.stage);
+    // A live concept apply flips the store-driven dock stage to "custom" so the
+    // pre-filled custom form shows; a resumed concept draft (no stage flip) keeps
+    // the concept field (stageMode maps concept_filled -> concept).
+    const stage = props.stage ? props.stage.stage : null;
+    mode.value = stage === "custom" ? "custom" : stageMode(d.stage);
     if (d.mode === "preset") {
       selectedPresetKey.value = d.preset_key ?? null;
       return;
@@ -423,6 +427,14 @@ function cancelConfirm() {
         </div>
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
+          <p
+            v-if="draft && draft.background_generated"
+            class="creation-concept-indicator"
+            role="status"
+            data-testid="creation-concept-indicator"
+          >
+            已套用構想草稿，背景已生成。
+          </p>
           <p
             v-if="budgetBriefing"
             class="creation-budget-briefing"

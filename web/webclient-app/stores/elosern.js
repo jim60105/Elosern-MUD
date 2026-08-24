@@ -611,6 +611,13 @@ export const useElosernStore = defineStore("elosern", () => {
       router.pushMenu({ items: [], focusKey: null });
       return true;
     }
+    if (item.openSubmenu === "concept") {
+      creation.view = "concept";
+      // The concept entry point opens the free-text concept field; a marker
+      // menu gives Escape a level to pop without discarding typed values.
+      router.pushMenu({ items: [], focusKey: null });
+      return true;
+    }
     if (item.presetKey) {
       const requestId = dispatchAction(CreationMenu.PRESET_ACTION, {
         preset_key: item.presetKey,
@@ -660,6 +667,8 @@ export const useElosernStore = defineStore("elosern", () => {
       creation.confirmItems = [];
     } else if (creation.view === "custom") {
       creation.view = "root";
+    } else if (creation.view === "concept") {
+      creation.view = "root";
     }
     if (name === "escape-root") {
       // escape-root does not pop a router level: re-sync the router to the
@@ -667,7 +676,7 @@ export const useElosernStore = defineStore("elosern", () => {
       const menus = creation.menus;
       if (creation.view === "presets") {
         router.replaceMenu(menus.menus.presets);
-      } else if (creation.view === "custom") {
+      } else if (creation.view === "custom" || creation.view === "concept") {
         router.replaceMenu({ items: [], focusKey: null });
       } else {
         router.replaceMenu(menus.menus.root);

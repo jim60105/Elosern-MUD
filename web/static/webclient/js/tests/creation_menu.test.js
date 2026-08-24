@@ -105,9 +105,10 @@ function validPanel(overrides) {
 
 test("root and preset menus route with exact payloads", () => {
   const root = CreationMenu.rootItems(validPanel());
-  assert.equal(root.length, 2);
+  assert.equal(root.length, 3);
   assert.equal(root[0].openSubmenu, "presets");
   assert.equal(root[1].openSubmenu, "custom");
+  assert.equal(root[2].openSubmenu, "concept");
 
   const presets = CreationMenu.presetItems(validPanel());
   assert.equal(presets.length, 2);
@@ -367,6 +368,6 @@ test("confirmation screens gate activation", () => {
 
 test("buildMenus exposes root and preset menus from the panel", () => {
   const model = CreationMenu.buildMenus(validPanel());
-  assert.equal(model.menus.root.items.length, 2);
+  assert.equal(model.menus.root.items.length, 3);
   assert.equal(model.menus.presets.items.length, 2);
 });
