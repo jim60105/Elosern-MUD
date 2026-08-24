@@ -10,34 +10,34 @@ server is used.
 
 from __future__ import annotations
 
-import time
-
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import store_state
+from .browser_helpers import store_state, wait_for_store_state
 
 
 class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
     """Drives OOC/IC through the real server and asserts client lifecycle state."""
 
     def _wait_active(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["connected"] and state["phase"] == "active" and not state["mutationsLocked"]:
-                return state
-            page.wait_for_timeout(250)
-        raise AssertionError("store never reached the active phase")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                bool(s.get("connected"))
+                and s.get("phase") == "active"
+                and s.get("mutationsLocked") is not True
+            ),
+            timeout=timeout,
+        )
+        return store_state(page)
 
     def _wait_detached(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["phase"] == "detached":
-                return state
-            page.wait_for_timeout(250)
-        raise AssertionError("store never entered the detached phase")
+        wait_for_store_state(
+            page,
+            lambda s: s.get("phase") == "detached",
+            timeout=timeout,
+        )
+        return store_state(page)
 
     @covers_requirement(
         "webclient-oob-protocol::unpuppet-retires-the-active-presentation-and-dispatch-sequence"
@@ -54,7 +54,7 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["panels"], {})
         self.assertTrue(state["mutationsLocked"])
         # The retained epoch allows a late bounded rejection to be accepted.
-        self.assertIsNotNone(state["activeEpoch"])
+        self.assertIsNotNone(state["epoch"])
         # The disconnect overlay must not appear: the connection is fine and
         # the drawer stays usable for repuppeting.
         visible = page.evaluate(
@@ -92,9 +92,9 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
             "  }], {});"
             "}"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return s.lastActionResult && s.lastActionResult.code === 'no_puppet'; }",
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("code") == "no_puppet",
             timeout=15000,
         )
         result = store_state(page)["lastActionResult"]
@@ -111,31 +111,33 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
     def test_repuppet_of_same_character_adopts_fresh_state(self):
         page = self.logged_in_page()
         active = self._wait_active(page)
-        epoch_before = active["activeEpoch"]
-        revision_before = active["revision"]
+        epoch_before = active["epoch"]
 
         page.evaluate("Evennia.msg('text', ['ooc'], {})")
         self._wait_detached(page)
 
         # Repuppet the same character through the ordinary drawer transport.
         page.evaluate("Evennia.msg('text', ['進入世界'], {})")
-        deadline = time.monotonic() + 30000 / 1000
-        adopted = None
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if (
-                state["connected"]
-                and state["phase"] == "active"
-                and state["activeEpoch"] is not None
-                and state["activeEpoch"] != epoch_before
-                and not state["mutationsLocked"]
-            ):
-                adopted = state
-                break
-            page.wait_for_timeout(250)
+        wait_for_store_state(
+            page,
+            lambda s: (
+                bool(s.get("connected"))
+                and s.get("phase") == "active"
+                and s.get("epoch") is not None
+                and s.get("epoch") != epoch_before
+                and s.get("mutationsLocked") is not True
+            ),
+            timeout=30000,
+        )
+        adopted = store_state(page)
         self.assertIsNotNone(adopted, "repuppet never adopted a fresh snapshot")
-        self.assertNotEqual(adopted["activeEpoch"], epoch_before)
-        self.assertNotEqual(adopted["revision"], revision_before)
+        # The new epoch is the primary contract; the presentation revision
+        # counter resets on the puppet change, so it restarts from 0 and can
+        # coincidentally equal the pre-OOC revision. Assert a fresh snapshot
+        # was emitted in the new epoch (revision > 0) rather than a fragile
+        # cross-epoch numeric comparison.
+        self.assertNotEqual(adopted["epoch"], epoch_before)
+        self.assertGreater(adopted["revision"], 0)
         panels = adopted["panels"]
         # The exploration-mode panels re-render from canonical state; local_map
         # availability depends on the character's map knowledge, so only the

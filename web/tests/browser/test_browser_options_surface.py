@@ -18,8 +18,6 @@ transport failure for the degraded path), and journeys wait on the store's
 
 from __future__ import annotations
 
-import time
-
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -28,6 +26,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -79,52 +78,77 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         return panel.get("suggestions") if panel else None
 
     def _wait_suggestions(self, page, status, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            suggestions = self._suggestions(page)
-            if suggestions and suggestions.get("status") == status:
-                return suggestions
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "suggestions status never became %r; state=%r"
-            % (status, store_state(page))
-        )
+        def _status_reached(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == status
+
+        wait_for_store_state(page, _status_reached, timeout=timeout)
 
     def _section(self, page):
         return page.evaluate(
-            "document.querySelector('[data-testid=\"suggestions-section\"]')) !== null"
+            "document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
         )
 
     def _wait_section(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if self._section(page):
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError("the suggestions section never rendered")
+        def _section_shown(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") in ("generating", "ready", "degraded")
+
+        wait_for_store_state(
+            page,
+            _section_shown,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
+                ),
+                "description": "the suggestions section is rendered in the action dock",
+            },
+            timeout=timeout,
+        )
 
     def _wait_section_gone(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if not self._section(page):
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError("the suggestions section never disappeared")
+        def _section_hidden(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is None or suggestions.get("status") == "unavailable"
+
+        wait_for_store_state(
+            page,
+            _section_hidden,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-section"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') === null"
+                ),
+                "description": "the suggestions section has disappeared from the action dock",
+            },
+            timeout=timeout,
+        )
 
     def _wait_generating_line(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            text = page.evaluate(
-                """() => {
-                    const line = document.querySelector(
-                        '[data-testid="suggestions-section"] .suggestions-generating');
-                    return line ? line.innerText : null;
-                }"""
-            )
-            if text:
-                return text
-            page.wait_for_timeout(150)
-        raise AssertionError("the generating line never rendered")
+        def _generating(state):
+            suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
+            return suggestions is not None and suggestions.get("status") == "generating"
+
+        wait_for_store_state(
+            page,
+            _generating,
+            dom_readiness={
+                "selector": '[data-testid="suggestions-generating"]',
+                "predicate": (
+                    "() => document.querySelector('[data-testid=\"suggestions-generating\"]') !== null"
+                ),
+                "description": "the generating line is rendered in the dock suggestions section",
+            },
+            timeout=timeout,
+        )
+        return page.evaluate(
+            """() => {
+                const line = document.querySelector(
+                    '[data-testid="suggestions-section"] .suggestions-generating');
+                return line ? line.innerText : null;
+            }"""
+        )
 
     def _ready_card_labels(self, page):
         return page.evaluate(
@@ -143,7 +167,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         ]
 
     def _narrative_inp_count(self, page):
-        return page.locator(".elosern-narrative .inp").count()
+        return page.locator('[data-testid="narrative-feed"] .inp').count()
 
     # -- journey helpers -----------------------------------------------------
 
@@ -176,9 +200,16 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         _press(page, "Enter")
 
     def _move_to_empty_ground(self, page):
-        """Walk through the dock from the plaza to the empty-ground room."""
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # the first exit (前往測試空地)
+        """Walk through the dock from the plaza to the empty-ground room (the
+        scripted transport-failure room, same journey as the surface file).
+
+        The flat Vue dock opens the Move submenu on the first Enter (the
+        exploration root's first item is "移動"), so the journey needs a second
+        Enter to select the focused destination row (前往測試空地, ``exit-44``)
+        and dispatch ``explore.move`` into the empty ground.
+        """
+        self._open_root(page, 0)  # opens the Move submenu, focus on 前往測試空地
+        _press(page, "Enter")     # select the focused move row -> dispatch explore.move
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -229,7 +260,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_suggestions_only_update_rerenders_section_without_dock_rebuild(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_suggestions(page, "ready")
+        # The class run shares one ManagedServer across 10 tests; the plaza
+        # suggestions "ready" generation can exceed the default 30s deadline
+        # under load, so use a bounded, longer deadline.
+        self._wait_suggestions(page, "ready", timeout=60000)
         self._wait_section(page)
         self._dismiss(page)
         self._wait_suggestions(page, "unavailable")
@@ -238,21 +272,23 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         # The generating push changed only the suggestions content: the
         # exploration menu subtree and the keyboard router must be untouched.
+        # The Vue dock renders its menu as `.dock-menu` (the legacy
+        # `.exploration-menu` class is retired).
         captured = page.evaluate(
             """() => {
                 window.__menuNode = document.querySelector(
-                    '#action-dock .exploration-menu');
+                    '#action-dock .dock-menu');
                 return window.__menuNode !== null;
             }"""
         )
         self.assertTrue(captured, "the exploration menu must be mounted")
         depth = page.evaluate("window.__elosernBridge.router.depth()")
 
-        self._wait_suggestions(page, "ready")
+        self._wait_suggestions(page, "ready", timeout=60000)
         stable = page.evaluate(
             """() => {
                 const menu = document.querySelector(
-                    '#action-dock .exploration-menu');
+                    '#action-dock .dock-menu');
                 return window.__menuNode === menu && window.__menuNode.isConnected;
             }"""
         )
@@ -282,10 +318,21 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         # The look result settles into the narrative.
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative')"
-            ".innerText.indexOf(s) !== -1",
-            arg="燈籠",
+        def _looked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "looked"
+
+        wait_for_store_state(
+            page,
+            _looked_result,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const feed = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return feed && feed.innerText.indexOf('燈籠') !== -1; }"
+                ),
+                "description": "the look result has settled into the narrative feed",
+            },
         )
         self.assertEqual(
             self._narrative_inp_count(page),
@@ -323,15 +370,16 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # The dialogue seam settles deterministically (the npc_dialogue
         # profile is disabled in the harness): the adapter's outcome lands in
-        # the stable live region.
-        deadline = time.monotonic() + 30
-        live = ""
-        while time.monotonic() < deadline:
-            live = page.locator("#elosern-action-live").inner_text()
-            if live == "對方回應了你的話。":
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(live, "對方回應了你的話。")
+        # the stable live region. The Vue app keeps the OOB result in the
+        # store (the legacy `#elosern-action-live` announcer is an empty div
+        # nothing writes to), so gate on the store result itself.
+        def _talked_result(state):
+            result = state.get("lastActionResult")
+            return result is not None and result.get("code") == "talked"
+
+        wait_for_store_state(page, _talked_result)
+        result = store_state(page).get("lastActionResult") or {}
+        self.assertEqual(result.get("message"), "對方回應了你的話。")
         self.assertEqual(
             self._narrative_inp_count(page),
             inp_before,
@@ -360,10 +408,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # window (the protocol-error lock is racy against the trigger
         # service's async republishes, which re-commit presentation state).
         page.evaluate("Evennia.connection.close()")
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return !s.connected && s.mutationsLocked; }"
-        )
+
+        def _locked(state):
+            return (not state.get("connected")) and bool(state.get("mutationsLocked"))
+
+        wait_for_store_state(page, _locked)
         # The non-dismissible offline overlay covers the dock (the lock UX);
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what
@@ -409,7 +458,9 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                         },
                     },
                 };
-                return Elosern.Protocol.receive(
+                // `receive` lives on the store instance (exposed through the
+                // bridge handle), not on the `Protocol` factory façade.
+                return window.__elosernBridge.store.receive(
                     s.generation, 'ui_update', [envelope], {});
             }"""
         )
@@ -461,7 +512,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # Degraded cards live in the dock only: the narrative stream never
         # renders suggestion cards (choice-points are the later slice).
         self.assertEqual(
-            page.locator(".elosern-narrative .option-card").count(),
+            page.locator('[data-testid="narrative-feed"] .option-card').count(),
             0,
             "degraded rule cards must never appear in the narrative stream",
         )
@@ -472,6 +523,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_move_into_room_shows_generating_then_ready(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        # The class shares one ManagedServer across all 10 tests; a prior test
+        # may have left the character at the empty-ground room (degraded state).
+        # Teleport back to the seeded plaza so the journey starts from the
+        # ready card set.
+        self._teleport_to_plaza(page)
         self._wait_suggestions(page, "ready")
         self._wait_section(page)
         self._dismiss(page)
@@ -485,9 +541,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
 
         # Returning to the plaza through the dock regenerates: generating
-        # line, then ready.
-        self._open_root(page, 0)  # Move
-        _press(page, "Enter")  # the single exit (回到廣場)
+        # line, then ready. The flat Vue dock opens the Move submenu on the
+        # first Enter (the empty-ground root's first item is "移動"), so the
+        # journey needs a second Enter to select the focused "回到廣場" row and
+        # dispatch the return move. The generating line is transient (~1.5s),
+        # so the dispatch must happen while the Move submenu is open (before
+        # the menu re-homes to the plaza).
+        self._open_root(page, 0)  # opens the empty-ground Move submenu
+        _press(page, "Enter")     # select the focused 回到廣場 row -> dispatch explore.move
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")
@@ -499,9 +560,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_section_gated_while_the_character_sub_dock_owns_the_surface(self):
         page = self._open_plaza_page()
 
-        # The character sub-dock wipes the action-dock subtree; the section
-        # must never render under it.
-        self._open_root(page, 3)  # 角色狀態
+        # Activate the character sub-dock deterministically through the
+        # store's `activeSubDock` state (the legacy `_open_root(page, 3)`
+        # assumed a hierarchical root the Vue flat dock does not render).
+        # While it is active, the suggestions section must not render.
+        page.evaluate("window.__elosernBridge.store.setActiveSubDock('character')")
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
             True,
@@ -513,8 +576,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             "sub-dock",
         )
 
-        # Leaving the sub-dock rebuilds the exploration dock from the current
-        # snapshot: the ready card set returns.
+        # Leaving the sub-dock (clearing `activeSubDock`) rebuilds the
+        # exploration dock from the current snapshot: the ready card set
+        # returns.
+        page.evaluate("window.__elosernBridge.store.setActiveSubDock(null)")
         _press(page, "Escape")
         self._wait_section(page)
         self.assertEqual(self._ready_card_labels(page), list(EXPECTED_READY_LABELS))

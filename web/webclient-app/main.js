@@ -4,6 +4,7 @@ import AppClient from "./AppClient.vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { createWindowBridge } from "./bridge.js";
 import { wireTransport } from "./transport.js";
+import LayoutStore from "./lib/layout_store.js";
 import "./styles/tokens.css";
 import "./styles/fonts.css";
 import "./styles/app-shell.css";
@@ -34,6 +35,15 @@ app.mount(resolveMountPoint());
 
 const store = useElosernStore();
 const bridge = createWindowBridge(store);
+
+// Versioned browser persistence (webclient-desktop-shell:
+// browser-persistence-is-versioned-and-presentation-only): on mount, read the
+// stored `elosern.layout` wrapper, migrate a known prior version, and reset a
+// malformed, oversized, missing, stock, or unknown version to the version-1
+// default while preserving every required component. `load()` re-persists a
+// migrated or reset wrapper so the next load starts from the current version.
+const layoutStore = LayoutStore.createStore({ storage: window.localStorage });
+layoutStore.load();
 
 // C3: the live evennia.js OOB transport is wired by base.html's Vue branch
 // AFTER the D10 text console has attached, so this coordinator owns the

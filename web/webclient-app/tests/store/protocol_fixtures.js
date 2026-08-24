@@ -96,6 +96,51 @@ export function explorationActions(overrides = undefined) {
   );
 }
 
+export function explorationPanel(overrides = undefined) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "exploration",
+      move: [
+        {
+          exit_ref: "east",
+          label: "西風酒館",
+          destination: "room:43",
+          enabled: true,
+          disabled_reason: null,
+        },
+        {
+          exit_ref: "north",
+          label: "北岸大道",
+          destination: "room:44",
+          enabled: false,
+          disabled_reason: { code: "blocked", message: "門被鎖住了" },
+        },
+      ],
+      look: {
+        room: { identity: 42, display_name: "石板廣場", room: true },
+        entities: [{ identity: 7, display_name: "店長", kind: "npc", portrait_ref: null }],
+        objects: [{ identity: 3, display_name: "木箱" }],
+      },
+      interact: [
+        {
+          identity: 7,
+          display_name: "店長",
+          portrait_ref: null,
+          affordances: [
+            { kind: "action", action_id: "explore.talk_scripted", label: "交談", enabled: true, disabled_reason: null },
+          ],
+        },
+      ],
+      character: { available: true },
+      quests: { available: true },
+      inventory: { available: true },
+    },
+    overrides,
+  );
+}
+
 export function combatActions(overrides = undefined) {
   return deepMerge(
     {

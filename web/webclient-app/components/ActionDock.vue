@@ -25,6 +25,10 @@ const props = defineProps({
   guidancePrefix: { type: String, default: null },
   // The committed `context_actions.suggestions` envelope, or null.
   suggestions: { type: Object, default: null },
+  // The active re-homed sub-dock surface (null | "character" | "services").
+  // The suggestions section must never render while a sub-dock owns the
+  // action-dock surface (spec webclient-options-surface).
+  activeSubDock: { type: String, default: null },
 });
 
 const emit = defineEmits(["action"]);
@@ -45,7 +49,14 @@ const guidanceNote = computed(
 const status = computed(
   () => (props.suggestions ? props.suggestions.status : null),
 );
-const showsSection = computed(() => SUGGESTION_STATUSES.includes(status.value));
+// The suggestions section renders only for the three live statuses AND only
+// while no re-homed services/character sub-dock owns the surface (spec: the
+// section is "never while a re-homed services/character sub-dock is active").
+const showsSection = computed(
+  () =>
+    SUGGESTION_STATUSES.includes(status.value) &&
+    props.activeSubDock === null,
+);
 const cards = computed(
   () =>
     props.suggestions && Array.isArray(props.suggestions.cards)

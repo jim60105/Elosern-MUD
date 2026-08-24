@@ -20,6 +20,7 @@ from .browser_helpers import (
     snapshot_envelope,
     store_state,
     valid_status_panel,
+    wait_for_store_state,
 )
 
 LAYOUT_KEY = "elosern.layout"
@@ -63,9 +64,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         }
         self._set_layout(page, wrapper)
         page.reload()
-        page.wait_for_function(
-            "() => { const s = (window.__elosernBridge && window.__elosernBridge.store.view) || null; return s && s.connected; }"
-        )
+        wait_for_store_state(page, lambda s: bool(s.get("connected")))
         for component in REQUIRED_COMPONENTS:
             count = self._count_component(page, component)
             self.assertEqual(
@@ -83,8 +82,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
     )
     def test_mounted_shell_renders_no_goldenlayout_tab_strip(self):
         page = self.logged_in_page()
-        page.wait_for_function(
-            "() => document.getElementById('action-dock') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.getElementById('action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible",
+            },
         )
         # `settings.hasHeaders: false` hides the tab strip entirely: no
         # visible `.lm_header` element exists anywhere (GoldenLayout keeps the
@@ -133,8 +143,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
     def test_unknown_malformed_layout_resets(self):
         page = self.logged_in_page()
         page.goto(self.webclient_url)
-        page.wait_for_function(
-            "() => document.getElementById('action-dock') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.getElementById('action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible",
+            },
         )
 
         # Non-JSON garbage resets to the default with all required components.
@@ -143,8 +164,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             {"key": LAYOUT_KEY, "value": "{{not json"},
         )
         page.reload()
-        page.wait_for_function(
-            "() => document.getElementById('action-dock') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.getElementById('action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible",
+            },
         )
         self.assert_surfaces_after_reload(page)
 
@@ -159,8 +191,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             },
         )
         page.reload()
-        page.wait_for_function(
-            "() => document.getElementById('action-dock') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.getElementById('action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible",
+            },
         )
         self.assert_surfaces_after_reload(page)
         stored = self._layout(page)
@@ -178,8 +221,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             },
         )
         page.reload()
-        page.wait_for_function(
-            "() => document.getElementById('action-dock') !== null"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.getElementById('action-dock'); "
+                    "if (!d) { return false; } "
+                    "const r = d.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                ),
+                "description": "#action-dock rendered and visible",
+            },
         )
         self.assert_surfaces_after_reload(page)
 
@@ -215,7 +269,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True, "actor": "nope"}},
         )
         result = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )
@@ -234,11 +288,19 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         self.assertFalse(second)
 
         # Ordinary text play continues.
-        narrative_before = len(page.locator(".elosern-narrative").inner_text())
+        narrative_before = len(page.locator('[data-testid="narrative-feed"]').inner_text())
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_before,
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return el && el.innerText.length > %d; }"
+                    ) % narrative_before,
+                "description": "narrative feed grew past the pre-command length",
+            },
         )
 
 
@@ -261,7 +323,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
             protocol_version=2,
         )
         rejected = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": v2},
         )
@@ -270,7 +332,7 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
 
         # The server's protocol-error reply locks every graphical mutation.
         page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_protocol_error', [args.envelope], {})",
             {
                 "generation": generation,
@@ -289,14 +351,22 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
 
         # Ordinary text input remains fully operational.
-        narrative_before = len(page.locator(".elosern-narrative").inner_text())
+        narrative_before = len(page.locator('[data-testid="narrative-feed"]').inner_text())
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_function(
-            "(n) => document.querySelector('.elosern-narrative').innerText.length > n",
-            arg=narrative_before,
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return el && el.innerText.length > %d; }"
+                    ) % narrative_before,
+                "description": "narrative feed grew past the pre-command length",
+            },
         )
         self.assertGreater(
-            len(page.locator(".elosern-narrative").inner_text()), narrative_before
+            len(page.locator('[data-testid="narrative-feed"]').inner_text()), narrative_before
         )
 
 

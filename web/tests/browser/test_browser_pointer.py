@@ -29,6 +29,7 @@ from .browser_helpers import (
     outbound_messages,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -64,21 +65,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         return store_state(page)["panels"]["exploration"]
 
     def _wait_exploration_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = self._exploration_panel(page)
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("exploration panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("exploration", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return self._exploration_panel(page)
 
     def _wait_mode(self, page, mode, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            if store_state(page)["mode"] == mode:
-                return
-            page.wait_for_timeout(250)
-        raise AssertionError(f"mode never became {mode}")
+        def _mode_ready(state):
+            return state.get("mode") == mode
+        wait_for_store_state(page, _mode_ready, timeout=timeout)
 
     def _click_row(self, page, key):
         """Click the row carrying `data-item-key` == key with the mouse only."""
@@ -117,12 +114,19 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def test_pointer_exploration_root_and_submenu_submission(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_exploration_available(page)
+        panel = self._wait_exploration_available(page)
 
-        # In the Vue app each traversable exit is its own ``explore.move``
-        # action affordance (base key ``action-explore.move``). Clicking the
-        # first exit row submits ``explore.move`` exactly once.
-        self._click_row(page, "action-explore.move")
+        # In the Vue app the exploration dock renders the keyboard router's
+        # hierarchical frame: the root's "移動" entry (key ``move``) opens the
+        # bounded move submenu, whose exit rows are keyed ``exit-<exit_ref>``.
+        # Opening it and clicking the first enabled exit dispatches
+        # ``explore.move`` exactly once.
+        self._click_row(page, "move")
+        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
+        self.assertTrue(move_rows, "expected at least one enabled move row")
+        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
+        self._click_row(page, exit_key)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:
@@ -136,12 +140,25 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def test_pointer_combat_target_selection_uses_keyboard_path(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_exploration_available(page)
+        panel = self._wait_exploration_available(page)
 
-        # In the Vue app the dock renders ``context_actions.affordances``;
-        # the goblin's ``explore.engage`` affordance is a top-level action
-        # row (``action-explore.engage``) — no separate target row.
-        self._click_row(page, "action-explore.engage")
+        # The G2 hierarchical exploration dock renders the keyboard-router
+        # frames: the root "互動" entry (key ``interact``) opens the interact
+        # submenu (target rows keyed ``target-<identity>``); selecting the goblin
+        # target renders its affordance menu, whose ``engage`` row (key
+        # ``engage``) dispatches ``explore.engage``.
+        self._click_row(page, "interact")
+        goblin = next(
+            (t for t in (panel.get("interact") or [])
+             if "哥布林" in (t.get("display_name") or "")),
+            None,
+        )
+        self.assertIsNotNone(goblin, "goblin target not found in the interact panel")
+        target_key = "target-" + str(goblin["identity"])
+        page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
+        self._click_row(page, target_key)
+        page.wait_for_selector('[data-item-key="engage"]', timeout=15000)
+        self._click_row(page, "engage")
         self._wait_mode(page, "combat")
 
         # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
@@ -151,9 +168,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         # inventing an OOB action.
         self._click_row(page, "attack")
         try:
-            page.wait_for_function(
-                "() => document.querySelectorAll("
-                "'#action-dock [data-item-key^=\"target-\"]').length >= 1",
+            wait_for_store_state(
+                page,
+                lambda s: bool(s.get("connected")),
+                dom_readiness={
+                    "selector": "#action-dock",
+                    "predicate": (
+                        "() => document.querySelectorAll("
+                        "'#action-dock [data-item-key^=\"target-\"]').length >= 1"
+                    ),
+                    "description": "combat target rows present in the action dock",
+                },
                 timeout=30000,
             )
         except Error as exc:
@@ -173,14 +198,9 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(target_keys), 1)
         before = sent_action_count(page)
         self._click_row(page, target_keys[0])
-        page.wait_for_function(
-            """() => {
-              const bridge = window.__elosernBridge;
-              return !!(bridge && bridge.store &&
-                  bridge.store.view.lastTarget === '""" + target_keys[0].removeprefix("target-") + """');
-            }""",
-            timeout=15000,
-        )
+        def _last_target_set(state):
+            return state.get("lastTarget") == target_keys[0].removeprefix("target-")
+        wait_for_store_state(page, _last_target_set, timeout=15000)
         self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
         self.assertEqual(sent_action_count(page), before)
 
@@ -213,17 +233,27 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def test_pointer_disabled_row_explains_without_submitting(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_exploration_available(page)
+        panel = self._wait_exploration_available(page)
 
         # The exploration fixture leaves a defeated wolf beside the living
-        # goblin, so the dock renders its engage affordance as a disabled row
-        # (``target_dead``). Clicking a disabled row focuses it (re-rendering
-        # the detail pane with the server reason) without submitting anything.
-        page.wait_for_function(
-            "() => document.querySelectorAll('#action-dock "
-            "[data-item-key][aria-disabled=\"true\"]').length >= 1",
-            timeout=15000,
-        )
+        # goblin. In the G2 hierarchical dock the wolf's ``engage`` affordance is
+        # a disabled row (``target_dead``) inside the wolf's target menu, so open
+        # the interact submenu and select the wolf target to render it.
+        self._click_row(page, "interact")
+        wolf = None
+        for t in (panel.get("interact") or []):
+            if any(
+                a.get("action_id") == "explore.engage" and a.get("enabled") is False
+                for a in (t.get("affordances") or [])
+            ):
+                wolf = t
+                break
+        self.assertIsNotNone(wolf, "disabled-engage target not found in the interact panel")
+        target_key = "target-" + str(wolf["identity"])
+        page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
+        self._click_row(page, target_key)
+        # The wolf's target menu renders the disabled ``engage`` row.
+        page.wait_for_selector('[data-item-key="engage"][aria-disabled="true"]', timeout=15000)
         disabled_key = page.evaluate(
             "() => document.querySelector('#action-dock "
             "[data-item-key][aria-disabled=\"true\"]').getAttribute('data-item-key')"
@@ -232,13 +262,12 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         row = page.locator(f'#action-dock [data-item-key="{disabled_key}"]')
         row.scroll_into_view_if_needed()
         row.click(force=True)
-        page.wait_for_timeout(300)
-        self.assertEqual(sent_action_count(page), before)
-        self.assertEqual(
-            store_state(page)["focus"]["key"],
-            disabled_key,
-            "clicking a disabled row must focus it",
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("focus") or {}).get("key") == disabled_key,
+            timeout=5000,
         )
+        self.assertEqual(sent_action_count(page), before)
         detail = page.evaluate(
             "document.querySelector('[data-testid=\"exploration-detail\"]').innerText"
         )
@@ -251,24 +280,33 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def test_rapid_double_activation_pushes_one_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_exploration_available(page)
+        panel = self._wait_exploration_available(page)
 
-        # In the Vue app the Move row is an action affordance: the first
-        # activation submits ``explore.move`` once, the immediate second
-        # activation of the same row is rejected (the in-flight lock, or the
-        # stale-row guard once the dock re-renders after the move), so exactly
-        # one action crosses the wire and no duplicated rows ever render.
+        # The G2 hierarchical dock renders the keyboard-router frame: the root
+        # "移動" entry (key ``move``) opens the bounded move submenu, whose exit
+        # rows are keyed ``exit-<exit_ref>``. Rapidly double-activating the first
+        # exit row submits ``explore.move`` once; the immediate second activation
+        # is rejected (the in-flight lock, or the stale-row guard once the dock
+        # re-renders after the move), so exactly one action crosses the wire and
+        # no duplicated rows ever render.
+        self._click_row(page, "move")
+        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
+        self.assertTrue(move_rows, "expected at least one enabled move row")
+        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
         page.evaluate(
             """() => {
-              const row = document.querySelector('[data-item-key="action-explore.move"]');
+              const row = document.querySelector('[data-item-key="EXITKEY"]');
               window.__staleRow = row;
               row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
-            }"""
+            }""".replace("EXITKEY", exit_key)
         )
         page.evaluate(
             """() => {
               const row = window.__staleRow;
-              row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+              if (row) {
+                row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+              }
             }"""
         )
         page.wait_for_timeout(400)
@@ -283,15 +321,21 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
     def test_real_mouse_double_click_pushes_one_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        self._wait_exploration_available(page)
+        panel = self._wait_exploration_available(page)
 
-        # A genuine browser double-click on a Move row: the first click
-        # (detail 1) submits ``explore.move`` once; the second click of the
-        # gesture is suppressed by the in-flight lock (no second submit), so
-        # exactly one action crosses the wire.
-        move = page.locator('[data-item-key="action-explore.move"]')
-        self.assertEqual(move.count(), 1)
-        move.dblclick()
+        # A genuine browser double-click on the first exit row of the move
+        # submenu (keyed ``exit-<exit_ref>``): the first click (detail 1)
+        # submits ``explore.move`` once; the second click of the gesture is
+        # suppressed by the in-flight lock (no second submit), so exactly one
+        # action crosses the wire.
+        self._click_row(page, "move")
+        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
+        self.assertTrue(move_rows, "expected at least one enabled move row")
+        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
+        exit_row = page.locator(f'[data-item-key="{exit_key}"]')
+        self.assertEqual(exit_row.count(), 1)
+        exit_row.dblclick()
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
         rows = self._rows(page)
@@ -309,20 +353,33 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => document.getElementById('elosern-offline-overlay')"
+                    ".getAttribute('data-visible') === 'true'"
+                ),
+                "description": "offline overlay visible",
+            },
         )
         before = sent_action_count(page)
         # The overlay intercepts pointer events; a primary click dispatched on
-        # a row position must not submit anything.
+        # the first root row (key ``move``, the "移動" entry) must not submit
+        # anything while the offline overlay is up (the store is disconnected, so
+        # dispatchAction is rejected and no OOB action crosses the wire).
         page.evaluate(
             """() => {
-              const row = document.querySelector('[data-item-key="action-explore.move"]');
-              row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+              const row = document.querySelector('[data-item-key="move"]');
+              if (row) {
+                row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+              }
             }"""
         )
         page.wait_for_timeout(300)
@@ -384,9 +441,17 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
 
                 login_and_open(page, self.webclient_url, self.base_url)
                 install_outbound_recorder(page)
-                self._wait_exploration_available(page)
-                self._click_row(page, "action-explore.move")
-                self.assertIn("action-explore.move", self._rows(page)[0])
+                panel = self._wait_exploration_available(page)
+                # The exploration root's first cell is the "移動" entry (key
+                # ``move``); opening it renders the bounded move submenu whose
+                # exit rows are keyed ``exit-<exit_ref>``.
+                self.assertEqual(self._rows(page)[0], "move")
+                self._click_row(page, "move")
+                move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
+                if move_rows:
+                    exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+                    page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
+                    self.assertIn(exit_key, self._rows(page))
                 page.close()
 
 
@@ -415,13 +480,12 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
                 self.server = None
 
     def _wait_services_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = store_state(page)["panels"].get("services")
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("services panel never became available")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("services", {}).get("available") is True,
+            timeout=timeout,
+        )
+        return store_state(page)["panels"].get("services")
 
     def _rows(self, page):
         return page.evaluate(

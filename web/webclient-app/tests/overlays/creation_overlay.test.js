@@ -84,6 +84,30 @@ describe("CreationOverlay (B5 overlays family)", () => {
     });
   });
 
+  it("the custom payload always carries the exact eight keys (blank background and no affinity emit JSON-safe defaults)", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    const event = lastAction(wrapper, "creation.custom");
+    expect(event).not.toBeNull();
+    expect(Object.keys(event.payload).sort()).toEqual([
+      "affinity_elements",
+      "age",
+      "allocations",
+      "apparent_age",
+      "background",
+      "display_name",
+      "race",
+      "subrace",
+    ]);
+    expect(event.payload.background).toBeNull();
+    expect(event.payload.affinity_elements).toEqual([]);
+  });
+
   it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
@@ -136,27 +160,43 @@ describe("CreationOverlay (B5 overlays family)", () => {
   });
 
   // -- Frame actions ----------------------------------------------------------
-  it("activate emits creation.activate after a preset is selected", async () => {
-    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
-    // Before a preset is selected the activate button is disabled.
-    expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBe("");
-    wrapper.findAll('[data-testid="creation-preset-card"]')[0].trigger("click");
-    await nextTick();
-    expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBeUndefined();
-    wrapper.get('[data-testid="creation-activate"]').trigger("click");
+  it("the confirm stage renders the confirmation screen and confirms the pending action", async () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        stage: {
+          stage: "confirm",
+          confirmItems: [
+            { key: "confirm-creation.activate", label: "確認啟用此預設角色？", actionId: "creation.activate" },
+            { key: "cancel-creation.activate", label: "取消" },
+          ],
+          confirmLabel: "確認啟用此預設角色？",
+          confirmAction: "creation.activate",
+          pendingPresetKey: "human_wanderer",
+        },
+      },
+    });
+    // The confirmation screen replaces the wizard body while the confirm stage
+    // is active.
+    expect(wrapper.get('[data-testid="creation-confirm"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-confirm-title"]').text()).toContain("確認啟用此預設角色？");
+    expect(wrapper.find('[data-testid="creation-preset-card"]').exists()).toBe(false);
+    wrapper.get('[data-testid="creation-confirm-ok"]').trigger("click");
     expect(lastAction(wrapper, "creation.activate")).toEqual({
       action_id: "creation.activate",
       payload: {},
     });
+    // The cancel button pops the confirmation (the AppClient routes it through
+    // the keyboard router's escape).
+    wrapper.get('[data-testid="creation-confirm-cancel"]').trigger("click");
+    expect(wrapper.emitted("cancel-confirm")).toBeTruthy();
   });
 
-  it("reset emits creation.reset with an empty payload", () => {
+  it("the reset button requests the destructive confirmation (no direct creation.reset)", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     wrapper.get('[data-testid="creation-reset"]').trigger("click");
-    expect(lastAction(wrapper, "creation.reset")).toEqual({
-      action_id: "creation.reset",
-      payload: {},
-    });
+    expect(wrapper.emitted("request-reset")).toBeTruthy();
+    expect(lastAction(wrapper, "creation.reset")).toBeNull();
   });
 
   // -- Draft resume ----------------------------------------------------------
@@ -256,22 +296,20 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-background"]').element.value).toBe("從渡口學來運貨的年輕人。");
   });
 
-  it("activation eligibility follows the draft stage (underage custom draft disables activate)", async () => {
+  it("the confirm stage mirrors the dock stage into the wizard mode", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
-    // Custom draft with both ages below the 18 minimum: the activate button is
-    // disabled until the adult gate passes.
-    const underage = {
-      ...CREATION_PANEL_CUSTOM_DRAFT_SAMPLE,
-      draft: { ...CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft, age: 17, apparent_age: 17 },
-    };
-    wrapper.setProps({ creation: underage });
+    // The store-driven dock stage (custom form open) syncs the wizard mode.
+    wrapper.setProps({
+      stage: { stage: "custom", confirmItems: [], confirmLabel: null, confirmAction: null, pendingPresetKey: null },
+    });
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBe("");
-    // Bumping both ages to 18+ re-enables activation from the same mounted overlay.
-    wrapper.get('[data-testid="creation-field-age"]').setValue(18);
-    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(18);
+    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("custom");
+    // Returning to the preset stage restores the preset cards.
+    wrapper.setProps({
+      stage: { stage: "presets", confirmItems: [], confirmLabel: null, confirmAction: null, pendingPresetKey: null },
+    });
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-activate"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("preset");
   });
 
   it("the close button emits close", () => {

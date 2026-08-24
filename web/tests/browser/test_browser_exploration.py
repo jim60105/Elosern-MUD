@@ -14,8 +14,6 @@ deterministic; no remote, LLM, or image service is involved.
 
 from __future__ import annotations
 
-import time
-
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -24,6 +22,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .harness import ManagedServer
 from . import fixtures
@@ -32,6 +31,11 @@ from . import fixtures
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
     page.wait_for_timeout(wait_ms)
+
+
+def _connected_active(state: dict) -> bool:
+    """Gate on the client being connected and in the active presentation phase."""
+    return bool(state.get("connected")) and state.get("phase") == "active"
 
 
 class ExplorationBrowserTest(BrowserAcceptanceTest):
@@ -64,27 +68,18 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         return store_state(page)["panels"].get("exploration")
 
     def _wait_exploration_available(self, page, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            panel = self._exploration_panel(page)
-            if panel and panel.get("available") is True:
-                return panel
-            page.wait_for_timeout(250)
-        raise AssertionError("exploration panel never became available")
+        def _exploration_available(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("exploration") or {}
+            return panel.get("available") is True
+
+        wait_for_store_state(page, _exploration_available, timeout=timeout)
 
     def _wait_panel(self, page, name, predicate, timeout=30000):
-        deadline = time.monotonic() + timeout / 1000
-        while time.monotonic() < deadline:
-            try:
-                panel = store_state(page)["panels"].get(name)
-                if panel and predicate(panel):
-                    return panel
-            except Exception:
-                pass
-            page.wait_for_timeout(250)
-        raise AssertionError(
-            "panel %s predicate never became true; state=%r" % (name, store_state(page))
-        )
+        def _panel_ready(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get(name)
+            return panel is not None and predicate(panel)
+
+        wait_for_store_state(page, _panel_ready, timeout=timeout)
 
     def _reset_root(self, page):
         focus_action_dock(page)
@@ -161,15 +156,15 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         self._open_root(page, 3)  # 角色狀態
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
-            True,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            "character",
             "the character panel must own the action dock",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
-            False,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            None,
             "Escape must leave the character panel",
         )
 
@@ -195,9 +190,17 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 1)  # Look
         _press(page, "Enter")  # look at the room
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
-            arg="南門",
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!el && el.innerText.indexOf('南門') !== -1; }"
+                ),
+                "description": "narrative feed shows the South Gate room",
+            },
         )
 
     @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
@@ -210,9 +213,17 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowRight")  # the guard (first present entity)
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
-            arg="她看著你的眼神裡帶著信賴。",
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!el && el.innerText.indexOf('她看著你的眼神裡帶著信賴。') !== -1; }"
+                ),
+                "description": "narrative feed shows the guard's trust line",
+            },
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
@@ -239,9 +250,17 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(len(talk), 1)
         self.assertIn("keyword_id", talk[0]["payload"])
         self.assertIn("npc_id", talk[0]["payload"])
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
-            arg="冒險者公會",
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!el && el.innerText.indexOf('冒險者公會') !== -1; }"
+                ),
+                "description": "narrative feed shows the adventurers' guild",
+            },
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
@@ -255,8 +274,18 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "Enter")
         _press(page, "ArrowRight")  # 自由交談 (second grid column)
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": "#inputfield",
+                "predicate": (
+                    "() => { const f = document.getElementById('inputfield'); "
+                    "const a = document.activeElement; "
+                    "return !!f && a === f; }"
+                ),
+                "description": "command drawer input field is focused",
+            },
         )
         page.keyboard.type("你好，詩人")
         page.keyboard.press("Enter")
@@ -267,9 +296,17 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
         # Offline degrade reaches the authored greeting/silence.
-        page.wait_for_function(
-            "(s) => document.querySelector('.elosern-narrative').innerText.indexOf(s) !== -1",
-            arg="歡迎來到冒險者公會",
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!el && el.innerText.indexOf('歡迎來到冒險者公會') !== -1; }"
+                ),
+                "description": "narrative feed shows the offline greeting",
+            },
         )
 
     @covers_requirement(
@@ -286,32 +323,68 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "Enter")
         _press(page, "ArrowRight")  # 自由交談 (second grid column)
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": "#inputfield",
+                "predicate": (
+                    "() => { const f = document.getElementById('inputfield'); "
+                    "const a = document.activeElement; "
+                    "return !!f && a === f; }"
+                ),
+                "description": "command drawer input field is focused",
+            },
         )
         page.keyboard.type("話到嘴邊又吞了回去")
         page.keyboard.press("Escape")
-        page.wait_for_function(
-            "() => !(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })() && (() => {"
-            "  const dock = document.getElementById('action-dock');"
-            "  return document.activeElement === dock || "
-            "    (document.activeElement && dock.contains(document.activeElement));"
-            "})()"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); "
+                    "const drawerClosed = !d || d.getAttribute('data-open') !== 'true'; "
+                    "const dock = document.getElementById('action-dock'); "
+                    "const a = document.activeElement; "
+                    "return drawerClosed && !!dock && (a === dock || (a && dock.contains(a))); }"
+                ),
+                "description": "command drawer closed and action dock focused",
+            },
         )
 
         # Send an ordinary command through the drawer: it must travel as text,
         # never as explore.talk_freeform speech to the previously selected NPC.
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": "#inputfield",
+                "predicate": (
+                    "() => { const f = document.getElementById('inputfield'); "
+                    "const a = document.activeElement; "
+                    "return !!f && a === f; }"
+                ),
+                "description": "command drawer input field is focused",
+            },
         )
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.keyboard.type("look")
         page.keyboard.press("Enter")
-        page.wait_for_function(
-            "(before) => document.querySelector('.elosern-narrative')"
-            ".innerText.length > before",
-            arg=narrative_before.__len__(),
+        before_len = len(narrative_before)
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!el && el.innerText.length > %d; }" % before_len
+                ),
+                "description": "narrative feed grew past the pre-command length",
+            },
         )
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 0)
         # The command was sent through the text path.
@@ -335,12 +408,11 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowDown")  # the goblin (second grid row, first column)
         _press(page, "Enter")
         _press(page, "Enter")  # 戰鬥 (engage)
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["mode"] == "combat":
-                break
-            page.wait_for_timeout(250)
+        wait_for_store_state(
+            page,
+            lambda s: s.get("mode") == "combat",
+            timeout=30000,
+        )
         self.assertEqual(store_state(page)["mode"], "combat")
         self.assertEqual(sent_action_count(page, "explore.engage"), 1)
         self.assertEqual(
@@ -360,14 +432,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 6)  # Wait/休息
         _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
         _press(page, "Enter")
-        deadline = time.monotonic() + 20
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result and result["code"] == "unsafe_skip":
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(result["code"], "unsafe_skip")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("code") == "unsafe_skip",
+            timeout=20000,
+        )
+        self.assertEqual(store_state(page)["lastActionResult"]["code"], "unsafe_skip")
         self.assertEqual(sent_action_count(page, "explore.wait"), 1)
         self.assertEqual(store_state(page)["serverTime"], time_before)
 
@@ -377,19 +447,25 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "ArrowDown")  # 等待至正午 (second grid row)
         _press(page, "ArrowDown")  # 休息一段時間 (third grid row)
         _press(page, "Enter")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="exploration-rest-form"]',
+                "predicate": (
+                    "() => !!document.querySelector('[data-testid=\"exploration-rest-form\"]')"
+                ),
+                "description": "exploration rest duration form rendered",
+            },
         )
         page.keyboard.type("3600")
         page.keyboard.press("Enter")
-        deadline = time.monotonic() + 20
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result and result["code"] == "unsafe_skip":
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(result["code"], "unsafe_skip")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("code") == "unsafe_skip",
+            timeout=20000,
+        )
+        self.assertEqual(store_state(page)["lastActionResult"]["code"], "unsafe_skip")
         self.assertEqual(sent_action_count(page, "explore.wait"), 2)
         self.assertEqual(store_state(page)["serverTime"], time_before)
 
@@ -412,14 +488,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 6)  # Wait/休息
         _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
         _press(page, "Enter")
-        deadline = time.monotonic() + 20
-        ok = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result and result["code"] == "skipped":
-                ok = result
-                break
-            page.wait_for_timeout(250)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("code") == "skipped",
+            timeout=20000,
+        )
+        ok = store_state(page)["lastActionResult"]
         self.assertIsNotNone(ok, "a safe wait must succeed")
         time_after = store_state(page)["serverTime"]
         self.assertNotEqual(
@@ -451,14 +525,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
               }], {});
             }"""
         )
-        deadline = time.monotonic() + 20
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result and result["requestId"] == "stale-move-1":
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(result["outcome"], "stale")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") == "stale-move-1",
+            timeout=20000,
+        )
+        self.assertEqual(store_state(page)["lastActionResult"]["outcome"], "stale")
         self.assertEqual(
             store_state(page)["panels"]["local_map"]["current_node"],
             map_before,
@@ -479,15 +551,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
               }], {});
             }"""
         )
-        deadline = time.monotonic() + 20
-        result = None
-        while time.monotonic() < deadline:
-            result = store_state(page)["lastActionResult"]
-            if result and result["requestId"] == "tampered-move-1":
-                break
-            page.wait_for_timeout(250)
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_exit")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") == "tampered-move-1",
+            timeout=20000,
+        )
+        last = store_state(page)["lastActionResult"]
+        self.assertEqual(last["outcome"], "rejected")
+        self.assertEqual(last["code"], "no_exit")
         self.assertEqual(
             store_state(page)["panels"]["local_map"]["current_node"],
             map_before,
@@ -527,8 +598,9 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => { if (window.__elosernWs) window.__elosernWs.close(4001); }"
         )
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); return !s.connected; }"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
         )
         page.evaluate("Evennia.connect()")
         self._wait_exploration_available(page)
@@ -545,16 +617,54 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Pointer: open Look, then click its final back cell.
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
+            dom_readiness={
+                "selector": '#action-dock [data-item-key="look"]',
+                "predicate": (
+                    "() => !!document.querySelector('#action-dock [data-item-key=\"look\"]')"
+                ),
+                "description": "Look cell rendered in the exploration dock",
+            },
+        )
         page.locator('[data-item-key="look"]').click()
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"exploration-detail\"]') !== null"
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": '[data-testid="exploration-detail"]',
+                "predicate": (
+                    "() => !!document.querySelector('[data-testid=\"exploration-detail\"]')"
+                ),
+                "description": "exploration detail panel rendered",
+            },
+        )
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
+            dom_readiness={
+                "selector": '#action-dock [data-item-key="back"]',
+                "predicate": (
+                    "() => !!document.querySelector('#action-dock [data-item-key=\"back\"]')"
+                ),
+                "description": "back cell rendered in the detail dock",
+            },
         )
         page.locator('[data-item-key="back"]').click()
-        page.wait_for_function(
-            "() => { const keys = Array.from("
-            "document.querySelectorAll('#action-dock [data-item-key]'))"
-            ".map((el) => el.getAttribute('data-item-key'));"
-            "return keys.indexOf('move') !== -1 && keys.indexOf('look') !== -1; }"
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
+            dom_readiness={
+                "selector": "#action-dock",
+                "predicate": (
+                    "() => { const keys = Array.from("
+                    "document.querySelectorAll('#action-dock [data-item-key]'))"
+                    ".map((el) => el.getAttribute('data-item-key'));"
+                    "return keys.indexOf('move') !== -1 && keys.indexOf('look') !== -1; }"
+                ),
+                "description": "exploration root cells (move/look) rendered in the dock",
+            },
         )
         # The root cells render again, no ui_action was sent, and no drawer
         # text was submitted.
@@ -564,8 +674,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             keys,
-            ["action-explore.move", "action-explore.look", "action-explore.interact",
-             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
         )
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
@@ -598,7 +707,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # back cell (the exploration fixture carries no guild navigate entry).
         self.assertEqual(
             target_keys,
-            ["action-explore.talk_scripted", "back"],
+            ["talk-scripted", "back"],
             "the target-affordance cells must render after one Escape",
         )
         self.assertEqual(
@@ -606,7 +715,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "action-explore.talk_scripted",
+            "talk-scripted",
         )
         _press(page, "Escape")  # back to the Interact target list
         page.wait_for_timeout(80)
@@ -644,21 +753,24 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # cells (the shared-router regression).
         self._open_root(page, 4)  # Quests
         self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"),
-            True,
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            "services",
             "the services dock must own the surface inside Quests",
         )
         _press(page, "Escape")
         page.wait_for_timeout(120)
-        self.assertEqual(page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.panels.services && s.panels.services.available !== false; })()"), False)
+        self.assertEqual(
+            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
+            None,
+            "Escape must leave the services sub-dock",
+        )
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         self.assertEqual(
             keys,
-            ["action-explore.move", "action-explore.look", "action-explore.interact",
-             "action-character.status", "action-quests", "action-inventory", "action-explore.wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
             "the exploration root cells must render after Escape from Quests",
         )
         self.assertEqual(
@@ -666,7 +778,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "action-quests",
+            "move",
         )
 
 

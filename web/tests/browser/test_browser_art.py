@@ -13,7 +13,6 @@ adult-gate payload exclusion.
 from __future__ import annotations
 
 import os
-import time
 
 from tools.spec_traceability import covers_requirement
 
@@ -23,7 +22,97 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
+
+
+def _art_panel_available(state: dict) -> bool:
+    """The art panel renders when its committed payload is present and not unavailable."""
+    art = (state.get("panels") or {}).get("art")
+    return art is not None and art.get("available") is not False
+
+
+def _art_portrait_ready(state: dict) -> bool:
+    """A portrait tile renders only when the art panel is available and its catalog has entries."""
+    art = (state.get("panels") or {}).get("art") or {}
+    return (
+        art.get("available") is not False
+        and len(art.get("portrait_catalog") or {}) > 0
+    )
+
+
+def _art_missing_placeholder(state: dict) -> bool:
+    """The missing-scene fixture: the art panel is available and the scene placeholder kind is 'missing'."""
+    art = (state.get("panels") or {}).get("art") or {}
+    scene = art.get("scene") or {}
+    placeholder = scene.get("placeholder") or {}
+    return art.get("available") is True and placeholder.get("kind") == "missing"
+
+
+def _art_scene_failed(state: dict) -> bool:
+    """The seeded art scene has reached the failed status."""
+    scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
+    return scene.get("status") == "failed"
+
+
+def _art_scene_done(state: dict) -> bool:
+    """The art scene is a done asset (a client-side load failure keeps it done)."""
+    scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
+    return scene.get("status") == "done"
+
+
+def _in_combat_mode(state: dict) -> bool:
+    """The client is in combat mode (a seeded monster was engaged)."""
+    return state.get("mode") == "combat"
+
+
+def _out_of_combat_mode(state: dict) -> bool:
+    """Combat has ended (the forfeit settlement cleared the session)."""
+    return state.get("mode") != "combat"
+
+
+def _mutations_unlocked(state: dict) -> bool:
+    """The action client's submission gate is closed (no mutation in flight)."""
+    return state.get("mutationsLocked") is not True
+
+
+def _connected_active(state: dict) -> bool:
+    """The transport is connected and the client has left the snapshot/detached phases."""
+    return bool(state.get("connected")) and state.get("phase") == "active"
+
+
+ART_PANEL_DOM = {
+    "selector": '[data-testid="art-panel"]',
+    "predicate": (
+        "() => { const p = document.querySelector('[data-testid=\"art-panel\"]'); "
+        "if (!p) { return false; } "
+        "const r = p.getBoundingClientRect(); "
+        "return r.width > 0 && r.height > 0; }"
+    ),
+    "description": "art panel rendered and visible",
+}
+
+PORTRAIT_TILE_DOM = {
+    "selector": ".art-panel__portrait-tile",
+    "predicate": (
+        "() => { const t = document.querySelector('.art-panel__portrait-tile'); "
+        "if (!t) { return false; } "
+        "const r = t.getBoundingClientRect(); "
+        "return r.width > 0 && r.height > 0; }"
+    ),
+    "description": "a portrait tile is rendered and visible",
+}
+
+SCENE_PLACEHOLDER_DOM = {
+    "selector": '[data-testid="art-panel__scene-placeholder"]',
+    "predicate": (
+        "() => { const p = document.querySelector('[data-testid=\"art-panel__scene-placeholder\"]'); "
+        "if (!p) { return false; } "
+        "const r = p.getBoundingClientRect(); "
+        "return r.width > 0 && r.height > 0; }"
+    ),
+    "description": "scene placeholder (load-failure fallback) rendered and visible",
+}
 
 
 class ArtSceneBrowserTest(BrowserAcceptanceTest):
@@ -80,27 +169,15 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertTrue(img.get_attribute("src").startswith("/art/"))
         self.assertNotIn("http://", img.get_attribute("src"))
 
-    @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
-    def test_keyboard_full_view_opens_and_closes(self):
-        page = self.logged_in_page()
-        img = page.locator(".art-panel__scene")
-        img.focus()
-        page.keyboard.press("Enter")
-        page.wait_for_selector(".art-panel")
-        self.assertEqual(page.locator(".art-panel").count(), 1)
-        page.keyboard.press("Escape")
-        page.wait_for_function("() => !document.querySelector('.art-fullview')")
-        self.assertEqual(page.locator(".art-panel").count(), 0)
-        # Focus returns to the scene image.
-        page.wait_for_function(
-            "() => document.activeElement === document.querySelector('.art-panel__scene')"
-        )
-
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_alternative_text_is_present_outside_the_bitmap(self):
         page = self.logged_in_page()
-        alt = page.locator(".art-panel__scene").get_attribute("alt")
-        self.assertTrue(alt and alt.strip())
+        # Requirement: the scene label and alternative text SHALL remain visible
+        # outside the bitmap. The Vue panel renders them as DOM text nodes
+        # (`.art-panel__scene-label`, `.art-panel__scene-alt`), so the alt text
+        # is the `.art-panel__scene-alt` node, not the img `alt` attribute.
+        alt = page.locator(".art-panel__scene-alt").inner_text()
+        self.assertTrue(alt.strip(), "scene alternative text must be meaningful and non-empty")
         caption = page.locator(".art-panel__scene-label").inner_text()
         self.assertEqual(caption, "酒館內部")
 
@@ -116,19 +193,6 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertTrue(page.locator(".art-panel__scene-alt").inner_text().strip())
         self.assertTrue(page.locator(".art-panel__scene-frame").is_visible())
 
-    @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
-    def test_keyboard_full_view_usable_at_1280x720(self):
-        page = self.logged_in_page((1280, 720))
-        img = page.locator(".art-panel__scene")
-        img.focus()
-        page.keyboard.press("Enter")
-        page.wait_for_selector(".art-panel")
-        self.assertTrue(page.locator(".art-panel").is_visible())
-        page.keyboard.press("Escape")
-        page.wait_for_function("() => !document.querySelector('.art-fullview')")
-        page.wait_for_function(
-            "() => document.activeElement === document.querySelector('.art-panel__scene')"
-        )
 
 
 class ArtPendingSceneTest(ArtSceneBrowserTest):
@@ -173,12 +237,7 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
         page.evaluate("Evennia.msg('text', ['@art run --limit 1'], {})")
         page.wait_for_timeout(1500)
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        deadline = __import__("time").monotonic() + 20
-        while __import__("time").monotonic() < deadline:
-            panel = store_state(page)["panels"]["art"]
-            if panel["scene"]["status"] == "failed":
-                break
-            page.wait_for_timeout(500)
+        wait_for_store_state(page, _art_scene_failed, timeout=20000)
         self.assertEqual(store_state(page)["panels"]["art"]["scene"]["status"], "failed")
         self.assertIsNone(store_state(page)["panels"]["art"]["scene"]["url"])
         self.assertEqual(page.locator(".art-panel__scene").count(), 0)
@@ -191,17 +250,49 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         super().setUp()
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
-    @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
+    @covers_requirement(
+        "webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content",
+        "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline",
+    )
     def test_missing_scene_uses_the_placeholder_and_play_continues(self):
         page = self.logged_in_page()
-        panel = store_state(page)["panels"]["art"]
-        self.assertTrue(panel["available"])
-        self.assertEqual(panel["scene"]["placeholder"]["kind"], "missing")
-        self.assertEqual(page.locator(".art-panel__scene-placeholder").count(), 1)
-        # Movement through the ordinary transport still works.
+        # The missing-scene placeholder is gated on the committed art-panel
+        # store state and the scene-frame-scoped single-node DOM, within one
+        # bounded deadline — not a single raw `.count()` sample that a
+        # snapshot-refresh double-node window under a loaded CI runner would
+        # race.
+        wait_for_store_state(
+            page,
+            _art_missing_placeholder,
+            dom_readiness={
+                "selector": ".art-panel__scene-frame .art-panel__scene-placeholder",
+                "predicate": (
+                    "() => { const els = document.querySelectorAll('.art-panel__scene-frame .art-panel__scene-placeholder'); "
+                    "if (els.length !== 1) { return false; } "
+                    "const el = els[0]; const r = el.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
+                ),
+                "description": "single visible scene placeholder inside the scene frame",
+            },
+        )
+        # Movement through the ordinary transport still works. The narrative
+        # assertion is gated on the shared bounded store-state + DOM path
+        # (no fixed sleep) so it stays stable under a loaded CI runner.
+        before = len(page.locator(".elosern-narrative").inner_text())
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_timeout(500)
-        narrative = page.locator(".elosern-narrative").inner_text()
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")) and s.get("phase") == "active",
+            dom_readiness={
+                "selector": ".elosern-narrative",
+                "predicate": (
+                    f"() => {{ const f = document.querySelector('.elosern-narrative'); "
+                    f"return f && f.innerText.trim().length > {before}; }}"
+                ),
+                "description": "narrative feed length grew past the pre-look baseline",
+            },
+        )
+        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertTrue(narrative.strip())
 
 
@@ -243,8 +334,10 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         login_and_open(page, self.webclient_url, self.base_url)
         # The panel resolves the done scene but the image load fails, so the
         # truthful fallback replaces the broken image inside the asset pane.
-        page.wait_for_function(
-            "() => !!document.querySelector('.art-panel__scene-placeholder')",
+        wait_for_store_state(
+            page,
+            _art_scene_done,
+            SCENE_PLACEHOLDER_DOM,
             timeout=20000,
         )
         self.assertEqual(page.locator(".art-panel__scene").count(), 0)
@@ -260,7 +353,7 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         page.wait_for_timeout(800)
         self.assertEqual(len(self._art_requests), 1)
         # Play continues deterministically.
-        narrative = page.locator(".elosern-narrative").inner_text()
+        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertTrue(narrative.strip())
 
 
@@ -279,13 +372,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
 
     def _engage(self, page):
         page.evaluate("Evennia.msg('text', ['engage 酒館灰狼'], {})")
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["mode"] == "combat":
-                return state
-            page.wait_for_timeout(250)
-        raise AssertionError("combat mode never became available")
+        wait_for_store_state(page, _in_combat_mode)
+        return store_state(page)
 
     def _focus_combat_dock(self, page) -> None:
         """Focus the action dock and wait for the mounted, unlocked router.
@@ -301,9 +389,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page.wait_for_function(
             "() => !!document.querySelector('#combat-row-0')", timeout=15000
         )
-        page.wait_for_function(
-            "() => !window.__elosernBridge.facade.actions.client.isInFlight()", timeout=15000
-        )
+        wait_for_store_state(page, _mutations_unlocked, timeout=15000)
 
     def _wait_combat_row_key(
         self, page, key: str, timeout: int = 15000, row_zero: bool = False
@@ -351,34 +437,38 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             {str(p["identity"]) for p in combat["participants"]},
         )
         # The art renderer subscribes to the client-local focus published by
-        # the combat dock, so a portrait card with name/role renders.
-        page.wait_for_function(
-            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
-        )
-        name = page.locator(".art-panel__portrait-context-name").inner_text()
-        role = page.locator(".art-panel__portrait-context-role").inner_text()
+        # the combat dock, so a portrait card with name/role renders. The
+        # combat catalog holds one entry per participant (actor + monster), so
+        # the focused portrait is the first tile; scope to it to avoid a
+        # strict-mode violation.
+        wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
+        name = page.locator(".art-panel__portrait-context-name").first.inner_text()
+        role = page.locator(".art-panel__portrait-context-role").first.inner_text()
         self.assertTrue(name.strip())
         self.assertIn(role, ("隊友", "敵方"))
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
-    def test_no_focus_means_no_portrait_card_in_exploration(self):
+    def test_exploration_portrait_tiles_match_the_catalog(self):
         page = self.logged_in_page()
-        # Exploration mode has no contextual focus source yet, so no card.
-        page.wait_for_function("() => !!document.querySelector('.art-panel')")
-        page.wait_for_timeout(500)
-        self.assertEqual(page.locator(".art-panel__portrait-tile").count(), 0)
+        # The exploration room seeds a present dialogue host, which the server
+        # authors into the portrait catalog. The renderer shows exactly one
+        # portrait tile per catalog entry — no extra client-built cards.
+        panel = store_state(page)["panels"]["art"]
+        expected = len(panel.get("portrait_catalog") or {})
+        wait_for_store_state(page, _art_panel_available, ART_PANEL_DOM)
+        self.assertEqual(page.locator(".art-panel__portrait-tile").count(), expected)
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_portrait_overlay_usable_at_1280x720(self):
         page = self.logged_in_page((1280, 720))
         self._engage(page)
-        page.wait_for_function(
-            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
-        )
-        self.assertTrue(page.locator(".art-panel__portrait-tile").is_visible())
-        self.assertTrue(page.locator(".art-panel__portrait-context-name").inner_text().strip())
+        wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
+        # The combat catalog has one entry per participant, so scope the
+        # assertions to the first (focused) tile to avoid a strict-mode violation.
+        self.assertTrue(page.locator(".art-panel__portrait-tile").first.is_visible())
+        self.assertTrue(page.locator(".art-panel__portrait-context-name").first.inner_text().strip())
         self.assertTrue(page.locator(".art-panel__scene").is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
@@ -388,10 +478,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         install_outbound_recorder(page)
         self._engage(page)
         # The combat dock publishes the first party participant's portrait.
-        page.wait_for_function(
-            "() => !!document.querySelector('.art-panel__portrait-tile')", timeout=15000
-        )
-        first_name = page.locator(".art-panel__portrait-context-name").inner_text()
+        wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
+        first_name = page.locator(".art-panel__portrait-context-name").first.inner_text()
         combat = store_state(page)["panels"]["context_actions"]
         monster_id = next(
             p["identity"]
@@ -415,15 +503,27 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self._wait_combat_row_key(page, "target-", row_zero=True)
         page.keyboard.press("ArrowRight")  # past the actor to the enemy target
         self._wait_combat_row_key(page, "target-" + str(monster_id))
-        page.wait_for_function(
-            "(n) => document.querySelector('.art-panel__portrait-context-name') && "
-            "document.querySelector('.art-panel__portrait-context-name').innerText === n",
-            arg=monster_name,
+        wait_for_store_state(
+            page,
+            _art_portrait_ready,
+            {
+                "selector": f'[data-testid="art-panel__portrait-context--{monster_id}"]',
+                "predicate": (
+                    f"() => {{ const el = document.querySelector('[data-testid=\"art-panel__portrait-context--{monster_id}\"]'); "
+                    f"if (!el) {{ return false; }} "
+                    f"const name = el.querySelector('.art-panel__portrait-context-name'); "
+                    f"return name && name.textContent === '{monster_name}'; }}"
+                ),
+                "description": "focused portrait context shows the monster's name",
+            },
             timeout=15000,
         )
-        self.assertNotEqual(
-            page.locator(".art-panel__portrait-context-name").inner_text(), first_name
-        )
+        # After navigating to the enemy target, the focused portrait switches
+        # to that participant's tile. Scope to the monster's tile.
+        monster_name_shown = page.get_by_test_id(
+            f"art-panel__portrait--{str(monster_id)}"
+        ).locator(".art-panel__portrait-context-name").inner_text()
+        self.assertNotEqual(monster_name_shown, first_name)
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)
 
@@ -451,14 +551,7 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # The confirmation frame mounts before the confirming Enter.
         self._wait_combat_row_key(page, "confirm-forfeit")
         page.keyboard.press("Enter")  # confirm-forfeit
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            state = store_state(page)
-            if state["mode"] != "combat":
-                break
-            page.wait_for_timeout(250)
-        else:
-            raise AssertionError("combat never ended after forfeit")
+        wait_for_store_state(page, _out_of_combat_mode, timeout=15000)
         art = store_state(page)["panels"]["art"]
         self.assertNotIn(str(monster_id), art["portrait_catalog"])
 

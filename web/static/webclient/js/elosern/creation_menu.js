@@ -51,6 +51,14 @@
         payload: null,
         openSubmenu: "custom",
       },
+      {
+        key: "concept",
+        label: "角色概念",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openSubmenu: "concept",
+      },
     ];
   }
 

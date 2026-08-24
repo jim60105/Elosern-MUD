@@ -12,9 +12,9 @@
 //
 // Shell-owned view behavior (pre-store): the `/` key toggles the drawer and
 // focuses the field (slash-as-text inside editables is untouched), Escape
-// releases a focused drawer back to the narrative pane, and the mount
-// retires the replaced text fallback (hidden, not removed) so the shell
-// cannot stack below the viewport.
+// closes the open drawer and restores action-dock focus (webclient-desktop-
+// shell), and the mount retires the replaced text fallback (hidden, not
+// removed) so the shell cannot stack below the viewport.
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandDrawer from "./CommandDrawer.vue";
@@ -43,9 +43,17 @@ const props = defineProps({
   uncertain: { type: Boolean, default: false },
   prompt: { type: String, default: "" },
   commandHistory: { type: Array, default: () => [] },
+  // The committed `context_actions.suggestions` envelope — the narrative
+  // stream-end choice-point block (webclient-action-choicepoints) renders
+  // at the feed's end through this slice.
+  suggestions: { type: Object, default: null },
+  // The store's mutation-lock flag (connection-loss or a reload-required
+  // protocol error locks all graphical mutations). Passed to the drawer so a
+  // rejected send preserves the typed speech.
+  mutationsLocked: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["submit-command"]);
+const emit = defineEmits(["submit-command", "choice-action", "drawer-closed"]);
 
 const drawerOpen = ref(false);
 const drawer = ref(null);
@@ -68,8 +76,18 @@ function openDrawer() {
 
 function closeDrawer(restoreFocus) {
   drawerOpen.value = false;
+  // A closed drawer (Escape / cancel) must release the pending freeform
+  // dialogue target so later ordinary commands travel as text, not speech.
+  emit("drawer-closed");
   if (restoreFocus) {
-    feed.value?.focus();
+    // Spec (webclient-desktop-shell): Escape closes the drawer and restores
+    // the `#action-dock` focus (the preserved focus target), not the feed.
+    const dock = document.getElementById("action-dock");
+    if (dock && typeof dock.focus === "function") {
+      dock.focus();
+    } else {
+      feed.value?.focus();
+    }
   }
 }
 
@@ -90,6 +108,12 @@ function onSubmit(text) {
   // One deliberate send through the single dispatch entry (the store routes
   // it at C1; the transport carries ordinary text, never ui_action).
   emit("submit-command", text);
+}
+
+function onChoiceAction(intent) {
+  // The narrative stream-end choice-point card/dismiss actions route through
+  // the same single dispatch entry as the dock (store is the sole writer).
+  emit("choice-action", intent);
 }
 
 // The shell-wide key claims before the wiring wave: `/` toggles the drawer,
@@ -126,6 +150,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onWindowKeydown);
 });
+
+// Expose the drawer open/close so the store-driven freeform dialogue entry
+// (a freeform affordance activation) can open and focus the command drawer.
+defineExpose({ openDrawer, closeDrawer });
 </script>
 
 <template>
@@ -146,7 +174,12 @@ onBeforeUnmount(() => {
         <slot name="panel-left" />
       </aside>
       <main class="app-shell__center">
-        <NarrativeFeed ref="feed" :lines="props.narrative" />
+        <NarrativeFeed
+          ref="feed"
+          :lines="props.narrative"
+          :suggestions="props.suggestions"
+          @choice-action="onChoiceAction"
+        />
       </main>
       <aside class="app-shell__panel app-shell__panel-right" aria-label="右側面板">
         <slot name="panel-right" />
@@ -172,6 +205,8 @@ onBeforeUnmount(() => {
       :open="drawerOpen"
       :prompt="props.prompt"
       :history="props.commandHistory"
+      :connected="props.connected"
+      :mutations-locked="props.mutationsLocked"
       @submit="onSubmit"
       @toggle="toggleDrawer"
       @focus-parent="onFocusParent"

@@ -11,6 +11,9 @@
 // - `window.Elosern.Protocol` / `window.Elosern.KeyboardRouter` are the
 //   imported UMD modules, re-exposed byte-identical (design D1: re-exposure,
 //   not re-implementation).
+// - `window.Elosern.LayoutStore` is the imported versioned layout-persistence
+//   UMD (browser-persistence-is-versioned-and-presentation-only), so the
+//   browser-acceptance layout tests can construct a storage-bound store.
 // - `window.Elosern.narrativeInput` is the store's single narrative/choice-
 //   point append path: `appendInput` echoes exactly one `.inp` line through
 //   `store.sendText`; the choice-point stream-end block is owned by the
@@ -30,6 +33,7 @@
 import Protocol from "./lib/protocol.js";
 import KeyboardRouter from "./lib/keyboard_router.js";
 import StreamEndBlock from "./lib/stream_end_block.js";
+import LayoutStore from "./lib/layout_store.js";
 
 // The claimed-when-consumed key set (webclient-desktop-shell keyboard
 // routing): arrows move within the active finite menu, Enter confirms the
@@ -101,7 +105,7 @@ export function createWindowBridge(store) {
   // submits dispatch nothing (the store's `dispatchAction` gates on
   // connected / mutationsLocked / in-flight, design D5).
   function submit(actionId, payload, display) {
-    return store.dispatchAction(actionId, payload);
+    return store.dispatchAction(actionId, payload, display);
   }
 
   function sync() {
@@ -250,6 +254,15 @@ export function createWindowBridge(store) {
     if (event.ctrlKey || event.metaKey || event.altKey) {
       return;
     }
+    // A focused native button (a choice-point card, a dock menu item)
+    // activates itself on Enter; the router must not claim that Enter
+    // (spec webclient-options-surface: card click handlers are native; the
+    // router ignores keyboard-synthesized clicks). Arrow keys still route
+    // through the router so keyboard navigation keeps working.
+    const target = event.target;
+    if (event.key === "Enter" && target && target.closest && target.closest("button, [role=button]")) {
+      return;
+    }
     const claimed = store.focusPress(event.key, !!event.repeat);
     if (claimed && CLAIMED_KEYS.includes(event.key)) {
       event.preventDefault();
@@ -269,6 +282,7 @@ export function createWindowBridge(store) {
   window.Elosern = {
     Protocol,
     KeyboardRouter,
+    LayoutStore,
     narrativeInput,
     actions,
   };

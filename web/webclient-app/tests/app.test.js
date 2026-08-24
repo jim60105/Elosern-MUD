@@ -104,7 +104,7 @@ describe("AppShell root (B1 core family)", () => {
   });
 
   it("emits exactly one submit-command per deliberate send", async () => {
-    const w = mountShell();
+    const w = mountShell({ connected: true });
     w.get('[data-testid="command-drawer-entry"]').trigger("click");
     await w.vm.$nextTick();
     const input = w.get("textarea#inputfield");

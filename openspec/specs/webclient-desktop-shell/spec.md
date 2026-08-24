@@ -112,7 +112,13 @@ focus, disabled-explanation, and submission-gating path as Enter, as specified b
 explanation but SHALL NOT submit. Held or repeated Enter and all mutation submissions while
 one is in flight or awaiting its declared presentation revision SHALL be suppressed, and no
 combination of key and pointer input SHALL emit more than one request per deliberate
-activation.
+activation. The exploration keyboard root SHALL be the G2 hierarchical root (Move / Look /
+Interact / Character / Quests / Inventory / Wait), whose items carry the bare keys
+`move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`, rendered as a
+single-row grid. This root replaces the legacy B2 flat `context_actions` affordance list,
+whose items were keyed `action-<action_id>` / `action-<surface>` (e.g. `action-guild`). The
+B2 key-derivation contract is preserved only as the isolated Node gate
+(`web/webclient-app/tests/action/dock_items.test.js`), not as the live exploration focus frame.
 
 #### Scenario: Keyboard navigation and backtracking are deterministic
 - **WHEN** the player navigates a test menu with arrows, enters a submenu, and presses Escape
@@ -145,6 +151,16 @@ activation.
   focused and the player presses `/`
 - **THEN** the drawer stays open (if it was open) and a literal `/` is typed into that
   control, so text such as `whisper /ooc` remains fully typeable
+
+#### Scenario: Exploration root exposes the G2 hierarchical keys
+- **WHEN** the client is in exploration mode and the player presses ArrowDown on the single-row
+  exploration root (Move / Look / Interact / Character / Quests / Inventory / Wait)
+- **THEN** the keyboard router's focus key is the bare G2 key (`move` at the first cell, a no-op
+  on the single-row grid), not the legacy B2 `action-guild`-style `action-<id>`/`action-<surface>`
+  key, and Enter on the focused root item pushes its client-local submenu (the dock depth becomes
+  2) without dispatching a `ui_action`; focus then lands on the pushed submenu's first item (for an
+  empty exploration panel, the disabled `move-empty` row), so `store.view.focus.key` is `move-empty`
+  and `store.view.focus.enabled` is false
 
 
 ### Requirement: The command drawer preserves ordinary text control

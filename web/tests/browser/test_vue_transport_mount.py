@@ -25,9 +25,21 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     BROWSER_ACCOUNT,
     BROWSER_PASSWORD,
+    evaluate_tolerating_navigation,
     install_outbound_recorder,
     sent_action_count,
+    wait_for_store_state,
 )
+
+
+def _store_active(state: dict) -> bool:
+    """The transport is connected and the session is in the active phase."""
+    return bool(state.get("connected")) and state.get("phase") == "active"
+
+
+def _store_active_unlocked(state: dict) -> bool:
+    """The transport is connected, active, and not mutation-locked."""
+    return _store_active(state) and state.get("mutationsLocked") is not True
 
 VUE_QUERY = "?__vue=1"
 
@@ -70,6 +82,8 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         page.goto(f"{self.webclient_url}{VUE_QUERY}")
         # If the bundle is blocked, the Vue app never mounts (main.js does not
         # run), so the console is NOT retired and drives the live transport.
+        # The degraded (bundle-blocked) page has no C4 bridge or store, so
+        # readiness is purely DOM-based: wait for the D10 console's data-status.
         if block_bundle:
             page.wait_for_function(
                 f"() => {{ const c = document.querySelector('{CONSOLE}');"
@@ -77,19 +91,11 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
                 timeout=30000,
             )
         else:
-            page.wait_for_function(
-                "() => { const b = window.__elosernBridge; const s = b && b.store;"
-                " return s && s.view.connected && s.view.phase === 'active'; }",
-                timeout=45000,
-            )
+            wait_for_store_state(page, _store_active, timeout=45000)
         return page, responses
 
     def _store_active(self, page) -> None:
-        page.wait_for_function(
-            "() => { const b = window.__elosernBridge; const s = b && b.store;"
-            " return s && s.view.connected && s.view.phase === 'active' && !s.view.mutationsLocked; }",
-            timeout=45000,
-        )
+        wait_for_store_state(page, _store_active_unlocked, timeout=45000)
 
     def test_live_transport_round_trips_and_store_adopts_snapshot(self):
         """C3 task 2.2: transport round-trip + store snapshot adoption."""
@@ -100,14 +106,29 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         page.evaluate("() => window.__elosernBridge.store.sendText('look')")
         # The command crosses the wire and the server's room text returns
         # through the D10 coordinator into the store's narrative.
-        page.wait_for_function(
-            "() => (window.__elosernSent || []).some("
-            "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
+
+        def _text_command_crossed(state: dict) -> bool:
+            return bool(evaluate_tolerating_navigation(
+                page,
+                "() => (window.__elosernSent || []).some("
+                "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
+            ))
+
+        def _narrative_has_out_line(state: dict) -> bool:
+            return bool(evaluate_tolerating_navigation(
+                page,
+                "() => { const s = window.__elosernBridge.store;"
+                " return s && s.narrative.some(l => l.kind === 'out' && l.text.length > 0); }",
+            ))
+
+        wait_for_store_state(
+            page,
+            _text_command_crossed,
             timeout=20000,
         )
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge.store;"
-            " return s.narrative.some(l => l.kind === 'out' && l.text.length > 0); }",
+        wait_for_store_state(
+            page,
+            _narrative_has_out_line,
             timeout=45000,
         )
 
@@ -121,8 +142,9 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         # Ensure the presentation revision is settled before dispatching so the
         # ui_action names the server's newest revision (stale guard).
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge.store; return s.view.revision; }",
+        wait_for_store_state(
+            page,
+            lambda state: bool(state.get("revision")),
             timeout=45000,
         )
         # The first submit dispatches a ui_action; the gate keeps exactly one
@@ -154,9 +176,9 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
              return true; }""",
             submits["req"],
         )
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge.store;"
-            " return !(s.view.dispatch.inFlight); }",
+        wait_for_store_state(
+            page,
+            lambda state: not (state.get("dispatch") or {}).get("inFlight"),
             timeout=20000,
         )
 
@@ -174,6 +196,10 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         field = page.locator(CONSOLE_INPUT)
         field.fill("look")
         field.press("Enter")
+
+        # The degraded (bundle-blocked) page has no Vue store/bridge, so the
+        # deterministic readiness is carried by the ``__elosernSent`` outbound
+        # recorder and the console-log DOM check (pure JS/DOM waits).
         page.wait_for_function(
             "() => (window.__elosernSent || []).some("
             "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
@@ -198,10 +224,9 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             "() => Evennia.msg('ui_sync', [{ protocol_version: 2 }], {})"
         )
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge.store;"
-            " const pe = s.view.protocolError;"
-            " return pe && pe.code === 'unsupported_version'; }",
+        wait_for_store_state(
+            page,
+            lambda state: (state.get("protocolError") or {}).get("code") == "unsupported_version",
             timeout=45000,
         )
         self.assertTrue(
@@ -211,9 +236,17 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         # The text path is independent of the OOB panel channel: a text command
         # still round-trips while the graphical dock is locked.
         page.evaluate("() => window.__elosernBridge.store.sendText('look')")
-        page.wait_for_function(
-            "() => { const s = window.__elosernBridge.store;"
-            " return s.narrative.some(l => l.kind === 'out' && l.text.length > 0); }",
+
+        def _narrative_has_out_line(state: dict) -> bool:
+            return bool(evaluate_tolerating_navigation(
+                page,
+                "() => { const s = window.__elosernBridge.store;"
+                " return s && s.narrative.some(l => l.kind === 'out' && l.text.length > 0); }",
+            ))
+
+        wait_for_store_state(
+            page,
+            _narrative_has_out_line,
             timeout=45000,
         )
 
@@ -229,7 +262,7 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
         # The Vue bridge is active under the production default; the legacy
         # GoldenLayout shell globals and jQuery are retired from the load path.
         self.assertIsNotNone(
-            page.evaluate("window.__elosernBridge ?? null"),
+            page.evaluate("window.__elosernBridge ? true : null"),
             "the Vue bridge owns the production default (C4 flip)",
         )
         self.assertIsNone(
@@ -251,7 +284,7 @@ class VueTransportMountBrowserTest(BrowserAcceptanceTest):
 
         # Reduced motion: emulate prefers-reduced-motion: reduce; the tokens.css
         # @media block must resolve the motion tokens to 1ms.
-        page.emulate_media(reduce_motion="reduce")
+        page.emulate_media(reduced_motion="reduce")
         motion_base = page.evaluate(
             "() => getComputedStyle(document.documentElement)."
             "getPropertyValue('--motion-base').trim()"

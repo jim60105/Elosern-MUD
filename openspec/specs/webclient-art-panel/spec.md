@@ -180,7 +180,13 @@ for a done record, invalid output identity, OOB disconnect during completion, an
 failure SHALL each degrade presentation only and log bounded diagnostics. A browser image load
 failure SHALL show fallback text/placeholder and SHALL NOT repeatedly fetch without a new URL or
 user reload. OOB errors SHALL contain no traceback, local path, unescaped player content, or rejected
-prompt content.
+prompt content. A missing/pending/failed scene SHALL degrade to a single
+`.art-panel__scene-placeholder` node inside the `.art-panel__scene-frame`. Because a snapshot
+refresh or a Vue re-render can open a transient double-node window under a loaded runner, the browser
+acceptance test SHALL gate its placeholder-count assertion on the shared bounded wait helper (the
+committed art-panel store state plus a DOM-readiness descriptor, within one bounded deadline) rather
+than a single raw `.count()` sample, so the assertion observes the single visible placeholder node
+deterministically.
 
 #### Scenario: Offline art never blocks play
 - **WHEN** the worker command is fixed to fail and the scheduler is disabled
@@ -195,6 +201,13 @@ prompt content.
 - **WHEN** an art or presentation error occurs
 - **THEN** no OOB message or panel payload contains a traceback, filesystem path, rejected prompt, or
   underage subject data
+
+#### Scenario: The missing-scene placeholder gate observes a single node
+- **WHEN** the art panel is available with a missing scene and a snapshot refresh or Vue re-render
+  opens a transient double-node window under a loaded runner
+- **THEN** the acceptance test's bounded gate keeps polling the scoped selector
+  `.art-panel__scene-frame .art-panel__scene-placeholder` until it observes exactly one visible
+  placeholder node, so the assertion is deterministic rather than a single raw `.count()` sample
 
 ### Requirement: Art panel browser acceptance is keyboard-first, accessible, and desktop-bounded
 The scene full view SHALL open by click on the image or Enter on the focused image and SHALL close on

@@ -68,7 +68,13 @@ function openActiveSession(store) {
   store.beginTransport(1);
   store.setConnected(true);
   const result = store.receive(1, "ui_snapshot", [
-    fx.snapshot({ panels: { status: fx.statusPanel(), context_actions: fx.explorationActions() } }),
+    fx.snapshot({
+      panels: {
+        status: fx.statusPanel(),
+        exploration: fx.explorationPanel(),
+        local_map: fx.localMapPanel(),
+      },
+    }),
   ]);
   expect(result.accepted).toBe(true);
   expect(store.view.phase).toBe("active");
@@ -85,13 +91,15 @@ describe("window.Elosern bridge", () => {
     const { facade } = installBridge();
     expect(window.Elosern).toBe(facade);
     expect(Object.keys(facade).sort()).toEqual(
-      ["KeyboardRouter", "Protocol", "actions", "narrativeInput"].sort(),
+      ["KeyboardRouter", "Protocol", "LayoutStore", "actions", "narrativeInput"].sort(),
     );
 
     // Protocol = the imported UMD module, byte-identical re-exposure (D1).
     expect(facade.Protocol.PROTOCOL_VERSION).toBe(1);
     expect(typeof facade.Protocol.createStore).toBe("function");
     expect(typeof facade.Protocol.validateSnapshot).toBe("function");
+    // LayoutStore = the imported versioned layout-persistence UMD (D1).
+    expect(typeof facade.LayoutStore.createStore).toBe("function");
 
     // KeyboardRouter = the imported UMD module (claim-contract constants).
     expect(typeof facade.KeyboardRouter.createRouter).toBe("function");
@@ -183,8 +191,8 @@ describe("window.Elosern bridge", () => {
     const { store, facade } = installBridge();
     openActiveSession(store);
 
-    // Initial focus is the first affordance.
-    expect(store.view.focus.key).toBe("action-explore.wait");
+    // Initial focus is the first G2 root item.
+    expect(store.view.focus.key).toBe("move");
 
     // An unclaimed key (a plain letter) is not swallowed by the bridge.
     const unclaimed = press("l");
@@ -196,35 +204,32 @@ describe("window.Elosern bridge", () => {
     const slash = press("/");
     expect(slash.defaultPrevented).toBe(true);
 
-    // A consumed key (ArrowDown) moves focus to the disabled second item.
-    const down = press("ArrowDown");
-    expect(down.defaultPrevented).toBe(true);
-    expect(store.view.focus.key).toBe("action-explore.wait-2");
-    expect(store.view.focus.enabled).toBe(false);
-
-    // Enter on the disabled item explains without submitting: the router
-    // emits `disabled` and does NOT claim the key, so the bridge leaves the
-    // event as-is (the explanation is surfaced, no `ui_action` is dispatched).
-    const enter1 = press("Enter");
-    expect(enter1.defaultPrevented).toBe(false);
-    expect(store.view.focus.key).toBe("action-explore.wait-2");
-
-    // Down again reaches the enabled navigation item; Enter follows the
-    // router's submit path through the single store dispatch entry.
-    press("ArrowDown");
-    expect(store.view.focus.key).toBe("action-guild");
+    // A consumed key (ArrowRight) moves focus along the G2 single-row root
+    // grid (7-column, one row); ArrowDown is a no-op in a single-row grid.
+    const right = press("ArrowRight");
+    expect(right.defaultPrevented).toBe(true);
+    expect(store.view.focus.key).toBe("look");
     expect(store.view.focus.enabled).toBe(true);
-    const enter2 = press("Enter");
-    expect(enter2.defaultPrevented).toBe(true);
-    // The navigation item pushes a local surface, not a ui_action (the store
-    // records the target surface on lastSurface).
-    expect(store.view.lastSurface).toBe("guild");
-    expect(store.view.focus.key).toBe("action-guild");
 
-    // Escape is claimed and pops exactly one menu level (a single-frame menu
-    // emits `escape-root`; nothing is swallowed).
+    // A second ArrowRight reaches "interact"; a plain letter is left unclaimed.
+    press("ArrowRight");
+    expect(store.view.focus.key).toBe("interact");
+    const unclaimed2 = press("m");
+    expect(unclaimed2.defaultPrevented).toBe(false);
+
+    // The "character" root entry re-homes the character sub-dock (a local
+    // surface intent, no `ui_action` dispatched).
+    press("ArrowRight");
+    expect(store.view.focus.key).toBe("character");
+    const enterChar = press("Enter");
+    expect(enterChar.defaultPrevented).toBe(true);
+    expect(store.view.activeSubDock).toBe("character");
+
+    // Escape leaves the character sub-dock and re-homes the exploration root.
     const escape = press("Escape");
     expect(escape.defaultPrevented).toBe(true);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.view.focus.key).toBe("move");
   });
 
   it("lets editable controls keep their keys", () => {

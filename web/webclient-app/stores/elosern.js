@@ -30,6 +30,10 @@ import LocalMap from "../lib/local_map.js";
 import ChoicePointLogic from "../lib/choicepoint.js";
 import OptionCards from "../lib/option_cards.js";
 import CombatMenu from "../lib/combat_menu.js";
+import CreationMenu from "../lib/creation_menu.js";
+import ExplorationMenu from "../lib/exploration_menu.js";
+import ServiceMenu from "../lib/service_menu.js";
+import CommandEcho from "../lib/command_echo.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
@@ -134,7 +138,21 @@ export const useElosernStore = defineStore("elosern", () => {
   let requestCounter = 0;
   let sender = null; // { sendAction(envelope), sendText(text) } — C3 attaches evennia.js
   let lastSurface = null;
-  let lastTarget = null;
+   let lastTarget = null;
+   // Monotonic signal the shell watches to open the command drawer (a freeform
+   // dialogue entry point requests a drawer open + field focus).
+   let drawerRequest = 0;
+   // Monotonic signal the shell watches to CLOSE the command drawer and
+   // restore action-dock focus (a successful dock-borrowed send, e.g. freeform
+   // dialogue). Ordinary text sends keep the drawer open, so only the
+   // borrowed (freeform) path bumps this.
+   let drawerCloseRequest = 0;
+   // The npc identity for an active freeform dialogue; set when a freeform
+   // affordance is activated, cleared when its speech is submitted.
+   let freeformTarget = null;
+   // Monotonic signal the shell watches to open the exploration rest-duration
+   // form (the wait/rest entry point).
+   let restFormRequest = 0;
   // The confirm source ("pointer" or "keyboard") of the latest router confirm;
   // a pointer confirm is a client-local target selection (no OOB dispatch),
   // while a keyboard confirm submits the OOB cast (spec: selection is
@@ -159,12 +177,66 @@ export const useElosernStore = defineStore("elosern", () => {
   // skill/scale/target selection state), or null outside combat mode.
   let combat = null;
 
+  // The legacy character-creation dock port (the preserved CreationMenu model
+  // driving the keyboard router in creation mode, design D4): the current dock
+  // stage (root/presets/custom/confirm), the built menus, and the save awaiting
+  // its confirmation. Null outside creation mode.
+  let creation = null; // {view, menus, confirmItems, pendingActivate, pendingActivateKey, pendingSaveRequestId, panelSig}
+
   // D4: the imported keyboard router owns the focus state; its events are
   // routed through the same store actions (a broken renderer must never
   // break the reducer).
   const router = KeyboardRouter.createRouter({
     onEvent: onRouterEvent,
   });
+
+  // G1 re-home: the test helpers (and a user Escape at the root frame) call
+  // `router.reset()` with no menu, which empties the frame stack and leaves
+  // Arrow/Enter as no-ops. Wrap the preserved router's `reset` so a menu-less
+  // reset immediately re-homes the root frame from the committed
+  // `context_actions` panel — a dead keyboard frame can never survive a reset.
+  {
+    const originalReset = router.reset;
+    router.reset = function (menu) {
+      const depth = originalReset.call(router, menu);
+      if (!menu && router.depth() === 0) {
+        rehomeFrame(reducer.getState());
+      }
+      return depth;
+    };
+  }
+
+  // The active sub-dock surface (null | "character" | "services"): which
+  // re-homed sub-dock currently owns the action-dock surface. The
+  // suggestions section must never render while one is active (spec
+  // webclient-options-surface). Set by the sub-dock panels on mount/unmount.
+  // Declared before the initial view so `buildView` can read it.
+   const activeSubDock = ref(null);
+   function setActiveSubDock(value) {
+     activeSubDock.value = value;
+     // Publish so `store.view.activeSubDock` (read by the action dock)
+     // reflects the change; the view is a rebuilt snapshot, not live-bound.
+     publishView();
+   }
+
+   // The bounded services quantity form (webclient-service-menus: buy/sell
+   // quantity validation with exact-copper outcomes). A local UI exception: the
+   // player focuses a stock/sell row (a bounded trade row carrying a
+   // `quantity` {min,max}), opens the form, types a digit quantity, and only
+   // a valid quantity dispatches the `shop.buy` / `shop.sell` action. The
+   // unsubmitted quantity is discarded on a `services` panel replacement
+   // (reconnect), so the form is purely client-local.
+   const quantityForm = ref(null);
+    function openQuantityForm(item) {
+      const qty = item.quantity;
+      quantityForm.value = {
+        itemKey: item.itemKey,
+        actionId: item.actionId,
+        state: ServiceMenu.quantityState(qty.min, qty.max),
+        open: true,
+      };
+      publishView();
+    }
 
   const view = ref(initialView());
   const narrative = ref([]);
@@ -214,11 +286,39 @@ export const useElosernStore = defineStore("elosern", () => {
       publishView();
       return;
     }
+    if (name === "menu-closed" || name === "escape-root") {
+      if (creation) {
+        handleCreationMenuEvent(name);
+      }
+      // Escape from an exploration re-homed sub-dock (character / services):
+      // clear the sub-dock and re-home the exploration root frame.
+      else if (reducer.getState().mode === "exploration" && activeSubDock.value) {
+        setActiveSubDock(null);
+        rehomeFrame(reducer.getState());
+      }
+      return;
+    }
     if (name !== "submit" && name !== "space") {
       return;
     }
     const item = payload && payload.item;
     if (!item) {
+      return;
+    }
+    // The creation dock owns the router in creation mode (the legacy
+    // creation_dock.js keyboard journey): submenu opens, preset-card saves,
+    // confirmation dispatches, and cancel pops one level.
+    if (creation && handleCreationItem(item)) {
+      return;
+    }
+    // The exploration dock owns the router in exploration mode (the G2
+    // hierarchical root + submenus): root entries open Move/Look/Interact/Wait
+    // submenus and the Character/Quests/Inventory sub-docks, submenu rows
+    // dispatch their `explore.*` actions.
+    if (handleServiceItem(item)) {
+      return;
+    }
+    if (handleExplorationItem(item)) {
       return;
     }
     // Combat keyboard hierarchy (the preserved CombatMenu model, mirroring the
@@ -415,6 +515,61 @@ export const useElosernStore = defineStore("elosern", () => {
   // dock's preserved `action-`/`target-` item keys as the single key
   // contract.
   let lastMenuSig = null;
+  // The committed `services` panel signature: a replacement (a reconnect
+  // resync) discards the unsubmitted client-local quantity form.
+  let lastServicesSig = null;
+  // G1 re-home: repopulate the root frame from the committed `context_actions`
+  // panel after a menu-less `router.reset()` emptied the stack. Called by the
+  // wrapped `router.reset` (synchronous) and by `rebuildFocusMenu`'s re-home
+  // path (the commit-driven safety net).
+  function rehomeFrame(rs) {
+    const panel = (rs.panels && rs.panels.context_actions) || null;
+    if (panel && panel.kind === "combat") {
+      const previous = combat
+        ? { skillKey: combat.focusSkillKey, page: combat.page || 0, skillByKey: combat.skillByKey }
+        : {};
+      combat = CombatMenu.rebuildForPanel(combat, panel, previous);
+      lastMenuSig = stableStringify(combat.menus.root.items);
+      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      return;
+    }
+    // Exploration mode: the stable hierarchical root (Move/Look/Interact/
+    // Character/Quests/Inventory/Wait) is composed only from the validated
+    // `exploration` panel (G2: the dock renders the hierarchical root, never a
+    // flat affordance list). Submenus (move exits, look targets, interact
+    // targets, wait dayparts) are separate router frames.
+    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
+    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
+    const root = model.menus.root;
+    lastMenuSig = stableStringify(root.items);
+    // Leaving combat mode: the exploration root frame owns the keyboard
+    // router now.
+    combat = null;
+    if (root.items.length === 0) {
+      if (router.depth() > 0) {
+        // A committed panel without focusable items clears the frame stack
+        // (the wrapped reset re-homes synchronously; the depth guard keeps
+        // the re-home from recursing).
+        router.reset();
+      }
+      return;
+    }
+    dockRawByKey = {};
+    const items = root.items.map((raw) => {
+      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
+      item.key = raw.key;
+      item.openSubmenu = raw.openSubmenu || null;
+      item.openCharacter = !!raw.openCharacter;
+      item.openServiceSubmenu = raw.openServiceSubmenu || null;
+      item.actionId = raw.actionId || null;
+      item.payload = raw.payload || null;
+      dockRawByKey[raw.key] = raw;
+      return item;
+    });
+    router.replaceMenu({ items, grid: true, gridCols: root.gridCols });
+  }
+
   function rebuildFocusMenu(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
     const kind = (panel && panel.kind) || null;
@@ -434,44 +589,446 @@ export const useElosernStore = defineStore("elosern", () => {
         : {};
       const probe = CombatMenu.buildMenus(panel, { skillKey: previous.skillKey, page: previous.page || 0 });
       const sig = stableStringify(probe.menus.root.items);
-      if (sig === lastMenuSig) {
-        // Panel unchanged: keep the existing combat tree so the in-progress
-        // client-local selection state (chosen skill, 威力 scale, AREA
-        // shorthand/candidates) set by the keyboard flow survives publishView
-        // cycles. Only a genuine panel replacement rebuilds (rebuildForPanel
-        // deterministically preserves a still-valid scale, and prunes vanished
-        // selections).
+      const rehomeNeeded = router.depth() === 0;
+      if (sig === lastMenuSig && !rehomeNeeded) {
+        // Panel unchanged and the router frame is alive: keep the existing
+        // combat tree so the in-progress client-local selection state
+        // (chosen skill, 威力 scale, AREA shorthand/candidates) set by the
+        // keyboard flow survives publishView cycles. Only a genuine panel
+        // replacement — or a router reset (depth 0, the test helper's
+        // `router.reset()` re-home) — rebuilds.
         return;
       }
       lastMenuSig = sig;
-      combat = CombatMenu.rebuildForPanel(combat, panel, previous);
-      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      rehomeFrame(rs);
       return;
     }
-    // The committed `context_actions` panel (affordances/participants AND the
-    // sibling `suggestions` envelope) is the menu frame's content: any change
-    // to the committed panel resets the router focus to the first item, while
-    // an identical re-commit preserves the focus position.
-    const sig = stableStringify(panel);
-    if (sig === lastMenuSig) {
+    // Exploration mode: the menu frame's content is the validated `exploration`
+    // panel (G2 hierarchical root). Any change to the committed exploration
+    // panel resets the router focus to the first root item, while an identical
+    // re-commit preserves the focus position.
+    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
+    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
+    const sig = stableStringify(model.menus.root.items);
+    const rehomeNeeded = router.depth() === 0 && model.menus.root.items.length > 0;
+    if (sig === lastMenuSig && !rehomeNeeded) {
       return;
     }
-    lastMenuSig = sig;
-    combat = null;
-    const rawItems = focusItemsFor(panel);
-    const keys = dockItemKeys(rawItems);
-    dockRawByKey = {};
-    const items = rawItems.map((raw, index) => {
-      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
-      item.key = keys[index];
-      dockRawByKey[keys[index]] = raw;
-      return item;
+    rehomeFrame(rs);
+  }
+
+  // ------------------------------------------------------------------ creation
+
+  // The committed `creation` panel, or null unless the session is in creation
+  // mode with an available panel (the legacy `panelAvailable` check).
+  function creationPanelOf(rs) {
+    const panel = (rs.panels && rs.panels.creation) || null;
+    if (!panel || panel.available !== true || rs.mode !== "creation") {
+      return null;
+    }
+    return panel;
+  }
+
+  // The legacy `_panelSignature`: the preset keys, the race keys, and the
+  // canonical draft. Any change rebuilds the creation menus and resumes the
+  // server-persisted stage.
+  function creationPanelSignature(panel) {
+    const custom = panel.custom || {};
+    return stableStringify({
+      presets: (panel.presets || []).map((card) => card.key),
+      races: (custom.races || []).map((race) => race.key),
+      draft: panel.draft || null,
     });
-    if (items.length === 0) {
-      router.reset();
+  }
+
+  // Open the confirmation stage for the just-saved draft (preset/custom) or
+  // the destructive reset, pushing the confirm items as the single router
+  // frame (the legacy `_openPendingConfirm` / `_openResetConfirm`). The stage
+  // the player was on is remembered so cancel restores exactly that view.
+  function openCreationConfirm(kind, presetKey, returnStage) {
+    if (!creation || creation.view === "confirm") {
       return;
     }
-    router.replaceMenu({ items, grid: false });
+    creation.pendingActivate = kind;
+    creation.pendingActivateKey = kind === "preset" ? presetKey || null : null;
+    creation.pendingSaveRequestId = null;
+    creation.returnStage = returnStage || creation.view || "root";
+    const menu =
+      kind === "reset"
+        ? CreationMenu.confirmMenu("確認清除角色草稿？此操作無法回復。", CreationMenu.RESET_ACTION, {}, null)
+        : CreationMenu.activateConfirm(kind === "preset" ? presetKey : null);
+    creation.confirmItems = menu.items;
+    creation.view = "confirm";
+    router.pushMenu({ items: creation.confirmItems, focusKey: null });
+  }
+
+  // Router submit for an exploration item (the G2 hierarchical dock): the root
+  // entries open submenus (Move/Look/Interact/Wait), the Character/Quests/
+  // Inventory entries re-home the services/character sub-docks, submenu rows
+  // dispatch their `explore.*` action, and an interact target selection pushes
+  // that target's affordance menu. Returns true when the item belonged to the
+  // exploration dock.
+  function handleExplorationItem(item) {
+    const rs = reducer.getState();
+    if (rs.mode !== "exploration") {
+      return false;
+    }
+    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
+    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
+    const menus = model.menus;
+    if (item.openSubmenu && menus[item.openSubmenu]) {
+      const submenu = menus[item.openSubmenu];
+      router.pushMenu(submenu);
+      dockRawByKey = {};
+      (submenu.items || []).forEach((raw) => {
+        if (raw && raw.key) {
+          dockRawByKey[raw.key] = raw;
+        }
+      });
+      publishView();
+      return true;
+    }
+    if (item.openCharacter) {
+      setActiveSubDock("character");
+      return true;
+    }
+    if (item.openServiceSubmenu) {
+      setActiveSubDock("services");
+      // Push the re-homed service submenu (guild: register/board/quests/exam;
+      // shop: 貨架/販賣) so the keyboard router owns the service surface.
+      const servicesPanel = (reducer.getState().panels && reducer.getState().panels.services) || {};
+      const serviceModel = ServiceMenu.buildMenus(servicesPanel);
+      const submenu = serviceModel.menus[item.openServiceSubmenu];
+      if (submenu) {
+        router.pushMenu(submenu);
+        dockRawByKey = {};
+        (submenu.items || []).forEach((raw) => {
+          if (raw && raw.key) {
+            dockRawByKey[raw.key] = raw;
+          }
+        });
+        publishView();
+      }
+      return true;
+    }
+    // A back row returns to the parent menu: pop exactly one router level and
+    // re-sync the dock to the parent frame's cells.
+    if (item.goBack) {
+      router.popMenu();
+      const menu = router.currentMenu();
+      dockRawByKey = {};
+      if (menu && Array.isArray(menu.items)) {
+        menu.items.forEach((raw) => {
+          if (raw && raw.key) {
+            dockRawByKey[raw.key] = raw;
+          }
+        });
+      }
+      publishView();
+      return true;
+    }
+    // An interact target row: record the selected identity (client-local) and
+    // push that target's server-authored affordance menu (scripted keywords,
+    // free-form dialogue, party, engage).
+    if (item.openTarget != null) {
+      const identity = item.openTarget;
+      lastTarget = String(identity);
+      const target = ExplorationMenu.targetById(model, identity);
+      const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+      if (targetMenu) {
+        router.pushMenu(targetMenu);
+        dockRawByKey = {};
+        (targetMenu.items || []).forEach((raw) => {
+          if (raw && raw.key) {
+            dockRawByKey[raw.key] = raw;
+          }
+        });
+      }
+      publishView();
+      return true;
+    }
+    // The "talk-scripted" item opens the scripted-keyword menu for the focused
+    // target (G2: finite keyword buttons, not free text). The selected target
+    // identity is client-local in `lastTarget`; look its descriptor up from the
+    // committed exploration panel to build the bounded keyword buttons.
+    if (item.openKeywords) {
+      const target = lastTarget ? ExplorationMenu.targetById(model, Number(lastTarget)) : null;
+      const scripted = target ? ExplorationMenu.scriptedAffordanceFor(target) : null;
+      const keywordMenu = target ? ExplorationMenu.keywordMenuFor(model, target, scripted) : null;
+      if (keywordMenu) {
+        router.pushMenu(keywordMenu);
+        dockRawByKey = {};
+        (keywordMenu.items || []).forEach((raw) => {
+          if (raw && raw.key) {
+            dockRawByKey[raw.key] = raw;
+          }
+        });
+      }
+      publishView();
+      return true;
+    }
+    // The rest-duration item (openRestForm): opens the bounded custom-duration
+    // form before any OOB action (webclient-exploration-menu: the form is the
+    // sole local UI exception — confirm opens the form, no dispatch yet).
+    if (item.openRestForm) {
+      restFormRequest += 1;
+      publishView();
+      return true;
+    }
+    // A free-form dialogue item: open the command drawer for the selected
+    // target; the typed speech submits as explore.talk_freeform with the
+    // target's npc_id (the guarded dialogue seam, webclient-exploration-menu).
+    if (item.freeform) {
+      freeformTarget = item.npcId;
+      lastTarget = String(item.npcId);
+      drawerRequest += 1;
+      publishView();
+      return true;
+    }
+    // A real OOB exploration action (explore.move / look / wait / engage /
+    // talk_scripted / talk_freeform): one dispatch through the single entry.
+    // The item's server-authored `commandDisplay` descriptor is passed through
+    // so the CommandEcho catalog resolves exactly one display line.
+    if (item.actionId) {
+      dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
+      return true;
+    }
+    return false;
+  }
+
+  // Router submit for a services sub-dock item (the re-homed services surface):
+  // board/quests/stock/sell/quest-N open bounded submenus, the 放棄 row opens the
+  // explicit confirmation screen, and the action rows (register / accept / turnin /
+  // exam / buy / sell) dispatch their `guild.*`/`shop.*` action. Returns true
+  // when the item belonged to the services sub-dock.
+  function handleServiceItem(item) {
+    const rs = reducer.getState();
+    if (rs.mode !== "exploration" || activeSubDock.value !== "services") {
+      return false;
+    }
+    const servicesPanel = (rs.panels && rs.panels.services) || {};
+    const model = ServiceMenu.buildMenus(servicesPanel);
+    // A bounded services submenu (board / quests / stock / sell / quest-N):
+    // push the submenu frame for the keyboard router. The per-quest detail pane
+    // (詳情 / 放棄 / 回報) is not in `buildMenus` — it is built per-quest via
+    // `questMenuFor`.
+    if (item.openSubmenu) {
+      let submenu = model.menus[item.openSubmenu];
+      if (!submenu && item.openSubmenu.startsWith("quest-")) {
+        const guild = (rs.panels.services && rs.panels.services.guild) || {};
+        const questRow = (guild.quests || [])[Number(item.openSubmenu.split("-")[1])];
+        if (questRow) {
+          submenu = ServiceMenu.questMenuFor(model, questRow);
+        }
+      }
+      if (submenu) {
+        router.pushMenu(submenu);
+        dockRawByKey = {};
+        (submenu.items || []).forEach((raw) => {
+          if (raw && raw.key) {
+            dockRawByKey[raw.key] = raw;
+          }
+        });
+        publishView();
+        return true;
+      }
+    }
+    // The quest-detail 放棄 row: push the explicit confirmation menu (the
+    // `.services-confirm` screen renders behind it; no mutation is sent yet).
+    if (item.confirmActionId) {
+      const confirmMenu = ServiceMenu.confirmMenu(
+        item.confirmLabel,
+        item.confirmActionId,
+        item.confirmPayload,
+        item.commandDisplay ? item.commandDisplay.itemLabel : null
+      );
+      router.pushMenu(confirmMenu);
+      dockRawByKey = {};
+      (confirmMenu.items || []).forEach((raw) => {
+        if (raw && raw.key) {
+          dockRawByKey[raw.key] = raw;
+        }
+      });
+      publishView();
+      return true;
+    }
+    // A bounded trade row (a stock/sell row carrying a `quantity` {min,max}):
+    // open the local quantity form; the typed quantity is validated against the
+    // bounds before the `shop.buy` / `shop.sell` dispatch.
+    if (item.quantity) {
+      openQuantityForm(item);
+      return true;
+    }
+    // A services action row (guild.register / quest_accept / quest_turnin /
+    // exam_start / shop.buy / shop.sell): dispatch the exact OOB action.
+    if (item.actionId) {
+      dispatchAction(item.actionId, item.payload || {});
+      return true;
+    }
+    return false;
+  }
+
+  // Router submit for a creation item (the legacy `handleItem`): submenu opens,
+  // preset-card saves, confirm dispatches, and cancel pops one level. Returns
+  // true when the item belonged to the creation dock.
+  function handleCreationItem(item) {
+    if (!creation || !creation.menus) {
+      return false;
+    }
+    if (item.openSubmenu === "presets") {
+      creation.view = "presets";
+      router.pushMenu(creation.menus.menus.presets);
+      return true;
+    }
+    if (item.openSubmenu === "custom") {
+      creation.view = "custom";
+      // A marker menu gives Escape a level to pop without discarding values.
+      router.pushMenu({ items: [], focusKey: null });
+      return true;
+    }
+    if (item.openSubmenu === "concept") {
+      creation.view = "concept";
+      // The concept entry point opens the free-text concept field; a marker
+      // menu gives Escape a level to pop without discarding typed values.
+      router.pushMenu({ items: [], focusKey: null });
+      return true;
+    }
+    if (item.presetKey) {
+      const requestId = dispatchAction(CreationMenu.PRESET_ACTION, {
+        preset_key: item.presetKey,
+      });
+      if (requestId !== null) {
+        creation.pendingSaveRequestId = requestId;
+        creation.pendingActivate = "preset";
+        creation.pendingActivateKey = item.presetKey;
+      }
+      return true;
+    }
+    if (
+      item.actionId === CreationMenu.ACTIVATE_ACTION ||
+      item.actionId === CreationMenu.RESET_ACTION
+    ) {
+      dispatchAction(item.actionId, item.payload || {});
+      return true;
+    }
+    if (item.key && item.key.indexOf("cancel-") === 0) {
+      router.popMenu();
+      creation.view = creation.pendingActivate === "preset" ? "presets" : "custom";
+      creation.pendingActivate = null;
+      creation.pendingActivateKey = null;
+      return true;
+    }
+    return false;
+  }
+
+  // Router escape/menu-closed for creation: pop exactly one menu level and
+  // restore the matching view without discarding the server draft (the legacy
+  // `onRouterEvent` menu handling). The custom form's marker menu and the
+  // confirm screens all restore to root / presets / custom.
+  function handleCreationMenuEvent(name) {
+    if (!creation) {
+      return;
+    }
+    if (creation.view === "presets") {
+      creation.view = "root";
+    } else if (creation.view === "confirm") {
+      // Restore exactly the stage the confirmation was opened from (a reset
+      // confirm opened on the preset page returns to presets, one opened on
+      // the custom form returns to custom, ...).
+      creation.view = creation.returnStage || "root";
+      creation.returnStage = null;
+      creation.pendingActivate = null;
+      creation.pendingActivateKey = null;
+      creation.confirmItems = [];
+    } else if (creation.view === "custom") {
+      creation.view = "root";
+    } else if (creation.view === "concept") {
+      creation.view = "root";
+    }
+    if (name === "escape-root") {
+      // escape-root does not pop a router level: re-sync the router to the
+      // menu matching the restored view.
+      const menus = creation.menus;
+      if (creation.view === "presets") {
+        router.replaceMenu(menus.menus.presets);
+      } else if (creation.view === "custom" || creation.view === "concept") {
+        router.replaceMenu({ items: [], focusKey: null });
+      } else {
+        router.replaceMenu(menus.menus.root);
+      }
+    }
+    publishView();
+  }
+
+  // Rebuild the creation dock state for the committed view (the legacy
+  // creation_dock.js subscribe/mount logic): mount on entering creation mode,
+  // rebuild menus when the panel signature changes, resume the server-
+  // persisted draft stage, and resolve the pending save's confirmation.
+  function rebuildCreationDock(prev, rs) {
+    const panel = creationPanelOf(rs);
+    if (!panel) {
+      if (creation) {
+        creation = null;
+      }
+      return;
+    }
+    if (!creation) {
+      creation = {
+        view: "root",
+        menus: null,
+        confirmItems: [],
+        pendingActivate: null,
+        pendingActivateKey: null,
+        pendingSaveRequestId: null,
+        returnStage: null,
+        panelSig: null,
+      };
+    }
+    // Resolve a pending save's confirmation BEFORE the panel-signature
+    // refresh (the legacy dock's ordering): the just-saved draft's panel
+    // arrives with or right after the save result, so the refresh must open
+    // — and never clobber — the confirmation for the just-saved draft
+    // (fix-creation-finalization-safety D1): success opens the confirmation;
+    // rejection or error stays on the current view.
+    if (creation.pendingSaveRequestId !== null) {
+      const result = rs.lastActionResult || null;
+      const prevResult = prev ? prev.lastActionResult || null : null;
+      if (result && result !== prevResult && result.requestId === creation.pendingSaveRequestId) {
+        creation.pendingSaveRequestId = null;
+        if (result.outcome === "success") {
+          const kind = creation.pendingActivate || "preset";
+          // A successful preset save opens the confirmation from the preset
+          // list; a custom/concept save from the form.
+          openCreationConfirm(
+            kind,
+            creation.pendingActivateKey,
+            kind === "preset" ? "presets" : "custom",
+          );
+          return;
+        }
+        creation.pendingActivate = null;
+        creation.pendingActivateKey = null;
+      }
+    }
+    const sig = creationPanelSignature(panel);
+    if (creation.panelSig !== sig) {
+      creation.panelSig = sig;
+      creation.menus = CreationMenu.buildMenus(panel);
+      const draft = panel.draft || null;
+      if (draft && draft.mode === "preset") {
+        openCreationConfirm("preset", draft.preset_key || null, "presets");
+      } else if (draft && (draft.mode === "custom" || draft.mode === "concept")) {
+        if (creation.view !== "confirm") {
+          creation.view = "custom";
+          router.reset({ items: [], focusKey: null });
+        }
+      } else if (creation.view !== "confirm") {
+        creation.view = "root";
+        router.reset({ items: creation.menus.menus.root.items, focusKey: null });
+      }
+    }
   }
 
   function syncRouterGates() {
@@ -515,25 +1072,49 @@ export const useElosernStore = defineStore("elosern", () => {
             : null,
         timeLabel: formatTimeLabel(rs.serverTime),
       },
-      prompt,
-      lastSurface,
-      lastTarget,
+       prompt,
+       lastSurface,
+       lastTarget,
+       drawerRequest,
+       drawerCloseRequest,
+       restFormRequest,
+       activeSubDock: activeSubDock.value,
 
       contextActions: panel,
       suggestions,
       suggestionsView: OptionCards.buildOptionsView(panel || {}),
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
       choicePoint: { state: choiceState, suggestions },
-      localMapModel: panels.local_map ? LocalMap.reducePanel(panels.local_map) : null,
+      localMapModel: panels.local_map
+        ? { ...LocalMap.reducePanel(panels.local_map), available: panels.local_map.available !== false }
+        : null,
       // The keyboard router's current combat menu frame (root/skills/scale/
       // target) so the visible dock follows keyboard navigation (Option B).
       combatMenu: router.currentMenu(),
+      // The keyboard router's menu depth (1 = the root frame, 2+ = a submenu
+      // frame is active). The action dock's detail pane renders only at
+      // depth 2+ (or in combat mode), not at the exploration root.
+      dockDepth: router.depth(),
       // The focused AREA skill's selected candidate identities (the client-
       // local selection the Space toggle mutates); drives the "✓" marker.
       combatSelected:
         combat && combat.focusSkillKey && combat.skillByKey[combat.focusSkillKey]
           ? combat.skillByKey[combat.focusSkillKey].selected
           : [],
+
+      // The character-creation dock stage (the legacy creation dock port): the
+      // keyboard-router menu the overlay mirrors. Null outside creation mode.
+      creationView: creation
+        ? {
+            stage: creation.view,
+            confirmItems: creation.confirmItems,
+            confirmLabel:
+              creation.confirmItems.length > 0 ? creation.confirmItems[0].label : null,
+            confirmAction:
+              creation.confirmItems.length > 0 ? creation.confirmItems[0].actionId : null,
+            pendingPresetKey: creation.pendingActivateKey,
+          }
+        : null,
 
       focus: currentItem
         ? {
@@ -548,6 +1129,10 @@ export const useElosernStore = defineStore("elosern", () => {
         inFlight: inFlight ? { requestId: inFlight.requestId, presentationRevision: inFlight.presentationRevision } : null,
         uncertain,
         submittedRequestId: lastSubmittedRequestId,
+        // Whether a mutation was submitted and its result not yet confirmed
+        // (the client-local uncertain-marking precondition, exposed for the
+        // browser harness).
+        mutationSubmitted,
       },
     };
   }
@@ -555,10 +1140,19 @@ export const useElosernStore = defineStore("elosern", () => {
   function publishView() {
     const prev = view.value;
     const rs = reducer.getState();
+    // The unsubmitted quantity form is client-local (spec webclient-service-menus):
+    // a replaced `services` panel (e.g. a reconnect resync) discards it.
+    const servicesPanel = (rs.panels && rs.panels.services) || null;
+    const servicesSig = stableStringify(servicesPanel);
+    if (quantityForm.value && servicesSig !== lastServicesSig) {
+      quantityForm.value = null;
+    }
+    lastServicesSig = servicesSig;
     handleTransportLifecycle(prev, rs);
     handleActionResult(prev, rs);
     releaseIfReady(rs);
     rebuildFocusMenu(prev, rs);
+    rebuildCreationDock(prev, rs);
     syncRouterGates();
     view.value = buildView(prev, rs);
   }
@@ -649,23 +1243,60 @@ export const useElosernStore = defineStore("elosern", () => {
     return line;
   }
 
+  // Clear the pending freeform dialogue target (a cancelled drawer must not
+  // capture later ordinary commands as dialogue speech).
+  function clearFreeformTarget() {
+    if (freeformTarget != null) {
+      freeformTarget = null;
+      publishView();
+    }
+  }
+
   function sendText(text) {
     if (!view.value.connected) {
       return false;
     }
     const value = String(text == null ? "" : text);
-    appendText("in", value);
     commandHistory.value.push(value);
     while (commandHistory.value.length > MAX_COMMAND_HISTORY) {
       commandHistory.value.shift();
     }
+    // An active freeform dialogue target routes the typed speech through the
+    // guarded dialogue seam (explore.talk_freeform) with the target's npc_id,
+    // never as ordinary narrative text. The NPC's server-authored display name
+    // is read from the committed exploration panel and passed as the
+    // `commandDisplay` descriptor so the CommandEcho catalog resolves the line.
+    if (freeformTarget != null) {
+      const rs = reducer.getState();
+      const panel = (rs.panels && rs.panels.exploration) || {};
+      let npcLabel = "";
+      for (const target of panel.interact || []) {
+        if (String(target.identity) === String(freeformTarget)) {
+          npcLabel = target.display_name || "";
+          break;
+        }
+      }
+      const sent = dispatchAction("explore.talk_freeform", { npc_id: freeformTarget, speech: value }, { npcLabel });
+      // A successful dock-borrowed send closes the drawer and restores
+      // action-dock focus (webclient-desktop-shell: the borrowed-drawer send
+      // returns focus to the dock); a rejected send keeps the drawer open.
+      if (sent !== null) {
+        drawerCloseRequest += 1;
+      }
+      freeformTarget = null;
+      publishView();
+      return true;
+    }
+    // Ordinary text command: the typed command line is part of the narrative
+    // stream (a player input line), never a mutation echo.
+    appendText("in", value);
     if (sender && typeof sender.sendText === "function") {
       sender.sendText(value);
     }
     return true;
   }
 
-  function dispatchAction(actionId, payload) {
+  function dispatchAction(actionId, payload, display) {
     const v = view.value;
     if (!v.connected || v.mutationsLocked || v.phase !== "active" || inFlight) {
       return null;
@@ -682,10 +1313,25 @@ export const useElosernStore = defineStore("elosern", () => {
     inFlight = { requestId, presentationRevision: null };
     mutationSubmitted = true;
     lastSubmittedRequestId = requestId;
+    // A custom save tracks its request so the result resolution opens the
+    // confirmation for the just-saved draft (fix-creation-finalization-safety
+    // D1); the preset path records the same markers on router submit.
+    if (actionId === CreationMenu.CUSTOM_ACTION && creation) {
+      creation.pendingSaveRequestId = requestId;
+      creation.pendingActivate = "custom";
+      creation.pendingActivateKey = null;
+    }
     router.setMutationInFlight(true);
     try {
       if (sender && typeof sender.sendAction === "function") {
         sender.sendAction(envelope);
+        // The display command line (webclient-input-narrative): resolve exactly
+        // one bounded echo line from the pure catalog and append it as a literal
+        // text line; a rejected result leaves the line in place.
+        const line = CommandEcho.commandLine(actionId, envelope.payload, display);
+        if (line) {
+          appendText("in", line);
+        }
       }
     } catch (err) {
       // A synchronous transport failure (a closing WebSocket, a failed
@@ -704,7 +1350,52 @@ export const useElosernStore = defineStore("elosern", () => {
     return requestId;
   }
 
+  // Open the destructive-reset confirmation (the creation dock's reset button
+  // never dispatches `creation.reset` directly): the confirm stage renders the
+  // `creation-confirm` screen and the router carries the confirm menu.
+  function requestCreationReset() {
+    if (!creation || !creation.menus) {
+      return false;
+    }
+    openCreationConfirm("reset", null, creation.view);
+    publishView();
+    return true;
+  }
+
   function focusPress(key, repeat) {
+    // The bounded services quantity form (a local UI exception) captures its
+    // own keys before the keyboard router: digits and Backspace edit the
+    // bounded quantity, Enter submits a valid quantity (or keeps the form open
+    // when the value is out of bounds), and Escape closes it.
+    const q = quantityForm.value;
+    if (q && q.open) {
+      if (key >= "0" && key <= "9") {
+        ServiceMenu.quantityInput(q.state, key);
+        publishView();
+        return true;
+      }
+      if (key === "Backspace") {
+        ServiceMenu.quantityBackspace(q.state);
+        publishView();
+        return true;
+      }
+      if (key === "Escape") {
+        q.open = false;
+        publishView();
+        return true;
+      }
+      if (key === "Enter") {
+        const value = ServiceMenu.validateQuantity(q.state);
+        if (value !== null) {
+          dispatchAction(q.actionId, { item_key: q.itemKey, quantity: value });
+          q.open = false;
+        }
+        publishView();
+        return true;
+      }
+      // Any other key while the form is open is consumed locally.
+      return true;
+    }
     // A keyboard confirm (Enter) records the keyboard source so the target-row
     // submit path can distinguish it from a pointer confirm.
     if (key === "Enter") {
@@ -771,7 +1462,9 @@ export const useElosernStore = defineStore("elosern", () => {
     setPrompt,
     appendText,
     sendText,
+    clearFreeformTarget,
     dispatchAction,
+    requestCreationReset,
     focusPress,
     focusConfirm,
     focusEscape,
@@ -788,5 +1481,18 @@ export const useElosernStore = defineStore("elosern", () => {
     // render" signal) so the AppClient auto-resync watcher can request one
     // ui_sync per failure episode.
     lastPanelRejection,
-  };
+    // The protocol store's subscription seam (the C4 harness re-map): browser
+    // tests observe `beginTransport` notifications (the transport-reset state
+    // with a null epoch and empty panels) to gate on deterministic state.
+    subscribe: (listener) => reducer.subscribe(listener),
+     // Set which re-homed sub-dock currently owns the action-dock surface
+     // (null clears). The sub-dock panels set/clear this on mount/unmount;
+     // the suggestions section hides while one is active.
+     setActiveSubDock,
+     // The bounded services quantity form (a local UI exception): exposed so
+     // the services panels can sync their per-row quantity control to the
+     // activated item (the `services-quantity` testid follows the form's
+     // item_key). Discarded (nulled) on a `services` panel replacement.
+     quantityForm,
+   };
 });

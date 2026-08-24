@@ -3715,7 +3715,11 @@
           panels[name] = JSON.parse(canonicalJson(meta.panels[name]));
         });
         phase = "active";
-        mutationsLocked = false;
+        // A reload-required (incompatible) protocol error keeps the graphical
+        // controls locked even while ordinary presentations keep committing;
+        // only a fresh transport generation (beginTransport) clears the error
+        // and releases the lock.
+        mutationsLocked = !!(protocolError && protocolError.reloadRequired);
         notify();
       }
 

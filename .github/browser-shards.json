@@ -42,7 +42,8 @@
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_stale_forfeit_rejects",
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round",
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry"
+        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry",
+        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation.CustomCreationJourneys",
@@ -147,15 +148,13 @@
       "name": "art",
       "files_a": [
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_keyboard_full_view_opens_and_closes",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_1280x720",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_keyboard_full_view_usable_at_1280x720",
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_without_prior_image_uses_placeholder"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_no_focus_means_no_portrait_card_in_exploration",
+        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_exploration_portrait_tiles_match_the_catalog",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_1280x720",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_defeated_participant_leaves_the_catalog_in_the_same_update",
@@ -225,6 +224,20 @@
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_incompatible_oob_locks_graphical_keeps_text",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_production_base_html_default_is_vue",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_reduced_motion_and_status_not_color_only"
+      ]
+    },
+    {
+      "index": 16,
+      "name": "wait-helper",
+      "files_a": [
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_store_gate_returns_when_predicate_true",
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_none_read_tolerated_and_predicate_not_invoked_on_none",
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_both_gates_must_hold"
+      ],
+      "files_b": [
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_timeout_diagnostic_carries_required_fields",
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_none_read_flagged_in_timeout",
+        "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_non_navigation_dom_error_surfaced_in_diagnostic"
       ]
     }
   ]

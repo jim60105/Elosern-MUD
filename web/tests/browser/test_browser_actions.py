@@ -20,6 +20,7 @@ from .browser_helpers import (
     snapshot_envelope,
     store_state,
     valid_status_panel,
+    wait_for_store_state,
 )
 
 
@@ -35,13 +36,18 @@ class ActionLockingTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
 
         page.evaluate("Evennia.connection.close()")
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "return !s.connected; }"
-        )
-        page.wait_for_function(
-            "() => document.getElementById('elosern-offline-overlay')"
-            ".getAttribute('data-visible') === 'true'"
+        wait_for_store_state(
+            page,
+            lambda s: not s.get("connected"),
+            dom_readiness={
+                "selector": "#elosern-offline-overlay",
+                "predicate": (
+                    "() => { const o = document.getElementById('elosern-offline-overlay'); "
+                    "return !!o && o.getAttribute('data-visible') === 'true'; }"
+                ),
+                "description": "offline overlay visible while disconnected",
+            },
+            timeout=30000,
         )
 
         request_id = page.evaluate(
@@ -57,7 +63,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
         # A reload-required protocol error locks all graphical mutations.
         accepted = page.evaluate(
-            """(args) => Elosern.Protocol.receive(
+            """(args) => window.__elosernBridge.store.receive(
               args.generation, 'ui_protocol_error', [{
                 protocol_version: 1,
                 code: 'unsupported_version',
@@ -86,8 +92,18 @@ class ActionLockingTest(BrowserAcceptanceTest):
 
         # The command drawer sends ordinary text, never a ui_action.
         page.keyboard.press("/")
-        page.wait_for_function(
-            "() => document.activeElement === document.getElementById('inputfield')"
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": "#inputfield",
+                "predicate": (
+                    "() => document.activeElement === "
+                    "document.getElementById('inputfield')"
+                ),
+                "description": "#inputfield focused",
+            },
+            timeout=30000,
         )
         page.keyboard.type("look")
         page.keyboard.press("Enter")
@@ -112,13 +128,13 @@ class ActionLockingTest(BrowserAcceptanceTest):
             "&amp; plain text"
         )
         page.evaluate(
-            "(text) => window.__elosernConsole.model.appendIn(text)", payload
+            "(text) => window.__elosernBridge.store.appendText('in', text)", payload
         )
-        narrative = page.locator(".elosern-narrative").inner_text()
+        narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertIn("plain text", narrative)
         self.assertIn("<b onclick=", narrative)
         self.assertEqual(
-            page.evaluate("document.querySelector('.elosern-narrative')"
+            page.evaluate("document.querySelector('[data-testid=\"narrative-feed\"]')"
                           ".querySelectorAll('b, script').length"),
             0,
             "server-authored text must be inserted as text, never HTML",
@@ -143,7 +159,7 @@ class ActionLockingTest(BrowserAcceptanceTest):
             {"status": {"schema_version": 1, "available": True}},
         )
         result = page.evaluate(
-            "(args) => Elosern.Protocol.receive("
+            "(args) => window.__elosernBridge.store.receive("
             "args.generation, 'ui_snapshot', [args.envelope], {})",
             {"generation": generation, "envelope": malformed},
         )
@@ -174,14 +190,22 @@ class ActionLockingTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(syncs), 1)
 
         # Ordinary text still works when structured rendering fails.
-        narrative_before = page.locator(".elosern-narrative").inner_text()
+        narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        page.wait_for_function(
-            "(before) => document.querySelector('.elosern-narrative')"
-            ".innerText.length > before",
-            arg=narrative_before.__len__(),
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const n = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return !!n && n.innerText.length > %d; }" % len(narrative_before)
+                ),
+                "description": "narrative feed grew past the pre-look length",
+            },
+            timeout=30000,
         )
-        narrative_after = page.locator(".elosern-narrative").inner_text()
+        narrative_after = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertGreater(len(narrative_after), len(narrative_before))
 
 

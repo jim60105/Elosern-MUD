@@ -27,12 +27,19 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     BROWSER_ACCOUNT,
     BROWSER_PASSWORD,
+    evaluate_tolerating_navigation,
     fresh_epoch,
     install_outbound_recorder,
     snapshot_envelope,
     valid_status_panel,
     wait_for_shell_active,
+    wait_for_store_state,
 )
+
+
+def _store_active(state: dict) -> bool:
+    """The transport is connected and the session is in the active phase."""
+    return bool(state.get("connected")) and state.get("phase") == "active"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
@@ -112,9 +119,17 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         # The B1 shell retires the replaced text fallback on mount (hidden,
         # never removed), so readiness is asserted on transport state, not
         # visibility.
-        page.wait_for_function(
-            f"() => {{ const c = document.querySelector('{CONSOLE}');"
-            " return c && c.getAttribute('data-status') === 'ready'; }",
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": CONSOLE,
+                "predicate": (
+                    f"() => {{ const c = document.querySelector('{CONSOLE}');"
+                    " return c && c.getAttribute('data-status') === 'ready'; }"
+                ),
+                "description": "the D10 text console reports data-status=ready",
+            },
             timeout=30000,
         )
         return page, responses
@@ -127,7 +142,18 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
     def test_vue_bundle_loads_from_origin_offline(self):
         """The built page makes no remote runtime request (delta scenario)."""
         page, responses = self.open_vue_page(capture_responses=True)
-        page.wait_for_selector(VUE_ROOT, timeout=30000)
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": VUE_ROOT,
+                "predicate": (
+                    f"() => !!document.querySelector('{VUE_ROOT}')"
+                ),
+                "description": "the Vue SPA root element is connected",
+            },
+            timeout=30000,
+        )
 
         ok_urls = [response.url for response in responses if response.status == 200]
         origin_prefix = f"http://127.0.0.1:{self.server.runtime.http_port}"
@@ -174,7 +200,18 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         releases back to the narrative pane.
         """
         page, _responses = self.open_vue_page()
-        page.wait_for_selector(VUE_ROOT, timeout=30000)
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": VUE_ROOT,
+                "predicate": (
+                    f"() => !!document.querySelector('{VUE_ROOT}')"
+                ),
+                "description": "the Vue SPA root element is connected",
+            },
+            timeout=30000,
+        )
 
         # The ready mount renders no blocking pre-connection layer.
         self.assertEqual(
@@ -218,32 +255,76 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
 
             # Usability with a real pointer at this viewport: the entry
             # button opens the drawer, the field accepts text, Enter sends
-            # (the field clears), and Escape releases back to the narrative
-            # pane — a covered or clipped surface would fail here.
+            # (the field clears), and Escape releases the drawer back to the
+            # action dock (webclient-desktop-shell: closing the open drawer
+            # restores action-dock focus) — a covered or clipped surface
+            # would fail here.
             page.locator('[data-testid="command-drawer-entry"]').click()
-            page.wait_for_selector(
-                '[data-testid="command-drawer"][data-open="true"]', timeout=10000
+            wait_for_store_state(
+                page,
+                _store_active,
+                dom_readiness={
+                    "selector": '[data-testid="command-drawer"][data-open="true"]',
+                    "predicate": (
+                        "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
+                        " return d && d.getAttribute('data-open') === 'true'; }"
+                    ),
+                    "description": "the command drawer is open",
+                },
+                timeout=10000,
             )
-            field = page.locator("#inputfield")
-            field.wait_for(state="visible", timeout=10000)
+            field = page.locator('[data-testid="command-drawer-input"]')
+            wait_for_store_state(
+                page,
+                _store_active,
+                dom_readiness={
+                    "selector": '[data-testid="command-drawer-input"]',
+                    "predicate": (
+                        "() => { const i = document.querySelector('[data-testid=\"command-drawer-input\"]'); "
+                        "if (!i) { return false; } "
+                        "const r = i.getBoundingClientRect(); "
+                        "return r.width > 0 && r.height > 0 && i.offsetParent !== null; }"
+                    ),
+                    "description": "the drawer command input field is visible",
+                },
+                timeout=10000,
+            )
             field.fill("look")
             field.press("Enter")
-            page.wait_for_function(
-                "() => document.getElementById('inputfield') &&"
-                " document.getElementById('inputfield').value === ''",
+            wait_for_store_state(
+                page,
+                _store_active,
+                dom_readiness={
+                    "selector": '[data-testid="command-drawer-input"]',
+                    "predicate": (
+                        "() => { const i = document.querySelector('[data-testid=\"command-drawer-input\"]'); "
+                        "return i && i.value === ''; }"
+                    ),
+                    "description": "the drawer command input cleared after send",
+                },
                 timeout=10000,
             )
             field.press("Escape")
-            page.wait_for_selector(
-                '[data-testid="command-drawer"][data-open="false"]', timeout=10000
+            wait_for_store_state(
+                page,
+                _store_active,
+                dom_readiness={
+                    "selector": '[data-testid="command-drawer"][data-open="false"]',
+                    "predicate": (
+                        "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
+                        " return d && d.getAttribute('data-open') === 'false'; }"
+                    ),
+                    "description": "the command drawer is closed",
+                },
+                timeout=10000,
             )
-            self.assertEqual(
+            self.assertTrue(
                 page.evaluate(
-                    "document.activeElement && "
-                    "document.activeElement.getAttribute('data-testid')"
+                    "() => { const a = document.activeElement; "
+                    "const dock = document.getElementById('action-dock'); "
+                    "return !!dock && !!a && (a === dock || dock.contains(a)); }"
                 ),
-                "narrative-feed",
-                "Escape must return focus to the narrative pane, not body",
+                "Escape must return focus to the action dock, not body",
             )
 
         self.assertIsNone(
@@ -264,9 +345,17 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         with the C3 store wiring.
         """
         page, _responses = self.open_vue_page()
-        page.wait_for_function(
-            f"() => {{ const c = document.querySelector('{CONSOLE}');"
-            " return c && c.getAttribute('data-status') === 'ready'; }",
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": CONSOLE,
+                "predicate": (
+                    f"() => {{ const c = document.querySelector('{CONSOLE}');"
+                    " return c && c.getAttribute('data-status') === 'ready'; }"
+                ),
+                "description": "the D10 text console reports data-status=ready",
+            },
             timeout=30000,
         )
         self.assertFalse(
@@ -284,27 +373,62 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             " el.style.display = ''; } } }"
         )
         field = page.locator(CONSOLE_INPUT)
-        field.wait_for(state="visible", timeout=10000)
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": CONSOLE_INPUT,
+                "predicate": (
+                    f"() => {{ const i = document.querySelector('{CONSOLE_INPUT}');"
+                    " if (!i) { return false; }"
+                    " const r = i.getBoundingClientRect();"
+                    " return r.width > 0 && r.height > 0 && i.offsetParent !== null; }"
+                ),
+                "description": "the D10 console input field is visible",
+            },
+            timeout=10000,
+        )
         field.fill("look")
         field.press("Enter")
 
-        page.wait_for_function(
-            "() => (window.__elosernSent || []).some("
-            "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
+        def _text_command_crossed(state: dict) -> bool:
+            return bool(evaluate_tolerating_navigation(
+                page,
+                "() => (window.__elosernSent || []).some("
+                "(m) => m[0] === 'text' && m[1] && m[1][0] === 'look')",
+            ))
+
+        wait_for_store_state(
+            page,
+            _text_command_crossed,
             timeout=15000,
         )
         # The command echo rendered and the server's deterministic room text
         # came back through the same jQuery-free transport.
-        page.wait_for_function(
-            f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
-            " return log && log.textContent.includes('look');"
-            " }",
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": CONSOLE_LOG,
+                "predicate": (
+                    f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
+                    " return log && log.textContent.includes('look'); }"
+                ),
+                "description": "the console log shows the command echo",
+            },
             timeout=15000,
         )
-        page.wait_for_function(
-            f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
-            " return log && log.textContent.includes('測試起點');"
-            " }",
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": CONSOLE_LOG,
+                "predicate": (
+                    f"() => {{ const log = document.querySelector('{CONSOLE_LOG}');"
+                    " return log && log.textContent.includes('測試起點'); }"
+                ),
+                "description": "the console log shows the server room text",
+            },
             timeout=30000,
         )
         self.assertIsNone(
@@ -322,7 +446,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         wait_for_shell_active(page)
         self.assertIsNone(page.evaluate("window.jQuery ?? null"))
         self.assertIsNotNone(
-            page.evaluate("window.__elosernBridge ?? null"),
+            page.evaluate("window.__elosernBridge ? true : null"),
             "the Vue bridge hook owns the production default (C4 flip)",
         )
 
@@ -364,8 +488,17 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         failed: list[str] = []
         page.on("response", lambda response: failed.append(response.url) if response.status >= 400 else None)
         page.goto(f"http://127.0.0.1:{port}/iframe.html?id={STORY_ID}&viewMode=story")
+        # The Storybook story page is a pure component render with no C4 bridge
+        # or store, so readiness is purely DOM-based: wait for the
+        # narrative-feed's visibility (the stable `data-testid` hook).
+        page.wait_for_function(
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+            "if (!f) { return false; } "
+            "const r = f.getBoundingClientRect(); "
+            "return r.width > 0 && r.height > 0 && f.offsetParent !== null; }",
+            timeout=30000,
+        )
         feed = page.locator('[data-testid="narrative-feed"]')
-        feed.wait_for(state="visible", timeout=30000)
         self.assertIn(
             STORY_SAMPLE_LINE,
             feed.inner_text(),
@@ -385,7 +518,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
     def test_window_elosern_bridge_facades_resolve_and_route(self):
         """C2: the window.Elosern public-contract bridge resolves and routes.
 
-        The A1 frozen façade surface (four façades, exact member sets) resolves
+        The A1 frozen façade surface (five façades, exact member sets) resolves
         on the Vue test-config page; narrative input routes through the store's
         single append path; the action-dispatch entry is single (one mutation in
         flight); and document key events are claimed exactly when the router
@@ -393,7 +526,18 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         (the live transport's text round-trip is proven by C3).
         """
         page, _responses = self.open_vue_page()
-        page.wait_for_selector(VUE_ROOT, timeout=30000)
+        wait_for_store_state(
+            page,
+            _store_active,
+            dom_readiness={
+                "selector": VUE_ROOT,
+                "predicate": (
+                    f"() => !!document.querySelector('{VUE_ROOT}')"
+                ),
+                "description": "the Vue SPA root element is connected",
+            },
+            timeout=30000,
+        )
 
         surface = page.evaluate(
             """() => {
@@ -410,8 +554,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             surface["facades"],
-            ["KeyboardRouter", "Protocol", "actions", "narrativeInput"],
-            "the bridge exposes exactly the four frozen façades (A1 audit §1)",
+            ["KeyboardRouter", "LayoutStore", "Protocol", "actions", "narrativeInput"],
+            "the bridge exposes exactly the five frozen façades (A1 audit §1)",
         )
         self.assertEqual(surface["protocolVersion"], 1)
         self.assertTrue(surface["hasRouter"])
@@ -432,6 +576,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 "handlePresentation",
                 "handleReconnect",
                 "handleTransportReset",
+                "requestResync",
+                "resetResyncEpisode",
                 "submit",
                 "sync",
             ],
@@ -597,8 +743,13 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(released["resultAccepted"])
         self.assertFalse(released["stillInFlight"])
 
-        # Document key events route through the bridge's key routing: the
-        # router claims ArrowDown; unclaimed letter keys fall through.
+        # Document key events route through the bridge's key routing. The
+        # keyboard router's exploration focus frame is the G2 hierarchical
+        # root (Move / Look / Interact / Character / Quests / Inventory /
+        # Wait), rendered as a single-row grid — so ArrowDown is a no-op and
+        # focus stays on the first cell (`move`). This replaces the legacy
+        # B2 flat `action-`/`target-` affordance-list key contract. Unclaimed
+        # letter keys fall through to the text path.
         keys = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
@@ -615,28 +766,33 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 };
             }"""
         )
-        self.assertEqual(keys["focusKey"], "action-guild")
+        self.assertEqual(keys["focusKey"], "move")
         self.assertTrue(keys["focusEnabled"])
         self.assertTrue(keys["downClaimed"])
         self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
 
-        # Enter on the focused navigation item pushes the local guild surface
-        # (no ui_action is dispatched for navigation items).
+        # Enter on the G2 exploration root's focused item (`move`) pushes its
+        # client-local move submenu (the dock depth becomes 2) without
+        # dispatching a ui_action. With no traversal exits in the committed
+        # exploration panel, the pushed move submenu's first row is the
+        # disabled `move-empty` item.
         enter_result = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
                 const enter = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
                 document.dispatchEvent(enter);
                 return {
-                    surface: store.view.lastSurface,
+                    dockDepth: store.view.dockDepth,
                     focusKey: store.view.focus.key,
+                    focusEnabled: store.view.focus.enabled,
                     inFlight: facade.actions.client.isInFlight(),
                     prevented: enter.defaultPrevented,
                 };
             }"""
         )
-        self.assertEqual(enter_result["surface"], "guild")
-        self.assertEqual(enter_result["focusKey"], "action-guild")
+        self.assertEqual(enter_result["dockDepth"], 2)
+        self.assertEqual(enter_result["focusKey"], "move-empty")
+        self.assertFalse(enter_result["focusEnabled"], "the pushed move submenu's first row is the disabled move-empty item")
         self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
         self.assertTrue(enter_result["prevented"])
 
