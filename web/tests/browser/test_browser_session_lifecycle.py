@@ -54,7 +54,7 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["panels"], {})
         self.assertTrue(state["mutationsLocked"])
         # The retained epoch allows a late bounded rejection to be accepted.
-        self.assertIsNotNone(state["activeEpoch"])
+        self.assertIsNotNone(state["epoch"])
         # The disconnect overlay must not appear: the connection is fine and
         # the drawer stays usable for repuppeting.
         visible = page.evaluate(
@@ -111,7 +111,7 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
     def test_repuppet_of_same_character_adopts_fresh_state(self):
         page = self.logged_in_page()
         active = self._wait_active(page)
-        epoch_before = active["activeEpoch"]
+        epoch_before = active["epoch"]
         revision_before = active["revision"]
 
         page.evaluate("Evennia.msg('text', ['ooc'], {})")
@@ -124,15 +124,15 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
             lambda s: (
                 bool(s.get("connected"))
                 and s.get("phase") == "active"
-                and s.get("activeEpoch") is not None
-                and s.get("activeEpoch") != epoch_before
+                and s.get("epoch") is not None
+                and s.get("epoch") != epoch_before
                 and s.get("mutationsLocked") is not True
             ),
             timeout=30000,
         )
         adopted = store_state(page)
         self.assertIsNotNone(adopted, "repuppet never adopted a fresh snapshot")
-        self.assertNotEqual(adopted["activeEpoch"], epoch_before)
+        self.assertNotEqual(adopted["epoch"], epoch_before)
         self.assertNotEqual(adopted["revision"], revision_before)
         panels = adopted["panels"]
         # The exploration-mode panels re-render from canonical state; local_map
