@@ -1,9 +1,7 @@
 ## Purpose
 
 Establishes the offline loading contract for the WebClient's Vue 3 single-page application: a locally built, self-contained Vite bundle served entirely from the project origin with no remote runtime UI dependencies, desktop-only bounded rendering at 1440x900 and 1280x720, and the retirement of the replaced stock and pre-Js text fallback on mount. It also carries the design system over from the 設計稿: the ink-night palette with a single seal-red accent, self-hosted display, serif, and sans typefaces, focus, selection, and motion tokens, status and health information never conveyed by color alone, and reduced-motion honor. It also preserves the client DOM contract hooks (action-dock target, item keys, `data-testid` hooks) and the stable public façades as browser-bridge shims. It also fixes the C4 flip contract: the view layer is fully reactive and store-bound, no legacy imperative view-plugin code remains in the load path, and every activation emits at most one request.
-
 ## Requirements
-
 ### Requirement: The WebClient loads a self-contained offline Vue SPA
 The project WebClient SHALL load a locally built, self-contained Vue 3 single-page application produced
 by a Vite build and served entirely from the project origin. The page SHALL make no remote request for
@@ -27,12 +25,17 @@ later changes in this migration; this change establishes the offline build and r
 - **THEN** the stock and pre-Js text fallback it replaces is hidden so it does not stack with the mounted application
 
 ### Requirement: The design system carries over from the design draft and stays offline
-The Vue application SHALL render with the approved design system derived from the 設計稿: the ink-night
-palette with a single seal-red accent, the self-hosted display, serif, and sans typefaces, and the
-focus, selection, and motion tokens. Status and health information SHALL never be conveyed by color
-alone (an icon or symbol plus a numeric value or an explicit text label is required), SHALL honor
-`prefers-reduced-motion`, and SHALL remain legible for common color-vision differences. No design asset
-or font SHALL be fetched from a remote origin at render time.
+The Vue application SHALL render with the approved design system derived from the 設計稿
+(`docs/design/elosern-redesign/`), and that draft SHALL be the binding reference for **both** the visual
+system and the application's layout and information architecture — its palette, typefaces, and tokens,
+and equally its stage composition, surface anchoring, and mode-gated visibility model. The application
+SHALL render with the ink-night palette and its single seal-red accent, the self-hosted display, serif,
+and sans typefaces, and the focus, selection, and motion tokens. Status and health information SHALL
+never be conveyed by color alone (an icon or symbol plus a numeric value or an explicit text label is
+required), SHALL honor `prefers-reduced-motion`, and SHALL remain legible for common color-vision
+differences. No design asset or font SHALL be fetched from a remote origin at render time. Where this
+capability and the draft are silent on a visual or navigational detail, the draft governs; a surface in
+the draft that has no backing OOB read model SHALL NOT be built and SHALL NOT be mocked.
 
 #### Scenario: Self-hosted fonts load offline
 - **WHEN** the application loads with remote requests blocked
@@ -45,6 +48,14 @@ or font SHALL be fetched from a remote origin at render time.
 #### Scenario: Reduced motion is honored
 - **WHEN** `prefers-reduced-motion` is set
 - **THEN** non-essential animation transitions are disabled
+
+#### Scenario: The draft is the binding layout reference
+- **WHEN** the application composes its surfaces
+- **THEN** it renders the draft's stage composition and mode-gated visibility model, not a fixed multi-column dashboard
+
+#### Scenario: An unbacked draft surface is absent rather than mocked
+- **WHEN** the draft shows a surface with no backing OOB read model
+- **THEN** the application renders no such surface and presents no placeholder standing in for its data
 
 ### Requirement: The Vue app binds the preserved strict DOM-independent logic to a reactive store
 The Vue application SHALL use a single reactive store (Pinia) as the sole writer of client view state.
@@ -135,3 +146,4 @@ preserved action-dock target, and every activation SHALL emit at most one reques
 #### Scenario: Single request per deliberate activation
 - **WHEN** a mutation control is activated rapidly or a held key repeats while a submission is in flight
 - **THEN** at most one request is emitted until the action's declared presentation revision is accepted
+

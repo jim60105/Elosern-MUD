@@ -1,61 +1,73 @@
 ## Purpose
 
 The desktop Vue SPA shell surfaces, client state reduction, keyboard focus model, command drawer, layout migration, theme, accessibility, and text fallback.
-
 ## Requirements
-
 ### Requirement: The WebClient loads a local Vue SPA desktop shell
-The project WebClient SHALL load Evennia's existing transport together with a locally built, self-contained
-Vue 3 single-page application. It SHALL make no remote request for a runtime UI dependency. The
-application SHALL provide the required header, narrative, art, status, local-map, action-dock, and
-command-drawer components and SHALL render them as self-identifying surfaces — the narrative log, status
-resources, map legend, art caption, dock menu, and prompt line — never as a tab-title component strip. The
-`local-map` surface SHALL render the `webclient-local-map` panel owned by the `map-knowledge-minimap`
-delivery unit. The `art` surface SHALL render the validated `webclient-art-panel` payload: the current
-scene and its contextual portrait overlay when the panel is available, and a truthful scene placeholder
-(never an invented image) whenever the asset is missing, pending without a prior image, failed, invalid, or
-the OOB channel is unavailable.
+The project WebClient SHALL load Evennia's existing transport together with a locally built,
+self-contained Vue 3 single-page application. It SHALL make no remote request for a runtime UI
+dependency. The application SHALL provide the required brand, narrative, scene, status, local-map,
+action-dock, and command-drawer surfaces and SHALL render them as self-identifying surfaces — the
+narrative caption, status resources, map legend, scene label, dock menu, and prompt line — never as a
+tab-title component strip. The `local-map` surface SHALL render the `webclient-local-map` panel owned
+by the `map-knowledge-minimap` delivery unit. The `scene` surface SHALL render the validated
+`webclient-art-panel` payload as the stage backdrop: the current scene when the panel is available,
+and a truthful degrade to the mode's gradient stage (never an invented image) whenever the asset is
+missing, pending without a prior image, failed, invalid, or the OOB channel is unavailable.
 
 #### Scenario: Offline page load has its UI dependencies
 - **WHEN** the WebClient is opened with all non-local network requests blocked
 - **THEN** the transport code, the Vite-built Vue application, the project modules, and the theme load from the project origin without a CDN failure
 
-#### Scenario: The minimap renders while art degrades to its placeholder
+#### Scenario: The minimap renders while the scene degrades to its gradient stage
 - **WHEN** the shell renders the local_map payload and the art panel is unavailable, missing, or failed
-- **THEN** the local-map surface renders the validated `local_map` payload, and the art surface renders the truthful scene placeholder with no invented image
+- **THEN** the local-map surface renders the validated `local_map` payload, and the stage backdrop renders the mode gradient with no invented image
 
-#### Scenario: Art renders when the validated panel is available
+#### Scenario: The scene renders when the validated panel is available
 - **WHEN** the `webclient-art-panel` payload is available in the current snapshot
-- **THEN** the art surface renders the scene with cover-style 16:9 layout and its contextual portrait overlay, with the scene label and alternative text outside the bitmap
+- **THEN** the stage backdrop renders the scene cover-cropped behind the HUD surfaces, with the scene label and alternative text rendered as text outside the bitmap
 
 #### Scenario: The shell renders self-identifying surfaces without a tab strip
 - **WHEN** the shell mounts
-- **THEN** no tab-title chrome is rendered anywhere, every required component is present, and each surface carries its own self-identifying content instead of a component-name tab title
-
+- **THEN** no tab-title chrome is rendered anywhere, every required surface is present, and each surface carries its own self-identifying content instead of a component-name tab title
 
 ### Requirement: Required desktop surfaces remain visible and usable
-The narrative log SHALL occupy the primary reading area, with supporting header, status, placeholders, and action dock visible at 1440x900 and 1280x720. Required components and the action dock SHALL NOT be permanently closable. The foundation SHALL target desktop only and SHALL NOT claim mobile acceptance. The header SHALL show the game title, the current location, the world date/time, and the connection state, with the connected state marked by an ok-green dot paired with a label — never a raw mode label in place of location. The action dock SHALL render as the approved command surface: a seal-red frame, a guidance line naming the shortcuts (direction keys to choose, Enter to confirm, Escape to return, `/` to open the command input), and its items as grid buttons, with the focused cell marked by a seal-red fill plus a leading glyph, unfocused cells bordered, and disabled cells dimmed but focusable for their explanation. Submenus SHALL render as an item grid beside a detail pane that names the focused item, its availability, and the next key action.
+The narrative SHALL occupy the visual centre of the stage as a bounded caption whose complete log is
+reachable in one action, with the brand, the top-meta pill, the HUD island stack, and the action dock
+visible at 1440x900 and 1280x720. The action dock, the narrative caption, and the command line SHALL
+NOT be permanently closable; every other surface MAY be opened on demand and closed. The foundation
+SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as
+its brand and SHALL show the current location, the world date/time, and the connection state in a
+top-meta surface, with the connected state marked by an ok-green dot paired with a label — never a raw
+mode label in place of location. The action dock SHALL render as the approved command surface: a
+seal-red frame, a guidance line naming the shortcuts (direction keys to choose, Enter to confirm,
+Escape to return, `/` to open the command input), and its items as grid buttons, with the focused cell
+marked by a seal-red fill plus a leading glyph, unfocused cells bordered, and disabled cells dimmed but
+focusable for their explanation. Submenus SHALL render as an item grid beside a detail pane that names
+the focused item, its availability, and the next key action.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
-- **THEN** every required component and the command-drawer control is visible without overlapping the narrative input path
+- **THEN** the narrative caption, the brand, the top-meta surface, the HUD island stack, the action dock, and the command-drawer control are visible without overlapping the narrative input path
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
-- **THEN** every required component remains reachable and the player can read narrative, inspect status, and open the command drawer
+- **THEN** every required surface remains reachable and the player can read narrative, open the complete log, inspect status, and open the command drawer
+
+#### Scenario: The complete narrative stays reachable from the bounded caption
+- **WHEN** the narrative holds more lines than the bounded caption can display
+- **THEN** the player reaches the complete retained log in one action from the caption card
 
 #### Scenario: Mounting the shell retires the degraded text fallback
 - **WHEN** the Vue SPA shell mounts into its container
 - **THEN** the degraded stock text fallback (`#messagewindow`) is hidden so it cannot stack with the mounted shell in normal document flow and push required surfaces below the visible viewport
 
-#### Scenario: The header identifies location, time, and connection without a mode label
+#### Scenario: The shell identifies brand, location, time, and connection without a mode label
 - **WHEN** the shell is connected in exploration mode
-- **THEN** the header shows the game title, the current location label from the synced status panel, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
+- **THEN** the brand shows the game name, the top-meta surface shows the current location label from the synced status panel, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
 
 #### Scenario: The action dock renders as a framed grid with a guidance line
 - **WHEN** the action dock is mounted in any mode
 - **THEN** it is framed in seal red, carries a guidance line naming the shortcut keys, renders its current menu items as grid cells with a shape-marked focused cell and dimmed disabled cells, and its submenus show a detail pane beside the item grid
-
 
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. Because the portal converts server output to HTML before the `text` message is sent, the narrative log SHALL render that stream through the `webclient-narrative-markup` allowlist pipeline rather than inserting it as a single text node; it SHALL NOT display markup source to the player, and it SHALL NOT interpret anything outside that pipeline's allowlist. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom; the indicator SHALL be a labeled control that states its count and its jump action — a button reading "↓ N 則新訊息（點擊返回最新）" or equivalent — SHALL be announced through a polite live region, SHALL be hidden entirely while the count is zero, and SHALL, when activated, scroll the log to the latest output and clear the count, exactly as scrolling to the bottom does. Narrative output SHALL remain usable if every structured renderer is unavailable, and SHALL remain usable if a message cannot be fully tokenized — such a message degrades to readable literal text rather than suppressing the log.
@@ -75,7 +87,6 @@ The shell SHALL route Evennia's existing narrative and command output to a scrol
 #### Scenario: Converted server output renders as text, not as markup source
 - **WHEN** the server sends ordinary room, command, or narrator output that the portal converted to HTML
 - **THEN** the narrative shows the styled, line-broken prose and no element, attribute, or entity source characters are visible
-
 
 ### Requirement: Client state reduction is strict and atomic
 The client state store SHALL validate protocol, transport generation, epoch, revision, mode, panel allowlist, layout version, and panel schema before publishing state to renderers. `connection_open` SHALL start a new local generation in `awaiting_initial_snapshot`, retire the prior epoch in bounded memory, clear prior panel state, and lock mutations. Only that generation's first valid full snapshot with a non-retired epoch SHALL establish active state. Once active, a different epoch on the same generation, an older receiver generation, a non-newer active-epoch revision, or any malformed message SHALL be discarded. Included panels SHALL replace completely, and subscribers SHALL observe no partially applied message.
@@ -162,7 +173,6 @@ B2 key-derivation contract is preserved only as the isolated Node gate
   empty exploration panel, the disabled `move-empty` row), so `store.view.focus.key` is `move-empty`
   and `store.view.focus.enabled` is false
 
-
 ### Requirement: The command drawer preserves ordinary text control
 
 The drawer SHALL default to closed: its input row is hidden until the player opens it, and the only
@@ -247,8 +257,6 @@ controls are disabled.
 - **THEN** the command travels through the ordinary text path, no `explore.talk_freeform` action is
   submitted, and the typed text is not delivered as speech to the previously selected NPC
 
-
-
 ### Requirement: Browser persistence is versioned and presentation-only
 Local browser storage SHALL contain only a bounded wrapper with project layout version, safe dimensions/tab state, and harmless display preferences. It SHALL contain no transport generation, active or retired epoch, revision, panel payload, actor identifier, request result, command text, credential, or canonical game state. Known project layout versions SHALL migrate explicitly; malformed, oversized, missing, stock, or unknown versions SHALL reset to the version-1 default while preserving required components.
 
@@ -263,7 +271,6 @@ Local browser storage SHALL contain only a bounded wrapper with project layout v
 #### Scenario: Stock layout state is not imported
 - **WHEN** a browser profile contains Evennia's pre-project GoldenLayout storage keys
 - **THEN** version 1 does not treat those values as canonical project layout state
-
 
 ### Requirement: Theme and controls remain accessible
 The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for narrative and headings with a legible UI face for controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.
@@ -287,7 +294,6 @@ The shell SHALL use the approved desktop palette — near-black charcoal surface
 #### Scenario: The narrative exception is bounded to one pipeline
 - **WHEN** the shell's panel renderers are inspected
 - **THEN** only the narrative log renders converted markup, every other renderer inserts server values as text, and no renderer uses an HTML-parsing API
-
 
 ### Requirement: Connection loss locks stale controls
 On WebSocket loss after a successful connection, the shell SHALL preserve the last rendered state under a non-dismissible offline overlay and SHALL prevent all graphical mutation submission. Reconnection SHALL request a full snapshot and remove the overlay only after a valid new-epoch snapshot is adopted.
@@ -346,3 +352,4 @@ never suppress the log.
 - **WHEN** the player re-reads the log and its input lines sit alongside server lines
 - **THEN** no line is ever sent to the server, nothing is replayed, and the log content has no effect on
   game state
+
