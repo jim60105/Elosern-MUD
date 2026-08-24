@@ -112,7 +112,6 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         active = self._wait_active(page)
         epoch_before = active["epoch"]
-        revision_before = active["revision"]
 
         page.evaluate("Evennia.msg('text', ['ooc'], {})")
         self._wait_detached(page)
@@ -132,8 +131,13 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         )
         adopted = store_state(page)
         self.assertIsNotNone(adopted, "repuppet never adopted a fresh snapshot")
+        # The new epoch is the primary contract; the presentation revision
+        # counter resets on the puppet change, so it restarts from 0 and can
+        # coincidentally equal the pre-OOC revision. Assert a fresh snapshot
+        # was emitted in the new epoch (revision > 0) rather than a fragile
+        # cross-epoch numeric comparison.
         self.assertNotEqual(adopted["epoch"], epoch_before)
-        self.assertNotEqual(adopted["revision"], revision_before)
+        self.assertGreater(adopted["revision"], 0)
         panels = adopted["panels"]
         # The exploration-mode panels re-render from canonical state; local_map
         # availability depends on the character's map knowledge, so only the
