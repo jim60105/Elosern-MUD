@@ -421,6 +421,7 @@ function onChoiceAction(intent) {
         <ShopPanel
           v-if="panelAvailable('services')"
           :services="panel('services')"
+          :quantity-form="store.quantityForm"
           @buy="onShopBuy"
           @sell="onShopSell"
         />

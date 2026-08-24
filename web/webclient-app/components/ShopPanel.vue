@@ -12,6 +12,10 @@ import { computed, reactive, ref, watch } from "vue";
 const props = defineProps({
   // The committed `services` v1 panel payload (or the unavailable form).
   services: { type: Object, required: true },
+  // The store's bounded quantity form (a local UI exception). When the
+  // keyboard flow opens the form, the panel highlights the activated row
+  // (the `services-quantity` control follows the form's item_key).
+  quantityForm: { type: Object, default: null },
 });
 
 const emit = defineEmits(["buy", "sell"]);
@@ -79,7 +83,12 @@ const selectedKey = ref(null);
 watch(
   () => props.services,
   () => {
-    selectedKey.value = null;
+    // A replaced `services` panel (a reconnect resync) rebuilds the per-item
+    // quantity entries from canonical persistence. The panel-local selection
+    // (`selectedKey`) is owned by the quantity-form watch below: the store
+    // nulls the form on a panel replacement, and that watch's else-branch
+    // clears `selectedKey`. Rebuilding `quantities` here re-defaults every
+    // item's entry to its action's own lower bound.
     for (const key of Object.keys(quantities)) {
       delete quantities[key];
     }
@@ -92,6 +101,20 @@ watch(
       if (!(row.item_key in quantities)) {
         quantities[row.item_key] = row.sell?.quantity?.min ?? 1;
       }
+    }
+  }
+);
+
+// The keyboard flow opens the store's quantity form; mirror its open state
+// into the panel selection so the `services-quantity` control tracks the
+// activated item. A closed or null form clears the selection.
+watch(
+  () => props.quantityForm,
+  (form) => {
+    if (form && form.open && form.itemKey) {
+      selectedKey.value = form.itemKey;
+    } else {
+      selectedKey.value = null;
     }
   }
 );

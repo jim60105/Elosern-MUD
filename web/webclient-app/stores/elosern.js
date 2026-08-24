@@ -227,16 +227,16 @@ export const useElosernStore = defineStore("elosern", () => {
    // unsubmitted quantity is discarded on a `services` panel replacement
    // (reconnect), so the form is purely client-local.
    const quantityForm = ref(null);
-   function openQuantityForm(item) {
-     const qty = item.quantity;
-     quantityForm.value = {
-       itemKey: item.itemKey,
-       actionId: item.actionId,
-       state: ServiceMenu.quantityState(qty.min, qty.max),
-       open: true,
-     };
-     publishView();
-   }
+    function openQuantityForm(item) {
+      const qty = item.quantity;
+      quantityForm.value = {
+        itemKey: item.itemKey,
+        actionId: item.actionId,
+        state: ServiceMenu.quantityState(qty.min, qty.max),
+        open: true,
+      };
+      publishView();
+    }
 
   const view = ref(initialView());
   const narrative = ref([]);
@@ -1485,9 +1485,14 @@ export const useElosernStore = defineStore("elosern", () => {
     // tests observe `beginTransport` notifications (the transport-reset state
     // with a null epoch and empty panels) to gate on deterministic state.
     subscribe: (listener) => reducer.subscribe(listener),
-    // Set which re-homed sub-dock currently owns the action-dock surface
-    // (null clears). The sub-dock panels set/clear this on mount/unmount;
-    // the suggestions section hides while one is active.
-    setActiveSubDock,
-  };
+     // Set which re-homed sub-dock currently owns the action-dock surface
+     // (null clears). The sub-dock panels set/clear this on mount/unmount;
+     // the suggestions section hides while one is active.
+     setActiveSubDock,
+     // The bounded services quantity form (a local UI exception): exposed so
+     // the services panels can sync their per-row quantity control to the
+     // activated item (the `services-quantity` testid follows the form's
+     // item_key). Discarded (nulled) on a `services` panel replacement.
+     quantityForm,
+   };
 });
