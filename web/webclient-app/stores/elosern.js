@@ -88,16 +88,20 @@ function formatTimeLabel(serverTime) {
 }
 
 // The committed transport phase maps to the ConnectOverlay status slice the
-// B1 component accepts (connecting/waiting/offline/ready).
-function connectionStatusFor(connected, phase) {
+// B1 component accepts (connecting/waiting/offline/ready). `loggedIn` is the
+// client-local session state delivered by the evennia.js `logged_in` OOB
+// event: a connected socket that has not logged in yet waits for login
+// (an anonymous session never receives a snapshot, so the phase alone cannot
+// distinguish "snapshot in flight" from "not logged in").
+function connectionStatusFor(connected, loggedIn, phase) {
   if (!connected) {
     return "offline";
   }
+  if (!loggedIn || phase === "detached") {
+    return "waiting";
+  }
   if (phase === "active") {
     return "ready";
-  }
-  if (phase === "detached") {
-    return "waiting";
   }
   return "connecting";
 }
@@ -169,6 +173,12 @@ export const useElosernStore = defineStore("elosern", () => {
   // result for a different request ID does not confirm the current one).
   let lastSubmittedRequestId = null;
   let prompt = "";
+  // Client-local session state (mirrors the D10 console model): the evennia.js
+  // `logged_in` OOB event marks the account attached; a disconnect resets it.
+  // The transport status slice needs it because the server never sends a
+  // `ui_snapshot` to an anonymous session, so "connected with no snapshot"
+  // means "waiting for login" until the account actually logs in.
+  let loggedIn = false;
   // The raw committed item behind each focus key (the router's submit event
   // carries only the projected {label, enabled, description, key}; intents,
   // surfaces, and identities are read back from the raw item, never invented).
@@ -1062,8 +1072,9 @@ export const useElosernStore = defineStore("elosern", () => {
       lastActionResult: rs.lastActionResult,
       retiredEpochCount: rs.retiredEpochCount,
       connected: rs.connected,
+      loggedIn,
 
-      connectionStatus: connectionStatusFor(rs.connected, rs.phase),
+      connectionStatus: connectionStatusFor(rs.connected, loggedIn, rs.phase),
       statusSlice: {
         connected: rs.connected,
         locationLabel:
@@ -1197,6 +1208,12 @@ export const useElosernStore = defineStore("elosern", () => {
   }
 
   function setConnected(connected) {
+    // A disconnect ends the authenticated session (mirrors the D10 console
+    // model): the next socket starts waiting for login again. Reset before
+    // the reducer commit so the synchronous publish sees the cleared flag.
+    if (!connected) {
+      loggedIn = false;
+    }
     const res = reducer.setConnected(connected);
     // A transport disconnect (connection_close) while an OOB mutation was
     // submitted and the client's in-flight gate is still held (the result has
@@ -1219,6 +1236,11 @@ export const useElosernStore = defineStore("elosern", () => {
 
   function setSender(next) {
     sender = next || null;
+  }
+
+  function setLoggedIn(value) {
+    loggedIn = !!value;
+    publishView();
   }
 
   function setPrompt(text) {
@@ -1458,6 +1480,7 @@ export const useElosernStore = defineStore("elosern", () => {
     receive,
     beginTransport,
     setConnected,
+    setLoggedIn,
     setSender,
     setPrompt,
     appendText,

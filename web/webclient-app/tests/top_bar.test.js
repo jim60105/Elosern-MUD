@@ -14,7 +14,7 @@ describe("TopBar (B1 core family)", () => {
     wrapper = mount(TopBar, {
       props: { connected: true, locationLabel: "測試起點", timeLabel: "春季 3 日 · 12:00" },
     });
-    expect(wrapper.get("[data-testid='topbar-title']").text()).toBe("霧落");
+    expect(wrapper.get("[data-testid='topbar-title']").text()).toBe("伊洛瑟恩");
     expect(wrapper.get("[data-testid='topbar-location']").text()).toBe("測試起點");
     expect(wrapper.get("[data-testid='topbar-clock']").text()).toBe("春季 3 日 · 12:00");
     const conn = wrapper.get("[data-testid='connection-state']");

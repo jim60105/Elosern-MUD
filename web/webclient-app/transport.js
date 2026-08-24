@@ -50,7 +50,14 @@ export function wireTransport(store, consoleHandle) {
   }
 
   function resyncIfAwaiting() {
-    if (store.view.phase === "awaiting_initial_snapshot") {
+    // A reconnect can emit `logged_in` before the portal re-attaches the
+    // account's puppet: the bounded deferral re-synchronizes while still
+    // awaiting the initial snapshot OR while detached (a `no_puppet` error
+    // right after login) — one shot per `logged_in`, never a loop.
+    if (
+      store.view.phase === "awaiting_initial_snapshot" ||
+      store.view.phase === "detached"
+    ) {
       sendSync();
     }
   }
@@ -90,6 +97,9 @@ export function wireTransport(store, consoleHandle) {
     }
     store.beginTransport(generation);
     store.setConnected(true);
+    // A fresh socket has not authenticated yet: the overlay waits for login
+    // until the server's `logged_in` event marks the account attached.
+    store.setLoggedIn(false);
     registerOobListeners();
     sendSync();
     consolePaint();
@@ -108,6 +118,10 @@ export function wireTransport(store, consoleHandle) {
       consoleHandle.model.reset();
       consoleHandle.model.setLoggedIn(true);
     }
+    // The account is attached on this session: the transport status slice can
+    // leave the "waiting for login" state (the snapshot may still be in
+    // flight, shown as "connecting").
+    store.setLoggedIn(true);
     // A reconnecting websocket can emit `logged_in` right before the portal
     // re-attaches the account's puppet; a bounded deferral re-synchronizes
     // only while still awaiting the initial snapshot (no sync loop).

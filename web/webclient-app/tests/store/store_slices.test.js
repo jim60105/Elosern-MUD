@@ -25,6 +25,9 @@ const PANEL_ALLOWLIST = [
 function openActiveSession(store) {
   store.beginTransport(1);
   store.setConnected(true);
+  // The real protocol delivers `logged_in` before any snapshot; model the
+  // authenticated session so the store's status slice reaches "ready".
+  store.setLoggedIn(true);
   const result = store.receive(1, "ui_snapshot", [fx.snapshot()], {});
   expect(result.accepted).toBe(true);
   return store;
@@ -227,12 +230,26 @@ describe("store view slices", () => {
 
   it("maps the committed transport state to the ConnectOverlay status slice", () => {
     expect(store.view.connectionStatus).toBe("offline");
-    openActiveSession(store);
+    // A connected socket that has not logged in yet waits for login: an
+    // anonymous session never receives a snapshot, so "connected, no
+    // snapshot" is "waiting for login", never "connecting".
+    store.beginTransport(1);
+    store.setConnected(true);
+    expect(store.view.connectionStatus).toBe("waiting");
+    // The `logged_in` event marks the session authenticated; the overlay
+    // shows "connecting" only while a snapshot is genuinely in flight.
+    store.setLoggedIn(true);
+    expect(store.view.connectionStatus).toBe("connecting");
+    store.receive(1, "ui_snapshot", [fx.snapshot()], {});
     expect(store.view.connectionStatus).toBe("ready");
     store.setConnected(false);
     expect(store.view.connectionStatus).toBe("offline");
+    // A disconnect ends the authenticated session: the next connect waits
+    // for login again until the server re-emits `logged_in`.
     store.beginTransport(2);
     store.setConnected(true);
+    expect(store.view.connectionStatus).toBe("waiting");
+    store.setLoggedIn(true);
     expect(store.view.connectionStatus).toBe("connecting");
     store.receive(
       2,

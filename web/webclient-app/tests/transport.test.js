@@ -7,8 +7,12 @@
 // shared lifecycle events dispatch to BOTH the D10 console model and the
 // store.
 
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+
 import { wireTransport } from "../transport.js";
+import { useElosernStore } from "../stores/elosern.js";
+import * as fx from "./store/protocol_fixtures.js";
 
 function makeStubStore() {
   const calls = [];
@@ -46,6 +50,10 @@ function makeStubStore() {
       store.view.connected = v;
       store.view.statusSlice.connected = v;
       store.view.mutationsLocked = !v;
+      return undefined;
+    },
+    setLoggedIn(v) {
+      calls.push(["setLoggedIn", v]);
       return undefined;
     },
     setSender(s) {
@@ -194,6 +202,73 @@ describe("wireTransport", () => {
     emit("connection_open");
     const after = store.calls.filter((c) => c[0] === "beginTransport").length;
     expect(after).toBe(before + 1);
+  });
+
+  it("marks the session waiting-for-login on open and logged-in on the logged_in event", () => {
+    const { evennia, emit } = makeFakeEvennia();
+    const consoleHandle = makeConsoleHandle();
+    const store = makeStubStore();
+    window.Evennia = evennia;
+    wireTransport(store, consoleHandle);
+
+    // A fresh socket has not authenticated yet: the overlay must not present
+    // "connecting" forever while the server never sends a snapshot to an
+    // anonymous session.
+    emit("connection_open");
+    expect(store.calls).toContainEqual(["setLoggedIn", false]);
+
+    // The server's `logged_in` OOB event marks the account attached; the
+    // store then waits only for the in-flight snapshot ("connecting").
+    emit("logged_in");
+    expect(store.calls).toContainEqual(["setLoggedIn", true]);
+  });
+
+  it("drives the real store through the login and reconnect lifecycle", async () => {
+    // The full wiring against the Pinia store (not the stub): the overlay
+    // status slice must follow the real event order
+    // connection_open -> logged_in -> ui_snapshot, and a reconnect must not
+    // retain the prior authenticated session. Fake timers drive the bounded
+    // post-login resync deferral.
+    vi.useFakeTimers();
+    try {
+      const { evennia, emit, sent } = makeFakeEvennia();
+      window.Evennia = evennia;
+      const consoleHandle = makeConsoleHandle();
+      setActivePinia(createPinia());
+      const store = useElosernStore();
+      wireTransport(store, consoleHandle);
+
+      // Anonymous socket: waiting for login, never "connecting" forever.
+      emit("connection_open");
+      expect(store.view.connectionStatus).toBe("waiting");
+
+      // Account attached: the overlay shows "connecting" only while the
+      // initial snapshot is genuinely in flight.
+      emit("logged_in");
+      expect(store.view.connectionStatus).toBe("connecting");
+
+      // A valid snapshot commits: ready.
+      emit("ui_snapshot", [fx.snapshot()], {});
+      expect(store.view.connectionStatus).toBe("ready");
+
+      // Reconnect: the fresh socket starts unauthenticated again (waiting).
+      emit("connection_close");
+      expect(store.view.connectionStatus).toBe("offline");
+      emit("connection_open");
+      expect(store.view.connectionStatus).toBe("waiting");
+
+      // A `no_puppet` detach around login stays "waiting"; the deferred
+      // resync after `logged_in` still retries while detached (one shot).
+      emit("ui_protocol_error", [fx.protocolError()], {});
+      expect(store.view.connectionStatus).toBe("waiting");
+      emit("logged_in");
+      const before = sent.filter((m) => m[0] === "ui_sync").length;
+      await vi.advanceTimersByTimeAsync(600);
+      const after = sent.filter((m) => m[0] === "ui_sync").length;
+      expect(after).toBeGreaterThan(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("routes text/prompt and dispatches actions through the single sender seam", () => {

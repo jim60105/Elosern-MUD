@@ -34,7 +34,7 @@ import sys
 ######################################################################
 
 # This is the name of your game. Make it catchy!
-SERVERNAME = "evennia-skeleton"
+SERVERNAME = "Elosern"
 
 # Keep mutable SQLite state in the dedicated container volume.
 DATABASES["default"]["NAME"] = os.path.join(GAME_DIR, "server", "db", "evennia.db3")

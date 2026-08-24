@@ -24,9 +24,12 @@ describe("store protocol ordering", () => {
   });
 
   // Start one transport generation, connect, and adopt the first snapshot.
+  // The real protocol delivers `logged_in` before any snapshot; the helper
+  // models the authenticated session so the status slice reaches "ready".
   function openSession() {
     store.beginTransport(1);
     store.setConnected(true);
+    store.setLoggedIn(true);
     const result = store.receive(1, "ui_snapshot", [fx.snapshot()], {});
     expect(result.accepted).toBe(true);
     return result;

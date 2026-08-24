@@ -52,3 +52,24 @@ class LoginIntroductionTests(EvenniaTest):
         messages = self._messages_on_login()
         self.assertNotIn("伊洛瑟恩大陸", messages)
         self.assertNotIn("你站在伊洛瑟恩大陸的門口", messages)
+
+    @covers_requirement("webclient-login-gate::the-webclient-overlay-shows-the-waiting-for-login-state-for-anonymous-sessions")
+    def test_login_emits_logged_in_oob_to_the_session(self):
+        # The webclient login gate is driven by the server's `logged_in` OOB
+        # event: evennia's at_post_login notifies the session through
+        # session.msg(logged_in={}). The browser's client-local `loggedIn`
+        # flag (and the overlay's waiting-for-login state) is set when this
+        # event arrives, and cleared on connection_open/connection_close.
+        original_msg = self.session.msg
+        oob_mock = Mock()
+        self.session.msg = oob_mock
+        try:
+            self.account.at_post_login(session=self.session)
+        finally:
+            self.session.msg = original_msg
+        logged_in_calls = [
+            call for call in oob_mock.call_args_list
+            if call.kwargs and "logged_in" in call.kwargs
+        ]
+        self.assertEqual(len(logged_in_calls), 1)
+        self.assertEqual(logged_in_calls[0].kwargs["logged_in"], {})

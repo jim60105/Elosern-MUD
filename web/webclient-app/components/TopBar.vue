@@ -18,7 +18,7 @@ defineProps({
     :class="connected ? 'connected' : 'disconnected'"
     data-testid="topbar"
   >
-    <div class="header-title" data-testid="topbar-title">霧落</div>
+    <div class="header-title" data-testid="topbar-title">伊洛瑟恩</div>
     <div class="header-meta">
       <span class="header-location" data-testid="topbar-location">
         {{ locationLabel || "位置：--" }}
