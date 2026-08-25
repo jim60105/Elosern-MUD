@@ -390,9 +390,10 @@ function activateNode(node) {
    detail line stay non-overlapping below it. */
 .local-map__lattice {
   display: block;
-  /* Natural pixel size from the lattice (cols × rows × 24px cells); the
-     attribute width/height drive the render, capped by the island budget. */
-  width: auto;
+  /* Natural pixel size from the lattice (cols × rows × 24px cells): the SVG's
+     width/height attributes drive the render. The element keeps its attribute
+     width (not stretched to the container), and a wide lattice is capped by
+     max-width so the height scales down proportionally. */
   max-width: 206px;
   height: auto;
   background: var(--ink-860);
