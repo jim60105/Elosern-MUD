@@ -552,15 +552,13 @@ function onChoiceAction(intent) {
           v-if="panelAvailable('art') && store.view.mode !== 'combat'"
           :art="panel('art')"
         />
-        <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame is mounted
-             into H1's `hud-left` anchor, combat-only. -->
+        <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame renders in
+             the stage's right anchor, combat-only. -->
         <ParticipantFrame
           v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
           :participants="contextActionsPanel.participants"
           :art-panel="panel('art')"
         />
-      </template>
-      <template #panel-right>
         <CharacterPanel v-if="panelAvailable('character')" :character="panel('character')" />
         <SkillBook v-if="skillRowsAvailable()" :skills="panel('character')" />
         <ShopPanel

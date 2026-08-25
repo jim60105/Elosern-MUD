@@ -85,7 +85,11 @@ WORLD_FAMILY_STORY_IDS = {
 # B3 data families). The four full-overlays keys from B5
 # (webclient-vue-06-showcase-overlays) are added at the manifest freeze
 # (design D3): after B5 the frozen manifest carries the complete required
-# set, so this baseline must extend — not restructure.
+# set, so this baseline must extend — not restructure. The H1/H2/H3 HUD
+# waves added eleven more keys (HudFrame, SceneBackdrop, FullLogOverlay,
+# RestForm, DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead,
+# VitalsTrack, ConditionChips, ParticipantFrame), which this baseline now
+# carries as well.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -93,15 +97,26 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
     "Core/CommandDrawer",
+    "Core/HudFrame",
+    "Core/SceneBackdrop",
+    "Core/FullLogOverlay",
     "Action/ActionDock",
     "Action/DockMenu",
     "Action/DockMenuItem",
     "Action/OptionCard",
+    "Action/RestForm",
     "Action/ChoiceCardRow",
     "Action/ChoicePointBlock",
+    "Action/DockTabBar",
+    "Action/DockBreadcrumb",
+    "Action/SkillDetailPane",
     "Data/StatusPanel",
     "Data/CharacterPanel",
+    "Data/CharacterHead",
+    "Data/VitalsTrack",
     "Data/SkillBook",
+    "Data/ConditionChips",
+    "Data/ParticipantFrame",
     "Overlays/CreationOverlay",
     "Overlays/HelpOverlay",
     "Overlays/MapOverlay",

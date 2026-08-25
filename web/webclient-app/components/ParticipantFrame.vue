@@ -94,7 +94,7 @@ function portraitSrc(portrait) {
           <div
             v-else
             class="participant-frame__portrait-placeholder"
-            :data-testid="participant-portrait-placeholder"
+            data-testid="participant-portrait-placeholder"
           >
             {{ (portraitFor(p).placeholder && portraitFor(p).placeholder.label) || "肖像圖像尚未生成" }}
           </div>
@@ -127,7 +127,7 @@ function portraitSrc(portrait) {
           <div
             v-else
             class="participant-frame__portrait-placeholder"
-            :data-testid="participant-portrait-placeholder"
+            data-testid="participant-portrait-placeholder"
           >
             {{ (portraitFor(p).placeholder && portraitFor(p).placeholder.label) || "肖像圖像尚未生成" }}
           </div>

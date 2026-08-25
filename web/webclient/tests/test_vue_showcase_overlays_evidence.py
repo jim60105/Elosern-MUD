@@ -90,7 +90,10 @@ DEFERRED_TITLE_PATTERNS = (
 )
 
 # The complete required-component set before this change (B1 core,
-# B2 action-dock, B3 data, B4 world + services).
+# B2 action-dock, B3 data, B4 world + services). The H1/H2/H3 HUD waves
+# added eleven keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
+# DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead, VitalsTrack,
+# ConditionChips, ParticipantFrame), which this baseline now carries.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -98,15 +101,26 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
     "Core/CommandDrawer",
+    "Core/HudFrame",
+    "Core/SceneBackdrop",
+    "Core/FullLogOverlay",
     "Action/ActionDock",
     "Action/DockMenu",
     "Action/DockMenuItem",
     "Action/OptionCard",
+    "Action/RestForm",
     "Action/ChoiceCardRow",
     "Action/ChoicePointBlock",
+    "Action/DockTabBar",
+    "Action/DockBreadcrumb",
+    "Action/SkillDetailPane",
     "Data/StatusPanel",
     "Data/CharacterPanel",
+    "Data/CharacterHead",
+    "Data/VitalsTrack",
     "Data/SkillBook",
+    "Data/ConditionChips",
+    "Data/ParticipantFrame",
     "World/LocalMap",
     "World/ArtPanel",
     "World/ShopPanel",

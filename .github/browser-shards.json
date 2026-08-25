@@ -15,7 +15,8 @@
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_disabled_items_defend_send_no_packet",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_flee_flow_submits_empty_payload",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_forfeit_requires_confirmation",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels",
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_pointer_tab_click_pops_to_root_and_activates_once"
       ]
     },
     {
@@ -26,13 +27,15 @@
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_disabled_reason_is_visible_without_packet",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports",
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_area_space_selects_once_even_when_held",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_panel_groups_skills_by_category_in_enum_order",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_panel_advertises_scales_only_for_the_mastered_element"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_panel_advertises_scales_only_for_the_mastered_element",
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports"
       ]
     },
     {
@@ -209,7 +212,8 @@
       "files_b": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_text_console_round_trips_commands_without_jquery",
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_core_surfaces_render_usable_at_supported_viewports",
-        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_window_elosern_bridge_facades_resolve_and_route"
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_window_elosern_bridge_facades_resolve_and_route",
+        "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_frozen_manifest_grows_only_in_lockstep_with_stories"
       ]
     },
     {
@@ -238,6 +242,25 @@
         "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_timeout_diagnostic_carries_required_fields",
         "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_none_read_flagged_in_timeout",
         "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_non_navigation_dom_error_surfaced_in_diagnostic"
+      ]
+    },
+    {
+      "index": 17,
+      "name": "contextual-hud",
+      "files_a": [
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_dock_root_tab_bar_truthful_count_badges",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_dock_panes_render_per_kind_vocabulary"
+      ],
+      "files_b": [
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_action_dock_floating_panel_persists_across_modes",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_combat_participant_frame_presents_participants_and_portraits",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode"
       ]
     }
   ]

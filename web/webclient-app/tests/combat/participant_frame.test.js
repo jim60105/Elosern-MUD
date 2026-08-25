@@ -28,8 +28,8 @@ describe("ParticipantFrame (task 6.9)", () => {
 
   // Hoisted fixtures (arrays of objects) to dodge the V8/Node 24 parser quirk.
   const participants = [
-    { identity: "p1", team: "allies", token: "阿強", display_name: "阿強", hp_current: 80, hp_maximum: 100, state: "active", portrait_ref: null },
-    { identity: "p2", team: "allies", token: "小美", display_name: "小美", hp_current: 0, hp_maximum: 90, state: "knocked_out", portrait_ref: "portrait_mei" },
+    { identity: "p1", team: "party", token: "阿強", display_name: "阿強", hp_current: 80, hp_maximum: 100, state: "active", portrait_ref: null },
+    { identity: "p2", team: "party", token: "小美", display_name: "小美", hp_current: 0, hp_maximum: 90, state: "knocked_out", portrait_ref: "portrait_mei" },
     { identity: "f1", team: "foes", token: "哥布林", display_name: "哥布林", hp_current: 45, hp_maximum: 45, state: "active", portrait_ref: "portrait_gob" },
     { identity: "f2", team: "foes", token: "オーク", display_name: "オーク", hp_current: 120, hp_maximum: 120, state: "defeated", portrait_ref: null },
   ];
@@ -85,8 +85,8 @@ describe("skill frame server order + single-sub-group skip (task 6.9)", () => {
     key: "heal", label: "治癒", description: "恢復生命值。", cost: { mp: 12 },
     target_spec: "single", enabled: true, disabled_reason: null, targets: [1], shorthands: [],
   };
-  const participant = {
-    identity: 1, token: "p1", display_name: "阿強", team: "allies",
+   const participant = {
+     identity: 1, token: "p1", display_name: "阿強", team: "party",
     state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null,
   };
   const foe = {
