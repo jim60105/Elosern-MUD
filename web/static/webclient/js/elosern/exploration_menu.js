@@ -91,63 +91,63 @@
   // Root menu.
   // -------------------------------------------------------------------------
 
-   // Canonical direction words the exit label can carry, mapped to one
-   // canonical token. A label outside the table (a named door or a dynamic
-   // wilderness gateway) returns null — the renderer shows it verbatim in the
-   // glyph slot and never guesses a direction (H3 design D9).
-   var DIRECTION_ALIASES = {
-     n: "north",
-     north: "north",
-     北: "north",
-     s: "south",
-     south: "south",
-     南: "south",
-     e: "east",
-     east: "east",
-     東: "east",
-     w: "west",
-     west: "west",
-     西: "west",
-     ne: "northeast",
-     northeast: "northeast",
-     東北: "northeast",
-     nw: "northwest",
-     northwest: "northwest",
-     西北: "northwest",
-     se: "southeast",
-     southeast: "southeast",
-     東南: "southeast",
-     sw: "southwest",
-     southwest: "southwest",
-     西南: "southwest",
-     up: "up",
-     上: "up",
-     down: "down",
-     下: "down"
-   };
+  // Canonical direction words the exit label can carry, mapped to one
+  // canonical token. A label outside the table (a named door or a dynamic
+  // wilderness gateway) returns null — the renderer shows it verbatim in the
+  // glyph slot and never guesses a direction (H3 design D9).
+  var DIRECTION_ALIASES = {
+    n: "north",
+    north: "north",
+    北: "north",
+    s: "south",
+    south: "south",
+    南: "south",
+    e: "east",
+    east: "east",
+    東: "east",
+    w: "west",
+    west: "west",
+    西: "west",
+    ne: "northeast",
+    northeast: "northeast",
+    東北: "northeast",
+    nw: "northwest",
+    northwest: "northwest",
+    西北: "northwest",
+    se: "southeast",
+    southeast: "southeast",
+    東南: "southeast",
+    sw: "southwest",
+    southwest: "southwest",
+    西南: "southwest",
+    up: "up",
+    上: "up",
+    down: "down",
+    下: "down"
+  };
 
-   function normalizeDirection(label) {
-     if (typeof label !== "string") {
-       return null;
-     }
-     var key = label.trim().toLowerCase();
-     return key in DIRECTION_ALIASES ? DIRECTION_ALIASES[key] : null;
-   }
+  function normalizeDirection(label) {
+    if (typeof label !== "string") {
+      return null;
+    }
+    var key = label.trim().toLowerCase();
+    return key in DIRECTION_ALIASES ? DIRECTION_ALIASES[key] : null;
+  }
 
-   function rootItems(panel, suggestions) {
-     var items = [
-       openItem("move", "移動", "move"),
-       openItem("look", "查看", "look"),
-       openItem("interact", "互動", "interact"),
-       {
-         key: "character",
-         label: "角色狀態",
-         enabled: true,
-         actionId: null,
-         payload: null,
-         openCharacter: true,
-       },
-     ];
+  function rootItems(panel, suggestions) {
+    var items = [
+      openItem("move", "移動", "move"),
+      openItem("look", "查看", "look"),
+      openItem("interact", "互動", "interact"),
+      {
+        key: "character",
+        label: "角色狀態",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openCharacter: true,
+      },
+    ];
     // A root whose capability surface is absent must not render as a dead
     // functional entry.
     if (panel.quests && panel.quests.available) {
@@ -170,23 +170,23 @@
         openServiceSubmenu: "inventory",
       });
     }
-     items.push(openItem("wait", "等待/休息", "wait"));
-     // The suggestions root entry (H3 webclient-hud-03-action-dock): present
-     // whenever the committed `suggestions` envelope is not `unavailable`;
-     // `unavailable` renders no entry at all (today's "renders nothing").
-     var status = suggestions && suggestions.status;
-     if (status && status !== "unavailable") {
-       items.push({
-         key: "suggestions",
-         label: "建議",
-         enabled: true,
-         actionId: null,
-         payload: null,
-         openSubmenu: "suggestions",
-       });
-     }
-     return items;
-   }
+    items.push(openItem("wait", "等待/休息", "wait"));
+    // The suggestions root entry (H3 webclient-hud-03-action-dock): present
+    // whenever the committed `suggestions` envelope is not `unavailable`;
+    // `unavailable` renders no entry at all (today's "renders nothing").
+    var status = suggestions && suggestions.status;
+    if (status && status !== "unavailable") {
+      items.push({
+        key: "suggestions",
+        label: "建議",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openSubmenu: "suggestions",
+      });
+    }
+    return items;
+  }
 
   // -------------------------------------------------------------------------
   // Wait/rest submenu.
@@ -517,165 +517,165 @@
     };
   }
 
-   // -------------------------------------------------------------------------
-   // Suggestions menu (H3 webclient-hud-03-action-dock): the `建議` root
-   // entry's frame — the committed `context_actions.suggestions` envelope
-   // becomes a keyboard-reachable router frame: cards as rows, the `✕ 清除建議`
-   // dismiss row (`options.dismiss`, `{}`), and a back row. `generating` is
-   // one disabled row; `degraded` keeps its muted note and the zero-card
-   // empty-state line; `unavailable` means the root entry is absent.
-   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Suggestions menu (H3 webclient-hud-03-action-dock): the `建議` root
+  // entry's frame — the committed `context_actions.suggestions` envelope
+  // becomes a keyboard-reachable router frame: cards as rows, the `✕ 清除建議`
+  // dismiss row (`options.dismiss`, `{}`), and a back row. `generating` is
+  // one disabled row; `degraded` keeps its muted note and the zero-card
+  // empty-state line; `unavailable` means the root entry is absent.
+  // -------------------------------------------------------------------------
 
-   function cardItems(suggestions) {
-     var cards = (suggestions && Array.isArray(suggestions.cards)
-       ? suggestions.cards
-       : []);
-     var items = [];
-     var used = {};
-     function uniqueKey(base) {
-       var key = base;
-       for (var n = 2; used[key]; n += 1) {
-         key = base + "-" + n;
-       }
-       used[key] = true;
-       return key;
-     }
-     cards.forEach(function (card) {
-       var item;
-       if (card.kind === "freeform") {
-         // A freeform card speaks its label as the `explore.talk_freeform`
-         // speech (the options surface contract: the speech is always the
-         // label text).
-         item = {
-           key: uniqueKey("action-explore.talk_freeform"),
-           label: card.label,
-           hint: card.hint || null,
-           enabled: true,
-           actionId: "explore.talk_freeform",
-           payload: {
-             npc_id: card.params && card.params.npc_id,
-             speech: card.label,
-           },
-         };
-       } else {
-         // A known_action card dispatches its validator-normalized payload
-         // as-is.
-         item = {
-           key: uniqueKey("action-" + card.action_code),
-           label: card.label,
-           hint: card.hint || null,
-           enabled: true,
-           actionId: card.action_code,
-           payload: card.params || {},
-         };
-       }
-       items.push(item);
-     });
-     return items;
-   }
+  function cardItems(suggestions) {
+    var cards = (suggestions && Array.isArray(suggestions.cards)
+      ? suggestions.cards
+      : []);
+    var items = [];
+    var used = {};
+    function uniqueKey(base) {
+      var key = base;
+      for (var n = 2; used[key]; n += 1) {
+        key = base + "-" + n;
+      }
+      used[key] = true;
+      return key;
+    }
+    cards.forEach(function (card) {
+      var item;
+      if (card.kind === "freeform") {
+        // A freeform card speaks its label as the `explore.talk_freeform`
+        // speech (the options surface contract: the speech is always the
+        // label text).
+        item = {
+          key: uniqueKey("action-explore.talk_freeform"),
+          label: card.label,
+          hint: card.hint || null,
+          enabled: true,
+          actionId: "explore.talk_freeform",
+          payload: {
+            npc_id: card.params && card.params.npc_id,
+            speech: card.label,
+          },
+        };
+      } else {
+        // A known_action card dispatches its validator-normalized payload
+        // as-is.
+        item = {
+          key: uniqueKey("action-" + card.action_code),
+          label: card.label,
+          hint: card.hint || null,
+          enabled: true,
+          actionId: card.action_code,
+          payload: card.params || {},
+        };
+      }
+      items.push(item);
+    });
+    return items;
+  }
 
-   function suggestionsMenu(suggestions) {
-     var status = suggestions && suggestions.status;
-     var items = [];
-     if (status === "generating") {
-       items.push({
-         key: "suggestions-generating",
-         label: "AI 正在構思建議…",
-         enabled: false,
-         actionId: null,
-         payload: null,
-         description: "AI 正在構思建議…",
-         disabledReason: { code: "generating", message: "AI 正在構思建議…" },
-       });
-     } else if (status === "ready" || status === "degraded") {
-       items = cardItems(suggestions);
-       if (status === "degraded" && items.length === 0) {
-         items.push({
-           key: "suggestions-empty",
-           label: "現在沒有什麼值得做的動作",
-           enabled: false,
-           actionId: null,
-           payload: null,
-           description: "現在沒有什麼值得做的動作",
-           disabledReason: { code: "empty", message: "現在沒有什麼值得做的動作" },
-         });
-       }
-       items.push({
-         key: "action-options.dismiss",
-         label: "✕ 清除建議",
-         enabled: true,
-         actionId: "options.dismiss",
-         payload: {},
-       });
-     }
-     items.push(backItem());
-     return {
-       items: items,
-       focusKey: null,
-       title: "建議",
-       grid: true,
-       gridCols: items.length,
-     };
-   }
+  function suggestionsMenu(suggestions) {
+    var status = suggestions && suggestions.status;
+    var items = [];
+    if (status === "generating") {
+      items.push({
+        key: "suggestions-generating",
+        label: "AI 正在構思建議…",
+        enabled: false,
+        actionId: null,
+        payload: null,
+        description: "AI 正在構思建議…",
+        disabledReason: { code: "generating", message: "AI 正在構思建議…" },
+      });
+    } else if (status === "ready" || status === "degraded") {
+      items = cardItems(suggestions);
+      if (status === "degraded" && items.length === 0) {
+        items.push({
+          key: "suggestions-empty",
+          label: "現在沒有什麼值得做的動作",
+          enabled: false,
+          actionId: null,
+          payload: null,
+          description: "現在沒有什麼值得做的動作",
+          disabledReason: { code: "empty", message: "現在沒有什麼值得做的動作" },
+        });
+      }
+      items.push({
+        key: "action-options.dismiss",
+        label: "✕ 清除建議",
+        enabled: true,
+        actionId: "options.dismiss",
+        payload: {},
+      });
+    }
+    items.push(backItem());
+    return {
+      items: items,
+      focusKey: null,
+      title: "建議",
+      grid: true,
+      gridCols: items.length,
+    };
+  }
 
-   // -------------------------------------------------------------------------
-   // Menu model builder.
-   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Menu model builder.
+  // -------------------------------------------------------------------------
 
-   function buildMenus(panel, options) {
-     options = options || {};
-     var currentNode = options.currentNode || null;
-     var suggestions = options.suggestions || null;
-     var rootItemsList = rootItems(panel, suggestions);
-     // The root is a single-row tab bar: the column count equals the item
-     // count (H3 design D12) so arrow-key geometry matches the rendered
-     // order.
-     var model = {
-       panel: panel,
-       currentNode: currentNode,
-       menus: {
-         root: {
-           items: rootItemsList,
-           focusKey: null,
-           grid: true,
-           gridCols: rootItemsList.length,
-           title: "探索",
-         },
-         move: {
-           items: moveItems(panel, currentNode),
-           focusKey: null,
-           grid: true,
-           gridCols: 2,
-           title: "移動",
-         },
-         look: {
-           items: lookItems(panel),
-           focusKey: null,
-           grid: true,
-           gridCols: 2,
-           title: "查看",
-         },
-         interact: {
-           items: interactItems(panel),
-           focusKey: null,
-           grid: true,
-           gridCols: 2,
-           title: "互動",
-         },
-         wait: {
-           items: waitItems(),
-           focusKey: null,
-           grid: true,
-           gridCols: 2,
-           title: "等待",
-         },
-       },
-     };
-     if (suggestions && suggestions.status && suggestions.status !== "unavailable") {
-       model.menus.suggestions = suggestionsMenu(suggestions);
-     }
-     return model;
-   }
+  function buildMenus(panel, options) {
+    options = options || {};
+    var currentNode = options.currentNode || null;
+    var suggestions = options.suggestions || null;
+    var rootItemsList = rootItems(panel, suggestions);
+    // The root is a single-row tab bar: the column count equals the item
+    // count (H3 design D12) so arrow-key geometry matches the rendered
+    // order.
+    var model = {
+      panel: panel,
+      currentNode: currentNode,
+      menus: {
+        root: {
+          items: rootItemsList,
+          focusKey: null,
+          grid: true,
+          gridCols: rootItemsList.length,
+          title: "探索",
+        },
+        move: {
+          items: moveItems(panel, currentNode),
+          focusKey: null,
+          grid: true,
+          gridCols: 2,
+          title: "移動",
+        },
+        look: {
+          items: lookItems(panel),
+          focusKey: null,
+          grid: true,
+          gridCols: 2,
+          title: "查看",
+        },
+        interact: {
+          items: interactItems(panel),
+          focusKey: null,
+          grid: true,
+          gridCols: 2,
+          title: "互動",
+        },
+        wait: {
+          items: waitItems(),
+          focusKey: null,
+          grid: true,
+          gridCols: 2,
+          title: "等待",
+        },
+      },
+    };
+    if (suggestions && suggestions.status && suggestions.status !== "unavailable") {
+      model.menus.suggestions = suggestionsMenu(suggestions);
+    }
+    return model;
+  }
 
   function targetById(model, identity) {
     var targets = (model.panel && model.panel.interact) || [];
