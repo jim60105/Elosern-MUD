@@ -2,9 +2,12 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import {
+  LOCAL_MAP_INTERIOR_SAMPLE,
+  LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
+  LOCAL_MAP_WILDERNESS_SAMPLE,
 } from "../../stories/fixtures.js";
 
 describe("LocalMap (B4 world family)", () => {
@@ -26,8 +29,12 @@ describe("LocalMap (B4 world family)", () => {
     return wrapper;
   }
 
-  it("renders the payload's map title", () => {
-    expect(mountMap().get('[data-testid="local-map__title"]').text()).toBe("霧骨渡口");
+  it("renders the payload's map title in the island's meta line", () => {
+    const w = mountMap();
+    // H2: the meta line carries the title plus, on the coordinate-bearing
+    // layers only, the renderer-axis orientation legend (design D9).
+    const title = w.get('[data-testid="local-map__title"] .local-map__meta-title');
+    expect(title.text()).toBe("霧骨渡口");
   });
 
   it("renders the honest unavailable box with the payload's reason message", () => {
@@ -148,5 +155,54 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.findAll('[data-testid="local-map__actionable"]')).toHaveLength(0);
     expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(1);
     expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
+  });
+
+  // H2 (webclient-hud-02-status-islands, design D9/D10): the island
+  // re-chrome keeps the load-bearing `.local-map` root class, adds the
+  // renderer-axis orientation legend on the coordinate-bearing layers only,
+  // and renders no bearing, no compass angle, or distance.
+
+  it("keeps the .local-map root class the mode-gate CSS selects on", () => {
+    const w = mountMap();
+    expect(w.find(".local-map").exists()).toBe(true);
+    expect(w.attributes("data-testid")).toBe("local-map");
+  });
+
+  it("shows the orientation legend on grid and wilderness layers only", () => {
+    for (const sample of [LOCAL_MAP_SAMPLE, LOCAL_MAP_WILDERNESS_SAMPLE]) {
+      const w = mountMap({ localMap: sample });
+      const orientation = w.find('[data-testid="local-map__orientation"]');
+      expect(orientation.exists(), `legend present for ${sample.layer}`).toBe(true);
+      expect(orientation.text()).toBe("北↑");
+      w.unmount();
+    }
+  });
+
+  it("omits the orientation legend on the coordinate-free instance and interior layers", () => {
+    for (const sample of [LOCAL_MAP_INSTANCE_SAMPLE, LOCAL_MAP_INTERIOR_SAMPLE]) {
+      const w = mountMap({ localMap: sample });
+      expect(
+        w.find('[data-testid="local-map__orientation"]').exists(),
+        `legend absent for ${sample.layer}`,
+      ).toBe(false);
+      w.unmount();
+    }
+  });
+
+  it("renders no bearing, no degree sign, and no distance figure anywhere in the island", () => {
+    for (const sample of [
+      LOCAL_MAP_SAMPLE,
+      LOCAL_MAP_WILDERNESS_SAMPLE,
+      LOCAL_MAP_INSTANCE_SAMPLE,
+      LOCAL_MAP_INTERIOR_SAMPLE,
+    ]) {
+      const w = mountMap({ localMap: sample });
+      const text = w.text();
+      expect(text).not.toContain("°");
+      // No compass bearing like 「北 324° · 西 262°」 and no distance unit.
+      expect(text).not.toMatch(/[北南東西]\s*\d+/);
+      expect(text).not.toMatch(/\d+\s*(?:公尺|公里|km)\b/i);
+      w.unmount();
+    }
   });
 });

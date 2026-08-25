@@ -8,7 +8,15 @@ import {
   STATUS_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
-describe("StatusPanel (B3 data family)", () => {
+// StatusPanel (H2, webclient-hud-02-status-islands, design D1): the
+// `hud-left` island stack. It composes three separately-chromed islands —
+// CharacterHead, VitalsTrack, and ConditionChips — and keeps the preserved
+// `data-testid="status-panel"` root and the three
+// `status-panel__gauge-value--{hp,mp,sp}` hooks (now carried by the
+// VitalsTrack rows), so the combat and transport-mount browser journeys
+// need no edit.
+
+describe("StatusPanel (H2 island-stack root)", () => {
   let wrapper;
 
   afterEach(() => {
@@ -22,133 +30,79 @@ describe("StatusPanel (B3 data family)", () => {
       props: {
         status: STATUS_PANEL_SAMPLE,
         character: CHARACTER_PANEL_SAMPLE,
+        lowHp: false,
+        revision: 1,
+        epoch: 0,
         ...props,
       },
     });
     return wrapper;
   }
 
-  it("renders actor and location from the status payload", () => {
+  it("renders the head card, the vitals, and the conditions as three sibling islands in fixed order", () => {
     const w = mountPanel();
-    const actor = w.get('[data-testid="status-panel__actor"]');
-    expect(actor.text()).toContain("艾倫·灰誓");
-    expect(actor.text()).toContain("霧骨渡口");
+    const head = w.get('[data-testid="character-head"]');
+    const vitals = w.get('[data-testid="vitals-track"]');
+    const conditions = w.get('[data-testid="status-panel__conditions"]');
+    // The three islands are siblings of the preserved stack root, in the
+    // head → vitals → conditions order (design D1).
+    expect(head.exists()).toBe(true);
+    expect(vitals.exists()).toBe(true);
+    expect(conditions.exists()).toBe(true);
+    const root = w.get('[data-testid="status-panel"]');
+    const children = root.element.children;
+    expect(children).toHaveLength(3);
+    // The island testids are on the children themselves (not descendants),
+    // so assert the attribute on the child element directly.
+    expect(children[0].getAttribute("data-testid")).toBe("character-head");
+    expect(children[1].getAttribute("data-testid")).toBe("vitals-track");
+    expect(children[2].getAttribute("data-testid")).toBe("status-panel__conditions");
   });
 
-  it("pairs every gauge with a symbol and an explicit current / maximum value", () => {
+  it("keeps the preserved root testid and the three gauge-value hooks", () => {
     const w = mountPanel();
-    const expected = {
-      hp: { symbol: "♥", label: "生命", value: "231 / 405" },
-      mp: { symbol: "❖", label: "魔力", value: "139 / 420" },
-      sp: { symbol: "⚡", label: "耐力", value: "68 / 68" },
-    };
-    for (const [key, item] of Object.entries(expected)) {
-      const gauge = w.get(`[data-testid="status-panel__gauge--${key}"]`);
-      expect(gauge.text()).toContain(item.symbol);
-      expect(gauge.text()).toContain(item.label);
-      expect(
-        gauge.find(`[data-testid="status-panel__gauge-value--${key}"]`).text(),
-      ).toBe(item.value);
+    expect(w.get('[data-testid="status-panel"]').exists()).toBe(true);
+    for (const key of ["hp", "mp", "sp"]) {
+      const value = w.get(`[data-testid="status-panel__gauge-value--${key}"]`).text();
+      const expected = {
+        hp: "231 / 405",
+        mp: "139 / 420",
+        sp: "68 / 68",
+      }[key];
+      expect(value).toBe(expected);
     }
   });
 
-  it("renders counters, static traits, and wallet from the character payload", () => {
+  it("relocates every pre-change row so no row loses its only home", () => {
     const w = mountPanel();
-    expect(w.get('[data-testid="status-panel__trait--atk_phys"]').text()).toContain("18");
-    expect(w.get('[data-testid="status-panel__trait--agility"]').text()).toContain("20");
-    expect(w.get('[data-testid="status-panel__trait--defense"]').text()).toContain("12");
-    expect(w.get('[data-testid="status-panel__trait--magic_level"]').text()).toContain("31");
-    expect(w.get('[data-testid="status-panel__trait--guild_merit"]').text()).toContain("140");
-    expect(w.get('[data-testid="status-panel__wallet"]').text()).toBe("錢包3,240 銅");
+    // magic_level + guild rank/merit + wallet moved to the head card's rank
+    // and wallet lines (design D1/D11).
+    const rank = w.get('[data-testid="character-head__rank"]').text();
+    expect(rank).toContain("魔階·大師");
+    expect(rank).toContain("公會 E");
+    expect(rank).toContain("功績 140");
+    expect(w.get('[data-testid="character-head__wallet"]').text()).toBe("錢包 3,240 銅");
+    // The disguise flag moved to the head card's marker.
+    expect(w.get('[data-testid="character-head__disguise"]').text()).toBe("目前有偽裝");
   });
 
-  it("renders conditions with severity markers, remaining seconds, and derived modifiers", () => {
-    const w = mountPanel();
-    const buff = w.get('[data-testid="status-panel__condition--fastwind"]');
-    expect(buff.attributes("data-severity")).toBe("beneficial");
-    expect(buff.text()).toContain("疾風");
-    expect(buff.find('[data-testid="status-panel__condition-timer"]').text()).toBe("60 s");
-
-    const harmful = w.get('[data-testid="status-panel__condition--shame_exposure"]');
-    expect(harmful.attributes("data-severity")).toBe("harmful");
-    // Every derived modifier pair is rendered, not just a color change.
-    expect(harmful.find('[data-testid="status-panel__condition-mod--defense"]').text()).toBe("defense -15");
-    expect(harmful.find('[data-testid="status-panel__condition-mod--agility"]').text()).toBe("agility -10");
-
-    // The informational condition carries neither a timer nor modifiers.
-    const info = w.get('[data-testid="status-panel__condition--fog_veil"]');
-    expect(info.attributes("data-severity")).toBe("informational");
-    expect(info.find('[data-testid="status-panel__condition-timer"]').exists()).toBe(false);
-    expect(info.findAll('[data-testid^="status-panel__condition-mod--"]')).toHaveLength(0);
-  });
-
-  it("pairs every condition with a DOM severity glyph, not color or border alone", () => {
-    const w = mountPanel();
-    // The glyph is a real DOM node per severity, plus the payload's own label.
-    const expected = {
-      fastwind: { glyph: "▲", label: "疾風" },
-      shame_exposure: { glyph: "▼", label: "高露出" },
-      fog_veil: { glyph: "◆", label: "霧隱" },
-    };
-    for (const [code, item] of Object.entries(expected)) {
-      const condition = w.get(`[data-testid="status-panel__condition--${code}"]`);
-      expect(condition.find(".status-panel__condition-glyph").text()).toBe(item.glyph);
-      expect(condition.text()).toContain(item.label);
-    }
-  });
-
-  it("renders every counter and static trait as its canonical label plus a numeric value", () => {
-    const w = mountPanel();
-    const expected = {
-      atk_phys: "18",
-      agility: "20",
-      defense: "12",
-      magic_level: "31",
-      guild_merit: "140",
-    };
-    for (const [key, value] of Object.entries(expected)) {
-      const row = w.get(`[data-testid="status-panel__trait--${key}"]`);
-      expect(row.find(".status-panel__trait-key").text()).not.toBe("");
-      expect(row.find(".status-panel__trait-value").text()).toBe(value);
-    }
-  });
-
-  it("renders the honest empty-condition line when the payload has none", () => {
-    const w = mountPanel({ status: STATUS_PANEL_MINIMAL_SAMPLE });
-    expect(w.get('[data-testid="status-panel__conditions-empty"]').text()).toBe("無條件");
-    expect(w.findAll('[data-testid^="status-panel__condition--"]')).toHaveLength(0);
-  });
-
-  it("renders the disguise flag from the status payload, both ways", () => {
-    expect(mountPanel().get('[data-testid="status-panel__disguise"]').text()).toBe("目前有偽裝");
-    const w = mountPanel({ status: STATUS_PANEL_COMBAT_SAMPLE });
-    const flag = w.get('[data-testid="status-panel__disguise"]');
-    expect(flag.text()).toBe("無偽裝");
-    expect(flag.attributes("data-active")).toBe("false");
-  });
-
-  it("renders the combat session only when the payload carries one", () => {
-    expect(mountPanel().find('[data-testid="status-panel__combat"]').exists()).toBe(false);
+  it("moves the combat session line into the vitals island's header row", () => {
     const w = mountPanel({ status: STATUS_PANEL_COMBAT_SAMPLE });
     const combat = w.get('[data-testid="status-panel__combat"]');
     expect(combat.attributes("data-mode")).toBe("guild_exam");
     expect(combat.text()).toBe("戰鬥中（公會考核）· 第 3 回合");
   });
 
+  it("renders the 無條件 empty state in the conditions island", () => {
+    const w = mountPanel({ status: STATUS_PANEL_MINIMAL_SAMPLE });
+    expect(w.get('[data-testid="status-panel__conditions-empty"]').text()).toBe("無條件");
+    expect(w.findAll('[data-testid^="status-panel__condition--"]')).toHaveLength(0);
+  });
+
   it("invents no intimate/adult block (no backing field, not mocked)", () => {
     const w = mountPanel();
-    expect(w.find('[data-testid="status-panel__intimate"]').exists()).toBe(false);
     for (const word of ["親密", "興奮", "濕潤", "羞恥", "高潮", "露出部位"]) {
       expect(w.text()).not.toContain(word);
     }
-  });
-
-  it("renders only values the payloads carry", () => {
-    const w = mountPanel({ status: STATUS_PANEL_MINIMAL_SAMPLE });
-    expect(w.text()).toContain("405 / 405");
-    expect(w.text()).toContain("420 / 420");
-    // Nothing numeric beyond the payloads' own values and labels.
-    expect(w.get('[data-testid="status-panel__gauge-value--hp"]').text()).toBe("405 / 405");
-    expect(w.get('[data-testid="status-panel__wallet"]').text()).toBe("錢包3,240 銅");
   });
 });

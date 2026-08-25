@@ -1,10 +1,18 @@
 <script setup>
-// LocalMap (B4 world family): the `local_map` v1 panel renderer for the Vue
-// webclient. It renders the committed payload's title, the SVG lattice with
-// not-color-only state markers (square / open circle / filled circle /
-// diamond), the edge styles, the legend with state glyphs, and the detail
-// line. Actionable adjacent nodes emit `move` with the payload's own
-// exit_ref and destination — no field is invented.
+// LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
+// `local_map` v1 panel renderer, re-chromed as the stage's right-anchor
+// island. The root keeps the stable `.local-map` class that H1's
+// combat-hide CSS and the shell's `HIDDEN_BY_MODE` focus-rescue map select
+// on literally, so the re-chrome never silently un-hides the minimap in a
+// mode whose matrix hides it. The canvas is sized from the reduced model's
+// exported lattice (`cols`/`rows`), so the canvas reserves its own space
+// within the island's bounded height. The meta line carries the payload's
+// `title` and, on the coordinate-bearing `grid` / `wilderness` layers only,
+// a renderer-axis orientation legend (北↑); coordinate-free `instance` /
+// `interior` layers omit it. No bearing, no compass angle, no distance is
+// rendered (node `x`/`y` are renderer-local presentation geometry). The
+// full-map affordance is deferred to H5 (MapOverlay), so the island ships
+// no full-map control; the per-node `explore.move` submission is unchanged.
 import { computed, ref } from "vue";
 
 const props = defineProps({
@@ -25,12 +33,21 @@ function legendState(index) {
 const available = computed(() => props.localMap.available === true);
 const reason = computed(() => props.localMap.reason?.message ?? "");
 const title = computed(() => props.localMap.title ?? "");
+const layer = computed(() => props.localMap.layer ?? null);
 const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
 const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
 const legend = computed(() => (Array.isArray(props.localMap.legend) ? props.localMap.legend : []));
-// The bounded, focusable remembered-remote-node list (spec: presented
-// outside the coordinate canvas; focus-only, no travel action).
 const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
+const cols = computed(() => props.localMap.cols ?? 0);
+const rows = computed(() => props.localMap.rows ?? 0);
+
+// The orientation legend states the renderer's own axis convention only
+// (design D9): the wilderness adapter puts north at +y and the renderer
+// inverts y so +y draws upward — a statement about the drawing, not about
+// the world. Shown on the coordinate-bearing layers only.
+const showsOrientation = computed(
+  () => layer.value === "grid" || layer.value === "wilderness",
+);
 
 // The detail line localizes the raw visibility token: previously entered
 // nodes (visible_visited / remembered) both read as 已探索.
@@ -47,27 +64,31 @@ const nodeById = computed(() => {
   return byId;
 });
 
-// Renderer-local geometry: map the payload's x/y range into the 640x400
-// viewBox with 40px padding. Node x/y are presentation coordinates.
-const bbox = computed(() => {
-  const xs = nodes.value.map((n) => n.x);
-  const ys = nodes.value.map((n) => n.y);
-  return {
-    minX: xs.length ? Math.min(...xs) : 0,
-    maxX: xs.length ? Math.max(...xs) : 1,
-    minY: ys.length ? Math.min(...ys) : 0,
-    maxY: ys.length ? Math.max(...ys) : 1,
-  };
-});
-const PADDING = 40;
+// Lattice-driven canvas geometry (design D9 + the local-map delta): the
+// reduced model places in-view nodes on a bounded integer lattice and
+// exports the lattice's column/row counts; the canvas sizes from that
+// lattice so it reserves its own space inside the island instead of the
+// island scrolling a required surface out of view. North (+y) draws
+// upward, so a node's row is inverted against the row count. A reserved
+// label band below the last row keeps node labels inside the canvas
+// instead of overhanging it and colliding with the island's next surface.
+const CELL = 24;
+const LABEL_BAND = 14;
+const canvasWidth = computed(() => Math.max(1, cols.value) * CELL);
+const canvasHeight = computed(() => Math.max(1, rows.value) * CELL + LABEL_BAND);
+
+// Node labels are bounded and truncated in the 24px cell; the full label
+// stays reachable through the node's accessible name.
+const LABEL_MAX = 6;
+function truncatedLabel(label) {
+  const value = String(label ?? "");
+  return value.length > LABEL_MAX ? value.slice(0, LABEL_MAX) + "…" : value;
+}
 
 function nodePos(node) {
-  const { minX, maxX, minY, maxY } = bbox.value;
-  const scaleX = (640 - 2 * PADDING) / Math.max(1, maxX - minX);
-  const scaleY = (400 - 2 * PADDING) / Math.max(1, maxY - minY);
   return {
-    x: PADDING + (node.x - minX) * scaleX,
-    y: 400 - PADDING - (node.y - minY) * scaleY,
+    x: node.col * CELL + CELL / 2,
+    y: (Math.max(1, rows.value) - 1 - node.row) * CELL + CELL / 2,
   };
 }
 
@@ -79,12 +100,14 @@ const edgeGeoms = computed(() =>
       const s = nodeById.value[edge.source];
       const d = nodeById.value[edge.destination];
       if (!s || !d) return null;
+      const sp = nodePos(s);
+      const dp = nodePos(d);
       return {
         i,
-        x1: nodePos(s).x,
-        y1: nodePos(s).y,
-        x2: nodePos(d).x,
-        y2: nodePos(d).y,
+        x1: sp.x,
+        y1: sp.y,
+        x2: dp.x,
+        y2: dp.y,
       };
     })
     .filter(Boolean),
@@ -114,7 +137,10 @@ const activeNode = computed(() => {
 const detailParts = computed(() => {
   const node = activeNode.value;
   if (!node) return [];
-  const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility, `(${node.x}, ${node.y})`];
+  const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility];
+  if (typeof node.x === "number" && typeof node.y === "number") {
+    parts.push(`(${node.x}, ${node.y})`);
+  }
   if (node.action) parts.push(`→ ${node.action.destination}`);
   return parts;
 });
@@ -146,20 +172,28 @@ function activateNode(node) {
 
 <template>
   <aside class="local-map" data-testid="local-map">
-    <h3 v-if="available" class="local-map__title" data-testid="local-map__title">
-      {{ title }}
-    </h3>
-
     <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
       {{ reason }}
     </p>
-
     <template v-else>
+      <!-- The island's top-meta line (design D9): the payload's title plus,
+           on the coordinate-bearing layers only, the renderer's axis
+           orientation legend. No bearing or distance is rendered. -->
+      <div class="local-map__meta" data-testid="local-map__title">
+        <span class="local-map__meta-title">{{ title }}</span>
+        <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
+          北↑
+        </span>
+      </div>
+
       <svg
-        class="local-map__lattice"
-        viewBox="0 0 640 400"
+         class="local-map__lattice"
+         :width="canvasWidth"
+         :height="canvasHeight"
+         :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
         role="img"
         aria-label="區域地圖縮圖"
+        data-testid="local-map__lattice"
         @mouseleave="clearHover"
       >
         <line
@@ -172,7 +206,7 @@ function activateNode(node) {
           :y1="edge.y1"
           :x2="edge.x2"
           :y2="edge.y2"
-          aria-hidden="true"
+          :aria-label="edges[edge.i].label"
         />
         <g
           v-for="node in nodes"
@@ -190,6 +224,7 @@ function activateNode(node) {
           <rect
             v-if="node.visibility === 'current'"
             class="local-map__marker local-map__marker--current"
+            data-testid="local-map__marker--current"
             x="-13"
             y="-13"
             width="26"
@@ -218,14 +253,16 @@ function activateNode(node) {
             transform="rotate(45)"
             aria-hidden="true"
           />
-          <circle
-            v-if="node.action"
-            class="local-map__actionable"
-            data-testid="local-map__actionable"
-            r="18"
-            aria-hidden="true"
-          />
-          <text class="local-map__node-label" y="24" text-anchor="middle">{{ node.label }}</text>
+           <circle
+             v-if="node.action"
+             class="local-map__actionable"
+             data-testid="local-map__actionable"
+             r="10"
+             aria-hidden="true"
+           />
+           <text class="local-map__node-label" y="24" text-anchor="middle">
+             <title>{{ node.label }}</title>{{ truncatedLabel(node.label) }}
+           </text>
         </g>
       </svg>
 
@@ -268,7 +305,7 @@ function activateNode(node) {
         >
           <svg
             class="local-map__legend-glyph"
-              :class="`local-map__legend-glyph--${legendState(i)}`"
+            :class="`local-map__legend-glyph--${legendState(i)}`"
             viewBox="-16 -16 32 32"
             width="14"
             height="14"
@@ -291,23 +328,44 @@ function activateNode(node) {
 </template>
 
 <style scoped>
+/* The island chrome (design D9): the shared tokens, so a token change or
+   the reduced-motion block reaches it at once. The root keeps the
+   load-bearing `.local-map` class that H1's mode-gate CSS selects on. */
 .local-map {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
+  padding: 9px;
   background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: var(--line);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
   font-family: var(--f-sans);
 }
 
-.local-map__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
+.local-map__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--paper-500);
+  margin-bottom: 4px;
+}
+
+.local-map__meta-title {
+  color: var(--paper-300);
+}
+
+/* The renderer-axis orientation legend (北↑): a statement about the
+   drawing's axis convention, not about the world (design D9). */
+.local-map__orientation {
+  font-family: var(--f-mono);
+  letter-spacing: 0;
+  color: var(--gold-400);
 }
 
 .local-map__unavailable {
@@ -320,8 +378,16 @@ function activateNode(node) {
   font-size: 0.85em;
 }
 
+/* The canvas sizes from the model's exported lattice (cols × rows cells),
+   bounded to the island's content width; the legend, remembered list, and
+   detail line stay non-overlapping below it. */
 .local-map__lattice {
-  width: 100%;
+  display: block;
+  /* Natural pixel size from the lattice (cols × rows × 24px cells); the
+     attribute width/height drive the render, capped by the island budget. */
+  width: auto;
+  max-width: 206px;
+  height: auto;
   background: var(--ink-860);
   border: var(--line);
   border-radius: var(--radius-sm);
@@ -336,6 +402,9 @@ function activateNode(node) {
   fill: var(--paper-300);
   font-family: var(--f-mono);
   font-size: 11px;
+  /* Decorative label: must never intercept pointer events intended for the
+     node's actionable circle (the label sits in the cell below its node). */
+  pointer-events: none;
 }
 
 .local-map__marker--current {
@@ -360,6 +429,12 @@ function activateNode(node) {
   fill: var(--seal-glow);
   stroke: var(--seal-400);
   stroke-width: 2;
+}
+
+/* Edges form a non-interactive connector layer: they never intercept the
+   pointer events intended for a node's actionable circle. */
+.local-map__edge {
+  pointer-events: none;
 }
 
 .local-map__edge--traversable {

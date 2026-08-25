@@ -263,7 +263,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         "narrative": '[data-testid="narrative-feed"]',
         "art": '[data-testid="scene-backdrop"]',
         "status": '[data-testid="status-panel"]',
-        "local-map": ".local-map",
+        "local-map": '[data-testid="local-map"]',
         "action-dock": "#action-dock",
         "command-drawer": '[data-testid="command-drawer"]',
     }

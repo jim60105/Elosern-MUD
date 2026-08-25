@@ -592,6 +592,59 @@ def valid_local_map_panel(**overrides) -> dict:
     return panel
 
 
+def valid_art_panel() -> dict:
+    """A schema-valid available art panel for injected snapshots.
+
+    Mirrors the exact available art form the server presenter emits
+    (``web/webclient/presentation/art.py::art_presenter``): a done scene
+    with a same-origin URL, 16:9 aspect ratio, and no placeholder.
+    """
+    return {
+        "schema_version": 1,
+        "available": True,
+        "kind": "scene",
+        "scene": {
+            "archetype": None,
+            "label": "酒館內部",
+            "subject_key": None,
+            "status": "done",
+            "url": "/art/scene/tavern_interior.png",
+            "aspect_ratio": "16:9",
+            "alt": "酒館內部",
+            "placeholder": None,
+        },
+        "portrait_catalog": {},
+    }
+
+
+def valid_character_panel(**overrides) -> dict:
+    """A schema-valid available character panel (schema version 3) for
+    injected snapshots.
+
+    Mirrors the exact available character form the server presenter emits
+    (``web/webclient/presentation/character.py``): a `magic_level` trait row,
+    a guild rank/merit, and an integer-copper wallet. ``overrides`` replace
+    top-level fields for variant cases (e.g. an active disguise).
+    """
+    panel = {
+        "schema_version": 3,
+        "available": True,
+        "kind": "character",
+        "traits": [
+            {"key": "magic_level", "label": "魔法階級", "current": 27, "max": 99},
+        ],
+        "actives": [],
+        "passives": [],
+        "equipment": [],
+        "disguise": {"active": False, "description": "", "displayed": []},
+        "guild": {"rank": "銀牌", "merit": 120},
+        "wallet": 3240,
+        "persona": {"background": None},
+    }
+    panel.update(overrides)
+    return panel
+
+
 def snapshot_envelope(epoch: str, revision: int, panels: dict, **overrides) -> dict:
     """A schema-valid full snapshot envelope (mirrors server schema)."""
     envelope = {

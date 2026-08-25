@@ -449,6 +449,7 @@ function onChoiceAction(intent) {
         :suggestions="store.view.suggestions"
         :mutations-locked="store.view.mutationsLocked"
         :open-surfaces="openSurfaces"
+        :low-hp="store.view.vitals.lowHp"
         @submit-command="onSubmitCommand"
         @choice-action="onChoiceAction"
         @drawer-closed="onDrawerClosed"
@@ -466,15 +467,21 @@ function onChoiceAction(intent) {
           v-if="panelAvailable('status') || panelAvailable('character')"
           :status="panel('status') || {}"
           :character="panel('character') || {}"
+          :low-hp="store.view.vitals.lowHp"
+          :revision="store.view.revision"
+          :epoch="store.view.epoch"
         />
+        <ArtPanel v-if="panelAvailable('art')" :art="panel('art')" />
+      </template>
+      <template #panel-right>
+        <!-- The minimap island (H2, design D9): the stage's right anchor,
+             beneath H1's top-meta pill. The `@move` wiring and `explore.move`
+             submission are untouched. -->
         <LocalMap
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
           @move="onMapMove"
         />
-        <ArtPanel v-if="panelAvailable('art')" :art="panel('art')" />
-      </template>
-      <template #panel-right>
         <CharacterPanel v-if="panelAvailable('character')" :character="panel('character')" />
         <SkillBook v-if="skillRowsAvailable()" :skills="panel('character')" />
         <ShopPanel

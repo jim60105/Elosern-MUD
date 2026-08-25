@@ -11,7 +11,10 @@ from .browser_helpers import (
     sent_action_count,
     snapshot_envelope,
     store_state,
+    valid_art_panel,
+    valid_character_panel,
     valid_local_map_panel,
+    valid_status_panel,
     wait_for_narrative_settled,
     wait_for_store_state,
 )
@@ -171,6 +174,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::theme-and-controls-remain-accessible"
     )
+    @covers_requirement(
+        "webclient-contextual-hud::vitals-pair-an-icon-a-label-and-numerals-with-a-trailing-damage-bar",
+    )
     def test_unavailable_placeholders_and_numeric_status(self):
         page = self.logged_in_page()
         # The art component is now the real renderer: no foundation placeholder
@@ -183,20 +189,28 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertTrue(art_surface.is_visible())
         # The minimap surface renders (or gracefully reports unavailable) and
         # is no longer a placeholder.
-        local_map_surface = page.locator(".local-map")
+        local_map_surface = page.locator('[data-testid="local-map"]')
         self.assertEqual(local_map_surface.count(), 1, "local-map surface present")
         self.assertTrue(local_map_surface.is_visible())
 
-        resources = page.locator(".status-gauge__value").all_inner_texts()
-        self.assertEqual(len(resources), 3, "hp, mp, sp resource rows")
-        for value in resources:
+        # H2 re-map: the preserved `status-panel__gauge-value--<key>` hooks
+        # now live on the vitals island's rows (the old `.status-gauge__value`
+        # class-literal selector is retired in favour of the data-testid hooks).
+        for key in ("hp", "mp", "sp"):
+            value = page.locator(
+                f'[data-testid="status-panel__gauge-value--{key}"]'
+            ).inner_text()
             current, maximum = value.split(" / ")
             self.assertTrue(current.isdigit(), f"current not numeric: {current!r}")
             self.assertTrue(maximum.isdigit(), f"maximum not numeric: {maximum!r}")
 
-        # The mockup gauge bars complement the mandated numeric text.
-        bars = page.locator(".status-gauge__bar").all_inner_texts()
-        self.assertEqual(len(bars), 3, "hp, mp, sp gauge bars")
+        # The mockup gauge tracks complement the mandated numeric text.
+        for key in ("hp", "mp", "sp"):
+            self.assertEqual(
+                page.locator(f'[data-testid="status-panel__gauge--{key}"]').count(),
+                1,
+                f"{key} gauge row present",
+            )
 
         header_conn = page.locator(".meta-conn").inner_text()
         self.assertIn("已連線", header_conn)
@@ -393,6 +407,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
     )
+    @covers_requirement(
+        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+    )
     def test_scrollback_unread_behavior(self):
         page = self.logged_in_page()
         narrative = page.locator('[data-testid="narrative-feed"]')
@@ -416,7 +433,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop <= 8"
                 ),
                 "description": "narrative feed scrolled to the top",
             },
@@ -434,11 +451,19 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         unread = page.locator("#narrative-unread .narrative-unread-button").inner_text()
         self.assertRegex(unread, r"↓ \d+ 則新訊息（點擊返回最新）")
 
-        # The viewport must not have been forced to the bottom.
+        # The viewport must not have been forced to the bottom. The feed uses
+        # smooth scrolling + browser scroll-anchoring, so a line landing below
+        # the fold can nudge the scroll position by a few px (reflow). The
+        # "not forced to the bottom" contract is that it stays near the top;
+        # a small offset is legitimate browser behavior, not a scroll-to-bottom.
         scroll_top_after = page.evaluate(
             "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop"
         )
-        self.assertEqual(scroll_top_after, 0)
+        self.assertLess(
+            scroll_top_after,
+            10,
+            "feed stayed near the top; not forced to the bottom",
+        )
 
         # Clicking the marker jumps to the bottom, clears the count, and hides
         # the marker.
@@ -465,7 +490,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop <= 8"
                 ),
                 "description": "narrative feed scrolled to the top",
             },
@@ -812,6 +837,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
     )
+    @covers_requirement(
+        "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"
+    )
     def test_minimap_present_in_exploration_absent_in_combat(self):
         """H1 group 8.4: the minimap is visible in exploration and hidden in combat.
 
@@ -840,7 +868,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         self.assertTrue(expl["accepted"], "the exploration snapshot was accepted")
         page.wait_for_timeout(150)
-        lm = page.locator(".local-map")
+        lm = page.locator('[data-testid="local-map"]')
         self.assertEqual(lm.count(), 1, "minimap renders in exploration mode")
         self.assertTrue(lm.is_visible(), "minimap is visible in exploration mode")
 
@@ -861,16 +889,22 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         self.assertTrue(combat["accepted"], "the combat-mode snapshot was accepted")
         page.wait_for_timeout(150)
-        lm = page.locator(".local-map")
+        lm = page.locator('[data-testid="local-map"]')
         self.assertEqual(lm.count(), 1, "the minimap element remains in the DOM")
         hidden = page.evaluate(
-            "() => { const el = document.querySelector('.local-map'); "
+            "() => { const el = document.querySelector('[data-testid=\"local-map\"]'); "
             "return el ? (el.offsetParent === null) : false; }"
         )
         self.assertTrue(hidden, "the minimap is hidden (display:none) in combat mode")
 
     @covers_requirement(
         "webclient-desktop-shell::narrative-output-remains-the-authoritative-text-surface"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
     def test_full_log_opens_in_one_action_and_escapes_with_focus_restoration(self):
         """H1 group 8.5: the full log is a one-action escape hatch.
@@ -888,6 +922,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         overlay = page.locator('[data-testid="fulllog-overlay"]')
         self.assertTrue(overlay.is_visible(), "the full log overlay is visible after one click")
+        # The open-surface registry (design D9) marks the stage recessed while
+        # an overlay is open, and the mark clears only when it closes.
+        self.assertEqual(
+            page.locator('[data-testid="elosern-stage"]').get_attribute("data-menu-open"),
+            "true",
+            "stage is marked menu-open while the full-log overlay is open",
+        )
         # While open, focus is trapped in the overlay.
         focused_overlay = page.evaluate(
             "() => { const o = document.querySelector('[data-testid=\"fulllog-overlay\"]'); "
@@ -905,12 +946,213 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             0,
             "the full log overlay is removed after Escape",
         )
+        self.assertEqual(
+            page.locator('[data-testid="elosern-stage"]').get_attribute("data-menu-open"),
+            "false",
+            "the stage mark clears once the last open surface closes",
+        )
         focus_restored = page.evaluate(
             "() => { const c = document.querySelector('[data-testid=\"narrative-fulllog-control\"]'); "
             "const a = document.activeElement; return c && c === a; }"
         )
         self.assertTrue(focus_restored, "focus is restored to the control that opened the full log")
 
+    @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-hud-island-stack-renders-as-bounded-floating-islands-not-column-cards",
+    )
+    def test_populated_island_stack_fits_its_anchor_at_both_viewports(self):
+        """H2 task 9.5: at 1440x900 and 1280x720, the left island stack,
+        the minimap island, the narrative caption, and the dock must not
+        intersect — with the condition overflow disclosed and ArtPanel
+        present and populated (design D12: the assertions run against the
+        layout that actually ships, not an idealised three-island stack)."""
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.new_page(viewport)
+                from .browser_helpers import login_and_open
+
+                login_and_open(page, self.webclient_url, self.base_url)
+                state = store_state(page)
+                # An 8-condition status panel makes the +N overflow chip
+                # render, so the assertion runs with the overflow disclosed.
+                status = valid_status_panel("艾倫·灰誓", "char-42")
+                status["conditions"] = [
+                    {
+                        "code": f"cond_{i}",
+                        "label": f"狀態{i + 1}",
+                        "severity": ["beneficial", "informational", "warning", "harmful", "critical"][i % 5],
+                        **({"remaining_seconds": i * 10} if i % 4 == 0 else {}),
+                    }
+                    for i in range(8)
+                ]
+                page.evaluate(
+                    "(args) => window.__elosernBridge.store.receive("
+                    "args.generation, 'ui_snapshot', [args.envelope], {})",
+                    {
+                        "generation": state["generation"],
+                        "envelope": snapshot_envelope(
+                            state["epoch"],
+                            state["revision"] + 1,
+                            {
+                                "status": status,
+                                "local_map": valid_local_map_panel(),
+                                "art": valid_art_panel(),
+                            },
+                            mode="exploration",
+                        ),
+                    },
+                )
+                page.wait_for_timeout(300)
+                overflow = page.locator('[data-testid="status-panel__condition-overflow"]')
+                if overflow.count() > 0:
+                    overflow.click()
+                    page.wait_for_timeout(200)
+
+                def intersect(sel_a, sel_b):
+                    return page.evaluate(
+                        """(sels) => {
+                          const a = document.querySelector(sels[0]);
+                          const b = document.querySelector(sels[1]);
+                          if (!a || !b) return false;
+                          const ra = a.getBoundingClientRect();
+                          const rb = b.getBoundingClientRect();
+                          const T = 1;
+                          return !(ra.right <= rb.left + T || rb.right <= ra.left + T ||
+                                  ra.bottom <= rb.top + T || rb.bottom <= ra.top + T);
+                        }""",
+                        [sel_a, sel_b],
+                    )
+
+                selectors = [
+                    '[data-testid="status-panel"]',
+                    '[data-testid="local-map"]',
+                    '[data-testid="narrative-feed"]',
+                    "#action-dock",
+                ]
+                for i in range(len(selectors)):
+                    for j in range(i + 1, len(selectors)):
+                        self.assertFalse(
+                            intersect(selectors[i], selectors[j]),
+                            f"{selectors[i]} intersects {selectors[j]} at {viewport}",
+                        )
+                # ArtPanel is present and populated in the left anchor
+                # (design D12), so the height budget is asserted against the
+                # real layout.
+                self.assertTrue(
+                    page.locator('[data-testid="art-panel"]').count() >= 1,
+                    "ArtPanel present in the left anchor",
+                )
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-character-head-card-renders-only-backed-identity",
+    )
+    def test_character_head_card_renders_only_backed_identity(self):
+        """H2 head-card: the glyph portrait, the numeric magic-level badge,
+        the display name, the derived magic-rank title paired with the guild
+        rank and merit, and the thousands-grouped wallet — and no race,
+        subrace, class, or faction line (none exists in either payload)."""
+        page = self.logged_in_page()
+        state = store_state(page)
+        status = valid_status_panel("艾倫·灰誓", "char-42")
+        character = valid_character_panel()
+        page.evaluate(
+            "(args) => window.__elosernBridge.store.receive("
+            "args.generation, 'ui_snapshot', [args.envelope], {})",
+            {
+                "generation": state["generation"],
+                "envelope": snapshot_envelope(
+                    state["epoch"],
+                    state["revision"] + 1,
+                    {"status": status, "character": character},
+                    mode="exploration",
+                ),
+            },
+        )
+        page.wait_for_timeout(300)
+
+        head = page.locator('[data-testid="character-head"]')
+        # Glyph portrait: first grapheme of the display name (艾).
+        self.assertEqual(page.locator('[data-testid="character-head__glyph"]').inner_text(), "艾")
+        # Numeric magic-level badge from the magic_level trait row.
+        self.assertEqual(
+            page.locator('[data-testid="character-head__badge"]').inner_text(), "27"
+        )
+        # The display name from status.actor.name.
+        self.assertEqual(
+            page.locator('[data-testid="character-head__name"]').inner_text(), "艾倫·灰誓"
+        )
+        # The rank line pairs the derived magic-rank title (level 27 → 術師)
+        # with the guild rank and merit from character.guild.
+        rank_text = page.locator('[data-testid="character-head__rank"]').inner_text()
+        self.assertIn("魔階·術師", rank_text)
+        self.assertIn("公會 銀牌", rank_text)
+        self.assertIn("功績 120", rank_text)
+        # The wallet, thousands-grouped integer copper (design D11).
+        self.assertEqual(
+            page.locator('[data-testid="character-head__wallet"]').inner_text(),
+            "錢包 3,240 銅",
+        )
+        # Disguise marker is absent when no disguise is active.
+        self.assertEqual(page.locator('[data-testid="character-head__disguise"]').count(), 0)
+        # No race / subrace / class / faction line anywhere on the card.
+        head_text = head.inner_text()
+        for token in ("種族", "職業", "陣營", "subrace", "faction", "class"):
+            self.assertNotIn(token, head_text, f"head card must not render a {token} line")
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-low-hp-presentation-state-is-derived-client-side-and-drives-the-stage-hook",
+    )
+    def test_low_hp_state_drives_the_stage_hook(self):
+        """H2 low-HP: the client derives the low-HP presentation state from
+        the committed hp ratio against the 25% display threshold and drives
+        the stage's red vignette through the existing low-HP hook. A low
+        ratio (hp 20/100 = 0.2) sets data-lowhp="true"; a healthy ratio
+        (hp 100/100 = 1.0) sets data-lowhp="false"."""
+        page = self.logged_in_page()
+        state = store_state(page)
+
+        def inject_status(hp_current: int, hp_maximum: int) -> None:
+            st = valid_status_panel("艾倫·灰誓", "char-42")
+            st["resources"] = {
+                "hp": {"current": hp_current, "maximum": hp_maximum},
+                "mp": {"current": 50, "maximum": 50},
+                "sp": {"current": 20, "maximum": 20},
+            }
+            page.evaluate(
+                "(args) => window.__elosernBridge.store.receive("
+                "args.generation, 'ui_snapshot', [args.envelope], {})",
+                {
+                    "generation": state["generation"],
+                    "envelope": snapshot_envelope(
+                        state["epoch"],
+                        state["revision"] + 1,
+                        {"status": st},
+                        mode="exploration",
+                    ),
+                },
+            )
+            page.wait_for_timeout(300)
+
+        # Low hp (0.2 <= 0.25): the stage root carries the low-HP state.
+        inject_status(20, 100)
+        self.assertEqual(
+            page.locator('[data-testid="elosern-stage"]').get_attribute("data-lowhp"),
+            "true",
+            "a committed hp ratio at or below the 25% threshold must light the stage",
+        )
+        # Healthy hp (1.0 > 0.25): the stage returns to its ordinary state.
+        inject_status(100, 100)
+        self.assertEqual(
+            page.locator('[data-testid="elosern-stage"]').get_attribute("data-lowhp"),
+            "false",
+            "a committed hp ratio above the threshold must clear the stage state",
+        )
+        page.close()
 
 
 if __name__ == "__main__":

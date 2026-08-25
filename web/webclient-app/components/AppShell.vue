@@ -64,6 +64,11 @@ const props = defineProps({
   // (AppClient) tracks — e.g. "full-log", "creation". The drawer is owned
   // here and merged in before reaching the frame.
   openSurfaces: { type: Array, default: () => [] },
+  // The derived low-HP presentation state (H2, design D5): forwarded onto
+  // HudFrame's already-declared `lowhp` prop — one prop declaration and one
+  // attribute binding, no structural edit to the frame. The stage then
+  // renders its red vignette and the HP fill renders its pulse.
+  lowHp: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["submit-command", "choice-action", "drawer-closed", "open-full-log"]);
@@ -222,6 +227,7 @@ defineExpose({ openDrawer, closeDrawer, restoreDockFocus });
     <HudFrame
       :mode="mode"
       :open-surfaces="frameOpenSurfaces"
+      :lowhp="lowHp"
     >
       <template #backdrop>
         <slot name="backdrop" />

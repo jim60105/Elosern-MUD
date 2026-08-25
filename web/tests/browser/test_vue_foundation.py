@@ -453,6 +453,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only",
         "webclient-component-showcase::every-required-ui-component-is-a-vue-sfc-with-a-documented-storybook-story",
+        "webclient-component-showcase::the-frozen-component-set-grows-only-through-a-governed-redesign-wave",
     )
     def test_storybook_stories_render_offline(self):
         """A story renders from local assets with non-local requests blocked.

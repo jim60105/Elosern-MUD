@@ -154,6 +154,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_done_scene_renders_same_origin_image(self):
         page = self.logged_in_page()
         state = store_state(page)
@@ -203,6 +204,7 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_pending_scene_without_prior_image_uses_placeholder(self):
         page = self.logged_in_page()
         panel = store_state(page)["panels"]["art"]
@@ -231,6 +233,7 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
             os.environ.pop(key, None)
 
     @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_failed_scene_uses_the_placeholder(self):
         page = self.logged_in_page()
         # Drain the queue with the failing image-generation client, then refresh
@@ -273,6 +276,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
     @covers_requirement(
         "webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content",
         "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline",
+        "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage",
     )
     def test_missing_scene_uses_the_placeholder_and_play_continues(self):
         page = self.logged_in_page()

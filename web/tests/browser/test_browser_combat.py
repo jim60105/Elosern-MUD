@@ -475,6 +475,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(actions), 2, actions)
 
     @covers_requirement("webclient-combat-menu::combat-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    @covers_requirement(
+        "webclient-contextual-hud::condition-chips-carry-a-severity-glyph-a-payload-duration-and-a-bounded-overflow",
+    )
     def test_combat_renders_at_minimum_viewport(self):
         page = self.logged_in_page(viewport=(1280, 720))
         install_outbound_recorder(page)
@@ -493,9 +496,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                 f"{key} resource must render current/maximum values",
             )
         # The seeded poisoned buff surfaces applied modifier text.
-        conditions = page.locator('[data-testid="status-panel__conditions"]').inner_text()
-        self.assertIn("agility", conditions)
-        self.assertIn("-10%", conditions)
+        # H2 re-map (task 9.3): the condition area is now icon chips; the
+        # modifier text lives in the chip's aria-label. The agility penalty
+        # is its own condition row (``poison_agility_penalty``), which carries
+        # the ``modifiers`` field — the ``poisoned`` buff code alone only
+        # carries the label and remaining seconds.
+        chip_label = page.locator(
+            '[data-testid="status-panel__condition--poison_agility_penalty"]'
+        ).get_attribute("aria-label")
+        self.assertIn("agility", chip_label)
+        self.assertIn("-10%", chip_label)
         # Action controls stay usable and disabled entries explain themselves.
         self.assertTrue(page.locator(".dock-menu").is_visible())
         self._press(page, "ArrowRight")  # skills

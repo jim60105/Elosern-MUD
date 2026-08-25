@@ -35,6 +35,7 @@ import ExplorationMenu from "../lib/exploration_menu.js";
 import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
+import { gaugeRatio, isLowHp } from "../components/vitals.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
 const MAX_NARRATIVE_LINES = 500;
@@ -1058,6 +1059,23 @@ export const useElosernStore = defineStore("elosern", () => {
     const choiceState = ChoicePointLogic.nextChoicePointState(prevChoiceState, suggestions);
     const currentItem = router.currentItem();
 
+    // The derived vitals slice (H2, design D5): the three gauge ratios plus
+    // the low-HP presentation state, computed from the committed `status`
+    // payload alone — no new payload field, no server call. An unavailable
+    // status panel yields null ratios and `lowHp: false` (not true by
+    // default); the state is non-load-bearing, so the numerals and the 危險
+    // marker carry the same information at every value.
+    const statusPanel = panels.status;
+    const vitals =
+      statusPanel && statusPanel.available !== false && statusPanel.resources
+        ? {
+            hp: gaugeRatio(statusPanel.resources.hp),
+            mp: gaugeRatio(statusPanel.resources.mp),
+            sp: gaugeRatio(statusPanel.resources.sp),
+            lowHp: isLowHp(statusPanel.resources),
+          }
+        : { hp: null, mp: null, sp: null, lowHp: false };
+
     return {
       generation: rs.generation,
       phase: rs.phase,
@@ -1074,8 +1092,9 @@ export const useElosernStore = defineStore("elosern", () => {
       connected: rs.connected,
       loggedIn,
 
-      connectionStatus: connectionStatusFor(rs.connected, loggedIn, rs.phase),
-      statusSlice: {
+       connectionStatus: connectionStatusFor(rs.connected, loggedIn, rs.phase),
+       vitals,
+       statusSlice: {
         connected: rs.connected,
         locationLabel:
           panels.status && panels.status.actor && panels.status.actor.location
