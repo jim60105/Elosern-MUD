@@ -240,10 +240,12 @@ These rules bind every sub-change.
 | H2 | `webclient-hud-02-status-islands` | H1 | the left HUD island stack: character head card (glyph portrait, magic rank, guild rank), vitals with icons + trailing ghost bar + low-HP pulse and vignette, condition chips with severity glyph + duration + `+N` overflow, the minimap island with combat hide | Planned |
 | H3 | `webclient-hud-03-action-dock` | H1 | the floating dock: icon tab bar with count badges, `.crumb` breadcrumb + back, the pane vocabulary (exit outlet / target rows / suggestion cards / target affordances), the combat participant token frame and the skill master-detail (category → group → skill → power scale → target), the 2-step forfeit confirm; `#action-dock` and keyboard parity preserved | Planned |
 | H4 | `webclient-hud-04-reference-drawers` | H1, H3 | the right-side drawer surface (scrim, focus trap, Escape, slide transition) and the migration of SkillBook / InventoryPanel + equipment paper-doll / ShopPanel / QuestBoard / LoreDrawer / a full character-status drawer out of the right column into it; the right column is removed | Planned |
-| H5 | `webclient-hud-05-overlays-and-command-line` | H1, H3 | the persistent command line (prompt chevron, always-visible field, history + hints, mode-contextual quick-word chips) replacing the collapsed drawer entry; `MapOverlay` / `SettingsOverlay` / `HelpOverlay` wired to real triggers; the `--prose-scale` A−/A/A+ control persisted through the settings surface | Planned |
+| H5 | `webclient-hud-05-overlays-and-command-line` | H1, H2, H3 | the persistent command line (prompt chevron, always-visible field, history + hints, mode-contextual quick-word chips) replacing the collapsed drawer entry; `MapOverlay` / `SettingsOverlay` / `HelpOverlay` wired to real triggers; the `--prose-scale` A−/A/A+ control persisted through the settings surface | Planned |
 | H6 | `webclient-hud-06-remap-and-finalize` | H2, H4, H5 | apply the §5.1/§5.2 supersession into `webclient-ui-design.md`; re-freeze the browser contract audit and the component manifest at their complete new sets; extend the deferred-surface assertion; flip this roadmap's Status column; final gates | Planned |
 
-**Critical path:** `H1 → H3 → {H4, H5} → H6`. H2 depends only on H1 and runs parallel to H3.
+**Critical path:** `H1 → H3 → {H4, H5} → H6`. H2 depends only on H1 and runs parallel to H3, but **H5 also depends on H2**: H2's `webclient-local-map` delta withholds the minimap's full-map
+affordance until the surface it opens is reachable, and H5 is the wave that mounts `MapOverlay`, so the
+control lands in H5 editing H2's `LocalMap.vue` — a forced serialize under §7, not a merge.
 
 **Sizing.** H1, H3 and H4 are each larger than the one-workday budget the migration roadmap set. A
 wave that cannot be verified in one workday is **split, not stretched** — splitting a wave amends this
@@ -259,7 +261,7 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
 |---|---|---|
 | `components/AppShell.vue`, `AppClient.vue` | **H1** establishes the anchor frame → each later wave edits only its own slot | a structural edit to the frame serializes behind H1 |
 | `styles/tokens.css`, `styles/app-shell.css` | **H1** | H2–H5 consume; a token addition serializes |
-| `components/StatusPanel.vue`, `LocalMap.vue`, `ArtPanel.vue` | **H2** (H1 only re-homes them) | — |
+| `components/StatusPanel.vue`, `LocalMap.vue`, `ArtPanel.vue` | **H2** (H1 only re-homes them) | one sanctioned exception: **H5** adds the minimap's full-map control to `LocalMap.vue`, because H2's own delta forbids that control existing before H5 mounts the surface it opens — a forced serialize behind H2, not a merge |
 | `components/ActionDock.vue`, `DockMenu.vue`, `DockMenuItem.vue` | **H3** | H5's quick-word chips live in the command line, not the dock |
 | `components/{SkillBook,InventoryPanel,ShopPanel,QuestBoard,LoreDrawer}.vue` | **H4** | — |
 | `components/CommandDrawer.vue`, `{Map,Settings,Help}Overlay.vue` | **H5** | — |
@@ -268,7 +270,7 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
 | `docs/superpowers/specs/2026-08-02-webclient-ui-design.md` §5.1/§5.2 | **H6** | — |
 | `openspec/specs/<capability>/spec.md` | applied only at a change's archive, topologically | never two archives of the same capability at once |
 
-**Safe parallel lanes:** H2 ∥ H3 (disjoint component sets, both consume H1's frame); H4 ∥ H5 after H3
+**Safe parallel lanes:** H2 ∥ H3 (disjoint component sets, both consume H1's frame); H4 ∥ H5 after H2 and H3
 (drawers vs. command line + overlays are file-independent). Everything else is serial.
 
 **Global rule:** coding may overlap; **merge and archive are strictly topological**.
