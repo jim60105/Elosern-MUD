@@ -112,6 +112,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
+        # The dock's data-mode can lag the committed mode on a loaded CI
+        # runner; a single get_attribute auto-wait can time out. Poll until
+        # the dock exposes the combat mode before asserting.
+        page.wait_for_function(
+            "() => { const d = document.querySelector('#action-dock'); "
+            "return d && d.getAttribute('data-mode') === 'combat'; }",
+            timeout=30000,
+        )
         self.assertEqual(self._dock_mode(page), "combat")
         focus_action_dock(page)
         # The action dock remains the documented focus target and forwards
@@ -179,15 +187,48 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # store pops the router back to the root frame, focuses the clicked
         # item, and confirms it with `source="pointer"` — exactly one
         # deliberate activation, no stray `ui_action`.
+        # Wait for the flee tab to be present before clicking; on a loaded
+        # runner the dock's tab bar can lag behind the committed depth change,
+        # so an immediate click can race the render.
+        page.wait_for_selector("#dock-tab-flee", timeout=30000)
         page.locator("#dock-tab-flee").click()
-        page.wait_for_timeout(200)
 
-        # The router returned to the root frame (depth 1).
-        self.assertEqual(store_state(page)["dockDepth"], 1)
-        # The clicked tab is now the open/focused tab.
-        self.assertEqual(
-            page.locator("#dock-tab-flee").get_attribute("aria-selected"), "true"
-        )
+        # The router returned to the root frame (depth 1) and the clicked tab is
+        # the open/focused tab. The click's `tabToRootAndConfirm` pops to root and
+        # focuses `flee` synchronously, but the confirmed `combat.flee` ends the
+        # session, so the store reverts to exploration (focus back to `move`) and
+        # the combat dock's flee tab is replaced by the exploration dock. The
+        # focused-flee state (store focus + depth + DOM selected) is therefore
+        # transient: it exists only during the short window before the
+        # exploration snapshot arrives. Poll tightly (5ms) in a single evaluate
+        # that reads the store state and the DOM attribute together, so the
+        # transient state is observed before the mode revert overwrites it.
+        observed = None
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            observed = page.evaluate(
+                """() => {
+                  const b = window.__elosernBridge;
+                  const v = b && b.store.view;
+                  const t = document.querySelector('#dock-tab-flee');
+                  return {
+                    focusKey: v && v.focus && v.focus.key,
+                    depth: v && v.dockDepth,
+                    selected: t ? t.getAttribute('aria-selected') : null,
+                  };
+                }"""
+            )
+            if (
+                observed
+                and observed["focusKey"] == "flee"
+                and observed["depth"] == 1
+                and observed["selected"] == "true"
+            ):
+                break
+            page.wait_for_timeout(5)
+        self.assertEqual(observed["focusKey"], "flee", "the clicked tab is focused")
+        self.assertEqual(observed["depth"], 1, "the router returned to the root frame")
+        self.assertEqual(observed["selected"], "true", "the clicked tab is marked selected")
         # Exactly one `combat.flee` ui_action was dispatched (no stray actions).
         self.assertEqual(sent_action_count(page, "combat.flee"), 1)
 

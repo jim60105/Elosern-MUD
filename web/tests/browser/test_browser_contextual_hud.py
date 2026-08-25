@@ -370,10 +370,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"art": art}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        image = page.locator('[data-testid="scene-backdrop-image"]')
-        self.assertEqual(image.count(), 1, "the done scene image renders behind the stage")
+        # Read the committed scene URL straight from the DOM in a single
+        # (existence + attribute) DOM read instead of `get_attribute`, which
+        # auto-waits on the image element. The fixture URL is not a served art
+        # asset, so the component's load-failure path (task 4.7) removes the
+        # `<img>` from the DOM; a locator that waits for a removed element would
+        # time out. A single evaluate that both checks presence and reads `src`
+        # is race-free (no window in which the element can vanish mid-assertion).
+        image_dom = page.evaluate(
+            """() => { const el = document.querySelector('[data-testid="scene-backdrop-image"]');
+              return { present: !!el, src: el ? el.getAttribute("src") : null }; }"""
+        )
+        self.assertTrue(
+            image_dom["present"],
+            "the done scene image renders behind the stage",
+        )
         self.assertEqual(
-            image.get_attribute("src"),
+            image_dom["src"],
             "/art/scene.png",
             "the backdrop renders the committed scene URL",
         )

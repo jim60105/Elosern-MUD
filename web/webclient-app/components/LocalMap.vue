@@ -336,10 +336,13 @@ function activateNode(node) {
   flex-direction: column;
   gap: var(--sp-2);
   box-sizing: border-box;
-  /* The island must be compressible inside the capped hud-right anchor
-     (design D9/D10): when the island content outgrows the anchor's height
-     budget, the root shrinks instead of overflowing into the action dock. */
-  min-height: 0;
+  /* The island keeps its natural content height (design D9/D10): a flex item
+     with min-height:0 + flex-shrink:1 let the capped hud-right anchor
+     compress it to the meta row, pushing the canvas/legend/detail below the
+     island's box. min-height:auto makes the island size to its content; when
+     the content outgrows the anchor's height budget, the anchor scrolls
+     (overflow-y:auto) instead of the island being crushed. */
+  min-height: auto;
   padding: 9px;
   background: var(--panel);
   backdrop-filter: blur(8px);
