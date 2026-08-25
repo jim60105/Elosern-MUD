@@ -230,14 +230,16 @@ one action-dispatch entry, respectively.
         "isMutationInFlight",
         "setAwaitingRevision",
         "isAwaitingRevision",
-        "clearRepeatGuard",
-        "press",
-        "handle",
-        "focus",
-        "focusItemByKey",
-        "confirm"
-      ]
-    },
+         "clearRepeatGuard",
+         "press",
+         "handle",
+         "focus",
+          "focusItemByKey",
+          "confirm",
+          "trail",
+          "rootMenu"
+        ]
+     },
     "narrativeInput": {
       "kind": "object",
       "defined_at": "web/static/webclient/js/plugins/goldenlayout.js",

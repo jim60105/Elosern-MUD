@@ -451,6 +451,8 @@
         },
       ],
       itemLabel: itemLabel || null,
+      // The breadcrumb names the confirmation frame (H3 webclient-hud-03-action-dock).
+      title: "確認",
     };
   }
 
@@ -463,22 +465,30 @@
     var model = {
       panel: panel,
       surfaces: present,
-      menus: {
-        root: { items: rootItems(panel), focusKey: null },
-        guild: { items: guildItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        board: { items: boardItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        quests: { items: questItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        shop: { items: shopItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        stock: { items: stockItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        sell: { items: sellableItems(panel), focusKey: null, grid: true, gridCols: 2 },
-        inventory: { items: inventoryItems(panel), focusKey: null, grid: true, gridCols: 2 },
-      },
+       menus: {
+         // Menu titles (H3 webclient-hud-03-action-dock): the breadcrumb
+         // names every stacked frame; fixed, testable labels.
+         root: { items: rootItems(panel), focusKey: null, title: "服務" },
+         guild: { items: guildItems(panel), focusKey: null, grid: true, gridCols: 2, title: "公會" },
+         board: { items: boardItems(panel), focusKey: null, grid: true, gridCols: 2, title: "任務板" },
+         quests: { items: questItems(panel), focusKey: null, grid: true, gridCols: 2, title: "任務記錄" },
+         shop: { items: shopItems(panel), focusKey: null, grid: true, gridCols: 2, title: "商店" },
+         stock: { items: stockItems(panel), focusKey: null, grid: true, gridCols: 2, title: "貨架" },
+         sell: { items: sellableItems(panel), focusKey: null, grid: true, gridCols: 2, title: "販賣" },
+         inventory: { items: inventoryItems(panel), focusKey: null, grid: true, gridCols: 2, title: "背包" },
+       },
     };
     return model;
   }
 
   function questMenuFor(model, questRow) {
-    return { items: questDetailMenu(model.panel, questRow), focusKey: null, grid: true, gridCols: 2 };
+    return {
+      items: questDetailMenu(model.panel, questRow),
+      focusKey: null,
+      grid: true,
+      gridCols: 2,
+      title: "任務詳情",
+    };
   }
 
   return {

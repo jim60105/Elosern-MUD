@@ -92,15 +92,18 @@ ART_PANEL_DOM = {
     "description": "art panel rendered and visible",
 }
 
+# H3: in combat mode the ArtPanel is hidden and the portraits render in the
+# ParticipantFrame (the 我方/敵方 token rows). This DOM readiness targets the
+# participant frame's rows.
 PORTRAIT_TILE_DOM = {
-    "selector": ".art-panel__portrait-tile",
+    "selector": ".participant-frame__row",
     "predicate": (
-        "() => { const t = document.querySelector('.art-panel__portrait-tile'); "
+        "() => { const t = document.querySelector('.participant-frame__row'); "
         "if (!t) { return false; } "
         "const r = t.getBoundingClientRect(); "
         "return r.width > 0 && r.height > 0; }"
     ),
-    "description": "a portrait tile is rendered and visible",
+    "description": "a combat participant row is rendered and visible",
 }
 
 SCENE_PLACEHOLDER_DOM = {
@@ -406,16 +409,18 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
     def _focus_combat_dock(self, page) -> None:
         """Focus the action dock and wait for the mounted, unlocked router.
 
-        The combat dock renders its first row synchronously inside the router
-        reset's focus emission, so a mounted ``#combat-row-0`` proves the
-        KeyboardRouter frame exists; waiting for ``isMutationInFlight()`` to be
-        false closes the router's submission gate. Together they guarantee a
-        subsequent Enter press reaches the KeyboardRouter and is never
-        swallowed by the command-drawer field or an unfocused editable target.
+        H3: at the combat root (depth 1) the active row container is the tab
+        bar, which carries ``data-testid="dock-menu"`` (the preserved hook that
+        moves between the tab bar and the pane). Waiting for that container
+        proves the KeyboardRouter frame is mounted; waiting for
+        ``isMutationInFlight()`` false closes the submission gate. Together
+        they guarantee a subsequent Enter press reaches the KeyboardRouter and
+        is never swallowed by the command-drawer field.
         """
         focus_action_dock(page)
         page.wait_for_function(
-            "() => !!document.querySelector('#combat-row-0')", timeout=15000
+            "() => !!document.querySelector('[data-testid=\"dock-menu\"]')",
+            timeout=15000,
         )
         wait_for_store_state(page, _mutations_unlocked, timeout=15000)
 
@@ -464,16 +469,14 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             set(art["portrait_catalog"]),
             {str(p["identity"]) for p in combat["participants"]},
         )
-        # The art renderer subscribes to the client-local focus published by
-        # the combat dock, so a portrait card with name/role renders. The
-        # combat catalog holds one entry per participant (actor + monster), so
-        # the focused portrait is the first tile; scope to it to avoid a
-        # strict-mode violation.
+        # H3: the combat portrait renders in the ParticipantFrame (the 我方/敵方
+        # token rows). Scope to the first (focused) row to avoid a strict-mode
+        # violation.
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        name = page.locator(".art-panel__portrait-context-name").first.inner_text()
-        role = page.locator(".art-panel__portrait-context-role").first.inner_text()
+        name = page.locator(".participant-frame__name").first.inner_text()
+        role = page.locator(".participant-frame__group-label").first.inner_text()
         self.assertTrue(name.strip())
-        self.assertIn(role, ("隊友", "敵方"))
+        self.assertIn(role, ("我方", "敵方"))
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)
 
@@ -493,10 +496,11 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page = self.logged_in_page((1280, 720))
         self._engage(page)
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        # The combat catalog has one entry per participant, so scope the
-        # assertions to the first (focused) tile to avoid a strict-mode violation.
-        self.assertTrue(page.locator(".art-panel__portrait-tile").first.is_visible())
-        self.assertTrue(page.locator(".art-panel__portrait-context-name").first.inner_text().strip())
+        # H3: the combat portrait renders in the ParticipantFrame; scope the
+        # assertions to the first participant row to avoid a strict-mode
+        # violation.
+        self.assertTrue(page.locator(".participant-frame__row").first.is_visible())
+        self.assertTrue(page.locator(".participant-frame__name").first.inner_text().strip())
         self.assertTrue(page.locator('[data-testid="scene-backdrop-image"]').is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
@@ -505,9 +509,10 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # The combat dock publishes the first party participant's portrait.
+        # H3: the combat participant frame (ParticipantFrame) publishes the
+        # first party participant's portrait/name.
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        first_name = page.locator(".art-panel__portrait-context-name").first.inner_text()
+        first_name = page.locator(".participant-frame__name").first.inner_text()
         combat = store_state(page)["panels"]["context_actions"]
         monster_id = next(
             p["identity"]
@@ -531,26 +536,31 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self._wait_combat_row_key(page, "target-", row_zero=True)
         page.keyboard.press("ArrowRight")  # past the actor to the enemy target
         self._wait_combat_row_key(page, "target-" + str(monster_id))
+        # H3: after navigating to the enemy target, the participant frame
+        # (ParticipantFrame) shows the monster's name in the 敵方 group.
         wait_for_store_state(
             page,
             _art_portrait_ready,
             {
-                "selector": f'[data-testid="art-panel__portrait-context--{monster_id}"]',
+                "selector": "[data-testid=\"participant-frame\"]",
                 "predicate": (
-                    f"() => {{ const el = document.querySelector('[data-testid=\"art-panel__portrait-context--{monster_id}\"]'); "
-                    f"if (!el) {{ return false; }} "
-                    f"const name = el.querySelector('.art-panel__portrait-context-name'); "
-                    f"return name && name.textContent === '{monster_name}'; }}"
+                    f"() => {{ const f = document.querySelector('[data-testid=\"participant-frame\"]');"
+                    f" if (!f) {{ return false; }}"
+                    f" const names = Array.from(f.querySelectorAll('.participant-frame__name')).map((n) => n.textContent);"
+                    f" return names.some((n) => n && n.indexOf('{monster_name}') !== -1); }}"
                 ),
-                "description": "focused portrait context shows the monster's name",
+                "description": "the participant frame (hud-left island) shows the monster's name",
             },
             timeout=15000,
         )
-        # After navigating to the enemy target, the focused portrait switches
-        # to that participant's tile. Scope to the monster's tile.
-        monster_name_shown = page.get_by_test_id(
-            f"art-panel__portrait--{str(monster_id)}"
-        ).locator(".art-panel__portrait-context-name").inner_text()
+        # The participant frame's 敵方 row shows the monster's name, distinct
+        # from the party's first name.
+        monster_name_shown = page.evaluate(
+            f"() => {{ const f = document.querySelector('[data-testid=\"participant-frame\"]');"
+            f" if (!f) {{ return null; }}"
+            f" const names = Array.from(f.querySelectorAll('.participant-frame__name')).map((n) => n.textContent);"
+            f" return names.find((n) => n && n.indexOf('{monster_name}') !== -1) || null; }}"
+        )
         self.assertNotEqual(monster_name_shown, first_name)
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)
@@ -570,10 +580,13 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # Forfeit the battle deterministically (no dice roll): the terminal
         # settlement clears the session and the catalog entry disappears in the
         # same combat update.
-        # Root order: attack, skills, items, defend, flee, forfeit.
+        # H3: the combat root is a single-row tab bar (the draft's floating
+        # panel), so the forfeit tab is reached with ArrowRight (ArrowDown is
+        # a no-op on a single-row bar). Root order: attack, skills, items,
+        # defend, flee, forfeit.
         self._focus_combat_dock(page)
         for _ in range(5):
-            page.keyboard.press("ArrowDown")
+            page.keyboard.press("ArrowRight")
             page.wait_for_timeout(60)
         page.keyboard.press("Enter")  # open the secondary Forfeit menu
         # The confirmation frame mounts before the confirming Enter.

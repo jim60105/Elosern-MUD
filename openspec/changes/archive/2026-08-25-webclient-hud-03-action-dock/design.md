@@ -381,3 +381,27 @@ None blocking. Three deferred to their owning wave:
 - Whether the `戰鬥外` badge (D14) and the look-row stat line (D10) become buildable — both wait on a
   presenter change that is out of scope for the whole roadmap; each is recorded in the deferred-
   surface assertion with the field it needs.
+
+## Preserved-contract record (tasks 1.1 / 1.3 / 1.4)
+
+### 1.1 — identifiers this change must not move
+- `#action-dock`: its `tabindex="0"`, `data-mode`, the listbox composite role, and its documented
+  focus-target status (the single tab stop at depth 1, the `dock-menu` hook moving to the active row
+  container at depth ≥ 2).
+- The `#combat-row-<i>` row-id pattern (and `#exploration-row-<i>` for the exploration root).
+- `data-item-key` with the `action-` / `target-` prefixes (the preserved item-key contract).
+- The bare G2 root keys (`move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`) and
+  the combat root keys (`attack`, `skills`, `items`, `defend`, `flee`, `forfeit`).
+- `data-testid="dock-menu"` — from this change forward it marks whichever container is the **active**
+  row container (the tab bar at depth 1, the pane at depth ≥ 2).
+
+### 1.3 — the 12 affected browser files (re-mapped in group 8)
+`web/tests/browser/browser_helpers.py`, `test_browser_art.py`, `test_browser_choicepoints.py`,
+`test_browser_combat.py`, `test_browser_creation.py`, `test_browser_exploration.py`,
+`test_browser_input_narrative.py`, `test_browser_layout.py`, `test_browser_options_surface.py`,
+`test_browser_pointer.py`, `test_browser_services.py`, `test_browser_shell.py`.
+
+### 1.4 — hooks re-mapped to `data-testid` (for H6's audit re-freeze)
+`exploration-detail`, `combat-detail`, `suggestions-section`, `action-dock-guidance`, and
+`action-dock-description`. The Node contract gate reads `action-dock-guidance` and
+`action-dock-description` from `ActionDock.vue` (carried there even when the tab bar is absent).

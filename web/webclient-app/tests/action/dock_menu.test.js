@@ -47,9 +47,12 @@ describe("DockMenu (B2 action-dock family)", () => {
   function mountMenu(props = {}) {
     const host = document.createElement("div");
     document.body.appendChild(host);
+    // H3: the pane container carries `data-testid="dock-menu"` only at
+    // depth >= 2 (the tab bar owns the hook at depth 1), so mount the menu
+    // at the pane depth to exercise the preserved row-container contract.
     wrapper = mount(DockMenu, {
       attachTo: host,
-      props: { items: AFFORDANCES, ...props },
+      props: { items: AFFORDANCES, depth: 2, ...props },
     });
     return wrapper;
   }
@@ -94,7 +97,7 @@ describe("DockMenu (B2 action-dock family)", () => {
     document.body.appendChild(w2host);
     const w2 = mount(DockMenu, {
       attachTo: w2host,
-      props: { items: AFFORDANCES, focusedKey: null },
+      props: { items: AFFORDANCES, focusedKey: null, depth: 2 },
     });
     // No focused cell: the aria-activedescendant attribute is absent.
     expect(

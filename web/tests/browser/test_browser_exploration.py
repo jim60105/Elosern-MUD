@@ -699,9 +699,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "Escape")  # back to the target-affordance menu
         page.wait_for_timeout(80)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 3)
+        # H3 (design D2): at depth >= 2 the dock renders both the root tab
+        # bar (8 root tabs) and the scrolling pane (the active frame's rows).
+        # The test's cell assertions target the pane's rows only.
         target_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'.action-dock__pane [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         # The guard's affordance menu: the scripted-talk entry plus the final
         # back cell (the exploration fixture carries no guild navigate entry).
@@ -722,7 +725,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
         interact_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
+            "'.action-dock__pane [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         expected_interact = [
             "target-" + str(target["identity"]) for target in panel["interact"]
@@ -768,9 +771,11 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
+        # H3 (design D5): the exploration root now includes the 建議 (suggestions)
+        # tab, so the root has 8 cells, not 7.
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait", "suggestions"],
             "the exploration root cells must render after Escape from Quests",
         )
         self.assertEqual(

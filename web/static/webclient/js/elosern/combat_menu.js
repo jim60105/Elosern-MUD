@@ -130,33 +130,123 @@
   // Skill list with deterministic pagination.
   // -------------------------------------------------------------------------
 
-  function pageRange(index, total) {
-    var start = Math.floor(index / PAGE_SIZE) * PAGE_SIZE;
-    return { start: start, end: Math.min(start + PAGE_SIZE, total) };
-  }
+   // H3 (webclient-hud-03-action-dock): the skill master-detail replaces the
+   // flat skill list. `categoryItems` is the category frame (one row per
+   // committed `skills[]` category group, badged with its owned-skill count);
+   // `groupItems` is the group frame, presented only when the category
+   // carries more than one sub-group — a single-sub-group category opens the
+   // skill frame directly, so no level ever offers a single choice (design
+   // D11). The skill frame lists that group's descriptors beside the detail
+   // pane (design D11/D15: no pagination — the bounded pane scrolls).
+   function categoryItems(panel) {
+     var items = [];
+     ((panel && panel.skills) || []).forEach(function (category, index) {
+       var count = 0;
+       (category.groups || []).forEach(function (group) {
+         count += (group.skills || []).length;
+       });
+       items.push({
+         key: "skill-cat-" + index,
+         label: category.label,
+         enabled: true,
+         actionId: "open-category",
+         payload: { categoryIndex: index },
+         skillCount: count,
+       });
+     });
+     return items;
+   }
 
-  function skillItems(skills, focusIdentity, page) {
-    var items = [];
-    for (var index = 0; index < skills.length; index++) {
-      var skill = skills[index];
-      var item = {
-        key: skill.key,
-        label: skill.label,
-        description: skill.description,
-        costText: skill.costText,
-        enabled: skill.enabled,
-        disabledReason: skill.disabledReason,
-        actionId: null,
-        payload: null,
+   function groupItems(panel, categoryIndex) {
+     var category = ((panel && panel.skills) || [])[categoryIndex];
+     var groups = (category && category.groups) || [];
+     var items = [];
+     groups.forEach(function (group, index) {
+       items.push({
+         key: "skill-group-" + categoryIndex + "-" + index,
+         label: group.label || group.group || "群組",
+         enabled: true,
+         actionId: "open-group",
+         payload: { categoryIndex: categoryIndex, groupIndex: index },
+       });
+     });
+     return items;
+   }
+
+   // The skill frame for one category group: the group's descriptors in the
+   // server's order, each row carrying the skill's label and resource cost
+   // beside the detail pane (the draft's `.sk` row + `.skdetail`).
+   function groupSkillItems(combat, categoryIndex, groupIndex) {
+     var panel = combat.panel;
+     var category = ((panel && panel.skills) || [])[categoryIndex];
+     var group = ((category && category.groups) || [])[groupIndex];
+     var items = [];
+     ((group && group.skills) || []).forEach(function (skill) {
+       var model = combat.skillByKey && combat.skillByKey[skill.key];
+       if (!model) {
+         return;
+       }
+       var item = {
+         key: skill.key,
+         label: model.label,
+         description: model.description,
+         costText: model.costText,
+         enabled: model.enabled,
+         disabledReason: model.disabledReason,
+         actionId: null,
+         payload: null,
+       };
+       if (model.enabled) {
+         item.actionId = "open-skill";
+         item.payload = { skillKey: skill.key };
+       }
+       items.push(item);
+     });
+     return items;
+   }
+
+   // Open a category: a single-sub-group category opens the skill frame
+   // directly; a multi-group category opens the group frame (design D11).
+   function openCategory(combat, categoryIndex) {
+     var panel = combat.panel;
+     var category = ((panel && panel.skills) || [])[categoryIndex];
+     var groups = (category && category.groups) || [];
+     if (groups.length === 1) {
+       return {
+         items: groupSkillItems(combat, categoryIndex, 0),
+         focusKey: null,
+         grid: true,
+         gridCols: 1,
+         title: groups[0].label || groups[0].group || "技能",
+       };
+     }
+      var items = groupItems(panel, categoryIndex);
+      return {
+        items: items,
+        focusKey: null,
+        grid: true,
+        gridCols: items.length,
+        title: category.label,
       };
-      if (skill.enabled) {
-        item.actionId = "open-skill";
-        item.payload = { skillKey: skill.key };
-      }
-      items.push(item);
     }
-    return items;
-  }
+
+    // H3: open one group's skill frame (a groupItem's confirm action,
+    // `open-group`): the group's descriptors beside the detail pane.
+    function openGroup(combat, categoryIndex, groupIndex) {
+      var panel = combat.panel;
+      var category = ((panel && panel.skills) || [])[categoryIndex];
+      var group = ((category && category.groups) || [])[groupIndex];
+      if (!group) {
+        return null;
+      }
+      return {
+        items: groupSkillItems(combat, categoryIndex, groupIndex),
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: group.label || group.group || "技能",
+      };
+    }
 
   // -------------------------------------------------------------------------
   // Freeform scale-choice step (element-mastery-freeform-casting).
@@ -351,18 +441,24 @@
       return skillModel(skill, byId);
     });
 
+    var rootItemsList = rootItems(panel);
+    var categoryItemsList = categoryItems(panel);
+    // The combat root is a single-row tab bar (H3 design D12): the column
+    // count equals the item count — 6 in the normal state, 1 in `recovery`.
     var menus = {
       root: {
-        items: rootItems(panel),
+        items: rootItemsList,
         focusKey: state.focusKey || null,
         grid: true,
-        gridCols: 5,
+        gridCols: rootItemsList.length,
+        title: "戰鬥",
       },
-      skills: {
-        items: skillItems(skills, state.focusIdentity, state.page || 0),
-        focusKey: state.focusKey || null,
+      categories: {
+        items: categoryItemsList,
+        focusKey: null,
         grid: true,
-        gridCols: 2,
+        gridCols: categoryItemsList.length,
+        title: "技能",
       },
       forfeit: {
         items: [
@@ -372,6 +468,7 @@
         focusKey: null,
         grid: true,
         gridCols: 2,
+        title: "投降",
       },
     };
 
@@ -409,6 +506,7 @@
         skillKey: skillKey,
         grid: true,
         gridCols: scales.length,
+        title: "威力",
       };
     }
     return openSkillTargets(combat, skillKey);
@@ -426,6 +524,7 @@
       skillKey: skillKey,
       grid: true,
       gridCols: 2,
+      title: "目標",
     };
   }
 
@@ -541,9 +640,14 @@
     RECOVERY_SECONDARY_ACTIONS: RECOVERY_SECONDARY_ACTIONS.slice(),
     PAGE_SIZE: PAGE_SIZE,
     BASIC_ATTACK_KEY: BASIC_ATTACK_KEY,
-    rootItems: rootItems,
-    buildMenus: buildMenus,
-    openSkill: openSkill,
+     rootItems: rootItems,
+     buildMenus: buildMenus,
+     categoryItems: categoryItems,
+     groupItems: groupItems,
+     groupSkillItems: groupSkillItems,
+     openCategory: openCategory,
+     openGroup: openGroup,
+     openSkill: openSkill,
     openSkillTargets: openSkillTargets,
     chooseScale: chooseScale,
     scaleLabelFor: scaleLabelFor,

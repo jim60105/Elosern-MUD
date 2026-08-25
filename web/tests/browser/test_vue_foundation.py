@@ -15,7 +15,9 @@ blocked (webclient-vue-02-showcase-core).
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import tempfile
 import threading
 import unittest
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -43,6 +45,30 @@ def _store_active(state: dict) -> bool:
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
+
+# Mirror of the component-coverage gate's `title:` extraction (the same
+# regex the gate applies to every `*.stories.js` file under web/webclient-app).
+STORY_TITLE_RE = re.compile(r"""title:\s*["'`]([^"'`]+)["'`]""")
+
+
+def _collect_story_titles() -> set[str]:
+    """Collect the Storybook story titles the component-coverage gate sees.
+
+    Mirrors `scripts/component-coverage.mjs`'s collector: walk
+    `web/webclient-app` for `*.stories.js`, skip `node_modules` and
+    dot-directories, and extract each file's `title:` literal.
+    """
+    titles: set[str] = set()
+    app_root = REPO_ROOT / "web" / "webclient-app"
+    for path in app_root.rglob("*.stories.js"):
+        parts = path.relative_to(app_root).parts
+        if "node_modules" in parts or any(part.startswith(".") for part in parts):
+            continue
+        match = STORY_TITLE_RE.search(path.read_text(encoding="utf-8"))
+        if match:
+            titles.add(match.group(1))
+    return titles
+
 
 # The deterministic story rendered by the offline-rendering check: the
 # narrative centerpiece bound to the fixture sample.
@@ -796,6 +822,91 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertFalse(enter_result["focusEnabled"], "the pushed move submenu's first row is the disabled move-empty item")
         self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
         self.assertTrue(enter_result["prevented"])
+
+    @covers_requirement(
+        "webclient-component-showcase::the-frozen-component-set-grows-only-through-a-governed-redesign-wave"
+    )
+    def test_frozen_manifest_grows_only_in_lockstep_with_stories(self):
+        """The component-coverage gate enforces the frozen required set.
+
+        A governed redesign wave adds a component only in lockstep: the same
+        change adds the manifest title, ships the Storybook story (bound to
+        deterministic offline `args:` values), and extends the spec. The gate
+        (`scripts/component-coverage.mjs`) fails closed when a manifest title
+        has no matching story, a registered story has no manifest entry (the
+        component is wired into the live app before its manifest row exists),
+        or a frozen manifest is empty.
+        """
+        collected = _collect_story_titles()
+        self.assertGreater(
+            len(collected),
+            0,
+            "the webclient-app must register story titles for the gate probe",
+        )
+
+        def run_gate(manifest: dict) -> subprocess.CompletedProcess:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "component-manifest.json"
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                return subprocess.run(
+                    ["node", "scripts/component-coverage.mjs", str(path)],
+                    cwd=str(REPO_ROOT),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+
+        # Lockstep pass: the wave that ships the story also adds its
+        # manifest title in the same change — the gate passes with the
+        # complete set re-frozen.
+        lockstep = run_gate({"required": sorted(collected), "frozen": True})
+        self.assertEqual(
+            lockstep.returncode,
+            0,
+            "a lockstep wave (manifest title + story in the same change) "
+            "must pass the component-coverage gate:\n"
+            + lockstep.stdout
+            + lockstep.stderr,
+        )
+
+        # A manifest title added without a matching story: the wave edited
+        # the manifest alone, so the gate fails and the change cannot land.
+        missing_story = run_gate(
+            {"required": sorted(collected | {"Core/PhantomComponent"}), "frozen": True}
+        )
+        self.assertNotEqual(
+            missing_story.returncode,
+            0,
+            "a manifest edit without a matching story must fail the gate",
+        )
+        self.assertIn("Core/PhantomComponent", missing_story.stderr)
+        self.assertIn("missing a story file", missing_story.stderr)
+
+        # A registered story whose title is absent from the manifest: the
+        # component is wired into the live app before its story/manifest
+        # entry exists, so the frozen set would grow silently.
+        dropped = sorted(collected)[0]
+        unlisted = run_gate({"required": sorted(collected - {dropped}), "frozen": True})
+        self.assertNotEqual(
+            unlisted.returncode,
+            0,
+            "a story without a manifest entry must fail the gate",
+        )
+        self.assertIn(dropped, unlisted.stderr)
+        self.assertIn("missing from the", unlisted.stderr)
+
+        # A frozen manifest with an empty required set fails closed: the
+        # complete set cannot be empty while frozen.
+        empty_frozen = run_gate({"required": [], "frozen": True})
+        self.assertNotEqual(
+            empty_frozen.returncode,
+            0,
+            "a frozen required-component manifest must not be empty",
+        )
+        self.assertIn(
+            "frozen required-component manifest is empty",
+            empty_frozen.stderr,
+        )
 
 
 if __name__ == "__main__":

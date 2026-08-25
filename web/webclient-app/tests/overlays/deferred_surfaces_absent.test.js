@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import manifest from "../../component-manifest.json";
+import DockMenu from "../../components/DockMenu.vue";
+import SkillDetailPane from "../../components/SkillDetailPane.vue";
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
@@ -64,19 +67,77 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
     // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
-    // extends it by three — `Data/CharacterHead`, `Data/VitalsTrack`,
-    // `Data/ConditionChips` (29 → 32). H6 re-freezes at the complete new
-    // set.
-    expect(manifest.required).toHaveLength(32);
+    // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
+    // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
+    // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
+    // and `Data/ParticipantFrame` (32 → 36). H6 re-freezes at the complete
+    // new set.
+    expect(manifest.required).toHaveLength(36);
     // The four full overlays complete the required set (B5's new family).
     for (const title of [
       "Overlays/MapOverlay",
       "Overlays/SettingsOverlay",
       "Overlays/HelpOverlay",
       "Overlays/CreationOverlay",
+      "Action/DockTabBar",
+      "Action/DockBreadcrumb",
+      "Action/SkillDetailPane",
+      "Data/ParticipantFrame",
     ]) {
       expect(manifest.required).toContain(title);
     }
+  });
+
+  // H3 (task 7.3): the dock renders no `戰鬥外` skill badge (design D14 —
+  // the `combat_out_of_combat` flag is serialized by no presenter), no
+  // look-row stat line (waits on a not-yet-committed `status` field), and
+  // no exploration-row portrait (waits on a not-yet-committed `portrait_ref`
+  // for exploration rows). Each deferred surface is named by the field it
+  // waits on, so a regression that invents one fails at the unit gate.
+  it("the dock renders no 戰鬥外 skill badge (waits on the combat_out_of_combat flag)", () => {
+    const skill = {
+      key: "fireball",
+      label: "火球",
+      description: "凝聚火焰魔力。",
+      costText: "MP 14",
+      targetSpec: "single",
+      element: "fire",
+      enabled: true,
+      disabledReason: null,
+      freeformScales: [],
+      scale: 1,
+    };
+    const wrapper = mount(SkillDetailPane, { props: { skill } });
+    // The 戰鬥外 badge is a deferred surface: it waits on the
+    // `combat_out_of_combat` flag, which no presenter serializes.
+    expect(wrapper.find('[data-testid="skill-ooc"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("戰鬥外");
+  });
+
+  it("the dock renders no look-row stat line (waits on the status field)", () => {
+    // A look (nav) pane row: the stat line is deferred — it waits on a
+    // `status` field that the look panel does not commit yet.
+    const items = [
+      { key: "look-room", label: "查看房間", enabled: true, action_id: "explore.look", params: { room: true } },
+      { key: "entity-5", label: "南門守衛", enabled: true, action_id: "explore.look", params: { target_id: 5 }, kind: "npc" },
+    ];
+    const wrapper = mount(DockMenu, {
+      props: { items, focusedKey: "entity-5", idPrefix: "exploration-row" },
+    });
+    expect(wrapper.find('[data-testid="look-row-stat"]').exists()).toBe(false);
+  });
+
+  it("the dock renders no exploration-row portrait (waits on the portrait_ref field)", () => {
+    // An exploration (nav) row: the portrait slot is deferred — it waits on
+    // a `portrait_ref` field the exploration panel does not commit yet.
+    const items = [
+      { key: "entity-5", label: "南門守衛", enabled: true, action_id: "explore.look", params: { target_id: 5 }, kind: "npc" },
+    ];
+    const wrapper = mount(DockMenu, {
+      props: { items, focusedKey: "entity-5", idPrefix: "exploration-row" },
+    });
+    expect(wrapper.find('[data-testid="exploration-row-portrait"]').exists()).toBe(false);
+    expect(wrapper.find("img").exists()).toBe(false);
   });
 
   it("asserts the deferred surfaces are absent from the required set", () => {
