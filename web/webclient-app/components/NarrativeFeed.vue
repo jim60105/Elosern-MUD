@@ -97,7 +97,13 @@ export default {
     function scrollToBottom() {
       const el = feedRoot.value;
       if (el) {
+        // The feed's stylesheet sets `scroll-behavior: smooth` for user
+        // programmatic scrolls; the deterministic auto-scroll must be instant,
+        // so override the behavior for this single assignment.
+        const prevBehavior = el.style.scrollBehavior;
+        el.style.scrollBehavior = "auto";
         el.scrollTop = el.scrollHeight;
+        el.style.scrollBehavior = prevBehavior;
       }
     }
 
@@ -105,15 +111,28 @@ export default {
     // exactly like the legacy single-owner check around each insertion.
     // Watch the array length (not the array reference) so a push or a trim
     // both trigger the auto-scroll / unread logic.
+    //
+    // `lastSettledSh` tracks the content height of the last settled render.
+    // The stream-end choice-point block (webclient-action-choicepoints) swaps
+    // its generating line / ready group in place, and that in-place re-render
+    // can complete before a watcher callback reads the DOM, so the
+    // "reader was tracking the stream end" decision for a block swap is made
+    // against the last settled geometry, never the live mid-swap DOM.
+    const lastSettledSh = ref(0);
+
     watch(
       () => props.lines.length,
       (newLen, oldLen) => {
         const added = Math.max(0, newLen - (oldLen ?? 0));
-        if (added === 0) {
-          return;
-        }
         const wasAtBottom = atBottom();
         void nextTick().then(() => {
+          const el = feedRoot.value;
+          if (el) {
+            lastSettledSh.value = el.scrollHeight;
+          }
+          if (added === 0) {
+            return;
+          }
           if (wasAtBottom) {
             scrollToBottom();
           } else {
@@ -121,6 +140,37 @@ export default {
           }
         });
       },
+    );
+
+    // The stream-end choice-point block (webclient-action-choicepoints): the
+    // generating line and the taller ready group are the SAME DOM node swapping
+    // content in place, so the `lines.length` watcher alone would not keep the
+    // stream end visible across the swap. Watch the suggestions status (sync
+    // flush, at the store commit) and auto-scroll for a reader pinned at the
+    // bottom, deciding "was at the stream end" from the settled height that
+    // preceded the current block content (`preBlockSh`), never the mid-swap DOM.
+    const preBlockSh = ref(0);
+
+    watch(
+      () => (props.suggestions && props.suggestions.status) || "none",
+      (status) => {
+        const el = feedRoot.value;
+        const wasAtBottom =
+          !el || preBlockSh.value - el.scrollTop - el.clientHeight < AT_BOTTOM_SLACK;
+        void nextTick().then(() => {
+          const el2 = feedRoot.value;
+          if (el2) {
+            // `lastSettledSh` still holds the pre-swap height here; hand it to
+            // `preBlockSh` as the reference for the next in-place swap.
+            preBlockSh.value = lastSettledSh.value;
+            lastSettledSh.value = el2.scrollHeight;
+          }
+          if (wasAtBottom) {
+            scrollToBottom();
+          }
+        });
+      },
+      { flush: "sync" },
     );
 
     function onScroll() {

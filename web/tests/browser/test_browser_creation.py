@@ -984,8 +984,12 @@ class ViewportCreationJourney(CreationBrowserTest):
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
-        # Narrative and status-unavailable surfaces remain visible.
-        self.assertTrue(page.locator('[data-testid="narrative-feed"]').is_visible())
+        # H1 mode-gate: the narrative feed is display:none in creation mode
+        # (HudFrame's CSS-only visibility gate), not merely dimmed.
+        self.assertFalse(
+            page.locator('[data-testid="narrative-feed"]').is_visible(),
+            "the narrative feed is display:none in creation mode",
+        )
         placeholder_texts = page.locator(".elosern-placeholder").all_inner_texts()
         self.assertTrue(
             all("尚未開放" in text for text in placeholder_texts),

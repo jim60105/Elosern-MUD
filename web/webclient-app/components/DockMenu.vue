@@ -52,6 +52,11 @@ const rows = computed(() =>
   })),
 );
 
+// The exit-outlet pane renders one tile per exit: the standard `back` row
+// (the breadcrumb chevron owns the close control) is a navigation cell, not
+// an exit (task 5.4).
+const outletRows = computed(() => rows.value.filter((row) => row.item.key !== "back"));
+
 const focusedRow = computed(
   () => rows.value.find((row) => row.key === props.focusedKey) ?? null,
 );
@@ -147,9 +152,9 @@ watch(
       <!-- OUTLET: exit tiles — direction glyph, destination name, no
            sub-line when the destination is not in the committed lattice
            (task 5.4). -->
-      <div v-if="paneKind === 'outlet'" class="dock-menu__outlet" :style="paneGridStyle">
-        <button
-          v-for="row in rows"
+       <div v-if="paneKind === 'outlet'" class="dock-menu__outlet" :style="paneGridStyle">
+         <button
+           v-for="row in outletRows"
           :id="row.rowId"
           type="button"
           role="option"

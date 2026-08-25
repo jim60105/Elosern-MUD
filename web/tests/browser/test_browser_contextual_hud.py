@@ -62,7 +62,11 @@ def _exploration_panel(interact_targets: list, move_rows: list | None = None) ->
         "available": True,
         "kind": "exploration",
         "move": move_rows or [],
-        "look": {"room": None, "entities": [], "objects": []},
+        "look": {
+            "room": {"identity": 43, "display_name": "南門", "room": True},
+            "entities": [],
+            "objects": [],
+        },
         "interact": interact_targets,
         "character": {"available": False},
         "quests": {"available": False},
@@ -249,7 +253,7 @@ def _art_panel(portrait_refs: list) -> dict:
     return {
         "schema_version": 1,
         "available": True,
-        "kind": "art",
+        "kind": "scene",
         "scene": {
             "archetype": None,
             "label": "南門街道",
@@ -490,7 +494,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
         # Open the command drawer too: the mark stays while two surfaces are open.
-        page.locator(".drawer-entry").click()
+        # The full-log overlay is an aria-modal dialog that intercepts pointer
+        # events, so the drawer opens through the shell's `/` key (the shell
+        # keyboard contract), not through the pointer-clickable `.drawer-entry`.
+        page.keyboard.press("/")
+        page.wait_for_timeout(100)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "true",
@@ -696,7 +704,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
         )
         context_actions = _exploration_context_actions_panel(
-            _suggestions_ready(["查看四周", "查看物品"])
+            _suggestions_ready(["查看四周", "查看物品", "查看角色"])
         )
         _inject_snapshot(
             page,
@@ -940,7 +948,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             if cmd == "ui_action" and args and args[0].get("action_id") == "combat.forfeit"
         ]
         self.assertEqual(
-            forfeit[0].get("session_id"),
+            forfeit[0]["payload"]["session_id"],
             "browser-combat-0001",
             "the forfeit action carries the current session identifier",
         )

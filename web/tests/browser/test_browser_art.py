@@ -258,7 +258,7 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
                     "() => { const els = document.querySelectorAll('[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]'); "
                     "if (els.length !== 1) { return false; } "
                     "const el = els[0]; const r = el.getBoundingClientRect(); "
-                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }",
+                    "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
                 ),
                 "description": "single visible scene placeholder inside the scene frame",
             },

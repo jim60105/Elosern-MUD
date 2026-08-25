@@ -202,8 +202,8 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             page.get_attribute(VUE_ROOT, "data-elosern-stage"),
-            "showcase-core",
-            "the B1 core-family AppShell must be the mounted stage",
+            "contextual-hud",
+            "the H1 contextual HUD AppShell is the mounted stage",
         )
         self.assertEqual(
             page.get_attribute(VUE_ROOT, "data-elosern-mode"),

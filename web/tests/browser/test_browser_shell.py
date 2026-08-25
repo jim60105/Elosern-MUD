@@ -1132,8 +1132,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         (hp 100/100 = 1.0) sets data-lowhp="false"."""
         page = self.logged_in_page()
         state = store_state(page)
+        revision_cursor = state["revision"]
 
         def inject_status(hp_current: int, hp_maximum: int) -> None:
+            nonlocal revision_cursor
+            # The reducer admits only strictly newer revisions (protocol.js
+            # rejects `not_newer`), so each injection must advance the
+            # revision cursor.
+            revision_cursor += 1
             st = valid_status_panel("艾倫·灰誓", "char-42")
             st["resources"] = {
                 "hp": {"current": hp_current, "maximum": hp_maximum},
@@ -1147,7 +1153,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     "generation": state["generation"],
                     "envelope": snapshot_envelope(
                         state["epoch"],
-                        state["revision"] + 1,
+                        revision_cursor,
                         {"status": st},
                         mode="exploration",
                     ),

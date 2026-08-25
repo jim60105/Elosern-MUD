@@ -151,6 +151,18 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             }"""
         )
 
+    def _scroll_feed_to_bottom(self, page):
+        """Pin the reader to the stream end so appended lines keep the end
+        visible (the feed auto-scrolls only while the reader is at the
+        bottom; a taller ready group would otherwise count as unread)."""
+        page.evaluate(
+            """() => {
+                const n = document.querySelector('[data-testid="narrative-feed"]');
+                if (n) { n.scrollTop = n.scrollHeight; }
+            }"""
+        )
+        page.wait_for_timeout(100)
+
     def _section(self, page):
         return page.evaluate(
             "document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
@@ -246,6 +258,10 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         self._wait_stream_block_count(page, 0)
 
         self._teleport_to_plaza(page)
+        # Pin the reader to the stream end: the generating line mount and
+        # the taller ready replacement both auto-scroll only while the
+        # reader is at the bottom (scroll-keep).
+        self._scroll_feed_to_bottom(page)
 
         def _generating(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
@@ -306,6 +322,9 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
     def test_text_after_ready_moves_the_block_to_the_stream_end(self):
         page = self._open_plaza_stream_page()
         self.assertTrue(self._stream_is_last_element(page))
+        # Pin the reader to the stream end so the appended look text and the
+        # relocated block keep the end visible (scroll-keep).
+        self._scroll_feed_to_bottom(page)
 
         # A look command lands narrative text after the ready commit; the
         # block must relocate to the new stream end (text between the older
@@ -481,6 +500,11 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         page = self._open_plaza_stream_page()
         # Walk through the dock into the scripted-transport-failure room.
         self._move_to_empty_ground(page)
+        # The move leaves the router inside the 移動 submenu (depth 2). The
+        # legacy suggestions section only renders at the root frame, so pop
+        # one level: Escape returns focus to the root frame (design D2/D10).
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(100)
 
         def _section_shown(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")

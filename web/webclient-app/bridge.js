@@ -264,7 +264,14 @@ export function createWindowBridge(store) {
       return;
     }
     const claimed = store.focusPress(event.key, !!event.repeat);
-    if (claimed && CLAIMED_KEYS.includes(event.key)) {
+    // H3 (task 2.7): the single-row tab bar grid makes vertical presses
+    // no-ops (and a single-column grid makes horizontal presses no-ops), but
+    // while a dock frame is mounted the arrow keys stay claimed, so the
+    // handler prevents the page from scrolling or leaking the key to the text
+    // path even when the router's move is a no-op.
+    const ARROW_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+    const frameMounted = !!(store.view && store.view.dockDepth > 0);
+    if ((claimed || (frameMounted && ARROW_KEYS.includes(event.key))) && CLAIMED_KEYS.includes(event.key)) {
       event.preventDefault();
     }
   }

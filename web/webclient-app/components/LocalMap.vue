@@ -332,10 +332,14 @@ function activateNode(node) {
    the reduced-motion block reaches it at once. The root keeps the
    load-bearing `.local-map` class that H1's mode-gate CSS selects on. */
 .local-map {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  box-sizing: border-box;
+   display: flex;
+   flex-direction: column;
+   gap: var(--sp-2);
+   box-sizing: border-box;
+   /* The island must be compressible inside the capped hud-right anchor
+      (design D9/D10): when the island content outgrows the anchor's height
+      budget, the root shrinks instead of overflowing into the action dock. */
+   min-height: 0;
   padding: 9px;
   background: var(--panel);
   backdrop-filter: blur(8px);

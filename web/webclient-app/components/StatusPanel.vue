@@ -45,9 +45,14 @@ const props = defineProps({
    the shared island chrome (design D2.1). The anchor's own 9px gap
    separates the islands. */
 .island-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  font-family: var(--f-sans);
-}
+   display: flex;
+   flex-direction: column;
+   gap: 9px;
+   /* The stack root is a transparent container; each child island carries
+      the shared island chrome (design D2.1). The anchor's own 9px gap
+      separates the islands. `min-height: 0` lets the whole stack compress
+      inside the capped hud-left anchor instead of overflowing the budget. */
+   min-height: 0;
+   font-family: var(--f-sans);
+ }
 </style>

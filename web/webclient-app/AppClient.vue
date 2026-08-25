@@ -535,7 +535,13 @@ function onChoiceAction(intent) {
           :revision="store.view.revision"
           :epoch="store.view.epoch"
         />
-        <ArtPanel v-if="panelAvailable('art')" :art="panel('art')" />
+        <!-- H3 (task 6.3): the art catalog strip is absent while the
+             participant frame is mounted (combat mode); the frame owns the
+             catalog there. -->
+        <ArtPanel
+          v-if="panelAvailable('art') && store.view.mode !== 'combat'"
+          :art="panel('art')"
+        />
       </template>
       <template #panel-right>
         <!-- The minimap island (H2, design D9): the stage's right anchor,
@@ -545,12 +551,6 @@ function onChoiceAction(intent) {
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
           @move="onMapMove"
-        />
-        <!-- H3 (task 6.3): the art catalog strip is absent while the
-             participant frame is mounted (combat mode). -->
-        <ArtPanel
-          v-if="panelAvailable('art') && store.view.mode !== 'combat'"
-          :art="panel('art')"
         />
         <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame renders in
              the stage's right anchor, combat-only. -->
