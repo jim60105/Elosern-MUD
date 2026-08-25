@@ -124,7 +124,7 @@ Verified against `web/webclient/presentation/` and `web/webclient/actions/regist
 | Condition chips with severity + duration | `status.conditions[].{code,label,severity,remaining_seconds,modifiers}` | **backed** |
 | Minimap fog-of-war | `local_map.nodes[].visibility` ∈ current / visible_unvisited / visible_visited / remembered | **backed** |
 | Wallet, guild rank, merit, equipment, disguise true-vs-displayed | `character.{wallet,guild,equipment,disguise}` | **backed** |
-| Held-item bag | `services.inventory.rows[]` (bounded to 32 + `pagination.inventory_total`) | **backed, bounded** |
+| Held-item bag | `services.inventory.rows[]`, bounded to 32 (`MAX_INVENTORY_ROWS`) | **backed, bounded — but the true total is NOT surfaced**: `pagination.inventory_total` is `len(inventory.rows)` (`world/rules/service_view.py:757`), i.e. the *capped* count, so a bag holding more than 32 kinds cannot say how many it hides. The UI states the ceiling in words and never renders "32 of N". |
 | World date/time | envelope `server_time` (already rendered in the top bar) | **backed** |
 | Player's own portrait outside combat | `world/rules/art_view.py:176` — *"The actor itself is never a present focusable subject of their own exploration catalog"* | **not backed** — glyph placeholder only, exactly as the 設計稿 itself draws it |
 | Race / subrace / class / faction on the character card | `character` payload carries `traits`, `equipment`, `disguise`, `guild`, `wallet`, `persona.background` — no race/class/faction fields | **not backed** |
@@ -301,6 +301,14 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
   `.local-map__*`, `.quest-board__*`, `.status-gauge__*` literal selectors, several of which are also
   pinned in spec *text*. → §5's per-wave re-map rule plus H6's re-freeze; the preserved-id list is
   frozen up front so `#action-dock`-based tests (11 files) never move.
+- **Two pre-existing defects surfaced by the gap analysis, each fixed by the wave that touches it.**
+  `stores/elosern.js:703-705`'s `openCharacter` branch sets `activeSubDock = "character"` and pushes no
+  frame — the Character dock root has been a silent no-op ever since the permanently-visible right
+  column *was* the character surface; **H4** gives it the surface it always implied.
+  `QuestBoard.vue:155-161` dispatches the destructive `guild.quest_abandon` straight from a click with
+  no confirmation, while the dock path has required a two-step confirm since the services wave; **H4**
+  brings the pointer path to parity. Neither is new work invented by this roadmap — both are contract
+  violations the old layout hid, and neither may be left for H6 to sweep up.
 - **The settings overlay emits actions the server does not allowlist.** `SettingsOverlay.vue:74` emits
   `options.type_scale` (and siblings), but `options.dismiss` is the *only* allowlisted `options.*`
   action (`web/webclient/actions/registry.py:350`). The mismatch has never fired because the overlay is
