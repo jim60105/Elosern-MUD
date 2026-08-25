@@ -144,14 +144,14 @@ const PORTRAIT_STYLE = {
 
 <style scoped>
 .art-panel {
-   display: flex;
-   flex-direction: column;
-   gap: var(--sp-3);
-   box-sizing: border-box;
-   /* Compressible inside the capped island anchors (design D12): when the
-      panel content outgrows the anchor budget the root shrinks instead of
-      overflowing the budget. */
-   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  box-sizing: border-box;
+  /* Compressible inside the capped island anchors (design D12): when the
+     panel content outgrows the anchor budget the root shrinks instead of
+     overflowing the budget. */
+  min-height: 0;
   padding: var(--sp-3) var(--sp-4);
   background: var(--panel);
   border: var(--line);

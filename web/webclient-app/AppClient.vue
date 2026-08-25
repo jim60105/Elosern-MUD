@@ -263,44 +263,44 @@ const dockItems = computed(() => {
           message: item.disabledReason.message,
         };
       }
-       if (item.actionId) {
-         normalized.action_id = item.actionId;
-         normalized.params = item.payload || {};
-       } else {
-         // Open items (Attack / Skills / Forfeit) drive local submenus, not an
-         // OOB action — classify them as local navigation cells.
-         normalized.navigation = true;
-         normalized.surface = item.key;
-       }
-       if (item.description) {
-         normalized.description = item.description;
-       }
-       // A skill item's cost text (e.g. "MP 20") — the detail pane names the
-       // focused skill's cost.
-       if (item.costText) {
-         normalized.cost_text = item.costText;
-       }
-       // H3 (task 5.1): the pane-kind classifier reads these fields off the
-       // normalized items (the scale step is detected by the `choose-scale`
-       // action, the AREA targets by `selected` / `toggle-target`).
-       normalized.scaleChoice = item.scaleChoice === true;
-       normalized.direction = item.direction ?? null;
-       normalized.destination = item.destination ?? null;
-       normalized.kind = item.kind ?? null;
-       return normalized;
+      if (item.actionId) {
+        normalized.action_id = item.actionId;
+        normalized.params = item.payload || {};
+      } else {
+        // Open items (Attack / Skills / Forfeit) drive local submenus, not an
+        // OOB action — classify them as local navigation cells.
+        normalized.navigation = true;
+        normalized.surface = item.key;
+      }
+      if (item.description) {
+        normalized.description = item.description;
+      }
+      // A skill item's cost text (e.g. "MP 20") — the detail pane names the
+      // focused skill's cost.
+      if (item.costText) {
+        normalized.cost_text = item.costText;
+      }
+      // H3 (task 5.1): the pane-kind classifier reads these fields off the
+      // normalized items (the scale step is detected by the `choose-scale`
+      // action, the AREA targets by `selected` / `toggle-target`).
+      normalized.scaleChoice = item.scaleChoice === true;
+      normalized.direction = item.direction ?? null;
+      normalized.destination = item.destination ?? null;
+      normalized.kind = item.kind ?? null;
+      return normalized;
     });
   }
     return [];
- });
+});
 
- // H3 (task 3.2): the active frame's pane kind, derived from the committed
- // `dockItems` (the single navigation state, design D1). Exposed here so the
- // dock's tab bar + pane render from one commit; the pane host (DockMenu)
- // re-derives the same kind internally for its row variants.
- const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
+// H3 (task 3.2): the active frame's pane kind, derived from the committed
+// `dockItems` (the single navigation state, design D1). Exposed here so the
+// dock's tab bar + pane render from one commit; the pane host (DockMenu)
+// re-derives the same kind internally for its row variants.
+const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
 
- // H3 (task 3.2): the root frame's items (the stable hierarchical root or the
- // combat root) normalized for the dock's tab bar — the tab bar renders these
+// H3 (task 3.2): the root frame's items (the stable hierarchical root or the
+// combat root) normalized for the dock's tab bar — the tab bar renders these
 // while the pane follows the current frame, both from one commit.
 const rootItems = computed(() => {
   const menu = store.view.rootMenu;

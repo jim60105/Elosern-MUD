@@ -152,9 +152,9 @@ watch(
       <!-- OUTLET: exit tiles — direction glyph, destination name, no
            sub-line when the destination is not in the committed lattice
            (task 5.4). -->
-       <div v-if="paneKind === 'outlet'" class="dock-menu__outlet" :style="paneGridStyle">
-         <button
-           v-for="row in outletRows"
+      <div v-if="paneKind === 'outlet'" class="dock-menu__outlet" :style="paneGridStyle">
+        <button
+          v-for="row in outletRows"
           :id="row.rowId"
           type="button"
           role="option"
@@ -184,11 +184,11 @@ watch(
           :aria-selected="row.key === focusedKey"
           class="dock-menu__nav-row"
           :class="{ 'dock-menu__nav-row--focused': row.key === focusedKey }"
-           :data-item-key="row.key"
-           tabindex="-1"
-           @click="onCellClick(row)"
-         >
-           <span v-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>
+          :data-item-key="row.key"
+          tabindex="-1"
+          @click="onCellClick(row)"
+        >
+          <span v-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>
           <div class="dock-menu__nav-text">
             <span class="dock-menu__nav-name">{{ row.item.label }}</span>
             <span v-if="row.item.kind" class="dock-menu__nav-sub">{{ row.item.kind }}</span>
@@ -219,11 +219,11 @@ watch(
             :aria-selected="row.key === focusedKey"
             class="dock-menu__aff-btn"
             :class="{ 'dock-menu__aff-btn--focused': row.key === focusedKey }"
-             :data-item-key="row.key"
-             tabindex="-1"
-             @click="onCellClick(row)"
-           >
-             <span class="dock-menu__aff-label">{{ row.item.label }}</span>
+            :data-item-key="row.key"
+            tabindex="-1"
+            @click="onCellClick(row)"
+          >
+            <span class="dock-menu__aff-label">{{ row.item.label }}</span>
             <span v-if="!row.item.enabled" class="dock-menu__aff-reason">{{ row.reason || "（無法使用）" }}</span>
           </button>
         </div>
@@ -256,11 +256,11 @@ watch(
           :aria-selected="row.key === focusedKey"
           class="dock-menu__skill"
           :class="{ 'dock-menu__skill--on': row.key === focusedKey }"
-           :data-item-key="row.key"
-           tabindex="-1"
-           @click="onCellClick(row)"
-         >
-           <span class="dock-menu__skill-name">{{ row.item.label }}</span>
+          :data-item-key="row.key"
+          tabindex="-1"
+          @click="onCellClick(row)"
+        >
+          <span class="dock-menu__skill-name">{{ row.item.label }}</span>
           <span v-if="row.item.cost_text" class="dock-menu__skill-cost">{{ row.item.cost_text }}</span>
           <span v-if="row.item.selected" class="dock-menu__skill-check" aria-hidden="true">✓</span>
         </button>
@@ -281,14 +281,14 @@ watch(
               'dock-menu__token--foe': row.item.team === 'foes',
               'dock-menu__token--pressed': row.item.selected,
             }"
-           :aria-pressed="row.item.selected"
-           :data-item-key="row.key"
-           tabindex="-1"
-           @click="onCellClick(row)"
-         >
-           {{ row.item.label }}
-         </button>
-       </div>
+          :aria-pressed="row.item.selected"
+          :data-item-key="row.key"
+          tabindex="-1"
+          @click="onCellClick(row)"
+        >
+          {{ row.item.label }}
+        </button>
+      </div>
 
       <!-- SCALES: the 威力 step (task 6.6): the server-computed `mp_cost`,
            ascending, `1` preselected. -->
@@ -301,11 +301,11 @@ watch(
           :aria-pressed="row.key === focusedKey"
           class="dock-menu__scale"
           :class="{ 'dock-menu__scale--on': row.key === focusedKey }"
-           :data-item-key="row.key"
-           tabindex="-1"
-           @click="onCellClick(row)"
-         >
-           <span>{{ row.item.label }}</span>
+          :data-item-key="row.key"
+          tabindex="-1"
+          @click="onCellClick(row)"
+        >
+          <span>{{ row.item.label }}</span>
           <span v-if="row.item.description" class="dock-menu__scale-cost">{{ row.item.description }}</span>
         </button>
       </div>
@@ -329,12 +329,12 @@ watch(
               'dock-menu__confirm-btn--primary': row.key.startsWith('confirm'),
               'dock-menu__confirm-btn--focused': row.key === focusedKey,
             }"
-             :aria-selected="row.key === focusedKey"
-             tabindex="-1"
-             @click="onCellClick(row)"
-           >
-             {{ row.item.label }}
-           </button>
+            :aria-selected="row.key === focusedKey"
+            tabindex="-1"
+            @click="onCellClick(row)"
+          >
+            {{ row.item.label }}
+          </button>
         </div>
       </div>
 
