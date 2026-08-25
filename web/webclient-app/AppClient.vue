@@ -6,12 +6,15 @@
 // no surface is invented for a panel without a backing model).
 import { computed, nextTick, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
+import { classifyPane } from "./components/dock-panes.js";
 import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import ArtPanel from "./components/ArtPanel.vue";
 import CharacterPanel from "./components/CharacterPanel.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
+import ParticipantFrame from "./components/ParticipantFrame.vue";
+import SkillDetailPane from "./components/SkillDetailPane.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
 import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
@@ -199,36 +202,42 @@ const dockItems = computed(() => {
     // Inventory/Wait) or an active submenu (move exits / look targets /
     // interact targets / wait dayparts). It is never a flat affordance list,
     // so pointer and keyboard users navigate the identical router path.
-    const menu = store.view.combatMenu;
-    const items = (menu && menu.items) || [];
-    return items.map((item) => {
-      const normalized = {
-        key: item.key,
-        label: item.label,
-        enabled: item.enabled !== false,
-      };
-      if (item.actionId) {
-        normalized.action_id = item.actionId;
-        normalized.params = item.payload || {};
-      } else {
-        // A local cell (submenu opener, target/keyword opener, freeform row,
-        // confirmation cancel, or a disabled placeholder such as
-        // `interact-empty` / `target-empty`) is never an OOB action — classify
-        // it as a navigation cell so `classify` never throws.
-        normalized.navigation = true;
-        normalized.surface = item.key;
-      }
-      if (item.disabledReason) {
-        normalized.disabled_reason = {
-          code: item.disabledReason.code,
-          message: item.disabledReason.message,
+      const menu = store.view.combatMenu;
+      const items = (menu && menu.items) || [];
+      return items.map((item) => {
+        const normalized = {
+          key: item.key,
+          label: item.label,
+          enabled: item.enabled !== false,
         };
-      }
-      if (item.description) {
-        normalized.description = item.description;
-      }
-      return normalized;
-    });
+        if (item.actionId) {
+          normalized.action_id = item.actionId;
+          normalized.params = item.payload || {};
+        } else {
+          // A local cell (submenu opener, target/keyword opener, freeform row,
+          // confirmation cancel, or a disabled placeholder such as
+          // `interact-empty` / `target-empty`) is never an OOB action — classify
+          // it as a navigation cell so `classify` never throws.
+          normalized.navigation = true;
+          normalized.surface = item.key;
+        }
+        if (item.disabledReason) {
+          normalized.disabled_reason = {
+            code: item.disabledReason.code,
+            message: item.disabledReason.message,
+          };
+        }
+        if (item.description) {
+          normalized.description = item.description;
+        }
+        // H3 (task 5.4/5.5): the pane vocabulary fields the dock's outlet /
+        // nav variants read directly (the renderer never re-parses the label).
+        normalized.direction = item.direction ?? null;
+        normalized.destination = item.destination ?? null;
+        normalized.kind = item.kind ?? null;
+        normalized.openSubmenu = item.openSubmenu ?? null;
+        return normalized;
+      });
   }
   if (p.kind === "combat") {
     // The combat dock follows the preserved keyboard hierarchy (Option B):
@@ -254,28 +263,83 @@ const dockItems = computed(() => {
           message: item.disabledReason.message,
         };
       }
-      if (item.actionId) {
-        normalized.action_id = item.actionId;
-        normalized.params = item.payload || {};
-      } else {
-        // Open items (Attack / Skills / Forfeit) drive local submenus, not an
-        // OOB action — classify them as local navigation cells.
-        normalized.navigation = true;
-        normalized.surface = item.key;
-      }
-      if (item.description) {
-        normalized.description = item.description;
-      }
-      // A skill item's cost text (e.g. "MP 20") — the detail pane names the
-      // focused skill's cost.
-      if (item.costText) {
-        normalized.cost_text = item.costText;
-      }
-      return normalized;
+       if (item.actionId) {
+         normalized.action_id = item.actionId;
+         normalized.params = item.payload || {};
+       } else {
+         // Open items (Attack / Skills / Forfeit) drive local submenus, not an
+         // OOB action — classify them as local navigation cells.
+         normalized.navigation = true;
+         normalized.surface = item.key;
+       }
+       if (item.description) {
+         normalized.description = item.description;
+       }
+       // A skill item's cost text (e.g. "MP 20") — the detail pane names the
+       // focused skill's cost.
+       if (item.costText) {
+         normalized.cost_text = item.costText;
+       }
+       // H3 (task 5.1): the pane-kind classifier reads these fields off the
+       // normalized items (the scale step is detected by the `choose-scale`
+       // action, the AREA targets by `selected` / `toggle-target`).
+       normalized.scaleChoice = item.scaleChoice === true;
+       normalized.direction = item.direction ?? null;
+       normalized.destination = item.destination ?? null;
+       normalized.kind = item.kind ?? null;
+       return normalized;
     });
   }
-   return [];
+    return [];
+ });
+
+ // H3 (task 3.2): the active frame's pane kind, derived from the committed
+ // `dockItems` (the single navigation state, design D1). Exposed here so the
+ // dock's tab bar + pane render from one commit; the pane host (DockMenu)
+ // re-derives the same kind internally for its row variants.
+ const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
+
+ // H3 (task 3.2): the root frame's items (the stable hierarchical root or the
+ // combat root) normalized for the dock's tab bar — the tab bar renders these
+// while the pane follows the current frame, both from one commit.
+const rootItems = computed(() => {
+  const menu = store.view.rootMenu;
+  const items = (menu && menu.items) || [];
+  return items.map((item) => {
+    const normalized = {
+      key: item.key,
+      label: item.label,
+      enabled: item.enabled !== false,
+    };
+    if (item.actionId) {
+      normalized.action_id = item.actionId;
+      normalized.params = item.payload || {};
+    } else {
+      normalized.navigation = true;
+      normalized.surface = item.key;
+    }
+    if (item.disabledReason) {
+      normalized.disabled_reason = {
+        code: item.disabledReason.code,
+        message: item.disabledReason.message,
+      };
+    }
+    return normalized;
+  });
 });
+
+// H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
+// tab's item, and confirms it ("pointer") — one deliberate activation, no
+// stray `ui_action`. Bounded by `router.depth()`.
+function onTabClick(key) {
+  store.tabToRootAndConfirm(key, "pointer");
+}
+
+// H3 (task 4.6): the crumb's back chevron pops exactly one router level —
+// matching the keyboard Escape path.
+function onDockBack() {
+  store.focusEscape();
+}
 
 // Phase-0 audit §2.3: the preserved `#combat-row-<i>` row frames and the
 // REMAP-TO-TESTID detail pane. The row prefix and detail testid are keyed
@@ -482,6 +546,21 @@ function onChoiceAction(intent) {
           :local-map="store.view.localMapModel"
           @move="onMapMove"
         />
+        <!-- H3 (task 6.3): the art catalog strip is absent while the
+             participant frame is mounted (combat mode). -->
+        <ArtPanel
+          v-if="panelAvailable('art') && store.view.mode !== 'combat'"
+          :art="panel('art')"
+        />
+        <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame is mounted
+             into H1's `hud-left` anchor, combat-only. -->
+        <ParticipantFrame
+          v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
+          :participants="contextActionsPanel.participants"
+          :art-panel="panel('art')"
+        />
+      </template>
+      <template #panel-right>
         <CharacterPanel v-if="panelAvailable('character')" :character="panel('character')" />
         <SkillBook v-if="skillRowsAvailable()" :skills="panel('character')" />
         <ShopPanel
@@ -505,24 +584,43 @@ function onChoiceAction(intent) {
       </template>
       <template #action-dock>
         <ActionDock
-          v-if="dockItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
+          v-if="rootItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'exploration'"
+          :root-items="rootItems"
+          :focused-key="store.view.focus.key"
+          :view="store.view"
           :suggestions="store.view.suggestions"
-          :active-sub-dock="store.view.activeSubDock"
           @action="onAction"
+          @tab-click="onTabClick"
+          @back="onDockBack"
         >
-          <DockMenu
-            v-if="dockItems.length"
-            :items="dockItems"
-            :focused-key="store.view.focus.key"
-            :id-prefix="rowPrefix"
-             :detail-test-id="detailTestId"
-             :show-detail="showDetail"
-             :detail-message="restFormError"
-            :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
-            @focus-change="onDockFocusChange"
-            @activate="onDockActivate"
-          />
+          <div class="dock-pane-host">
+            <DockMenu
+              v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain')"
+              :items="dockItems"
+              :focused-key="store.view.focus.key"
+              :id-prefix="rowPrefix"
+              :detail-test-id="detailTestId"
+              :show-detail="showDetail"
+              :detail-message="restFormError"
+              :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
+              :depth="store.view.dockDepth"
+              :view="store.view"
+              :target-name="store.view.combatMenu ? store.view.combatMenu.title : null"
+              :hide-generic-detail="!!store.view.focusedSkill"
+              @focus-change="onDockFocusChange"
+              @activate="onDockActivate"
+            />
+            <SkillDetailPane
+              v-if="store.view.focusedSkill"
+              :skill="store.view.focusedSkill"
+              :selected="store.view.combatSelected"
+              :scales="store.view.focusedSkill.freeformScales || []"
+              :scale="store.view.focusedSkill.scale || 1"
+              @choose-scale="(p) => store.chooseScale(p.scale)"
+              @choose-shorthand="(p) => store.chooseShorthand(p.shorthand)"
+            />
+          </div>
           <RestForm v-if="restFormOpen" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
           <div v-if="servicesConfirm" class="services-confirm">
             <div class="services-confirm-title" data-testid="services-confirm-title">
@@ -564,5 +662,16 @@ function onChoiceAction(intent) {
 .elosern-root {
   height: 100%;
   width: 100%;
+}
+
+/* H3 (task 6.4): the skill master-detail layout — the skill list and the
+   detail pane sit side by side inside the dock pane (the draft's `.skwrap`
+   two-column grid, adapted to a flex row that fits the bounded pane). */
+.dock-pane-host {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  align-items: flex-start;
 }
 </style>

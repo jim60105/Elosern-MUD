@@ -39,11 +39,16 @@ SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL
 its brand and SHALL show the current location, the world date/time, and the connection state in a
 top-meta surface, with the connected state marked by an ok-green dot paired with a label — never a raw
 mode label in place of location. The action dock SHALL render as the approved command surface: a
-seal-red frame, a guidance line naming the shortcuts (direction keys to choose, Enter to confirm,
-Escape to return, `/` to open the command input), and its items as grid buttons, with the focused cell
-marked by a seal-red fill plus a leading glyph, unfocused cells bordered, and disabled cells dimmed but
-focusable for their explanation. Submenus SHALL render as an item grid beside a detail pane that names
-the focused item, its availability, and the next key action.
+floating panel bounded to a maximum width and centred in the stage's dock anchor, whose root menu
+frame renders as a tab bar of icon-and-label tabs with the open entry marked by a seal-red fill, and
+whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
+naming the shortcuts (direction keys to choose, Enter to confirm, Escape to return, `/` to open the
+command input). The focused row SHALL be marked by a seal-red fill plus a leading glyph, unfocused
+rows bordered, and disabled rows dimmed but focusable for their explanation. Below the root frame the
+dock SHALL render a breadcrumb naming the parent and current frames with a back control, and SHALL
+render each frame's rows in the form that frame calls for — an exit outlet, navigation rows, a
+target's affordance rows under its name, suggestion cards, or the combat forms — beside a detail pane
+that names the focused item, its availability, and the next key action wherever the frame carries one.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
@@ -65,9 +70,9 @@ the focused item, its availability, and the next key action.
 - **WHEN** the shell is connected in exploration mode
 - **THEN** the brand shows the game name, the top-meta surface shows the current location label from the synced status panel, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
 
-#### Scenario: The action dock renders as a framed grid with a guidance line
+#### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it is framed in seal red, carries a guidance line naming the shortcut keys, renders its current menu items as grid cells with a shape-marked focused cell and dimmed disabled cells, and its submenus show a detail pane beside the item grid
+- **THEN** it renders as one centred floating panel in the dock anchor, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a seal-red fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
 
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. Because the portal converts server output to HTML before the `text` message is sent, the narrative log SHALL render that stream through the `webclient-narrative-markup` allowlist pipeline rather than inserting it as a single text node; it SHALL NOT display markup source to the player, and it SHALL NOT interpret anything outside that pipeline's allowlist. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom; the indicator SHALL be a labeled control that states its count and its jump action — a button reading "↓ N 則新訊息（點擊返回最新）" or equivalent — SHALL be announced through a polite live region, SHALL be hidden entirely while the count is zero, and SHALL, when activated, scroll the log to the latest output and clear the count, exactly as scrolling to the bottom does. Narrative output SHALL remain usable if every structured renderer is unavailable, and SHALL remain usable if a message cannot be fully tokenized — such a message degrades to readable literal text rather than suppressing the log.
@@ -124,9 +129,12 @@ explanation but SHALL NOT submit. Held or repeated Enter and all mutation submis
 one is in flight or awaiting its declared presentation revision SHALL be suppressed, and no
 combination of key and pointer input SHALL emit more than one request per deliberate
 activation. The exploration keyboard root SHALL be the G2 hierarchical root (Move / Look /
-Interact / Character / Quests / Inventory / Wait), whose items carry the bare keys
-`move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`, rendered as a
-single-row grid. This root replaces the legacy B2 flat `context_actions` affordance list,
+Interact / Character / Quests / Inventory / Wait, plus Suggestions whenever the committed
+`suggestions` envelope is not `unavailable`), whose items carry the bare keys
+`move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`, `suggestions`, rendered as a
+single-row grid whose column count equals its item count. The combat root SHALL likewise declare a
+column count equal to its item count, so both roots' horizontal arrow geometry matches their rendered
+tab order. This root replaces the legacy B2 flat `context_actions` affordance list,
 whose items were keyed `action-<action_id>` / `action-<surface>` (e.g. `action-guild`). The
 B2 key-derivation contract is preserved only as the isolated Node gate
 (`web/webclient-app/tests/action/dock_items.test.js`), not as the live exploration focus frame.
@@ -162,6 +170,12 @@ B2 key-derivation contract is preserved only as the isolated Node gate
   focused and the player presses `/`
 - **THEN** the drawer stays open (if it was open) and a literal `/` is typed into that
   control, so text such as `whisper /ooc` remains fully typeable
+
+#### Scenario: The suggestions root entry appears only when the envelope carries one
+- **WHEN** the committed `suggestions` envelope's status is `unavailable`
+- **THEN** the exploration root carries no `suggestions` item at all
+- **WHEN** the status is `generating`, `ready`, or `degraded`
+- **THEN** the exploration root carries the `suggestions` item and opening it pushes the suggestions frame without dispatching a `ui_action`
 
 #### Scenario: Exploration root exposes the G2 hierarchical keys
 - **WHEN** the client is in exploration mode and the player presses ArrowDown on the single-row

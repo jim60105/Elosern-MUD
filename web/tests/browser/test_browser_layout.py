@@ -181,14 +181,12 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": "#action-dock",
+                "selector": '[data-testid="status-panel"]',
                 "predicate": (
-                    "() => { const d = document.getElementById('action-dock'); "
-                    "if (!d) { return false; } "
-                    "const r = d.getBoundingClientRect(); "
-                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                    "return el !== null; }"
                 ),
-                "description": "#action-dock rendered and visible",
+                "description": "status panel mounted after reload",
             },
         )
         self.assert_surfaces_after_reload(page)
@@ -208,14 +206,12 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": "#action-dock",
+                "selector": '[data-testid="status-panel"]',
                 "predicate": (
-                    "() => { const d = document.getElementById('action-dock'); "
-                    "if (!d) { return false; } "
-                    "const r = d.getBoundingClientRect(); "
-                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                    "return el !== null; }"
                 ),
-                "description": "#action-dock rendered and visible",
+                "description": "status panel mounted after reload",
             },
         )
         self.assert_surfaces_after_reload(page)
@@ -238,14 +234,12 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": "#action-dock",
+                "selector": '[data-testid="status-panel"]',
                 "predicate": (
-                    "() => { const d = document.getElementById('action-dock'); "
-                    "if (!d) { return false; } "
-                    "const r = d.getBoundingClientRect(); "
-                    "return r.width > 0 && r.height > 0 && d.offsetParent !== null; }"
+                    "() => { const el = document.querySelector('[data-testid=\"status-panel\"]'); "
+                    "return el !== null; }"
                 ),
-                "description": "#action-dock rendered and visible",
+                "description": "status panel mounted after reload",
             },
         )
         self.assert_surfaces_after_reload(page)

@@ -248,7 +248,11 @@ destructive reset confirmation; and stale and duplicate submission behavior. Tes
 deterministic fixtures, SHALL make no remote, LLM, or image-generation request, SHALL assert
 the creation dock is the sole action-dock owner in creation mode and re-renders on
 exploration (the shared `#action-dock` node may persist with `data-mode` switching), and SHALL
-assert no persona/import field is rendered. Test waits SHALL gate on
+assert no persona/import field is rendered. That shared node is the floating dock panel itself, so
+the panel SHALL NOT be remounted at a mode change; in creation mode it SHALL render neither the tab
+bar's tabs nor the breadcrumb, because the creation surface is a modal form rather than a router
+frame, while keeping its own chrome, its `data-mode="creation"` attribute, and its role as the
+surface's documented focus target. Test waits SHALL gate on
 deterministic state — polling the committed store view and the creation-surface DOM with a
 bounded deadline — rather than on the raw `#action-dock` element becoming visible, so the
 suite stays stable under a loaded CI runner.
@@ -272,3 +276,11 @@ suite stays stable under a loaded CI runner.
 #### Scenario: Creation dock is the sole owner in creation mode and re-renders in exploration
 - **WHEN** the browser is in creation mode with the `creation` panel available
 - **THEN** exactly one `#action-dock` element is rendered with `data-mode="creation"` (the creation dock is its sole owner), and after activation hands off to exploration no creation-mode dock remains: the shared dock re-renders as `data-mode="exploration"` when `context_actions` is available, so the shared DOM node may persist rather than being fully removed
+
+#### Scenario: The floating dock panel is the persistent node across a mode change
+- **WHEN** the browser hands off from creation mode to exploration mode after activation
+- **THEN** the same single `#action-dock` panel element persists with its `data-mode` switched from `creation` to `exploration`, and it is not removed and re-created
+
+#### Scenario: Creation mode renders no tab bar and no breadcrumb
+- **WHEN** the dock is rendered in creation mode
+- **THEN** it renders the creation surface with no root tabs, no count badge, and no breadcrumb line, and the creation form keeps its own key capture exactly as before

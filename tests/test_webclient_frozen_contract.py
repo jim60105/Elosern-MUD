@@ -91,6 +91,8 @@ EXPECTED_KEYBOARDROUTER_INSTANCE_MEMBERS = (
     "focus",
     "focusItemByKey",
     "confirm",
+    "trail",
+    "rootMenu",
 )
 EXPECTED_NARRATIVEINPUT_MEMBERS = (
     "appendInput",

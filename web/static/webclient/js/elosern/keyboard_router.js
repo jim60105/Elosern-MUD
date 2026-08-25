@@ -134,6 +134,16 @@
       if (menu.grid && menu.gridCols > 0) {
         var cols = menu.gridCols;
         var rows = Math.max(1, Math.ceil(menu.items.length / cols));
+        // H3 (task 2.7): the combat root is a single-row tab bar
+        // (`gridCols == items.length` → `rows == 1`), so vertical presses are
+        // no-ops; symmetrically, a single-column grid (`cols == 1`) makes
+        // horizontal presses no-ops.
+        if ((direction === ARROW_UP || direction === ARROW_DOWN) && rows === 1) {
+          return false;
+        }
+        if ((direction === ARROW_LEFT || direction === ARROW_RIGHT) && cols === 1) {
+          return false;
+        }
         var row = frame.focusRow;
         var col = frame.focusCol;
         if (direction === ARROW_UP) {
@@ -319,6 +329,20 @@
       // The current frame's menu (read-only); null when no frame is mounted.
       currentMenu: function () {
         return currentMenu();
+      },
+      // Read-only breadcrumb source (H3 webclient-hud-03-action-dock): each
+      // stacked frame's `menu.title` in push order, so the dock's crumb and
+      // tab bar derive from the router's frame stack, never a second
+      // navigation state.
+      trail: function () {
+        return stack.map(function (frame) {
+          return frame.menu && frame.menu.title ? frame.menu.title : "";
+        });
+      },
+      // The root frame's menu (read-only): the tab bar renders the root
+      // frame's items while the pane follows the current frame (H3 task 3.2).
+      rootMenu: function () {
+        return stack.length > 0 ? stack[0].menu : null;
       },
 
       // Submission gating.

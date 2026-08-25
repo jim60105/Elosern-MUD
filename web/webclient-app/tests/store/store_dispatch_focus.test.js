@@ -229,15 +229,32 @@ describe("store dispatch + focus", () => {
 
     it("navigates the combat root grid with preserved action keys", () => {
       openSession();
+      const panels = { context_actions: fx.combatActions() };
       store.receive(
         1,
         "ui_update",
-        [fx.update({ revision: 2, panels: { context_actions: fx.combatActions() } })],
+        [fx.update({ revision: 2, panels })],
         {},
       );
       expect(store.view.focus.key).toBe("attack");
       expect(store.view.focus.label).toBe("攻擊");
-      expect(store.focusPress("ArrowDown")).toBe(true);
+      // H3 (task 2.7): the combat root is now a single-row tab bar (the
+      // column count equals the item count — 6 in the normal state), so the
+      // arrow-key geometry is horizontal. A vertical press is a no-op.
+      expect(store.focusPress("ArrowDown")).toBe(false);
+      expect(store.view.focus.key).toBe("attack");
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("skills");
+      expect(store.view.focus.label).toBe("技能");
+      // Walk the single-row tab bar to the last tab (the secondary
+      // `forfeit` action, the preserved 投降 entry).
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("items");
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("defend");
+      expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("flee");
+      expect(store.focusPress("ArrowRight")).toBe(true);
       expect(store.view.focus.key).toBe("forfeit");
       expect(store.view.focus.label).toBe("投降");
     });
@@ -335,14 +352,53 @@ describe("store dispatch + focus", () => {
       expect(store.focusConfirm("keyboard")).toBe(false);
       expect(sender.sent.actions.length).toBe(0);
 
-      // Pointer activation shares the same gates (mutation-lock + enabled).
-      store.focusPress("ArrowLeft"); // back to the enabled "exit-east"
-      store.dispatchAction("explore.wait", { daypart: "dusk" });
-      expect(store.focusConfirm("pointer")).toBe(false);
-      expect(store.view.dispatch.inFlight).not.toEqual(null);
-      expect(sender.sent.actions.length).toBe(1);
-    });
-  });
+       // Pointer activation shares the same gates (mutation-lock + enabled).
+       store.focusPress("ArrowLeft"); // back to the enabled "exit-east"
+       store.dispatchAction("explore.wait", { daypart: "dusk" });
+       expect(store.focusConfirm("pointer")).toBe(false);
+       expect(store.view.dispatch.inFlight).not.toEqual(null);
+       expect(sender.sent.actions.length).toBe(1);
+     });
+
+     // H3 (task 3.3): the breadcrumb trail is the router's frame stack, so its
+     // length must equal the router depth after every push, pop, replacement,
+     // and mode change — the crumb can never lag the frame (design D1).
+     it("keeps view.dockTrail.length equal to view.dockDepth across push / pop / replace / mode change", () => {
+       openSession();
+       const invariant = () => {
+         expect(store.view.dockTrail.length).toBe(store.view.dockDepth);
+       };
+       // Root frame: depth 1, one trail entry (the root title).
+       expect(store.view.dockDepth).toBe(1);
+       invariant();
+
+       // Push: confirming the focused root entry ("move") opens the move
+       // submenu — the frame stack grows to depth 2, the trail gains a level.
+       const panels2 = { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() };
+       store.receive(1, "ui_update", [fx.update({ revision: 2, panels: panels2 })], {});
+       expect(store.focusConfirm("keyboard")).toBe(true);
+       expect(store.view.dockDepth).toBe(2);
+       invariant();
+
+       // Pop: Escape returns to the root frame — depth back to 1.
+       expect(store.focusEscape()).toBe(true);
+       expect(store.view.dockDepth).toBe(1);
+       invariant();
+
+       // Replace: a panel replacement rebuilds the root frame (depth stays 1).
+       const panels3 = { exploration: fx.explorationPanel({ inventory: { available: false } }), local_map: fx.localMapPanel() };
+       store.receive(1, "ui_update", [fx.update({ revision: 3, panels: panels3 })], {});
+       expect(store.view.dockDepth).toBe(1);
+       invariant();
+
+       // Mode change: switching to combat resets the router to the combat root
+       // frame (depth 1, the combat root title in the trail).
+       const panels4 = { context_actions: fx.combatActions(), local_map: fx.localMapPanel() };
+       store.receive(1, "ui_update", [fx.update({ revision: 4, mode: "combat", panels: panels4 })], {});
+       expect(store.view.dockDepth).toBe(1);
+       invariant();
+     });
+   });
 
   describe("navigation and target intents", () => {
     it("records a navigation surface intent instead of inventing an OOB action", () => {

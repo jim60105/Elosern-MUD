@@ -279,10 +279,22 @@ export const useElosernStore = defineStore("elosern", () => {
   function onRouterEvent(name, payload) {
     if (name === "focus" || name === "disabled") {
       if (name === "focus" && combat) {
+        const item = payload && payload.item;
+        // A focused skill row (its key is in the committed `skillByKey`) sets
+        // the focused-skill model so the detail pane renders the skill's
+        // (possibly disabled) reason — even for a disabled skill whose row
+        // carries no `open-skill` action.
+        if (
+          item &&
+          typeof item.key === "string" &&
+          combat.skillByKey &&
+          combat.skillByKey[item.key]
+        ) {
+          combat.focusSkillKey = item.key;
+        }
         // A combat target-row focus is a client-local selection (spec: focus
         // and selection remain client-local until submission); record the
         // selected identity without dispatching any OOB action.
-        const item = payload && payload.item;
         if (
           item &&
           typeof item.key === "string" &&
@@ -349,6 +361,26 @@ export const useElosernStore = defineStore("elosern", () => {
         openCombatSkill(item.payload.skillKey);
         return;
       }
+      // H3: the skills tab pushes the category frame; a category with a
+      // single skill group skips the group frame (openCategory collapses it),
+      // a multi-group category pushes the group frame, and a group pushes
+      // that group's skill frame (open-group).
+      if (item.actionId === "open-category" && item.payload) {
+        const menu = CombatMenu.openCategory(combat, item.payload.categoryIndex || 0);
+        if (menu) {
+          router.pushMenu(menu);
+          publishView();
+        }
+        return;
+      }
+      if (item.actionId === "open-group" && item.payload) {
+        const menu = CombatMenu.openGroup(combat, item.payload.categoryIndex || 0, item.payload.groupIndex || 0);
+        if (menu) {
+          router.pushMenu(menu);
+          publishView();
+        }
+        return;
+      }
       if (item.actionId === "choose-scale" && item.payload) {
         if (combat.focusSkillKey && CombatMenu.chooseScale(combat, combat.focusSkillKey, item.payload.scale)) {
           const targetMenu = CombatMenu.openSkillTargets(combat, combat.focusSkillKey);
@@ -371,7 +403,9 @@ export const useElosernStore = defineStore("elosern", () => {
         return;
       }
       if (item.key === "skills") {
-        router.pushMenu(combat.menus.skills);
+        // H3: the skills tab opens the category frame (master-detail
+        // navigation), replacing the flat paginated skill list.
+        router.pushMenu(combat.menus.categories);
         publishView();
         return;
       }
@@ -526,6 +560,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // dock's preserved `action-`/`target-` item keys as the single key
   // contract.
   let lastMenuSig = null;
+  // H3: the committed suggestions block signature (OptionCards.
+  // suggestionsSignature). A suggestions-only update (the AI proposal set
+  // changed but the panel structure did not) replaces the open suggestions
+  // frame in place instead of re-homing the whole dock.
+  let lastSuggSig = null;
   // The committed `services` panel signature: a replacement (a reconnect
   // resync) discards the unsubmitted client-local quantity form.
   let lastServicesSig = null;
@@ -541,7 +580,12 @@ export const useElosernStore = defineStore("elosern", () => {
         : {};
       combat = CombatMenu.rebuildForPanel(combat, panel, previous);
       lastMenuSig = stableStringify(combat.menus.root.items);
-      router.replaceMenu({ items: combat.menus.root.items, grid: true, gridCols: combat.menus.root.gridCols });
+      router.replaceMenu({
+        items: combat.menus.root.items,
+        grid: true,
+        gridCols: combat.menus.root.gridCols,
+        title: combat.menus.root.title || "戰鬥",
+      });
       return;
     }
     // Exploration mode: the stable hierarchical root (Move/Look/Interact/
@@ -551,9 +595,13 @@ export const useElosernStore = defineStore("elosern", () => {
     // targets, wait dayparts) are separate router frames.
     const explorationPanel = (rs.panels && rs.panels.exploration) || {};
     const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
+    const suggestions = (panel && panel.suggestions) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
     const root = model.menus.root;
-    lastMenuSig = stableStringify(root.items);
+    // H3: the structural signature excludes the volatile suggestions row —
+    // a suggestions-only change must not re-home the whole dock.
+    lastMenuSig = stableStringify(root.items.filter((it) => it.key !== "suggestions"));
+    lastSuggSig = OptionCards.suggestionsSignature(suggestions);
     // Leaving combat mode: the exploration root frame owns the keyboard
     // router now.
     combat = null;
@@ -575,11 +623,11 @@ export const useElosernStore = defineStore("elosern", () => {
       item.openServiceSubmenu = raw.openServiceSubmenu || null;
       item.actionId = raw.actionId || null;
       item.payload = raw.payload || null;
-      dockRawByKey[raw.key] = raw;
-      return item;
-    });
-    router.replaceMenu({ items, grid: true, gridCols: root.gridCols });
-  }
+       dockRawByKey[raw.key] = raw;
+       return item;
+     });
+     router.replaceMenu({ items, grid: true, gridCols: root.gridCols, title: root.title || "探索" });
+   }
 
   function rebuildFocusMenu(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
@@ -620,13 +668,67 @@ export const useElosernStore = defineStore("elosern", () => {
     // re-commit preserves the focus position.
     const explorationPanel = (rs.panels && rs.panels.exploration) || {};
     const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
-    const sig = stableStringify(model.menus.root.items);
+    const suggestions = (panel && panel.suggestions) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
+    // H3: separate the structural and suggestions signatures. A
+    // suggestions-only change (identical structure, new proposal set) takes
+    // the in-place update path instead of a full re-home.
+    const structSig = stableStringify(model.menus.root.items.filter((it) => it.key !== "suggestions"));
+    const suggSig = OptionCards.suggestionsSignature(suggestions);
     const rehomeNeeded = router.depth() === 0 && model.menus.root.items.length > 0;
-    if (sig === lastMenuSig && !rehomeNeeded) {
+    const structChanged = structSig !== lastMenuSig;
+    const suggChanged = suggSig !== lastSuggSig;
+    if (!structChanged && !suggChanged && !rehomeNeeded) {
       return;
     }
-    rehomeFrame(rs);
+    if (structChanged || rehomeNeeded) {
+      lastMenuSig = structSig;
+      lastSuggSig = suggSig;
+      rehomeFrame(rs);
+      return;
+    }
+    // Suggestions-only: replace the open suggestions frame in place,
+    // preserving focus deterministically — a card whose action_code + params
+    // survives keeps focus; otherwise the nearest surviving row.
+    lastSuggSig = suggSig;
+    replaceSuggestionsFrameInPlace(suggestions);
+  }
+
+  // H3: the suggestions frame holds the volatile AI proposal set. When only
+  // that set changes, its router frame is replaced in place (the rest of the
+  // dock is untouched) with focus preserved per webclient-options-surface.
+  function replaceSuggestionsFrameInPlace(suggestions) {
+    const currentMenu = router.currentMenu();
+    if (!currentMenu || currentMenu.title !== "建議") {
+      // The suggestions frame is not open (the user navigated elsewhere) —
+      // the next re-home will surface the new suggestions row.
+      return;
+    }
+    const oldItems = currentMenu.items;
+    const focusedItem = router.currentItem();
+    const focusedIndex = focusedItem ? oldItems.indexOf(focusedItem) : -1;
+    const newMenu = ExplorationMenu.suggestionsMenu(suggestions);
+    let focusKey = null;
+    if (focusedItem && focusedItem.actionId) {
+      const match = newMenu.items.find(
+        (it) => it.actionId === focusedItem.actionId &&
+          stableStringify(it.payload || {}) === stableStringify(focusedItem.payload || {})
+      );
+      if (match) {
+        focusKey = match.key;
+      }
+    }
+    if (!focusKey) {
+      const idx = focusedIndex >= 0 && focusedIndex < newMenu.items.length ? focusedIndex : 0;
+      const item = newMenu.items[idx];
+      focusKey = item ? item.key : null;
+    }
+    // replaceMenu resets focus (and re-enters publishView, guarded by the
+    // updated signatures); then restore the deterministic focus key.
+    router.replaceMenu(newMenu);
+    if (focusKey) {
+      router.focusItemByKey(focusKey);
+    }
   }
 
   // ------------------------------------------------------------------ creation
@@ -687,7 +789,11 @@ export const useElosernStore = defineStore("elosern", () => {
     }
     const explorationPanel = (rs.panels && rs.panels.exploration) || {};
     const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode });
+    // H3: the suggestions root row (openSubmenu "suggestions") resolves only
+    // when the committed suggestions envelope is passed to the builder.
+    const contextActions = (rs.panels && rs.panels.context_actions) || null;
+    const suggestions = (contextActions && contextActions.suggestions) || null;
+    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
     const menus = model.menus;
     if (item.openSubmenu && menus[item.openSubmenu]) {
       const submenu = menus[item.openSubmenu];
@@ -1037,7 +1143,11 @@ export const useElosernStore = defineStore("elosern", () => {
         }
       } else if (creation.view !== "confirm") {
         creation.view = "root";
-        router.reset({ items: creation.menus.menus.root.items, focusKey: null });
+        router.reset({
+          items: creation.menus.menus.root.items,
+          focusKey: null,
+          title: creation.menus.menus.root.title || "建角",
+        });
       }
     }
   }
@@ -1118,19 +1228,33 @@ export const useElosernStore = defineStore("elosern", () => {
       localMapModel: panels.local_map
         ? { ...LocalMap.reducePanel(panels.local_map), available: panels.local_map.available !== false }
         : null,
-      // The keyboard router's current combat menu frame (root/skills/scale/
-      // target) so the visible dock follows keyboard navigation (Option B).
-      combatMenu: router.currentMenu(),
-      // The keyboard router's menu depth (1 = the root frame, 2+ = a submenu
-      // frame is active). The action dock's detail pane renders only at
-      // depth 2+ (or in combat mode), not at the exploration root.
-      dockDepth: router.depth(),
-      // The focused AREA skill's selected candidate identities (the client-
-      // local selection the Space toggle mutates); drives the "✓" marker.
-      combatSelected:
-        combat && combat.focusSkillKey && combat.skillByKey[combat.focusSkillKey]
-          ? combat.skillByKey[combat.focusSkillKey].selected
-          : [],
+       // The keyboard router's current combat menu frame (root/skills/scale/
+       // target) so the visible dock follows keyboard navigation (Option B).
+       combatMenu: router.currentMenu(),
+       // H3 (task 3.2): the root frame's menu — the dock's tab bar renders
+       // the root frame's items while the pane follows the current frame,
+       // both from one commit.
+       rootMenu: router.rootMenu(),
+       // The keyboard router's menu depth (1 = the root frame, 2+ = a submenu
+       // frame is active). The action dock's detail pane renders only at
+       // depth 2+ (or in combat mode), not at the exploration root.
+       dockDepth: router.depth(),
+       // H3: the full frame stack (root -> current), the data source for
+       // the dock's breadcrumb (HudFrame's crumb strip renders these).
+       dockTrail: router.trail(),
+       // The focused AREA skill's selected candidate identities (the client-
+       // local selection the Space toggle mutates); drives the "✓" marker.
+       combatSelected:
+         combat && combat.focusSkillKey && combat.skillByKey[combat.focusSkillKey]
+           ? combat.skillByKey[combat.focusSkillKey].selected
+           : [],
+       // H3 (task 6.5): the focused skill model for the master-detail pane —
+       // the `SkillDetailPane` renders this committed model, never inventing
+       // a `戰鬥外` badge (design D14).
+       focusedSkill:
+         combat && combat.focusSkillKey && combat.skillByKey[combat.focusSkillKey]
+           ? combat.skillByKey[combat.focusSkillKey]
+           : null,
 
       // The character-creation dock stage (the legacy creation dock port): the
       // keyboard-router menu the overlay mirrors. Null outside creation mode.
@@ -1451,11 +1575,49 @@ export const useElosernStore = defineStore("elosern", () => {
   }
 
   function focusEscape() {
-    return router.escape();
+    // The Escape-key operation through the preserved public key-entry adapter
+    // (`press` is a frozen façade member; the internal `escape` function is
+    // not on the frozen instance surface). H3's breadcrumb back chevron and
+    // the creation cancel-confirm both route through this same path.
+    return router.press(KeyboardRouter.ESCAPE);
   }
 
   function focusItemByKey(key) {
     return router.focusItemByKey(key);
+  }
+
+  // H3 (task 4.5): the pointer tab click — return the router to the root
+  // frame (bounded pop loop, task 8.7: exactly one deliberate activation,
+  // no stray `ui_action`), focus the clicked tab's item, and confirm it with
+  // `source="pointer"`.
+  function tabToRootAndConfirm(itemKey, source) {
+    while (router.depth() > 1) {
+      router.popMenu();
+    }
+    if (router.focusItemByKey(itemKey)) {
+      focusConfirm(source || "pointer");
+    }
+    publishView();
+  }
+
+  // H3 (task 6.6): the 威力 scale step and the AREA shorthand step — the
+  // pointer path mirrors the keyboard `choose-scale` / `choose-shorthand`
+  // dispatch (the store is the single writer).
+  function chooseScale(scale) {
+    if (combat && combat.focusSkillKey && CombatMenu.chooseScale(combat, combat.focusSkillKey, scale)) {
+      const targetMenu = CombatMenu.openSkillTargets(combat, combat.focusSkillKey);
+      if (targetMenu) {
+        router.pushMenu(targetMenu);
+        publishView();
+      }
+    }
+  }
+
+  function chooseShorthand(shorthand) {
+    if (combat && combat.focusSkillKey) {
+      CombatMenu.chooseShorthand(combat, combat.focusSkillKey, shorthand);
+      publishView();
+    }
   }
 
   function markNarrativeSeen() {
@@ -1508,10 +1670,13 @@ export const useElosernStore = defineStore("elosern", () => {
     dispatchAction,
     requestCreationReset,
     focusPress,
-    focusConfirm,
-    focusEscape,
-    focusItemByKey,
-    markNarrativeSeen,
+     focusConfirm,
+     focusEscape,
+     focusItemByKey,
+     tabToRootAndConfirm,
+     chooseScale,
+     chooseShorthand,
+     markNarrativeSeen,
     clearUncertain,
     getSender,
     refreshView,

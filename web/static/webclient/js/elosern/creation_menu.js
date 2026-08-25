@@ -479,6 +479,8 @@
         },
       ],
       itemLabel: itemLabel || null,
+      // The breadcrumb names the confirmation frame (H3 webclient-hud-03-action-dock).
+      title: "確認",
     };
   }
 
@@ -495,8 +497,10 @@
     return {
       panel: panel,
       menus: {
-        root: { items: rootItems(panel), focusKey: null },
-        presets: { items: presetItems(panel), focusKey: null, grid: true, gridCols: 2 },
+        // Menu titles (H3 webclient-hud-03-action-dock): the breadcrumb
+        // names every stacked frame; fixed, testable labels.
+        root: { items: rootItems(panel), focusKey: null, title: "建角" },
+        presets: { items: presetItems(panel), focusKey: null, grid: true, gridCols: 2, title: "預設角色" },
       },
     };
   }

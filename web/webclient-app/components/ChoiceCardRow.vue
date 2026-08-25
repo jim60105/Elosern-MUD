@@ -31,9 +31,12 @@ const emit = defineEmits(["action"]);
 </template>
 
 <style scoped>
+/* H3 (task 5.7): the draft's `.sugs` grid — auto-fill cards, so the
+   choice-card frame and the dock suggestions pane share the identical card
+   renderer (one card renderer, no divergence). */
 .choice-card-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
 }
 </style>

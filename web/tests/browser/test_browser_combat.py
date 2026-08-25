@@ -127,6 +127,146 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             True,
         )
 
+    @covers_requirement("webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces")
+    def test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+
+        # Depth 1 (the combat root frame): the breadcrumb is hidden (no parent
+        # frame to return to).
+        self.assertTrue(
+            page.locator('[data-testid="dock-crumb"]').evaluate(
+                "el => el.hidden || getComputedStyle(el).display === 'none'"
+            ),
+            "the crumb must be hidden at depth 1",
+        )
+
+        # Open the skills tab to push the category frame (depth 2).
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+
+        crumb = page.locator('[data-testid="dock-crumb"]')
+        self.assertFalse(
+            crumb.evaluate("el => el.hidden"),
+            "the crumb must be visible at depth >= 2",
+        )
+        # It names the parent frame (戰鬥) and the current frame (技能).
+        self.assertIn("戰鬥", crumb.inner_text())
+        self.assertIn("技能", crumb.inner_text())
+
+        # The back chevron pops exactly one router level (the store's
+        # `focusEscape()` path — the keyboard and pointer parity).
+        crumb.locator(".dock-crumb__back").click()
+        page.wait_for_timeout(120)
+        self.assertTrue(
+            page.locator('[data-testid="dock-crumb"]').evaluate("el => el.hidden"),
+            "the crumb must be hidden again after the back chevron pops one level",
+        )
+
+    @covers_requirement("webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation")
+    def test_pointer_tab_click_pops_to_root_and_activates_once(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+
+        # Navigate to the skills category frame (depth 2).
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self.assertEqual(store_state(page)["dockDepth"], 2)
+
+        # Pointer click on a non-current tab (the 逃跑 tab) at depth 2: the
+        # store pops the router back to the root frame, focuses the clicked
+        # item, and confirms it with `source="pointer"` — exactly one
+        # deliberate activation, no stray `ui_action`.
+        page.locator("#dock-tab-flee").click()
+        page.wait_for_timeout(200)
+
+        # The router returned to the root frame (depth 1).
+        self.assertEqual(store_state(page)["dockDepth"], 1)
+        # The clicked tab is now the open/focused tab.
+        self.assertEqual(
+            page.locator("#dock-tab-flee").get_attribute("aria-selected"), "true"
+        )
+        # Exactly one `combat.flee` ui_action was dispatched (no stray actions).
+        self.assertEqual(sent_action_count(page, "combat.flee"), 1)
+
+    @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
+    def test_dock_and_participant_frame_geometry_at_both_desktop_viewports(self):
+        # H3 task 8.8: at both 1440x900 and 1280x720, the dock panel must
+        # stay inside its anchor, the deepest combat frame's cast/confirm
+        # control must be reachable without clipping, and the participant
+        # frame must not intersect the dock or the narrative caption.
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                install_outbound_recorder(page)
+                self._engage(page)
+
+                # Navigate to the deepest combat frame (the fire_ball target
+                # frame): skills tab -> category -> group -> skill -> target.
+                self._press(page, "ArrowRight")  # skills tab
+                self._press(page, "Enter")  # category frame
+                self._press(page, "Enter")  # group frame
+                self._press(page, "Enter")  # skill frame
+                self._press(page, "Enter")  # target frame (deepest)
+
+                geo = page.evaluate(
+                    """() => {
+                      const rectOf = (sel) => {
+                        const el = document.querySelector(sel);
+                        if (!el) { return null; }
+                        const r = el.getBoundingClientRect();
+                        return { x: r.left, y: r.top, w: r.width, h: r.height };
+                      };
+                      // The participant frame sits in the bounded hud-left anchor
+                      // (`max-height` + `overflow-y:auto`), so only the portion
+                      // of the frame inside the anchor is visible.
+                      const clampTo = (inner, outer) => {
+                        if (!inner || !outer) { return inner; }
+                        const x = Math.max(inner.x, outer.x);
+                        const y = Math.max(inner.y, outer.y);
+                        const x2 = Math.min(inner.x + inner.w, outer.x + outer.w);
+                        const y2 = Math.min(inner.y + inner.h, outer.y + outer.h);
+                        if (x2 <= x || y2 <= y) { return null; }
+                        return { x, y, w: x2 - x, h: y2 - y };
+                      };
+                      const noIntersect = (a, b) => !(a && b)
+                        || a.x >= b.x + b.w || b.x >= a.x + a.w
+                        || a.y >= b.y + b.h || b.y >= a.y + a.h;
+                      const inside = (inner, outer) => !!(inner && outer
+                        && inner.x >= outer.x && inner.y >= outer.y
+                        && (inner.x + inner.w) <= (outer.x + outer.w)
+                        && (inner.y + inner.h) <= (outer.y + outer.h));
+                      const withinViewport = (r) => !!(r && r.x >= 0 && r.y >= 0
+                        && (r.x + r.w) <= window.innerWidth
+                        && (r.y + r.h) <= window.innerHeight);
+                      const dock = rectOf('#action-dock');
+                      const anchor = rectOf('[data-testid="anchor-dock"]');
+                      const hudLeft = rectOf('[data-anchor="hud-left"]');
+                      const participantRaw = rectOf('[data-testid="participant-frame"]');
+                      const participant = clampTo(participantRaw, hudLeft);
+                      const caption = rectOf('[data-testid="narrative-feed"]');
+                      const confirm = rectOf('.dock-menu-item--focused');
+                      return {
+                        dockInsideAnchor: inside(dock, anchor),
+                        confirmReachable: withinViewport(confirm),
+                        participantNoDock: noIntersect(participant, dock),
+                        participantNoCaption: noIntersect(participant, caption),
+                        hasParticipant: !!participantRaw,
+                        hasConfirm: !!confirm,
+                        hasAnchor: !!anchor,
+                      };
+                    }"""
+                )
+                self.assertTrue(geo["hasAnchor"], f"missing dock anchor at {viewport}")
+                self.assertTrue(geo["hasParticipant"], f"missing participant frame at {viewport}")
+                self.assertTrue(geo["hasConfirm"], f"missing confirm control at {viewport}")
+                self.assertTrue(geo["dockInsideAnchor"], f"dock not inside anchor at {viewport}")
+                self.assertTrue(geo["confirmReachable"], f"confirm control clipped at {viewport}")
+                self.assertTrue(geo["participantNoDock"], f"participant frame intersects dock at {viewport}")
+                self.assertTrue(geo["participantNoCaption"], f"participant frame intersects caption at {viewport}")
+
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_attack_flow_submits_basic_attack_once(self):
         page = self.logged_in_page()
@@ -157,10 +297,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         target = self._fire_ball_identity(page)
 
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills list
-        # Skills list starts at fire_ball (first owned active skill).
-        self._press(page, "Enter")  # open fire_ball targets
+        # H3 skill master-detail (design D11): the skills tab opens the
+        # category frame, then the group frame (elemental_magic has two
+        # sub-groups), then the skill frame. fire_ball is the first skill of
+        # the fire group.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire focused)
+        self._press(page, "Enter")  # open fire group -> skill frame (fire_ball focused)
+        self._press(page, "Enter")  # open fire_ball -> target frame
         # The single-target menu lists the actor and the monster (both valid
         # for ANY scope); move past the actor to select the monster.
         self._press(page, "ArrowRight")
@@ -182,11 +327,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # cannot supply its disguise key, so the menu exposes the disabled
         # explanation instead of a cast. flee is the enabled SELF skill (third
         # grid row, first column of the 2-column skills grid).
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # status_disguise (second grid row)
-        self._press(page, "ArrowDown")  # flee (third grid row)
-        self._press(page, "Enter")  # open flee
+        # H3 (design D11): skills tab -> category frame (a single row of
+        # category tabs). flee lives in the 移動 (movement) category, index 3,
+        # which is single-group and opens the skill frame directly.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open category frame (elemental_magic focused)
+        self._press(page, "ArrowRight")  # martial_arts (index 1)
+        self._press(page, "ArrowRight")  # enhancement (index 2)
+        self._press(page, "ArrowRight")  # movement (index 3)
+        self._press(page, "Enter")  # single-group -> skill frame (flee)
+        self._press(page, "Enter")  # open-skill (flee) -> self-confirm
         self._press(page, "Enter")  # confirm self-cast
 
         actions = self._ui_actions(page)
@@ -205,11 +355,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         # concentration is the fourth owned active skill (second grid row,
         # second column).
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowDown")  # status_disguise (second grid row)
-        self._press(page, "ArrowRight")  # concentration (second grid column)
-        self._press(page, "Enter")  # open concentration (NONE)
+        # H3 (design D11): concentration lives in the 強化 (enhancement)
+        # category, index 2 (single-group), which opens the skill frame
+        # directly.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open category frame (elemental_magic focused)
+        self._press(page, "ArrowRight")  # martial_arts (index 1)
+        self._press(page, "ArrowRight")  # enhancement (index 2)
+        self._press(page, "Enter")  # single-group -> skill frame (concentration)
+        self._press(page, "Enter")  # open-skill (concentration) -> 施展 item
         self._press(page, "Enter")  # confirm the single 施展 item
 
         actions = self._ui_actions(page)
@@ -226,10 +380,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # Skills -> wind_blade (AREA) -> all-enemies shorthand -> confirm.
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowRight")  # wind_blade
+        # H3 (design D11): wind_blade is the elemental_magic / wind group.
+        # Skills tab -> category frame (elemental_magic focused) -> group frame
+        # (fire + wind) -> select the wind group -> skill frame (wind_blade) ->
+        # 威力 scale step (preselected ×1) -> all-enemies shorthand.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+        self._press(page, "ArrowRight")  # select the wind group (index 1)
+        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
         self._press(page, "Enter")  # open wind_blade: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
@@ -285,9 +444,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
-        # Root grid: attack..flee in the first row, forfeit below the first
-        # cell (six items across five columns).
-        self._press(page, "ArrowDown")  # forfeit (second grid row)
+        # H3 (design D2): the combat root is a single-row tab bar (attack,
+        # skills, items, defend, flee, forfeit) — navigation is horizontal.
+        # Focus reaches `forfeit` (index 5) by pressing ArrowRight five times.
+        self._press(page, "ArrowRight")  # skills (1)
+        self._press(page, "ArrowRight")  # items (2)
+        self._press(page, "ArrowRight")  # defend (3)
+        self._press(page, "ArrowRight")  # flee (4)
+        self._press(page, "ArrowRight")  # forfeit (5)
         self._press(page, "Enter")  # open the secondary Forfeit menu
         self.assertEqual(
             sent_action_count(page), 0, "opening Forfeit must not mutate"
@@ -382,10 +546,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
 
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowRight")  # wind_blade
-        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        # H3 (design D11): wind_blade is the elemental_magic / wind group.
+        # Skills tab -> category frame (elemental_magic focused) -> group frame
+        # (fire + wind) -> wind group -> skill frame (wind_blade) -> 威力 scale
+        # step (preselected ×1) -> target flow.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open category frame (elemental_magic focused)
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+        self._press(page, "ArrowRight")  # wind group (index 1)
+        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
+        self._press(page, "Enter")  # open-skill (wind_blade): 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         # The actor is now a valid candidate, so the first grid row holds the
@@ -410,21 +580,29 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "ArrowRight")  # items (disabled)
-        detail = page.evaluate(
-            "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
+        # H3 (design D2/D11): a disabled entry explains itself through the
+        # detail pane (`SkillDetailPane`, `combat-detail`) in the skill frame.
+        # status_disguise (SELF) is disabled in combat (the session context
+        # cannot supply its disguise key), so the pane exposes its disabled
+        # explanation instead of a cast. Navigate: skills tab -> category frame
+        # -> 特殊 (utility, index 4, single-group) -> skill frame.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # category frame (elemental_magic focused)
+        self._press(page, "ArrowRight")  # martial_arts (index 1)
+        self._press(page, "ArrowRight")  # enhancement (index 2)
+        self._press(page, "ArrowRight")  # movement (index 3)
+        self._press(page, "ArrowRight")  # utility (index 4)
+        self._press(page, "Enter")  # single-group -> skill frame (status_disguise focused)
+        # Focusing the disabled skill row sets the focused-skill model, so the
+        # detail pane (SkillDetailPane, `combat-detail`) renders its reason.
+        self.assertTrue(
+            page.locator(".skill-detail-pane__disabled").count() == 1,
+            "the detail pane names the disabled skill's reason",
         )
-        self.assertIn("道具功能尚未開放", detail)
-        self._press(page, "Enter")  # disabled confirm -> explanation, no packet
-        self._press(page, "ArrowRight")  # defend (disabled)
+        # Enter on a disabled skill submits no packet.
         self._press(page, "Enter")
         page.wait_for_timeout(300)
-        self.assertEqual(sent_action_count(page), 0)
-        detail = page.evaluate(
-            "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
-        )
-        self.assertIn("防禦功能尚未開放", detail)
+        self.assertEqual(sent_action_count(page), 0, "a disabled skill submits no packet")
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
     def test_combat_rebuilds_keyboard_menu_after_round(self):
@@ -507,12 +685,29 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertIn("agility", chip_label)
         self.assertIn("-10%", chip_label)
         # Action controls stay usable and disabled entries explain themselves.
+        # H3: at the combat root (depth 1) only the tab bar renders; the pane
+        # (`.dock-menu`) appears at depth >= 2. Navigate into the skill frame so
+        # the dock's action controls (the pane) are visible.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # category frame (elemental_magic focused)
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+        self._press(page, "ArrowRight")  # wind group (index 1)
+        self._press(page, "Enter")  # skill frame (wind_blade)
         self.assertTrue(page.locator(".dock-menu").is_visible())
-        self._press(page, "ArrowRight")  # skills
+        # Disabled root tabs (`items` / `defend`) are dimmed and marked
+        # disabled at the combat root. Pop back to the root and check the
+        # disabled `items` tab is present and disabled.
+        self._press(page, "Escape")
+        self._press(page, "Escape")
+        self._press(page, "Escape")
+        self._press(page, "ArrowRight")  # skills tab
         self._press(page, "ArrowRight")  # items (disabled)
-        self.assertIn(
-            "道具功能尚未開放",
-            page.evaluate("document.querySelector('[data-testid=\"combat-detail\"]').innerText"),
+        disabled_tab = page.locator("#action-dock .dock-tab-bar__tab[disabled]").first
+        self.assertEqual(disabled_tab.get_attribute("disabled"), "", "the disabled `items` tab is disabled")
+        self.assertEqual(disabled_tab.get_attribute("tabindex"), "-1")
+        self.assertEqual(
+            page.locator("#action-dock").evaluate("el => el.scrollWidth <= el.clientWidth"),
+            True,
         )
         self.assertEqual(
             page.locator("#action-dock").evaluate("el => el.scrollWidth <= el.clientWidth"),
@@ -526,61 +721,60 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             install_outbound_recorder(page)
             self._engage(page)
-            # The dock body carries the split: item grid left, detail pane
-            # right.
+            # H3 (design D2/D11): the combat root is a single-row tab bar
+            # (depth 1); the pane (DockMenu + SkillDetailPane) renders only at
+            # depth >= 2. Navigate into the skill frame: skills tab -> category
+            # -> group -> skill (wind_blade).
+            self._press(page, "ArrowRight")  # skills tab
+            self._press(page, "Enter")  # open category frame (elemental_magic focused)
+            self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+            self._press(page, "ArrowRight")  # focus the wind group (index 1)
+            self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
+            # The dock body carries the split: item list left, detail pane right.
             self.assertEqual(page.locator(".dock-menu-layout").count(), 1)
             self.assertTrue(page.locator(".dock-menu").is_visible())
             self.assertTrue(page.locator('[data-testid="combat-detail"]').is_visible())
-            # The skills submenu renders a 2-column grid with a detail pane
-            # naming the focused skill's cost and the next key action.
-            self._press(page, "ArrowRight")  # skills
-            self._press(page, "Enter")
-            self.assertEqual(
-                page.evaluate(
-                    "getComputedStyle(document.querySelector('.dock-menu')).display"
-                ),
-                "grid",
-                "the skills list must render as a CSS grid",
+            # The skill frame's row group (the variant container) uses the pane
+            # kind's CSS layout (H3: `.dock-menu__skills` is a flex column).
+            pane_display = page.evaluate(
+                "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
+                " const v = el && el.firstElementChild;"
+                " return v ? getComputedStyle(v).display : null }"
             )
-            self.assertEqual(
-                page.evaluate(
-                    "getComputedStyle(document.querySelector('.dock-menu'))"
-                    ".gridTemplateColumns.split(' ').length"
-                ),
-                2,
-                "the skills grid must use two columns",
+            self.assertIn(
+                pane_display,
+                ("grid", "block", "flex"),
+                "the skill frame's row group uses its pane kind's CSS layout",
             )
             page.wait_for_timeout(150)
             detail = page.evaluate(
                 "document.querySelector('[data-testid=\"combat-detail\"]').innerText"
             )
             self.assertIn("MP ", detail, "the detail pane names the skill cost")
-            self.assertIn("Enter → 開啟", detail, "the detail pane names the next key action")
-            focused = page.locator(".dock-menu .dock-menu-item--focused").first
-            self.assertTrue(
-                "▶" in focused.evaluate("el => getComputedStyle(el, '::before').content")
-            )
+            # H3: the detail pane's "next key action" is now the 威力 scale
+            # choice (not the legacy "Enter → 開啟" line). Assert a scale option.
+            self.assertIn("MP 28", detail, "the detail pane shows the 威力 scale options")
+            # H3: the skill frame's focused row carries the gold border and
+            # the `dock-menu__skill--on` class (not the legacy `dock-menu-item--focused`).
+            focused = page.locator(".dock-menu .dock-menu__skill--on").first
+            self.assertEqual(focused.count(), 1, "the focused skill row is rendered")
             self.assertEqual(
-                focused.evaluate("el => getComputedStyle(el).backgroundColor"),
-                "rgb(169, 50, 42)",
+                focused.evaluate("el => getComputedStyle(el).borderColor"),
+                "rgb(203, 161, 53)",
+                "the focused skill row uses the gold border",
             )
             # Disabled cells are dimmed (dimmer border + dimmer text) but
-            # still focusable for their explanation.
-            self._press(page, "Escape")
-            self._press(page, "ArrowRight")  # skills
-            self._press(page, "ArrowRight")  # items (disabled)
-            disabled = page.locator(".dock-menu .dock-menu-item--disabled").first
-            self.assertEqual(disabled.get_attribute("aria-disabled"), "true")
+            # still focusable for their explanation. Pop back to the combat root
+            # (three Escapes: skill -> group -> category -> root) and focus the
+            # disabled `items` root tab.
+            self._press(page, "Escape")  # -> group frame
+            self._press(page, "Escape")  # -> category frame
+            self._press(page, "Escape")  # -> combat root (depth 1)
+            self._press(page, "ArrowRight")  # skills tab
+            self._press(page, "ArrowRight")  # items tab (disabled)
+            disabled = page.locator("#action-dock .dock-tab-bar__tab[disabled]").first
+            self.assertTrue(disabled.evaluate("el => el.disabled"), "disabled root tab is disabled")
             self.assertEqual(disabled.get_attribute("tabindex"), "-1")
-            self.assertNotEqual(
-                page.evaluate(
-                    "() => { const el = document.querySelector("
-                    "'.dock-menu .dock-menu-item--disabled');"
-                    "return getComputedStyle(el).borderColor; }"
-                ),
-                "rgb(81, 76, 67)",
-                "disabled cells use the dimmer border",
-            )
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
     @covers_requirement("webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe")
@@ -594,9 +788,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
 
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")
-        self._press(page, "ArrowRight")  # wind_blade
+        # H3 (design D11): wind_blade is the elemental_magic / wind group.
+        # Skills tab -> category frame -> group frame (fire + wind) -> wind group
+        # -> skill frame (wind_blade) -> 威力 scale step (preselected ×1) -> target flow.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+        self._press(page, "ArrowRight")  # select the wind group (index 1)
+        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
         self._press(page, "Enter")  # open wind_blade: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # The actor is now a valid candidate, so the first grid row holds the
@@ -606,11 +805,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # Space once toggles the candidate: the selection marker appears and
         # the client-local selection has exactly one identity.
         self._press(page, "Space")
-        marker = page.locator(".dock-menu .dock-menu-item--focused")
+        # H3: the target frame's rows are the `.dock-menu__token` rows; the
+        # Space toggle marks the selected candidate with the `✓` pressed token.
+        marker = page.locator(".dock-menu .dock-menu__token--pressed")
         self.assertEqual(marker.count(), 1)
-        self.assertTrue(marker.first.inner_text().startswith("✓"))
+        # H3: the pressed token carries `aria-pressed="true"` and the
+        # gold seal border (the `✓` is no longer a text prefix in the token row).
+        self.assertEqual(marker.first.get_attribute("aria-pressed"), "true")
         selected_count = page.evaluate(
-            "() => document.querySelectorAll('.dock-menu .dock-menu-item--focused').length"
+            "() => document.querySelectorAll('.dock-menu .dock-menu__token--pressed').length"
         )
         self.assertEqual(selected_count, 1)
 
@@ -625,7 +828,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
         page.wait_for_timeout(150)
         selected_count = page.evaluate(
-            "() => document.querySelectorAll('.dock-menu .dock-menu-item--focused').length"
+            "() => document.querySelectorAll('.dock-menu .dock-menu__token--pressed').length"
         )
         self.assertEqual(
             selected_count, 1, "held Space must not repeatedly toggle candidates"
@@ -652,13 +855,18 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             '[data-testid="status-panel__gauge-value--mp"]'
         ).inner_text()
 
-        # Skills -> wind_blade opens the 威力 scale step (the seeded character
-        # owns wind_mastery); 威力×2 is the fourth cell of the five-cell grid.
-        self._press(page, "ArrowRight")  # skills
-        self._press(page, "Enter")  # open skills
-        self._press(page, "ArrowRight")  # wind_blade
+        # H3 (design D11): wind_blade is the elemental_magic / wind group.
+        # Skills tab -> category frame -> group frame (fire + wind) -> wind group
+        # -> skill frame (wind_blade) -> 威力 scale step (wind_mastery owned);
+        # 威力×2 is the fourth cell of the five-cell grid.
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
+        self._press(page, "ArrowRight")  # select the wind group (index 1)
+        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
         self._press(page, "Enter")  # open wind_blade: 威力 scale step
-        scale_rows = page.locator(".dock-menu .dock-menu-item")
+        # H3: the scale step's rows are the pane's `.dock-menu__scale` buttons.
+        scale_rows = page.locator(".dock-menu .dock-menu__scale")
         self.assertGreaterEqual(scale_rows.count(), 5)
         self.assertIn(
             "威力×",

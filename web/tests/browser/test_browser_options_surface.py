@@ -210,6 +210,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         """
         self._open_root(page, 0)  # opens the Move submenu, focus on 前往測試空地
         _press(page, "Enter")     # select the focused move row -> dispatch explore.move
+        # H3 re-chrome: the legacy suggestions section renders only at the root
+        # frame (depth 1). The move leaves the router on the Move frame (depth
+        # 2), so pop exactly one level back to the root so the section (and its
+        # degraded/empty/generating renders) is visible to the assertions.
+        _press(page, "Escape")
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -272,12 +277,13 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         # The generating push changed only the suggestions content: the
         # exploration menu subtree and the keyboard router must be untouched.
-        # The Vue dock renders its menu as `.dock-menu` (the legacy
-        # `.exploration-menu` class is retired).
+        # H3: the active row container carries `data-testid="dock-menu"`, which
+        # is the tab bar at depth 1 (the exploration root). A suggestions-only
+        # update must not rebuild that container.
         captured = page.evaluate(
             """() => {
                 window.__menuNode = document.querySelector(
-                    '#action-dock .dock-menu');
+                    '#action-dock [data-testid="dock-menu"]');
                 return window.__menuNode !== null;
             }"""
         )
@@ -288,7 +294,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         stable = page.evaluate(
             """() => {
                 const menu = document.querySelector(
-                    '#action-dock .dock-menu');
+                    '#action-dock [data-testid="dock-menu"]');
                 return window.__menuNode === menu && window.__menuNode.isConnected;
             }"""
         )
@@ -549,6 +555,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # the menu re-homes to the plaza).
         self._open_root(page, 0)  # opens the empty-ground Move submenu
         _press(page, "Enter")     # select the focused 回到廣場 row -> dispatch explore.move
+        # H3 re-chrome: the generating line lives in the legacy suggestions
+        # section, which renders only at the root frame (depth 1). The return
+        # move leaves the router on the plaza Move frame (depth 2), so pop one
+        # level to the root so the transient generating line is visible.
+        _press(page, "Escape")
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")

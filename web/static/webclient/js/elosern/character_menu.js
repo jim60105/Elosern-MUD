@@ -121,7 +121,7 @@
       items.push(sectionItem("section-persona", "背景"));
       items.push(displayItem("persona-background", "背景：" + persona.background, null));
     }
-    return { items: items, focusKey: null, panel: panel, grid: true, gridCols: 2 };
+    return { items: items, focusKey: null, panel: panel, grid: true, gridCols: 2, title: "角色狀態" };
   }
 
   return {

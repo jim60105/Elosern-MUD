@@ -722,7 +722,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())
-            # Seal-red frame + guidance line naming the shortcuts.
+            # The floating panel's `--line` top border (H3 re-chrome):
+            # `border-top: var(--line)` = `1px solid var(--ink-700)`.
             frame = dock.evaluate(
                 """el => {
                   const style = getComputedStyle(el);
@@ -730,27 +731,32 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                            background: style.backgroundColor };
                 }"""
             )
-            self.assertEqual(frame["borderTop"], "rgb(169, 50, 42)")
-            guidance = page.locator('[data-testid="action-dock-guidance"]').inner_text()
+            self.assertEqual(frame["borderTop"], "rgb(44, 38, 52)")
+            # H3 re-chrome: the shortcut legend moved to the always-rendered
+            # `action-dock-description` line (the `action-dock-guidance` line
+            # only renders when a per-surface prefix is committed).
+            description = page.locator('[data-testid="action-dock-description"]').inner_text()
             for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 開啟指令"):
-                self.assertIn(keyword, guidance)
-            # The root is one equal-width row of grid cells with the mockup
-            # chrome: focused cell = seal-red fill + leading glyph. The cell
-            # count varies 5-7 with quest/inventory capability availability.
+                self.assertIn(keyword, description)
+            # The root is now the tab bar (H3): one row of tabs (the root
+            # frame's items as tabs). The tab count varies 5-7 with
+            # quest/inventory capability availability.
             cells = page.locator("#action-dock [data-item-key]")
             self.assertGreaterEqual(cells.count(), 5)
             self.assertLessEqual(cells.count(), 7)
-            focused = page.locator("#action-dock .dock-menu-item--focused").first
-            self.assertEqual(
-                focused.evaluate(
-                    "el => getComputedStyle(el).backgroundColor"
-                ),
-                "rgb(169, 50, 42)",
-                "the focused cell carries the seal-red fill",
-            )
+            # The open/focused tab carries the seal-red gradient fill (the
+            # `--on` class), and its leading glyph is an SVG icon.
+            focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
             self.assertTrue(
-                "▶" in focused.evaluate("el => getComputedStyle(el, '::before').content"),
-                "the focused cell carries the leading glyph",
+                "gradient" in focused.evaluate(
+                    "el => getComputedStyle(el).backgroundImage"
+                ),
+                "the focused tab carries the seal-red gradient fill",
+            )
+            self.assertEqual(
+                focused.locator("svg.dock-tab-bar__icon").count(),
+                1,
+                "the focused tab carries a leading icon",
             )
             # The mockup root draws no visible detail pane; opening a submenu
             # reveals the grid + detail split.
@@ -769,13 +775,24 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             )
             detail = page.locator('[data-testid="exploration-detail"]')
             self.assertTrue(detail.is_visible())
-            self.assertEqual(
-                page.evaluate(
-                    "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
-                    " return el && getComputedStyle(el).display === 'grid'; }"
-                ),
-                True,
-                "submenu item lists render as a CSS grid",
+            # H3: at depth >= 2 the active row container is the pane
+            # (`[data-testid="dock-menu"]` = the `.dock-menu` div); the
+            # pane's row group (the variant container) is the CSS grid.
+            # H3: at depth >= 2 the active row container is the pane
+            # (`[data-testid="dock-menu"]` = the `.dock-menu` div); the pane's
+            # variant container lays out its rows with the CSS layout the pane
+            # kind dictates (outlet/cards = grid, plain = block, skills/targets
+            # = flex). Assert the first child's computed display is one of the
+            # pane variants' valid layouts.
+            pane_display = page.evaluate(
+                "() => { const el = document.querySelector('[data-testid=\"dock-menu\"]');"
+                " const v = el && el.firstElementChild;"
+                " return v ? getComputedStyle(v).display : null; }"
+            )
+            self.assertIn(
+                pane_display,
+                ("grid", "block", "flex"),
+                "the submenu's variant container uses its pane kind's CSS layout",
             )
             # The detail pane names the focused item's next key action.
             page.evaluate("window.__elosernBridge.router.focusItemByKey('back')")
