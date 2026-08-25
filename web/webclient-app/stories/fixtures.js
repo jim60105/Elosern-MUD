@@ -588,6 +588,159 @@ export const LOCAL_MAP_UNAVAILABLE_SAMPLE = {
   reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
 };
 
+// The wilderness layer: coordinate-bearing nodes (the renderer-axis
+// orientation legend 北↑ applies).
+export const LOCAL_MAP_WILDERNESS_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "wilderness",
+  current_node: "wild:plains:3:1",
+  title: "灰鬮荒原",
+  nodes: [
+    {
+      id: "wild:plains:3:1",
+      label: "灰鬮荒原",
+      x: 3,
+      y: 1,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      action: null,
+    },
+    {
+      id: "wild:plains:4:1",
+      label: "獵人小徑",
+      x: 4,
+      y: 1,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: { kind: "move", exit_ref: "e_plains_3_1_e", destination: "wild:plains:4:1" },
+    },
+    {
+      id: "wild:plains:2:2",
+      label: "舊營地",
+      x: 2,
+      y: 2,
+      visibility: "visible_visited",
+      current: false,
+      anchor: false,
+      landmark: true,
+      action: null,
+    },
+    {
+      id: "wild:plains:7:5",
+      label: "遠處山徑",
+      x: 7,
+      y: 5,
+      visibility: "remembered",
+      current: false,
+      anchor: false,
+      landmark: true,
+      action: null,
+    },
+  ],
+  edges: [
+    { source: "wild:plains:3:1", destination: "wild:plains:4:1", label: "獵人小徑", known: true, traversable: true },
+    { source: "wild:plains:3:1", destination: "wild:plains:2:2", label: "舊營地", known: true, traversable: false },
+  ],
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+  ],
+};
+
+// The instance layer: the presenter's layout-index coordinates (a
+// coordinate-free graph — the orientation legend is omitted).
+export const LOCAL_MAP_INSTANCE_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "instance",
+  current_node: "room:101",
+  title: "洞窟",
+  nodes: [
+    {
+      id: "room:101",
+      label: "洞窟入口",
+      x: 0,
+      y: 0,
+      visibility: "current",
+      current: true,
+      anchor: false,
+      landmark: false,
+      action: null,
+    },
+    {
+      id: "room:102",
+      label: "南門",
+      x: 0,
+      y: 1,
+      visibility: "visible_visited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: null,
+    },
+    {
+      id: "room:103",
+      label: "未探索",
+      x: 1,
+      y: 0,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: { kind: "move", exit_ref: "e_cave_exit", destination: "room:103" },
+    },
+  ],
+  edges: [
+    { source: "room:101", destination: "room:102", label: "回程", known: true, traversable: true },
+    { source: "room:101", destination: "room:103", label: "進洞窟", known: false, traversable: true },
+  ],
+  legend: ["你目前所在的位置", "尚未探索的相鄰位置"],
+};
+
+// The interior layer: the same layout-index coordinate shape as instance
+// (coordinate-free graph — the orientation legend is omitted).
+export const LOCAL_MAP_INTERIOR_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "interior",
+  current_node: "room:201",
+  title: "公會大廳",
+  nodes: [
+    {
+      id: "room:201",
+      label: "公會大廳",
+      x: 0,
+      y: 0,
+      visibility: "current",
+      current: true,
+      anchor: false,
+      landmark: false,
+      action: null,
+    },
+    {
+      id: "room:202",
+      label: "訓練場",
+      x: 1,
+      y: 0,
+      visibility: "visible_visited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: { kind: "move", exit_ref: "e_hall_training", destination: "room:202" },
+    },
+  ],
+  edges: [
+    { source: "room:201", destination: "room:202", label: "訓練場", known: true, traversable: true },
+  ],
+  legend: ["你目前所在的位置"],
+};
+
 // The `art` payload when the scene asset is generated: the 16:9 scene
 // renders cover-style and the 3:4 portrait catalog carries contextual
 // names/roles; labels and alt text stay DOM nodes outside the bitmaps.

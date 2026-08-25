@@ -1,24 +1,25 @@
 import { h } from "vue";
 import LocalMap from "../../components/LocalMap.vue";
 import {
+  LOCAL_MAP_INTERIOR_SAMPLE,
+  LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
+  LOCAL_MAP_WILDERNESS_SAMPLE,
 } from "../fixtures.js";
 
-// LocalMap (B4 world family): renders the committed `local_map` v1 panel —
-// an SVG lattice whose node markers encode visibility by non-color shape
-// (square / open circle / filled circle / diamond), the legend with state
-// glyphs, and the detail line. Nodes carrying the payload's own exact
-// `move` action are actionable: activating one emits `move` with its
-// exit_ref and destination. Nothing is invented; unavailable payloads render
-// only the registry-owned reason message.
+// LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
+// minimap renders as the stage's right-anchor island — bounded, the
+// renderer-axis orientation legend on the coordinate-bearing `grid` /
+// `wilderness` layers only, no bearing, no distance, and no full-map
+// control (MapOverlay is H5's). The stories below cover the island chrome
+// across all four layers (grid / wilderness / instance / interior) plus the
+// minimal and unavailable forms.
 
 const renderMap = (args) => ({
   render: () =>
-    h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; padding: 12px;" }, [
-      h(LocalMap, args),
-    ]),
+    h("div", { style: "width: 230px;" }, [h(LocalMap, args)]),
 });
 
 export default {
@@ -30,6 +31,27 @@ export const FullLattice = {
   render: renderMap,
   args: {
     localMap: LOCAL_MAP_SAMPLE,
+  },
+};
+
+export const Wilderness = {
+  render: renderMap,
+  args: {
+    localMap: LOCAL_MAP_WILDERNESS_SAMPLE,
+  },
+};
+
+export const Instance = {
+  render: renderMap,
+  args: {
+    localMap: LOCAL_MAP_INSTANCE_SAMPLE,
+  },
+};
+
+export const Interior = {
+  render: renderMap,
+  args: {
+    localMap: LOCAL_MAP_INTERIOR_SAMPLE,
   },
 };
 

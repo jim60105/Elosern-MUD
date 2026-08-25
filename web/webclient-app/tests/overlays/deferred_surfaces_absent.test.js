@@ -37,7 +37,9 @@ function collectStoryTitles(dir) {
 // H1 (webclient-hud-01-shell-and-scene): the stage reserves no anchor for
 // a companion strip, a toast queue, or a persistent objective tracker
 // (roadmap §2.4 — no backing read model; deferred surfaces are absent, not
-// mocked).
+// mocked). H2 (webclient-hud-02-status-islands) names the unbacked HUD
+// claims the draft makes: the companion strip, the head card's
+// race/subrace/class/faction line, and any minimap bearing or distance.
 const DEFERRED_TITLE_PATTERNS = [
   /\bParty\b/i,
   /\bIntimate\b/i,
@@ -46,16 +48,26 @@ const DEFERRED_TITLE_PATTERNS = [
   /\bToasts?\b/i,
   /\bCompanions?\b/i,
   /\bObjectives?\b/i,
+  // H2 additions: the head-card identity line and the minimap's unbacked
+  // figures (roadmap §2.4 — no race/class/faction field or bearing/distance
+  // exists in the payloads).
+  /\bRace\b/i,
+  /\bSubrace\b/i,
+  /\bClass\b/i,
+  /\bFaction\b/i,
+  /\bBearing\b/i,
+  /\bDistance\b/i,
+  /\bCompass\b/i,
 ];
 
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
-    // H1 grows the frozen set by three (the contextual-HUD foundation
-    // components) plus the C4-wired RestForm (a live-wired component that
-    // must have its story in the same change); H6 re-freezes at the complete
-    // new set.
-    expect(manifest.required).toHaveLength(29);
+    // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
+    // extends it by three — `Data/CharacterHead`, `Data/VitalsTrack`,
+    // `Data/ConditionChips` (29 → 32). H6 re-freezes at the complete new
+    // set.
+    expect(manifest.required).toHaveLength(32);
     // The four full overlays complete the required set (B5's new family).
     for (const title of [
       "Overlays/MapOverlay",
