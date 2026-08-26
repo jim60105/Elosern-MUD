@@ -156,7 +156,8 @@
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_1280x720",
-        "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_without_prior_image_uses_placeholder"
+        "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_scene_without_prior_image_uses_placeholder",
+        "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
@@ -172,6 +173,7 @@
       "name": "art-harness-shell",
       "files_a": [
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_missing_scene_uses_the_placeholder_and_play_continues",
+        "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_scene_backdrop_captions_clear_dock_and_command_line",
         "web.tests.browser.test_browser_art.ArtImageLoadFailureTest.test_image_load_failure_shows_fallback_without_refetch",
         "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest"
       ],
@@ -269,7 +271,8 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
-        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud"
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap"
       ]
     }
   ]

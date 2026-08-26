@@ -149,13 +149,14 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
         """The manifest is the exact B3 surface and the showcase stays in lockstep.
 
         The set equality is the baseline for the "extend, don't restructure"
-        contract: the B1 core family is preserved, the six action-dock keys
-        from B2 are intact, the three data-family keys from B3
+        contract: the B1 core family is preserved, the action-dock keys from
+        B2 are intact, the data-family keys from B3
         (webclient-vue-04-showcase-data, manifest design D5) are added, the
-        six world-family keys from B4 (webclient-vue-05-showcase-world) are
-        added, and the four full-overlays keys from B5
+        world-family keys from B4 (webclient-vue-05-showcase-world) are
+        added, the full-overlays keys from B5
         (webclient-vue-06-showcase-overlays) are added at the manifest
-        freeze (design D3).
+        freeze (design D3), and the shared-map-lattice key from the
+        improve-webclient-map-overlay-scale change joins the frozen set.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -177,6 +178,7 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ArtPanel", "World/ShopPanel",
                 "World/QuestBoard", "World/LoreDrawer", "World/InventoryPanel",
+                "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
                 "Overlays/OverlayHost",

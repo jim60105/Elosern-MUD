@@ -136,11 +136,12 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
 
         The set equality asserts the extend-don't-restructure contract at
         this change's step: the B1 core and B2 action-dock keys are
-        preserved and exactly the three data-family keys are added; the six
-        world-family keys from B4 (webclient-vue-05-showcase-world) joined
-        the baseline at its merge, and the four full-overlays keys from B5
+        preserved and the data-family keys are added; the world-family keys
+        from B4 (webclient-vue-05-showcase-world) joined the baseline at its
+        merge, the full-overlays keys from B5
         (webclient-vue-06-showcase-overlays) joined the baseline at its
-        manifest freeze (design D3).
+        manifest freeze (design D3), and the shared-map-lattice key from the
+        improve-webclient-map-overlay-scale change joined the frozen set.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -163,6 +164,7 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 "Data/ParticipantFrame", "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ArtPanel", "World/ShopPanel",
                 "World/QuestBoard", "World/LoreDrawer", "World/InventoryPanel",
+                "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
                 "Overlays/OverlayHost",

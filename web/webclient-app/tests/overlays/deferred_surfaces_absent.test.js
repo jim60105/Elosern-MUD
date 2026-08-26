@@ -150,8 +150,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // `Core/CommandDrawer` → `Core/CommandLine` and adds `Core/QuickWordChips`
     // and `Overlays/OverlayHost` (39 → 41). H6 (webclient-hud-06-remap-and-
     // finalize, task 4.2 + 5.2) removes the dead `Data/CharacterPanel` view
-    // code, re-freezing the set at 40.
-    expect(manifest.required).toHaveLength(40);
+    // code, re-freezing the set at 40. The improve-webclient-map-overlay-scale
+    // change adds `World/MapLattice` to the required set (40 → 41).
+    expect(manifest.required).toHaveLength(41);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",
@@ -164,13 +165,14 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Action/DockTabBar",
      "Action/DockBreadcrumb",
      "Action/SkillDetailPane",
-     "Data/ParticipantFrame",
-     "Core/HudDrawer",
-     "Data/EquipmentDoll",
-     "Data/CharacterStatusDrawer",
-   ]) {
-     expect(manifest.required).toContain(title);
-   }
+      "Data/ParticipantFrame",
+      "Core/HudDrawer",
+      "Data/EquipmentDoll",
+      "Data/CharacterStatusDrawer",
+      "World/MapLattice",
+    ]) {
+      expect(manifest.required).toContain(title);
+    }
   });
 
   // H3 (task 7.3): the dock renders no `戰鬥外` skill badge (design D14 —

@@ -90,11 +90,12 @@ DEFERRED_TITLE_PATTERNS = (
     re.compile(r"\bToasts?\b", re.IGNORECASE),
 )
 
-# The complete required-component set before this change (B1 core,
-# B2 action-dock, B3 data, B4 world + services). The H1/H2/H3 HUD waves
-# added eleven keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
+# The required-set baseline with the overlays family keys removed: the B1
+# core, B2 action-dock, B3 data, and B4 world + services keys, plus the
+# H1–H3 HUD wave keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
 # DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead, VitalsTrack,
-# ConditionChips, ParticipantFrame), which this baseline now carries.
+# ConditionChips, ParticipantFrame) and the `World/MapLattice` key the
+# improve-webclient-map-overlay-scale change added to the frozen set.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -131,6 +132,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/QuestBoard",
     "World/LoreDrawer",
     "World/InventoryPanel",
+    "World/MapLattice",
 }
 
 

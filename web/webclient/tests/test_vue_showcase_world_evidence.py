@@ -3,8 +3,9 @@
 The world + services family contracts of webclient-vue-05-showcase-world are
 implemented and verified in the Node/Vue world: the world-family Vitest
 suite, the deterministic component-coverage gate extended with the family's
-six required components, and the Storybook showcase in which every family
-component has documented offline stories. ``covers_requirement`` can only
+seven required components (the shared map-lattice renderer joins the B4
+family), and the Storybook showcase in which every family component has
+documented offline stories. ``covers_requirement`` can only
 attach to a Python ``test_*`` function, so this module executes those gates
 and asserts they pass. Following the B1/B2/B3 precedent, the
 ``@covers_requirement`` import and the annotation linking this module to the
@@ -26,7 +27,7 @@ Test-to-requirement mapping (applied at archive):
   guarantee of the new stories is evidenced by B1's
   ``test_story_files_import_only_local_or_bundled_modules``, which walks
   every story file, plus ``test_world_family_stories_make_no_non_local_requests``,
-  which scopes that check to the World family's six story files).
+  which scopes that check to the World family's seven story files).
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ WORLD_FAMILY_KEYS = (
     "World/QuestBoard",
     "World/LoreDrawer",
     "World/InventoryPanel",
+    "World/MapLattice",
 )
 
 # The exact showcase story registration for the world + services family: the
@@ -72,6 +74,12 @@ WORLD_FAMILY_STORY_IDS = {
     "world-localmap--full-lattice",
     "world-localmap--minimal",
     "world-localmap--unavailable",
+    "world-maplattice--island-scale-sample",
+    "world-maplattice--island-scale-wilderness",
+    "world-maplattice--island-scale-minimal",
+    "world-maplattice--overlay-scale-sample",
+    "world-maplattice--overlay-scale-wilderness",
+    "world-maplattice--overlay-scale-minimal",
     "world-loredrawer--bare",
     "world-loredrawer--full-lore",
     "world-loredrawer--section-unavailable",
@@ -201,9 +209,10 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
 
         The set equality asserts the extend-don't-restructure contract at
         this change's step: the B1 core, B2 action-dock, and B3 data-family
-        keys are preserved and exactly the six world + services family keys
-        are added. B5, which freezes the manifest, updates the baseline
-        deliberately. The deferred surfaces — a full inventory bag and a
+        keys are preserved and exactly the seven world + services family keys
+        are added (the shared map-lattice renderer, from the
+        improve-webclient-map-overlay-scale change, joins the B4 family).
+        B5, which freezes the manifest, updates the baseline deliberately. The deferred surfaces — a full inventory bag and a
         dedicated party/companion panel (roadmap design doc section 7) are
         asserted absent from the manifest and from the story titles.
         """
@@ -262,7 +271,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
             "world + services family stories missing from the showcase: "
             + ", ".join(sorted(missing)),
         )
-        # Every family story title resolves to the family's six components,
+        # Every family story title resolves to the family's seven components,
         # so the coverage gate and the showcase agree on the family surface.
         family_titles = {entries[story_id]["title"] for story_id in WORLD_FAMILY_STORY_IDS}
         self.assertEqual(
@@ -270,6 +279,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
             {f"World/{component}" for component in (
                 "LocalMap", "ArtPanel", "ShopPanel",
                 "QuestBoard", "LoreDrawer", "InventoryPanel",
+                "MapLattice",
             )},
         )
 
