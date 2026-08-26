@@ -488,7 +488,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # instant scroll for this single assignment (the same override pattern
         # the feed's own `scrollToBottom` and the scrolled-away test use).
         page.evaluate(
-            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\'];"
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
             " const prev = f.style.scrollBehavior;"
             " f.style.scrollBehavior = 'auto';"
             " f.scrollTop = 0;"
