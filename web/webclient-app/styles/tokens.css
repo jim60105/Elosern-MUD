@@ -112,7 +112,15 @@
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
-   --dock-h: clamp(150px, 22vh, 184px);
+    --dock-h: clamp(150px, 22vh, 184px);
+    /* The persistent command line's own height (HudFrame's
+       [data-anchor="command-line"] rule consumes it). */
+    --command-line-h: 46px;
+    /* How far above the stage bottom the dock's top edge sits: the dock's own
+       height plus the command line beneath it. Every surface positioned above
+       the dock derives its offset from this single token, never re-deriving
+       the command line's height by hand. */
+    --stage-content-bottom: calc(var(--dock-h) + var(--command-line-h));
    /* ---- z-index scale ----
       Every full-screen surface consumes --z-surface-modal (or a value derived
       from it); nothing but the offline overlay may exceed --z-offline.

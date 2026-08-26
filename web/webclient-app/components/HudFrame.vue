@@ -164,7 +164,7 @@ defineExpose({ menuOpen });
 .elosern-stage [data-anchor="feed"] {
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--dock-h) + 60px);
+  bottom: calc(var(--stage-content-bottom) + 60px);
   width: min(880px, calc(90vw - 524px));
   z-index: 3;
 }
@@ -173,7 +173,7 @@ defineExpose({ menuOpen });
 .elosern-stage [data-anchor="dock"] {
   left: 0;
   right: 0;
-  bottom: 46px;
+  bottom: var(--command-line-h);
   height: var(--dock-h);
   z-index: 5;
 }
@@ -183,7 +183,7 @@ defineExpose({ menuOpen });
   left: 0;
   right: 0;
   bottom: 0;
-  height: 46px;
+  height: var(--command-line-h);
   z-index: 6;
 }
 

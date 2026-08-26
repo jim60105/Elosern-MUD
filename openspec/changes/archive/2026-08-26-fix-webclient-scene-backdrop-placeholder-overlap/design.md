@@ -52,6 +52,27 @@ same root cause and the exact same fix; splitting it into a separate change woul
 re-reviewing the identical root-cause analysis twice for no isolation benefit — the caption's own
 rendered content, testids, and behavior are otherwise untouched.
 
+**Tokenize the command line's height as `--command-line-h`, consumed by the dock's `bottom` and the
+command line's `height`.** Defining `--stage-content-bottom` with an inline 46px literal would leave the
+magic number duplicated a third time — the same re-derivation pattern that let the original bug ship.
+Following the earlier `fix-webclient-hud-integration-gaps` precedent (the change that tokenized a
+duplicated z-index literal rather than patching each consumer's number), the quantity is named once; the
+computed layout of the dock and command line rules is unchanged, only their source becomes the shared
+token.
+
+**Expose the SceneBackdrop handle through the `window.__elosernBridge` test hook.** The `__generating`
+pending notice renders only when the scene is pending AND the client-local prior image is set, a state
+the seed fixtures do not produce on their own. The hook is a plain `backdrop: null` property on the
+`__elosernBridge` object; `AppClient.vue`'s `onMounted` writes its `sceneBackdropRef` template ref's value
+(the SceneBackdrop instance's exposed interface) into that property at mount. The bridge object must be
+created *before* `app.mount()` in `main.js`, because the registration callback fires during mount. A
+plain property was chosen over a getter because `app._instance` — the natural "read the root component's
+exposed ref" approach — is dev-only in Vue 3.5's production build (the `app._instance = vnode.component`
+assignment sits inside the dev block of the esm-bundler dist), so a getter on it would silently return
+`null` in production. This follows the repository's `__`-prefixed harness-hook convention
+(cf. `main.js`'s existing `__elosernBridge` block). The managed-browser pending journey then seeds the
+prior image with a data-URL built from the seed fixture's valid PNG, so no network request is involved.
+
 ## Risks / Trade-offs
 
 - **Moving the narrative caption up by ~46px could reduce its available height budget** if the caption's
