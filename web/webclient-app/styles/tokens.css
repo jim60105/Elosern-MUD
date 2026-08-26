@@ -111,8 +111,16 @@
   --radius-sm: 8px;
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
-  --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
-  --dock-h: clamp(150px, 22vh, 184px);
+   --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
+   --dock-h: clamp(150px, 22vh, 184px);
+   /* ---- z-index scale ----
+      Every full-screen surface consumes --z-surface-modal (or a value derived
+      from it); nothing but the offline overlay may exceed --z-offline.
+      OverlayHost's full-screen overlay stays deliberately outside this scale
+      (z-index: 92) because the drawer/overlay pair is mutually exclusive at
+      the store level. */
+   --z-surface-modal: 3000;
+   --z-offline: 9000;
 }
 
 /* H5: colorblind-safe status palette. The settings surface's colorblind

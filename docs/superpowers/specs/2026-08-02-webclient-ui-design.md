@@ -188,7 +188,7 @@ Every surface's visibility is driven by the single committed attribute on the st
 (`data-elosern-mode`): a surface the current mode hides is removed with `display:none` — never dimmed —
 so it leaves the accessibility tree and the tab order, and it is present again when the mode returns.
 
-Players may resize the stage anchors. The saved layout configuration (the Vue layout store) includes a
+The saved layout configuration (the Vue layout store) includes a
 project layout version. When required component names or layout structure change, known old versions are
 migrated. An unrecognized version is reset to the approved default. The action dock, connection state, and
 command-line entry point cannot be removed by a stale localStorage layout.
@@ -221,7 +221,7 @@ The action dock owns focus after initial sync and after every completed or rejec
 - Enter chooses the focused item or submits a complete action.
 - Escape pops exactly one menu level.
 - Space toggles a candidate in an AREA multi-target menu.
-- `/` opens and focuses the command drawer.
+- The command line is a permanently present field with no open/closed state; `/` moves focus into it.
 - Sending or cancelling text restores action-dock focus.
 - Disabled entries remain focusable so their explanation can be read, but Enter performs no action.
 - Holding Enter cannot submit repeatedly. The action dock locks while a mutation is in flight.

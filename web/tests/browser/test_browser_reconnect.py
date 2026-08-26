@@ -13,6 +13,7 @@ awaiting-phase checks.
 
 from __future__ import annotations
 
+import os
 import time
 
 from tools.spec_traceability import covers_requirement
@@ -30,6 +31,15 @@ from .browser_helpers import (
     valid_status_panel,
     wait_for_store_state,
 )
+
+# The stacking-guarantee tests open the scene/portrait full-views, which need
+# the art fixture. The managed server is a per-process singleton that seeds
+# from this env var at boot, so the var must be set before the shared server
+# first starts in the process. Setting it at module import (unittest discovery
+# time) guarantees that ordering; setting it only in a class's setUpClass is
+# too late when another test class in the same CI-shard process has already
+# booted the server.
+os.environ["ELOSERN_BROWSER_ART"] = "done"
 
 
 class ReconnectTest(BrowserAcceptanceTest):
@@ -302,6 +312,128 @@ class ReconnectTest(BrowserAcceptanceTest):
         self.assertEqual(result["retired"], "retired_epoch")
         self.assertTrue(result["accepted"])
         self.assertEqual(result["epoch"], "nextEpoch_____00000001")
+
+    def _topmost_at(self, page, x, y):
+        # The stacking guarantee (delta scenario 1/2): the offline overlay
+        # must be the topmost painted element where it overlaps an open
+        # surface. jsdom cannot prove paint order (no layout/paint engine),
+        # so this runs in a real Playwright-driven browser.
+        return page.evaluate(
+            """(args) => {
+              const overlay = document.getElementById('elosern-offline-overlay');
+              const el = document.elementFromPoint(args.x, args.y);
+              return {
+                tag: el ? (el.tagName + (el.id ? '#' + el.id : '')) : null,
+                isOverlay: !!(el && overlay && (el === overlay || overlay.contains(el))),
+              };
+            }""",
+            {"x": x, "y": y},
+        )
+
+    def _assert_offline_overlay_topmost(self, page):
+        topmost = self._topmost_at(
+            page,
+            page.evaluate("() => window.innerWidth / 2"),
+            page.evaluate("() => window.innerHeight / 2"),
+        )
+        self.assertTrue(
+            topmost["isOverlay"],
+            "the offline overlay must be the topmost element at viewport center, "
+            f"got: {topmost['tag']}",
+        )
+
+    def _reopen_status_drawer(self, page):
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('status'); }"
+        )
+        page.wait_for_selector('[data-testid="hud-drawer"]', timeout=15000)
+
+    def _reopen_map_overlay(self, page):
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openOverlay('map'); }"
+        )
+        page.wait_for_selector('[data-testid="overlay-host"]', timeout=15000)
+
+    @covers_requirement(
+        "webclient-desktop-shell::connection-loss-locks-stale-controls"
+    )
+    def test_offline_overlay_outranks_open_reference_drawer(self):
+        page = self.logged_in_page()
+        self._reopen_status_drawer(page)
+        self._disconnect_transport(page)
+        # A transport loss force-closes the open drawer (the store's
+        # `syncHudDrawer`), so re-open it to prove the overlay paints above a
+        # *still-open* surface, not just an empty stage.
+        self._reopen_status_drawer(page)
+        self._assert_offline_overlay_topmost(page)
+        # The drawer panel is right-anchored (width min(560px, 94vw)); probe a
+        # point inside the panel region (its horizontal centre) as well, so
+        # the assertion covers the panel's own tier, not just the scrim.
+        panel_topmost = self._topmost_at(
+            page,
+            page.evaluate("() => window.innerWidth - 280"),
+            page.evaluate("() => window.innerHeight / 2"),
+        )
+        self.assertTrue(
+            panel_topmost["isOverlay"],
+            "the offline overlay must be the topmost element over the drawer panel, "
+            f"got: {panel_topmost['tag']}",
+        )
+
+    @covers_requirement(
+        "webclient-desktop-shell::connection-loss-locks-stale-controls"
+    )
+    def test_offline_overlay_outranks_open_fullscreen_overlay(self):
+        page = self.logged_in_page()
+        self._reopen_map_overlay(page)
+        self._disconnect_transport(page)
+        # A transport loss force-closes the open full-screen overlay (the
+        # store's `syncHudDrawer`), so re-open it to prove the offline
+        # overlay is painted above a *still-open* surface.
+        self._reopen_map_overlay(page)
+        self._assert_offline_overlay_topmost(page)
+
+    @covers_requirement(
+        "webclient-desktop-shell::connection-loss-locks-stale-controls"
+    )
+    def test_offline_overlay_outranks_open_full_views_and_full_log(self):
+        # The delta spec's scenario 2 also names the portrait/scene
+        # full-views and the full-log overlay. Those surfaces are
+        # component-local refs (not store state), so a transport loss does
+        # NOT force-close them: open the surface, disconnect, and the surface
+        # stays mounted while the offline overlay paints above it. The
+        # scene/portrait surfaces need the art fixture, opted in for this
+        # whole class in `setUpClass` (the seed reads the env var at server
+        # start; `ELOSERN_BROWSER_ART_ROOT` is owned by the runtime env).
+        surfaces = [
+            ("full-log",
+             '[data-testid="narrative-fulllog-control"]',
+             '[data-testid="fulllog-overlay"]'),
+            ("scene-full-view",
+             '[data-testid="scene-backdrop-control"]',
+             '[data-testid="scene-backdrop-fullview"]'),
+            ("portrait-full-view",
+             '[data-testid^="art-panel__portrait-fullview"]',
+             '[data-testid="art-panel__fullview"]'),
+        ]
+        for name, open_selector, open_wait in surfaces:
+            with self.subTest(surface=name):
+                page = self.logged_in_page()
+                if name == "scene-full-view":
+                    # The scene full-view control sits under the stage anchor
+                    # (its center point resolves to `div.stage-anchor`), so a
+                    # plain pointer click times out; dispatch the DOM click
+                    # that drives the component's `@click` handler.
+                    page.evaluate(
+                        '() => document.querySelector(\'[data-testid="scene-backdrop-control"]\').click()'
+                    )
+                else:
+                    page.click(open_selector, timeout=15000)
+                page.wait_for_selector(open_wait, timeout=15000)
+                self._disconnect_transport(page)
+                self._assert_offline_overlay_topmost(page)
 
 
 if __name__ == "__main__":

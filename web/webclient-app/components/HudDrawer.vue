@@ -139,7 +139,7 @@ function onScrimClick() {
 .hud-drawer-scrim {
   position: fixed;
   inset: 0;
-  z-index: 2900;
+  z-index: calc(var(--z-surface-modal) - 100);
   background: rgba(8, 7, 10, 0.5);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -152,7 +152,7 @@ function onScrimClick() {
   right: 0;
   bottom: 0;
   width: min(560px, 94vw);
-  z-index: 3000;
+  z-index: var(--z-surface-modal);
   display: flex;
   flex-direction: column;
   background: var(--panel-solid);

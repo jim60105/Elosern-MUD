@@ -335,7 +335,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
 .elosern-app-shell #elosern-offline-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--z-offline);
   display: none;
   background: rgba(8, 7, 10, 0.82);
   color: var(--paper-100);
