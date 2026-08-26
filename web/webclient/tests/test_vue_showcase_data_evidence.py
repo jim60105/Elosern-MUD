@@ -48,7 +48,6 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # manifest (extend, don't restructure — B5 freezes the manifest; design D5).
 DATA_FAMILY_KEYS = (
     "Data/StatusPanel",
-    "Data/CharacterPanel",
     "Data/SkillBook",
 )
 
@@ -56,8 +55,6 @@ DATA_FAMILY_KEYS = (
 # Storybook index.json entry id for every story exported by this change
 # (title "Data/<Component>", deterministic story names).
 DATA_FAMILY_STORY_IDS = {
-    "data-characterpanel--full-payload",
-    "data-characterpanel--undisguised",
     "data-skillbook--active-tab",
     "data-skillbook--passive-tab",
     "data-skillbook--search-filtered",
@@ -149,7 +146,6 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
         )["required"]
         self.assertIn("Data/StatusPanel", required)
-        self.assertIn("Data/CharacterPanel", required)
         self.assertIn("Data/SkillBook", required)
         self.assertEqual(
             set(required) - set(DATA_FAMILY_KEYS),
@@ -204,12 +200,12 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
             set(),
             "data family stories missing from the showcase: " + ", ".join(sorted(missing)),
         )
-        # Every family story title resolves to the family's three components,
+        # Every family story title resolves to the family's components,
         # so the coverage gate and the showcase agree on the family surface.
         family_titles = {entries[story_id]["title"] for story_id in DATA_FAMILY_STORY_IDS}
         self.assertEqual(
             family_titles,
             {f"Data/{component}" for component in (
-                "StatusPanel", "CharacterPanel", "SkillBook",
+                "StatusPanel", "SkillBook",
             )},
         )

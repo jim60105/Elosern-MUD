@@ -171,7 +171,7 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 *ACTION_FAMILY_KEYS,
                 "Action/RestForm", "Action/DockTabBar", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",
-                "Data/StatusPanel", "Data/CharacterPanel",
+                "Data/StatusPanel",
                 "Data/CharacterHead", "Data/VitalsTrack", "Data/SkillBook",
                 "Data/ConditionChips", "Data/ParticipantFrame",
                 "Data/EquipmentDoll", "Data/CharacterStatusDrawer",

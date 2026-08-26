@@ -71,7 +71,8 @@
       "name": "layout-reconnect",
       "files_a": [
         "web.tests.browser.test_browser_layout.LayoutMigrationTest",
-        "web.tests.browser.test_browser_layout.ProtocolMismatchTest"
+        "web.tests.browser.test_browser_layout.ProtocolMismatchTest",
+        "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest"
       ],
       "files_b": [
         "web.tests.browser.test_browser_reconnect.ReconnectTest",

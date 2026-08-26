@@ -10,9 +10,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
-import { h } from "vue";
-import AppShell from "../../components/AppShell.vue";
-import ActionDock from "../../components/ActionDock.vue";
+import AppClient from "../../AppClient.vue";
 import { createWindowBridge } from "../../bridge.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
@@ -21,21 +19,26 @@ let wrapper;
 let bridge;
 
 function dispatchWindowKey(key) {
-  window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+  // Dispatch on `document` (bubbling) so BOTH the bridge's document listener
+  // (`createWindowBridge` -> `installKeyRouting`) and the shell's window
+  // listener receive the keypress — the real coexistence path the contract
+  // guards.
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+  );
 }
 
 function mountAll() {
   const host = document.createElement("div");
   host.id = "elosern-app";
   document.body.appendChild(host);
-  // The preserved focus target on the Escape release path is the action dock
-  // (`#action-dock`), so mount it into the shell's action-dock slot.
-  wrapper = mount(AppShell, {
-    attachTo: host,
-    slots: { "action-dock": () => h(ActionDock) },
-  });
+  // Mount the full `AppClient` (the complete view-layer wiring, which includes
+  // the `watch(drawerRequest) -> focusCommandField` route) rather than a bare
+  // `AppShell`, so the real keypress -> store -> watcher -> focus flow is
+  // exercised end-to-end.
   setActivePinia(createPinia());
   const store = useElosernStore();
+  wrapper = mount(AppClient, { attachTo: host });
   bridge = createWindowBridge(store);
   return store;
 }
@@ -135,5 +138,20 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
     expect(store.view.dockDepth).toBe(2, "the dock's menu level is untouched by the field's Escape");
+  });
+
+  it("ArrowDown on the single-row exploration root is a no-op move but still suppresses the default", async () => {
+    const store = mountAll();
+    openActiveSession(store);
+
+    // After the snapshot, the router re-homes to the exploration root — a
+    // single-row tab bar (`gridCols == items.length` → `rows == 1`), so a
+    // vertical press is a no-op (unconsumed). Direction keys are always
+    // claimed: even a no-op arrow press still suppresses the browser's default
+    // page-scroll (G2 exploration root).
+    const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+    expect(event.defaultPrevented).toBe(true, "a no-op direction press is still claimed (preventDefault)");
   });
 });

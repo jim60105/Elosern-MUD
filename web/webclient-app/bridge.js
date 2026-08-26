@@ -264,11 +264,17 @@ export function createWindowBridge(store) {
       return;
     }
     const claimed = store.focusPress(event.key, !!event.repeat);
-    // H5 (webclient-pointer-activation): the key is claimed EXACTLY when the
-    // router consumed it. Unconsumed keys (e.g. a no-op arrow press on a
-    // single-row grid) fall through to the text / command-history path, so
-    // only a consumed claim (for a claimed key) prevents the default.
-    if (claimed && CLAIMED_KEYS.includes(event.key)) {
+    // Direction keys are always claimed: they drive focus navigation and must
+    // suppress the browser's default page-scroll, even when the router's move
+    // is a no-op on a single-row grid (the G2 exploration root). Other claimed
+    // keys prevent the default only when the router consumed them; unconsumed
+    // letter keys fall through to the text / command-history path.
+    const isDirectionKey =
+      event.key === "ArrowUp" ||
+      event.key === "ArrowDown" ||
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight";
+    if ((isDirectionKey || claimed) && CLAIMED_KEYS.includes(event.key)) {
       event.preventDefault();
     }
   }

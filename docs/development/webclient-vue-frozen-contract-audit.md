@@ -397,6 +397,7 @@ the selectors it breaks). Prefix entries cover dynamic suffixes.
 | `art-panel` + `.art-panel__<suffix>` (`.art-panel__portrait-tile`) | H1 (still mounted) | REMAP-TO-TESTID |
 | `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
 | `combat-detail` | H3 | REMAP-TO-TESTID |
+| `quick-word-chip-<verb>` (prefix `quick-word-chip`: `quick-word-chip-看`, the quick-word command chips) | H6 | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets** (re-mapped to stable hooks, no main-requirement
 wording names any of these, so no spec delta):
@@ -406,6 +407,7 @@ wording names any of these, so no spec delta):
 | `.dock-menu-item` (prefix; covers `.dock-menu-item--focused` under `#action-dock`) | REMAP-TO-TESTID |
 | `.dock-menu`, `.dock-menu-layout`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
 | `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
+| `.hint` (the command-line hint cluster naming the history-recall keys; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
 | `.lm_header` (legacy GoldenLayout header assertion: must NOT render) | RETIRED-WITH-SHELL |
 | `.elosern-*` retired visual classes (`.elosern-narrative`, `.elosern-placeholder`, `.elosern-header`, `.elosern-status`, `.elosern-action-dock`) — the managed suite asserts they no longer render on the Vue shell | RETIRED-WITH-SHELL |

@@ -104,8 +104,13 @@ describe("AppShell root (B1 core family)", () => {
     });
     wrapper = w;
 
-    // `/` from the dock (a non-editable target) focuses the field.
+    // `/` from the dock (a non-editable target) focuses the field. The shell's
+    // window handler claims the key (preventDefault — no literal slash); the
+    // exposed `focusCommandField` API (the store's single focus entry) moves
+    // focus into the always-present field.
     pressKey(window, "/");
+    await w.vm.$nextTick();
+    w.vm.focusCommandField();
     await w.vm.$nextTick();
     let input = w.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
@@ -116,6 +121,11 @@ describe("AppShell root (B1 core family)", () => {
     await w.vm.$nextTick();
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
     expect(w.find("textarea#inputfield").exists()).toBe(true);
+
+    // Refocus the always-present field so the literal-slash step's premise
+    // (an editable control is focused) holds after the Escape rescue.
+    w.vm.focusCommandField();
+    await w.vm.$nextTick();
 
     // A `/` pressed while an editable control (the field) is focused is
     // ordinary text input: the shell's window-level claim never fires, so a

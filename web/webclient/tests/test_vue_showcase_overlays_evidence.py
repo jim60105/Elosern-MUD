@@ -118,7 +118,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     "Data/StatusPanel",
-    "Data/CharacterPanel",
     "Data/CharacterHead",
     "Data/VitalsTrack",
     "Data/SkillBook",

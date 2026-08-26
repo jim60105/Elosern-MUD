@@ -473,6 +473,23 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         # Guarantee overflow so the narrative can be scrolled up.
         _append_narrative_fillers(page, 80)
+        # Gate on the 80 fillers having rendered (overflow established) and the
+        # feed's auto-scroll having settled, so the reader position is
+        # deterministic before we scroll to the top.
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="narrative-feed"]',
+                "predicate": (
+                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                    " const lines = f ? f.querySelectorAll('.narrative-line').length : 0;"
+                    " return f && f.scrollHeight > f.clientHeight && lines >= 80; }"
+                ),
+                "description": "80 fillers rendered (overflow established)",
+            },
+            timeout=30000,
+        )
         # Scroll to the top, then gate on the scroll actually reaching the top.
         # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
         # `scrollTop = 0` triggers an animation that races the gate. Force an
@@ -492,9 +509,10 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop === 0"
+                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]'); "
+                    "return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
                 ),
-                "description": "narrative feed scrolled to the top",
+                "description": "narrative feed scrolled to the top (and not at the bottom)",
             },
             timeout=30000,
         )
