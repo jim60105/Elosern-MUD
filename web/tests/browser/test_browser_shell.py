@@ -666,9 +666,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_command_line_field_button_alignment_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)
-            # H5 (task 8.8): the command line is permanently present — no
-            # opening action is needed before measuring the field/button
-            # alignment.
+            # H5 (design D1/D2): focus lands on the action dock after sync;
+            # the command field never auto-focuses. Establish the design's
+            # precondition (dock focus), then press "/" so the shell's global
+            # shortcut focuses the field before measuring alignment.
+            focus_action_dock(page)
+            page.keyboard.press("/")
             _wait_field_focused(page)
             page.wait_for_timeout(200)
             geometry = page.evaluate(

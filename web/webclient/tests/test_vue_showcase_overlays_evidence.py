@@ -52,6 +52,7 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/SettingsOverlay",
     "Overlays/HelpOverlay",
     "Overlays/CreationOverlay",
+    "Overlays/OverlayHost",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -100,7 +101,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
-    "Core/CommandDrawer",
+    "Core/CommandLine",
+    "Core/QuickWordChips",
     "Core/HudFrame",
     "Core/SceneBackdrop",
     "Core/FullLogOverlay",

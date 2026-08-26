@@ -164,7 +164,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "the input row is visible by default",
         )
         self.assertTrue(
-            page.locator(".prompt").is_visible(),
+            page.locator('[data-testid="command-line-prompt"]').is_visible(),
             "the prompt chevron is visible by default",
         )
         self.assertTrue(

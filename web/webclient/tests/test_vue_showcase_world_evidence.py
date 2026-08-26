@@ -98,7 +98,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
-    "Core/CommandDrawer",
+    "Core/CommandLine",
+    "Core/QuickWordChips",
     "Core/HudFrame",
     "Core/SceneBackdrop",
     "Core/FullLogOverlay",
@@ -126,6 +127,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/HelpOverlay",
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
+    "Overlays/OverlayHost",
 }
 
 

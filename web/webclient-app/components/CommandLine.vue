@@ -400,14 +400,18 @@ defineExpose({ focusField });
 
 /* Constrained width (design D5): the hint cluster is the first element
    dropped, then the chip cluster scrolls; the field, the history controls
-   and the utility controls are never dropped. */
-@media (max-width: 1399px) {
-  .cmdline .hint {
-    display: none;
-  }
-  .cmdline .qwc {
-    overflow-x: auto;
-  }
+   and the utility controls are never dropped. Implemented as always-on
+   flexbox degradation (no mobile breakpoint is shipped, design D1/D5). */
+.cmdline .hint {
+  flex-shrink: 3;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cmdline .qwc {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .hist {
