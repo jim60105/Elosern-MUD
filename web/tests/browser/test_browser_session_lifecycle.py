@@ -56,7 +56,8 @@ class SessionLifecycleBrowserTest(BrowserAcceptanceTest):
         # The retained epoch allows a late bounded rejection to be accepted.
         self.assertIsNotNone(state["epoch"])
         # The disconnect overlay must not appear: the connection is fine and
-        # the drawer stays usable for repuppeting.
+        # the command line (H5: the retired drawer's successor) stays usable
+        # for repuppeting.
         visible = page.evaluate(
             "document.getElementById('elosern-offline-overlay')"
             ".getAttribute('data-visible') === 'true'"

@@ -4,9 +4,10 @@ These journeys drive the real Evennia server's combat sessions through the
 Vue action dock (ActionDock): the seeded character owns fire_ball (SINGLE),
 wind_blade (AREA), status_disguise (SELF), concentration (NONE), and the innate
 basic_attack (SINGLE) and flee (SELF). Each test starts combat by engaging a
-fixture monster through the ordinary drawer, then drives the combat dock with
-arrows and Enter, asserting the exact OOB payloads and ordinary narrative
-delivery.
+fixture monster through the ordinary command line (H5, webclient-hud-05-
+overlays-and-command-line: the retired drawer's successor), then drives the
+combat dock with arrows and Enter, asserting the exact OOB payloads and
+ordinary narrative delivery.
 """
 
 from __future__ import annotations

@@ -7,32 +7,31 @@ import {
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
 
-describe("MapOverlay (B5 overlays family)", () => {
+describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () => {
   let wrapper;
 
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
+    document.body.innerHTML = "";
   });
 
-  it("renders the full lattice in the dialog frame, reusing the LocalMap panel", () => {
+  it("renders the full lattice in the overlay body, reusing the LocalMap panel", () => {
     wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
-    const dialog = wrapper.get('[data-testid="map-overlay"]');
-    expect(dialog.attributes("role")).toBe("dialog");
-    expect(dialog.attributes("aria-label")).toBe("區域地圖");
-    // Interactive cells keep LocalMap's preserved item keys.
-    expect(
-      wrapper.find('[data-testid="local-map"]').exists(),
-    ).toBe(true);
-    // The lattice SVG carries the local-map__lattice class (no testid).
+    // The body is a plain block (task 6.1): no dialog role / aria-modal /
+    // close control — those belong to the OverlayHost.
+    const overlay = wrapper.get('[data-testid="map-overlay"]');
+    expect(overlay.attributes("role")).toBeUndefined();
+    expect(wrapper.find('[data-testid="map-overlay-close"]').exists()).toBe(false);
+    // The available branch renders the LocalMap lattice.
+    expect(wrapper.find('[data-testid="map-overlay-content"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(true);
     expect(wrapper.find(".local-map__lattice").exists()).toBe(true);
-    expect(
-      wrapper.find('[data-testid="local-map__node--grid:altoria:1:2"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-testid="local-map__node--grid:altoria:1:2"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="local-map__legend"]').exists()).toBe(true);
   });
 
-  it("forwards the move event when the actionable adjacent node is clicked", async () => {
+  it("forwards the move event when an actionable adjacent node is clicked", async () => {
     wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
     await wrapper
       .get('[data-testid="local-map__node--grid:altoria:2:2"]')
@@ -45,6 +44,12 @@ describe("MapOverlay (B5 overlays family)", () => {
     });
   });
 
+  it("forwards the open-map event from the island's full-map trigger (task 6.2)", async () => {
+    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    await wrapper.get('[data-testid="local-map__expand"]').trigger("click");
+    expect(wrapper.emitted("open-map")).toBeTruthy();
+  });
+
   it("renders only the registry-owned reason for the unavailable payload", () => {
     wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE } });
     expect(
@@ -52,22 +57,15 @@ describe("MapOverlay (B5 overlays family)", () => {
     ).toBe("區域地圖目前無法顯示");
     // The unavailable form never invents a lattice: no LocalMap panel.
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
-  });
-
-  it("emits close and hides the overlay when the close button is clicked", async () => {
-    wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_MINIMAL_SAMPLE } });
-    await wrapper.get('[data-testid="map-overlay-close"]').trigger("click");
-    expect(wrapper.emitted("close")).toBeTruthy();
-    expect(wrapper.find('[data-testid="map-overlay"]').exists()).toBe(false);
-    // No lattice after the client-local close (no OOB envelope).
-    expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="map-overlay-content"]').exists()).toBe(false);
   });
 
   it("re-renders the available/unavailable branch when the local_map payload is replaced", async () => {
     wrapper = mount(MapOverlay, { props: { localMap: LOCAL_MAP_SAMPLE } });
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(true);
-    // An OOB read-model update replaces the payload: the frame must track
-    // the new state, never show a stale branch.
+    // An OOB read-model update replaces the payload: the body must track the
+    // new state, never show a stale branch (the delta's read-model-update
+    // requirement, first observable here outside Storybook).
     await wrapper.setProps({ localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE });
     expect(
       wrapper.get('[data-testid="map-overlay-unavailable"]').text(),
@@ -75,12 +73,5 @@ describe("MapOverlay (B5 overlays family)", () => {
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(false);
     await wrapper.setProps({ localMap: LOCAL_MAP_SAMPLE });
     expect(wrapper.find('[data-testid="local-map"]').exists()).toBe(true);
-  });
-
-  it("hides the overlay root when open is false", () => {
-    wrapper = mount(MapOverlay, {
-      props: { localMap: LOCAL_MAP_SAMPLE, open: false },
-    });
-    expect(wrapper.find('[data-testid="map-overlay"]').exists()).toBe(false);
   });
 });

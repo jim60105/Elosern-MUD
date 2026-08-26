@@ -36,6 +36,7 @@ import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
+import LayoutStore from "../lib/layout_store.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
 const MAX_NARRATIVE_LINES = 500;
@@ -264,6 +265,9 @@ export const useElosernStore = defineStore("elosern", () => {
         console.warn(`openHudDrawer: unknown drawer "${name}" rejected (not coerced)`);
         return false;
       }
+      // Mutual exclusion (H5, design D8): opening a drawer closes the open
+      // overlay so at most one focus-trapped surface exists.
+      closeOverlay();
       hudDrawer.value = name;
       publishView();
       return true;
@@ -294,7 +298,169 @@ export const useElosernStore = defineStore("elosern", () => {
       return true;
     }
 
-    // The service surface that the current service frame belongs to, recorded
+    // H5 (webclient-hud-05-overlays-and-command-line, design D7/D8): the
+    // full-screen overlay controller. `view.hudOverlay` is the single
+    // open-overlay name (null | map | settings | help); at most one overlay
+    // is open at a time (structural: a single value). Unknown names are
+    // rejected, not coerced. Opening an overlay closes any open reference
+    // drawer (design D8: an overlay and a drawer are never open together,
+    // so at most one focus-trapped surface exists at any moment), and the
+    // opener control is captured at open time so the host's focus
+    // restoration returns to the trigger that opened the most recent overlay.
+    // The store is the single writer and owns the teardown on a mode change
+    // into creation, an epoch reset, or a transport loss (same events as
+    // the drawer teardown in `syncHudDrawer`).
+    const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help"]);
+    const hudOverlay = ref(null);
+    const hudOverlayOpener = ref(null);
+
+    function openOverlay(name, openerEl = null) {
+      if (!HUD_OVERLAY_NAMES.has(name)) {
+        console.warn(`openOverlay: unknown overlay "${name}" rejected (not coerced)`);
+        return false;
+      }
+      // Mutual exclusion (design D8): opening the overlay closes the open
+      // drawer so exactly one focus-trapped surface exists.
+      closeHudDrawer({});
+      hudOverlay.value = name;
+      // The opener is captured at open time, not in the host's onMounted:
+      // an overlay that replaces another must restore focus to its own
+      // trigger, never to the trigger of the closed overlay (design D7).
+      hudOverlayOpener.value = openerEl;
+      publishView();
+      return true;
+    }
+
+    function closeOverlay() {
+      if (hudOverlay.value === null) {
+        return false;
+      }
+      hudOverlay.value = null;
+      hudOverlayOpener.value = null;
+      publishView();
+      return true;
+    }
+
+    // H5 (webclient-hud-05-overlays-and-command-line, tasks 7.5/7.8): the
+    // presentation-preferences slice. Client-local presentation state
+    // (webclient-component-showcase delta): the narrative prose scale
+    // (`fontScale`), the text-to-HTML narrative toggle (`text2html`), the
+    // optional reduced-motion override (`reducedMotion` — `null` means no
+    // override, the OS `prefers-reduced-motion` applies) and the colorblind
+    // status palette (`colorblind`). No settings control dispatches a
+    // `ui_action`; each preference is applied to the document's presentation
+    // tokens immediately, is persisted through the versioned,
+    // presentation-only layout store, and is re-applied at load. The store's
+    // own LayoutStore instance is the only writer (main.js's instance stays
+    // load-only): a preference save reloads the latest validated wrapper
+    // before writing, so the caller's `dimensions` and `tabs` are preserved.
+    const layoutPersistence = LayoutStore.createStore({ storage: window.localStorage });
+    const prefs = {
+      fontScale: 1,
+      text2html: true,
+      // Optional key: absent in the stored wrapper = no override (task 7.5).
+      reducedMotion: null,
+      colorblind: false,
+    };
+
+    function applyPresentationPreferences() {
+      const root = document.documentElement;
+      // The three prose-scale targets (design D13): the narrative caption's
+      // lines, the full-log surface's lines and the prompt line read this
+      // token; no HUD/dock/drawer/overlay chrome reads it.
+      root.style.setProperty("--prose-scale", String(prefs.fontScale));
+      if (prefs.reducedMotion) {
+        root.setAttribute("data-reduced-motion", prefs.reducedMotion);
+      } else {
+        root.removeAttribute("data-reduced-motion");
+      }
+      if (prefs.colorblind) {
+        root.setAttribute("data-colorblind", "on");
+      } else {
+        root.removeAttribute("data-colorblind");
+      }
+      publishView();
+    }
+
+    function persistPresentationPreferences() {
+      // Reload the latest validated wrapper before writing (task 7.8): a
+      // version-1 wrapper lacking the new keys normalizes cleanly (no
+      // version bump, task 7.5); an unknown stored version resets to the
+      // default with every preference re-applied rather than half-applied.
+      const current = layoutPersistence.load();
+      const wrapper = current.state;
+      wrapper.preferences = {
+        text2html: prefs.text2html,
+        fontScale: prefs.fontScale,
+        colorblind: prefs.colorblind,
+      };
+      // The reducedMotion key is optional (task 7.5): only write it when the
+      // override is explicit. The layout store validates it as a boolean —
+      // `true` forces reduced motion ("on"), `false` forces full motion
+      // ("off"); absence in the stored wrapper means "no override" (the OS
+      // `prefers-reduced-motion` applies).
+      if (prefs.reducedMotion) {
+        wrapper.preferences.reducedMotion = prefs.reducedMotion === "on";
+      }
+      layoutPersistence.save(wrapper);
+    }
+
+    function loadPresentationPreferences() {
+      const result = layoutPersistence.load();
+      const stored = (result.state && result.state.preferences) || {};
+      if (typeof stored.fontScale === "number" && isFinite(stored.fontScale)) {
+        prefs.fontScale = Math.min(2, Math.max(0.5, stored.fontScale));
+      }
+      if (typeof stored.text2html === "boolean") {
+        prefs.text2html = stored.text2html;
+      }
+      // The `reducedMotion` key is optional (task 7.5): stored as a boolean
+      // override — `true` forces reduced motion ("on"), `false` forces full
+      // motion ("off"); its absence means "no override" (the OS
+      // `prefers-reduced-motion` applies).
+      if (typeof stored.reducedMotion === "boolean") {
+        prefs.reducedMotion = stored.reducedMotion ? "on" : "off";
+      }
+      if (typeof stored.colorblind === "boolean") {
+        prefs.colorblind = stored.colorblind;
+      }
+      applyPresentationPreferences();
+    }
+
+    function setFontScale(value) {
+      if (typeof value !== "number" || !isFinite(value)) {
+        return;
+      }
+      prefs.fontScale = Math.min(2, Math.max(0.5, value));
+      applyPresentationPreferences();
+      persistPresentationPreferences();
+    }
+
+    function setTextToHtml(on) {
+      prefs.text2html = !!on;
+      applyPresentationPreferences();
+      persistPresentationPreferences();
+    }
+
+    function setReducedMotion(value) {
+      // `null` = no override (the OS preference applies); `"on"` forces
+      // reduced motion; `"off"` beats the OS `prefers-reduced-motion` media
+      // query (task 7.6).
+      if (value !== null && value !== "on" && value !== "off") {
+        return;
+      }
+      prefs.reducedMotion = value;
+      applyPresentationPreferences();
+      persistPresentationPreferences();
+    }
+
+      function setColorblind(on) {
+        prefs.colorblind = !!on;
+        applyPresentationPreferences();
+        persistPresentationPreferences();
+      }
+
+     // The service surface that the current service frame belongs to, recorded
     // at frame-push time (design D2's "record the surface at push time", not
     // inferred from the menu's display title). `null` when no service frame
     // is active.
@@ -406,6 +572,13 @@ export const useElosernStore = defineStore("elosern", () => {
         setActiveSubDock(null);
         rehomeFrame(reducer.getState());
       }
+      return;
+    }
+    if (name === "toggle-drawer") {
+      // H5: the `/` key routes bridge -> router -> here. Bump `drawerRequest`
+      // so the shell's watcher focuses the always-present command field (D1/D2).
+      drawerRequest += 1;
+      publishView();
       return;
     }
     if (name !== "submit" && name !== "space") {
@@ -655,6 +828,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // The committed `services` panel signature: a replacement (a reconnect
   // resync) discards the unsubmitted client-local quantity form.
   let lastServicesSig = null;
+  // H5 (tasks 7.5/7.8): re-apply the persisted presentation preferences at
+  // load. Placed after every `let` signature variable that `publishView`
+  // touches (lastMenuSig / lastSuggSig / lastServicesSig) and after `view`,
+  // so the init-time `publishView` cannot hit a temporal-dead-zone.
+  loadPresentationPreferences();
   // G1 re-home: repopulate the root frame from the committed `context_actions`
   // panel after a menu-less `router.reset()` emptied the stack. Called by the
   // wrapped `router.reset` (synchronous) and by `rebuildFocusMenu`'s re-home
@@ -1286,23 +1464,32 @@ export const useElosernStore = defineStore("elosern", () => {
       const epochChanged = !!prev && prev.epoch !== rs.activeEpoch;
       const transportLost = !!prev && prev.connected && !rs.connected;
 
-     if (modeChanged || epochChanged || transportLost) {
-       // A committed mode change out of exploration, an epoch reset, or a
-       // transport loss each close the services-backed drawers and discard
-       // local selection, quantity, and confirmation state (the quantity
-       // form is also nulled by the panel-replacement logic above).
-       const d = hudDrawer.value;
-       if (d === "quest" || d === "shop" || d === "inventory") {
-         hudDrawer.value = null;
-       }
-       if (transportLost || epochChanged) {
-         if (hudDrawer.value) {
-           hudDrawer.value = null;
-         }
-       }
-       setServiceSurface(null);
-       return;
-     }
+      if (modeChanged || epochChanged || transportLost) {
+        // A committed mode change out of exploration, an epoch reset, or a
+        // transport loss each close the services-backed drawers and discard
+        // local selection, quantity, and confirmation state (the quantity
+        // form is also nulled by the panel-replacement logic above).
+        const d = hudDrawer.value;
+        if (d === "quest" || d === "shop" || d === "inventory") {
+          hudDrawer.value = null;
+        }
+        if (transportLost || epochChanged) {
+          if (hudDrawer.value) {
+            hudDrawer.value = null;
+          }
+        }
+        // H5 (webclient-hud-05-overlays-and-command-line, design D7): the
+        // open full-screen overlay is force-closed on the same three events
+        // (mode change into creation, epoch reset, transport loss); the host
+        // restores focus to the overlay's own trigger (the opener element
+        // captured at open time, design D7).
+        if (hudOverlay.value !== null) {
+          hudOverlay.value = null;
+          hudOverlayOpener.value = null;
+        }
+        setServiceSurface(null);
+        return;
+      }
 
       // Frame hosting (design D2): while a service frame is the router's
       // current frame, ensure the matching reference drawer is open (the
@@ -1386,15 +1573,36 @@ export const useElosernStore = defineStore("elosern", () => {
         // | shop | quest | lore | status); at most one drawer is open at a
         // time (structural: one value).
         hudDrawer: hudDrawer.value,
+        // H5 (task 5.2): the single open-overlay name (null | map | settings
+        // | help), plus the opener element captured at open time — the anchor
+        // for the host's focus restoration (design D7).
+        hudOverlay: hudOverlay.value,
+        hudOverlayOpener: hudOverlayOpener.value,
+        // H5 (task 7.5/7.8): the client-local presentation preferences the
+        // settings surface owns — the narrative prose scale, the text-to-HTML
+        // narrative toggle, the optional reduced-motion override and the
+        // colorblind status palette. No setting dispatches a `ui_action`; the
+        // store applies each to the document's presentation tokens and
+        // persists it through the versioned layout store.
+        fontScale: prefs.fontScale,
+        textToHtml: prefs.text2html,
+        reducedMotion: prefs.reducedMotion,
+        colorblind: prefs.colorblind,
 
        contextActions: panel,
       suggestions,
       suggestionsView: OptionCards.buildOptionsView(panel || {}),
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
       choicePoint: { state: choiceState, suggestions },
-      localMapModel: panels.local_map
-        ? { ...LocalMap.reducePanel(panels.local_map), available: panels.local_map.available !== false }
-        : null,
+       localMapModel: panels.local_map
+         ? {
+             ...LocalMap.reducePanel(panels.local_map),
+             available: panels.local_map.available !== false,
+             // The registry-owned unavailable reason so the island and the map
+             // overlay can render it (H5 offline-degradation, task 8.9).
+             reason: panels.local_map.reason,
+           }
+         : null,
        // The keyboard router's current combat menu frame (root/skills/scale/
        // target) so the visible dock follows keyboard navigation (Option B).
        combatMenu: router.currentMenu(),
@@ -1875,6 +2083,25 @@ export const useElosernStore = defineStore("elosern", () => {
       // one menu level when the drawer hosts a service frame).
        openHudDrawer,
        closeHudDrawer,
+        // H5 (task 5.3): the full-screen overlay controller — the single open
+        // entry (`openOverlay` over `map` / `settings` / `help`, unknown names
+        // rejected, closes any open drawer for mutual exclusion, design D8)
+        // and the single close entry (`closeOverlay`). The opener element is
+        // captured at open time and published as `view.hudOverlayOpener` for
+        // the host's focus restoration (design D7).
+        openOverlay,
+        closeOverlay,
+        // H5 (task 7.8): the presentation-preferences controller — the
+        // client-local presentation state the settings surface owns (prose
+        // scale, text-to-HTML toggle, optional reduced-motion override,
+        // colorblind palette). No setting dispatches a `ui_action`; each
+        // setter applies the preference to the document's presentation tokens
+        // and persists it through the versioned layout store (reloading the
+        // latest validated wrapper before writing).
+        setFontScale,
+        setTextToHtml,
+        setReducedMotion,
+        setColorblind,
        // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
        // router's current frame is a service frame (guild / shop / inventory)
        // so the drawer layer can render that frame's rows through the shared

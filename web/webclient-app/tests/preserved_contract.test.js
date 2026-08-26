@@ -2,12 +2,19 @@
 // contract. These identifiers the keyboard router, the public façades and
 // the OOB bridge depend on — `#action-dock` (with `data-mode`, `tabindex`
 // and the listbox composite role), `#elosern-action-live`,
-// `#elosern-offline-overlay`, `#inputfield`, `#narrative-unread`,
-// `data-testid="narrative-feed"`, `data-testid="command-drawer"`,
-// `data-testid="action-dock"`, and the `action-*` / `target-*` item keys —
-// are preserved unchanged by the stage restructure. A regression fails at the
-// unit gate rather than in the browser suite (task 1.2), and the mounted
-// AppClient keeps the dock contract intact in every committed mode (task 1.4).
+// `#elosern-offline-overlay`, `#inputfield` inside its `.inputfieldwrapper`
+// wrapper (H5, webclient-hud-05-overlays-and-command-line, task 1.2: the
+// command line is permanently present, so the field survives in every mode
+// matrix that renders the command-line anchor), `#narrative-unread`,
+// `data-testid="narrative-feed"`, `data-testid="action-dock"`, and the
+// `action-*` / `target-*` item keys — are preserved unchanged by the stage
+// restructure. The `layout_store.js` `REQUIRED_COMPONENTS` entry
+// `command-drawer` is the one preserved layout-store identifier (the layout
+// store's bounded wrapper still names the command-line component
+// `command-drawer`; H5 retires the drawer's open/closed DOM state, not the
+// layout-store key). A regression fails at the unit gate rather than in the
+// browser suite (task 1.2), and the mounted AppClient keeps the dock contract
+// intact in every committed mode (task 1.4).
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -136,14 +143,21 @@ describe("H1 preserved DOM contract (design D6)", () => {
       expect(wrapper.find(`#${id}`).exists(), `#${id} must survive`).toBe(true);
     }
     expect(wrapper.find('[data-testid="narrative-feed"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="command-drawer"]').exists()).toBe(true);
+    // H5 (task 1.2): the command line is permanently present — the bar is
+    // always rendered (no open/closed state), so `#inputfield` inside its
+    // `.inputfieldwrapper` survives without any opening action.
+    expect(wrapper.find('[data-testid="command-line"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="action-live-region"]').exists()).toBe(true);
 
-    // The preserved `#inputfield` field lives inside the command drawer and
-    // only renders while the drawer is open — open it, then assert survival.
-    wrapper.vm.openDrawer();
+    // The preserved `#inputfield` field lives inside the always-present
+    // command line; focusing it is a side-effect-free claim (no drawer state
+    // to toggle, design D1).
+    const inputfield = wrapper.find("#inputfield");
+    expect(inputfield.exists(), "#inputfield must survive").toBe(true);
+    expect(inputfield.element.closest(".inputfieldwrapper")).not.toBeNull();
+    wrapper.vm.focusCommandField();
     await wrapper.vm.$nextTick();
-    expect(wrapper.find("#inputfield").exists(), "#inputfield must survive").toBe(true);
+    expect(document.activeElement).toBe(inputfield.element);
     wrapper.unmount();
   });
 

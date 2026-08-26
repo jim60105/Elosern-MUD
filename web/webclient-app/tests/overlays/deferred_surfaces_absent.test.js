@@ -50,9 +50,9 @@ const DEFERRED_TITLE_PATTERNS = [
   /\bToasts?\b/i,
   /\bCompanions?\b/i,
   /\bObjectives?\b/i,
-  // H2 additions: the head-card identity line and the minimap's unbacked
-  // figures (roadmap §2.4 — no race/class/faction field or bearing/distance
-  // exists in the payloads).
+   // H2 additions: the head-card identity line and the minimap's unbacked
+   // figures (roadmap §2.4 — no race/class/faction field or bearing/distance
+   // exists in the payloads).
   /\bRace\b/i,
   /\bSubrace\b/i,
   /\bClass\b/i,
@@ -60,36 +60,58 @@ const DEFERRED_TITLE_PATTERNS = [
   /\bBearing\b/i,
   /\bDistance\b/i,
   /\bCompass\b/i,
+  // H5 (webclient-hud-05-overlays-and-command-line, task 8.3): this wave's
+  // deferrals, each named by the backing it waits on:
+  // - the draft's 分類 → 條目 → 子主題 game-help browser (an OOB panel
+  //   carrying `help` content — the `help` command's output reaches the
+  //   client only as narrative text; no committed panel carries it);
+  // - the audio-volume rows (no audio subsystem in this client);
+  // - the `HUD 縮放` slider and the 重映射 control;
+  // - map zoom/pan (the map surface ships no zoom or pan affordance).
+  /\bHelpBrowser\b/i,
+  /\bGameHelp\b/i,
+  /\bAudio\b/i,
+  /\bVolume\b/i,
+  /\bHudScale\b/i,
+  /\bRemap(ping)?\b/i,
+  /\bZoom\b/i,
+  /\bPan\b/i,
 ];
 
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
-    // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
-    // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
-    // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
-    // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
-    // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
-    // adds the three reference-drawer components (`Core/HudDrawer`,
-    // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H6
-    // re-freezes at the complete new set.
-    expect(manifest.required).toHaveLength(39);
-    // The four full overlays complete the required set (B5's new family).
-    for (const title of [
-      "Overlays/MapOverlay",
-      "Overlays/SettingsOverlay",
-      "Overlays/HelpOverlay",
-      "Overlays/CreationOverlay",
-      "Action/DockTabBar",
-      "Action/DockBreadcrumb",
-      "Action/SkillDetailPane",
-      "Data/ParticipantFrame",
-      "Core/HudDrawer",
-      "Data/EquipmentDoll",
-      "Data/CharacterStatusDrawer",
-    ]) {
-      expect(manifest.required).toContain(title);
-    }
+   // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
+   // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
+   // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
+   // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
+   // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
+   // adds the three reference-drawer components (`Core/HudDrawer`,
+   // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H5
+   // (webclient-hud-05-overlays-and-command-line, task 8.2) renames
+   // `Core/CommandDrawer` → `Core/CommandLine` and adds `Core/QuickWordChips`
+   // and `Overlays/OverlayHost` (39 → 41). H6 re-freezes at the complete new
+   // set.
+   expect(manifest.required).toHaveLength(41);
+   // The four full overlays complete the required set (B5's new family).
+   for (const title of [
+     "Overlays/MapOverlay",
+     "Overlays/SettingsOverlay",
+     "Overlays/HelpOverlay",
+     "Overlays/OverlayHost",
+     "Overlays/CreationOverlay",
+     "Core/CommandLine",
+     "Core/QuickWordChips",
+     "Action/DockTabBar",
+     "Action/DockBreadcrumb",
+     "Action/SkillDetailPane",
+     "Data/ParticipantFrame",
+     "Core/HudDrawer",
+     "Data/EquipmentDoll",
+     "Data/CharacterStatusDrawer",
+   ]) {
+     expect(manifest.required).toContain(title);
+   }
   });
 
   // H3 (task 7.3): the dock renders no `戰鬥外` skill badge (design D14 —

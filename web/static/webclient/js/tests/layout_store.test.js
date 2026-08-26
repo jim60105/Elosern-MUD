@@ -237,6 +237,43 @@ test("fontScale preference is bounded", () => {
   assert.deepEqual(stored.preferences, { text2html: true }, "out-of-range fontScale dropped");
 });
 
+// H5 (webclient-hud-05-overlays-and-command-line, task 9.2): the two added
+// PREFERENCE_TYPES keys (reducedMotion, colorblind) — a version-1 wrapper
+// lacking the keys still normalizes and no version bump occurs.
+test("a version-1 wrapper lacking the H5 preference keys still normalizes without a version bump", () => {
+  const validated = LayoutStore.validateWrapper(
+    wrapper({ preferences: { text2html: true, fontScale: 1.12 } })
+  );
+  assert.ok(validated, "the old wrapper is valid");
+  assert.equal(validated.layout_version, 1, "no version bump");
+  assert.deepEqual(
+    validated.preferences,
+    { text2html: true, fontScale: 1.12 },
+    "unknown preference keys are dropped, known keys kept"
+  );
+});
+
+test("the H5 preference keys (reducedMotion, colorblind) validate as booleans", () => {
+  const store = defaultStore();
+  const saved = store.save(
+    wrapper({
+      preferences: {
+        text2html: true,
+        fontScale: 0.92,
+        reducedMotion: false,
+        colorblind: true,
+        evil: "x",
+      }
+    })
+  );
+  assert.equal(saved, true);
+  const stored = JSON.parse(store.storage.getItem(LayoutStore.STORAGE_KEY));
+  assert.deepEqual(
+    stored.preferences,
+    { text2html: true, fontScale: 0.92, reducedMotion: false, colorblind: true }
+  );
+});
+
 test("required components are preserved and never closable", () => {
   const config = LayoutStore.buildConfig(LayoutStore.defaultWrapper());
   assert.ok(allRequiredPresent(config));

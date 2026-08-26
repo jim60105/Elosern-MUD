@@ -2,157 +2,99 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 
-// SettingsOverlay (B5 overlay family): full-viewport settings dialog with
-// client-local options (fonts, type scale, reduced motion, text-to-HTML
-// narrative, colorblind palette). Each control change emits the matching
-// `options.*` OOB action envelope (the C-wave store persists/dispatches it).
-describe("SettingsOverlay (B5 overlay family)", () => {
+// SettingsOverlay (H5, webclient-hud-05-overlays-and-command-line): the
+// body content of the shared full-screen overlay. The modal chrome (header,
+// close control, focus trap) belongs to the OverlayHost, so the body itself
+// carries no dialog role, close button, `open` prop or `close` emit. Every
+// control is client-local presentation state — no settings control dispatches
+// a `ui_action`; each change emits a plain preference-change event that the
+// store persists through the versioned layout store (tasks 7.1–7.8).
+describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () => {
   let wrapper;
 
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
-    document.documentElement.removeAttribute("data-reduced-motion");
+    document.body.innerHTML = "";
   });
 
-  it("renders the full-viewport settings dialog as a dialog with a close button", () => {
+  it("renders the settings body without modal chrome (task 6.1)", () => {
     wrapper = mount(SettingsOverlay);
     const overlay = wrapper.get('[data-testid="settings-overlay"]');
-    expect(overlay.attributes("role")).toBe("dialog");
-    expect(wrapper.find('[data-testid="settings-overlay-close"]').exists()).toBe(true);
+    // The body is a plain block, not a dialog: no role, no aria-modal, no
+    // close control (those live on the OverlayHost now).
+    expect(overlay.attributes("role")).toBeUndefined();
+    expect(overlay.attributes("aria-modal")).toBeUndefined();
+    expect(wrapper.find('[data-testid="settings-overlay-close"]').exists()).toBe(false);
   });
 
-  it("emits close from the close button", () => {
+  it("renders the A−/A/A+ scale segment, the 3-state reduced-motion control and the two toggles", () => {
     wrapper = mount(SettingsOverlay);
-    wrapper.get('[data-testid="settings-overlay-close"]').trigger("click");
-    expect(wrapper.emitted("close")).toBeTruthy();
+    for (const testid of [
+      "settings-overlay-scale-A−",
+      "settings-overlay-scale-A",
+      "settings-overlay-scale-A+",
+      "settings-overlay-reduced-motion-default",
+      "settings-overlay-reduced-motion-on",
+      "settings-overlay-reduced-motion-off",
+      "settings-overlay-text-to-html",
+      "settings-overlay-colorblind",
+    ]) {
+      expect(wrapper.find(`[data-testid="${testid}"]`).exists()).toBe(true, `${testid} present`);
+    }
+    // The invented font-family select is removed (task 7.3).
+    expect(wrapper.find('[data-testid="settings-overlay-fonts"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="settings-overlay-type-scale"]').exists()).toBe(false);
   });
 
-  it("hides the overlay when open is false", () => {
-    wrapper = mount(SettingsOverlay, { props: { open: false } });
-    expect(wrapper.find('[data-testid="settings-overlay"]').exists()).toBe(false);
+  it("marks the current scale step with a non-colour indicator (task 7.2)", () => {
+    wrapper = mount(SettingsOverlay, { props: { fontScale: 0.92 } });
+    const aMinus = wrapper.get('[data-testid="settings-overlay-scale-A−"]');
+    expect(aMinus.classes()).toContain("on");
+    expect(aMinus.attributes("aria-pressed")).toBe("true");
   });
 
-  it("emits options.fonts when the font select changes", () => {
+  it("emits scale-change with the selected step value", async () => {
     wrapper = mount(SettingsOverlay);
-    const select = wrapper.get('[data-testid="settings-overlay-fonts"]');
-    select.element.value = "f-serif";
-    select.trigger("change");
-    expect(wrapper.emitted("action")[0][0]).toEqual({
-      action_id: "options.fonts",
-      payload: { font: "f-serif" },
-    });
+    wrapper.get('[data-testid="settings-overlay-scale-A+"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("scale-change")).toEqual([[1.12]]);
   });
 
-  it("emits options.type_scale when the type scale select changes", () => {
+  it("emits reduced-motion-change across the three states", async () => {
     wrapper = mount(SettingsOverlay);
-    const select = wrapper.get('[data-testid="settings-overlay-type-scale"]');
-    select.element.value = "1.25";
-    select.trigger("change");
-    expect(wrapper.emitted("action")[0][0]).toEqual({
-      action_id: "options.type_scale",
-      payload: { value: 1.25 },
-    });
+    wrapper.get('[data-testid="settings-overlay-reduced-motion-on"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"]]);
+    wrapper.get('[data-testid="settings-overlay-reduced-motion-off"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"], ["off"]]);
+    wrapper.get('[data-testid="settings-overlay-reduced-motion-default"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("reduced-motion-change")).toEqual([["on"], ["off"], [null]]);
   });
 
-  it("emits options.reduced_motion from the reduced-motion toggle", () => {
-    wrapper = mount(SettingsOverlay);
-    const toggle = wrapper.get('[data-testid="settings-overlay-reduced-motion"]');
-    toggle.element.checked = true;
-    toggle.trigger("change");
-    expect(wrapper.emitted("action")[0][0]).toEqual({
-      action_id: "options.reduced_motion",
-      payload: { value: "on" },
-    });
+  it("marks the active reduced-motion state with a non-colour indicator", () => {
+    wrapper = mount(SettingsOverlay, { props: { reducedMotion: "on" } });
+    expect(wrapper.get('[data-testid="settings-overlay-reduced-motion-on"]').attributes("aria-pressed")).toBe("true");
+    expect(wrapper.get('[data-testid="settings-overlay-reduced-motion-default"]').attributes("aria-pressed")).toBe("false");
   });
 
-  it("emits options.text_to_html from the HTML narrative toggle", () => {
+  it("emits text-html-change from the HTML narrative toggle", async () => {
     wrapper = mount(SettingsOverlay);
     const toggle = wrapper.get('[data-testid="settings-overlay-text-to-html"]');
     toggle.element.checked = true;
     toggle.trigger("change");
-    expect(wrapper.emitted("action")[0][0]).toEqual({
-      action_id: "options.text_to_html",
-      payload: { enabled: true },
-    });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("text-html-change")).toEqual([[true]]);
   });
 
-  it("emits options.colorblind from the colorblind toggle", () => {
+  it("emits colorblind-change from the colorblind toggle", async () => {
     wrapper = mount(SettingsOverlay);
     const toggle = wrapper.get('[data-testid="settings-overlay-colorblind"]');
     toggle.element.checked = true;
     toggle.trigger("change");
-    expect(wrapper.emitted("action")[0][0]).toEqual({
-      action_id: "options.colorblind",
-      payload: { enabled: true },
-    });
-  });
-
-  it("reflects the reduced-motion option as a root data attribute", () => {
-    wrapper = mount(SettingsOverlay, { props: { options: { reduced_motion: "on" } } });
-    expect(
-      wrapper.get('[data-testid="settings-overlay"]').attributes("data-reduced-motion"),
-    ).toBe("on");
-    wrapper.unmount();
-
-    wrapper = mount(SettingsOverlay);
-    expect(
-      wrapper.get('[data-testid="settings-overlay"]').attributes("data-reduced-motion"),
-    ).toBe("off");
-  });
-
-  it("reflects reduced motion app-wide via the document root (app-wide motion tokens)", () => {
-    document.documentElement.removeAttribute("data-reduced-motion");
-    wrapper = mount(SettingsOverlay, { props: { options: { reduced_motion: "on" } } });
-    // The option's state is applied to <html>, so the whole app (shell,
-    // panels, narrative feed) inherits the 1ms motion tokens — not just
-    // the settings dialog.
-    expect(document.documentElement.getAttribute("data-reduced-motion")).toBe("on");
-    // Toggling the control off keeps the app-wide state in sync.
-    const toggle = wrapper.get('[data-testid="settings-overlay-reduced-motion"]');
-    toggle.element.checked = false;
-    toggle.trigger("change");
-    expect(document.documentElement.getAttribute("data-reduced-motion")).toBe("off");
-    expect(wrapper.emitted("action").at(-1)[0]).toEqual({
-      action_id: "options.reduced_motion",
-      payload: { value: "off" },
-    });
-  });
-
-  it("reflects the colorblind option as a root data attribute", () => {
-    wrapper = mount(SettingsOverlay, { props: { options: { colorblind: true } } });
-    expect(
-      wrapper.get('[data-testid="settings-overlay"]').attributes("data-colorblind"),
-    ).toBe("on");
-    wrapper.unmount();
-
-    wrapper = mount(SettingsOverlay);
-    expect(
-      wrapper.get('[data-testid="settings-overlay"]').attributes("data-colorblind"),
-    ).toBe("off");
-  });
-
-  it("emits only options.-prefixed action ids for every control", () => {
-    wrapper = mount(SettingsOverlay);
-    const font = wrapper.get('[data-testid="settings-overlay-fonts"]');
-    font.element.value = "f-mono";
-    font.trigger("change");
-    const scale = wrapper.get('[data-testid="settings-overlay-type-scale"]');
-    scale.element.value = "0.9";
-    scale.trigger("change");
-    const motion = wrapper.get('[data-testid="settings-overlay-reduced-motion"]');
-    motion.element.checked = true;
-    motion.trigger("change");
-    const html = wrapper.get('[data-testid="settings-overlay-text-to-html"]');
-    html.element.checked = true;
-    html.trigger("change");
-    const blind = wrapper.get('[data-testid="settings-overlay-colorblind"]');
-    blind.element.checked = true;
-    blind.trigger("change");
-    const actions = wrapper.emitted("action");
-    expect(actions).toHaveLength(5);
-    for (const [envelope] of actions) {
-      expect(envelope.action_id.startsWith("options.")).toBe(true);
-    }
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("colorblind-change")).toEqual([[true]]);
   });
 });

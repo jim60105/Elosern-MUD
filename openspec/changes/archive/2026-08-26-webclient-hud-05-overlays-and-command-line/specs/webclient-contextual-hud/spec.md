@@ -3,10 +3,12 @@
 ### Requirement: The command line is a permanently present bar in the stage's command-line anchor
 The client's text control SHALL render as a single bar filling the stage's `command-line` anchor,
 containing — in this order — the mode's quick-word chips, a prompt chevron, the command input field, a
-hint cluster, the command-history controls, and the overlay utility controls. In every mode this
-capability's visibility matrix renders the command line, the input field SHALL be present in the DOM,
-visible and focusable without any opening action: there SHALL be no entry control, no `aria-expanded`
-state and no closed state. No stored presentation state SHALL be able to remove it.
+hint cluster, the command-history controls, and the overlay utility controls. In the modes this
+capability's visibility matrix renders the command line (exploration and combat), the input field SHALL
+be present in the DOM, visible and focusable without any opening action: there SHALL be no entry
+control, no `aria-expanded` state and no closed state. No stored presentation state SHALL be able to
+remove it. (The command line is intentionally absent from the layout in creation mode, per H1's
+visibility matrix and design D10.)
 
 The bar SHALL NOT overlap the action dock, the narrative caption or any HUD anchor at 1440x900 or
 1280x720. When horizontal space is insufficient, the hint cluster SHALL be dropped first and the
@@ -67,13 +69,17 @@ SHALL name a key, gesture or affordance that has no implementation behind it.
 
 ### Requirement: A full-screen overlay is one focus-trapped surface, and only one is open at a time
 A full-screen overlay SHALL render as one shared surface laid over the stage, carrying a header naming
-the surface and a labelled close control, with its body as its only scrolling region. While an overlay
+the surface and a labelled close control, with its body as its only scrolling region. The surface is fixed
+from the stage's 46px command-line height (`top:46px; left:0; right:0; bottom:0`), so the command line
+stays visible and usable underneath it. While an overlay
 is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation. It
 SHALL close on Escape and on activation of its close control, and both paths SHALL restore focus to the
 control that opened it. It SHALL use the shared focus trap the client already owns rather than a second
 implementation.
 
-At most one overlay SHALL be open at any time; opening a second SHALL close the first. An overlay and a
+At most one overlay SHALL be open at any time; opening a second SHALL close the first, and the opener
+recorded for the replacement is the control that opened it, so closing restores focus to the most recent
+trigger, never to the trigger of the closed overlay. An overlay and a
 reference drawer SHALL NOT be open together: opening either SHALL close the other, so at most one
 focus-trapped surface exists at any moment. An open overlay SHALL register itself as an open surface so
 the stage recession this capability already requires applies without a second mechanism.

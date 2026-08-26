@@ -156,7 +156,8 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
             {
                 "Core/AppShell", "Core/TopBar", "Core/ConnectOverlay",
                 "Core/NarrativeFeed", "Core/UnreadIndicator",
-                "Core/CommandDrawer", "Core/HudFrame", "Core/SceneBackdrop",
+                "Core/CommandLine", "Core/QuickWordChips", "Core/HudFrame",
+                "Core/SceneBackdrop",
                 "Core/FullLogOverlay", "Core/HudDrawer",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
                 "Action/OptionCard", "Action/RestForm", "Action/ChoiceCardRow",
@@ -168,6 +169,7 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 "World/QuestBoard", "World/LoreDrawer", "World/InventoryPanel",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
+                "Overlays/OverlayHost",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

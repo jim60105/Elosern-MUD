@@ -259,7 +259,11 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
         "status": '[data-testid="status-panel"]',
         "local-map": '[data-testid="local-map"]',
         "action-dock": "#action-dock",
-        "command-drawer": '[data-testid="command-drawer"]',
+        # H5 (webclient-hud-05-overlays-and-command-line): the layout-store
+        # key `command-drawer` is preserved, but its DOM surface is now the
+        # permanently-present command line (`command-line` testid), not the
+        # retired drawer.
+        "command-drawer": '[data-testid="command-line"]',
     }
 
     def _count_component(self, page, component) -> int:

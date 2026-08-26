@@ -415,7 +415,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         proves the KeyboardRouter frame is mounted; waiting for
         ``isMutationInFlight()`` false closes the submission gate. Together
         they guarantee a subsequent Enter press reaches the KeyboardRouter and
-        is never swallowed by the command-drawer field.
+        is never swallowed by the command-line field (H5: the retired
+        command drawer's successor, webclient-hud-05-overlays-and-command-line).
         """
         focus_action_dock(page)
         page.wait_for_function(

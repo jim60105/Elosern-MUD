@@ -91,21 +91,31 @@ A pointer activation SHALL be admitted only when it is a primary single activati
 ### Requirement: Keyboard input is dispatched through the WebClient plugin contract
 Key input SHALL be dispatched through the KeyboardRouter handle path exposed by the
 public keyboard bridge (the `window.Elosern.KeyboardRouter` claim contract), claimed
-exactly when the router consumed the event or when the open command drawer owns the
+exactly when the router consumed the event or when the focused command field owns the
 key; unconsumed keys SHALL fall through to the text and command-history path, so
-history recall keeps its turn. A modal capture that must pre-empt the keyboard
+history recall keeps its turn. Because the command field is permanently present rather
+than opened, field ownership SHALL be determined by whether the field holds focus, not
+by an open state. A modal capture that must pre-empt the keyboard
 bridge — the exploration dock's bounded rest-duration entry, the services dock's
 bounded quantity form, or the creation dock's text/numeric field — MAY use a
-capture-phase listener and SHALL remove it when its form closes.
+capture-phase listener and SHALL remove it when its form closes. A focus-trapped
+surface laid over the stage — a reference drawer or a full-screen overlay — SHALL own
+every key it receives while it holds trapped focus, and SHALL release that ownership
+when it closes and returns focus to the control that opened it.
 
 #### Scenario: No unclaimed-keydown noise remains
-- **WHEN** the player navigates the action dock and types in the command drawer
+- **WHEN** the player navigates the action dock and types in the command field
 - **THEN** the bridge claims exactly the events its router consumed and the keys its
-  open drawer owns, so no unclaimed keydown noise remains
+  focused command field owns, so no unclaimed-keydown noise remains
 
 #### Scenario: Unclaimed keys still reach the text and history path
-- **WHEN** the player uses the stock command-history recall keys in the command drawer
+- **WHEN** the player uses the stock command-history recall keys in the command field
 - **THEN** the bridge does not claim them and history recall works
+
+#### Scenario: A trapped surface owns its keys while it is open
+- **WHEN** a full-screen overlay holds trapped focus and the player presses a navigation key
+- **THEN** the overlay owns the key, the router consumes nothing behind it, and closing the
+  overlay returns focus to its trigger and restores the router's ownership
 
 ### Requirement: Pointer parity is verified in the browser without weakening keyboard-only acceptance
 The managed localhost Playwright suite SHALL exercise, with the pointer only at both supported desktop viewports: an exploration root entry and one submenu submission, a service submenu submission, a combat root action and one combat submenu selection, a disabled row that explains without submitting, and an activation attempt while the offline overlay is shown. Each SHALL assert the exact emitted `ui_action` count and payload. The existing keyboard-only acceptance requirements SHALL remain unchanged and SHALL continue to pass, so keyboard-only play is still a verified guarantee rather than a side effect.

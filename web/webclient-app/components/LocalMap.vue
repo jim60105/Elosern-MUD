@@ -21,7 +21,7 @@ const props = defineProps({
   localMap: { type: Object, required: true },
 });
 
-const emit = defineEmits(["move"]);
+const emit = defineEmits(["move", "open-map"]);
 
 // Legend entries follow the fixed visibility order: current, visible_unvisited,
 // visible_visited, remembered. Extra entries cycle through the same glyphs.
@@ -184,6 +184,19 @@ function activateNode(node) {
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑
         </span>
+        <!-- H5 (task 6.2): the island's labelled full-map trigger, a sibling
+             of the lattice on the island's header row (H2's deferred affordance
+             now that the full-map surface is reachable). Opening the map
+             overlay routes through the parent's overlay slice. -->
+        <button
+          type="button"
+          class="local-map__expand"
+          data-testid="local-map__expand"
+          aria-label="展開全地圖"
+          @click="emit('open-map')"
+        >
+          展開全地圖
+        </button>
       </div>
 
       <svg
@@ -365,6 +378,32 @@ function activateNode(node) {
 
 .local-map__meta-title {
   color: var(--paper-300);
+}
+
+/* The full-map trigger (H5, task 6.2): a small labelled control right-aligned
+   in the island's meta row, sibling of the lattice — never a wrapper around
+   the actionable move nodes. */
+.local-map__expand {
+  margin-left: auto;
+  padding: 2px var(--sp-2);
+  color: var(--gold-400);
+  background: transparent;
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.local-map__expand:hover {
+  color: var(--paper-50);
+  border-color: var(--gold-400);
+}
+
+.local-map__expand:focus-visible {
+  color: var(--paper-50);
+  border-color: var(--gold-400);
 }
 
 /* The renderer-axis orientation legend (北↑): a statement about the

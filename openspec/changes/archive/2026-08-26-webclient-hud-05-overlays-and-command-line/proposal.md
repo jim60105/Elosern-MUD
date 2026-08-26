@@ -161,9 +161,10 @@ None. H1 created and archived `webclient-contextual-hud`; H5 adds requirements t
   `test_browser_exploration.py` (2 `command-drawer`, 6 `#inputfield`), `test_vue_foundation.py` (5
   `command-drawer` plus the `-entry` / `-input` hooks and the required-testid list at :68-69),
   `test_browser_actions.py` (3 `#inputfield`), `test_browser_wait_helper.py` (3 `command-drawer` in the
-  bounded-wait fixtures), `test_browser_layout.py` (the required-surface name at :34 and its selector at
-  :268), `browser_helpers.py` (the required-selector list at :35), and `test_browser_art.py` (a docstring
-  at :386). `#inputfield` is asserted **unchanged** in all of them.
+  bounded-wait fixtures),   `test_browser_layout.py` (the required-surface name at :34 and its selector at
+  :268), `browser_helpers.py` (the required-selector list at :35), `test_browser_art.py` (a docstring
+  at :386), and `test_browser_contextual_hud.py` (1 `command-drawer`, 1 `drawer-entry` — found during
+  research, not in the original impact list). `#inputfield` is asserted **unchanged** in all of them.
 - **Re-mapped unit assertions:** `tests/command_drawer.test.js` → `tests/command_line.test.js`,
   `tests/preserved_contract.test.js`, `tests/app.test.js`, `tests/bridge/app_shell_bridge.test.js`,
   `tests/bridge/bridge.test.js`, `tests/overlays/settings_overlay.test.js` (the `options.*` emit cases

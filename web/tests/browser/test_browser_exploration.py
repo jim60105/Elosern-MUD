@@ -264,7 +264,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
-    def test_freeform_dialogue_degrades_offline_through_the_drawer(self):
+    def test_freeform_dialogue_degrades_offline_through_the_command_line(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -284,7 +284,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     "const a = document.activeElement; "
                     "return !!f && a === f; }"
                 ),
-                "description": "command drawer input field is focused",
+                "description": "command-line input field is focused",
             },
         )
         page.keyboard.type("你好，詩人")
@@ -333,7 +333,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     "const a = document.activeElement; "
                     "return !!f && a === f; }"
                 ),
-                "description": "command drawer input field is focused",
+                "description": "command-line input field is focused",
             },
         )
         page.keyboard.type("話到嘴邊又吞了回去")
@@ -344,18 +344,19 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": "#action-dock",
                 "predicate": (
-                    "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); "
-                    "const drawerClosed = !d || d.getAttribute('data-open') !== 'true'; "
+                    "() => { const d = document.querySelector('[data-testid=\"command-line\"]'); "
+                    "const linePresent = !!d; "
                     "const dock = document.getElementById('action-dock'); "
                     "const a = document.activeElement; "
-                    "return drawerClosed && !!dock && (a === dock || (a && dock.contains(a))); }"
+                    "return linePresent && !!dock && (a === dock || (a && dock.contains(a))); }"
                 ),
-                "description": "command drawer closed and action dock focused",
+                "description": "command line present and action dock focused",
             },
         )
 
-        # Send an ordinary command through the drawer: it must travel as text,
-        # never as explore.talk_freeform speech to the previously selected NPC.
+        # Send an ordinary command through the always-present command line: it
+        # must travel as text, never as explore.talk_freeform speech to the
+        # previously selected NPC.
         page.keyboard.press("/")
         wait_for_store_state(
             page,
@@ -367,7 +368,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     "const a = document.activeElement; "
                     "return !!f && a === f; }"
                 ),
-                "description": "command drawer input field is focused",
+                "description": "command-line input field is focused",
             },
         )
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
@@ -666,8 +667,8 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "description": "exploration root cells (move/look) rendered in the dock",
             },
         )
-        # The root cells render again, no ui_action was sent, and no drawer
-        # text was submitted.
+        # The root cells render again, no ui_action was sent, and no
+        # command-line text was submitted.
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"

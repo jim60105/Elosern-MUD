@@ -56,9 +56,18 @@ export default {
     function onKeyDown(event) {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         restoreOpenerFocus();
         emit("close");
         return;
+      }
+      if (event.key !== "Tab") {
+        // A focus-trapped surface owns every key it receives
+        // (webclient-pointer-activation): stop propagation so the
+        // document-level keyboard bridge (and the router behind the overlay)
+        // never consumes navigation keys while the overlay holds trapped
+        // focus — "the router consumes nothing behind it".
+        event.stopPropagation();
       }
       if (event.key === "Tab" && trap) {
         // The shared trap cycles Tab across every focusable control in the
@@ -159,7 +168,8 @@ export default {
 
 <style>
 /* The full-screen scrollable log view: the complete retained narrative,
-   rendered through the same renderer as the caption card. */
+   rendered through the same renderer as the caption card. H5 (design D13):
+   the full-log surface's lines are a prose-scale target. */
 .fulllog-overlay {
   position: fixed;
   inset: 0;
@@ -168,7 +178,7 @@ export default {
   background: var(--ink-950);
   color: var(--paper-100);
   font-family: var(--f-serif);
-  font-size: var(--text-narrative);
+  font-size: calc(var(--text-narrative) * var(--prose-scale));
   line-height: var(--lh-narrative);
   padding: var(--sp-6);
   outline: none;

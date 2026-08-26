@@ -11,7 +11,9 @@ dismissal — is the only allowlisted `options.*` action, and widening the actio
 server-side change that no showcase or redesign wave makes. Each setting SHALL be applied to the
 document's presentation tokens immediately, SHALL be persisted through the client's versioned,
 presentation-only browser store as a harmless display preference, and SHALL be re-applied at load and
-reset with that store when its stored version is unrecognised. The surface SHALL offer no control it
+reset with that store when its stored version is unrecognised. The reduced-motion preference SHALL be
+optional in the stored wrapper: when the key is absent the operating system's `prefers-reduced-motion`
+preference SHALL continue to apply, and an explicit stored value — either direction — SHALL override it. The surface SHALL offer no control it
 does not implement, so a control with no outcome — a typeface choice the design system's role-assigned
 faces do not support, an audio level with no audio subsystem, an interface-scale slider, or a key
 remapping — SHALL NOT be rendered. The creation overlay SHALL implement a presets/custom/concept wizard

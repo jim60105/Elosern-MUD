@@ -308,7 +308,8 @@ export default {
   margin: 0 auto;
   padding: 2px var(--sp-6);
   font-family: var(--f-serif);
-  font-size: var(--text-narrative);
+  /* H5 (design D13): the caption card's lines are a prose-scale target. */
+  font-size: calc(var(--text-narrative) * var(--prose-scale));
   line-height: var(--lh-narrative);
   color: var(--paper-100);
   white-space: pre-wrap;

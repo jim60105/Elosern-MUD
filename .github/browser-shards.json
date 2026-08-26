@@ -90,7 +90,7 @@
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_drawer",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_cancelled_freeform_dialogue_cannot_capture_a_later_command",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_engage_transitions_to_combat",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",
@@ -265,7 +265,10 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_action_dock_floating_panel_persists_across_modes",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_combat_participant_frame_presents_participants_and_portraits",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
-        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode"
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud"
       ]
     }
   ]

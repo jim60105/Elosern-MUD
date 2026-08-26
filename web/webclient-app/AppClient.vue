@@ -20,35 +20,41 @@ import HudDrawer from "./components/HudDrawer.vue";
 import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreDrawer from "./components/LoreDrawer.vue";
+import MapOverlay from "./components/MapOverlay.vue";
 import QuestBoard from "./components/QuestBoard.vue";
 import RestForm from "./components/RestForm.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
+import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
 import SkillBook from "./components/SkillBook.vue";
 import StatusPanel from "./components/StatusPanel.vue";
+import OverlayHost from "./components/OverlayHost.vue";
+import HelpOverlay from "./components/HelpOverlay.vue";
 
 const store = useElosernStore();
 
-// The shell instance handle: the store-driven freeform dialogue entry point
-// (a freeform affordance) requests the command drawer open + field focus
-// through the exposed AppShell method.
+// The shell instance handle (H5, design D1/D6): the store-driven freeform
+// dialogue entry point (a freeform affordance) requests command-line field
+// focus through the exposed AppShell method — the field is permanently
+// present, so there is no open/closed state to toggle.
 const shellRef = ref(null);
 watch(
   () => store.view.drawerRequest,
   (request) => {
     if (request > 0) {
-      shellRef.value?.openDrawer();
+      shellRef.value?.focusCommandField();
     }
   },
 );
-// A successful dock-borrowed send (freeform dialogue) closes the drawer and
-// restores action-dock focus (webclient-desktop-shell: the borrowed-drawer
-// send returns focus to the dock).
+// A successful dock-borrowed send (freeform dialogue) restores action-dock
+// focus (webclient-desktop-shell: the borrowed send returns focus to the
+// dock). The field is never closed, so the completion signal is the focus
+// return, not a surface close (H5, design D6).
 watch(
   () => store.view.drawerCloseRequest,
   (request) => {
     if (request > 0) {
-      shellRef.value?.closeDrawer(true);
+      shellRef.value?.releaseCommandField(true);
     }
   },
 );
@@ -111,6 +117,12 @@ const openSurfaces = computed(() => {
   // mechanism.
   if (store.view.hudDrawer) {
     surfaces.push(store.view.hudDrawer);
+  }
+  // H5 (task 5.4): the open full-screen overlay registers into the same
+  // open-surface set; the stage's recession mark clears only when no
+  // surface remains open.
+  if (store.view.hudOverlay) {
+    surfaces.push(store.view.hudOverlay);
   }
   return surfaces;
 });
@@ -451,6 +463,33 @@ function onMapMove(moveData) {
   });
 }
 
+// H5 (webclient-hud-05-overlays-and-command-line, tasks 5.2/6.4): the
+// overlay opener is captured at open time (the focused element before the
+// overlay renders). Closing the host restores focus to the trigger that
+// opened it; when a second overlay replaces the first, the host
+// re-initializes its focus trap with the new opener (design D7).
+function openOverlayByName(name) {
+  const opener = document.activeElement;
+  store.openOverlay(name, opener);
+}
+
+// The command line's 設定/說明 utility controls (design D10) open the
+// settings / help overlays through the same opener-captured path.
+function onOpenOverlay(name) {
+  openOverlayByName(name);
+}
+
+// The minimap island's 展開全地圖 control (task 6.2) opens the map surface.
+function onMapExpand() {
+  openOverlayByName("map");
+}
+
+// The host's close control and Escape both route here (task 5.2): the host
+// restores focus to the opener before emitting.
+function onOverlayClose() {
+  store.closeOverlay();
+}
+
 function onCreationAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
@@ -515,12 +554,6 @@ function onSubmitCommand(text) {
   return store.sendText(text);
 }
 
-function onDrawerClosed() {
-  // A cancelled command drawer releases the pending freeform dialogue target
-  // so later ordinary commands are never captured as dialogue speech.
-  store.clearFreeformTarget();
-}
-
 function onChoiceAction(intent) {
   // The narrative stream-end choice-point card/dismiss intents (C4): the
   // same single dispatch entry as the dock (store is the sole writer).
@@ -546,10 +579,13 @@ function onChoiceAction(intent) {
         :mutations-locked="store.view.mutationsLocked"
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
+        :text-to-html="store.view.textToHtml"
+        :in-flight="store.view.dispatch.inFlight !== null"
         @submit-command="onSubmitCommand"
         @choice-action="onChoiceAction"
-        @drawer-closed="onDrawerClosed"
+        @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
+        @open-overlay="onOpenOverlay"
       >
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
              it renders the committed `art` panel's scene truthfully — the
@@ -583,6 +619,7 @@ function onChoiceAction(intent) {
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
           @move="onMapMove"
+          @open-map="onMapExpand"
         />
         <!-- H3 (tasks 6.1/6.2/6.3): the combat participant frame renders in
              the stage's right anchor, combat-only. -->
@@ -703,6 +740,48 @@ function onChoiceAction(intent) {
         @activate="onDockActivate"
       />
     </HudDrawer>
+
+    <!-- H5 (tasks 5.4/6.4): the single shared full-screen overlay surface.
+         The host owns the geometry, the focus trap, the Escape handling and
+         the labelled close control; the three stripped overlay bodies mount
+         inside its body slot. An open overlay registers into `openSurfaces`
+         so the stage recession applies without a second mechanism. The
+         creation overlay is mode-driven and stays outside this single-open
+         stack (task 5.5). -->
+    <OverlayHost
+      v-if="store.view.hudOverlay"
+      :overlay="store.view.hudOverlay"
+      :opener="store.view.hudOverlayOpener"
+      :map-model="store.view.localMapModel"
+      :location-label="store.view.statusSlice.locationLabel"
+      @close="onOverlayClose"
+      @move="onMapMove"
+    >
+      <template #default="{ overlay: openName, mapModel }">
+        <MapOverlay
+          v-if="openName === 'map'"
+          :local-map="mapModel || {}"
+          @move="onMapMove"
+          @open-map="onMapExpand"
+        />
+        <SettingsOverlay
+          v-else-if="openName === 'settings'"
+          :font-scale="store.view.fontScale"
+          :text-to-html="store.view.textToHtml"
+          :reduced-motion="store.view.reducedMotion"
+          :colorblind="store.view.colorblind"
+          @scale-change="store.setFontScale"
+          @text-html-change="store.setTextToHtml"
+          @reduced-motion-change="store.setReducedMotion"
+          @colorblind-change="store.setColorblind"
+        />
+        <!-- No committed panel carries authored guide content, so the help
+             surface renders its client-owned control reference and the
+             statement of how the game's own `help` output is reached (task
+             6.6) — no invented copy. -->
+        <HelpOverlay v-else :guide="{}" />
+      </template>
+    </OverlayHost>
 
     <CreationOverlay
       v-if="panelAvailable('creation')"
