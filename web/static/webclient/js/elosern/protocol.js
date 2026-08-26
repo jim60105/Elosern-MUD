@@ -392,7 +392,7 @@
         throw new Error("non-finite numbers are forbidden");
       }
       if (Number.isInteger(value)) {
-        if (value < 0 || value > MAX_SAFE_INTEGER) {
+        if (value < -MAX_SAFE_INTEGER || value > MAX_SAFE_INTEGER) {
           throw new Error("integer is outside the JavaScript-safe range");
         }
       }

@@ -25,7 +25,9 @@ from .browser_helpers import (
     sent_action_count,
     snapshot_envelope,
     store_state,
+    valid_character_panel,
     valid_local_map_panel,
+    valid_status_panel,
     wait_for_store_state,
 )
 
@@ -1387,6 +1389,120 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the map overlay renders only the reason, never a stale lattice",
         )
         page.close()
+
+    def test_status_drawer_tiles_and_pills_fit_with_no_overlap(self):
+        """The re-chromed 角色狀態 drawer: the stat tiles and condition pills
+        wrap without overlap, clipping, or horizontal overflow at both
+        viewports (the design's card-tile / pill-badge presentation).
+
+        Exercises a low-HP resource (the 危險 marker case) and a 9-condition
+        roster spanning all five severities (more than the H2 island's 6-item
+        cap), including a multi-modifier condition and several durations.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                focus_action_dock(page)
+                status = valid_status_panel("艾倫·灰誓", "char-42")
+                status["resources"]["hp"] = {"current": 12, "maximum": 405}
+                # The signed modifier values mirror the deterministic
+                # combat_modifiers.yaml (defense -15, agility -10, hp -3):
+                # the global JSON-safety bound now spans the full
+                # JavaScript-safe range, so the roster reaches the drawer.
+                status["conditions"] = [
+                    {"code": "regen", "label": "再生", "severity": "beneficial", "remaining_seconds": 30},
+                    {"code": "fog_veil", "label": "霧隱", "severity": "informational"},
+                    {
+                        "code": "focus",
+                        "label": "專注",
+                        "severity": "warning",
+                        "remaining_seconds": 10,
+                        "modifiers": {"atk_phys": 5},
+                    },
+                    {
+                        "code": "exposure",
+                        "label": "高露出",
+                        "severity": "harmful",
+                        "modifiers": {"defense": -15, "agility": -10},
+                    },
+                    {
+                        "code": "bleed",
+                        "label": "出血",
+                        "severity": "harmful",
+                        "remaining_seconds": 20,
+                        "modifiers": {"hp": -3},
+                    },
+                    {"code": "paralyze", "label": "癱瘓", "severity": "critical"},
+                    {"code": "shield", "label": "護盾", "severity": "beneficial", "remaining_seconds": 15},
+                    {"code": "chill", "label": "失溫", "severity": "harmful", "remaining_seconds": 8},
+                    {"code": "lucky", "label": "幸運", "severity": "informational", "remaining_seconds": 60},
+                ]
+                character = valid_character_panel()
+                _inject_snapshot(page, {"status": status, "character": character}, mode="exploration")
+                _wait_mode(page, "exploration")
+                self._open_status_drawer(page)
+                page.wait_for_selector('[data-testid="character-status-drawer__condition--regen"]', timeout=15000)
+
+                fit = page.evaluate(
+                    """() => {
+                      const body = document.querySelector('.hud-drawer__body');
+                      if (!body) return { ok: false, reason: 'drawer body missing' };
+                      const bodyRect = body.getBoundingClientRect();
+                      const tiles = Array.from(document.querySelectorAll(
+                        '[data-testid^="character-status-drawer__vital--"], ' +
+                        '[data-testid^="character-status-drawer__trait--"], ' +
+                        '[data-testid="character-status-drawer__guild-rank"], ' +
+                        '[data-testid="character-status-drawer__guild-merit"]'));
+                      const pills = Array.from(document.querySelectorAll('.character-status-drawer__pill'));
+                      const els = [...tiles, ...pills];
+                      // Per-element overflow: a tile or pill whose text content
+                      // is wider than its own box would scroll internally.
+                      for (const el of els) {
+                        if (el.scrollWidth > el.clientWidth + 1) {
+                          return { ok: false, reason: 'element content overflows its box' };
+                        }
+                      }
+                      const boxes = els.map((el) => el.getBoundingClientRect());
+                      // Non-intersection pattern (fix-webclient-local-map-node-crowding):
+                      // no two tiles/pills may overlap.
+                      for (let i = 0; i < boxes.length; i++) {
+                        for (let j = i + 1; j < boxes.length; j++) {
+                          const a = boxes[i], b = boxes[j];
+                          const overlap = !(
+                            a.right <= b.left || b.right <= a.left ||
+                            a.bottom <= b.top || b.bottom <= a.top
+                          );
+                          if (overlap) return { ok: false, reason: 'tile/pill pair overlaps' };
+                        }
+                      }
+                      // Boundary: no tile/pill spills past the drawer's horizontal
+                      // content box; any box intersecting the body's visible area
+                      // must not be clipped at the body's top or bottom edge.
+                      for (const box of boxes) {
+                        if (box.left < bodyRect.left || box.right > bodyRect.right) {
+                          return { ok: false, reason: 'box outside drawer horizontal bounds' };
+                        }
+                      }
+                      for (const box of boxes) {
+                        const intersects = box.top < bodyRect.bottom + 1 && box.bottom > bodyRect.top - 1;
+                        if (intersects && (box.top < bodyRect.top - 1 || box.bottom > bodyRect.bottom + 1)) {
+                          return { ok: false, reason: 'box clipped at the drawer body edge' };
+                        }
+                      }
+                      // No unexpected horizontal overflow in the drawer body.
+                      if (body.scrollWidth > body.clientWidth + 1) {
+                        return { ok: false, reason: 'drawer body has horizontal overflow' };
+                      }
+                      return { ok: true, tileCount: tiles.length, pillCount: pills.length };
+                    }"""
+                )
+                self.assertTrue(fit["ok"], f"status drawer tiles and pills fit at {viewport}: {fit}")
+                self.assertEqual(fit["pillCount"], 9, "all 9 conditions render as pills")
+                self.assertEqual(fit["tileCount"], 6, "3 vitals + 1 trait + 2 guild tiles render")
+                # Visual evidence for the design-alignment check (task 6.5).
+                if viewport == (1440, 900):
+                    page.screenshot(path=f"tmp/status_drawer_{viewport[0]}x{viewport[1]}.png")
+                page.close()
 
 
 if __name__ == "__main__":

@@ -354,6 +354,24 @@ test("enforces status field-specific bounds", () => {
       validStatusPanel({ combat: { mode: "travel", round: 1 } })
     )
   );
+  // Signed modifier values from the deterministic `combat_modifiers.yaml`
+  // (e.g. defense -15, accuracy -10) must pass panel validation so the
+  // full condition roster reaches the client's character-status drawer.
+  assert.doesNotThrow(
+    () =>
+      Protocol.validateStatusPanel(
+        validStatusPanel({
+          conditions: [
+            {
+              code: "high_exposure_defense_penalty",
+              label: "高露出",
+              severity: "harmful",
+              modifiers: { defense: -15, agility: -10 },
+            },
+          ],
+        })
+      )
+  );
 });
 
 test("validates exact ui_action_result envelopes", () => {
@@ -428,6 +446,14 @@ test("enforces global JSON-safety bounds", () => {
   // Non-finite numbers.
   assert.throws(() => Protocol.checkGlobalSafety({ value: Infinity }));
   assert.throws(() => Protocol.checkGlobalSafety({ value: NaN }));
+
+  // The global integer bound is the full JavaScript-safe range: negative
+  // safe integers (e.g. the signed values from the deterministic
+  // combat_modifiers.yaml) are accepted; only values below -2^53 or above
+  // 2^53 - 1 are rejected.
+  assert.doesNotThrow(() => Protocol.checkGlobalSafety({ defense: -15 }));
+  assert.doesNotThrow(() => Protocol.checkGlobalSafety({ value: -9007199254740991 }));
+  assert.throws(() => Protocol.checkGlobalSafety({ value: -9007199254740992 }));
 
   // Non-integer revision.
   assert.equal(

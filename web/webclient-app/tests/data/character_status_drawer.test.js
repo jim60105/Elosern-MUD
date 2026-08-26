@@ -93,4 +93,50 @@ describe("CharacterStatusDrawer", () => {
     // The standing statement: combat always resolves on true traits.
     expect(w.get('[data-testid="character-status-drawer__disguise-note"]').text()).toContain("真值");
   });
+
+  it("marks every drawer section with a labelled small-caps heading", () => {
+    const w = mountDrawer();
+    const labels = w.findAll(".character-status-drawer__section-label");
+    expect(labels).toHaveLength(6);
+    // DOM order: vitals, conditions, traits, disguise, guild, persona.
+    expect(labels.map((el) => el.text())).toEqual(["生命量", "狀態", "屬性", "偽裝", "計數 · 公會", "背景"]);
+  });
+
+  it("renders vitals, traits and guild counters as bordered card tiles in a two-column grid", () => {
+    const w = mountDrawer();
+    // Three grids: vitals, traits, guild counters.
+    expect(w.findAll(".character-status-drawer__statgrid").length).toBe(3);
+    const vitals = w.findAll('[data-testid^="character-status-drawer__vital--"]');
+    expect(vitals).toHaveLength(3);
+    const traits = w.findAll('[data-testid^="character-status-drawer__trait--"]');
+    expect(traits).toHaveLength(CHARACTER_PANEL_SAMPLE.traits.length);
+    expect(w.find('[data-testid="character-status-drawer__guild-rank"]').exists()).toBe(true);
+    expect(w.find('[data-testid="character-status-drawer__guild-merit"]').exists()).toBe(true);
+  });
+
+  it("renders each condition as a severity-tinted pill keeping all row content in a muted suffix", () => {
+    const w = mountDrawer();
+    const pills = w.findAll(".character-status-drawer__pill");
+    expect(pills).toHaveLength(STATUS_PANEL_SAMPLE.conditions.length);
+    for (const pill of pills) {
+      const severity = pill.attributes("data-severity");
+      expect(pill.classes()).toContain(`character-status-drawer__pill--${severity}`);
+      expect(pill.find(".character-status-drawer__condition-stat").exists()).toBe(true);
+    }
+    // Nothing is dropped: the exposure pill still carries every modifier,
+    // the fastwind pill still carries its duration.
+    const exposure = w.get('[data-testid="character-status-drawer__condition--shame_exposure"]');
+    expect(exposure.text()).toContain("defense -15");
+    expect(exposure.text()).toContain("agility -10");
+    const fastwind = w.get('[data-testid="character-status-drawer__condition--fastwind"]');
+    expect(fastwind.text()).toContain("剩 60 秒");
+  });
+
+  it("keeps the 危險 marker beside the HP label on a low-HP tile", () => {
+    const w = mountDrawer({ lowHp: true });
+    const danger = w.get('[data-testid="character-status-drawer__vital-danger"]');
+    expect(danger.text()).toBe("危險");
+    const hpTile = w.get('[data-testid="character-status-drawer__vital--hp"]');
+    expect(hpTile.text()).toContain("危險");
+  });
 });
