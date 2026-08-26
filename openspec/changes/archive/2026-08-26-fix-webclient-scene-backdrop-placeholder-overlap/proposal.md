@@ -26,17 +26,20 @@ should be fixed together since they share one root cause and one fix.
 
 ## What Changes
 
-- Add a single shared stage-content-bottom token to `styles/tokens.css` (e.g. `--stage-content-bottom:
-  calc(var(--dock-h) + 46px)`, where 46px is the persistent command line's own height, already a magic
-  number duplicated at `HudFrame.vue:176` and `:186`) so every anchored-above-the-dock surface computes
-  its offset from one place instead of re-deriving the command-line height by hand.
+- Add two tokens to `styles/tokens.css`: `--command-line-h` (the persistent command line's own height,
+  tokenizing the 46px literal duplicated at `HudFrame.vue:176` and `:186`) and the single shared
+  `--stage-content-bottom: calc(var(--dock-h) + var(--command-line-h))`, so every
+  anchored-above-the-dock surface computes its offset from one place instead of re-deriving the
+  command-line height by hand.
 - Update `SceneBackdrop.vue`'s five `bottom: calc(var(--dock-h) + Npx)` rules and `HudFrame.vue`'s feed
   anchor rule (`bottom: calc(var(--dock-h) + 60px)`) to add their existing buffer on top of
   `--stage-content-bottom` instead of `--dock-h` alone.
 - No change to `.elosern-stage [data-anchor="dock"]`'s or `[data-anchor="command-line"]`'s own
-  positioning (`HudFrame.vue:172-188`) — those two are already correct (the dock is already offset by
-  the literal 46px); only the *consumers* that derive a position relative to the dock without also
-  accounting for the command line are wrong.
+  positioning values (`HudFrame.vue:172-188`) — those two are already correct (the dock is already
+  offset by 46px above the command line). The duplicated 46px magic number in those two rules is
+  tokenized as `--command-line-h` so the quantity is named once, following the repository's
+  `fix-webclient-hud-integration-gaps` precedent (the earlier change tokenized a duplicated z-index
+  literal rather than patching each consumer's number); the computed layout is unchanged.
 - **BREAKING**: none. Pure CSS positioning correction; no DOM structure, testid, prop, or protocol
   change. Visually, the affected captions move up by ~46px (into the gap between the dock and the
   scene) and no longer intrude into the dock's tab-bar row.
@@ -59,10 +62,16 @@ None.
 
 ## Impact
 
-- **Code**: `web/webclient-app/styles/tokens.css` (new `--stage-content-bottom` token),
-  `web/webclient-app/components/SceneBackdrop.vue` (five `bottom` rules), `web/webclient-app/components/
-  HudFrame.vue` (the `[data-anchor="feed"]` rule only — `[data-anchor="dock"]` and
-  `[data-anchor="command-line"]` are unchanged).
+- **Code**: `web/webclient-app/styles/tokens.css` (new `--command-line-h` and
+  `--stage-content-bottom` tokens), `web/webclient-app/components/SceneBackdrop.vue` (five `bottom`
+  rules), `web/webclient-app/components/HudFrame.vue` (the `[data-anchor="feed"]` offset, plus the
+  `[data-anchor="dock"]` bottom and `[data-anchor="command-line"]` height now consuming
+  `--command-line-h` — same computed values).
+- **Test hook**: `web/webclient-app/AppClient.vue` (a `sceneBackdropRef` template ref, registered into
+  the bridge by the root component's `onMounted`) and `web/webclient-app/main.js` (a plain
+  `backdrop: null` property on the `window.__elosernBridge` harness hook, whose object is created
+  *before* `app.mount()` so the on-mount registration finds it) so the managed-browser pending-scene
+  journey can seed the client-local prior-image memory (`setPriorImage`) deterministically.
 - **Tests**: extend `web/tests/browser/test_browser_art.py` (which already exercises the placeholder,
   missing, and unavailable scene states via `[data-testid="scene-backdrop-placeholder"]` and covers the
   `webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage`

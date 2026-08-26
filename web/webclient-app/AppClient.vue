@@ -4,7 +4,7 @@
 // reads the C1 store's committed slices; panels render only when their
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model).
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { classifyPane } from "./components/dock-panes.js";
 import AppShell from "./components/AppShell.vue";
@@ -38,6 +38,10 @@ const store = useElosernStore();
 // focus through the exposed AppShell method — the field is permanently
 // present, so there is no open/closed state to toggle.
 const shellRef = ref(null);
+// Test hook (the repository's __-prefixed harness-hook convention): the
+// managed-browser pending-scene journey seeds the client-local prior-image
+// memory through this handle (SceneBackdrop's exposed setPriorImage).
+const sceneBackdropRef = ref(null);
 watch(
   () => store.view.drawerRequest,
   (request) => {
@@ -559,6 +563,17 @@ function onChoiceAction(intent) {
   // same single dispatch entry as the dock (store is the sole writer).
   store.dispatchAction(intent.action_id, intent.payload);
 }
+
+// Register the SceneBackdrop instance (its exposed interface) on the window
+// bridge so the managed-browser pending-scene journey can seed the
+// client-local prior-image memory (webclient-contextual-hud: a pending scene
+// keeps its prior image dimmed and labelled, never presented as current).
+onMounted(() => {
+  const bridge = window.__elosernBridge;
+  if (bridge) {
+    bridge.backdrop = sceneBackdropRef.value;
+  }
+});
 </script>
 
 <template>
@@ -592,7 +607,7 @@ function onChoiceAction(intent) {
              done image, the dimmed prior image, or the mode gradient with a
              truthful placeholder. -->
         <template #backdrop>
-          <SceneBackdrop :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
+          <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
         </template>
         <template #panel-left>
         <StatusPanel

@@ -335,7 +335,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__placeholder {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--dock-h) + 12px);
+  bottom: calc(var(--stage-content-bottom) + 12px);
   transform: translateX(-50%);
   z-index: 2;
   display: flex;
@@ -366,7 +366,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__generating {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--dock-h) + 56px);
+  bottom: calc(var(--stage-content-bottom) + 56px);
   transform: translateX(-50%);
   z-index: 2;
   margin: 0;
@@ -383,7 +383,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__scene-label {
   position: absolute;
   left: 16px;
-  bottom: calc(var(--dock-h) + 12px);
+  bottom: calc(var(--stage-content-bottom) + 12px);
   z-index: 2;
   margin: 0;
   padding: 4px var(--sp-3);
@@ -398,7 +398,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__scene-alt {
   position: absolute;
   left: 16px;
-  bottom: calc(var(--dock-h) + 44px);
+  bottom: calc(var(--stage-content-bottom) + 44px);
   z-index: 2;
   margin: 0;
   padding: 4px var(--sp-3);
@@ -413,7 +413,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__fullview-control {
   position: absolute;
   right: 16px;
-  bottom: calc(var(--dock-h) + 12px);
+  bottom: calc(var(--stage-content-bottom) + 12px);
   z-index: 2;
   background: var(--ink-780);
   border: 1px solid var(--ink-600);

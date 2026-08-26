@@ -31,8 +31,11 @@ const pinia = createPinia();
 setActivePinia(pinia);
 const app = createApp(AppClient);
 app.use(pinia);
-app.mount(resolveMountPoint());
 
+// The bridge handle MUST exist before `app.mount()`: AppClient's onMounted
+// callback (which registers the SceneBackdrop handle) runs during mount, so
+// the `window.__elosernBridge` object must be in place before that callback
+// fires, or its `if (bridge)` guard silently skips the registration.
 const store = useElosernStore();
 const bridge = createWindowBridge(store);
 
@@ -62,4 +65,14 @@ window.__elosernBridge = {
   facade: bridge.facade,
   router: bridge.router,
   uninstall: bridge.uninstall,
+  // Test hook: the SceneBackdrop instance (its exposed interface, with
+  // setPriorImage). The root component (AppClient) registers its
+  // SceneBackdrop template ref's value into this handle on mount, so the
+  // managed-browser pending-scene journey can seed the client-local
+  // prior-image memory. A plain property (not a getter): `app._instance`
+  // is dev-only in Vue's production build, so the registration approach
+  // works in every build.
+  backdrop: null,
 };
+
+app.mount(resolveMountPoint());

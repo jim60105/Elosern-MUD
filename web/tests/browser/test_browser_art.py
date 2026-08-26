@@ -12,6 +12,7 @@ adult-gate payload exclusion.
 
 from __future__ import annotations
 
+import base64
 import os
 
 from tools.spec_traceability import covers_requirement
@@ -24,6 +25,31 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
+from .seed import FIXTURE_VALID_PNG
+
+# A same-origin-free image URL (the seed fixture's minimal valid 4x4 PNG as a
+# data URL) so the pending-scene generating notice can be seeded without any
+# network request (the harness guards non-local requests).
+PRIOR_IMAGE_DATA_URL = "data:image/png;base64," + base64.b64encode(FIXTURE_VALID_PNG).decode()
+
+
+def _rect(page, selector):
+    """The page-coordinate bounding box of a selector (None when absent from the DOM)."""
+    return page.evaluate(
+        """(sel) => {
+          const el = document.querySelector(sel);
+          return el ? el.getBoundingClientRect() : null;
+        }""",
+        selector,
+    )
+
+
+def _boxes_overlap(a, b):
+    """True when two page-coordinate boxes intersect."""
+    return not (
+        a["right"] <= b["left"] or b["right"] <= a["left"]
+        or a["bottom"] <= b["top"] or b["bottom"] <= a["top"]
+    )
 
 
 def _art_panel_available(state: dict) -> bool:
@@ -218,6 +244,67 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         placeholder = page.locator('[data-testid="scene-backdrop-placeholder"]').inner_text()
         self.assertTrue(placeholder.strip())
 
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
+    def test_pending_generating_notice_clears_dock_and_command_line(self):
+        """A pending scene with a prior image renders the explicit generating
+        notice; its bounding box stays above the action dock's and the command
+        line's top edges at both supported viewports.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                panel = store_state(page)["panels"]["art"]
+                self.assertEqual(panel["scene"]["status"], "pending")
+                # Bounded-wait for the bridge backdrop hook (the SceneBackdrop
+                # instance registered by AppClient on mount; a plain property on
+                # the bridge, not a getter).
+                page.wait_for_function(
+                    "() => { const b = window.__elosernBridge && window.__elosernBridge.backdrop; "
+                    "return !!(b && typeof b.setPriorImage === 'function'); }",
+                    timeout=15000,
+                )
+                # Seed the client-local prior-image memory with the fixture's valid
+                # PNG as a data URL (no network request; the dimmed prior image and
+                # the generating notice then render deterministically).
+                seeded = page.evaluate(
+                    """(url) => {
+                      const b = window.__elosernBridge.backdrop;
+                      if (b && typeof b.setPriorImage === "function") {
+                        b.setPriorImage(url);
+                        return true;
+                      }
+                      return false;
+                    }""",
+                    PRIOR_IMAGE_DATA_URL,
+                )
+                self.assertTrue(seeded, "the bridge's backdrop hook was available")
+                # The pending notice renders above the dock.
+                page.wait_for_selector('[data-testid="scene-backdrop-generating"]', timeout=15000)
+                notice = _rect(page, '[data-testid="scene-backdrop-generating"]')
+                dock = _rect(page, '[data-testid="action-dock"]')
+                cmd_line = _rect(page, '[data-testid="command-line"]')
+                self.assertIsNotNone(notice, "the generating notice is rendered")
+                self.assertIsNotNone(dock, "the action dock panel is rendered")
+                self.assertIsNotNone(cmd_line, "the command line is rendered")
+                self.assertLessEqual(
+                    notice["bottom"],
+                    dock["top"],
+                    "the generating notice intrudes into the action dock at %dx%d" % (viewport[0], viewport[1]),
+                )
+                self.assertLessEqual(
+                    notice["bottom"],
+                    cmd_line["top"],
+                    "the generating notice intrudes into the command line at %dx%d" % (viewport[0], viewport[1]),
+                )
+                self.assertFalse(
+                    _boxes_overlap(notice, dock),
+                    "the generating notice box intersects the action dock at %dx%d" % (viewport[0], viewport[1]),
+                )
+                self.assertFalse(
+                    _boxes_overlap(notice, cmd_line),
+                    "the generating notice box intersects the command line at %dx%d" % (viewport[0], viewport[1]),
+                )
+
 
 class ArtFailedSceneTest(ArtSceneBrowserTest):
     def setUp(self) -> None:
@@ -321,6 +408,78 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         )
         narrative = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertTrue(narrative.strip())
+
+    @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
+    def test_scene_backdrop_captions_clear_dock_and_command_line(self):
+        """Every rendered scene-backdrop caption (the truthful placeholder, the
+        scene label, the alternative text, and the full-view control) stays above
+        the action dock's top edge and the command line's top edge at both
+        supported viewports (fix-webclient-scene-backdrop-placeholder-overlap).
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                # The missing-scene placeholder is gated on the committed art-panel
+                # store state and the scene-frame-scoped single-node DOM, within one
+                # bounded deadline.
+                wait_for_store_state(
+                    page,
+                    _art_missing_placeholder,
+                    {
+                        "selector": "[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]",
+                        "predicate": (
+                            "() => { const els = document.querySelectorAll('[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]'); "
+                            "if (els.length !== 1) { return false; } "
+                            "const el = els[0]; const r = el.getBoundingClientRect(); "
+                            "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
+                        ),
+                        "description": "single visible scene placeholder inside the scene frame",
+                    },
+                )
+                dock = _rect(page, '[data-testid="action-dock"]')
+                cmd_line = _rect(page, '[data-testid="command-line"]')
+                self.assertIsNotNone(dock, "the action dock panel is rendered")
+                self.assertIsNotNone(cmd_line, "the command line is rendered")
+                for testid in (
+                    "scene-backdrop-placeholder",
+                    "scene-backdrop-label",
+                    "scene-backdrop-alt",
+                    "scene-backdrop-control",
+                ):
+                    box = _rect(page, '[data-testid="%s"]' % testid)
+                    if box is None:
+                        continue
+                    self.assertLessEqual(
+                        box["bottom"],
+                        dock["top"],
+                        "%s intrudes into the action dock at %dx%d" % (testid, viewport[0], viewport[1]),
+                    )
+                    self.assertLessEqual(
+                        box["bottom"],
+                        cmd_line["top"],
+                        "%s intrudes into the command line at %dx%d" % (testid, viewport[0], viewport[1]),
+                    )
+                    self.assertFalse(
+                        _boxes_overlap(box, dock),
+                        "%s box intersects the action dock at %dx%d" % (testid, viewport[0], viewport[1]),
+                    )
+                    self.assertFalse(
+                        _boxes_overlap(box, cmd_line),
+                        "%s box intersects the command line at %dx%d" % (testid, viewport[0], viewport[1]),
+                    )
+                # The narrative caption (the feed anchor) also clears the dock's
+                # top edge now that its offset moved up by the command line height.
+                feed = _rect(page, '[data-testid="narrative-feed"]')
+                if feed is not None:
+                    self.assertLessEqual(
+                        feed["bottom"],
+                        dock["top"],
+                        "the narrative caption intrudes into the action dock at %dx%d" % (viewport[0], viewport[1]),
+                    )
+                    self.assertFalse(
+                        _boxes_overlap(feed, dock),
+                        "the narrative caption box intersects the action dock at %dx%d" % (viewport[0], viewport[1]),
+                    )
 
 
 class ArtImageLoadFailureTest(ArtSceneBrowserTest):

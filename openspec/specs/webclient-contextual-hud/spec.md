@@ -75,6 +75,13 @@ placeholder label SHALL be rendered as text outside the bitmap, so no required i
 inside an image. The gradient stage SHALL differ per mode (exploration, dialogue, combat) and SHALL
 carry an inset vignette.
 
+The backdrop's own floating caption elements (the truthful-placeholder card, the `目前場景圖片生成中`
+pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
+positioned so that none of them overlaps the action dock's or the command line's rendered content, at
+both 1440x900 and 1280x720 — extending the sibling stage requirement's general anchor non-overlap
+invariant to these backdrop-internal captions, which sit outside the five named stage anchors but are
+absolutely positioned within the same full-bleed stage.
+
 #### Scenario: A done scene paints the stage
 - **WHEN** the committed art panel carries a `done` scene with a same-origin URL
 - **THEN** the backdrop renders that image cover-cropped behind every HUD surface, and the scene label and alternative text render as text outside the bitmap
@@ -94,6 +101,18 @@ carry an inset vignette.
 #### Scenario: The combat stage is visually distinct
 - **WHEN** the committed mode is combat and no scene image is available
 - **THEN** the backdrop renders the combat gradient stage, visually distinct from the exploration stage
+
+#### Scenario: The truthful-placeholder caption never intrudes on the action dock
+- **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the truthful-placeholder
+  card renders
+- **THEN** the placeholder card's rendered bounding box does not intersect the action dock's rendered
+  bounding box at either 1440x900 or 1280x720
+
+#### Scenario: The scene label, alt text, and full-view control clear the dock at both viewports
+- **WHEN** the scene label, alternative-text caption, pending notice, or full-view control render above
+  the dock
+- **THEN** each one's rendered bounding box stays above the action dock's top edge and above the command
+  line, at both 1440x900 and 1280x720
 
 ### Requirement: The narrative is a bounded caption whose complete log is reachable in one action
 The narrative SHALL render as a bounded caption card at the visual centre of the stage, constrained in
