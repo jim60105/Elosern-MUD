@@ -35,6 +35,9 @@ const props = defineProps({
   mutationsLocked: { type: Boolean, default: false },
   // The committed mode, forwarded to the quick-word chip sets (design D4).
   mode: { type: String, default: "exploration" },
+  // The action client's in-flight mutation flag (webclient-input-narrative):
+  // a free-form send blocked by an in-flight mutation keeps the typed speech.
+  inFlight: { type: Boolean, default: false },
   // The client-local text-to-HTML narrative preference: when off, the
   // prompt line (and the feed/full-log lines) render as literal text — the
   // preference chooses whether the pipeline runs, never what it permits.
@@ -114,9 +117,11 @@ function submit() {
     return false;
   }
   emit("submit", text);
-  // Preserve the typed speech when the send is rejected (disconnected or
-  // mutations locked); clear the draft only when the send is dispatched.
-  if (props.connected && !props.mutationsLocked) {
+  // Preserve the typed speech when the send is rejected (disconnected,
+  // mutations locked, or another mutation in flight); clear the draft only
+  // when the send is actually dispatched (webclient-input-narrative: a blocked
+  // borrowed send keeps the speech, never loses it).
+  if (props.connected && !props.mutationsLocked && !props.inFlight) {
     draft.value = "";
   }
   resetHistoryWalk();

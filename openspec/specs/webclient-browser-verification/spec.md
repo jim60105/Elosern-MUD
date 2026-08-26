@@ -43,11 +43,15 @@ Playwright acceptance SHALL use Chromium installed through the locked uv environ
 - **THEN** every successful HTTP and WebSocket request targets localhost and no test result depends on remote availability
 
 ### Requirement: Browser acceptance covers foundation recovery and layout behavior
-Playwright SHALL verify required shell visibility at 1440x900 and 1280x720; drawer open, send, and cancel behavior including focus retention after an ordinary send and focus restoration on Escape; pointer activation parity on the action dock; narrative rendering of converted server markup; minimap containment within its pane; transport interruption and control locking; lower-revision adoption in a new epoch; rejection of delayed prior-epoch messages; known layout migration; unknown layout reset; presenter degradation; and protocol mismatch with preserved text input.
+Playwright SHALL verify required shell visibility at 1440x900 and 1280x720; command-line focus, send, and cancel behavior — the input field present and typeable with no opening action, `/` moving focus into it without inserting a literal slash, focus retention after an ordinary send, and Escape sending nothing and restoring action-dock focus; the full-overlay contract — a labelled trigger opening exactly one overlay, a second trigger closing the first, and Escape closing the open overlay and restoring focus to its trigger; pointer activation parity on the action dock; narrative rendering of converted server markup; minimap containment within its pane; transport interruption and control locking; lower-revision adoption in a new epoch; rejection of delayed prior-epoch messages; known layout migration; unknown layout reset; presenter degradation; and protocol mismatch with preserved text input.
 
 #### Scenario: Supported viewports pass the shell journey
 - **WHEN** the acceptance journey runs at each supported desktop viewport
-- **THEN** every required surface is visible, two consecutive commands are sent from the drawer without any pointer interaction, and Escape restores action-dock focus
+- **THEN** every required surface is visible, the command input field is present and typeable without any opening action, two consecutive commands are sent from it without any pointer interaction, and Escape restores action-dock focus
+
+#### Scenario: The overlay journey opens, replaces, and returns focus
+- **WHEN** the acceptance journey activates the map trigger, then the settings trigger, then presses Escape
+- **THEN** exactly one overlay is present at each step, opening the second closes the first, and Escape closes the open overlay and returns focus to the trigger that opened it
 
 #### Scenario: Reconnect behavior is exercised end to end
 - **WHEN** the harness interrupts the active WebSocket and reconnects it

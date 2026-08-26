@@ -3,10 +3,12 @@
 ### Requirement: The command line is a permanently present bar in the stage's command-line anchor
 The client's text control SHALL render as a single bar filling the stage's `command-line` anchor,
 containing — in this order — the mode's quick-word chips, a prompt chevron, the command input field, a
-hint cluster, the command-history controls, and the overlay utility controls. In every mode this
-capability's visibility matrix renders the command line, the input field SHALL be present in the DOM,
-visible and focusable without any opening action: there SHALL be no entry control, no `aria-expanded`
-state and no closed state. No stored presentation state SHALL be able to remove it.
+hint cluster, the command-history controls, and the overlay utility controls. In the modes this
+capability's visibility matrix renders the command line (exploration and combat), the input field SHALL
+be present in the DOM, visible and focusable without any opening action: there SHALL be no entry
+control, no `aria-expanded` state and no closed state. No stored presentation state SHALL be able to
+remove it. (The command line is intentionally absent from the layout in creation mode, per H1's
+visibility matrix and design D10.)
 
 The bar SHALL NOT overlap the action dock, the narrative caption or any HUD anchor at 1440x900 or
 1280x720. When horizontal space is insufficient, the hint cluster SHALL be dropped first and the

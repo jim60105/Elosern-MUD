@@ -115,6 +115,22 @@
   --dock-h: clamp(150px, 22vh, 184px);
 }
 
+/* H5: colorblind-safe status palette. The settings surface's colorblind
+   override sets `data-colorblind="on"` on `<html>`; this block swaps the
+   vitals/status tokens to a deuteranopia/protanopia-safe set so the control
+   has a real, visible outcome (webclient-contextual-hud: "no control is
+   rendered that has no effect"). */
+:root[data-colorblind="on"] {
+  --vit-hp: #d95f0e;
+  --vit-mp: #3a6fc4;
+  --vit-sp: #e2c06a;
+  --buff: #4d9e6a;
+  --debuff: #c75b3f;
+  --ok: #4d9e6a;
+  --warn: #e2a03c;
+  --crit: #c0392b;
+}
+
 /* Shared keyframes (motion system). */
 @keyframes elosern-combat-pulse {
   50% {

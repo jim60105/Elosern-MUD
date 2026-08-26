@@ -68,6 +68,14 @@ function onKeydown(event) {
     onClose();
     return;
   }
+  if (event.key !== "Tab") {
+    // A focus-trapped surface owns every key it receives
+    // (webclient-pointer-activation): stop propagation so the document-level
+    // keyboard bridge (and the router behind the surface) never consumes
+    // navigation keys while the overlay holds trapped focus — "the router
+    // consumes nothing behind it".
+    event.stopPropagation();
+  }
   if (trap) {
     trap.onKeydown(event);
   }
@@ -179,7 +187,6 @@ onBeforeUnmount(() => {
   z-index: 92;
   display: flex;
   flex-direction: column;
-  overflow: auto;
   background: var(--ink-950);
 }
 
@@ -250,5 +257,7 @@ onBeforeUnmount(() => {
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 </style>

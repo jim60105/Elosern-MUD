@@ -2,10 +2,12 @@ import { h } from "vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 
 // SettingsOverlay (B5 overlay family): the full-viewport settings dialog —
-// client-local options (fonts, type scale, reduced motion, the text-to-HTML
-// narrative toggle, colorblind-safe status palette). No OOB settings panel;
-// each change emits the matching `options.*` OOB action envelope for the
-// C-wave store to persist and dispatch.
+// client-local options (type scale, reduced motion, the text-to-HTML
+// narrative toggle, colorblind-safe status palette). All preferences are
+// client-local: the store persists them through the versioned layout store
+// and applies them to the document's presentation tokens immediately. They
+// dispatch no `ui_action` (webclient-component-showcase: "the settings
+// surface offers no control it does not implement").
 
 const renderOverlay = (args) => ({ render: () => h(SettingsOverlay, args) });
 
@@ -21,15 +23,15 @@ export const Default = {
 
 export const ReducedMotionOn = {
   render: renderOverlay,
-  args: { options: { reduced_motion: "on" } },
+  args: { reducedMotion: "on" },
 };
 
 export const HtmlNarrative = {
   render: renderOverlay,
-  args: { options: { text_to_html: true } },
+  args: { textToHtml: true },
 };
 
 export const Colorblind = {
   render: renderOverlay,
-  args: { options: { colorblind: true } },
+  args: { colorblind: true },
 };

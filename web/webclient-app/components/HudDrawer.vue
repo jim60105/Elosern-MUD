@@ -66,6 +66,13 @@ function onKeydown(event) {
     close();
     return;
   }
+  if (event.key !== "Tab") {
+    // A focus-trapped surface owns every key it receives
+    // (webclient-pointer-activation): stop propagation so the document-level
+    // keyboard bridge (and the router behind the drawer) never consumes
+    // navigation keys while the drawer holds trapped focus.
+    event.stopPropagation();
+  }
   if (event.key === "Tab" && trap) {
     trap.onKeydown(event);
   }

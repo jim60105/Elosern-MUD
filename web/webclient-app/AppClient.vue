@@ -580,6 +580,7 @@ function onChoiceAction(intent) {
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
         :text-to-html="store.view.textToHtml"
+        :in-flight="store.view.dispatch.inFlight !== null"
         @submit-command="onSubmitCommand"
         @choice-action="onChoiceAction"
         @focus-lost="store.clearFreeformTarget()"

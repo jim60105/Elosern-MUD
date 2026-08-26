@@ -56,9 +56,18 @@ export default {
     function onKeyDown(event) {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         restoreOpenerFocus();
         emit("close");
         return;
+      }
+      if (event.key !== "Tab") {
+        // A focus-trapped surface owns every key it receives
+        // (webclient-pointer-activation): stop propagation so the
+        // document-level keyboard bridge (and the router behind the overlay)
+        // never consumes navigation keys while the overlay holds trapped
+        // focus — "the router consumes nothing behind it".
+        event.stopPropagation();
       }
       if (event.key === "Tab" && trap) {
         // The shared trap cycles Tab across every focusable control in the

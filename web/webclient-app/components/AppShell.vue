@@ -77,6 +77,10 @@ const props = defineProps({
   // text (the preference chooses whether the markup pipeline runs, never
   // what it permits).
   textToHtml: { type: Boolean, default: true },
+  // The action client's in-flight mutation flag (H5, webclient-input-narrative):
+  // forwarded to the command line so a send blocked by an in-flight mutation
+  // keeps the typed speech in the field.
+  inFlight: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["submit-command", "choice-action", "open-full-log", "open-overlay", "focus-lost"]);
@@ -159,8 +163,11 @@ function onWindowKeydown(event) {
   }
   const key = event.key;
   if (key === "/" && !isEditable(event.target)) {
+    // The focus itself routes bridge -> router -> store (`toggle-drawer` ->
+    // `drawerRequest` -> the shell's `focusCommandField` watcher). This window
+    // binding only suppresses the browser's default (a literal `/`), so the key
+    // claim and the focus both go through the public keyboard bridge contract.
     event.preventDefault();
-    focusCommandField();
   }
 }
 
@@ -180,6 +187,13 @@ watch(
     const active = document.activeElement;
     const hiddenSelector = HIDDEN_BY_MODE[nextMode] || HIDDEN_BY_MODE.exploration;
     if (active && active.closest && hiddenSelector && active.closest(hiddenSelector)) {
+      restoreDockFocus();
+    }
+    // A creation transition closes the open overlay (the store's syncHudDrawer
+    // clears `hudOverlay`); route focus to the action dock so it is never lost
+    // into a hidden or unmounted surface (webclient-contextual-hud: "A creation
+    // transition closes the overlays ... focus is routed to the action dock").
+    if (nextMode === "creation" && active && active.closest && active.closest(".overlay-host")) {
       restoreDockFocus();
     }
     // The command line is now permanent (design D1 — no drawer to close): a
@@ -245,6 +259,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           :history="props.commandHistory"
           :connected="props.connected"
           :mutations-locked="props.mutationsLocked"
+          :in-flight="props.inFlight"
           :text-to-html="props.textToHtml"
           @submit="onSubmit"
           @focus-parent="releaseCommandField(true)"

@@ -574,6 +574,13 @@ export const useElosernStore = defineStore("elosern", () => {
       }
       return;
     }
+    if (name === "toggle-drawer") {
+      // H5: the `/` key routes bridge -> router -> here. Bump `drawerRequest`
+      // so the shell's watcher focuses the always-present command field (D1/D2).
+      drawerRequest += 1;
+      publishView();
+      return;
+    }
     if (name !== "submit" && name !== "space") {
       return;
     }

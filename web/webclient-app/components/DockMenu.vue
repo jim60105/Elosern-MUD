@@ -448,8 +448,14 @@ watch(
   color: var(--gold-400);
 }
 .dock-menu__outlet-tile--focused {
-  border-color: var(--gold-500);
+  background: var(--seal-600);
+  border-color: var(--seal-500);
   color: var(--paper-50);
+}
+.dock-menu__outlet-tile--focused::before {
+  content: "▶";
+  color: var(--gold-400);
+  font-size: 0.8em;
 }
 
 /* NAV (task 5.5): the draft's `.nrow` rows — icon, name, backed sub-line,
@@ -471,8 +477,15 @@ watch(
   cursor: pointer;
 }
 .dock-menu__nav-row--focused {
-  border-color: var(--gold-500);
+  background: var(--seal-600);
+  border-color: var(--seal-500);
+  color: var(--paper-50);
   transform: translateY(-1px);
+}
+.dock-menu__nav-row--focused::before {
+  content: "▶";
+  color: var(--gold-400);
+  font-size: 0.8em;
 }
 .dock-menu__nav-icon {
   width: 26px;
@@ -528,8 +541,15 @@ watch(
   cursor: pointer;
 }
 .dock-menu__aff-btn--focused {
-  border-color: var(--gold-500);
+  background: var(--seal-600);
+  border-color: var(--seal-500);
+  color: var(--paper-50);
   transform: translateY(-1px);
+}
+.dock-menu__aff-btn--focused::before {
+  content: "▶";
+  color: var(--gold-400);
+  font-size: 0.8em;
 }
 .dock-menu__aff-reason {
   color: var(--paper-500);
