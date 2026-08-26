@@ -279,6 +279,16 @@ export const useElosernStore = defineStore("elosern", () => {
       if (options.popFrame && activeSubDock.value === "services" && currentFrameIsServiceFrame()) {
         router.popMenu();
       }
+      // When closing the drawer while an exploration sub-dock (character /
+      // services) owns the action dock, clear the sub-dock and re-home the
+      // exploration root frame — the same teardown the router's `escape-root`
+      // handler performs. The drawer's own Escape handler now owns the key
+      // (focus is trapped in the drawer), so the router no longer sees the
+      // Escape and would not clear the sub-dock.
+      if (reducer.getState().mode === "exploration" && activeSubDock.value) {
+        setActiveSubDock(null);
+        rehomeFrame(reducer.getState());
+      }
       hudDrawer.value = null;
       publishView();
       return true;
