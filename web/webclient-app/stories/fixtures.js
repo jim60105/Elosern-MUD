@@ -588,6 +588,195 @@ export const LOCAL_MAP_UNAVAILABLE_SAMPLE = {
   reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
 };
 
+// The maximal-height, minimal-width lattice (task 3.5): exactly 64 in-view
+// nodes — one node per row across 64 rows, alternating the two columns
+// (x = y % 2) — a schema-valid worst-case tall map sitting exactly at the
+// model's 64-node bound. The renderer must scale the canvas down to fit
+// the island's bounded height instead of forcing the island to scroll a
+// required surface out of view. Every 16th row carries a 6-CJK label so the
+// truncation path (LABEL_MAX chars + ellipsis) is exercised.
+const TALL_LATTICE_ROWS = 64;
+const TALL_LATTICE_NODES = Array.from({ length: TALL_LATTICE_ROWS }, (_, y) => {
+  const x = y % 2;
+  const isCurrent = y === 32;
+  return {
+    id: `grid:altoria:${x}:${y}`,
+    label: y % 16 === 0 ? "霧骨渡口碼頭" : `渡口${y % 8}`,
+    x,
+    y,
+    visibility: isCurrent ? "current" : "visible_unvisited",
+    current: isCurrent,
+    anchor: isCurrent,
+    landmark: isCurrent,
+    action: null,
+  };
+});
+
+export const LOCAL_MAP_TALL_LATTICE_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:0:32",
+  title: "霧骨渡口",
+  nodes: TALL_LATTICE_NODES,
+  edges: [
+    { source: "grid:altoria:0:32", destination: "grid:altoria:1:33", label: "北岸", known: true, traversable: true },
+    { source: "grid:altoria:0:32", destination: "grid:altoria:1:31", label: "南門", known: true, traversable: false },
+  ],
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+  ],
+};
+
+// The tall-lattice + long-remembered-list combination (rubber-duck blocking
+// issue): 48 in-view nodes (2 cols × 48 rows) + 16 remembered far nodes =
+// 64 nodes total, hitting the model's MAX_NODES bound. The island's
+// dynamically measured canvas height cap must reserve space for the
+// remembered list so the anchor never scrolls.
+const TALL_REMEMBERED_INVIEW_NODES = Array.from({ length: 48 }, (_, y) => {
+  const x = y % 2;
+  const isCurrent = y === 24;
+  return {
+    id: `grid:altoria:${x}:${y}`,
+    label: y % 16 === 0 ? "霧骨渡口碼頭" : `渡口${y % 8}`,
+    x,
+    y,
+    visibility: isCurrent ? "current" : "visible_unvisited",
+    current: isCurrent,
+    anchor: isCurrent,
+    landmark: isCurrent,
+    action: null,
+  };
+});
+
+const TALL_REMEMBERED_FAR_NODES = Array.from({ length: 16 }, (_, i) => ({
+  id: `grid:altoria:${5 + i % 6}:${100 + i}`,
+  label: "遠方路網",
+  x: 5 + i % 6,
+  y: 100 + i,
+  visibility: "remembered",
+  current: false,
+  anchor: false,
+  landmark: true,
+  action: null,
+}));
+
+export const LOCAL_MAP_TALL_REMEMBERED_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:0:24",
+  title: "霧骨渡口",
+  nodes: [...TALL_REMEMBERED_INVIEW_NODES, ...TALL_REMEMBERED_FAR_NODES],
+  edges: [
+    { source: "grid:altoria:0:24", destination: "grid:altoria:1:25", label: "北岸", known: true, traversable: true },
+    { source: "grid:altoria:0:24", destination: "grid:altoria:1:23", label: "南門", known: true, traversable: false },
+  ],
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+  ],
+};
+
+// The dedicated geometry-stress fixture (rubber-duck critique): horizontally
+// and vertically adjacent nodes, the current 26×26 rect and the stroked
+// `visible_unvisited` circle (visual half-extent 13px including stroke), 4-
+// CJK labels (truncated at LABEL_MAX with an ellipsis when longer), and two
+// adjacent connector edges. It pins the pre-scale non-intersection invariant
+// at the renderer's own pitch constants.
+export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:1:1",
+  title: "霧骨渡口",
+  nodes: [
+    {
+      id: "grid:altoria:1:1",
+      label: "霧骨渡口",
+      x: 1,
+      y: 1,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      action: null,
+    },
+    {
+      id: "grid:altoria:2:1",
+      label: "南門街道市場",
+      x: 2,
+      y: 1,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: { kind: "move", exit_ref: "e_altoria_1_1_e", destination: "grid:altoria:2:1" },
+    },
+    {
+      id: "grid:altoria:1:2",
+      label: "碼頭廣場舊街",
+      x: 1,
+      y: 2,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      action: null,
+    },
+    {
+      id: "grid:altoria:0:1",
+      label: "旅館公會",
+      x: 0,
+      y: 1,
+      visibility: "visible_visited",
+      current: false,
+      anchor: true,
+      landmark: false,
+      action: null,
+    },
+  ],
+  edges: [
+    { source: "grid:altoria:1:1", destination: "grid:altoria:2:1", label: "南門", known: true, traversable: true },
+    { source: "grid:altoria:1:1", destination: "grid:altoria:1:2", label: "碼頭", known: true, traversable: false },
+  ],
+  legend: [
+    "你目前所在的位置",
+    "尚未探索的相鄰位置",
+    "已經探索過的相鄰位置",
+  ],
+};
+
+// The single-node room (delta spec scenario "A single-node room states
+// orientation without any collision risk"): exactly one current node, no
+// neighbors to collide with — the pitch/sizing change must produce no
+// regression for the single-node case.
+export const LOCAL_MAP_SINGLE_NODE_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:altoria:1:1",
+  title: "霧骨渡口",
+  nodes: [
+    {
+      id: "grid:altoria:1:1",
+      label: "霧骨渡口",
+      x: 1,
+      y: 1,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      action: null,
+    },
+  ],
+  edges: [],
+  legend: ["你目前所在的位置"],
+};
+
 // The wilderness layer: coordinate-bearing nodes (the renderer-axis
 // orientation legend 北↑ applies).
 export const LOCAL_MAP_WILDERNESS_SAMPLE = {

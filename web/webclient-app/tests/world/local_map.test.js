@@ -1,11 +1,17 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
+import MapOverlay from "../../components/MapOverlay.vue";
+import LocalMapModel from "../../lib/local_map.js";
 import {
+  LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
+  LOCAL_MAP_SINGLE_NODE_SAMPLE,
+  LOCAL_MAP_TALL_LATTICE_SAMPLE,
+  LOCAL_MAP_TALL_REMEMBERED_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
 } from "../../stories/fixtures.js";
@@ -204,5 +210,190 @@ describe("LocalMap (B4 world family)", () => {
       expect(text).not.toMatch(/\d+\s*(?:公尺|公里|km)\b/i);
       w.unmount();
     }
+  });
+
+  // ---------------------------------------------------------------------
+  // fix-webclient-local-map-node-crowding: the decoupled column/row pitch
+  // geometry — no two node markers (nor labels) may intersect at every
+  // populated lattice size up to the model's 64×64 bound.
+  // ---------------------------------------------------------------------
+
+  it("sizes the 2-col × 64-row lattice canvas from the model's exported lattice", () => {
+    // Mirror the store's localMapModel shape (stores/elosern.js): the
+    // reduced model plus the payload's `available` flag and reason.
+    const model = {
+      ...LocalMapModel.reducePanel(LOCAL_MAP_TALL_LATTICE_SAMPLE),
+      available: true,
+      reason: null,
+    };
+    expect(model.cols).toBe(2);
+    expect(model.rows).toBe(64);
+    const w = mountMap({ localMap: model });
+    const svg = w.find("svg.local-map__lattice");
+    expect(svg.exists()).toBe(true);
+    // Natural (pre-scale) canvas: 2 × 58px column pitch wide,
+    // 64 × 44px row pitch + 14px label band tall.
+    expect(svg.attributes("width")).toBe("116");
+    expect(svg.attributes("height")).toBe("2830");
+    expect(svg.attributes("viewBox")).toBe("0 0 116 2830");
+  });
+
+  it("keeps the 48-row lattice + 16 remembered nodes within the 64-node bound", () => {
+    // The rubber-duck blocking combination: 48 in-view + 16 remembered = 64
+    // (MAX_NODES). The model computes the lattice from the in-view nodes
+    // only; remembered nodes stay in the bounded focusable list.
+    const model = {
+      ...LocalMapModel.reducePanel(LOCAL_MAP_TALL_REMEMBERED_SAMPLE),
+      available: true,
+      reason: null,
+    };
+    expect(model.rows).toBe(48);
+    expect(model.cols).toBe(2);
+    expect(model.nodes).toHaveLength(48);
+    expect(model.remembered).toHaveLength(16);
+    const w = mountMap({ localMap: model });
+    const svg = w.find("svg.local-map__lattice");
+    // Natural canvas: 2 × 58px wide, 48 × 44px + 14px label band tall.
+    expect(svg.attributes("width")).toBe("116");
+    expect(svg.attributes("height")).toBe("2126");
+    // The remembered list renders 16 bounded, focusable entries outside the
+    // coordinate canvas.
+    const list = w.find('[data-testid="local-map-remembered"]');
+    expect(list.exists()).toBe(true);
+    expect(w.findAll(".local-map__remembered li")).toHaveLength(16);
+  });
+
+  it("keeps adjacent node markers and labels non-intersecting at natural geometry", () => {
+    const model = {
+      ...LocalMapModel.reducePanel(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
+      available: true,
+      reason: null,
+    };
+    const w = mountMap({ localMap: model });
+
+    // Node centers from the model's col/row + the renderer's decoupled
+    // pitch (COL_PITCH 58, ROW_PITCH 44, label band 14): centers are
+    // col*58+29 and (rows-1-row)*44+22 with rows=2.
+    const centers = {
+      "grid:altoria:1:1": { x: 87, y: 66 },
+      "grid:altoria:2:1": { x: 145, y: 66 },
+      "grid:altoria:1:2": { x: 87, y: 22 },
+      "grid:altoria:0:1": { x: 29, y: 66 },
+    };
+    for (const [id, center] of Object.entries(centers)) {
+      const node = w.get(`[data-testid="local-map__node--${id}"]`);
+      expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
+    }
+
+    // DOM-tied label offset: the component renders every node label's
+    // baseline at the fixed `y="26"` attribute (the crowding fix keeps the
+    // label line box clear of the node's own marker and of the row below).
+    for (const id of Object.keys(centers)) {
+      const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
+      expect(label.attributes("y")).toBe("26");
+    }
+
+    // Marker footprints in pre-scale units: the current 26×26 rect and the
+    // stroked unvisited circles (r=12 + stroke 2 → visual half-extent 13);
+    // the filled visited circle is plain r=12 (half-extent 12).
+    const markerBoxes = {
+      "grid:altoria:1:1": { x1: 74, y1: 53, x2: 100, y2: 79 },
+      "grid:altoria:2:1": { x1: 132, y1: 53, x2: 158, y2: 79 },
+      "grid:altoria:1:2": { x1: 74, y1: 9, x2: 100, y2: 35 },
+      "grid:altoria:0:1": { x1: 17, y1: 54, x2: 45, y2: 78 },
+    };
+
+    // Node labels: baseline at center.y + 26; the 11px monospace line box
+    // extends ≈10.5px above and ≈3px below the baseline. A 4-CJK label is
+    // 44px wide (full-width CJK glyphs at 11px); a truncated label
+    // (4 chars + "…") is ≈ 55px wide.
+    const labelBoxes = {
+      "grid:altoria:1:1": { x1: 65, y1: 81.5, x2: 109, y2: 95 },
+      "grid:altoria:2:1": { x1: 117.5, y1: 81.5, x2: 172.5, y2: 95 },
+      "grid:altoria:1:2": { x1: 59.5, y1: 37.5, x2: 114.5, y2: 51 },
+      "grid:altoria:0:1": { x1: 7, y1: 81.5, x2: 51, y2: 95 },
+    };
+
+    function separated(a, b) {
+      return (
+        a.x2 + 2 <= b.x1 ||
+        b.x2 + 2 <= a.x1 ||
+        a.y2 + 2 <= b.y1 ||
+        b.y2 + 2 <= a.y1
+      );
+    }
+    function everyPair(boxes) {
+      const ids = Object.keys(boxes);
+      for (let i = 0; i < ids.length; i += 1) {
+        for (let j = i + 1; j < ids.length; j += 1) {
+          expect(
+            separated(boxes[ids[i]], boxes[ids[j]]),
+            `${ids[i]} vs ${ids[j]} must keep a ≥2px gap`,
+          ).toBe(true);
+        }
+      }
+      for (const id of Object.keys(boxes)) {
+        for (const labelId of Object.keys(labelBoxes)) {
+          expect(
+            separated(markerBoxes[id], labelBoxes[labelId]),
+            `marker ${id} vs label ${labelId} must keep a ≥2px gap`,
+          ).toBe(true);
+        }
+      }
+    }
+    everyPair(markerBoxes);
+
+    // Connector edges stay visible: the center-to-center span (58px
+    // horizontal / 44px vertical) minus the two 26px marker footprints
+    // leaves a positive visible segment.
+    const e0 = w.get('[data-testid="local-map__edge--0"]');
+    expect(e0.attributes("x1")).toBe("87");
+    expect(e0.attributes("y1")).toBe("66");
+    expect(e0.attributes("x2")).toBe("145");
+    expect(e0.attributes("y2")).toBe("66");
+    expect(58 - 26).toBeGreaterThan(0);
+    const e1 = w.get('[data-testid="local-map__edge--1"]');
+    expect(e1.attributes("x1")).toBe("87");
+    expect(e1.attributes("y1")).toBe("66");
+    expect(e1.attributes("x2")).toBe("87");
+    expect(e1.attributes("y2")).toBe("22");
+    expect(44 - 26).toBeGreaterThan(0);
+  });
+
+  it("renders a single-node room with no collision risk (no regression)", () => {
+    const model = {
+      ...LocalMapModel.reducePanel(LOCAL_MAP_SINGLE_NODE_SAMPLE),
+      available: true,
+      reason: null,
+    };
+    const w = mountMap({ localMap: model });
+    const svg = w.find("svg.local-map__lattice");
+    expect(svg.attributes("width")).toBe("58");
+    expect(svg.attributes("height")).toBe("58");
+    // rows=1 → y = (1-1-0)*44 + 22 = 22.
+    expect(
+      w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
+    ).toBe("translate(29, 22)");
+    expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
+  });
+
+  it("MapOverlay renders the shared LocalMap and forwards the move intent", async () => {
+    const model = {
+      ...LocalMapModel.reducePanel(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
+      available: true,
+      reason: null,
+    };
+    const overlay = mount(MapOverlay, {
+      props: { localMap: model },
+    });
+    // The shared component renders inside the overlay body (MapOverlay.vue:52-54).
+    expect(overlay.find('[data-testid="local-map__lattice"]').exists()).toBe(true);
+    await overlay.get('[data-testid="local-map__node--grid:altoria:2:1"]').trigger("click");
+    expect(overlay.emitted("move")).toHaveLength(1);
+    expect(overlay.emitted("move")[0][0]).toEqual({
+      exit_ref: "e_altoria_1_1_e",
+      destination: "grid:altoria:2:1",
+    });
+    overlay.unmount();
   });
 });

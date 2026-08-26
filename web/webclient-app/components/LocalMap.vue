@@ -13,7 +13,7 @@
 // rendered (node `x`/`y` are renderer-local presentation geometry). The
 // full-map affordance is deferred to H5 (MapOverlay), so the island ships
 // no full-map control; the per-node `explore.move` submission is unchanged.
-import { computed, ref } from "vue";
+import { computed, onMounted, onUpdated, ref } from "vue";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (available form or the
@@ -72,14 +72,78 @@ const nodeById = computed(() => {
 // upward, so a node's row is inverted against the row count. A reserved
 // label band below the last row keeps node labels inside the canvas
 // instead of overhanging it and colliding with the island's next surface.
-const CELL = 24;
+//
+// The column pitch and row pitch are decoupled (the crowding fix): one
+// shared `CELL` constant made markers touch edge-to-edge (the current
+// 26×26 rect and the r=12 circles fill a 24px cell) and pushed each
+// node's label (drawn one cell below the node) onto the node in the row
+// beneath. The row pitch must clear the marker height, the label's
+// rendered line height, and a visible gap before the next row's marker;
+// the column pitch must clear two truncated labels centered under
+// horizontally adjacent nodes.
+const COL_PITCH = 58;
+const ROW_PITCH = 44;
 const LABEL_BAND = 14;
-const canvasWidth = computed(() => Math.max(1, cols.value) * CELL);
-const canvasHeight = computed(() => Math.max(1, rows.value) * CELL + LABEL_BAND);
+const canvasWidth = computed(() => Math.max(1, cols.value) * COL_PITCH);
+const canvasHeight = computed(() => Math.max(1, rows.value) * ROW_PITCH + LABEL_BAND);
 
-// Node labels are bounded and truncated in the 24px cell; the full label
+// Dynamic canvas height budget (the crowding fix): a fixed 296px cap would
+// ignore the rendered height of the island's other sections, so a tall
+// lattice combined with a long remembered list would push required content
+// into the anchor's overflow-y scroll fallback. Instead the canvas's
+// max-height shrinks to the space the hud-right anchor's height budget
+// leaves after the meta row, remembered list, legend, and detail line.
+const rootEl = ref(null);
+const metaEl = ref(null);
+const rememberedEl = ref(null);
+const legendEl = ref(null);
+const detailEl = ref(null);
+const canvasMaxHeight = ref(0);
+
+function sectionHeight(el) {
+  return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+}
+
+function measureCanvasBudget() {
+  const root = rootEl.value;
+  if (!root) return;
+  // Island context only: the full-map overlay renders this component
+  // outside the hud-right anchor, so it keeps the CSS 296px cap.
+  const anchor = root.closest('[data-anchor="hud-right"]');
+  if (!anchor) return;
+  const budget = anchor.clientHeight;
+  if (!budget) return;
+  // 5 island sections (meta, canvas, remembered list when non-empty,
+  // legend, detail) separated by 8px (--sp-2) gaps; the meta row also
+  // carries a 4px margin-bottom outside its own bounding box; 9px island
+  // padding top and bottom; the canvas element's 2px border.
+  const gapCount = 3 + (remembered.value.length > 0 ? 1 : 0);
+  const others =
+    sectionHeight(metaEl.value) +
+    sectionHeight(rememberedEl.value) +
+    sectionHeight(legendEl.value) +
+    sectionHeight(detailEl.value);
+  // The extra 1px of slack absorbs the island's 1px border top/bottom
+  // rounding so the island never needs to scroll a required surface.
+  const available = budget - others - gapCount * 8 - 18 - 2 - 5;
+  canvasMaxHeight.value = Math.max(40, Math.min(296, available));
+}
+
+onMounted(() => {
+  measureCanvasBudget();
+  const anchor = rootEl.value?.closest('[data-anchor="hud-right"]');
+  if (anchor && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => measureCanvasBudget()).observe(anchor);
+  }
+});
+onUpdated(() => {
+  measureCanvasBudget();
+});
+
+// Node labels are bounded and truncated (4 CJK chars at 11px monospace ≈
+// 44px, within the 58px column pitch with a ≥2px gap); the full label
 // stays reachable through the node's accessible name.
-const LABEL_MAX = 6;
+const LABEL_MAX = 4;
 function truncatedLabel(label) {
   const value = String(label ?? "");
   return value.length > LABEL_MAX ? value.slice(0, LABEL_MAX) + "…" : value;
@@ -87,8 +151,8 @@ function truncatedLabel(label) {
 
 function nodePos(node) {
   return {
-    x: node.col * CELL + CELL / 2,
-    y: (Math.max(1, rows.value) - 1 - node.row) * CELL + CELL / 2,
+    x: node.col * COL_PITCH + COL_PITCH / 2,
+    y: (Math.max(1, rows.value) - 1 - node.row) * ROW_PITCH + ROW_PITCH / 2,
   };
 }
 
@@ -171,7 +235,7 @@ function activateNode(node) {
 </script>
 
 <template>
-  <aside class="local-map" data-testid="local-map">
+  <aside class="local-map" data-testid="local-map" ref="rootEl">
     <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
       {{ reason }}
     </p>
@@ -179,7 +243,7 @@ function activateNode(node) {
       <!-- The island's top-meta line (design D9): the payload's title plus,
            on the coordinate-bearing layers only, the renderer's axis
            orientation legend. No bearing or distance is rendered. -->
-      <div class="local-map__meta" data-testid="local-map__title">
+      <div class="local-map__meta" data-testid="local-map__title" ref="metaEl">
         <span class="local-map__meta-title">{{ title }}</span>
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑
@@ -204,6 +268,7 @@ function activateNode(node) {
         :width="canvasWidth"
         :height="canvasHeight"
         :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
+        :style="canvasMaxHeight ? { maxHeight: `${canvasMaxHeight}px` } : null"
         role="img"
         aria-label="區域地圖縮圖"
         data-testid="local-map__lattice"
@@ -273,7 +338,11 @@ function activateNode(node) {
             r="10"
             aria-hidden="true"
           />
-          <text class="local-map__node-label" y="24" text-anchor="middle">
+          <!-- The label baseline sits 26px below the node's origin: the
+               26×26 current marker's bottom edge is at +13px, so the label
+               top edge (baseline minus the ~10.5px ascent) keeps a ≥2px gap
+               from the node's own marker (the crowding fix). -->
+          <text class="local-map__node-label" y="26" text-anchor="middle">
             <title>{{ node.label }}</title>{{ truncatedLabel(node.label) }}
           </text>
         </g>
@@ -283,7 +352,7 @@ function activateNode(node) {
            the coordinate canvas): each entry keeps its non-color diamond
            state indicator and selects (focuses) the node without emitting a
            travel action. -->
-      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered">
+      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
         <li
           v-for="node in remembered"
           :key="node.id"
@@ -309,7 +378,7 @@ function activateNode(node) {
         </li>
       </ul>
 
-      <ul class="local-map__legend" data-testid="local-map__legend">
+      <ul class="local-map__legend" data-testid="local-map__legend" ref="legendEl">
         <li
           v-for="(entry, i) in legend"
           :key="`legend-${i}`"
@@ -333,7 +402,7 @@ function activateNode(node) {
         </li>
       </ul>
 
-      <p class="local-map__detail" data-testid="local-map-detail">
+      <p class="local-map__detail" data-testid="local-map-detail" ref="detailEl">
         {{ detailParts.join(" · ") }}
       </p>
     </template>
@@ -429,12 +498,26 @@ function activateNode(node) {
    detail line stay non-overlapping below it. */
 .local-map__lattice {
   display: block;
-  /* Natural pixel size from the lattice (cols × rows × 24px cells): the SVG's
-     width/height attributes drive the render. The element keeps its attribute
-     width (not stretched to the container), and a wide lattice is capped by
-     max-width so the height scales down proportionally. */
-  max-width: 206px;
+   /* Natural pixel size from the lattice (cols × 58px column pitch, rows ×
+      44px row pitch + label band): the SVG's width/height attributes drive
+      the render. `width: auto; height: auto` plus the `max-width` /
+      `max-height` caps scale the canvas down proportionally. The
+      `max-height: 296px` cap is the fallback (the full-map overlay context
+      and the pre-measurement first paint); in the island context the script
+      measures the hud-right anchor's height budget and binds a tighter
+      inline `max-height` that also reserves space for the remembered list
+      (the crowding fix: the canvas reserves its own space within the
+      island's bounded height). */
+  /* The island is a flex column (align-items: stretch), so without this the
+     SVG would stretch to the island's content width (up to the 206px cap),
+     *enlarging* small lattices and pushing the fixed label offset back onto
+     the marker below. `align-self: center` keeps the canvas at its natural
+     (or uniformly capped) size, centered. */
+  align-self: center;
+  width: auto;
   height: auto;
+  max-width: 206px;
+  max-height: 296px;
   background: var(--ink-860);
   border: var(--line);
   border-radius: var(--radius-sm);
