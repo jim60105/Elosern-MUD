@@ -122,9 +122,11 @@ describe("ShopPanel (B4 world / services family)", () => {
     ]);
   });
 
-  it("renders the wallet line in integer copper with thousands separators (no float money)", () => {
-    expect(mountPanel().get('[data-testid="shop-panel__wallet"]').text()).toBe("3,240 銅");
-    expect(mountPanel({ services: SERVICES_PANEL_MINIMAL_SAMPLE }).get('[data-testid="shop-panel__wallet"]').text()).toBe("0 銅");
+  it("omits the wallet line (H4 task 7.1: the wallet now lives in CharacterStatusDrawer — the single wallet rendering)", () => {
+    // The full and minimal payloads both carry a wallet value in
+    // `player.wallet_copper`, but ShopPanel no longer renders it.
+    expect(mountPanel().find('[data-testid="shop-panel__wallet"]').exists()).toBe(false);
+    expect(mountPanel({ services: SERVICES_PANEL_MINIMAL_SAMPLE }).find('[data-testid="shop-panel__wallet"]').exists()).toBe(false);
   });
 
   it("section absent: only the honest wallet line and the absence marker (no invented stock/sellable rows)", () => {

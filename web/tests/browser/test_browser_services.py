@@ -77,9 +77,25 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         return page.locator("#action-dock").get_attribute("data-mode")
 
     def _wait_services_available(self, page, timeout=30000):
+        # H4 (task 9.1): the reference surfaces now render only inside the
+        # open reference drawer. The gate is re-mapped onto the committed
+        # store state (services panel available) plus the drawer's own
+        # data-testid; opening the drawer is the journey's first step.
         wait_for_store_state(
             page,
             lambda s: ((s.get("panels") or {}).get("services") or {}).get("available") is True,
+            timeout=timeout,
+        )
+        # First step of the journey: open the reference drawer that hosts the
+        # service frame (H4 task 4.3). The body's own testid is then the
+        # drawer-body readiness gate.
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        wait_for_store_state(
+            page,
+            lambda s: True,
             dom_readiness={
                 "selector": '[data-testid="quest-board"]',
                 "predicate": (
@@ -88,7 +104,7 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
                     "const r = el.getBoundingClientRect(); "
                     "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
                 ),
-                "description": "services surface (quest-board) rendered and visible",
+                "description": "quest drawer body (quest-board) rendered inside the open drawer",
             },
             timeout=timeout,
         )
@@ -171,7 +187,9 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
-        heading = page.locator(".quest-board__title")
+        # H4 (task 9.2): the heading is now the open reference drawer's own
+        # title (the `#panel-right` reference panels were emptied into drawers).
+        heading = page.locator(".hud-drawer__title")
         self.assertTrue(heading.is_visible())
 
 
@@ -680,6 +698,100 @@ class ReconnectJourney(ServicesBrowserTest):
             "unsubmitted quantity must be discarded on reconnect",
         )
         self.assertEqual(sent_action_count(page, "shop.buy"), 0)
+
+
+class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
+    """H4 (task 9.4): the keyboard service journeys complete with arrows +
+    Enter, the service frame renders inside the reference drawer, and the
+    emitted payloads are unchanged."""
+
+    SERVICES_MODE = "guild_hall"
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    def test_keyboard_service_journey_frames_render_inside_drawer(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        self.assertFalse(panel["player"]["guild_registered"])
+
+        # The gate already opened the reference (quest) drawer. Drive the
+        # registration journey with arrow keys + Enter only.
+        self._open_guild_menu(page)
+        _press(page, "Enter")  # register row
+        self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
+        self.assertEqual(sent_action_count(page, "guild.register"), 1)
+
+        # The service frame (quest-board) renders inside the reference drawer
+        # (H4: the right-column panels were emptied into drawers).
+        inside_drawer = page.evaluate(
+            """() => {
+              const drawer = document.querySelector('[data-testid="hud-drawer"]');
+              const body = document.querySelector('[data-testid="quest-board"]');
+              return !!(drawer && body && drawer.contains(body));
+            }"""
+        )
+        self.assertTrue(inside_drawer, "the guild service frame renders inside the open reference drawer")
+
+        # The emitted payload is unchanged: the exact server-authored
+        # guild.register action with an empty payload.
+        sent = page.evaluate("window.__elosernSent || []")
+        registers = [
+            args[0]
+            for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "guild.register"
+        ]
+        self.assertEqual(len(registers), 1)
+        self.assertEqual(registers[0]["payload"], {})
+
+
+class ServicesUnavailableJourney(ServicesBrowserTest):
+    """H4 (task 9.8): with the `services` panel in its registry-owned
+    unavailable form, the reference drawers render only the reason — no
+    fabricated wallet, stock, quest, or lore rows."""
+
+    SERVICES_MODE = ""
+
+    def _wait_services_committed(self, page, timeout=30000):
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("services") is not None,
+            timeout=timeout,
+        )
+        return self._services_panel(page)
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    def test_unavailable_services_drawer_renders_reason_only(self):
+        page = self.logged_in_page()
+        panel = self._wait_services_committed(page)
+        # The character is at the exploration root (no service interior), so
+        # the services panel is the registry-owned unavailable form.
+        self.assertFalse(panel["available"])
+        self.assertIsNotNone(panel.get("reason"))
+
+        # Open the quest reference drawer (the gate's first step).
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        page.wait_for_selector('[data-testid="quest-board"]', timeout=15000)
+        board = page.locator('[data-testid="quest-board"]')
+        board_text = board.inner_text()
+        # The drawer body renders the registry-owned reason verbatim.
+        self.assertIn(panel["reason"]["message"], board_text)
+        # No fabricated board / quest / rank rows: the unavailable form carries
+        # no guild section, so the board and quest-detail rows are absent.
+        self.assertEqual(
+            page.locator('[data-testid="quest-board__board-row--"]').count(), 0,
+            "no fabricated quest-board rows in the unavailable form")
+        self.assertEqual(
+            page.locator('[data-testid="quest-board__quest-row--"]').count(), 0,
+            "no fabricated active-quest rows in the unavailable form")
+        self.assertEqual(
+            page.locator('[data-testid="quest-board__rankblock"]').count(), 0,
+            "no fabricated rank block in the unavailable form")
+        self.assertEqual(
+            page.locator('[data-testid="quest-board__abandon"]').count(), 0,
+            "no fabricated abandon control in the unavailable form")
 
 
 if __name__ == "__main__":

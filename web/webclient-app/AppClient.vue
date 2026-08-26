@@ -10,12 +10,13 @@ import { classifyPane } from "./components/dock-panes.js";
 import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import ArtPanel from "./components/ArtPanel.vue";
-import CharacterPanel from "./components/CharacterPanel.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
+import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
+import HudDrawer from "./components/HudDrawer.vue";
 import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreDrawer from "./components/LoreDrawer.vue";
@@ -104,6 +105,12 @@ const openSurfaces = computed(() => {
   }
   if (panelAvailable("creation")) {
     surfaces.push("creation");
+  }
+  // H4 (task 3.4): the open reference drawer registers into the same
+  // open-surface set so the stage recession (H1) applies without a second
+  // mechanism.
+  if (store.view.hudDrawer) {
+    surfaces.push(store.view.hudDrawer);
   }
   return surfaces;
 });
@@ -443,15 +450,23 @@ function onQuestAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
-// The character panel is the OOB read model that carries the skill book
-// (``actives`` / ``passives`` category groups); the skill book renders only
-// when that payload actually has the skill shape (truthful-data scope).
-function skillRowsAvailable() {
-  const p = panel("character");
-  return !!p && p.available !== false && (
-    (Array.isArray(p.actives) && p.actives.length > 0) ||
-    (Array.isArray(p.passives) && p.passives.length > 0)
-  );
+// H4 (task 7.4): the reference drawer layer. The drawer title/subtitle is
+// derived from the single open-drawer name the store publishes.
+const DRAWER_TITLES = {
+  skill: "技能書",
+  inventory: "背包 · 裝備",
+  shop: "商店",
+  quest: "任務",
+  lore: "世界圖鑑",
+  status: "角色狀態",
+};
+const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
+
+// The drawer chrome's close entry (Escape / close control / scrim): route
+// through the store's single close entry, popping exactly one menu level
+// when the drawer hosts a service frame (task 4.2).
+function onHudDrawerClose() {
+  store.closeHudDrawer({ popFrame: true });
 }
 
 function onAction(intent) {
@@ -559,26 +574,11 @@ function onChoiceAction(intent) {
           :participants="contextActionsPanel.participants"
           :art-panel="panel('art')"
         />
-        <CharacterPanel v-if="panelAvailable('character')" :character="panel('character')" />
-        <SkillBook v-if="skillRowsAvailable()" :skills="panel('character')" />
-        <ShopPanel
-          v-if="panelAvailable('services')"
-          :services="panel('services')"
-          :quantity-form="store.quantityForm"
-          @buy="onShopBuy"
-          @sell="onShopSell"
-        />
-        <QuestBoard
-          v-if="panelAvailable('services')"
-          :services="panel('services')"
-          @quest_register="onQuestAction"
-          @quest_accept="onQuestAction"
-          @quest_abandon="onQuestAction"
-          @quest_turnin="onQuestAction"
-          @exam_start="onQuestAction"
-        />
-        <LoreDrawer v-if="panelAvailable('services')" :services="panel('services')" />
-        <InventoryPanel v-if="panelAvailable('services')" :services="panel('services')" />
+        <!-- H4 (task 7.4): the six reference panels moved into the drawer
+             layer; the `#panel-right` anchor keeps only the minimap island
+             and the combat participant frame. The `hud-right` anchor's
+             geometry and the caption's width reservation are untouched
+             (task 7.5) — H2 re-tenants that anchor. -->
       </template>
       <template #action-dock>
         <ActionDock
@@ -628,6 +628,49 @@ function onChoiceAction(intent) {
         </ActionDock>
       </template>
     </AppShell>
+
+    <!-- H4 (task 7.4): the reference-drawer layer, mounted above the
+         stage. A single `HudDrawer` chrome hosts the drawer body for the
+         store's single open-drawer name; only the open drawer's surface is
+         in the DOM (task 7.7: no reference surface while closed). -->
+    <HudDrawer
+      v-if="store.view.hudDrawer"
+      :open="true"
+      :title="drawerTitle"
+      :drawer-key="store.view.hudDrawer"
+      @close="onHudDrawerClose"
+    >
+      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" />
+      <InventoryPanel
+        v-else-if="store.view.hudDrawer === 'inventory'"
+        :services="panel('services') || {}"
+      />
+      <ShopPanel
+        v-else-if="store.view.hudDrawer === 'shop'"
+        :services="panel('services') || {}"
+        :quantity-form="store.quantityForm"
+        @buy="onShopBuy"
+        @sell="onShopSell"
+      />
+      <QuestBoard
+        v-else-if="store.view.hudDrawer === 'quest'"
+        :services="panel('services') || {}"
+        @quest_register="onQuestAction"
+        @quest_accept="onQuestAction"
+        @quest_abandon="onQuestAction"
+        @quest_turnin="onQuestAction"
+        @exam_start="onQuestAction"
+        @open_lore="() => store.openHudDrawer('lore')"
+      />
+      <LoreDrawer v-else-if="store.view.hudDrawer === 'lore'" :services="panel('services') || {}" />
+      <CharacterStatusDrawer
+        v-else-if="store.view.hudDrawer === 'status'"
+        :status="panel('status') || {}"
+        :character="panel('character') || {}"
+        :low-hp="store.view.vitals.lowHp"
+        @open-skill="() => store.openHudDrawer('skill')"
+      />
+    </HudDrawer>
 
     <CreationOverlay
       v-if="panelAvailable('creation')"

@@ -1,12 +1,13 @@
 <script setup>
-// LoreDrawer (B4 services family): the "圖鑑抽屜" (codex drawer). It surfaces
-// the world lore the player has learned, rendered only from the committed
-// `services` v1 payload (design D2: a host, not a data source) — the host
-// line, the player summary (wallet, guild registration, rank, merit, next
-// rank/threshold), and the guild lore (quest-board objective/reward
-// summaries + the active quest's story detail). The 8-category codex has no
-// OOB read model in this payload, so the drawer never fabricates codex
-// cards (a deliberate skip); unknown lore never leaks its existence.
+// LoreDrawer (B4 services family): the "圖鑑抽屜" (codex drawer). It
+// surfaces the world lore the player has learned, rendered only from the
+// committed `services` v1 payload (design D2: a host, not a data source) —
+// the host line and the guild lore (quest-board objective/reward summaries
+// + the active quest's story detail). H4 (task 5.2) removed the duplicated
+// wallet line and player-summary rows; the wallet and guild summary now live
+// in the CharacterStatusDrawer. The 8-category codex has no OOB read model in
+// this payload, so the drawer never fabricates codex cards (a deliberate
+// skip); unknown lore never leaks its existence.
 import { computed } from "vue";
 
 const props = defineProps({
@@ -19,15 +20,9 @@ const props = defineProps({
 const unavailable = computed(() => props.services?.available === false);
 
 const host = computed(() => (unavailable.value ? null : (props.services?.host ?? null)));
-const player = computed(() => (unavailable.value ? null : (props.services?.player ?? null)));
 const guild = computed(() => (unavailable.value ? null : (props.services?.guild ?? null)));
 const boardLoreRows = computed(() => guild.value?.board ?? []);
 const activeQuestRows = computed(() => guild.value?.quests ?? []);
-
-// Integer copper, thousands-separated for display only (no float money).
-function formatCopper(value) {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
 
 // Quest state labels — the server's bounded quest states (presentation
 // services.py: in_progress / completed / failed), rendered as text.
@@ -62,52 +57,9 @@ function questStateLabel(state) {
       </span>
     </p>
 
-    <template v-if="player">
-      <div class="lore-drawer__summary" data-testid="lore-drawer__summary">
-        <div class="lore-drawer__line" data-testid="lore-drawer__wallet">
-          <span class="lore-drawer__line-key">錢包</span>
-          <span class="lore-drawer__line-value">{{ formatCopper(player.wallet ?? 0) }} 銅</span>
-        </div>
-        <div class="lore-drawer__line" data-testid="lore-drawer__guild-register">
-          <span class="lore-drawer__line-key">公會會員</span>
-          <span class="lore-drawer__line-value">
-            {{ player.guild_registered ? "已註冊" : "未註冊" }}
-          </span>
-        </div>
-        <div
-          v-if="player.guild_rank"
-          class="lore-drawer__line"
-          data-testid="lore-drawer__rank"
-        >
-          <span class="lore-drawer__line-key">公會等級</span>
-          <span class="lore-drawer__line-value">{{ player.guild_rank }}</span>
-        </div>
-        <div
-          v-if="typeof player.guild_merit === 'number'"
-          class="lore-drawer__line"
-          data-testid="lore-drawer__merit"
-        >
-          <span class="lore-drawer__line-key">功績</span>
-          <span class="lore-drawer__line-value">{{ player.guild_merit }}</span>
-        </div>
-        <div
-          v-if="player.next_rank"
-          class="lore-drawer__line"
-          data-testid="lore-drawer__next-rank"
-        >
-          <span class="lore-drawer__line-key">下一等級</span>
-          <span class="lore-drawer__line-value">{{ player.next_rank }}</span>
-        </div>
-        <div
-          v-if="typeof player.next_threshold === 'number'"
-          class="lore-drawer__line"
-          data-testid="lore-drawer__next-threshold"
-        >
-          <span class="lore-drawer__line-key">升格線</span>
-          <span class="lore-drawer__line-value">{{ player.next_threshold }}</span>
-        </div>
-      </div>
-    </template>
+    <!-- H4 (task 5.2): the duplicated wallet line and player-summary rows
+         are removed; the wallet and guild summary now live in the
+         CharacterStatusDrawer (the single wallet rendering, task 7.7). -->
 
     <section
       v-if="guild"

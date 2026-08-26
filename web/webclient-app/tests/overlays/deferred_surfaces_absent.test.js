@@ -46,7 +46,6 @@ function collectStoryTitles(dir) {
 const DEFERRED_TITLE_PATTERNS = [
   /\bParty\b/i,
   /\bIntimate\b/i,
-  /\bBag\b/i,
   /\bEventLog\b/i,
   /\bToasts?\b/i,
   /\bCompanions?\b/i,
@@ -70,9 +69,11 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
     // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
     // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
-    // and `Data/ParticipantFrame` (32 → 36). H6 re-freezes at the complete
-    // new set.
-    expect(manifest.required).toHaveLength(36);
+    // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
+    // adds the three reference-drawer components (`Core/HudDrawer`,
+    // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H6
+    // re-freezes at the complete new set.
+    expect(manifest.required).toHaveLength(39);
     // The four full overlays complete the required set (B5's new family).
     for (const title of [
       "Overlays/MapOverlay",
@@ -83,6 +84,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       "Action/DockBreadcrumb",
       "Action/SkillDetailPane",
       "Data/ParticipantFrame",
+      "Core/HudDrawer",
+      "Data/EquipmentDoll",
+      "Data/CharacterStatusDrawer",
     ]) {
       expect(manifest.required).toContain(title);
     }
@@ -164,11 +168,33 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     }
   });
 
-  it("keeps the equipped-only InventoryPanel (never a full bag)", () => {
+  it("documents the bag is now backed by services.inventory (world/rules/service_view.py:695-720), so the \bBag\b deferred pattern is retired", () => {
+    // H4 (task 8.3): the full inventory bag is NO LONGER deferred — the
+    // `services.inventory` read model (world/rules/service_view.py:695-720)
+    // backs the bounded 32-row bag listing. `World/InventoryPanel` renders
+    // that listing, so the `\bBag\b` pattern is removed from
+    // DEFERRED_TITLE_PATTERNS and the equipped-only case is retired.
     expect(manifest.required).toContain("World/InventoryPanel");
-    // The full inventory bag is deferred: no *Bag component or story exists
-    // (word-boundary match, consistent with DEFERRED_TITLE_PATTERNS).
+    // The bag now has a backing read model; no *Bag surface remains deferred.
     const titles = collectStoryTitles(APP_ROOT);
     expect(titles.filter((title) => /\bBag\b/i.test(title))).toEqual([]);
+  });
+
+  it("reserves no party/companion drawer, intimate collapsible, item-rarity affordance or discovered-lore compendium (task 8.4)", () => {
+    // H4 (task 8.4): the reference-drawer layer is the closed set of six
+    // drawers. The deferred surfaces are NOT reserved in the drawer layer.
+    const DRAWER_NAMES = ["skill", "inventory", "shop", "quest", "lore", "status"];
+    const DEFERRED_SURFACES = ["party", "companion", "intimate", "rarity", "codex"];
+    // None of the deferred surfaces is in the six-drawer set.
+    for (const deferred of DEFERRED_SURFACES) {
+      expect(DRAWER_NAMES, `drawer set reserves "${deferred}"`).not.toContain(deferred);
+    }
+    // And none of them appears in the required-component set.
+    for (const title of manifest.required) {
+      for (const word of ["Party", "Companion", "Intimate", "Rarity", "Codex", "Compendium"]) {
+        const re = new RegExp(`\\b${word}\\b`, "i");
+        expect(re.test(title), `required component ${title} reserves a deferred surface (${word})`).toBe(false);
+      }
+    }
   });
 });

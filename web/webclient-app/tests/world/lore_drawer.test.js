@@ -37,24 +37,25 @@ describe("LoreDrawer (B4 services family)", () => {
     expect(w.find('[data-testid="lore-drawer__host"]').exists()).toBe(false);
   });
 
-  it("renders the player summary: thousands-separated copper wallet, registration, rank, merit, next rank/threshold", () => {
+  it("omits the player summary block entirely (H4 task 5.2: wallet/summary moved to CharacterStatusDrawer)", () => {
     const w = mountDrawer();
-    expect(w.get('[data-testid="lore-drawer__wallet"]').text()).toContain("3,240 銅");
-    expect(w.get('[data-testid="lore-drawer__guild-register"]').text()).toContain("已註冊");
-    expect(w.get('[data-testid="lore-drawer__rank"]').text()).toContain("C");
-    expect(w.get('[data-testid="lore-drawer__merit"]').text()).toContain("140");
-    expect(w.get('[data-testid="lore-drawer__next-rank"]').text()).toContain("B");
-    expect(w.get('[data-testid="lore-drawer__next-threshold"]').text()).toContain("300");
+    expect(w.find('[data-testid="lore-drawer__summary"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__wallet"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__guild-register"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__rank"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__merit"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__next-rank"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__next-threshold"]').exists()).toBe(false);
   });
 
-  it("renders only the player fields the payload carries", () => {
+  it("renders no player fields the payload carries (honest absence after H4 task 5.2)", () => {
     const w = mountDrawer({ services: SERVICES_PANEL_MINIMAL_SAMPLE });
-    expect(w.get('[data-testid="lore-drawer__wallet"]').text()).toContain("0 銅");
-    expect(w.get('[data-testid="lore-drawer__guild-register"]').text()).toContain("未註冊");
+    expect(w.find('[data-testid="lore-drawer__wallet"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lore-drawer__guild-register"]').exists()).toBe(false);
     expect(w.find('[data-testid="lore-drawer__rank"]').exists()).toBe(false);
     expect(w.find('[data-testid="lore-drawer__next-rank"]').exists()).toBe(false);
     expect(w.find('[data-testid="lore-drawer__next-threshold"]').exists()).toBe(false);
-    expect(w.get('[data-testid="lore-drawer__merit"]').text()).toContain("0");
+    expect(w.find('[data-testid="lore-drawer__merit"]').exists()).toBe(false);
   });
 
   it("renders the guild lore: board summaries and the active quest detail", () => {
