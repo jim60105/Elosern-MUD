@@ -159,7 +159,8 @@ export default {
 
 <style>
 /* The full-screen scrollable log view: the complete retained narrative,
-   rendered through the same renderer as the caption card. */
+   rendered through the same renderer as the caption card. H5 (design D13):
+   the full-log surface's lines are a prose-scale target. */
 .fulllog-overlay {
   position: fixed;
   inset: 0;
@@ -168,7 +169,7 @@ export default {
   background: var(--ink-950);
   color: var(--paper-100);
   font-family: var(--f-serif);
-  font-size: var(--text-narrative);
+  font-size: calc(var(--text-narrative) * var(--prose-scale));
   line-height: var(--lh-narrative);
   padding: var(--sp-6);
   outline: none;

@@ -91,8 +91,8 @@ VUE_ROOT = '[data-testid="elosern-vue-root"]'
 CORE_SURFACE_TESTIDS = (
     "topbar",
     "narrative-feed",
-    "command-drawer",
-    "command-drawer-entry",
+    "command-line",
+    "quick-word-chips",
 )
 
 
@@ -220,10 +220,11 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         The B1 shell mounts the usable "ready" slice, so the pre-connection
         splash must be absent. At BOTH supported desktop viewports the
         surfaces stay fully in-bounds and a real pointer round-trip on the
-        command drawer must succeed (a covered shell or a surface pushed off
-        the input path would fail): the entry button opens the drawer, the
-        field accepts text, Enter sends (the field clears), and Escape
-        releases back to the narrative pane.
+        permanently-present command line must succeed (a covered shell or a
+        surface pushed off the input path would fail): the field accepts
+        text, Enter sends (the field clears), and Escape releases focus back
+        to the action dock (webclient-hud-05-overlays-and-command-line,
+        design D1: the command line is never closed).
         """
         page, _responses = self.open_vue_page()
         wait_for_store_state(
@@ -279,71 +280,29 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     " viewport",
                 )
 
-            # Usability with a real pointer at this viewport: the entry
-            # button opens the drawer, the field accepts text, Enter sends
-            # (the field clears), and Escape releases the drawer back to the
-            # action dock (webclient-desktop-shell: closing the open drawer
-            # restores action-dock focus) — a covered or clipped surface
-            # would fail here.
-            page.locator('[data-testid="command-drawer-entry"]').click()
-            wait_for_store_state(
-                page,
-                _store_active,
-                dom_readiness={
-                    "selector": '[data-testid="command-drawer"][data-open="true"]',
-                    "predicate": (
-                        "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
-                        " return d && d.getAttribute('data-open') === 'true'; }"
-                    ),
-                    "description": "the command drawer is open",
-                },
-                timeout=10000,
-            )
-            field = page.locator('[data-testid="command-drawer-input"]')
-            wait_for_store_state(
-                page,
-                _store_active,
-                dom_readiness={
-                    "selector": '[data-testid="command-drawer-input"]',
-                    "predicate": (
-                        "() => { const i = document.querySelector('[data-testid=\"command-drawer-input\"]'); "
-                        "if (!i) { return false; } "
-                        "const r = i.getBoundingClientRect(); "
-                        "return r.width > 0 && r.height > 0 && i.offsetParent !== null; }"
-                    ),
-                    "description": "the drawer command input field is visible",
-                },
-                timeout=10000,
-            )
+            # H5 (task 8.4/8.5): the command line is permanently present —
+            # no entry button and no open/closed state. A real pointer
+            # round-trip on the always-present field must succeed (a covered
+            # or clipped surface would fail): the field accepts text, Enter
+            # sends (the field clears), and Escape releases the field back to
+            # the action dock (the command line itself is never closed).
+            field = page.locator('[data-testid="command-line-input-field"]')
             field.fill("look")
             field.press("Enter")
             wait_for_store_state(
                 page,
                 _store_active,
                 dom_readiness={
-                    "selector": '[data-testid="command-drawer-input"]',
+                    "selector": '[data-testid="command-line-input-field"]',
                     "predicate": (
-                        "() => { const i = document.querySelector('[data-testid=\"command-drawer-input\"]'); "
-                        "return i && i.value === ''; }"
+                        "() => { const i = document.querySelector('[data-testid=\"command-line-input-field\"]');"
+                        " return i && i.value === ''; }"
                     ),
-                    "description": "the drawer command input cleared after send",
+                    "description": "the command-line input field cleared after send",
                 },
                 timeout=10000,
             )
             field.press("Escape")
-            wait_for_store_state(
-                page,
-                _store_active,
-                dom_readiness={
-                    "selector": '[data-testid="command-drawer"][data-open="false"]',
-                    "predicate": (
-                        "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
-                        " return d && d.getAttribute('data-open') === 'false'; }"
-                    ),
-                    "description": "the command drawer is closed",
-                },
-                timeout=10000,
-            )
             self.assertTrue(
                 page.evaluate(
                     "() => { const a = document.activeElement; "

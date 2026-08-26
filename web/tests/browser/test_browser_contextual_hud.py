@@ -268,6 +268,20 @@ def _art_panel(portrait_refs: list) -> dict:
     }
 
 
+def _local_map_unavailable_panel() -> dict:
+    """A schema-valid registry-owned unavailable ``local_map`` panel.
+
+    Mirrors the registry's ``build_unavailable("local_map")`` form: exactly
+    ``schema_version``, ``available: False``, and a bounded registry-owned
+    ``reason`` (the ``map_unavailable`` code + the 區域地圖目前無法顯示 message).
+    """
+    return {
+        "schema_version": 1,
+        "available": False,
+        "reason": {"code": "map_unavailable", "message": "區域地圖目前無法顯示"},
+    }
+
+
 # ---------------------------------------------------------------------------
 # Page-level helpers.
 # ---------------------------------------------------------------------------
@@ -334,9 +348,17 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(minimap.count(), 1, "the minimap island renders in exploration")
         self.assertTrue(minimap.is_visible(), "the minimap is visible in exploration")
 
+        # H5 (task 8.6): the command line's `#inputfield` is present and
+        # visible in exploration with no opening action (the field is always
+        # in the DOM, design D1).
+        field = page.locator("#inputfield")
+        self.assertEqual(field.count(), 1, "the command field is present in exploration")
+        self.assertTrue(field.is_visible(), "the command field is visible in exploration")
+
         # Commit combat: the minimap is removed from the layout with
         # display:none (never merely dimmed); the other mode-visible surfaces
-        # (narrative feed, command drawer, action dock) stay up.
+        # (narrative feed, command line, action dock) stay up (H5: the command
+        # line is permanently present, webclient-hud-05-overlays-and-command-line).
         _inject_snapshot(page, {"local_map": map_panel}, mode="combat")
         _wait_mode(page, "combat")
         self.assertEqual(
@@ -352,13 +374,38 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(hidden, "the minimap is display:none in combat, not merely dimmed")
         for selector in (
             '[data-testid="narrative-feed"]',
-            '[data-testid="command-drawer"]',
+            # H5 (webclient-hud-05-overlays-and-command-line): the command
+            # line is permanently present (design D1) — it stays visible in
+            # combat mode.
+            '[data-testid="command-line"]',
             "#action-dock",
         ):
             self.assertTrue(
                 page.locator(selector).is_visible(),
                 f"{selector} must stay visible in combat",
             )
+        # H5 (task 8.6): the command field stays present and visible in
+        # combat (the command line is never closed).
+        self.assertEqual(page.locator("#inputfield").count(), 1, "the command field is present in combat")
+        self.assertTrue(
+            page.locator("#inputfield").is_visible(),
+            "the command field is visible in combat",
+        )
+
+        # Commit creation: per H1's mode matrix, the command-line anchor is
+        # display:none, so the command field is absent from the layout.
+        _inject_snapshot(page, {"local_map": map_panel}, mode="creation")
+        _wait_mode(page, "creation")
+        self.assertEqual(
+            stage.get_attribute("data-elosern-mode"),
+            "creation",
+            "the stage root exposes the committed creation mode",
+        )
+        field_absent = page.evaluate(
+            "() => { const el = document.querySelector('#inputfield'); "
+            "return el ? (el.offsetParent === null) : true; }"
+        )
+        self.assertTrue(field_absent, "the command field is absent (display:none) in creation mode")
 
     @covers_requirement(
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage"
@@ -488,7 +535,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
     def test_open_drawer_or_overlay_dims_stage(self):
-        """An open drawer or overlay recesses the stage; the mark clears only when all close."""
+        """An open drawer or overlay recesses the stage; the mark clears only when all close.
+
+        H5 (webclient-hud-05-overlays-and-command-line): the command drawer
+        is replaced by the permanently-present command line (design D1), so
+        the second open surface is now an H5 full-screen overlay (settings)
+        opened through the store's overlay slice (design D8/D9).
+        """
         page = self.logged_in_page()
         stage = page.locator('[data-testid="elosern-stage"]')
         self.assertEqual(
@@ -506,19 +559,20 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "an open overlay recesses the stage",
         )
 
-        # Open the command drawer too: the mark stays while two surfaces are open.
-        # The full-log overlay is an aria-modal dialog that intercepts pointer
-        # events, so the drawer opens through the shell's `/` key (the shell
-        # keyboard contract), not through the pointer-clickable `.drawer-entry`.
-        page.keyboard.press("/")
-        page.wait_for_timeout(100)
+        # Open the H5 settings overlay through the store's overlay slice: the
+        # full-log overlay is an aria-modal dialog that intercepts pointer
+        # events, so the overlay opens via the store's `openOverlay` (design
+        # D8), not a pointer click on the command line's 設定 button.
+        page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "true",
             "the stage stays recessed while two surfaces are open",
         )
 
-        # Close the full log: the drawer remains open, so the stage stays recessed.
+        # Close the full log: the settings overlay remains open, so the stage
+        # stays recessed.
         page.locator('[data-testid="fulllog-close"]').click()
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"fulllog-overlay\"]') === null",
@@ -530,13 +584,155 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the stage stays recessed until the last open surface closes",
         )
 
-        # Close the drawer (Escape): the recess mark clears.
-        _press(page, "Escape")
+        # Close the settings overlay (the shared overlay host's close button):
+        # the recess mark clears.
+        page.locator('[data-testid="overlay-host-close"]').click()
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "false",
             "the recess mark clears only when no drawer and no overlay remain open",
         )
+
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    def test_h5_overlay_triggers_exclusion_and_focus_restoration(self):
+        """H5 overlay contract (task 8.7): each trigger opens exactly its own
+        overlay; at most one overlay is open at a time (opening a second closes
+        the first); Escape and the close control each restore focus to the
+        trigger (the opener captured at open time); the stage recession mark
+        is set while an overlay is open and clears when the last closes.
+        """
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # Each of the three triggers opens exactly its own overlay.
+        # settings trigger -> settings overlay.
+        page.locator('[data-testid="command-line-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the settings overlay recesses the stage",
+        )
+        # Close it so the next trigger is reachable (the command line is behind
+        # an open overlay).
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-overlay\"]') === null",
+            timeout=15000,
+        )
+
+        # help trigger -> help overlay.
+        page.locator('[data-testid="command-line-help"]').click()
+        page.wait_for_selector('[data-testid="help-overlay"]', timeout=15000)
+
+        # Mutual exclusion: opening a second overlay closes the first (the store
+        # keeps a single open-overlay name, design D8).
+        page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="help-overlay"]').count(),
+            0,
+            "opening settings closes the open help overlay (at most one overlay open)",
+        )
+        page.locator('[data-testid="overlay-host-close"]').click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recession mark clears when the last overlay closes",
+        )
+
+        # map trigger (the minimap island's 展開全地圖) -> map overlay; Escape
+        # restores focus to that trigger (the opener captured at open time).
+        page.locator('[data-testid="local-map__expand"]').click()
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the map overlay recesses the stage",
+        )
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recession mark clears after the map overlay closes",
+        )
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "local-map__expand",
+            "Escape restores focus to the map trigger that opened the overlay",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
+    )
+    def test_command_line_never_overlaps_dock_caption_or_hud(self):
+        """H5 (task 8.8): at both supported viewports and at each of the
+        three prose-scale steps, the command line does not overlap the action
+        dock, the narrative caption, or the HUD island anchors.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            page = self.logged_in_page(viewport)
+            exploration = _exploration_panel([_interact_target(11, "小販")])
+            _inject_snapshot(
+                page,
+                {
+                    "exploration": exploration,
+                    "context_actions": _exploration_context_actions_panel(
+                        {"status": "unavailable"}
+                    ),
+                    "local_map": valid_local_map_panel(),
+                },
+                mode="exploration",
+            )
+            _wait_mode(page, "exploration")
+            for scale in (0.92, 1, 1.12):
+                page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
+                overlaps = page.evaluate(
+                    """() => {
+                      const byId = (sel) => {
+                        const el = document.querySelector(sel);
+                        return el && el.getBoundingClientRect();
+                      };
+                      const cmd = byId('[data-testid="command-line"]');
+                      if (!cmd) { return ["command-line missing"]; }
+                      const targets = {
+                        dock: byId('#action-dock'),
+                        caption: byId('[data-testid="narrative-feed"]'),
+                        hudLeft: byId('[data-testid="anchor-hud-left"]'),
+                        hudRight: byId('[data-testid="anchor-hud-right"]'),
+                      };
+                      const hits = [];
+                      for (const key of Object.keys(targets)) {
+                        const b = targets[key];
+                        if (!b) { continue; }
+                        const overlap = !(
+                          cmd.right <= b.left || b.right <= cmd.left ||
+                          cmd.bottom <= b.top || b.bottom <= cmd.top
+                        );
+                        if (overlap) { hits.push(key); }
+                      }
+                      return hits;
+                    }"""
+                )
+                self.assertEqual(
+                    overlaps,
+                    [],
+                    "the command line overlaps %s at %dx%d @ scale %s" % (
+                        ", ".join(overlaps), viewport[0], viewport[1], scale,
+                    ),
+                )
 
     @covers_requirement(
         "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
@@ -1136,6 +1332,55 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     f"no stage anchor overlaps another at {viewport}",
                 )
                 page.close()
+
+    @covers_requirement(
+        "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
+    )
+    def test_local_map_unavailable_renders_registry_reason_in_map_overlay(self):
+        """8.9 offline-degradation regression: with the `local_map` panel in its
+        registry-owned unavailable form, the minimap island renders only the
+        registry-owned reason, and the map overlay's opening path still works —
+        the map overlay renders only the reason, never a stale lattice."""
+        page = self.logged_in_page()
+        _inject_snapshot(page, {"local_map": _local_map_unavailable_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # The minimap island renders the registry-owned reason (not the lattice).
+        island_reason = page.locator('[data-testid="local-map__unavailable"]')
+        self.assertTrue(island_reason.is_visible(), "the minimap island shows the registry-owned reason")
+        self.assertEqual(
+            island_reason.inner_text(),
+            "區域地圖目前無法顯示",
+            "the island shows the exact registry-owned reason message",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="local-map__lattice"]').count(),
+            0,
+            "no lattice renders while the local_map panel is unavailable",
+        )
+
+        # The map overlay's opening path (the island's 展開全地圖 trigger routes
+        # through the store's overlay slice) still opens the surface.
+        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+
+        # The map overlay renders ONLY the registry-owned reason (no lattice).
+        overlay_reason = page.locator('[data-testid="map-overlay-unavailable"]')
+        self.assertTrue(
+            overlay_reason.is_visible(),
+            "the map overlay shows the registry-owned reason",
+        )
+        self.assertEqual(
+            overlay_reason.inner_text(),
+            "區域地圖目前無法顯示",
+            "the map overlay shows the exact registry-owned reason message",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="map-overlay-content"]').count(),
+            0,
+            "the map overlay renders only the reason, never a stale lattice",
+        )
+        page.close()
 
 
 if __name__ == "__main__":

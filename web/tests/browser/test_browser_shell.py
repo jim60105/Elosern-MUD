@@ -22,12 +22,12 @@ from .browser_helpers import (
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
-    '[data-testid="command-drawer"]',
+    '[data-testid="command-line"]',
 )
 
 
 def _wait_field_focused(page, timeout=30000):
-    """Gate on the drawer's ``#inputfield`` being focused (after ``/`` or entry click)."""
+    """Gate on the command field ``#inputfield`` being focused (after ``/``)."""
     wait_for_store_state(
         page,
         lambda s: bool(s.get("connected")),
@@ -43,22 +43,26 @@ def _wait_field_focused(page, timeout=30000):
     )
 
 
-def _wait_drawer_closed_dock_focused(page, timeout=30000):
-    """Gate on the command drawer being closed and the action dock holding focus."""
+def _wait_command_field_released(page, timeout=30000):
+    """Gate on the action dock holding focus after the command field's Escape.
+
+    H5 (webclient-hud-05-overlays-and-command-line): the command line is
+    permanently present, so the release path is focus restoration to
+    ``#action-dock`` — not a surface close (the field is never closed).
+    """
     wait_for_store_state(
         page,
         lambda s: bool(s.get("connected")),
         dom_readiness={
             "selector": "#action-dock",
             "predicate": (
-                "() => { const d = document.querySelector('[data-testid=\"command-drawer\"]');"
-                " const open = d && d.getAttribute('data-open') === 'true';"
+                "() => { const d = document.querySelector('[data-testid=\"command-line\"]');"
                 " const dock = document.getElementById('action-dock');"
-                " return !open && dock && "
+                " return d && dock && "
                 "(document.activeElement === dock || "
                 "(document.activeElement && dock.contains(document.activeElement))); }"
             ),
-            "description": "command-drawer closed and #action-dock focused",
+            "description": "command field released: #action-dock focused, command line still present",
         },
         timeout=timeout,
     )
@@ -146,16 +150,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             locator = page.locator(selector)
             self.assertEqual(locator.count(), 1, f"missing surface {selector}")
             self.assertTrue(locator.is_visible(), f"{selector} is not visible")
-        # The command drawer defaults to closed: the input row exists in the
-        # DOM but is hidden behind the actionable entry button (D2).
-        self.assertFalse(
-            page.locator("#inputfield").is_visible(),
-            "the drawer input row must be hidden by default",
-        )
-        entry = page.locator(".drawer-entry")
-        self.assertEqual(entry.count(), 1)
-        self.assertTrue(entry.is_visible(), "the entry button is visible by default")
-        self.assertEqual(entry.get_attribute("aria-expanded"), "false")
+        # H5 (task 8.6): the command line is permanently present — the input
+        # field is in the DOM, visible and focusable with no opening action:
+        # no entry control, no `aria-expanded` state, no closed state.
+        self.assertEqual(page.locator('#inputfield').count(), 1)
+        self.assertTrue(page.locator('#inputfield').is_visible(), "the command field is visible")
+        self.assertEqual(page.locator('.drawer-entry').count(), 0, "no entry control")
+        self.assertEqual(page.locator('[aria-expanded]').count(), 0, "no element reports aria-expanded")
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
@@ -218,23 +219,24 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )
-    def test_keyboard_drawer_open_send_cancel_and_focus_restoration(self):
+    def test_keyboard_field_focus_send_cancel_and_focus_restoration(self):
         page = self.logged_in_page()
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
 
-        # Open the drawer with `/` and send an ordinary command. The field
-        # clears, the drawer stays open, and focus remains in the field so
-        # consecutive commands need no pointer interaction.
+        # H5: the command line is permanently present — `/` focuses the
+        # always-present field (no opening action). Send an ordinary command:
+        # the field clears and focus stays in the field, so consecutive
+        # commands need no pointer interaction.
         focus_action_dock(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()", "the command line is present"))
 
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         wait_for_narrative_settled(page, narrative_before.__len__())
-        # Focus retained in the field, drawer still open, field cleared.
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
+        # Focus retained in the field, command line still present, field cleared.
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
         self.assertTrue(
             page.evaluate(
                 "document.activeElement === document.getElementById('inputfield')"
@@ -245,36 +247,36 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         narrative_after = page.locator('[data-testid="narrative-feed"]').inner_text()
         self.assertNotEqual(
-            narrative_after, narrative_before, "drawer send produced no narrative"
+            narrative_after, narrative_before, "command-line send produced no narrative"
         )
 
         # A second command can be sent with no pointer interaction.
         page.keyboard.type("look")
         page.keyboard.press("Enter")
         wait_for_narrative_settled(page, narrative_after.__len__())
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
+        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"))
         self.assertTrue(
             page.evaluate(
                 "document.activeElement === document.getElementById('inputfield')"
             )
         )
 
-        # Cancel path: reopen, type, and Escape must not send anything; the
-        # drawer closes and action-dock focus is restored (the action dock
-        # forwards focus to the mounted listbox row container).
+        # Cancel path: Escape from the focused field sends nothing and
+        # restores action-dock focus; the command line itself is never
+        # closed (it is permanently present, design D1).
         page.keyboard.press("Escape")
-        _wait_drawer_closed_dock_focused(page)
+        _wait_command_field_released(page)
         focus_action_dock(page)
         page.keyboard.press("/")
         _wait_field_focused(page)
         page.keyboard.type("look")
         narrative_before_cancel = page.locator('[data-testid="narrative-feed"]').inner_text()
         page.keyboard.press("Escape")
-        _wait_drawer_closed_dock_focused(page)
+        _wait_command_field_released(page)
         self.assertEqual(
             page.locator('[data-testid="narrative-feed"]').inner_text(),
             narrative_before_cancel,
-            "Escape must not send drawer text",
+            "Escape must not send command-line text",
         )
 
     @covers_requirement(
@@ -381,7 +383,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.on("console", lambda msg: console_messages.append(msg.text))
 
         # Navigate the action dock with the keyboard: arrows, Enter, Escape,
-        # and drawer typing must never report an unhandled keydown.
+        # and command-line typing must never report an unhandled keydown.
         focus_action_dock(page)
         for _ in range(3):
             page.keyboard.press("ArrowDown")
@@ -553,11 +555,11 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
 
-        # A pointer activation of the drawer's entry button opens and focuses
-        # the field; Enter must send exactly one ordinary text message through
-        # the single drawer-owned path, clear the field, and keep focus in it.
-        page.locator(".drawer-entry").click()
-        self.assertTrue(page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-drawer\"]'); return d && d.getAttribute('data-open') === 'true'; })()"))
+        # H5: the command line is permanently present — pointer activation
+        # of the always-present field must send exactly one ordinary text
+        # message through the single send path, clear the field, and keep
+        # focus in it (the plugin contract reports no unhandled keydown).
+        page.locator("#inputfield").click()
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
@@ -588,7 +590,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         narrative_before = page.locator('[data-testid="narrative-feed"]').inner_text()
-        page.locator(".drawer-entry").click()
+        # H5: the field is permanently present; focus it directly (no opening
+        # action is needed — design D1).
+        page.locator("#inputfield").click()
         _wait_field_focused(page)
         page.keyboard.type("first line")
         page.keyboard.press("Shift+Enter")
@@ -606,7 +610,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )
-    def test_open_rest_form_never_swallows_drawer_field_enter(self):
+    def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         # The Wait/休息 entry is always the last root cell (5-7 cells
@@ -632,10 +636,11 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 "description": "rest form rendered",
             },
         )
-        # Open the drawer through its entry button and send: the rest form's
-        # capture-phase handler must yield, and the command travels as
-        # ordinary text (never an explore.wait submission).
-        page.locator(".drawer-entry").click()
+        # H5: the command line is permanently present — focus the always-present
+        # field and send; the rest form's capture-phase handler must yield,
+        # and the command travels as ordinary text (never an explore.wait
+        # submission).
+        page.locator("#inputfield").click()
         _wait_field_focused(page)
         page.keyboard.type("look")
         page.keyboard.press("Enter")
@@ -643,7 +648,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(
             sent_action_count(page, "explore.wait"),
             0,
-            "the rest form must not swallow the drawer send",
+            "the rest form must not swallow the command-line send",
         )
         sends = [
             args[0]
@@ -658,12 +663,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )
-    def test_drawer_field_button_alignment_at_both_viewports(self):
+    def test_command_line_field_button_alignment_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)
-            # The field is hidden until the drawer opens; open it through the
-            # entry button before measuring the field/button alignment.
-            page.locator(".drawer-entry").click()
+            # H5 (task 8.8): the command line is permanently present — no
+            # opening action is needed before measuring the field/button
+            # alignment.
             _wait_field_focused(page)
             page.wait_for_timeout(200)
             geometry = page.evaluate(

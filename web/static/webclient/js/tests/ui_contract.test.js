@@ -21,16 +21,18 @@ function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
 
-test("the command drawer sends ordinary text, never a ui_action envelope", () => {
-  const drawer = read("web/webclient-app/components/CommandDrawer.vue");
-  // The drawer component emits a single `submit(text)` intent; the store's
-  // sender seam (transport.js) routes it through Evennia.msg("text", ...).
-  assert.match(drawer, /emits: \["toggle", "submit"/);
-  assert.match(drawer, /emit\("submit", text\)/);
+test("the command line sends ordinary text, never a ui_action envelope", () => {
+  // H5 (webclient-hud-05-overlays-and-command-line): the command drawer was
+  // retired for the permanently-present command line; its single send intent
+  // (`submit(text)`) still routes through the store's text transport
+  // (Evennia.msg("text", ...)), never a ui_action envelope.
+  const line = read("web/webclient-app/components/CommandLine.vue");
+  assert.match(line, /defineEmits\(\["submit", "focus-parent", "open-overlay", "focus-lost"\]\)/);
+  assert.match(line, /emit\("submit", text\)/);
   assert.strictEqual(
-    /ui_action/.test(drawer),
+    /ui_action/.test(line),
     false,
-    "the drawer must not construct or reference a ui_action envelope"
+    "the command line must not construct or reference a ui_action envelope"
   );
   const store = read("web/webclient-app/stores/elosern.js");
   assert.match(store, /function dispatchAction\(/);

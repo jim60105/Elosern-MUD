@@ -57,10 +57,16 @@
   --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
   --text-sm: 13px;
   --text-body: 15px;
-  --text-narrative: 15.5px;
-  --text-dialog: 16px;
-  --lh-narrative: 1.82;
-  --lh-dialog: 1.78;
+   --text-narrative: 15.5px;
+   --text-dialog: 16px;
+   --lh-narrative: 1.82;
+   --lh-dialog: 1.78;
+   /* H5 (webclient-hud-05-overlays-and-command-line, design D13): the
+      narrative prose scale. Multiplied into the three prose targets only —
+      the narrative caption's lines, the full-log surface's lines and the
+      command-line prompt line — never into `--text-sm` / `--text-body` or
+      any HUD, dock, drawer or overlay chrome. */
+   --prose-scale: 1;
 
   /* ---- spacing ---- */
   --sp-1: 4px;
@@ -209,9 +215,21 @@
   content: "▼";
 }
 
-/* Reduced motion: disable nonessential motion at the token level. */
+/*
+ * Reduced motion: disable nonessential motion at the token level.
+ *
+ * H5 (webclient-hud-05-overlays-and-command-line, task 7.6): the
+ * reduced-motion preference acts as an override over the operating system's
+ * `prefers-reduced-motion` query, never replacing it. When no override is
+ * stored (the attribute absent), the OS preference applies. The stored
+ * override is written on `<html>` as `data-reduced-motion` ("on" or "off"):
+ * - the media-query block applies only while the override is not "off";
+ * - an explicit "on" forces the 1ms motion tokens regardless of the OS
+ *   preference;
+ * - an explicit "off" beats the media query (full motion).
+ */
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  :root:not([data-reduced-motion="off"]) {
     --motion-fast: 1ms;
     --motion-base: 1ms;
     --motion-slow: 1ms;
@@ -219,11 +237,27 @@
     --motion-hp-pulse: 1ms;
   }
 
-  *,
-  *::before,
-  *::after {
+  html:not([data-reduced-motion="off"]) *,
+  html:not([data-reduced-motion="off"]) *::before,
+  html:not([data-reduced-motion="off"]) *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+:root[data-reduced-motion="on"] {
+  --motion-fast: 1ms;
+  --motion-base: 1ms;
+  --motion-slow: 1ms;
+  --motion-pulse: 1ms;
+  --motion-hp-pulse: 1ms;
+}
+
+html[data-reduced-motion="on"] *,
+html[data-reduced-motion="on"] *::before,
+html[data-reduced-motion="on"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
 }

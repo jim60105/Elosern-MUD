@@ -39,9 +39,11 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get('[data-testid="connection-state"]').text()).toBe("○ 未連線");
     expect(w.get('[data-testid="narrative-feed"]')).toBeTruthy();
     expect(w.get('[data-testid="narrative-fulllog-control"]')).toBeTruthy();
-    const drawer = w.get('[data-testid="command-drawer"]');
-    expect(drawer.attributes("data-open")).toBe("false");
-    expect(w.get('[data-testid="command-drawer-entry"]').attributes("aria-expanded")).toBe("false");
+    // H5: the command line is a permanently present bar — no open/closed
+    // state, no entry control, no `aria-expanded`.
+    expect(w.get('[data-testid="command-line"]').exists()).toBe(true);
+    expect(w.find('textarea#inputfield').exists()).toBe(true);
+    expect(w.findAll("[aria-expanded]").length).toBe(0);
     expect(w.get('[data-testid="connect-overlay"]').attributes("data-status")).toBe("connecting");
     expect(w.get("#elosern-action-live").attributes("aria-live")).toBe("polite");
     expect(w.get("#elosern-offline-overlay").attributes("data-visible")).toBe("false");
@@ -86,9 +88,13 @@ describe("AppShell root (B1 core family)", () => {
     expect(w.get("#elosern-action-live").text().trim()).toBe("");
   });
 
-  it("toggles the drawer with `/` and focuses the field; Escape returns focus to the action dock; slash stays literal in the field", async () => {
-    // H1: the preserved focus target on drawer-close is the action dock
-    // (`#action-dock`), so mount the dock into the shell's action-dock slot.
+  it("`/` focuses the command field; Escape returns focus to the action dock; slash stays literal in the field", async () => {
+    // H5 (task 3.6): the command line has no open/closed state — `/` is an
+    // unconditional focus claim (no literal slash inserted), and Escape from
+    // the focused field routes `focus-parent` → `releaseCommandField(true)`
+    // → `#action-dock` focus rescue (the dock's menu level is untouched).
+    // Mount the dock into the shell's action-dock slot as the preserved focus
+    // target.
     const host = document.createElement("div");
     host.id = "elosern-app";
     document.body.appendChild(host);
@@ -97,22 +103,24 @@ describe("AppShell root (B1 core family)", () => {
       slots: { "action-dock": () => h(ActionDock) },
     });
     wrapper = w;
+
+    // `/` from the dock (a non-editable target) focuses the field.
     pressKey(window, "/");
     await w.vm.$nextTick();
-    expect(w.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("true");
     let input = w.get("textarea#inputfield");
     expect(document.activeElement).toBe(input.element);
 
+    // Escape from the focused field: nothing is sent, focus returns to the
+    // action dock; the field stays present (it is never closed).
     pressKey(input.element, "Escape");
     await w.vm.$nextTick();
-    expect(w.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("false");
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    expect(w.find("textarea#inputfield").exists()).toBe(true);
 
-    // Slash stays literal text inside the focused field (the shell does not
-    // claim it there). jsdom performs no default text insertion, so the
-    // keystroke lands the way a browser would: value plus input event. The
-    // drawer must stay open — the shell must not toggle — and focus must
-    // stay in the field. Re-fetch the field: the row remounts on re-open.
+    // A `/` pressed while an editable control (the field) is focused is
+    // ordinary text input: the shell's window-level claim never fires, so a
+    // literal slash is typeable. jsdom performs no default text insertion,
+    // so the keystroke lands the way a browser would: value plus input event.
     pressKey(window, "/");
     await w.vm.$nextTick();
     input = w.get("textarea#inputfield");
@@ -120,15 +128,16 @@ describe("AppShell root (B1 core family)", () => {
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
     await w.vm.$nextTick();
     expect(input.element.value).toBe("/");
-    expect(w.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("true");
     expect(document.activeElement).toBe(input.element);
   });
 
   it("emits exactly one submit-command per deliberate send", async () => {
     const w = mountShell({ connected: true });
-    w.get('[data-testid="command-drawer-entry"]').trigger("click");
-    await w.vm.$nextTick();
+    // The field is permanently present (H5): no entry button to click —
+    // focus the field directly and send.
     const input = w.get("textarea#inputfield");
+    w.vm.focusCommandField();
+    await w.vm.$nextTick();
     input.element.value = "look";
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
     pressKey(input.element, "Enter");

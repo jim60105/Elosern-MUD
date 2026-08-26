@@ -13,18 +13,21 @@
 // Preserved DOM contract (design D6): `#action-dock` (with `data-mode`,
 // `tabindex` and the listbox composite role, rendered by the dock),
 // `#elosern-action-live`, `#elosern-offline-overlay`, `#inputfield`
-// (inside the drawer), `#narrative-unread` (inside the feed), and the
+// (inside the command line), `#narrative-unread` (inside the feed), and the
 // `action-*` / `target-*` item keys all remain.
 //
-// Shell-owned view behavior: `/` toggles the command drawer and focuses the
-// field; Escape closes the open drawer and restores `#action-dock` focus;
-// the mount retires the replaced text fallback (hidden, not removed).
+// Shell-owned view behavior (H5, webclient-hud-05-overlays-and-command-line):
+// the command line is a permanently present bar — `/` moves focus into the
+// field (no literal slash, design D2); Escape from the field returns focus
+// to `#action-dock` (the field's own handler owns the key, design D3's
+// ladder: open overlay → open drawer → focused command field → dock menu
+// level). The mount retires the replaced text fallback (hidden, not removed).
 // A mode change that hides the surface holding focus moves focus to the
 // action dock *before* the CSS hides it (design D2; the side-effect-free
 // `restoreDockFocus` path — no second focus path).
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
-import CommandDrawer from "./CommandDrawer.vue";
+import CommandLine from "./CommandLine.vue";
 import HudFrame from "./HudFrame.vue";
 import NarrativeFeed from "./NarrativeFeed.vue";
 import TopBar from "./TopBar.vue";
@@ -69,24 +72,23 @@ const props = defineProps({
   // attribute binding, no structural edit to the frame. The stage then
   // renders its red vignette and the HP fill renders its pulse.
   lowHp: { type: Boolean, default: false },
+  // The client-local text-to-HTML narrative preference (H5): forwarded to
+  // the command line's prompt line — when off, the prompt renders as literal
+  // text (the preference chooses whether the markup pipeline runs, never
+  // what it permits).
+  textToHtml: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(["submit-command", "choice-action", "drawer-closed", "open-full-log"]);
+const emit = defineEmits(["submit-command", "choice-action", "open-full-log", "open-overlay", "focus-lost"]);
 
-const drawerOpen = ref(false);
-const drawer = ref(null);
+const commandLine = ref(null);
 const feed = ref(null);
 
-// The open-surface registry merged with the drawer state (design D9): the
-// stage recesses while any surface is open; the mark clears only when
-// nothing is open.
-const frameOpenSurfaces = computed(() => {
-  const surfaces = [...props.openSurfaces];
-  if (drawerOpen.value) {
-    surfaces.push("drawer");
-  }
-  return surfaces;
-});
+// The open-surface registry (design D9): AppClient computes the set of open
+// surfaces (full-log, creation, and H4's `hudDrawer`). The command line
+// has no open/closed state (design D1), so the registry passes through
+// unchanged.
+const frameOpenSurfaces = computed(() => props.openSurfaces);
 
 function isEditable(target) {
   if (!target || typeof target.closest !== "function") {
@@ -108,34 +110,21 @@ function restoreDockFocus() {
   }
 }
 
-function openDrawer() {
-  drawerOpen.value = true;
-  void nextTick().then(() => drawer.value?.focusField());
+// The persistent command line has no open/closed state (design D1): the
+// field is always in the DOM. The shell's single focus API: `/` and the
+// dock's free-form borrow (design D6) both route through `focusCommandField`.
+function focusCommandField() {
+  commandLine.value?.focusField();
 }
 
-function closeDrawer(restoreFocus) {
-  drawerOpen.value = false;
-  // A closed drawer (Escape / cancel) must release the pending freeform
-  // dialogue target so later ordinary commands travel as text, not speech.
-  emit("drawer-closed");
+// Escape from the focused field (the field's own handler emits
+// `focus-parent`): nothing is sent and focus is returned to `#action-dock`
+// — the only key that leaves the field (design D2). The `restoreDockFocus`
+// path stays the single focus-rescue path.
+function releaseCommandField(restoreFocus) {
   if (restoreFocus) {
-    // Spec (webclient-desktop-shell): Escape closes the drawer and restores
-    // the `#action-dock` focus (the preserved focus target), not the feed.
     restoreDockFocus();
   }
-}
-
-function toggleDrawer() {
-  if (drawerOpen.value) {
-    closeDrawer(true);
-  } else {
-    openDrawer();
-  }
-}
-
-function onFocusParent() {
-  // The drawer's own Escape path (field focus).
-  closeDrawer(true);
 }
 
 function onSubmit(text) {
@@ -150,29 +139,28 @@ function onChoiceAction(intent) {
   emit("choice-action", intent);
 }
 
-// The shell-wide key claims before the wiring wave: `/` toggles the drawer,
-// Escape releases an open drawer. Unclaimed keys fall through untouched.
+function onOpenOverlay(name) {
+  // The command line's 設定/說明 utility controls (H5, design D10): open the
+  // settings/help overlays through the parent's overlay slice.
+  emit("open-overlay", name);
+}
+
+// Shell-wide key claims (H5, design D2/D3): outside any editable control,
+// `/` moves focus into the field — the claim is unconditional for key
+// repeat (a repeated `/` still prevents a literal slash and re-focuses the
+// always-present field, idempotently). Escape is NOT claimed here: the
+// topmost open full-screen overlay, the open drawer (H4), the focused
+// command field (its own `focus-parent` emit), and the dock's menu level
+// (the router) each own that key at their rung of the precedence ladder.
+// Unclaimed keys fall through untouched.
 function onWindowKeydown(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
   const key = event.key;
   if (key === "/" && !isEditable(event.target)) {
-    if (event.repeat) {
-      return;
-    }
     event.preventDefault();
-    toggleDrawer();
-    return;
-  }
-  if (key === "Escape" && drawerOpen.value) {
-    // The drawer field's own handler runs first (target bubble) and already
-    // released it; this covers drawer focus that is not on the field.
-    if (!drawerOpen.value) {
-      return;
-    }
-    event.preventDefault();
-    closeDrawer(true);
+    focusCommandField();
   }
 }
 
@@ -194,12 +182,9 @@ watch(
     if (active && active.closest && hiddenSelector && active.closest(hiddenSelector)) {
       restoreDockFocus();
     }
-    // Entering creation closes an open command drawer (a non-creation surface
-    // must not persist into creation); the `drawer-closed` emit releases the
-    // pending freeform dialogue target.
-    if (nextMode === "creation" && drawerOpen.value) {
-      closeDrawer(false);
-    }
+    // The command line is now permanent (design D1 — no drawer to close): a
+    // mode change into creation only runs the pre-hide focus rescue; the CSS
+    // then hides the `command-line` anchor itself (H1's matrix).
   },
 );
 
@@ -212,9 +197,11 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onWindowKeydown);
 });
 
-// Expose the drawer open/close so the store-driven freeform dialogue entry
-// (a freeform affordance activation) can open and focus the command drawer.
-defineExpose({ openDrawer, closeDrawer, restoreDockFocus });
+// Expose the command-line focus API (H5, design D6): the store-driven
+// freeform dialogue entry point (a freeform affordance activation) focuses
+// the field via `focusCommandField`, and a successful dock-borrowed send
+// returns focus to `#action-dock` via `releaseCommandField(true)`.
+defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
 </script>
 
 <template>
@@ -251,16 +238,18 @@ defineExpose({ openDrawer, closeDrawer, restoreDockFocus });
         <slot name="action-dock" />
       </template>
       <template #command-line>
-        <CommandDrawer
-          ref="drawer"
-          :open="drawerOpen"
+        <CommandLine
+          ref="commandLine"
+          :mode="props.mode"
           :prompt="props.prompt"
           :history="props.commandHistory"
           :connected="props.connected"
           :mutations-locked="props.mutationsLocked"
+          :text-to-html="props.textToHtml"
           @submit="onSubmit"
-          @toggle="toggleDrawer"
-          @focus-parent="onFocusParent"
+          @focus-parent="releaseCommandField(true)"
+          @open-overlay="onOpenOverlay"
+          @focus-lost="() => emit('focus-lost')"
         />
       </template>
     </HudFrame>

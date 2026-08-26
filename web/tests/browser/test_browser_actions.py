@@ -90,7 +90,9 @@ class ActionLockingTest(BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
 
-        # The command drawer sends ordinary text, never a ui_action.
+        # H5 (webclient-hud-05-overlays-and-command-line): the command line
+        # (the retired drawer's successor) sends ordinary text, never a
+        # ui_action.
         page.keyboard.press("/")
         wait_for_store_state(
             page,
@@ -111,10 +113,10 @@ class ActionLockingTest(BrowserAcceptanceTest):
         sent = page.evaluate("window.__elosernSent")
         self.assertTrue(
             any(cmd == "text" for cmd, _args, _kw in sent),
-            "drawer must send text commands",
+            "the command line must send text commands",
         )
         self.assertEqual(
-            sent_action_count(page), 0, "drawer path must never build ui_action"
+            sent_action_count(page), 0, "the command-line path must never build ui_action"
         )
 
     @covers_requirement(

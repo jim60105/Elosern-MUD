@@ -20,19 +20,21 @@ BROWSER_PASSWORD = "ElosernBrowserTest!2026"
 _LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 # Guaranteed shell surfaces the Vue SPA always renders: the header, the
-# narrative feed, and the command drawer (the drawer's input field is only
-# rendered when the drawer is open, so it is NOT required for the shared
-# shell-active wait). The status panel and the action dock are conditional
-# (rendered only when their panels are available), so they are also not
-# required here. The narrative feed and command drawer are addressed through
-# the Vue SPA's stable `data-testid` hooks (the legacy `.elosern-narrative`
-# / `.elosern-drawer` class hooks are preserved by the Vue app, but the
-# `data-testid` hooks are the stable contract); the header still renders under
-# its legacy `.elosern-header` class.
+# narrative feed, and the command line (H5, webclient-hud-05-overlays-and-
+# command-line: the command line is permanently present — the input field
+# `#inputfield` renders in the DOM in every mode matrix that shows the
+# command-line anchor, so it IS required for the shared shell-active wait).
+# The status panel and the action dock are conditional (rendered only when
+# their panels are available), so they are also not required here. The
+# narrative feed and command line are addressed through the Vue SPA's stable
+# `data-testid` hooks (the legacy `.elosern-narrative` class hooks are
+# preserved by the Vue app, but the `data-testid` hooks are the stable
+# contract); the header still renders under its legacy `.elosern-header`
+# class.
 REQUIRED_SURFACES = (
     '[data-testid="topbar"]',
     '[data-testid="narrative-feed"]',
-    '[data-testid="command-drawer"]',
+    '[data-testid="command-line"]',
 )
 
 

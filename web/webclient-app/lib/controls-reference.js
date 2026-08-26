@@ -1,0 +1,51 @@
+// Controls reference (H5, webclient-hud-05-overlays-and-command-line,
+// task 6.6): the client's own key and command reference, rendered as the
+// help overlay's control section. This is the single client-owned source of
+// truth for what the client binds; the help overlay renders only what the
+// client implements — no authored game-help content, no placeholders. The
+// game's own `help` command output is reached by typing `help` into the
+// command field (the client knows this path, and states it).
+export const CONTROLS_REFERENCE = [
+  {
+    key: "/",
+    label: "Focus the command input field",
+    detail: "No literal slash is inserted.",
+  },
+  {
+    key: "Enter",
+    label: "Send the command",
+    detail: "A single send path; Shift+Enter inserts a newline without sending.",
+  },
+  {
+    key: "↑ / ↓",
+    label: "Walk the command history",
+    detail: "The unsent draft is preserved across the walk.",
+  },
+  {
+    key: "Esc",
+    label: "Close the topmost open surface",
+    detail:
+      "Precedence: open overlay → open drawer → focused command field → dock menu level.",
+  },
+  {
+    key: "Tab",
+    label: "Cycle focus within a focus-trapped surface",
+    detail: "Hidden and disabled controls are skipped.",
+  },
+  {
+    key: "Quick-word chips",
+    label: "Prepare a command without submitting",
+    detail: "The chip writes its verb plus a trailing space into the field and focuses it.",
+  },
+];
+
+// The single line stating how the game's own help output is reached (task
+// 6.6: one line, not a placeholder for the absent authored guide).
+export const GAME_HELP_PATH = "Type `help` into the command field to reach the game's own help output.";
+
+export function controlsReferenceSection() {
+  return {
+    entries: CONTROLS_REFERENCE,
+    gameHelpPath: GAME_HELP_PATH,
+  };
+}

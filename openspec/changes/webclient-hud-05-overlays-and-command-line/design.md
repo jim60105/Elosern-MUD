@@ -185,11 +185,15 @@ case `webclient-desktop-shell`'s "A cancelled dialogue cannot capture a later co
 
 ### D7 — One overlay host, one open overlay, registered into H1's existing recession set
 
-`OverlayHost.vue` owns the full-screen surface: `position:fixed; inset:0` above the stage, the draft's
-`.full` header row (icon, title, subtitle, labelled close control), a scrolling body slot, focus trapped
-through H4's `components/focus-trap.js`, Escape and the close control both closing and restoring focus to
-the trigger. `MapOverlay`, `SettingsOverlay` and `HelpOverlay` keep their bodies and lose their own
-chrome, `z-index` and close buttons.
+`OverlayHost.vue` owns the full-screen surface: `position:fixed; top:46px; left:0; right:0; bottom:0;
+z-index:92` above the stage — the draft's exact `.full` geometry, which keeps the persistent command line
+visible and usable under the overlay — the draft's `.full` header row (icon, title, subtitle, labelled close
+control), a scrolling body slot, focus trapped through H4's `components/focus-trap.js`, Escape and the close
+control both closing and restoring focus to the trigger. The host re-initialises its focus trap when the open
+overlay name changes: the trigger that opened each overlay is captured **at open time** (in the caller that
+opens the overlay), so opening `settings` while `map` is open replaces the stored opener, and closing
+`settings` returns focus to the settings trigger, not the map trigger. `MapOverlay`, `SettingsOverlay` and
+`HelpOverlay` keep their bodies and lose their own chrome, `z-index` and close buttons.
 
 **At most one overlay is open**; opening a second closes the first, mirroring H4's single-drawer rule.
 An open overlay pushes its name into the open-surface array `AppClient.vue:97-106` already computes, so

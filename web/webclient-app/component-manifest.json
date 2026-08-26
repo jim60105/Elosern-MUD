@@ -5,7 +5,8 @@
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
-    "Core/CommandDrawer",
+    "Core/CommandLine",
+    "Core/QuickWordChips",
     "Core/HudFrame",
     "Core/SceneBackdrop",
     "Core/FullLogOverlay",
@@ -38,6 +39,7 @@
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
     "Overlays/HelpOverlay",
+    "Overlays/OverlayHost",
     "Overlays/CreationOverlay"
   ],
   "frozen": true

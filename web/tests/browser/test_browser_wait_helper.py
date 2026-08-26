@@ -149,9 +149,9 @@ class WaitForStoreStateTest(unittest.TestCase):
         page.store_queue = [self._shell_ready_state()]
         page.dom_queue = [False, False, True]
         dom = {
-            "selector": '[data-testid="command-drawer"]',
-            "predicate": "() => !!(document.querySelector('[data-testid=\"command-drawer\"]') && true)",
-            "description": "command drawer mounted",
+            "selector": '[data-testid="command-line"]',
+            "predicate": "() => !!(document.querySelector('[data-testid=\"command-line\"]') && true)",
+            "description": "command line mounted",
         }
         wait_for_store_state(page, _active_shell, dom_readiness=dom, timeout=300)
 
@@ -160,9 +160,9 @@ class WaitForStoreStateTest(unittest.TestCase):
         page = _FakePage()
         page.store_queue = [{"connected": True, "phase": "detached"}]
         dom = {
-            "selector": '[data-testid="command-drawer"]',
+            "selector": '[data-testid="command-line"]',
             "predicate": "() => false",
-            "description": "command drawer mounted",
+            "description": "command line mounted",
         }
         with self.assertRaises(AssertionError) as ctx:
             wait_for_store_state(page, lambda s: s.get("phase") == "active", dom_readiness=dom, timeout=300)

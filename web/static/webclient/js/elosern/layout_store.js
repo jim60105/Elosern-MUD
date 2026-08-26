@@ -46,10 +46,15 @@
     "command-drawer",
   ];
 
-  // Only harmless display preferences may be persisted.
+  // Only harmless display preferences may be persisted. H5 adds the
+  // optional reduced-motion override and the colorblind palette — additive
+  // only, no layout-version bump: a version-1 wrapper lacking the new keys
+  // normalizes cleanly.
   var PREFERENCE_TYPES = {
     text2html: "boolean",
     fontScale: "number",
+    reducedMotion: "boolean",
+    colorblind: "boolean",
   };
 
   var REQUIRED_SET = {};
@@ -128,11 +133,15 @@
   }
 
   function defaultWrapper() {
+    // H5 (task 7.5): the default wrapper's preferences carry the prose
+    // scale and colorblind default; the `reducedMotion` key is absent
+    // (optional — its absence means "no override", the OS preference
+    // applies).
     return {
       layout_version: CURRENT_LAYOUT_VERSION,
       dimensions: {},
       tabs: {},
-      preferences: { text2html: true },
+      preferences: { text2html: true, fontScale: 1, colorblind: false },
     };
   }
 

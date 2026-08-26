@@ -1,38 +1,27 @@
 <script setup>
-// MapOverlay (B5 overlays family): a full-viewport dialog frame that hosts
-// the B4 LocalMap panel (the `local_map` OOB-backed surface). It reuses —
-// not re-implements — LocalMap: the lattice, the visibility states, the
-// legend, and the detail line all come from that component. Actionable
-// adjacent nodes forward a `move` event so the C-wire store can consume the
-// OOB `explore.move` intent. The close button is client-local UI: it emits
-// `close` and hides the overlay (no OOB envelope). When the payload is the
-// registry-owned unavailable form, the frame renders only
-// `localMap.reason.message`; nothing is invented.
-import { computed, ref, watch } from "vue";
+// MapOverlay (B5 overlays family): the body content of the shared full-screen
+// overlay surface (H5, webclient-hud-05-overlays-and-command-line, task 6.1).
+// The modal chrome (position, z-index, close button, aria-modal) now belongs
+// to the OverlayHost surface; this component renders only the `local_map`
+// payload's branch — the available lattice (reused LocalMap) or the
+// registry-owned unavailable reason. The host's focus trap, Escape, and the
+// labelled close control own the surface's behaviour. Actionable adjacent
+// nodes forward a `move` event so the C-wire store can consume the OOB
+// `explore.move` intent.
+import { computed } from "vue";
 import LocalMap from "./LocalMap.vue";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (the available form or the
-  // registry-owned unavailable form).
+  // registry-owned unavailable form). A replaced payload re-renders the
+  // matching branch live (the delta's read-model-update requirement).
   localMap: { type: Object, required: true },
-  // Client-local overlay visibility; the store (C-wire) toggles this.
-  open: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(["move", "close"]);
-
-// Local visibility mirrors the prop; closing hides the overlay root and the
-// parent can resync by flipping `open` back to true.
-const openNow = ref(props.open);
-watch(
-  () => props.open,
-  (value) => {
-    openNow.value = value;
-  },
-);
+const emit = defineEmits(["move", "open-map"]);
 
 // Reactive to OOB read-model updates: when the `local_map` payload is
-// replaced (e.g. the C-wire store publishes a new snapshot), the frame
+// replaced (e.g. the C-wire store publishes a new snapshot), the body
 // re-renders the available/unavailable branch instead of showing a stale
 // state.
 const available = computed(() => props.localMap.available === true);
@@ -44,107 +33,29 @@ function handleMove(payload) {
   emit("move", payload);
 }
 
-function handleClose() {
-  openNow.value = false;
-  emit("close");
+// The island's full-map trigger (task 6.2): forward to the parent's
+// overlay slice so the map overlay opens through the shared surface.
+function handleOpenMap() {
+  emit("open-map");
 }
 </script>
 
 <template>
-  <section
-    v-if="openNow"
-    class="elosern map-overlay"
-    role="dialog"
-    aria-label="區域地圖"
-    data-testid="map-overlay"
-  >
-    <div class="map-overlay__frame" data-testid="map-overlay-frame">
-      <header class="map-overlay__header" data-testid="map-overlay-header">
-        <h2 class="map-overlay__title" data-testid="map-overlay-title">
-          區域地圖
-        </h2>
-        <button
-          type="button"
-          class="map-overlay__close"
-          data-testid="map-overlay-close"
-          @click="handleClose"
-        >
-          關閉
-        </button>
-      </header>
-
-      <p
-        v-if="!available"
-        class="map-overlay__unavailable"
-        data-testid="map-overlay-unavailable"
-      >
-        {{ reasonMessage }}
-      </p>
-      <div v-else class="map-overlay__content" data-testid="map-overlay-content">
-        <LocalMap :local-map="localMap" @move="handleMove" />
-      </div>
+  <div class="map-overlay-body" data-testid="map-overlay">
+    <p
+      v-if="!available"
+      class="map-overlay__unavailable"
+      data-testid="map-overlay-unavailable"
+    >
+      {{ reasonMessage }}
+    </p>
+    <div v-else class="map-overlay__content" data-testid="map-overlay-content">
+      <LocalMap :local-map="localMap" @move="handleMove" @open-map="handleOpenMap" />
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.map-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--panel);
-}
-
-.map-overlay__frame {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  width: min(720px, 92vw);
-  padding: var(--sp-4);
-  background: var(--panel-solid);
-  border: var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.map-overlay__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-}
-
-.map-overlay__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: var(--text-body);
-}
-
-.map-overlay__close {
-  flex: none;
-  padding: var(--sp-1) var(--sp-2);
-  color: var(--paper-300);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--f-mono);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.map-overlay__close:hover {
-  color: var(--seal-400);
-  border-color: var(--seal-400);
-}
-
-.map-overlay__close:focus-visible {
-  color: var(--gold-400);
-  border-color: var(--gold-400);
-}
-
 .map-overlay__unavailable {
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
@@ -157,7 +68,7 @@ function handleClose() {
 }
 
 .map-overlay__content {
-  flex: 1;
-  min-height: 0;
+  display: flex;
+  justify-content: center;
 }
 </style>

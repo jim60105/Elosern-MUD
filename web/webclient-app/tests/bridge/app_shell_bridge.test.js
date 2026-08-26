@@ -1,13 +1,18 @@
 // C2 (webclient-vue-08-wire-bridge-contracts): the browser-bridge and the
 // AppShell key handlers coexist safely. The bridge (document listener)
-// claims the keys consumed by the keyboard router; the shell (window
-// listener) keeps the drawer-open state. One keypress must toggle or act
-// exactly once — no double activation.
+// claims the keys consumed by the keyboard router; the shell's window
+// handler (H5, webclient-hud-05-overlays-and-command-line) claims `/` only
+// when the target is not editable — the command line is permanently
+// present, so `/` moves focus into the always-present field (no open/closed
+// state to toggle). One keypress must act exactly once — no double
+// activation.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
+import { h } from "vue";
 import AppShell from "../../components/AppShell.vue";
+import ActionDock from "../../components/ActionDock.vue";
 import { createWindowBridge } from "../../bridge.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
@@ -23,7 +28,12 @@ function mountAll() {
   const host = document.createElement("div");
   host.id = "elosern-app";
   document.body.appendChild(host);
-  wrapper = mount(AppShell, { attachTo: host });
+  // The preserved focus target on the Escape release path is the action dock
+  // (`#action-dock`), so mount it into the shell's action-dock slot.
+  wrapper = mount(AppShell, {
+    attachTo: host,
+    slots: { "action-dock": () => h(ActionDock) },
+  });
   setActivePinia(createPinia());
   const store = useElosernStore();
   bridge = createWindowBridge(store);
@@ -57,25 +67,25 @@ afterEach(() => {
 });
 
 describe("bridge + AppShell key-routing coexistence (one effect per keypress)", () => {
-  it("toggles the drawer exactly once per `/` press with the bridge installed", async () => {
+  it("`/` focuses the always-present command field exactly once per press", async () => {
     const store = mountAll();
     openActiveSession(store);
-    const drawer = () => wrapper.get('[data-testid="command-drawer"]');
-    expect(drawer().attributes("data-open")).toBe("false");
 
-    // Press 1: the bridge claims `/` (the router's toggle-drawer); the
-    // shell's window handler opens the drawer — exactly one toggle.
+    // Press 1: the shell's window handler claims `/` (the target, `body`,
+    // is not editable) and focuses the command field.
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
-    expect(drawer().attributes("data-open")).toBe("true");
+    const input = wrapper.get("textarea#inputfield");
+    expect(document.activeElement).toBe(input.element);
 
-    // Press 2: exactly one close.
+    // Press 2: the claim is idempotent (no open/closed state — the command
+    // line is permanently present, design D1).
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
-    expect(drawer().attributes("data-open")).toBe("false");
+    expect(document.activeElement).toBe(input.element);
   });
 
-  it("keeps the open drawer field owning its `/` (literal slash, no double toggle)", async () => {
+  it("keeps the command field owning its `/` (literal slash, no double claim)", async () => {
     const store = mountAll();
     openActiveSession(store);
 
@@ -86,7 +96,7 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
 
     // A `/` typed into the focused field stays literal text: the bridge's
     // editable guard skips it and the shell's `!isEditable(target)` guard
-    // skips it too — the drawer stays open.
+    // skips it too — the field keeps the typed slash (design D2).
     const event = new KeyboardEvent("keydown", { key: "/", cancelable: true });
     input.element.dispatchEvent(event);
     input.element.value = "/";
@@ -94,28 +104,36 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     await wrapper.vm.$nextTick();
     expect(input.element.value).toBe("/");
     expect(event.defaultPrevented).toBe(false);
-    expect(wrapper.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("true");
     expect(document.activeElement).toBe(input.element);
   });
 
-  it("on Escape closes the open drawer and pops exactly one menu level", async () => {
+  it("Escape from the focused field returns focus to the dock; the menu depth is unchanged", async () => {
     const store = mountAll();
     openActiveSession(store);
 
-    // Open the drawer, then move focus back to the narrative feed.
+    // Navigate the router into a submenu (depth 2) so the dock's menu level
+    // state is non-trivial. H4 re-homed "character" into a reference drawer
+    // (no router push); "move" is the root entry that opens a real submenu.
+    store.focusItemByKey("move");
+    store.focusConfirm();
+    await wrapper.vm.$nextTick();
+    expect(store.view.dockDepth).toBe(2);
+
+    // `/` focuses the always-present field.
     dispatchWindowKey("/");
     await wrapper.vm.$nextTick();
-    wrapper.get('[data-testid="narrative-feed"]').element.focus();
+    const input = wrapper.get("textarea#inputfield");
+    expect(document.activeElement).toBe(input.element);
 
-    // The bridge claims Escape through the router (menu pops one level);
-    // the shell closes the drawer and restores focus to the feed. Both
-    // effects happen exactly once per press.
+    // The field's own handler owns Escape (ladder rung 3): nothing is sent,
+    // focus returns to `#action-dock`, and the dock's menu depth is
+    // unchanged (the dock's menu level is rung 4 and is only reached when
+    // the field does not hold focus).
     const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
-    window.dispatchEvent(event);
+    input.element.dispatchEvent(event);
     await wrapper.vm.$nextTick();
     expect(event.defaultPrevented).toBe(true);
-    expect(wrapper.get('[data-testid="command-drawer"]').attributes("data-open")).toBe("false");
-    expect(document.activeElement).toBe(wrapper.get('[data-testid="narrative-feed"]').element);
-    expect(store.view.focus.key).toBe("move");
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    expect(store.view.dockDepth).toBe(2, "the dock's menu level is untouched by the field's Escape");
   });
 });

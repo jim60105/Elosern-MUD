@@ -67,13 +67,17 @@ SHALL name a key, gesture or affordance that has no implementation behind it.
 
 ### Requirement: A full-screen overlay is one focus-trapped surface, and only one is open at a time
 A full-screen overlay SHALL render as one shared surface laid over the stage, carrying a header naming
-the surface and a labelled close control, with its body as its only scrolling region. While an overlay
+the surface and a labelled close control, with its body as its only scrolling region. The surface is fixed
+from the stage's 46px command-line height (`top:46px; left:0; right:0; bottom:0`), so the command line
+stays visible and usable underneath it. While an overlay
 is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation. It
 SHALL close on Escape and on activation of its close control, and both paths SHALL restore focus to the
 control that opened it. It SHALL use the shared focus trap the client already owns rather than a second
 implementation.
 
-At most one overlay SHALL be open at any time; opening a second SHALL close the first. An overlay and a
+At most one overlay SHALL be open at any time; opening a second SHALL close the first, and the opener
+recorded for the replacement is the control that opened it, so closing restores focus to the most recent
+trigger, never to the trigger of the closed overlay. An overlay and a
 reference drawer SHALL NOT be open together: opening either SHALL close the other, so at most one
 focus-trapped surface exists at any moment. An open overlay SHALL register itself as an open surface so
 the stage recession this capability already requires applies without a second mechanism.
