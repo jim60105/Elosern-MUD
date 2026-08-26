@@ -41,12 +41,9 @@ const sellable = computed(() => {
   return s && Array.isArray(s.sellable) ? s.sellable : [];
 });
 
-// The wallet renders only when the payload carries a player summary with a
-// wallet value; an absent player (unavailable form) must not fabricate 0.
-const wallet = computed(() => {
-  const w = props.services?.player?.wallet;
-  return typeof w === "number" ? Math.max(0, w) : null;
-});
+// H4 (task 7.1): the shop drawer no longer renders the wallet line; the
+// wallet now lives in the CharacterStatusDrawer (the single wallet rendering
+// across the drawer layer, task 7.7).
 
 // One quantity entry per item_key, defaulted to the action's own lower
 // bound (an invented default is a fabricated value); stock and sellable
@@ -260,10 +257,6 @@ function sellNow(row) {
       </div>
     </section>
 
-    <div v-if="wallet !== null" class="shop-panel__wallet-line">
-      <span class="shop-panel__wallet-label">錢包</span>
-      <span class="shop-panel__wallet" data-testid="shop-panel__wallet">{{ formatCopper(wallet) }} 銅</span>
-    </div>
     </template>
   </aside>
 </template>
@@ -394,14 +387,5 @@ function sellNow(row) {
   font-size: 0.85em;
 }
 
-.shop-panel__wallet-label {
-  color: var(--paper-300);
-  font-size: 0.9em;
-}
 
-.shop-panel__wallet {
-  color: var(--gold-500);
-  font-family: var(--f-mono);
-  font-size: 0.9em;
-}
 </style>

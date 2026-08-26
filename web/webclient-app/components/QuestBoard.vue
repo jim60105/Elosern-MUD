@@ -4,7 +4,7 @@
 // only the committed `services` v1 payload (guild section: registration,
 // quest board (接取), active quest records (回報·放棄·詳情), rank) and
 // invents nothing. A missing guild section renders an honest absent marker.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   // The committed `services` v1 panel payload.
@@ -17,6 +17,7 @@ const emit = defineEmits([
   "quest_turnin",
   "exam_start",
   "quest_register",
+  "open_lore",
 ]);
 
 // The registry-owned unavailable form carries only `reason` — the guild
@@ -46,11 +47,38 @@ function questStateLabel(state) {
 const hasNextStep = computed(
   () => rank.value?.next_rank != null && rank.value?.next_threshold != null,
 );
+
+// H4 (task 7.2): the 放棄 (abandon) pointer is placed behind the same
+// explicit two-step confirmation the dock path (service_menu.js confirmMenu)
+// already requires. The abandon button arms a local confirmation; only the
+// explicit confirm dispatches the exact `guild.quest_abandon` action.
+const confirmAbandon = ref(null);
+
+function confirmAbandonNow() {
+  const quest = confirmAbandon.value;
+  if (!quest || !quest.abandon || !quest.abandon.enabled) return;
+  emit("quest_abandon", {
+    action_id: quest.abandon.action_id,
+    payload: { quest_id: quest.quest_id },
+  });
+  confirmAbandon.value = null;
+}
 </script>
 
 <template>
   <section class="quest-board" data-testid="quest-board">
     <h3 class="quest-board__title" data-testid="quest-board__title">公會任務板</h3>
+
+    <!-- H4 (task 5.5): the single labelled control that opens the lore
+         (圖鑑) drawer from the quest drawer. -->
+    <button
+      type="button"
+      class="quest-board__action"
+      data-testid="quest-board__open-lore"
+      @click="emit('open_lore')"
+    >
+      世界圖鑑
+    </button>
 
     <p
       v-if="unavailable"
@@ -79,6 +107,7 @@ const hasNextStep = computed(
             v-if="registration.register && registration.register.enabled"
             type="button"
             class="quest-board__action"
+            data-testid="quest-board__register"
             @click="emit('quest_register', { action_id: registration.register.action_id })"
           >
             {{ registration.register.label }}
@@ -152,14 +181,15 @@ const hasNextStep = computed(
           <p class="quest-board__detail" data-testid="quest-board__quest-detail">
             {{ quest.detail }}
           </p>
-          <button
-            v-if="quest.abandon && quest.abandon.enabled"
-            type="button"
-            class="quest-board__action"
-             @click="emit('quest_abandon', { action_id: quest.abandon.action_id, payload: { quest_id: quest.quest_id } })"
-          >
-            {{ quest.abandon.label }}
-          </button>
+           <button
+             v-if="quest.abandon && quest.abandon.enabled"
+             type="button"
+             class="quest-board__action"
+             data-testid="quest-board__abandon"
+             @click="confirmAbandon = quest"
+           >
+             {{ quest.abandon.label }}
+           </button>
           <span
             v-if="quest.abandon && !quest.abandon.enabled && quest.abandon.disabled_reason"
             class="quest-board__reason"
@@ -217,9 +247,40 @@ const hasNextStep = computed(
           class="quest-board__reason"
           data-testid="quest-board__exam-reason"
         >
-          （{{ rank.exam_start.disabled_reason.message }}）
-        </span>
-      </section>
+           （{{ rank.exam_start.disabled_reason.message }}）
+         </span>
+       </section>
+
+       <!-- The explicit two-step confirmation for the abandon pointer (task
+            7.2): arm on the 放棄 button, then only the labelled 確認放棄
+            dispatches the exact guild.quest_abandon. -->
+       <div
+         v-if="confirmAbandon"
+         class="quest-board__confirm"
+         data-testid="quest-board__abandon-confirm"
+       >
+         <p class="quest-board__confirm-text" data-testid="quest-board__abandon-confirm-text">
+           放棄「{{ confirmAbandon.display_name }}」後任務會失敗，且無法回復。
+         </p>
+         <div class="quest-board__confirm-actions">
+           <button
+             type="button"
+             class="quest-board__action"
+             data-testid="quest-board__abandon-confirm-yes"
+             @click="confirmAbandonNow()"
+           >
+             確認放棄
+           </button>
+           <button
+             type="button"
+             class="quest-board__action"
+             data-testid="quest-board__abandon-confirm-no"
+             @click="confirmAbandon = null"
+           >
+             取消
+           </button>
+         </div>
+       </div>
     </template>
   </section>
 </template>
@@ -360,5 +421,27 @@ const hasNextStep = computed(
   margin: 0;
   color: var(--paper-300);
   font-size: 0.85em;
+}
+
+.quest-board__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--seal-600);
+  border-radius: var(--radius-sm);
+  background: var(--panel-hi);
+}
+
+.quest-board__confirm-text {
+  margin: 0;
+  color: var(--paper-100);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.quest-board__confirm-actions {
+  display: flex;
+  gap: var(--sp-2);
 }
 </style>

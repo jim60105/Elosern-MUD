@@ -507,9 +507,16 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_services_available(page)
 
-        # In the Vue app the service UI renders as a QuestBoard with a guild
-        # registration button (guild.register), not as action-dock rows.
-        register = page.locator(".quest-board__action")
+        # H4 (task 9.3): the service UI now renders as a QuestBoard inside
+        # the open reference drawer, not as action-dock rows or a permanent
+        # right-column panel. Opening the quest drawer is the journey's first
+        # step; the register control lives inside the drawer body.
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        register = page.locator('[data-testid="quest-board__register"]')
+        page.wait_for_selector('[data-testid="quest-board__register"]', timeout=15000)
         self.assertEqual(register.count(), 1)
         register.click()
         deadline = time.monotonic() + 20

@@ -967,6 +967,177 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
 
+    # ------------------------------------------------------------------
+    # H4 (tasks 9.5-9.7): reference-drawer browser acceptance.
+    # ------------------------------------------------------------------
+
+    REFERENCE_SURFACE_TESTIDS = [
+        "skill-book",
+        "inventory-panel",
+        "shop-panel",
+        "quest-board",
+        "lore-drawer",
+        "character-status-drawer",
+    ]
+
+    def _open_status_drawer(self, page):
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('status'); }"
+        )
+        page.wait_for_selector('[data-testid="hud-drawer"]', timeout=15000)
+
+    def _stage_anchor_rects(self, page):
+        return page.evaluate(
+            """() => {
+              const ids = ["anchor-hud-left", "anchor-hud-right", "anchor-feed", "anchor-dock"];
+              return ids.map((id) => {
+                const el = document.getElementById(id);
+                if (!el) return { id, rect: null };
+                return { id, rect: el.getBoundingClientRect() };
+              });
+            }"""
+        )
+
+    def _anchors_overlap(self, page):
+        rects = self._stage_anchor_rects(page)
+        present = [r for r in rects if r["rect"]]
+        for i in range(len(present)):
+            for j in range(i + 1, len(present)):
+                a, b = present[i]["rect"], present[j]["rect"]
+                overlap = not (
+                    a.right <= b.left or b.right <= a.left
+                    or a.bottom <= b.top or b.bottom <= a.top
+                )
+                if overlap:
+                    return True
+        return False
+
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    def test_reference_drawer_close_focus_and_absent_surfaces(self):
+        """H4 (task 9.5): at both viewports an open drawer closes in one
+        action, Escape restores focus, and no reference surface is in the DOM
+        while every drawer is closed."""
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                # The focus-restoration contract: the drawer is opened while the
+                # preserved #action-dock holds focus, so Escape returns focus
+                # there (the opener is the dock, not <body>).
+                focus_action_dock(page)
+                self._open_status_drawer(page)
+                stage = page.locator('[data-testid="elosern-stage"]')
+
+                # The open drawer recesses the stage (task 9.6 assertion inline).
+                self.assertEqual(
+                    stage.get_attribute("data-menu-open"),
+                    "true",
+                    f"the stage is recessed while the reference drawer is open at {viewport}",
+                )
+
+                # One action (Escape) closes the drawer; focus returns to the
+                # preserved action-dock target.
+                _press(page, "Escape")
+                page.wait_for_function(
+                    "() => document.querySelector('[data-testid=\"hud-drawer\"]') === null",
+                    timeout=15000,
+                )
+                self.assertEqual(
+                    page.locator('[data-testid="hud-drawer"]').count(),
+                    0,
+                    f"the drawer closes in one action (Escape) at {viewport}",
+                )
+                self.assertEqual(
+                    stage.get_attribute("data-menu-open"),
+                    "false",
+                    f"the recession mark clears when the last surface closes at {viewport}",
+                )
+                # Escape closes the drawer and restores focus to the preserved
+                # action-dock focus target (the focus-restoration contract).
+                focus_id = page.evaluate(
+                    "() => { const a = document.activeElement; "
+                    "return a ? (a.id || (a.getAttribute && a.getAttribute('data-testid')) || a.tagName) : null; }"
+                )
+                self.assertEqual(
+                    focus_id,
+                    "action-dock",
+                    f"Escape restores focus to the preserved #action-dock target at {viewport}",
+                )
+                dock = page.locator("#action-dock")
+                self.assertTrue(dock.count() >= 1, "the preserved action dock is present")
+
+                # No reference surface is in the DOM while every drawer is closed.
+                for testid in self.REFERENCE_SURFACE_TESTIDS:
+                    self.assertEqual(
+                        page.locator(f'[data-testid="{testid}"]').count(),
+                        0,
+                        f"reference surface {testid} is absent while all drawers are closed at {viewport}",
+                    )
+                self.assertEqual(
+                    page.locator('[data-testid="hud-drawer"]').count(), 0,
+                    "no drawer chrome in the DOM while closed")
+                self.assertEqual(
+                    page.locator('[data-testid="hud-drawer-scrim"]').count(), 0,
+                    "no drawer scrim in the DOM while closed")
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    def test_reference_drawer_recession_mark_lifecycle(self):
+        """H4 (task 9.6): the stage recession mark is present while a
+        reference drawer is open and cleared when the last surface closes."""
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"), "false",
+            "no surface open: no recession mark",
+        )
+        # Open the drawer while #action-dock holds focus so the opener (the
+        # element focused when the drawer opened) is the preserved dock.
+        focus_action_dock(page)
+        self._open_status_drawer(page)
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"), "true",
+            "the open reference drawer recesses the stage",
+        )
+        _press(page, "Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"hud-drawer\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"), "false",
+            "the recession mark clears when the last surface closes",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+    )
+    def test_caption_wider_and_no_anchor_overlap(self):
+        """H4 (task 9.7): with `#panel-right` emptied into drawers, the
+        narrative caption is wider at both viewports and no stage anchor
+        overlaps another."""
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                feed_width = page.evaluate(
+                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                    "return f ? f.getBoundingClientRect().width : 0; }"
+                )
+                self.assertGreater(
+                    feed_width, 400,
+                    f"the narrative caption is wider than before the hud-right removal at {viewport}",
+                )
+                self.assertFalse(
+                    self._anchors_overlap(page),
+                    f"no stage anchor overlaps another at {viewport}",
+                )
+                page.close()
+
+
 if __name__ == "__main__":
     import unittest
 

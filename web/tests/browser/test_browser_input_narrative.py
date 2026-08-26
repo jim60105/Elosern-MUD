@@ -287,11 +287,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         # Guarantee overflow so the narrative can be scrolled up.
         _append_narrative_fillers(page, 80)
-        # Scroll to the top, then gate on the scroll actually reaching the top
-        # (the feed uses smooth scrolling, so a fixed timeout can race the
-        # animation and the at-bottom decision is captured mid-scroll).
+        # Scroll to the top, then gate on the scroll actually reaching the top.
+        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
+        # `scrollTop = 0` triggers an animation that races the gate. Force an
+        # instant scroll for this single assignment (the same override pattern
+        # the feed's own `scrollToBottom` uses) so the reader is deterministically
+        # at the top before the input line is appended.
         page.evaluate(
-            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+            " const prev = f.style.scrollBehavior;"
+            " f.style.scrollBehavior = 'auto';"
+            " f.scrollTop = 0;"
+            " f.style.scrollBehavior = prev; }"
         )
         wait_for_store_state(
             page,

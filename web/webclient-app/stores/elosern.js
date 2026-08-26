@@ -237,17 +237,104 @@ export const useElosernStore = defineStore("elosern", () => {
    // a valid quantity dispatches the `shop.buy` / `shop.sell` action. The
    // unsubmitted quantity is discarded on a `services` panel replacement
    // (reconnect), so the form is purely client-local.
-   const quantityForm = ref(null);
-    function openQuantityForm(item) {
-      const qty = item.quantity;
-      quantityForm.value = {
-        itemKey: item.itemKey,
-        actionId: item.actionId,
-        state: ServiceMenu.quantityState(qty.min, qty.max),
-        open: true,
-      };
+    const quantityForm = ref(null);
+     function openQuantityForm(item) {
+       const qty = item.quantity;
+       quantityForm.value = {
+         itemKey: item.itemKey,
+         actionId: item.actionId,
+         state: ServiceMenu.quantityState(qty.min, qty.max),
+         open: true,
+       };
+       serviceSurface.value = "shop";
+       publishView();
+     }
+
+    // H4 (webclient-hud-04-reference-drawers, design D3): the reference
+    // drawer controller. `view.hudDrawer` is the single open-drawer name
+    // (null | skill | inventory | shop | quest | lore | status); at most one
+    // drawer is open at a time (structural: a single value). Unknown names
+    // are rejected, not coerced. The store is the single writer and owns the
+    // teardown on a mode change, an epoch reset, or a transport loss.
+    const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status"]);
+    const hudDrawer = ref(null);
+
+    function openHudDrawer(name) {
+      if (!HUD_DRAWER_NAMES.has(name)) {
+        console.warn(`openHudDrawer: unknown drawer "${name}" rejected (not coerced)`);
+        return false;
+      }
+      hudDrawer.value = name;
       publishView();
+      return true;
     }
+
+    function closeHudDrawer(options = {}) {
+      if (hudDrawer.value === null) {
+        return false;
+      }
+      // A drawer hosting a router frame (design D4): closing it pops exactly
+      // one menu level. A frameless drawer (status / skill / lore) closes
+      // without touching the frame stack.
+      if (options.popFrame && activeSubDock.value === "services" && currentFrameIsServiceFrame()) {
+        router.popMenu();
+      }
+      // When closing the drawer while an exploration sub-dock (character /
+      // services) owns the action dock, clear the sub-dock and re-home the
+      // exploration root frame — the same teardown the router's `escape-root`
+      // handler performs. The drawer's own Escape handler now owns the key
+      // (focus is trapped in the drawer), so the router no longer sees the
+      // Escape and would not clear the sub-dock.
+      if (reducer.getState().mode === "exploration" && activeSubDock.value) {
+        setActiveSubDock(null);
+        rehomeFrame(reducer.getState());
+      }
+      hudDrawer.value = null;
+      publishView();
+      return true;
+    }
+
+    // The service surface that the current service frame belongs to, recorded
+    // at frame-push time (design D2's "record the surface at push time", not
+    // inferred from the menu's display title). `null` when no service frame
+    // is active.
+    const serviceSurface = ref(null);
+    function setServiceSurface(value) {
+      serviceSurface.value = value;
+    }
+
+    // A service frame is the current router frame when the services sub-dock
+    // is active and the current menu is a service frame (not the services
+    // root, and not a plain exploration frame). The title set is a defensive
+    // check; routing uses the recorded `serviceSurface`, not the title.
+    const SERVICE_FRAME_TITLES = new Set([
+      "公會", "任務板", "任務記錄", "任務詳情",
+      "商店", "貨架", "販賣", "背包",
+    ]);
+    function currentFrameIsServiceFrame() {
+      const menu = router.currentMenu();
+      if (!menu || !Array.isArray(menu.items) || menu.items.length === 0) {
+        return false;
+      }
+      if (SERVICE_FRAME_TITLES.has(menu.title)) {
+        return true;
+      }
+      // The confirmation frame (guild.quest_abandon's explicit confirm screen):
+      // every item key is a `confirm-*` / `cancel-*` key.
+      return menu.items.every(
+        (i) => i.key && (i.key.startsWith("confirm-") || i.key.startsWith("cancel-")),
+      );
+    }
+
+    // The service surface -> reference drawer map (design D2): the guild
+    // service frames (board / quests / quest-detail / abandon-confirm) present
+    // the 任務 drawer, the shop frames (stock / sell) present the 商店 drawer,
+    // and the inventory frame presents the 背包 · 裝備 drawer.
+    const SERVICE_SURFACE_DRAWERS = {
+      guild: "quest",
+      shop: "shop",
+      inventory: "inventory",
+    };
 
   const view = ref(initialView());
   const narrative = ref([]);
@@ -809,10 +896,24 @@ export const useElosernStore = defineStore("elosern", () => {
     }
     if (item.openCharacter) {
       setActiveSubDock("character");
+      // H4 (task 4.2): the Character root opens the character-status drawer
+      // (the re-homed character surface). The sub-dock flag is kept so the
+      // dock's routing stays intact; the drawer is the new home of the
+      // surface.
+      openHudDrawer("status");
       return true;
     }
     if (item.openServiceSubmenu) {
       setActiveSubDock("services");
+      // H4 (task 4.3): record the service surface at push time (design D2)
+      // so the frame-hosting watcher routes to the matching reference drawer.
+      // The submenu key maps to a service surface: "guild" / "shop" are
+      // surfaces; "quests" is the guild's quest log (guild surface); "inventory"
+      // is the inventory surface.
+      const subKey = item.openServiceSubmenu;
+      const surface =
+        subKey === "quests" ? "guild" : (subKey === "guild" ? "guild" : subKey);
+      setServiceSurface(surface);
       // Push the re-homed service submenu (guild: register/board/quests/exam;
       // shop: 貨架/販賣) so the keyboard router owns the service surface.
       const servicesPanel = (reducer.getState().panels && reducer.getState().panels.services) || {};
@@ -932,6 +1033,18 @@ export const useElosernStore = defineStore("elosern", () => {
     // (詳情 / 放棄 / 回報) is not in `buildMenus` — it is built per-quest via
     // `questMenuFor`.
     if (item.openSubmenu) {
+      // H4 (task 4.3): record the service surface at push time — the guild
+      // frames (board / quests / quest-detail) route to the 任務 drawer, the
+      // shop frames (stock / sell) route to the 商店 drawer, and the
+      // inventory frame routes to the 背包 · 裝備 drawer.
+      const subKey = item.openSubmenu;
+      if (subKey === "board" || subKey === "quests" || subKey.startsWith("quest-")) {
+        setServiceSurface("guild");
+      } else if (subKey === "stock" || subKey === "sell") {
+        setServiceSurface("shop");
+      } else if (subKey === "inventory") {
+        setServiceSurface("inventory");
+      }
       let submenu = model.menus[item.openSubmenu];
       if (!submenu && item.openSubmenu.startsWith("quest-")) {
         const guild = (rs.panels.services && rs.panels.services.guild) || {};
@@ -955,6 +1068,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // The quest-detail 放棄 row: push the explicit confirmation menu (the
     // `.services-confirm` screen renders behind it; no mutation is sent yet).
     if (item.confirmActionId) {
+      // H4 (task 4.3): the abandon confirmation frame belongs to the guild
+      // (quest) surface.
+      setServiceSurface("guild");
       const confirmMenu = ServiceMenu.confirmMenu(
         item.confirmLabel,
         item.confirmActionId,
@@ -1152,14 +1268,61 @@ export const useElosernStore = defineStore("elosern", () => {
     }
   }
 
-  function syncRouterGates() {
-    router.setMutationInFlight(!!inFlight);
-    router.setAwaitingRevision(inFlight && inFlight.presentationRevision !== null ? inFlight.presentationRevision : null);
-  }
+   function syncRouterGates() {
+     router.setMutationInFlight(!!inFlight);
+     router.setAwaitingRevision(inFlight && inFlight.presentationRevision !== null ? inFlight.presentationRevision : null);
+   }
 
-  function initialView() {
-    return buildView(null, reducer.getState());
-  }
+   // H4 (task 4.3/4.4): the drawer controller's commit-path sync. Runs on
+   // every committed view (the store is the single writer). It (a) tears
+   // down the drawers on a mode change out of exploration, an epoch reset, or
+   // a transport loss (design D3), and (b) hosts the router's service frames
+   // inside the matching reference drawer (design D2): while a service frame
+   // is the router's current frame the drawer is open and renders that
+   // frame's rows; leaving the surface closes the drawer. The status drawer's
+   // payload is available in every mode, so it stays openable in combat.
+   function syncHudDrawer(prev, rs) {
+      const modeChanged = !!prev && prev.mode !== rs.mode;
+      const epochChanged = !!prev && prev.epoch !== rs.activeEpoch;
+      const transportLost = !!prev && prev.connected && !rs.connected;
+
+     if (modeChanged || epochChanged || transportLost) {
+       // A committed mode change out of exploration, an epoch reset, or a
+       // transport loss each close the services-backed drawers and discard
+       // local selection, quantity, and confirmation state (the quantity
+       // form is also nulled by the panel-replacement logic above).
+       const d = hudDrawer.value;
+       if (d === "quest" || d === "shop" || d === "inventory") {
+         hudDrawer.value = null;
+       }
+       if (transportLost || epochChanged) {
+         if (hudDrawer.value) {
+           hudDrawer.value = null;
+         }
+       }
+       setServiceSurface(null);
+       return;
+     }
+
+      // Frame hosting (design D2): while a service frame is the router's
+      // current frame, ensure the matching reference drawer is open (the
+      // invariant: no state where a service frame is current while its drawer
+      // is closed). A service drawer opened manually (e.g. the combat 狀態
+      // opener or a user action) stays open when no service frame is current
+      // until an explicit close or a teardown event.
+      const isServiceFrame =
+        activeSubDock.value === "services" && currentFrameIsServiceFrame();
+      if (isServiceFrame && serviceSurface.value) {
+        const drawerName = SERVICE_SURFACE_DRAWERS[serviceSurface.value];
+        if (drawerName && hudDrawer.value !== drawerName) {
+          hudDrawer.value = drawerName;
+        }
+      }
+    }
+
+   function initialView() {
+     return buildView(null, reducer.getState());
+   }
 
   function buildView(prev, rs) {
     const panels = rs.panels || {};
@@ -1218,9 +1381,13 @@ export const useElosernStore = defineStore("elosern", () => {
        drawerRequest,
        drawerCloseRequest,
        restFormRequest,
-       activeSubDock: activeSubDock.value,
+        activeSubDock: activeSubDock.value,
+        // H4 (task 4.1): the single open-drawer name (null | skill | inventory
+        // | shop | quest | lore | status); at most one drawer is open at a
+        // time (structural: one value).
+        hudDrawer: hudDrawer.value,
 
-      contextActions: panel,
+       contextActions: panel,
       suggestions,
       suggestionsView: OptionCards.buildOptionsView(panel || {}),
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
@@ -1308,6 +1475,7 @@ export const useElosernStore = defineStore("elosern", () => {
     rebuildFocusMenu(prev, rs);
     rebuildCreationDock(prev, rs);
     syncRouterGates();
+    syncHudDrawer(prev, rs);
     view.value = buildView(prev, rs);
   }
 
@@ -1696,10 +1864,21 @@ export const useElosernStore = defineStore("elosern", () => {
      // (null clears). The sub-dock panels set/clear this on mount/unmount;
      // the suggestions section hides while one is active.
      setActiveSubDock,
-     // The bounded services quantity form (a local UI exception): exposed so
-     // the services panels can sync their per-row quantity control to the
-     // activated item (the `services-quantity` testid follows the form's
-     // item_key). Discarded (nulled) on a `services` panel replacement.
-     quantityForm,
-   };
+      // The bounded services quantity form (a local UI exception): exposed so
+      // the services panels can sync their per-row quantity control to the
+      // activated item (the `services-quantity` testid follows the form's
+      // item_key). Discarded (nulled) on a `services` panel replacement.
+      quantityForm,
+      // H4 (task 4.1/4.2): the reference drawer controller — the single open
+      // entry (`openHudDrawer` over the closed name set, unknown names
+      // rejected) and the single close entry (`closeHudDrawer`, which pops
+      // one menu level when the drawer hosts a service frame).
+       openHudDrawer,
+       closeHudDrawer,
+       // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
+       // router's current frame is a service frame (guild / shop / inventory)
+       // so the drawer layer can render that frame's rows through the shared
+       // row renderer beside the surface's own presentation.
+       currentFrameIsServiceFrame,
+     };
 });

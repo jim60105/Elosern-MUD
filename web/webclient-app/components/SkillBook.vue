@@ -42,8 +42,8 @@ function skillCount(rows) {
   return count;
 }
 
-const activeCount = computed(() => skillCount(props.skills.actives));
-const passiveCount = computed(() => skillCount(props.skills.passives));
+const activeCount = computed(() => skillCount(props.skills?.actives));
+const passiveCount = computed(() => skillCount(props.skills?.passives));
 
 function matches(row, group, category) {
   const q = query.value.trim().toLowerCase();
@@ -74,8 +74,8 @@ function filterCategories(rows) {
 
 const visibleCategories = computed(() =>
   tab.value === "active"
-    ? filterCategories(props.skills.actives)
-    : filterCategories(props.skills.passives),
+    ? filterCategories(props.skills?.actives)
+    : filterCategories(props.skills?.passives),
 );
 
 const visibleTotal = computed(() =>

@@ -11,6 +11,7 @@ import { h, ref } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import ChoicePointBlock from "./ChoicePointBlock.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
+import { createFocusTrap } from "./focus-trap.js";
 
 export default {
   name: "FullLogOverlay",
@@ -28,46 +29,44 @@ export default {
     // The opener (the active element before the overlay took focus). When the
     // overlay closes, focus is restored to this element (design D4).
     const preFocus = ref(null);
+    // H4 (task 2.2): the shared focusable-query trap (design D5) replaces the
+    // hard-coded two-element cycle; the overlay's existing Escape and
+    // focus-restore behaviour is unchanged.
+    let trap = null;
 
-    // Focus trap: while the overlay is open, focus moves into it (the
-    // parent calls `focusSelf`); Tab stays within the view (a single
-    // focusable element — the view itself — so Tab is a no-op).
     function focusSelf() {
       preFocus.value = document.activeElement;
-      overlayEl.value?.focus();
+      trap = createFocusTrap(overlayEl.value, {
+        initialFocusEl: overlayEl.value,
+        openerEl: preFocus.value,
+      });
+      trap.enter();
     }
 
     function restoreOpenerFocus() {
+      if (trap) {
+        trap.restore();
+        return;
+      }
       if (preFocus.value instanceof HTMLElement && document.contains(preFocus.value)) {
         preFocus.value.focus();
       }
     }
 
-     function onKeyDown(event) {
-       if (event.key === "Escape") {
-         event.preventDefault();
-         restoreOpenerFocus();
-         emit("close");
-         return;
-       }
-       if (event.key === "Tab") {
-         // Focus trap: Tab cycles between the close button and the overlay
-         // root, so keyboard users can reach the close control without
-         // tabbing into the recessed background.
-         const root = overlayEl.value;
-         const closeBtn = root?.querySelector(".fulllog-close");
-         if (!root || !closeBtn) {
-           return;
-         }
-         const focusables = [closeBtn, root];
-         const activeIndex = focusables.indexOf(document.activeElement);
-         event.preventDefault();
-         const next = event.shiftKey
-           ? focusables[(activeIndex - 1 + focusables.length) % focusables.length]
-           : focusables[(activeIndex + 1) % focusables.length];
-         next.focus();
-       }
-     }
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        restoreOpenerFocus();
+        emit("close");
+        return;
+      }
+      if (event.key === "Tab" && trap) {
+        // The shared trap cycles Tab across every focusable control in the
+        // overlay (the close button, the choice-point cards), never into the
+        // recessed background (design D5).
+        trap.onKeydown(event);
+      }
+    }
 
     function onChoiceAction(intent) {
       // The stream-end choice-point card/dismiss intents route through the

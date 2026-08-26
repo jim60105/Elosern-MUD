@@ -72,15 +72,30 @@ describe("QuestBoard (B4 services family)", () => {
     expect(row.text()).toContain("任務目標尚未完成");
   });
 
-  it("clicking the enabled abandon control emits quest_abandon with the row's quest_id", async () => {
+  it("abandon uses a two-step confirmation: 確認放棄 only then dispatches guild.quest_abandon (H4 task 7.2)", async () => {
     const w = mountBoard();
-    const abandon = w
-      .get('[data-testid="quest-board__quest-row--q_1042"]')
-      .find(".quest-board__action");
+    const abandon = w.get('[data-testid="quest-board__abandon"]');
     await abandon.trigger("click");
+    // Arming the abandon button shows the confirm bar; the action is not
+    // dispatched until the explicit confirm is clicked.
+    const confirmBar = w.get('[data-testid="quest-board__abandon-confirm"]');
+    expect(confirmBar.exists()).toBe(true);
+    expect(w.emitted("quest_abandon")).toBeUndefined();
+    await confirmBar.find('[data-testid="quest-board__abandon-confirm-yes"]').trigger("click");
     expect(w.emitted("quest_abandon")).toEqual([
       [{ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } }],
     ]);
+    // The confirm bar closes after dispatching.
+    expect(w.find('[data-testid="quest-board__abandon-confirm"]').exists()).toBe(false);
+  });
+
+  it("cancelling the abandon confirmation keeps the confirm state cleared and emits nothing", async () => {
+    const w = mountBoard();
+    await w.get('[data-testid="quest-board__abandon"]').trigger("click");
+    const confirmBar = w.get('[data-testid="quest-board__abandon-confirm"]');
+    await confirmBar.find('[data-testid="quest-board__abandon-confirm-no"]').trigger("click");
+    expect(w.emitted("quest_abandon")).toBeUndefined();
+    expect(w.find('[data-testid="quest-board__abandon-confirm"]').exists()).toBe(false);
   });
 
   it("renders the rank block with merit and the next-rank threshold", () => {
