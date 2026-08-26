@@ -1873,7 +1873,12 @@ export const useElosernStore = defineStore("elosern", () => {
       // entry (`openHudDrawer` over the closed name set, unknown names
       // rejected) and the single close entry (`closeHudDrawer`, which pops
       // one menu level when the drawer hosts a service frame).
-      openHudDrawer,
-      closeHudDrawer,
-    };
+       openHudDrawer,
+       closeHudDrawer,
+       // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
+       // router's current frame is a service frame (guild / shop / inventory)
+       // so the drawer layer can render that frame's rows through the shared
+       // row renderer beside the surface's own presentation.
+       currentFrameIsServiceFrame,
+     };
 });

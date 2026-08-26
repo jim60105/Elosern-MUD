@@ -387,10 +387,27 @@ const servicesConfirm = computed(() => {
   const confirmItem = menu.items.find((i) => i.key && i.key.startsWith("confirm-"));
   return {
     label: confirmItem ? confirmItem.label : "確認",
-    actionId: confirmItem ? confirmItem.actionId : null,
-    payload: confirmItem ? confirmItem.payload : null,
-  };
-});
+     actionId: confirmItem ? confirmItem.actionId : null,
+     payload: confirmItem ? confirmItem.payload : null,
+   };
+ });
+
+ // H4 (R3, webclient-hud-04-reference-drawers): whether the open reference
+ // drawer is hosting the keyboard router's current service frame. When true,
+ // the drawer body renders that frame's rows through the shared row renderer
+ // (DockMenu) beside the surface's own presentation, and the dock suppresses
+ // the duplicate copy of those rows.
+ const drawerHostsServiceFrame = computed(() => {
+   const d = store.view.hudDrawer;
+   if (!d || d === "skill" || d === "lore" || d === "status") {
+     return false;
+   }
+   return (
+     store.view.activeSubDock === "services" &&
+     typeof store.currentFrameIsServiceFrame === "function" &&
+     store.currentFrameIsServiceFrame()
+   );
+ });
 
 
 // C4: the rest-duration form opens when the activated dock item is the
@@ -593,9 +610,9 @@ function onChoiceAction(intent) {
           @back="onDockBack"
         >
           <div class="dock-pane-host">
-            <DockMenu
-              v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain')"
-              :items="dockItems"
+             <DockMenu
+               v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain') && !drawerHostsServiceFrame"
+               :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
@@ -669,6 +686,21 @@ function onChoiceAction(intent) {
         :character="panel('character') || {}"
         :low-hp="store.view.vitals.lowHp"
         @open-skill="() => store.openHudDrawer('skill')"
+      />
+      <!-- H4 (R3): when the drawer hosts the keyboard router's current service
+           frame, render that frame's rows through the shared row renderer
+           (DockMenu), beside the surface's own presentation; the dock no
+           longer renders the duplicate copy of those rows. -->
+      <DockMenu
+        v-if="drawerHostsServiceFrame"
+        :items="dockItems"
+        :focused-key="store.view.focus.key"
+        :id-prefix="rowPrefix"
+        :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
+        :show-detail="showDetail"
+        :depth="store.view.dockDepth"
+        @focus-change="onDockFocusChange"
+        @activate="onDockActivate"
       />
     </HudDrawer>
 

@@ -1,10 +1,7 @@
 ## Purpose
 
 The read-only version-1 `services` panel payload (host resolution, player summary, guild/quest/shop/inventory surfaces, pagination), the seven exact allowlisted service action adapters, the no-mutation service read model, the keyboard service dock with bounded quantity forms and an abandon confirmation, and the Node/browser acceptance boundary.
-
 ## Requirements
-
-
 ### Requirement: The services panel is an exact read-only exploration-mode panel
 The production presentation registry SHALL register `services` schema version 1. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and `pagination`; `available` SHALL be true and `kind` SHALL be `services`. `schema_version` SHALL be integer 1. `host` SHALL be null or contain exactly `identity` (1..64 opaque ASCII characters) and `display_name` (1..256 Unicode code points) and SHALL be display-only reconciliation metadata that never enters a `ui_action` payload. `pagination` SHALL contain exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and equal to the number of rows shipped in that surface (zero when the surface is null). `player` SHALL contain exactly `wallet`, `guild_registered`, `guild_rank`, `guild_merit`, `next_rank`, and `next_threshold`: wallet SHALL be a non-negative JavaScript-safe integer, `guild_registered` a boolean, `guild_rank` null or a 1..8-character rank key, `guild_merit` a non-negative safe integer, and `next_rank`/`next_threshold` null when the actor holds the top rank, otherwise the next rank key and its positive catalog merit threshold. `guild`, `shop`, and `inventory` SHALL each be null or an exact section object. The presenter SHALL strictly read canonical records and registries through the no-mutation service read model, SHALL emit no live object reference and no filesystem path, and SHALL NOT mutate registration, quests, wallet, inventory, merchant stock, rank, merit, traits, location, or world time. The whole panel SHALL use the registered common unavailable form only when a global prerequisite fails — the puppet is not in exploration mode or the actor/player summary cannot be read without mutation; a failure confined to one surface SHALL make only that surface unavailable with a stable reason while the other surfaces and narrative stay healthy.
 
@@ -182,16 +179,25 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: registration success and idempotent re-registration, board list to detail to accept, active-quest abandon behind an explicit confirmation screen, completed-quest turn-in, merit/exam eligibility and the transition into the combat menu with the service dock torn down, shop open/closed status at fixed world times, buy and sell quantity validation with exact copper and stock outcomes, stale and duplicate submission behavior, repeated-inventory display, and reconnect retention. The service submenus SHALL be reached from the exploration dock's Interact/Quests/Inventory roots rather than a standalone Services root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, and SHALL assert that no use/equip control and no remote or ambiguous host control is rendered.
+The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1440x900 and 1280x720: registration success and idempotent re-registration, board list to detail to accept, active-quest abandon behind an explicit confirmation screen, completed-quest turn-in, merit/exam eligibility and the transition into the combat menu with the service dock torn down, shop open/closed status at fixed world times, buy and sell quantity validation with exact copper and stock outcomes, stale and duplicate submission behavior, repeated-inventory display, and reconnect retention. The service submenus SHALL be reached from the exploration dock's Interact/Quests/Inventory roots rather than a standalone Services root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged. While such a service frame is the keyboard router's current frame it SHALL render inside the right-anchored reference drawer that presents the same surface, which SHALL host that frame's rows through the same shared row renderer the dock uses and SHALL NOT introduce a second frame stack, a second focus model, or a second set of menu keys; the drawer SHALL trap focus while open, Escape SHALL close it and pop exactly one menu level, and leaving the surface SHALL close it. The drawer's own pointer affordances SHALL emit the same server-authored action identifiers and payloads as the hosted rows, through the same dispatch entry, and SHALL be locked by the same in-flight, epoch, and revision gates. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, and SHALL assert that no use/equip control and no remote or ambiguous host control is rendered, and that no service surface is present in the DOM while its drawer is closed.
 
 #### Scenario: Guild board journey completes in Chromium
 - **WHEN** a seeded registered member uses arrows and Enter to open the exploration dock, open Quests, open Guild, open Board, and accept an eligible offer
-- **THEN** the flow submits exactly `guild.quest_accept` once with the expected definition key and the refreshed quest log appears without typed input
+- **THEN** the flow submits exactly `guild.quest_accept` once with the expected definition key and the refreshed quest log appears without typed input, with each frame's rows rendered inside the quest drawer that opened with the Quests frame
 
 #### Scenario: Abandon requires confirmation
 - **WHEN** the player focuses an active quest's abandon action but has not confirmed
 - **THEN** no mutation is sent and Escape returns exactly one menu level without abandoning
 
+#### Scenario: The drawer's pointer path is confirmation-protected too
+- **WHEN** the player activates the abandon affordance on an active quest with the pointer inside the quest drawer
+- **THEN** an explicit confirmation step renders naming the quest, no mutation is sent until it is confirmed, and cancelling returns without submitting
+
 #### Scenario: Minimum viewport retains service essentials
-- **WHEN** the services panel renders at 1280x720 with a disabled buy row focused
-- **THEN** the player can read narrative, wallet, stock, the disabled reason, and the service controls without overlap preventing operation
+- **WHEN** the shop drawer is open at 1280x720 with a disabled buy row focused
+- **THEN** the player can read the stock, the exact copper values, the disabled reason, and the service controls inside the drawer without overlap preventing operation, closing the drawer is one action that restores the narrative caption and returns focus to the control that opened it, and the wallet stays reachable from the character-status drawer
+
+#### Scenario: No service surface is mounted while its drawer is closed
+- **WHEN** the exploration dock is at its root frame with every reference drawer closed
+- **THEN** no shop, quest-board, lore, or inventory surface exists in the DOM or in the tab order, and no fabricated stock, quest, lore, or bag row is rendered anywhere
+

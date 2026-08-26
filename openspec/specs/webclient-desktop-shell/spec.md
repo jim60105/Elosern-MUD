@@ -34,7 +34,12 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 The narrative SHALL occupy the visual centre of the stage as a bounded caption whose complete log is
 reachable in one action, with the brand, the top-meta pill, the HUD island stack, and the action dock
 visible at 1440x900 and 1280x720. The action dock, the narrative caption, and the command line SHALL
-NOT be permanently closable; every other surface MAY be opened on demand and closed. The foundation
+NOT be permanently closable; every other surface MAY be opened on demand and closed. The reference
+surfaces — the skill book, the bag and equipment, the shop, the quest board, the lore reference, and
+the character status — SHALL NOT be permanently visible: each SHALL render in a drawer anchored to the
+right edge of the stage, SHALL be absent from the layout and from the tab order while that drawer is
+closed, SHALL be reachable in at most two actions from the action dock's root frame, and SHALL be
+closable in one action that returns focus to the control that opened it. The foundation
 SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as
 its brand and SHALL show the current location, the world date/time, and the connection state in a
 top-meta surface, with the connected state marked by an ok-green dot paired with a label — never a raw
@@ -56,7 +61,15 @@ that names the focused item, its availability, and the next key action wherever 
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
-- **THEN** every required surface remains reachable and the player can read narrative, open the complete log, inspect status, and open the command drawer
+- **THEN** every required surface remains reachable and the player can read narrative, open the complete log, open the character-status drawer to inspect status, and open the command drawer
+
+#### Scenario: The reference surfaces are demand-opened, not permanently visible
+- **WHEN** the shell renders at 1440x900 or 1280x720 with no drawer open
+- **THEN** no skill book, bag, shop, quest board, lore reference, or character-status surface is present in the layout or the tab order, and no permanently visible column of reference panels is rendered
+
+#### Scenario: An open drawer is always one action from closed
+- **WHEN** a reference drawer is open at either supported viewport
+- **THEN** Escape, its labelled close control, and the scrim each close it in one action and return focus to the control that opened it, and the dock, the narrative caption, and the command line remain present behind it
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
 - **WHEN** the narrative holds more lines than the bounded caption can display
