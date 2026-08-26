@@ -483,8 +483,16 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         # Guarantee overflow and scroll up so an unread count accumulates.
         _append_narrative_fillers(page, 80)
+        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
+        # `scrollTop = 0` triggers an animation that races the gate. Force an
+        # instant scroll for this single assignment (the same override pattern
+        # the feed's own `scrollToBottom` and the scrolled-away test use).
         page.evaluate(
-            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\'];"
+            " const prev = f.style.scrollBehavior;"
+            " f.style.scrollBehavior = 'auto';"
+            " f.scrollTop = 0;"
+            " f.style.scrollBehavior = prev; }"
         )
         wait_for_store_state(
             page,
