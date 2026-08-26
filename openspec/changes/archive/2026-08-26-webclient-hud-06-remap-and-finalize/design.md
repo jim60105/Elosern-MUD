@@ -68,12 +68,15 @@ restructure instead of relying on a roadmap that will itself be archived.
 *Alternative rejected:* leaving the requirement event-scoped and adding a new one for this redesign.
 That produces a requirement per restructure and no general rule.
 
-### D4 — H6's showcase delta is based on H4's edited text
+### D4 — H6's showcase delta is based on the current main spec
 
-H4 corrects the frozen-set requirement's factually wrong deferral of the inventory bag (it *is* backed
-by `services.inventory.rows`). H6 re-states the same requirement at the final component set. Two
-changes MODIFY one requirement, so per roadmap §7 they land in topological order and H6's copy is taken
-from H4's edited version. H6 must re-read H4's delta at authoring time, not the main spec.
+H4 corrected the frozen-set requirement's factually wrong deferral of the inventory bag (it *is* backed
+by `services.inventory.rows`), and H5 extended it with the client-local settings state and the deferred
+game-help browser. Both changes have since landed and been archived, so their edits are synced into the
+main spec. H6 re-states the same requirement at the final component set, and its MODIFIED text is taken
+from the **current main spec** (not from H4's archived delta), so archiving H6 does not silently drop
+the H4/H5 edits. H6 adds only its own deltas: the persistent objective tracker in the deferred list,
+the re-frozen manifest wording, and the overlay-trigger assertion.
 
 *Alternative rejected:* folding the re-freeze into H4. H4 cannot know the final set — H5 adds
 components after it.
@@ -98,9 +101,10 @@ replaced.
 - **Rewriting a source-of-truth document is irreversible in review terms.** → The edit is scoped to two
   numbered subsections, the replaced text is quoted in the change's own record, and §5.3/§7 are
   explicitly untouched so the blast radius is inspectable.
-- **H4 and H6 both MODIFY the showcase frozen-set requirement.** → Roadmap §7's topological-archive rule
-  plus D4's explicit instruction to re-read H4's delta at authoring time. `openspec validate --all
-  --strict` after H4's archive is the check that the base was correct.
+- **H4, H5 and H6 all touched the showcase frozen-set requirement.** → Roadmap §7's topological-archive
+  rule plus D4's instruction that H6's MODIFIED text is based on the current main spec (which already
+  carries the H4 and H5 edits), so archiving H6 cannot drop those edits. `openspec validate --all
+  --strict` after each archive is the check that the base was correct.
 - **Dead-code removal can break a gate no one is running locally.** → D5's four-way emptiness proof plus
   the full managed browser suite in this change's gates; the suite is CI-owned, so H6 is the wave that
   must not be landed on a red CI.
@@ -117,3 +121,37 @@ manifest entries and stories in one commit.
 
 None. The one deferred decision — which components are actually dead — is answered by D5's evidence
 procedure at implementation time rather than guessed here.
+
+## Record of the replaced §5.1/§5.2 (task 1.4)
+
+The replaced text, quoted verbatim from `2026-08-02-webclient-ui-design.md` before H6's in-place
+rewrite, so the review can see exactly what was superseded:
+
+> ### 5.1 Default desktop layout
+>
+> The default layout has five required surfaces:
+>
+> 1. A narrow header shows the game title, location, world date/time, and connection state.
+> 2. The narrative log occupies roughly two-thirds of the main content area.
+> 3. The right rail shows a 16:9 scene image with a 3:4 contextual portrait overlaid at bottom right.
+> 4. The lower right rail splits character status and the local minimap.
+> 5. A non-closable action dock spans the bottom.
+>
+> Players may resize panels. The saved layout configuration (the Vue layout store) includes a project
+> layout version. When required component names or layout structure change, known old versions are
+> migrated. An unrecognized version is reset to the approved default. The action dock, connection
+> state, and command drawer entry point cannot be removed by a stale localStorage layout.
+>
+> ### 5.2 Visual language
+>
+> - Backgrounds use charcoal and near-black rather than pure black.
+> - Primary text uses warm paper gray.
+> - Vermilion marks active focus, current map position, and critical warnings.
+> - Borders, icons, labels, and shapes accompany every color distinction.
+> - Serif typography may be used for narrative and headings; controls use a highly legible UI face.
+> - Art never carries text required to understand state.
+> - Reduced-motion preference disables nonessential transitions.
+
+§5.3 (focus model) and §7 (player-facing surfaces) are byte-unchanged; the twelve cross-references to
+§5.1/§5.2 all live in `2026-08-25-webclient-hud-redesign-roadmap-design.md` and keep resolving
+because the section numbering is preserved.

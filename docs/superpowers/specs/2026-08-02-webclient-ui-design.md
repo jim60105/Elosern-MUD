@@ -163,28 +163,55 @@ command uses.
 
 ### 5.1 Default desktop layout
 
-The default layout has five required surfaces:
+The default layout is a full-bleed cinematic stage, not a three-column dashboard. The binding visual
+and information-architecture reference is the validated design draft (`docs/design/elosern-redesign/`,
+`index.html` + `REDESIGN.md`), and the delivery document that owns this redesign is
+`docs/superpowers/specs/2026-08-25-webclient-hud-redesign-roadmap-design.md`.
 
-1. A narrow header shows the game title, location, world date/time, and connection state.
-2. The narrative log occupies roughly two-thirds of the main content area.
-3. The right rail shows a 16:9 scene image with a 3:4 contextual portrait overlaid at bottom right.
-4. The lower right rail splits character status and the local minimap.
-5. A non-closable action dock spans the bottom.
+- **Stage:** a `.game` root (`position:fixed; inset:0`) filling the viewport; the scene backdrop from
+  the committed `art` panel is the lowest layer.
+- **Narrative:** a bounded caption card at the visual centre of the stage; the complete retained log is
+  reachable in one action from the caption (the `完整日誌` full-log overlay).
+- **HUD islands:** the left anchor carries the character head card, the vitals, and the condition chips
+  as separate floating islands; the right anchor carries the minimap island, which the committed-mode
+  matrix hides in combat (REDESIGN.md §2).
+- **Action dock:** the single persistent `#action-dock` panel in the `dock` anchor — an icon tab bar with
+  truthful count badges, a router-derived breadcrumb, the per-kind row vocabulary, the combat participant
+  frame, and the bounded skill master-detail.
+- **Command line:** the always-visible command line in the `command-line` anchor (prompt chevron, the
+  input field, quick-word chips, and history/Tab hints), replacing the collapsed drawer entry.
+- **Reference surfaces:** the skill book, bag + equipment, the shop, the quest board, the lore reference,
+  and the character status render in a right-anchored drawer (scrim, focus trap, Escape) rather than in a
+  permanently visible column.
 
-Players may resize panels. The saved layout configuration (the Vue layout store) includes a project layout version.
-When required component names or layout structure change, known old versions are migrated. An
-unrecognized version is reset to the approved default. The action dock, connection state, and command
-drawer entry point cannot be removed by a stale localStorage layout.
+Every surface's visibility is driven by the single committed attribute on the stage root
+(`data-elosern-mode`): a surface the current mode hides is removed with `display:none` — never dimmed —
+so it leaves the accessibility tree and the tab order, and it is present again when the mode returns.
+
+Players may resize the stage anchors. The saved layout configuration (the Vue layout store) includes a
+project layout version. When required component names or layout structure change, known old versions are
+migrated. An unrecognized version is reset to the approved default. The action dock, connection state, and
+command-line entry point cannot be removed by a stale localStorage layout.
 
 ### 5.2 Visual language
 
+The visual language is implemented by the design-token system — the ink-night palette, the single
+seal-red accent, the gold focus ring, the type ramps, the spacing, and the motion tokens in
+`web/webclient-app/styles/tokens.css`, with the subsetted self-hosted `.woff2` faces in
+`web/webclient-app/fonts/`. The validated design draft is the binding reference for any visual or
+navigational detail this section leaves unstated.
+
 - Backgrounds use charcoal and near-black rather than pure black.
 - Primary text uses warm paper gray.
-- Vermilion marks active focus, current map position, and critical warnings.
-- Borders, icons, labels, and shapes accompany every color distinction.
-- Serif typography may be used for narrative and headings; controls use a highly legible UI face.
+- Vermilion marks active focus, the current map position, and critical warnings.
+- Status and health information is never conveyed by color alone: borders, icons, labels, and shapes
+  accompany every color distinction (the not-color-only `.status-marker--*` utilities are enforced at the
+  token level).
+- Serif typography (self-hosted faces) may be used for narrative and headings; controls use a highly
+  legible UI face.
 - Art never carries text required to understand state.
-- Reduced-motion preference disables nonessential transitions.
+- The reduced-motion preference disables nonessential transitions at the token level (the
+  `prefers-reduced-motion` kill-switch in `tokens.css`).
 
 ### 5.3 Focus model
 

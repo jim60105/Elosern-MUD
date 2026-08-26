@@ -105,13 +105,15 @@ the combat-row id pattern, the required panel surface ids); every other
 surface exposes a stable `data-testid`. This keeps the existing Playwright
 slices and their traceability tests working until C4 re-maps the rest.
 
-### D6 — Design system extracted from the 設計稿
-The tokens live in `web/webclient-app/styles/tokens.css` (ink-night palette,
-single seal-red accent, gold focus, typography ramps, spacing, motion) and
-the subsetted self-hosted `.woff2` faces (Iansui / Noto Serif TC /
-Noto Sans TC unicode-range slices) in `web/webclient-app/fonts/`.
-`prefers-reduced-motion` and not-color-only status markers are enforced at
-the token/utility level (`.status-marker--*`) so they stay testable.
+### D6 — The 設計稿 is the binding visual and IA reference
+The validated single-screen design draft (`docs/design/elosern-redesign/`, `index.html` +
+`REDESIGN.md`) is the **binding** reference for the client's visual language and information
+architecture — not only the source of the design system. Its tokens live in
+`web/webclient-app/styles/tokens.css` (ink-night palette, single seal-red accent, gold focus,
+typography ramps, spacing, motion) and the subsetted self-hosted `.woff2` faces (Iansui / Noto
+Serif TC / Noto Sans TC unicode-range slices) in `web/webclient-app/fonts/`.
+`prefers-reduced-motion` and not-color-only status markers are enforced at the token/utility level
+(`.status-marker--*`) so they stay testable.
 
 ### D7 — Testing strategy: four gates
 - **Node gate (unchanged, logic):** `node --test
