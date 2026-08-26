@@ -13,7 +13,7 @@
 // publishes a single `view.hudDrawer` name). Focus is trapped while open;
 // Escape / the close control / the scrim each close and restore focus to
 // the control that opened it.
-import { onMounted, ref, watch } from "vue";
+import { onMounted, ref } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
 
 const props = defineProps({
@@ -31,23 +31,21 @@ const drawerEl = ref(null);
 const closeBtnEl = ref(null);
 let trap = null;
 
-// Move focus into the drawer when it opens (the shared focusable-query
-// trap, design D5); the close control is the natural first target.
-watch(
-  () => props.open,
-  (open, prev) => {
-    if (open && prev !== true) {
-      if (drawerEl.value) {
-        trap = createFocusTrap(drawerEl.value, {
-          initialFocusEl: closeBtnEl.value || drawerEl.value,
-          openerEl: document.activeElement,
-        });
-        trap.enter();
-      }
-    }
-  },
-  { immediate: true },
-);
+// The parent (`AppClient`) mounts this component only while a drawer is open
+// (`v-if="store.view.hudDrawer"`, `:open="true"`), so a fresh mount means a
+// drawer has just opened. By the time `onMounted` runs the template refs
+// (`drawerEl` / `closeBtnEl`) are assigned, so create the shared focusable-
+// query trap here (design D5) and move focus into the drawer; the close
+// control is the natural first target.
+onMounted(() => {
+  if (drawerEl.value) {
+    trap = createFocusTrap(drawerEl.value, {
+      initialFocusEl: closeBtnEl.value || drawerEl.value,
+      openerEl: document.activeElement,
+    });
+    trap.enter();
+  }
+});
 
 function close() {
   if (trap) {

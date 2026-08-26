@@ -1023,6 +1023,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
+                # The focus-restoration contract: the drawer is opened while the
+                # preserved #action-dock holds focus, so Escape returns focus
+                # there (the opener is the dock, not <body>).
+                focus_action_dock(page)
                 self._open_status_drawer(page)
                 stage = page.locator('[data-testid="elosern-stage"]')
 
@@ -1091,6 +1095,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             stage.get_attribute("data-menu-open"), "false",
             "no surface open: no recession mark",
         )
+        # Open the drawer while #action-dock holds focus so the opener (the
+        # element focused when the drawer opened) is the preserved dock.
+        focus_action_dock(page)
         self._open_status_drawer(page)
         self.assertEqual(
             stage.get_attribute("data-menu-open"), "true",
