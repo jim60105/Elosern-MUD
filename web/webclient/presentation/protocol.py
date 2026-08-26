@@ -162,7 +162,7 @@ def check_json_safety(
         # bool is a subclass of int in Python; enforce integer-bool separation.
         return
     elif isinstance(value, int):
-        if not 0 <= value <= MAX_SAFE_INTEGER:
+        if not -MAX_SAFE_INTEGER <= value <= MAX_SAFE_INTEGER:
             raise JSONSafetyError(
                 f"integer {value} is outside the JavaScript-safe range"
             )

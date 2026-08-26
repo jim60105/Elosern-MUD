@@ -79,5 +79,8 @@ None.
   values); add a component test asserting the new section-heading elements are present and a
   bounding-box/visual check (reusing the pattern from the sibling minimap-crowding change) that stat
   tiles and pills never overlap or clip their text at 1440×900 and 1280×720.
-- **No protocol, read-model, store, or OOB payload changes.** The `status`/`character` panel contracts and
-  the store's `elosern.js` slices are untouched.
+- **No protocol, read-model, store, or OOB payload changes** — with one narrow exception found during
+  verification: the global JSON-safety integer bound is relaxed to the full JavaScript-safe range so the
+  deterministic `combat_modifiers.yaml`'s signed modifier values (`defense: -15`, `accuracy: -10`) pass
+  the client's envelope validation and reach the drawer's full condition roster. The `status`/`character`
+  panel contracts and the store's `elosern.js` slices are untouched.

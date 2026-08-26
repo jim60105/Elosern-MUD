@@ -133,60 +133,71 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 
     <!-- Vitals: the three gauges, rendered directly from status.resources. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__vitals" aria-label="生命指標">
-      <div
-        v-for="v in VITALS"
-        :key="v.key"
-        class="character-status-drawer__vital"
-        :data-testid="`character-status-drawer__vital--${v.key}`"
-        :data-low="String(v.key === 'hp' && lowHp)"
-      >
-        <span class="character-status-drawer__vital-key">{{ v.label }}</span>
-        <span class="character-status-drawer__vital-track" aria-hidden="true">
-          <span
-            class="character-status-drawer__vital-fill"
-            :style="{ width: (gaugeRatioPct(resources?.[v.key]) ?? 0) + '%' }"
-          ></span>
-        </span>
-        <span v-if="v.key === 'hp' && lowHp" class="character-status-drawer__vital-danger" data-testid="character-status-drawer__vital-danger">
-          危險
-        </span>
-        <span class="character-status-drawer__vital-value" :data-testid="`character-status-drawer__vital-value--${v.key}`">
-          {{ resources?.[v.key]?.current ?? "—" }} / {{ resources?.[v.key]?.maximum ?? "—" }}
-        </span>
+      <p class="character-status-drawer__section-label">生命量</p>
+      <div class="character-status-drawer__statgrid">
+        <div
+          v-for="v in VITALS"
+          :key="v.key"
+          class="character-status-drawer__statrow"
+          :data-testid="`character-status-drawer__vital--${v.key}`"
+          :data-low="String(v.key === 'hp' && lowHp)"
+        >
+          <span class="character-status-drawer__statrow-key">
+            <span class="character-status-drawer__vital-key">{{ v.label }}</span>
+            <span v-if="v.key === 'hp' && lowHp" class="character-status-drawer__vital-danger" data-testid="character-status-drawer__vital-danger">
+              危險
+            </span>
+          </span>
+          <span class="character-status-drawer__statrow-value" :data-testid="`character-status-drawer__vital-value--${v.key}`">
+            {{ resources?.[v.key]?.current ?? "—" }} / {{ resources?.[v.key]?.maximum ?? "—" }}
+          </span>
+          <span class="character-status-drawer__vital-track" aria-hidden="true">
+            <span
+              class="character-status-drawer__vital-fill"
+              :style="{ width: (gaugeRatioPct(resources?.[v.key]) ?? 0) + '%' }"
+            ></span>
+          </span>
+        </div>
       </div>
     </section>
 
     <!-- The full condition roster (no cap, unlike H2's island). -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__conditions" aria-label="狀態">
+      <p class="character-status-drawer__section-label">狀態</p>
       <p v-if="conditions.length === 0" class="character-status-drawer__empty" data-testid="character-status-drawer__conditions-empty">
         無狀態
       </p>
-      <div
-        v-for="condition in conditions"
-        :key="condition.code"
-        class="character-status-drawer__condition"
-        :data-testid="`character-status-drawer__condition--${condition.code}`"
-        :data-severity="condition.severity"
-      >
-        <span class="character-status-drawer__condition-glyph" aria-hidden="true">
-          {{ SEVERITY_GLYPHS[condition.severity] ?? "◆" }}
-        </span>
-        <span class="character-status-drawer__condition-severity">{{ SEVERITY_LABELS[condition.severity] ?? condition.severity }}</span>
-        <span class="character-status-drawer__condition-label">{{ condition.label ?? condition.code }}</span>
+      <div v-if="conditions.length > 0" class="character-status-drawer__pillrow">
         <span
-          v-if="typeof condition.remaining_seconds === 'number'"
-          class="character-status-drawer__condition-timer"
-          :data-testid="`character-status-drawer__condition-timer--${condition.code}`"
+          v-for="condition in conditions"
+          :key="condition.code"
+          class="character-status-drawer__pill"
+          :class="`character-status-drawer__pill--${condition.severity}`"
+          :data-testid="`character-status-drawer__condition--${condition.code}`"
+          :data-severity="condition.severity"
         >
-          剩 {{ condition.remaining_seconds }} 秒
-        </span>
-        <span
-          v-for="(value, key) in (condition.modifiers || {})"
-          :key="key"
-          class="character-status-drawer__condition-mod"
-          :data-testid="`character-status-drawer__condition-mod--${condition.code}-${key}`"
-        >
-          {{ key }} {{ value }}
+          <span class="character-status-drawer__condition-label">{{ condition.label ?? condition.code }}</span>
+          <span class="character-status-drawer__condition-stat">
+            <span class="character-status-drawer__condition-glyph" aria-hidden="true">
+              {{ SEVERITY_GLYPHS[condition.severity] ?? "◆" }}
+            </span>
+            <span class="character-status-drawer__condition-severity">{{ SEVERITY_LABELS[condition.severity] ?? condition.severity }}</span>
+            <span
+              v-if="typeof condition.remaining_seconds === 'number'"
+              class="character-status-drawer__condition-timer"
+              :data-testid="`character-status-drawer__condition-timer--${condition.code}`"
+            >
+              剩 {{ condition.remaining_seconds }} 秒
+            </span>
+            <span
+              v-for="(value, key) in (condition.modifiers || {})"
+              :key="key"
+              class="character-status-drawer__condition-mod"
+              :data-testid="`character-status-drawer__condition-mod--${condition.code}-${key}`"
+            >
+              {{ key }} {{ value }}
+            </span>
+          </span>
         </span>
       </div>
     </section>
@@ -205,14 +216,17 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 
     <template v-if="characterAvailable">
       <section class="character-status-drawer__section" data-testid="character-status-drawer__traits" aria-label="屬性">
-        <div
-          v-for="row in traits"
-          :key="row.key"
-          class="character-status-drawer__trait"
-          :data-testid="`character-status-drawer__trait--${row.key}`"
-        >
-          <span class="character-status-drawer__trait-key">{{ row.label }}</span>
-          <span class="character-status-drawer__trait-value">{{ traitValue(row) }}</span>
+        <p class="character-status-drawer__section-label">屬性</p>
+        <div class="character-status-drawer__statgrid">
+          <div
+            v-for="row in traits"
+            :key="row.key"
+            class="character-status-drawer__statrow"
+            :data-testid="`character-status-drawer__trait--${row.key}`"
+          >
+            <span class="character-status-drawer__statrow-key">{{ row.label }}</span>
+            <span class="character-status-drawer__statrow-value">{{ traitValue(row) }}</span>
+          </div>
         </div>
       </section>
 
@@ -223,6 +237,7 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 
       <!-- The disguise section (task 5.4): 真值 / 顯示 comparison. -->
       <section class="character-status-drawer__section" data-testid="character-status-drawer__disguise" :data-active="String(disguiseActive)" aria-label="偽裝">
+        <p class="character-status-drawer__section-label">偽裝</p>
         <template v-if="disguiseActive">
           <p class="character-status-drawer__disguise-description" data-testid="character-status-drawer__disguise-description">
             {{ disguise.description }}
@@ -251,13 +266,16 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
       </section>
 
       <section class="character-status-drawer__section" data-testid="character-status-drawer__guild" aria-label="公會">
-        <div class="character-status-drawer__guild-row" data-testid="character-status-drawer__guild-rank">
-          <span class="character-status-drawer__guild-key">階級</span>
-          <span class="character-status-drawer__guild-value">{{ guild?.rank ?? "未加入公會" }}</span>
-        </div>
-        <div class="character-status-drawer__guild-row" data-testid="character-status-drawer__guild-merit">
-          <span class="character-status-drawer__guild-key">功績</span>
-          <span class="character-status-drawer__guild-value">{{ guild?.merit ?? 0 }}</span>
+        <p class="character-status-drawer__section-label">計數 · 公會</p>
+        <div class="character-status-drawer__statgrid">
+          <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-rank">
+            <span class="character-status-drawer__statrow-key">階級</span>
+            <span class="character-status-drawer__statrow-value">{{ guild?.rank ?? "未加入公會" }}</span>
+          </div>
+          <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-merit">
+            <span class="character-status-drawer__statrow-key">功績</span>
+            <span class="character-status-drawer__statrow-value">{{ guild?.merit ?? 0 }}</span>
+          </div>
         </div>
       </section>
 
@@ -271,6 +289,7 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
         data-testid="character-status-drawer__persona"
         aria-label="背景"
       >
+        <p class="character-status-drawer__section-label">背景</p>
         <p class="character-status-drawer__persona-background" data-testid="character-status-drawer__persona-background">
           {{ personaBackground }}
         </p>
@@ -320,12 +339,54 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   border-top: var(--line);
 }
 
-.character-status-drawer__vital {
+/* The shared section heading: the same small-caps treatment ConditionChips'
+   `.clab` uses, copied (not imported) per this component's convention. */
+.character-status-drawer__section-label {
+  margin: 0 0 7px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--paper-500);
+  text-transform: uppercase;
+}
+
+/* The design's two-column stat-tile grid (`.statgrid`): each stat is its
+   own bordered tile; `minmax(0, 1fr)` keeps the columns shrinkable. */
+.character-status-drawer__statgrid {
   display: grid;
-  grid-template-columns: 3.5em 1fr auto auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* The design's `.statrow` tile: bordered, rounded; content stacks on two
+   lines (label+value, then the full-width fill track) so the halved tile
+   width never squeezes the numeral and the 危險 marker. */
+.character-status-drawer__statrow {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2);
-  font-size: 0.9em;
+  gap: 0 10px;
+  min-width: 0;
+  background: var(--ink-820);
+  border: 1px solid var(--ink-700);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-family: var(--f-sans);
+}
+
+.character-status-drawer__statrow-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--paper-100);
+}
+
+.character-status-drawer__statrow-value {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--gold-400);
 }
 
 .character-status-drawer__vital-key {
@@ -333,6 +394,7 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 }
 
 .character-status-drawer__vital-track {
+  flex-basis: 100%;
   height: 6px;
   background: var(--ink-800);
   border-radius: 3px;
@@ -353,27 +415,28 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   font-weight: 700;
 }
 
-.character-status-drawer__vital-value {
-  color: var(--paper-50);
-  font-family: var(--f-mono);
-}
-
-.character-status-drawer__condition {
+/* The design's wrapped pill row (`.pillrow`/`.pill`): one rounded badge per
+   committed condition; the pill's muted suffix carries the same content the
+   flat row showed (severity word, glyph, duration, modifiers). */
+.character-status-drawer__pillrow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  font-size: 0.9em;
+  gap: 7px;
 }
 
-.character-status-drawer__condition-glyph {
-  font-size: 1em;
-}
-
-.character-status-drawer__condition-severity {
-  color: var(--paper-500);
-  font-size: 0.8em;
+.character-status-drawer__pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--ink-600);
+  background: var(--ink-780);
+  color: var(--paper-300);
 }
 
 .character-status-drawer__condition-label {
@@ -381,11 +444,24 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   font-weight: 600;
 }
 
+.character-status-drawer__condition-stat {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  margin-left: 5px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--paper-500);
+}
+
+.character-status-drawer__condition-severity {
+  color: var(--paper-500);
+}
+
 .character-status-drawer__condition-timer,
 .character-status-drawer__condition-mod {
-  color: var(--paper-300);
-  font-family: var(--f-mono);
-  font-size: 0.85em;
+  color: var(--paper-500);
 }
 
 .character-status-drawer__empty,
@@ -398,8 +474,6 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   border-radius: var(--radius-sm);
 }
 
-.character-status-drawer__trait,
-.character-status-drawer__guild-row,
 .character-status-drawer__equipment-item {
   display: flex;
   justify-content: space-between;
@@ -407,17 +481,42 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   font-size: 0.9em;
 }
 
-.character-status-drawer__trait-key,
-.character-status-drawer__guild-key,
 .character-status-drawer__equipment-slot {
   color: var(--paper-300);
   min-width: 3.5em;
 }
 
-.character-status-drawer__trait-value,
-.character-status-drawer__guild-value {
-  color: var(--paper-50);
-  font-family: var(--f-mono);
+/* The five severity tints: copied verbatim from ConditionChips' `.chip--*`
+   rules, so the full roster and the capped island agree on severity colour
+   everywhere it appears. */
+.character-status-drawer__pill--beneficial {
+  background: rgba(127, 191, 127, 0.14);
+  border-color: rgba(127, 191, 127, 0.5);
+  color: var(--buff);
+}
+
+.character-status-drawer__pill--informational {
+  background: rgba(195, 185, 163, 0.1);
+  border-color: var(--ink-600);
+  color: var(--paper-300);
+}
+
+.character-status-drawer__pill--warning {
+  background: rgba(199, 154, 74, 0.14);
+  border-color: rgba(199, 154, 74, 0.55);
+  color: var(--warn);
+}
+
+.character-status-drawer__pill--harmful {
+  background: rgba(224, 138, 90, 0.14);
+  border-color: rgba(224, 138, 90, 0.55);
+  color: var(--debuff);
+}
+
+.character-status-drawer__pill--critical {
+  background: rgba(224, 87, 79, 0.18);
+  border-color: var(--crit);
+  color: var(--crit);
 }
 
 .character-status-drawer__equipment-name {

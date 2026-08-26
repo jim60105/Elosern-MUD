@@ -91,6 +91,15 @@ payload can carry any of five severities, and the H2 island already established 
 mapping — this change's pills use the exact same `background`/`border-color`/`color` triples per severity,
 so the roster and the capped island agree on what each severity looks like everywhere it appears.
 
+**Relax the global JSON-safety integer bound to the full JavaScript-safe range
+(`-9,007,199,254,740,991..9,007,199,254,740,991`), in both the client's `protocol.js`
+`checkGlobalSafety` and the server-side Python mirror.** Verification showed the deterministic
+`world/rules/rulebook/combat_modifiers.yaml` already carries signed values (e.g. `defense: -15`,
+`accuracy: -10`), and the client's `validateStatusCondition` runs `checkGlobalSafety` on every
+`condition.modifiers` object — so the full condition roster (which the drawer now renders as pills)
+would be rejected wholesale by the old non-negative bound. The relaxation is the single protocol-side
+adjustment this change makes; no field contract, panel contract, or store slice changes.
+
 ## Risks / Trade-offs
 
 - **The full (uncapped) condition roster could produce a very long wrapped pill row for a heavily-buffed

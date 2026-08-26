@@ -126,6 +126,14 @@ class JSONSafetyTests(unittest.TestCase):
             check_json_safety({"s": "x" * (MAX_STRING_CODE_POINTS + 1)})
         with self.assertRaises(JSONSafetyError):
             check_json_safety({"n": MAX_SAFE_INTEGER + 1})
+        # The global integer range is the full JavaScript-safe range
+        # (-2^53+1 .. 2^53-1): negative safe integers (the signed values in
+        # the deterministic combat_modifiers.yaml, e.g. defense -15) pass,
+        # while values below -2^53 still fail.
+        self.assertIsNone(check_json_safety({"defense": -15}))
+        self.assertIsNone(check_json_safety({"n": -MAX_SAFE_INTEGER}))
+        with self.assertRaises(JSONSafetyError):
+            check_json_safety({"n": -MAX_SAFE_INTEGER - 1})
         with self.assertRaises(JSONSafetyError):
             check_json_safety({"n": float("inf")})
         with self.assertRaises(JSONSafetyError):
