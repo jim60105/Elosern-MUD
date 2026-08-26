@@ -173,7 +173,7 @@ export default {
 .fulllog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 3000;
+  z-index: var(--z-surface-modal);
   overflow-y: auto;
   background: var(--ink-950);
   color: var(--paper-100);

@@ -335,7 +335,7 @@ The shell SHALL use the approved desktop palette — near-black charcoal surface
 - **THEN** only the narrative log renders converted markup, every other renderer inserts server values as text, and no renderer uses an HTML-parsing API
 
 ### Requirement: Connection loss locks stale controls
-On WebSocket loss after a successful connection, the shell SHALL preserve the last rendered state under a non-dismissible offline overlay and SHALL prevent all graphical mutation submission. Reconnection SHALL request a full snapshot and remove the overlay only after a valid new-epoch snapshot is adopted.
+On WebSocket loss after a successful connection, the shell SHALL preserve the last rendered state under a non-dismissible offline overlay and SHALL prevent all graphical mutation submission. The offline overlay SHALL render above every other surface the client can have open — an open reference drawer, an open full-screen overlay (map/settings/help), a full-view art or scene surface, and the full-log overlay all included — so a connection loss is visibly announced regardless of what the player had open when it occurred. Reconnection SHALL request a full snapshot and remove the overlay only after a valid new-epoch snapshot is adopted.
 
 #### Scenario: Offline controls cannot submit
 - **WHEN** the active WebSocket closes while an enabled test action is focused
@@ -356,6 +356,14 @@ On WebSocket loss after a successful connection, the shell SHALL preserve the la
 #### Scenario: The overlay stays off before any successful connection
 - **WHEN** a first-time visitor opens the WebClient and no connection has ever reached the active phase
 - **THEN** the offline overlay remains hidden so the stock connect/create prompt underneath stays visible and usable
+
+#### Scenario: The offline overlay outranks an open reference drawer
+- **WHEN** a reference drawer (skill, inventory, shop, quest, lore, or status) is open and the WebSocket then closes
+- **THEN** the offline overlay is the topmost visible surface, painted above the drawer's scrim and panel
+
+#### Scenario: The offline overlay outranks an open full-screen overlay or full-view
+- **WHEN** the map, settings, or help overlay — or the portrait/scene full-view, or the full-log overlay — is open and the WebSocket then closes
+- **THEN** the offline overlay is the topmost visible surface, painted above that surface
 
 ### Requirement: Player input lines are part of the narrative stream with a divider
 

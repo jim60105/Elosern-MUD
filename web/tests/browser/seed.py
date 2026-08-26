@@ -157,7 +157,11 @@ def _art_fixture(character, room) -> None:
     from typeclasses.rooms import GridRoom
     from world.art.queue import ensure, settle
     from world.art.store import ArtAssetStatus
-    from world.art.subjects import ArtSubject, ArtSubjectKind
+    from world.art.subjects import (
+        ArtSubject,
+        ArtSubjectKind,
+        character_subject_for,
+    )
 
     mode = os.environ.get("ELOSERN_BROWSER_ART", "")
     if not mode:
@@ -180,15 +184,26 @@ def _art_fixture(character, room) -> None:
     }
     # A present named-policy NPC and a living monster so combat catalog tests
     # have both a dialogue host and a generic monster in the room.
-    host = create_object(
-        __import__("typeclasses.npcs", fromlist=["NPC"]).NPC,
-        key="酒館老闆",
-        location=art_room,
-    )
+    from typeclasses.npcs import NPC, ensure_npc_adult_identity
+
+    host = create_object(NPC, key="酒館老闆", location=art_room)
     from typeclasses.components import ScriptedDialogue
     from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
 
     host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+    # A named portrait policy on the dialogue host: the actor is excluded from
+    # its own exploration-mode portrait catalog (art_view), so the focusable
+    # catalog entry is the host's; settling it done gives the ArtPanel's
+    # portrait full-view control (v-if="entry.url") a URL to render.
+    host.db.portrait_policy = {
+        "mode": "named",
+        "stable_key": "browser-host",
+    }
+    # The host must pass the portrait adult gate (age/apparent_age >= 18),
+    # or the presenter resolves its catalog entry to the unavailable
+    # placeholder (status/url both None) even when its art record is done.
+    ensure_npc_adult_identity(host)
+    host.save()
     monster = create_object(Monster, key="酒館灰狼", location=art_room, nohome=True)
     monster.threat_tier = "low"
     monster.apply_monster_tier("floor")
@@ -205,10 +220,42 @@ def _art_fixture(character, room) -> None:
     if mode == "done":
         identity = "scene/tavern_interior.png"
         (root / identity).write_bytes(FIXTURE_VALID_PNG)
-        from world.art.queue import claim
+        from world.art.queue import claim, record_key
+        from world.art.store import ArtAssetRecord
 
-        claim(10)
+        # Ensure the named portrait records exist and claim every pending
+        # record (the startup sync enqueued ~10 scenes, the monster tiers,
+        # and the named portraits) so the scene and both named portraits
+        # settle as done, giving the ArtPanel's portrait full-view control
+        # (v-if="entry.url") a URL to render.
+        host_subject = character_subject_for(host)
+        actor_subject = character_subject_for(character)
+        for subject in (actor_subject, host_subject):
+            if subject is not None:
+                ensure(subject, "desc")
+        claim(50)
         settle(scene, status=ArtAssetStatus.DONE, output_identity=identity, error=None)
+        (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
+        for subject, stable_key in (
+            (actor_subject, f"browser-{character.pk}"),
+            (host_subject, "browser-host"),
+        ):
+            if subject is None:
+                continue
+            # Fail loudly if the portrait record was not claimed (claim budget
+            # 50 would otherwise leave it PENDING and settle is a silent
+            # no-op), instead of a later browser timeout.
+            record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+            if record is None:
+                raise RuntimeError(f"art fixture: no art record for {stable_key}")
+            if record.db.status != ArtAssetStatus.IN_PROGRESS:
+                raise RuntimeError(
+                    f"art fixture: portrait record {stable_key} not claimed "
+                    f"(status={record.db.status}); claim budget too small"
+                )
+            portrait_identity = f"portrait/character/{stable_key}.png"
+            (root / portrait_identity).write_bytes(FIXTURE_VALID_PNG)
+            settle(subject, status=ArtAssetStatus.DONE, output_identity=portrait_identity, error=None)
     elif mode == "failed":
         from world.art.queue import claim
 

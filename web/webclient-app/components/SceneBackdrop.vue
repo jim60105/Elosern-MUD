@@ -436,7 +436,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__fullview {
   position: fixed;
   inset: 0;
-  z-index: 3000;
+  z-index: var(--z-surface-modal);
   display: flex;
   flex-direction: column;
   align-items: center;
