@@ -107,6 +107,7 @@ function confirmAbandonNow() {
             v-if="registration.register && registration.register.enabled"
             type="button"
             class="quest-board__action"
+            data-testid="quest-board__register"
             @click="emit('quest_register', { action_id: registration.register.action_id })"
           >
             {{ registration.register.label }}

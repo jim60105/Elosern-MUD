@@ -21,10 +21,11 @@ import time
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import DEFAULT_VIEWPORT, BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    login_and_open,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -50,9 +51,15 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         # Each test boots its own isolated server; never the shared one.
         pass
 
+    # Extra seed env vars a subclass can add (e.g. ELOSERN_BROWSER_CREATION
+    # to boot a creation-pending character whose services panel is unavailable).
+    EXTRA_ENV: dict[str, str] = {}
+
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
         runtime.env["ELOSERN_BROWSER_SERVICES"] = self.SERVICES_MODE
+        for key, value in self.EXTRA_ENV.items():
+            runtime.env[key] = value
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
@@ -747,9 +754,32 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
 class ServicesUnavailableJourney(ServicesBrowserTest):
     """H4 (task 9.8): with the `services` panel in its registry-owned
     unavailable form, the reference drawers render only the reason — no
-    fabricated wallet, stock, quest, or lore rows."""
+    fabricated wallet, stock, quest, or lore rows.
+
+    The `services` panel is only unavailable outside exploration mode, so this
+    journey boots a creation-pending character (``ELOSERN_BROWSER_CREATION=1``)
+    and logs in with the dedicated creation account; the pending-creation
+    character is not in exploration, so the panel commits its registry-owned
+    ``services_unavailable`` form.
+    """
 
     SERVICES_MODE = ""
+    # Boot the creation-pending fixture so the character is non-exploration.
+    EXTRA_ENV = {"ELOSERN_BROWSER_CREATION": "1"}
+    CREATION_ACCOUNT = "browsercreator"
+    CREATION_PASSWORD = "CreationBrowserTest!2026"
+
+    def logged_in_page(self, viewport: tuple[int, int] = DEFAULT_VIEWPORT):
+        """Log in with the creation account (a creation-pending character)."""
+        page = self.new_page(viewport)
+        login_and_open(
+            page,
+            self.webclient_url,
+            self.base_url,
+            account=self.CREATION_ACCOUNT,
+            password=self.CREATION_PASSWORD,
+        )
+        return page
 
     def _wait_services_committed(self, page, timeout=30000):
         wait_for_store_state(

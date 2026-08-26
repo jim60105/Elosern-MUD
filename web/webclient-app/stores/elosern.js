@@ -1463,6 +1463,7 @@ export const useElosernStore = defineStore("elosern", () => {
     handleActionResult(prev, rs);
     releaseIfReady(rs);
     rebuildFocusMenu(prev, rs);
+    rebuildCreationDock(prev, rs);
     syncRouterGates();
     syncHudDrawer(prev, rs);
     view.value = buildView(prev, rs);

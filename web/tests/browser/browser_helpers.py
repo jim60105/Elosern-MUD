@@ -95,12 +95,21 @@ def sent_action_count(page: Page, action_id: str | None = None) -> int:
     return count
 
 
-def login_and_open(page: Page, webclient_url: str, base_url: str) -> None:
+def login_and_open(
+    page: Page,
+    webclient_url: str,
+    base_url: str,
+    account: str = BROWSER_ACCOUNT,
+    password: str = BROWSER_PASSWORD,
+) -> None:
     """Log in through Django auth and open the WebClient, waiting for the shell.
 
     The Evennia server performs a one-time initial-setup restart on a fresh
     database; the login page can briefly return an empty document while the
     restarted web process comes up. A short bounded retry absorbs that window.
+    ``account``/``password`` default to the shared browser account; pass the
+    creation account to reach a creation-pending (non-exploration) character,
+    whose ``services`` panel commits its registry-owned unavailable form.
     """
     login_url = f"{base_url}/auth/login/"
     attempts = 4
@@ -113,8 +122,8 @@ def login_and_open(page: Page, webclient_url: str, base_url: str) -> None:
             if attempt == attempts - 1:
                 raise
             page.wait_for_timeout(1500)
-    page.fill("#id_username", BROWSER_ACCOUNT)
-    page.fill("#id_password", BROWSER_PASSWORD)
+    page.fill("#id_username", account)
+    page.fill("#id_password", password)
     page.click('input[type="submit"]')
     page.wait_for_load_state("networkidle")
     page.goto(webclient_url)

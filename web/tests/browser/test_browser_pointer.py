@@ -515,8 +515,8 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
         )
-        register = page.locator(".quest-board__action")
-        page.wait_for_selector(".quest-board__action", timeout=15000)
+        register = page.locator('[data-testid="quest-board__register"]')
+        page.wait_for_selector('[data-testid="quest-board__register"]', timeout=15000)
         self.assertEqual(register.count(), 1)
         register.click()
         deadline = time.monotonic() + 20
