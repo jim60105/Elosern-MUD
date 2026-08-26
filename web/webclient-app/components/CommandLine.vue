@@ -373,9 +373,9 @@ defineExpose({ focusField });
 .inputsend {
   box-sizing: border-box;
   flex: none;
-  width: 30px;
-  height: 30px;
-  margin: 2px;
+  width: 34px;
+  height: 34px;
+  margin: 0;
   display: grid;
   place-items: center;
   font-family: var(--f-mono);
