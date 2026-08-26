@@ -43,6 +43,16 @@ DELTA_ID_PREFIXES = {
     "webclient-vue-10-wire-views-browser": "C4",
 }
 LOGIN_PAGE_EXEMPT = {"id_username", "id_password"}
+# ARIA / attribute selectors the managed suite uses only for assertions; they
+# are not contract hooks, so they are exempt from the frozen-list completeness
+# check.
+ATTRIBUTE_EXEMPT = {"role", "aria-expanded", "disabled", "data-testid^"}
+# Probe selectors the suite uses only to assert an element is absent — not
+# contract hooks, so they are exempt from the completeness check.
+HELPER_EXEMPT = {"missing-el"}
+# Known distinct-hook pairs where one hook name is a strict prefix of the other
+# without a `-`/`__` separator (the field id and its wrapper class).
+OVERLAP_EXEMPT = {("inputfield", "inputfieldwrapper")}
 
 EXPECTED_PROTOCOL_COUNT = 142
 EXPECTED_PROTOCOL_CREATE_STORE_MEMBERS = (
@@ -132,6 +142,37 @@ def _fenced_json_blocks(text: str) -> list[dict[str, object]]:
     for match in re.finditer(r"```json\n(.*?)```", text, re.DOTALL):
         blocks.append(json.loads(match.group(1)))
     return blocks
+
+
+def _css_hooks(selector: str) -> set[str]:
+    """Extract the checkable hook tokens from a CSS selector string.
+
+    Handles id fragments (``#id``), class fragments (``.class``), attribute
+    selectors (``[data-item-key]``), and element-prefixed hooks
+    (``img.participant-frame__portrait``). Non-hook attributes (``role``,
+    ``aria-expanded``, ``disabled``) are returned so the caller can exempt them.
+    """
+    hooks: set[str] = set()
+    sel = selector.strip()
+    if sel.startswith("["):
+        attr = sel.strip("[]").split("=")[0]
+        hooks.add(attr)
+        return hooks
+    if sel.startswith("#"):
+        for fragment in sel.split():
+            frag = fragment.split(":", 1)[0].split("[", 1)[0]
+            if frag.startswith("#"):
+                hooks.add(frag.lstrip("#"))
+            elif frag.startswith("."):
+                hooks.add(frag.lstrip("."))
+        return hooks
+    if sel.startswith("."):
+        hooks.add(sel.split(":", 1)[0].split("[", 1)[0].lstrip("."))
+        return hooks
+    if sel.startswith("img.") or sel.startswith("svg."):
+        hooks.add(sel.split(".", 1)[1].split(":", 1)[0].split("[", 1)[0])
+        return hooks
+    return hooks
 
 
 class WebClientFrozenContractAudit(unittest.TestCase):
@@ -341,10 +382,14 @@ class WebClientFrozenContractAudit(unittest.TestCase):
         exact: set[str] = set()
         prefixes: set[str] = set()
         for token in re.findall(r"`([^`]+)`", section):
+            # Normalize the token so CSS class hooks (`.dock-menu-item`) and id
+            # hooks (`#action-dock`) compare equal to the bare identifier the
+            # managed suite targets.
+            norm = token.lstrip(".#")
             if "<" in token:
-                prefixes.add(token.split("<", 1)[0])
+                prefixes.add(norm.split("<", 1)[0])
             else:
-                exact.add(token)
+                exact.add(norm)
         browser_root = REPO_ROOT / "web" / "tests" / "browser"
         targets: set[str] = set()
         for path in sorted(browser_root.glob("*.py")):
@@ -362,6 +407,11 @@ class WebClientFrozenContractAudit(unittest.TestCase):
                 r"data-testid=['\"]([\w-]+)['\"]", source
             ):
                 targets.add(match.group(1))
+            # H6 renewal: CSS class hooks targeted through `page.locator("...")`
+            # are re-mapped to stable hooks listed in the renewed §2.3.
+            for match in re.finditer(r"\.locator\(\s*['\"]([^'\"]+)['\"]", source):
+                for hook in _css_hooks(match.group(1)):
+                    targets.add(hook)
         self.assertGreater(
             len(targets),
             20,
@@ -373,12 +423,67 @@ class WebClientFrozenContractAudit(unittest.TestCase):
                     identifier in exact
                     or any(identifier.startswith(prefix) for prefix in prefixes)
                     or identifier in LOGIN_PAGE_EXEMPT
+                    or identifier in ATTRIBUTE_EXEMPT
+                    or identifier in HELPER_EXEMPT
                 )
                 self.assertTrue(
                     covered,
-                    f"browser-suite target #{identifier} is not in the frozen audit "
-                    "§2.3 list (or an explicit exemption)",
+                    f"browser-suite target #{identifier} is not in the renewed "
+                    "frozen audit §2.3 list (or an explicit exemption)",
                 )
+
+    def test_renewed_identifier_list_is_complete_and_non_overlapping(self):
+        """The re-frozen re-mapped `data-testid` set (the H1–H5 re-map table) is
+        the complete required hook set: no hook is listed twice, and no two hooks
+        shadow each other without a `-`/`__` family separator."""
+        section = self.text.split("### 2.3 ", 1)[1].split("### 2.4 ", 1)[0]
+        # Scope the check to the re-mapped `data-testid` table — the re-frozen
+        # set H6 owns. The preserved-hooks and CSS-class tables are context and
+        # may legitimately reference the same hooks, so they are excluded here.
+        start = section.index("**Re-mapped `data-testid` set (H1–H5)**")
+        end = section.index("**CSS class hooks the managed browser suite targets**")
+        remap_block = section[start:end]
+        # Collect hook entries from the table rows only; the block's prose and
+        # heading mention the word `data-testid` but are not hook entries.
+        tokens = [
+            match.group(1)
+            for line in remap_block.splitlines()
+            if line.lstrip().startswith("|")
+            for match in re.finditer(r"`([^`]+)`", line)
+        ]
+        # Normalize for comparison (strip a leading `#`/`.` if present).
+        def norm(t: str) -> str:
+            return t.lstrip(".#")
+
+        # No hook family is listed twice within the re-mapped set.
+        seen: set[str] = set()
+        for token in tokens:
+            key = norm(token)
+            with self.subTest(token=token):
+                self.assertNotIn(
+                    key,
+                    seen,
+                    f"hook family `{key}` is listed twice in the re-mapped set",
+                )
+                seen.add(key)
+        # No two exact hooks shadow each other without a `-`/`__` separator.
+        exact_tokens = [t for t in tokens if "<" not in t]
+        for i, a in enumerate(exact_tokens):
+            for b in exact_tokens[i + 1:]:
+                na, nb = norm(a), norm(b)
+                if na == nb or not nb.startswith(na):
+                    continue
+                continuation = nb[len(na):]
+                separator_ok = continuation.startswith("-") or continuation.startswith(
+                    "__"
+                )
+                exempt = (na, nb) in OVERLAP_EXEMPT or (nb, na) in OVERLAP_EXEMPT
+                with self.subTest(pair=(a, b)):
+                    self.assertTrue(
+                        separator_ok or exempt,
+                        f"hook `{nb}` shadows `{na}` without a `-`/`__` family "
+                        "separator and no exemption",
+                    )
 
     @covers_requirement(
         "webclient-browser-verification::the-implementation-bound-public-contract-is-frozen-before-the-shell-is-swapped",

@@ -594,6 +594,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
+        "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-map-settings-and-help-surfaces-are-reachable-from-the-live-client"
+    )
+    @covers_requirement(
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
     def test_h5_overlay_triggers_exclusion_and_focus_restoration(self):

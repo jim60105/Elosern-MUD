@@ -14,7 +14,8 @@
 - 專案設計
   - [引擎架構設計](/superpowers/specs/2026-07-29-ai-mud-engine-design)
   - [Vue WebClient 設計稿](/design/elosern-redesign/index)
-  - [Vue 元件展示](/development/frontend-vue-architecture)
+  - [WebClient 情境 HUD 重設計路線圖](/superpowers/specs/2026-08-25-webclient-hud-redesign-roadmap-design)
+  - [Vue 元件展示](/development/frontend-developer-guide)
 
 - Developer guides
   - [新增魔法指南](/development/adding-spells)

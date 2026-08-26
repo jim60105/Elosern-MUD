@@ -26,6 +26,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    outbound_messages,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -148,6 +149,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )
+    @covers_requirement(
+        "webclient-contextual-hud::the-command-line-is-a-permanently-present-bar-in-the-stage-s-command-line-anchor"
+    )
     def test_command_line_is_permanently_present_and_focusable(self):
         page = self.logged_in_page()
         # H5 (webclient-hud-05-overlays-and-command-line, design D1): the
@@ -170,6 +174,148 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(
             page.evaluate("(() => { const d = document.querySelector('[data-testid=\"command-line\"]'); return d !== null; })()"),
             "the command line must be present",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::quick-word-chips-prepare-a-command-without-submitting-it"
+    )
+    def test_quick_word_chip_prepares_a_command_without_sending(self):
+        """A quick-word chip writes its verb plus a trailing space into the field
+        and moves focus to the field; it prepares, it does not send (exactly one
+        send path — the field's send)."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        # The committed mode is exploration: the exploration chip set renders.
+        chip = page.locator('[data-testid="quick-word-chip-看"]')
+        self.assertEqual(chip.count(), 1, "the 看 chip renders in exploration")
+        chip.click()
+        self.assertEqual(
+            page.evaluate("() => document.getElementById('inputfield').value"),
+            "看 ",
+            "the chip wrote its verb plus a trailing space into the field",
+        )
+        self.assertTrue(
+            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
+            "focus moved to the field",
+        )
+        # The chip prepares, it does not send: no client->server message crosses
+        # the wire (the prepared command still travels through the field's single
+        # send path only).
+        self.assertEqual(
+            outbound_messages(page),
+            [],
+            "the chip sent no client->server message (it prepares, it does not send)",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-command-line-advertises-only-affordances-this-client-implements"
+    )
+    def test_command_line_hint_names_history_only_and_controls_share_the_walk(self):
+        """The hint cluster states the command-history recall keys and no completion
+        affordance; the history controls drive the same walk state the keys drive,
+        and neither submits."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        # The hint cluster names only the history recall keys (no completion).
+        self.assertEqual(
+            page.locator(".hint").inner_text(),
+            "↑↓ 歷史",
+            "the hint states only the history recall keys, no completion affordance",
+        )
+        # Seed the command history deterministically by sending two distinct text
+        # commands through the client's single send path (the field's send).
+        self._open_command_line(page)
+        page.keyboard.type("look")
+        page.keyboard.press("Enter")
+        self._open_command_line(page)
+        page.keyboard.type("take sword")
+        page.keyboard.press("Enter")
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.commandHistory.length >= 2",
+            timeout=15000,
+        )
+        # The two seeded sends are already on the wire; capture that baseline so
+        # the walk is proven to add no new message.
+        baseline = len(outbound_messages(page))
+        # The history-up control and the ↑ recall key drive the same walk state:
+        # the button walks to the most recent entry, the key walks to the one
+        # before it, and the unsent draft is preserved across the walk. Neither
+        # submits (the walk is display-only).
+        page.locator('[data-testid="command-line-history-up"]').click()
+        self.assertEqual(
+            page.evaluate("() => document.getElementById('inputfield').value"),
+            "take sword",
+            "the history control walked to the most recent entry",
+        )
+        # The recall key only drives the walk while the field is focused.
+        page.locator("#inputfield").focus()
+        page.keyboard.press("ArrowUp")
+        self.assertEqual(
+            page.evaluate("() => document.getElementById('inputfield').value"),
+            "look",
+            "the recall key walked to the prior entry (same shared walk state)",
+        )
+        self.assertEqual(
+            len(outbound_messages(page)),
+            baseline,
+            "neither the history control nor the recall key submitted (no new wire messages)",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::narrative-prose-scale-is-a-client-local-preference-the-settings-surface-owns"
+    )
+    def test_settings_prose_scale_is_a_client_local_preference(self):
+        """The settings surface owns the narrative prose scale as client-local
+        presentation state: three steps with a non-colour current-step indicator,
+        and no `ui_action` is dispatched for the change."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        # Open the settings overlay through the command line's utility control.
+        page.locator('[data-testid="command-line-settings"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        # The three-step prose-scale selector renders; the current step is marked
+        # by a non-colour indicator (aria-pressed / the `on` class).
+        for testid in ("settings-overlay-scale-A−", "settings-overlay-scale-A", "settings-overlay-scale-A+"):
+            self.assertEqual(
+                page.locator('[data-testid="%s"]' % testid).count(),
+                1,
+                f"{testid} renders",
+            )
+        self.assertTrue(
+            page.evaluate(
+                "() => { const el = document.querySelector('[data-testid=\"settings-overlay-scale-A\"]');"
+                " return el && (el.getAttribute('aria-pressed') === 'true' || el.classList.contains('on')); }"
+            ),
+            "the current prose-scale step is marked without colour alone",
+        )
+        # Changing the scale is client-local: it applies the value to the
+        # ``--prose-scale`` presentation token, persists it through the versioned
+        # layout store, and dispatches no ``ui_action``.
+        page.locator('[data-testid="settings-overlay-scale-A+"]').click()
+        page.wait_for_function(
+            "() => { const s = window.__elosernBridge.store;"
+            " return s && s.view && s.view.fontScale === 1.12; }",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => document.documentElement.style.getPropertyValue('--prose-scale')"
+            ),
+            "1.12",
+            "the prose scale is applied to the presentation token",
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => { const raw = localStorage.getItem('elosern.layout');"
+                " return raw ? JSON.parse(raw).preferences.fontScale : null; }"
+            ),
+            1.12,
+            "the prose scale is persisted as client-local presentation state",
+        )
+        self.assertEqual(
+            sent_action_count(page),
+            0,
+            "the prose-scale change is client-local presentation state, not a ui_action",
         )
 
     @covers_requirement(

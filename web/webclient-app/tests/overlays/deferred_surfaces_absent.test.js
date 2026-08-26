@@ -1,10 +1,20 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { h } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import manifest from "../../component-manifest.json";
+import CommandLine from "../../components/CommandLine.vue";
+import CreationOverlay from "../../components/CreationOverlay.vue";
 import DockMenu from "../../components/DockMenu.vue";
+import HelpOverlay from "../../components/HelpOverlay.vue";
+import LocalMap from "../../components/LocalMap.vue";
+import MapOverlay from "../../components/MapOverlay.vue";
+import NarrativeFeed from "../../components/NarrativeFeed.vue";
+import OverlayHost from "../../components/OverlayHost.vue";
+import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import SkillDetailPane from "../../components/SkillDetailPane.vue";
+import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE } from "../../stories/fixtures.js";
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
@@ -74,25 +84,74 @@ const DEFERRED_TITLE_PATTERNS = [
   /\bVolume\b/i,
   /\bHudScale\b/i,
   /\bRemap(ping)?\b/i,
-  /\bZoom\b/i,
-  /\bPan\b/i,
+   /\bZoom\b/i,
+   /\bPan\b/i,
+ ];
+
+// H6 (webclient-hud-06-remap-and-finalize, task 4.3): the complete unbacked
+// list. Each deferred surface is named with the OOB read model it waits on,
+// so a regression that builds an unbacked surface fails at the unit gate.
+const DEFERRED_SURFACES = [
+  {
+    name: "companion/party panel",
+    waitsOn: "the `party` read model (party payload)",
+    testidPrefixes: ["companion-", "party-"],
+  },
+  {
+    name: "event-log toasts",
+    waitsOn: "the `event_log` read model (the toast queue)",
+    testidPrefixes: ["event-log-", "toast-"],
+  },
+  {
+    name: "persistent objective tracker",
+    waitsOn: "the `objectives` read model (the persistent objectives field)",
+    testidPrefixes: ["objective-"],
+  },
+  {
+    name: "intimate/adult status collapsible",
+    waitsOn: "the `intimate` / `adult` status field (no backing read model yet)",
+    testidPrefixes: ["intimate-", "adult-"],
+  },
 ];
+
+// H6 (task 4.3, rubber-duck follow-up): the source-level absence check — the
+// `web/webclient-app` sources (components + stories) must not carry any
+// deferred-surface testid, proving the deferred surfaces are absent from the
+// authored view layer, not merely unrendered at a given moment.
+const SOURCE_DIRS = [
+  join(APP_ROOT, "components"),
+  join(APP_ROOT, "stories"),
+];
+
+function collectSources(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) {
+      files.push(...collectSources(path));
+      continue;
+    }
+    if (entry.endsWith(".vue") || entry.endsWith(".js")) files.push(path);
+  }
+  return files;
+}
 
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
-   // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
-   // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
-   // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
-   // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
-   // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
-   // adds the three reference-drawer components (`Core/HudDrawer`,
-   // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H5
-   // (webclient-hud-05-overlays-and-command-line, task 8.2) renames
-   // `Core/CommandDrawer` → `Core/CommandLine` and adds `Core/QuickWordChips`
-   // and `Overlays/OverlayHost` (39 → 41). H6 re-freezes at the complete new
-   // set.
-   expect(manifest.required).toHaveLength(41);
+    // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
+    // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
+    // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
+    // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
+    // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
+    // adds the three reference-drawer components (`Core/HudDrawer`,
+    // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H5
+    // (webclient-hud-05-overlays-and-command-line, task 8.2) renames
+    // `Core/CommandDrawer` → `Core/CommandLine` and adds `Core/QuickWordChips`
+    // and `Overlays/OverlayHost` (39 → 41). H6 (webclient-hud-06-remap-and-
+    // finalize, task 4.2 + 5.2) removes the dead `Data/CharacterPanel` view
+    // code, re-freezing the set at 40.
+    expect(manifest.required).toHaveLength(40);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",
@@ -218,5 +277,89 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
         expect(re.test(title), `required component ${title} reserves a deferred surface (${word})`).toBe(false);
       }
     }
+  });
+
+  // H6 (task 4.3 + rubber-duck follow-up): the authored view layer carries
+  // no deferred-surface testid — the deferred surfaces are absent from source,
+  // not merely unrendered.
+  it("the authored sources carry no deferred-surface testid (source-level absence)", () => {
+    const files = SOURCE_DIRS.flatMap((dir) => collectSources(dir));
+    expect(files.length).toBeGreaterThan(0);
+    const found = [];
+    for (const surface of DEFERRED_SURFACES) {
+      for (const prefix of surface.testidPrefixes) {
+        for (const file of files) {
+          const source = readFileSync(file, "utf-8");
+          if (source.includes(`data-testid="${prefix}`) || source.includes(`data-testid=\`${prefix}`)) {
+            found.push({ surface: surface.name, prefix, file });
+          }
+        }
+      }
+    }
+    expect(found, `deferred-surface testids present in source: ${JSON.stringify(found)}`).toEqual([]);
+  });
+});
+
+// H6 (task 4.4): every full overlay has a real trigger in the live surface
+// tree, so a built-but-unreachable overlay fails the unit gate the way
+// Map/Settings/Help did in B5.
+describe("H6 overlay reachability: every full overlay has a live trigger", () => {
+  it("the minimap island's expand control opens the map overlay", async () => {
+    const wrapper = mount(LocalMap, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    const expand = wrapper.get('[data-testid="local-map__expand"]');
+    expect(expand.exists()).toBe(true);
+    await expand.trigger("click");
+    expect(wrapper.emitted("open-map")).toBeTruthy();
+  });
+
+  it("the command line's settings and help buttons open the settings and help overlays", async () => {
+    const wrapper = mount(CommandLine);
+    const settings = wrapper.get('[data-testid="command-line-settings"]');
+    const help = wrapper.get('[data-testid="command-line-help"]');
+    expect(settings.exists()).toBe(true);
+    expect(help.exists()).toBe(true);
+    await settings.trigger("click");
+    expect(wrapper.emitted("open-overlay")).toBeTruthy();
+    expect(wrapper.emitted("open-overlay")[0][0]).toBe("settings");
+    await help.trigger("click");
+    expect(wrapper.emitted("open-overlay")[1][0]).toBe("help");
+  });
+
+  it("the narrative feed's full-log control opens the full log", async () => {
+    const wrapper = mount(NarrativeFeed, {
+      props: { lines: [{ kind: "sys", text: "你來到了霧骨渡口。" }] },
+    });
+    const control = wrapper.get('[data-testid="narrative-fulllog-control"]');
+    expect(control.exists()).toBe(true);
+    await control.trigger("click");
+    expect(wrapper.emitted("open-full-log")).toBeTruthy();
+  });
+
+  it("the creation overlay renders its own testids and a labelled close control", () => {
+    const wrapper = mount(CreationOverlay, {
+      props: { creation: CREATION_PANEL_SAMPLE },
+    });
+    expect(wrapper.find('[data-testid="creation-overlay"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="creation-body"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="creation-overlay-close"]').exists()).toBe(true);
+  });
+
+  it("the overlay host mounts the named overlay body (the real trigger-to-overlay path)", () => {
+    // Mounting the OverlayHost with a scoped slot that provides the overlay
+    // body proves the named overlay is actually mounted (not just that a
+    // trigger emits a name). Cycling the open-overlay name re-mounts the body.
+    const wrapper = mount(OverlayHost, {
+      props: { overlay: "settings", mapModel: LOCAL_MAP_SAMPLE },
+      slots: {
+        default: ({ overlay: name, mapModel }) =>
+          name === "settings"
+            ? h(SettingsOverlay, {})
+            : name === "help"
+              ? h(HelpOverlay, {})
+              : h(MapOverlay, { localMap: mapModel }),
+      },
+    });
+    expect(wrapper.find('[data-testid="overlay-host"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="settings-overlay"]').exists()).toBe(true);
   });
 });

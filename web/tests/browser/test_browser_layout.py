@@ -15,10 +15,12 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     fresh_epoch,
+    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     snapshot_envelope,
     store_state,
+    valid_local_map_panel,
     valid_status_panel,
     wait_for_store_state,
 )
@@ -382,6 +384,238 @@ class ProtocolMismatchTest(BrowserAcceptanceTest):
         )
         self.assertGreater(
             len(page.locator('[data-testid="narrative-feed"]').inner_text()), narrative_before
+        )
+
+
+class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
+    """H6 (webclient-hud-06-remap-and-finalize): the redesigned HUD invariants
+    promoted into the standing layout journey, so every future change re-runs the
+    stage-anchor non-overlap, the committed-mode surface gating, and the bounded
+    caption's one-action full log at both supported viewports."""
+
+    def _inject_snapshot(self, page, panels: dict, mode: str = "exploration") -> None:
+        """Inject one schema-valid ``ui_snapshot`` through the store's ``receive``."""
+        state = store_state(page)
+        result = page.evaluate(
+            "(args) => window.__elosernBridge.store.receive("
+            "args.generation, 'ui_snapshot', [args.envelope], {})",
+            {
+                "generation": state["generation"],
+                "envelope": snapshot_envelope(
+                    state["epoch"], state["revision"] + 1, panels, mode=mode
+                ),
+            },
+        )
+        if not result.get("accepted"):
+            raise AssertionError("injected ui_snapshot was rejected: %r" % (result,))
+
+    def _wait_mode(self, page, mode: str, timeout: int = 30000) -> None:
+        """Gate on the committed store mode matching ``mode``."""
+        wait_for_store_state(page, lambda s: s.get("mode") == mode, timeout=timeout)
+
+    def _press(self, page, key: str, wait_ms: int = 80) -> None:
+        page.keyboard.press(key)
+        page.wait_for_timeout(wait_ms)
+
+    def _stage_anchor_rects(self, page):
+        return page.evaluate(
+            """() => {
+              const ids = ["anchor-hud-left", "anchor-hud-right", "anchor-feed", "anchor-dock"];
+              return ids.map((id) => {
+                const el = document.querySelector('[data-testid="' + id + '"]');
+                if (!el) return { id, rect: null };
+                return { id, rect: el.getBoundingClientRect() };
+              });
+            }"""
+        )
+
+    def _anchors_overlap(self, page):
+        rects = self._stage_anchor_rects(page)
+        present = [r["rect"] for r in rects if r["rect"]]
+
+        def right(r):
+            return r["left"] + r["width"]
+
+        def bottom(r):
+            return r["top"] + r["height"]
+
+        for i in range(len(present)):
+            for j in range(i + 1, len(present)):
+                a, b = present[i], present[j]
+                overlap = not (
+                    right(a) <= b["left"] or right(b) <= a["left"]
+                    or bottom(a) <= b["top"] or bottom(b) <= a["top"]
+                )
+                if overlap:
+                    return True
+        return False
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-hud-island-stack-renders-as-bounded-floating-islands-not-column-cards"
+    )
+    def test_no_stage_anchor_overlaps_at_supported_viewports(self):
+        """No stage anchor's rendered box intersects another's at either supported
+        viewport (H1's stage-anchor non-overlap invariant, promoted to the standing
+        journey)."""
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                self._wait_mode(page, "exploration")
+                # All four stage anchors must be present with non-zero boxes; a
+                # deleted anchor would otherwise make the non-overlap check trivial.
+                rects = self._stage_anchor_rects(page)
+                for r in rects:
+                    box = r["rect"]
+                    self.assertIsNotNone(
+                        box,
+                        f"stage anchor {r['id']} is missing at {viewport}",
+                    )
+                    self.assertGreater(box["width"], 0, f"{r['id']} has a zero-width box at {viewport}")
+                    self.assertGreater(box["height"], 0, f"{r['id']} has a zero-height box at {viewport}")
+                self.assertFalse(
+                    self._anchors_overlap(page),
+                    f"no stage anchor overlaps another at {viewport}",
+                )
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"
+    )
+    def test_mode_gating_hides_and_restores_surfaces(self):
+        """Mode-gated surfaces are hidden with ``display:none`` (leaving the
+        accessibility tree and tab order) in the modes that hide them, and present
+        again in the modes that show them, at both supported viewports. Focus that
+        lands on a surface the mode change hides is rescued back to the action dock."""
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                map_panel = valid_local_map_panel()
+                self._inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
+                self._wait_mode(page, "exploration")
+
+                # Exploration: the minimap island and the command field are visible.
+                self.assertEqual(
+                    page.locator('[data-testid="local-map"]').count(), 1,
+                    "the minimap island renders in exploration",
+                )
+                self.assertTrue(
+                    page.locator('[data-testid="local-map"]').is_visible(),
+                    "the minimap is visible in exploration",
+                )
+                self.assertEqual(page.locator("#inputfield").count(), 1, "the command field is present in exploration")
+                self.assertTrue(page.locator("#inputfield").is_visible(), "the command field is visible in exploration")
+
+                # Combat: the minimap is display:none (leaves the a11y tree + tab
+                # order, never merely dimmed); the narrative feed, command line, and
+                # action dock stay up.
+                self._inject_snapshot(page, {"local_map": map_panel}, mode="combat")
+                self._wait_mode(page, "combat")
+                self.assertEqual(
+                    page.locator('[data-testid="local-map"]').count(), 1,
+                    "the minimap element stays in the DOM in combat",
+                )
+                self.assertTrue(
+                    page.evaluate(
+                        "() => { const el = document.querySelector('[data-testid=\"local-map\"]'); "
+                        "return el ? (el.offsetParent === null) : false; }"
+                    ),
+                    "the minimap is display:none in combat, not merely dimmed",
+                )
+                for selector in (
+                    '[data-testid="narrative-feed"]',
+                    '[data-testid="command-line"]',
+                    "#action-dock",
+                ):
+                    self.assertTrue(
+                        page.locator(selector).is_visible(),
+                        f"{selector} must stay visible in combat",
+                    )
+
+                # Creation: the full gated set is display:none (H1's visibility
+                # matrix + design D10) — the feed anchor, the left HUD island stack
+                # (hud-left), the command-line anchor, and the minimap.
+                # Focus the command field first so the mode change hides the focused
+                # surface; the shell rescues focus to the action dock.
+                page.locator("#inputfield").click()
+                self._inject_snapshot(page, {"local_map": map_panel}, mode="creation")
+                self._wait_mode(page, "creation")
+                for selector in (
+                    '[data-anchor="feed"]',
+                    '[data-anchor="hud-left"]',
+                    '[data-anchor="command-line"]',
+                    '[data-testid="local-map"]',
+                ):
+                    self.assertTrue(
+                        page.evaluate(
+                            "(sel) => { const el = document.querySelector(sel); "
+                            "return el ? (el.offsetParent === null) : true; }",
+                            selector,
+                        ),
+                        f"{selector} is display:none in creation mode",
+                    )
+                self.assertTrue(
+                    page.evaluate(
+                        "() => { const d = document.getElementById('action-dock');"
+                        " const a = document.activeElement;"
+                        " return d && (a === d || (a && d.contains(a))); }"
+                    ),
+                    "focus was rescued to the action dock when the focused surface was hidden",
+                )
+
+                # Return to exploration: the hidden surfaces are present again.
+                self._inject_snapshot(page, {"local_map": map_panel}, mode="exploration")
+                self._wait_mode(page, "exploration")
+                self.assertTrue(
+                    page.locator('[data-testid="local-map"]').is_visible(),
+                    "the minimap is visible again in exploration",
+                )
+                self.assertEqual(page.locator("#inputfield").count(), 1)
+                self.assertTrue(
+                    page.locator("#inputfield").is_visible(),
+                    "the command field is visible again in exploration",
+                )
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"
+    )
+    def test_complete_log_reachable_in_one_action_from_bounded_caption(self):
+        """The narrative caption is bounded and the full log opens in one action;
+        the minimap stays inside its HUD island (task 6.4 phrasing)."""
+        page = self.logged_in_page()
+        for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
+            page.evaluate("(text) => window.__elosernBridge.store.appendText('out', text)", line)
+        feed = page.locator('[data-testid="narrative-feed"]')
+        self.assertTrue(feed.is_visible(), "the narrative caption card renders")
+        geometry = page.evaluate(
+            """() => {
+              const f = document.querySelector('[data-testid="narrative-feed"]');
+              const st = document.querySelector('[data-testid="elosern-stage"]');
+              return { feedHeight: f.getBoundingClientRect().height,
+                       stageHeight: st.getBoundingClientRect().height };
+            }"""
+        )
+        self.assertLess(
+            geometry["feedHeight"],
+            geometry["stageHeight"],
+            "the caption card is bounded, not filling the stage",
+        )
+        page.locator('[data-testid="narrative-fulllog-control"]').click()
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
+        overlay = page.locator('[data-testid="fulllog-overlay"]')
+        self.assertTrue(overlay.is_visible(), "the full log opens in one action")
+        log_text = overlay.inner_text()
+        for line in ("南門的風很涼。", "你看到一隻哥布林。", "哥布林舉起了木棒。"):
+            self.assertIn(line, log_text, "the full log shows the complete retained narrative")
+        self._press(page, "Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"fulllog-overlay\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            page.locator('[data-testid="fulllog-overlay"]').count(),
+            0,
+            "the full log closes on Escape",
         )
 
 

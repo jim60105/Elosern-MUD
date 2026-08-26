@@ -348,55 +348,87 @@ Bucket values:
 | Self-contained modal key captures: `_bindFormKeys` (creation), `_bindQuantityKeys` (services), `_bindRestKeys` (exploration) | C2 | DELTA | `js/plugins/creation_dock.js:791`, `services_dock.js:256`, `exploration_dock.js:587`; spec `webclient-character-creation-ui:177-197` | The capture-phase pre-emption behavior is preserved by the bridge/app; only the wording naming the stock handler changes (entry C2-03) |
 | `Evennia.sendInputField` (ordinary text send through the transport) | C4 | PRESERVE-VIA-BRIDGE | `js/plugins/goldenlayout.js:484`; spec `webclient-desktop-shell:136-160` (drawer text control) | The Vue app keeps the existing `evennia.js` transport; typed commands keep sending as ordinary text (never `ui_action`) — the requirement wording is implementation-neutral and stays true |
 
-### 2.3 DOM identifiers (managed browser tests + keyboard router targets)
+### 2.3 DOM identifiers (managed browser tests + keyboard router targets) — re-frozen at the
+post-redesign client (H6)
 
-**Preserved contract hooks** — the Vue shell SHALL render these identifiers unchanged; the
-managed browser tests keep targeting them; no spec delta:
+The H1–H5 redesign waves re-mapped the browser-targeted identifier set. This section is the renewed
+frozen list: the preserved contract hooks H1 froze, plus every `data-testid` re-map performed by
+H1–H5 and the CSS class hooks the managed browser suite targets. It is a single deliverable — no
+second parallel list.
 
-| Hook | What it is | Decider | Bucket | Evidence |
-|---|---|---|---|---|
-| `action-dock` | the action-dock composite element and documented focus target | C4 | PRESERVE-SAME-HOOK | defined `goldenlayout.js:349,449`, `dock_surface.js:162-178`; spec wording `webclient-pointer-activation:48-49` (“the action-dock element SHALL remain the surface's documented focus target”), `webclient-browser-verification:50,54,86` (`document.getElementById('action-dock').focus()`); universal test target |
-| `combat-row-<i>` (row id pattern, prefix `combat-row`) | combat dock row frames | C4 | PRESERVE-SAME-HOOK | `dock_surface.js:62-64` (renderRow); spec wording `webclient-browser-verification:86-105` (`#combat-row-0`); `test_browser_combat.py:112-128` |
-| `data-item-key` (row attribute; `target-` prefix in target menus) | row identity and pointer/keyboard parity handle | C4 | PRESERVE-SAME-HOOK | `dock_surface.js:53`; spec wording `webclient-options-surface:75-76` (`[data-item-key] router rows`), `webclient-browser-verification:89,104`; universal click handle |
-| `inputfield` (drawer input, inside its wrapper) | the drawer command field the key path owns | C4 | PRESERVE-SAME-HOOK | `goldenlayout.js:402,409-411`; key-path drawer-ownership gate `js/plugins/elosern_ui.js:33-40` (`id === "inputfield" && closest(".inputfieldwrapper")`); focus/value assertions across `test_browser_input_narrative.py`, `test_browser_shell.py`, `test_browser_services.py`, `test_browser_creation.py` |
-| `.inp` / `.narrative-divider` (narrative classes) | player input line + divider | C4 | PRESERVE-SAME-HOOK | spec wording `webclient-desktop-shell:285-318` (`.inp`, `.narrative-divider` named literally); `test_browser_input_narrative.py` counts them |
-| `narrative-unread` (+ `.narrative-unread-button`, `data-count`) | unread marker control | C4 | PRESERVE-SAME-HOOK | `goldenlayout.js:145`; `test_browser_input_narrative.py:225-245`; behavior fixed by `webclient-desktop-shell:51-68` |
-| `elosern-action-live` | the non-interrupting live region for action notices | C4 | PRESERVE-SAME-HOOK | `goldenlayout.js:360`, `elosern_actions.js:310` (resolved by id at notice time); waited on across browser tests; `webclient-desktop-shell:238-239` (“action results SHALL use a non-interrupting live region”) |
-| `elosern-offline-overlay` | the non-dismissible offline overlay | C4 | PRESERVE-SAME-HOOK | `js/plugins/elosern_ui.js:196-205`, `elosern_actions.js:318`; `test_browser_shell.py`, `test_browser_reconnect.py`; `webclient-desktop-shell:262-283` |
-| `data-node` / `data-node-id` (minimap node attributes) | minimap node identity/focus hooks | C4 | PRESERVE-SAME-HOOK | renderer `js/elosern/local_map.js` (`renderNode`); `test_browser_local_map.py` |
+**Preserved contract hooks** — the Vue shell renders these identifiers unchanged; the managed browser
+tests keep targeting them; no spec delta:
 
-**Remapped identifiers** — C4 carries `data-testid` = the current identifier string and
-retargets the affected Playwright slices. No main-requirement wording names any of these, so no
-spec delta is required:
+| Hook | What it is | Bucket |
+|---|---|---|
+| `action-dock` | the single persistent `#action-dock` node carrying its `data-mode` attribute and listbox composite role; the surface's documented focus target (`webclient-pointer-activation`, `webclient-browser-verification:50,54,86`) | PRESERVE-SAME-HOOK |
+| `combat-row-<i>` (row id pattern, prefix `combat-row`) | the combat dock's row frames (`test_browser_combat.py` targets `#combat-row-0` before key presses) | PRESERVE-SAME-HOOK |
+| `data-item-key` (row attribute; `target-` prefix in target menus) | row identity and pointer/keyboard parity handle (`webclient-options-surface:75-76`) | PRESERVE-SAME-HOOK |
+| `inputfield` (command-line field, inside `.inputfieldwrapper`) | the always-visible command-line input the key path owns (`webclient-desktop-shell:136-167`) | PRESERVE-SAME-HOOK |
+| `.inp` / `.narrative-divider` (narrative classes) | player input line + divider (`webclient-desktop-shell:285-318`) | PRESERVE-SAME-HOOK |
+| `narrative-unread` (+ `.narrative-unread-button`, `data-count`) | the unread marker control (`webclient-desktop-shell:51-68`) | PRESERVE-SAME-HOOK |
+| `elosern-action-live` | the non-interrupting live region for action notices (`webclient-desktop-shell:238-239`); rendered by the Vue shell, no longer actively targeted by the managed suite | PRESERVE-SAME-HOOK |
+| `elosern-offline-overlay` | the non-dismissible offline overlay (`webclient-desktop-shell:262-283`); `test_browser_shell.py`, `test_browser_reconnect.py` | PRESERVE-SAME-HOOK |
+| `data-node` / `data-node-id` (minimap node attributes) | minimap node identity/focus hooks (`test_browser_local_map.py`) | PRESERVE-SAME-HOOK |
 
-| Hook | Current owner | Decider | Bucket |
-|---|---|---|---|
-| `combat-detail`, `local-map-detail` | `js/plugins/elosern_ui.js:280`, `goldenlayout.js:726` | C4 | REMAP-TO-TESTID |
-| `creation-body`, `creation-submit`, `creation-concept-indicator`, `creation-reset`, `creation-field-<name>`, `data-preset-key` | `js/plugins/creation_dock.js:330,403-404,514,566,693` | C4 | REMAP-TO-TESTID |
-| `creation-concept-submit`, `creation-form-message`, `creation-race` + `creation-subrace` (Vue `<select>` testids replacing the legacy `creation-race-<i>` race radios; see the C4 risk note — the Vue overlay renders race/subrace as `<select>`) | `js/plugins/creation_dock.js:272,343,362`; targets in `test_browser_creation.py:251,300,303,397,533,556` | C4 | REMAP-TO-TESTID |
-| `exploration-detail` (element id + `.exploration-detail` class on the same panel) | `js/plugins/exploration_dock.js:264-265,388`; targets in `test_browser_exploration.py:521`, `test_browser_shell.py:621,624-626` | C4 | REMAP-TO-TESTID |
-| `services-quantity`, `services-quantity-value` | `js/plugins/services_dock.js:246,254-257`; targets in `test_browser_services.py:374-376,608,646` | C4 | REMAP-TO-TESTID |
-| `exploration-rest-form` | `js/plugins/exploration_dock.js` (rest form) | C4 | REMAP-TO-TESTID |
-| `suggestions-section` | `js/plugins/exploration_dock.js` (`_renderSuggestionsSection`) | C4 | REMAP-TO-TESTID |
-| `action-dock-guidance`, `action-dock-description` | `goldenlayout.js:352,354`, `dock_surface.js:162-169` | C4 | REMAP-TO-TESTID |
-| drawer entry controls + `data-open`, `data-mode` | `goldenlayout.js:385-391,446-459`, `combat_dock.js:179,360-367` | C4 | REMAP-TO-TESTID |
-| `.elosern-*` visual classes (`.elosern-header`, `.elosern-narrative`, `.elosern-status`, `.elosern-action-dock`, `.elosern-drawer`, `.elosern-placeholder`, `.elosern-art`, `.elosern-local-map`), `.header-conn`, `.resource-value`, `.resource-bar`, `.status-unavailable-retry`, `.prompt`, `.drawer-entry`, `.elo-input-send`, `.dock-row` — exception: `.inp`, `.narrative-divider`, `.inputfieldwrapper` are preserved (rows above) | `js/plugins/goldenlayout.js` + `webclient/css/elosern.css`; visual restyle per the 設計稿 | C4 | RETIRED-WITH-SHELL |
-| `main-sub`, `messagewindow` (GL mount container + stock `default_out` fallback) | `web/templates/webclient/webclient.html:6-10`; `goldenlayout.js:1302,1311`; the Vite mount skeleton replaces both — the fallback-hiding behavior is re-expressed by delta C4-02 | C4 | RETIRED-WITH-SHELL |
-| `clientwrapper`, `connecting`, `noscript` | `web/templates/webclient/base.html:114-134`; template re-skeletonized at the flip | C4 | RETIRED-WITH-SHELL |
+**Re-mapped `data-testid` set (H1–H5)** — each family below is re-mapped to a stable `data-testid`
+hook; the managed Playwright slices were retargeted by the owning wave (roadmap §5: each wave re-maps
+the selectors it breaks). Prefix entries cover dynamic suffixes.
 
-**Out of shell scope (harness targets a Django-rendered page, unchanged by the flip):** the managed
-harness logs in through `#id_username` / `#id_password` (`web/tests/browser/browser_helpers.py:105-112`).
-These select the stock Evennia login form, which `base.html` does not own; C4 re-skeletonizes the
-`webclient.html` content area only, so the login targets stay valid with no preserve/remap decision —
-the browser suite keeps them verbatim.
+| Hook family | Wave | Bucket |
+|---|---|---|
+| `topbar`, `topbar-clock`, `topbar-location` | H1 | REMAP-TO-TESTID |
+| `narrative-feed`, `narrative-fulllog-control` | H1 | REMAP-TO-TESTID |
+| `text-console`, `text-console-input`, `text-console-log` (the dependency-free fallback console) | H1 | REMAP-TO-TESTID |
+| `scene-backdrop` + `scene-backdrop-<suffix>` (`scene-backdrop-image`, `scene-backdrop-label`, `scene-backdrop-alt`, `scene-backdrop-placeholder`) | H1 | REMAP-TO-TESTID |
+| `anchor-<name>` (prefix `anchor`: `anchor-hud-left`, `anchor-hud-right`, `anchor-feed`, `anchor-dock`) | H1 | REMAP-TO-TESTID |
+| `elosern-stage` (carries `data-elosern-mode` + `data-menu-open`), `elosern-vue-root` | H1 | REMAP-TO-TESTID |
+| `status-panel` + `status-panel__<suffix>` (`status-panel__condition-overflow`, `status-panel__condition--<code>`, `status-panel__gauge-value--<gauge>`) | H2 | REMAP-TO-TESTID |
+| `character-head` + `character-head__<suffix>` (`__badge`, `__disguise`, `__glyph`, `__name`, `__rank`, `__wallet`) | H2 | REMAP-TO-TESTID |
+| `local-map`, `local-map-detail`, `local-map-remembered`, `local-map__<suffix>` (`local-map__lattice`, `local-map__legend`, `local-map__title`, `local-map__marker--current`, `local-map__unavailable`, `local-map__actionable`); H5 adds `local-map__expand` (the full-map control, mounted with the `MapOverlay` it opens) | H2, H5 | REMAP-TO-TESTID |
+| `dock-menu`, `dock-crumb`, `dock-crumb__<suffix>` (covers the breadcrumb back control `dock-crumb__back`), `suggestions-section`, `suggestions-generating`, `dock-tab-<tab>` (prefix `dock-tab`: `dock-tab-flee`, `dock-tab-interact`, `dock-tab-move`, `dock-tab-look`, `dock-tab-suggestions`), `action-dock-description`, `exploration-detail`, `exploration-rest-form` | H3 | REMAP-TO-TESTID |
+| `command-line` + `command-line-<suffix>` (`command-line-input-field`, `command-line-prompt`, `command-line-settings`, `command-line-help`) | H5 | REMAP-TO-TESTID |
+| `map-overlay`, `map-overlay-content`, `map-overlay-unavailable` | H5 | REMAP-TO-TESTID |
+| `settings-overlay`, `help-overlay`, `creation-<suffix>` (prefix `creation`: `creation-body`, `creation-submit`, `creation-confirm`, `creation-reset`, `creation-concept-indicator`, `creation-preset-card`, `creation-race`, `creation-field-<name>`), `overlay-host-close` | H5 | REMAP-TO-TESTID |
+| `fulllog-overlay`, `fulllog-close` | H1 | REMAP-TO-TESTID |
+| `hud-drawer`, `hud-drawer-scrim` + `.hud-drawer__title`; `character-status-drawer`, `equipment-doll` (the drawer bodies H4 migrated out of the right column) | H4 | REMAP-TO-TESTID |
+| `participant-frame`, `participant-portrait-placeholder` + `participant-frame__<suffix>` (`participant-frame__row`, `participant-frame__name`, `participant-frame__group-label`, `img.participant-frame__portrait`) | H3 | REMAP-TO-TESTID |
+| `quest-board` + `quest-board__<suffix>` (`quest-board__abandon`, `quest-board__register`, `quest-board__rankblock`, `quest-board__board-row--<state>`, `quest-board__quest-row--<state>`) | H4 | REMAP-TO-TESTID |
+| `art-panel` + `.art-panel__<suffix>` (`.art-panel__portrait-tile`) | H1 (still mounted) | REMAP-TO-TESTID |
+| `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
+| `combat-detail` | H3 | REMAP-TO-TESTID |
 
-**Template load-order contract** (context for C4; no spec delta beyond the entries above):
+**CSS class hooks the managed browser suite targets** (re-mapped to stable hooks, no main-requirement
+wording names any of these, so no spec delta):
 
-| Contract | Decider | Bucket | Evidence |
-|---|---|---|---|
-| `base.html` script order (31 pinned scripts; UMD attach order is load-bearing), jQuery 3.2.1 + GoldenLayout 1.x vendor assets | C4 | RETIRED-WITH-SHELL | `web/templates/webclient/base.html:23-25,29,70-73,77-106`; roadmap C4 (remove jQuery/GoldenLayout/plugin loads, mount the Vite bundle) |
-| Evennia stock plugins `history` / `default_out` + 8 `plugin_handler.add` registrations (`goldenlayout`, `elosern_ui`, `elosern_state`, `elosern_exploration_dock`, `elosern_services_dock`, `elosern_creation_dock`, `elosern_combat_dock`, `choice_points`) | C4 | RETIRED-WITH-SHELL | `base.html:89-106`; registrations at `goldenlayout.js:1384`, `elosern_ui.js:696`, `elosern_state.js:352`, `exploration_dock.js:998`, `services_dock.js:553`, `creation_dock.js:1141`, `combat_dock.js:405`, `choice_points.js` — the handler surface (`onText`, `onPrompt`, `onSend`, `onKeydown`, `getGL`) is preserved only for the transport text path until C4 remaps it |
-| `evennia.js` transport + `Evennia.*` globals (`sendInputField`, `connection`, `.msg`) | C4 | PRESERVE-VIA-BRIDGE | `base.html:48-67`; the Vue app keeps the existing Evennia transport (roadmap §1: “on top of the existing Evennia transport”) |
+| Hook | Bucket |
+|---|---|
+| `.dock-menu-item` (prefix; covers `.dock-menu-item--focused` under `#action-dock`) | REMAP-TO-TESTID |
+| `.dock-menu`, `.dock-menu-layout`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
+| `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
+| `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
+| `.lm_header` (legacy GoldenLayout header assertion: must NOT render) | RETIRED-WITH-SHELL |
+| `.elosern-*` retired visual classes (`.elosern-narrative`, `.elosern-placeholder`, `.elosern-header`, `.elosern-status`, `.elosern-action-dock`) — the managed suite asserts they no longer render on the Vue shell | RETIRED-WITH-SHELL |
+| `messagewindow` (the retired `default_out` fallback host; revealed on demand by `test_vue_foundation.py`) | RETIRED-WITH-SHELL |
+
+**Out of shell scope (harness targets a Django-rendered page):** the managed harness logs in through
+`#id_username` / `#id_password` (`web/tests/browser/browser_helpers.py:105-112`). These select the
+stock Evennia login form, which the Vue shell does not own, so the login targets stay valid with no
+preserve/remap decision.
+
+**Template / mount contract** (renewed at H6; no spec delta beyond the entries above):
+
+| Contract | Bucket |
+|---|---|
+| `base.html` serves the built Vite bundle (`web/static/webclient/app/dist`) — the jQuery/GoldenLayout/plugin script loads were removed at the C4 flip; the stage mounts through `main.js` | RETIRED-WITH-SHELL |
+| `evennia.js` transport + `Evennia.*` globals (`sendInputField`, `connection`, `.msg`) are preserved by the bridge | PRESERVE-VIA-BRIDGE |
+
+**H6 verification (task 3.4):** the `window.Elosern.*` public façade surface (the §1
+`frozen-facade-surface` JSON — `Protocol`, `KeyboardRouter`, `narrativeInput`, `actions`) and the
+keyboard-router claim contract (C2's re-expression in `webclient-pointer-activation`) are **unchanged**
+by the H1–H5 redesign: the redesign is a view-layer change on the existing transport, so the frozen
+façade member lists in §1 remain the binding surface, and the keyboard-router consumption contract
+(`routeKeyboard` claim rules, modal capture pre-emption) is carried by the bridge untouched.
 
 ### 2.4 Layout-persistence keys
 

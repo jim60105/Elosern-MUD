@@ -43,15 +43,19 @@ Playwright acceptance SHALL use Chromium installed through the locked uv environ
 - **THEN** every successful HTTP and WebSocket request targets localhost and no test result depends on remote availability
 
 ### Requirement: Browser acceptance covers foundation recovery and layout behavior
-Playwright SHALL verify required shell visibility at 1440x900 and 1280x720; command-line focus, send, and cancel behavior — the input field present and typeable with no opening action, `/` moving focus into it without inserting a literal slash, focus retention after an ordinary send, and Escape sending nothing and restoring action-dock focus; the full-overlay contract — a labelled trigger opening exactly one overlay, a second trigger closing the first, and Escape closing the open overlay and restoring focus to its trigger; pointer activation parity on the action dock; narrative rendering of converted server markup; minimap containment within its pane; transport interruption and control locking; lower-revision adoption in a new epoch; rejection of delayed prior-epoch messages; known layout migration; unknown layout reset; presenter degradation; and protocol mismatch with preserved text input.
+Playwright SHALL verify required surface visibility at 1440x900 and 1280x720; that no stage anchor's rendered box intersects another stage anchor's rendered box at either supported viewport; that mode-gated surfaces are hidden with `display:none` (never dimmed) in the modes that hide them — so they leave the accessibility tree and the tab order — and are present again in the modes that show them; command-line focus, send, and cancel behavior — the input field present and typeable with no opening action, `/` moving focus into it without inserting a literal slash, focus retention after an ordinary send, and Escape sending nothing and restoring action-dock focus; the full-overlay contract — a labelled trigger opening exactly one overlay, a second trigger closing the first, and Escape closing the open overlay and restoring focus to its trigger; pointer activation parity on the action dock; narrative rendering of converted server markup; that the complete narrative log is reachable in one action from the bounded caption; minimap containment within its HUD island; transport interruption and control locking; lower-revision adoption in a new epoch; rejection of delayed prior-epoch messages; known layout migration; unknown layout reset; presenter degradation; and protocol mismatch with preserved text input.
 
 #### Scenario: Supported viewports pass the shell journey
 - **WHEN** the acceptance journey runs at each supported desktop viewport
-- **THEN** every required surface is visible, the command input field is present and typeable without any opening action, two consecutive commands are sent from it without any pointer interaction, and Escape restores action-dock focus
+- **THEN** every required surface is visible, no stage anchor overlaps another, two consecutive commands are sent from the command line without any pointer interaction, and Escape restores action-dock focus
 
 #### Scenario: The overlay journey opens, replaces, and returns focus
 - **WHEN** the acceptance journey activates the map trigger, then the settings trigger, then presses Escape
 - **THEN** exactly one overlay is present at each step, opening the second closes the first, and Escape closes the open overlay and returns focus to the trigger that opened it
+
+#### Scenario: Mode gating hides surfaces with display:none
+- **WHEN** the committed mode changes to one that hides a surface
+- **THEN** that surface is hidden with `display:none`, absent from the accessibility tree and the tab order, and it becomes present and focusable again when the mode changes back
 
 #### Scenario: Reconnect behavior is exercised end to end
 - **WHEN** the harness interrupts the active WebSocket and reconnects it
@@ -65,9 +69,13 @@ Playwright SHALL verify required shell visibility at 1440x900 and 1280x720; comm
 - **WHEN** the seeded actor looks at the room in the real client
 - **THEN** the narrative contains the room's styled prose, contains no literal element or entity source characters, and the colored segments carry their palette classes
 
-#### Scenario: The minimap stays inside its pane
+#### Scenario: The complete log is reachable from the bounded caption
+- **WHEN** the narrative holds more lines than the bounded caption displays
+- **THEN** the acceptance journey opens the complete retained log in one action from the caption and closes it on Escape with focus restored
+
+#### Scenario: The minimap stays inside its island
 - **WHEN** the shell renders a seeded grid room's minimap at each supported viewport
-- **THEN** every node marker is inside the map canvas, no two node markers overlap, and the legend and detail line remain visible
+- **THEN** every node marker is inside the map canvas, no two node markers overlap, and the legend and detail line remain visible within the island
 
 ### Requirement: Node and Playwright checks are mandatory quality-gate steps
 Playwright SHALL be added to the synchronized uv development dependency group. The npm frontend toolchain is a dev/CI-time dependency only and introduces no runtime npm dependency. The required quality workflow SHALL install Chromium with `uv run --locked playwright install --with-deps chromium` before the browser runner, run `node --test web/static/webclient/js/tests/*.test.js`, build the Vue application with the locked npm toolchain (`npm ci` and the Vite production build), run the Vue component (Vitest) test suite, build the Storybook component showcase with its component-coverage check against the frozen required set, and run the explicit `web/tests/browser/` discovery once, under coverage, with the enumerated test files executed serially within each browser workspace; concurrent browser workspaces SHALL own isolated server lifecycles (unique ephemeral ports, a private SQLite database, and dedicated log/media/static roots). The Vue `dist` artifact SHALL be built in the browser test workspaces and in the container image. The managed browser acceptance SHALL assert against the preserved DOM contract hooks (`#action-dock`, the `action-`/`target-` keys, `#combat-row-0`, panel ids) and the re-mapped `data-testid` hooks, and SHALL include the offline-degradation regression (bundle blocked → text playable via the console; incompatible OOB → graphical locked with text round-tripping). Browser tests carrying requirement annotations SHALL write to the same `OPENSPEC_TEST_EVIDENCE` path before execution evidence is verified. Browser coverage SHALL be combined with non-browser Evennia and top-level coverage before exact-root and aggregate threshold verification. Managed browser acceptance MUST NOT be included in a generic parallel Evennia profile. Existing strict OpenSpec, Python suite, traceability, coverage-root, aggregate 80% branch-coverage, and Codecov gates SHALL remain enabled. The built page makes no remote runtime request.
@@ -111,20 +119,27 @@ target — and turns a swallowed key press into a precise diagnostic.
   instead of a bare timeout
 
 ### Requirement: The implementation-bound public contract is frozen before the shell is swapped
-Before the WebClient's GoldenLayout/jQuery shell is replaced, the implementation-bound client
-contract SHALL be enumerated and frozen: the `window.Elosern.*` public façades, the keyboard /
-plugin key-event path, the DOM identifiers the managed browser tests target, and the versioned
-layout-persistence keys. The freeze SHALL be a committed, reviewed deliverable that is the binding
-input to the browser-bridge change, and every identifier the browser tests currently target SHALL be
-either preserved unchanged or re-mapped to a stable `data-testid` hook per that frozen list.
+Before any change that relocates a browser-targeted identifier — a shell swap, a layout restructure, or
+a surface migration — the implementation-bound client contract SHALL be enumerated and frozen: the
+`window.Elosern.*` public façades, the keyboard / plugin key-event path, the DOM identifiers the managed
+browser tests target, and the versioned layout-persistence keys. The freeze SHALL be a committed,
+reviewed deliverable that is the binding input to the change that performs the relocation, and every
+identifier the browser tests currently target SHALL be either preserved unchanged or re-mapped to a
+stable `data-testid` hook per that frozen list. The deliverable SHALL be renewed — not superseded by a
+second parallel document — whenever a later change relocates identifiers again, so exactly one frozen
+list describes the current client.
 
 #### Scenario: A frozen contract list exists before wiring
-- **WHEN** the Phase-0 contract audit is complete
-- **THEN** a committed list names each implementation-bound contract (façade, key path, targeted DOM id, persistence key) classified as preserve-via-bridge or delta, and is declared the input to the browser-bridge change
+- **WHEN** the contract audit for a pending shell or layout change is complete
+- **THEN** a committed list names each implementation-bound contract (façade, key path, targeted DOM id, persistence key) classified as preserve-via-bridge or delta, and is declared the input to the change that performs the relocation
 
 #### Scenario: Browser-test targets are preserved or re-mapped per the list
-- **WHEN** the GoldenLayout/jQuery shell is later replaced by the Vue app
+- **WHEN** the shell or the layout is restructured
 - **THEN** every identifier the managed Playwright suite currently targets is either preserved unchanged or re-mapped to a stable `data-testid`, per the frozen list
+
+#### Scenario: The frozen list is renewed rather than duplicated
+- **WHEN** a later change relocates browser-targeted identifiers again
+- **THEN** the existing frozen deliverable is updated to describe the current client, and no second parallel contract list is introduced
 
 ### Requirement: Browser test waits gate on deterministic state within a bounded deadline
 The managed Playwright acceptance journeys SHALL gate every test wait by polling the committed

@@ -32,6 +32,16 @@ Because one large change cannot be reviewed or rolled back safely, the migration
 dependency-waved sequence of ~1-workday changes, each independently green. This document owns the order
 and the rules that make twelve independent changes behave like one migration.
 
+> **Correction (2026-08-26, applied by `webclient-hud-06-remap-and-finalize`):** §1's layout intent —
+> building *to* the 設計稿 — was not delivered by A1–D1: the migration landed the Vue SPA and its
+> gates, but the shipped UI is the older five-surface, three-column dashboard, and §2's goal *"Land the
+> 設計稿 as a committed, linked design reference in `docs/`"* reduced the draft to a documentation
+> deliverable. The 設計稿's layout, information architecture, and contextual visibility model were
+> completed by the HUD redesign roadmap
+> (`docs/superpowers/specs/2026-08-25-webclient-hud-redesign-roadmap-design.md`), and H6 applies that
+> supersession in `2026-08-02-webclient-ui-design.md` §5.1/§5.2. The migration's twelve changes stand as
+> complete against their own contracts; the defect was in the contract, not the execution.
+
 ---
 
 ## 2. Goals and Non-Goals
@@ -69,6 +79,10 @@ The source-of-truth chain, highest precedence first:
    (per AGENTS.md).
 2. `docs/superpowers/specs/2026-08-02-webclient-ui-design.md` — the WebClient suite's source of truth,
    including its §13 Delivery Roadmap convention and §7 player-facing surfaces.
+   **Annotated 2026-08-26:** its §5.1 (default desktop layout) and §5.2 (visual language) are superseded
+   by the HUD redesign roadmap's precedence items 2–3 (`2026-08-25-webclient-hud-redesign-roadmap-design.md`
+   §4) — the chain ranked above this item is exactly the failure mode §1 documents; H6 rewrites those two
+   sections in place, so no superseded layout document outranks the roadmap that supersedes it.
 3. **This roadmap** — authoritative for the Vue-migration intent, delivery order, and cross-change
    mechanics; supersedes the single `webclient-vue-migration` change.
 4. Each `webclient-vue-NN-*` change — the implementation contract for its own slice.

@@ -31,7 +31,11 @@ H6 removes the contradiction at its source rather than layering another document
   `data-testid` re-map that H1–H5 performed. The audit becomes the binding input for the *next* shell
   change, exactly as A1's audit was for C2/C4.
 - **Re-freeze the component manifest** at the complete redesign set, and re-state
-  `webclient-component-showcase`'s frozen-set requirement at that set.
+  `webclient-component-showcase`'s frozen-set requirement at that set. Deleting the orphaned
+  `CharacterPanel` (its surface moved into the `CharacterStatusDrawer` at H4) also retires the
+  `CharacterPanel` naming in the showcase main spec's required-set enumeration and the
+  "status, character, and skill surfaces" requirement — both re-stated in the change's showcase
+  delta so the main spec stays true after the deletion.
 - **Extend the deferred-surface assertion** to the complete unbacked list — companion/party panel,
   event-log toasts, a persistent objective tracker, and the intimate/adult collapsible — each named
   with the read model it waits on.
@@ -58,8 +62,9 @@ H6 removes the contradiction at its source rather than layering another document
   non-overlap and mode-gating journeys and drops the "minimap containment within its pane" phrasing
   that the island model replaced.
 - `webclient-component-showcase`: the frozen-set requirement is re-stated at the complete redesign set.
-  **Its base text is H4's edited version, not the current main spec**, because H4 lands first and
-  corrects the inventory-bag deferral (roadmap §7: never two archives of the same capability at once).
+  **Its base text is the current main spec**, which already carries the synced H4 and H5 edits
+  (inventory-bag backed-by-`services.inventory.rows`; the client-local settings state; the deferred
+  game-help browser) (roadmap §7: never two archives of the same capability at once).
 
 ## Impact
 
