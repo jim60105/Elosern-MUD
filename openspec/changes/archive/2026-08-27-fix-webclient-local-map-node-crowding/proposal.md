@@ -18,14 +18,17 @@ during this review, and it reproduces on every room with more than one adjacent 
 
 ## What Changes
 
-- Widen the lattice's effective cell geometry in `LocalMap.vue` so a node's own marker footprint and its
-  label's rendered height both fit inside their cell with a visible margin to the neighboring cell:
-  separate the horizontal column pitch from the vertical row pitch (row pitch SHALL exceed column pitch
-  by at least the label's line height) rather than reusing one `CELL` constant for both axes and for
-  marker sizing.
-  - Reduce marker radius relative to the (now-taller) row pitch, or increase the pitch relative to
-    the existing marker sizes — either satisfies the spec; the design doc §D9 lattice model line-number
-    references above choose the appropriate constants.
+- Decouple the lattice's horizontal column pitch from the vertical row pitch in `LocalMap.vue`
+  (replacing the single shared `CELL` constant), sizing each axis by its verified clearance:
+  - the **column pitch** must clear two truncated node labels (4 CJK chars at 11px monospace ≈ 44px
+    wide) centered under horizontally adjacent nodes with a strictly-positive visible gap;
+  - the **row pitch** must clear the node's marker height, the node's own label's rendered line height,
+    and a strictly-positive gap before the next row's marker, so a label drawn below one node never
+    enters the bounding box of the node in the row beneath it.
+  - Neither axis is required to be the larger one; either may be reduced or the marker radii tuned to
+    satisfy the clearances (the design doc §D9 lattice model references above chose `COL_PITCH = 58`
+    and `ROW_PITCH = 44` — the column axis ended up wider, which the original "row pitch exceeds
+    column pitch" wording got backwards).
 - Fix `nodePos`'s row spacing so a label rendered below one node never falls inside the marker or label
   bounding box of the node in the row beneath it, at every populated lattice size up to the model's
   64×64 bound.

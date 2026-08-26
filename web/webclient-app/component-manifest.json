@@ -35,6 +35,7 @@
     "World/QuestBoard",
     "World/LoreDrawer",
     "World/InventoryPanel",
+    "World/MapLattice",
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
     "Overlays/HelpOverlay",

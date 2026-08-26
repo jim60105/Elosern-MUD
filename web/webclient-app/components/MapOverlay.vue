@@ -3,13 +3,13 @@
 // overlay surface (H5, webclient-hud-05-overlays-and-command-line, task 6.1).
 // The modal chrome (position, z-index, close button, aria-modal) now belongs
 // to the OverlayHost surface; this component renders only the `local_map`
-// payload's branch — the available lattice (reused LocalMap) or the
-// registry-owned unavailable reason. The host's focus trap, Escape, and the
-// labelled close control own the surface's behaviour. Actionable adjacent
-// nodes forward a `move` event so the C-wire store can consume the OOB
-// `explore.move` intent.
+// payload's branch — the available lattice (reused MapLattice at the
+// overlay's own larger scale) or the registry-owned unavailable reason.
+// The host's focus trap, Escape, and the labelled close control own the
+// surface's behaviour. Actionable adjacent nodes forward a `move` event so
+// the C-wire store can consume the OOB `explore.move` intent.
 import { computed } from "vue";
-import LocalMap from "./LocalMap.vue";
+import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (the available form or the
@@ -33,11 +33,9 @@ function handleMove(payload) {
   emit("move", payload);
 }
 
-// The island's full-map trigger (task 6.2): forward to the parent's
-// overlay slice so the map overlay opens through the shared surface.
-function handleOpenMap() {
-  emit("open-map");
-}
+// The `open-map` emit is kept for the parent's overlay slice (AppClient's
+// `onMapExpand`); the expand trigger now lives only in the island's chrome
+// (`LocalMap.vue`), so the overlay body itself no longer re-emits it.
 </script>
 
 <template>
@@ -50,7 +48,24 @@ function handleOpenMap() {
       {{ reasonMessage }}
     </p>
     <div v-else class="map-overlay__content" data-testid="map-overlay-content">
-      <LocalMap :local-map="localMap" @move="handleMove" @open-map="handleOpenMap" />
+      <!-- The shared lattice renderer at the overlay's larger scale: the
+           pitch fills the body's 848px content width for the seed's 3-column
+           lattice (900px host cap − 52px padding), labels truncate later
+           than the island's 4 characters, and markers scale by the same
+           factor so the crowding fix's non-collision geometry carries over.
+           No height cap is passed — the host body's `overflow-y: auto` is
+           the documented fallback for tall, dense payloads (design.md). -->
+      <MapLattice
+        :local-map="localMap"
+        :col-pitch="280"
+        :row-pitch="212"
+        :label-max="10"
+        :marker-scale="4.83"
+        :max-width="848"
+        :max-height="null"
+        :fill-width="true"
+        @move="handleMove"
+      />
     </div>
   </div>
 </template>
@@ -69,6 +84,10 @@ function handleOpenMap() {
 
 .map-overlay__content {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  /* The shared lattice renders its canvas at the body's available width and
+     its state legend below it; a row-direction flex would place the legend
+     beside the full-width canvas. */
 }
 </style>

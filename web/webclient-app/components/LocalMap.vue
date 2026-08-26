@@ -4,16 +4,16 @@
 // island. The root keeps the stable `.local-map` class that H1's
 // combat-hide CSS and the shell's `HIDDEN_BY_MODE` focus-rescue map select
 // on literally, so the re-chrome never silently un-hides the minimap in a
-// mode whose matrix hides it. The canvas is sized from the reduced model's
-// exported lattice (`cols`/`rows`), so the canvas reserves its own space
-// within the island's bounded height. The meta line carries the payload's
-// `title` and, on the coordinate-bearing `grid` / `wilderness` layers only,
-// a renderer-axis orientation legend (北↑); coordinate-free `instance` /
-// `interior` layers omit it. No bearing, no compass angle, no distance is
-// rendered (node `x`/`y` are renderer-local presentation geometry). The
-// full-map affordance is deferred to H5 (MapOverlay), so the island ships
-// no full-map control; the per-node `explore.move` submission is unchanged.
-import { computed, ref } from "vue";
+// mode whose matrix hides it. The lattice itself (nodes, markers,
+// connector edges, labels, state legend) is rendered by the shared
+// MapLattice component (improve-webclient-map-overlay-scale), so the
+// full-map overlay can render the same lattice at its own larger scale.
+// The island keeps its chrome: the meta row (title + orientation legend +
+// "展開全地圖" expand button), the bounded focusable remembered-node list,
+// and the hovered/selected-node detail line driven by the lattice's
+// `select`/`hover`/`leave` events.
+import { computed, onMounted, onUpdated, ref } from "vue";
+import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (available form or the
@@ -25,21 +25,13 @@ const emit = defineEmits(["move", "open-map"]);
 
 // Legend entries follow the fixed visibility order: current, visible_unvisited,
 // visible_visited, remembered. Extra entries cycle through the same glyphs.
-const LEGEND_STATES = ["current", "visible_unvisited", "visible_visited", "remembered"];
-function legendState(index) {
-  return LEGEND_STATES[index % LEGEND_STATES.length];
-}
 
 const available = computed(() => props.localMap.available === true);
 const reason = computed(() => props.localMap.reason?.message ?? "");
 const title = computed(() => props.localMap.title ?? "");
 const layer = computed(() => props.localMap.layer ?? null);
 const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
-const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
-const legend = computed(() => (Array.isArray(props.localMap.legend) ? props.localMap.legend : []));
 const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
-const cols = computed(() => props.localMap.cols ?? 0);
-const rows = computed(() => props.localMap.rows ?? 0);
 
 // The orientation legend states the renderer's own axis convention only
 // (design D9): the wilderness adapter puts north at +y and the renderer
@@ -58,68 +50,11 @@ const STATE_LABELS = {
   remembered: "已探索",
 };
 
-const nodeById = computed(() => {
-  const byId = {};
-  for (const node of nodes.value) byId[node.id] = node;
-  return byId;
-});
-
-// Lattice-driven canvas geometry (design D9 + the local-map delta): the
-// reduced model places in-view nodes on a bounded integer lattice and
-// exports the lattice's column/row counts; the canvas sizes from that
-// lattice so it reserves its own space inside the island instead of the
-// island scrolling a required surface out of view. North (+y) draws
-// upward, so a node's row is inverted against the row count. A reserved
-// label band below the last row keeps node labels inside the canvas
-// instead of overhanging it and colliding with the island's next surface.
-const CELL = 24;
-const LABEL_BAND = 14;
-const canvasWidth = computed(() => Math.max(1, cols.value) * CELL);
-const canvasHeight = computed(() => Math.max(1, rows.value) * CELL + LABEL_BAND);
-
-// Node labels are bounded and truncated in the 24px cell; the full label
-// stays reachable through the node's accessible name.
-const LABEL_MAX = 6;
-function truncatedLabel(label) {
-  const value = String(label ?? "");
-  return value.length > LABEL_MAX ? value.slice(0, LABEL_MAX) + "…" : value;
-}
-
-function nodePos(node) {
-  return {
-    x: node.col * CELL + CELL / 2,
-    y: (Math.max(1, rows.value) - 1 - node.row) * CELL + CELL / 2,
-  };
-}
-
-// Edges are drawn between the centers of their endpoints; an edge whose
-// endpoint is not in the payload is omitted from the drawn layer.
-const edgeGeoms = computed(() =>
-  edges.value
-    .map((edge, i) => {
-      const s = nodeById.value[edge.source];
-      const d = nodeById.value[edge.destination];
-      if (!s || !d) return null;
-      const sp = nodePos(s);
-      const dp = nodePos(d);
-      return {
-        i,
-        x1: sp.x,
-        y1: sp.y,
-        x2: dp.x,
-        y2: dp.y,
-      };
-    })
-    .filter(Boolean),
-);
-
-function edgeClass(edge) {
-  if (edge.known === false) return "local-map__edge--unknown";
-  return edge.traversable ? "local-map__edge--traversable" : "local-map__edge--blocked";
-}
-
 // Detail line: shows the hovered node when one is hovered, otherwise the
-// selected node, defaulting to the current node on mount.
+// selected node, defaulting to the current node on mount. The lattice's
+// `select` event (emitted on every node activation) drives `selectedId`;
+// the remembered list's own click/focus handlers still call `selectNode`
+// directly — it never left the island's scope.
 const selectedId = ref(props.localMap.current_node ?? null);
 const hoveredId = ref(null);
 
@@ -158,20 +93,67 @@ function clearHover() {
   hoveredId.value = null;
 }
 
-// Only an exact `move` action on the payload makes a node actionable.
-function activateNode(node) {
-  selectNode(node);
-  if (node.action && node.action.kind === "move") {
-    emit("move", {
-      exit_ref: node.action.exit_ref,
-      destination: node.action.destination,
-    });
-  }
+// Dynamic canvas height budget (the crowding fix): a fixed 296px cap would
+// ignore the rendered height of the island's other sections, so a tall
+// lattice combined with a long remembered list would push required content
+// into the anchor's overflow-y scroll fallback. Instead the canvas's
+// max-height shrinks to the space the hud-right anchor's height budget
+// leaves after the meta row, remembered list, legend, and detail line; the
+// computed cap is passed down to MapLattice as its `maxHeight` prop.
+const rootEl = ref(null);
+const metaEl = ref(null);
+const rememberedEl = ref(null);
+const detailEl = ref(null);
+const canvasMaxHeight = ref(0);
+
+function sectionHeight(el) {
+  return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
 }
+
+function measureCanvasBudget() {
+  const root = rootEl.value;
+  if (!root) return;
+  // Island context only: the full-map overlay renders the lattice outside
+  // the hud-right anchor, so it keeps the prop caps.
+  const anchor = root.closest('[data-anchor="hud-right"]');
+  if (!anchor) return;
+  const budget = anchor.clientHeight;
+  if (!budget) return;
+  // 5 island sections (meta, canvas, remembered list when non-empty,
+  // legend, detail) separated by 8px (--sp-2) gaps; the meta row also
+  // carries a 4px margin-bottom outside its own bounding box; 9px island
+  // padding top and bottom; the canvas element's 2px border. The state
+  // legend now renders inside MapLattice (this component's child), so the
+  // lookup is scoped to the island root to measure its height without
+  // picking up a legend from a sibling surface (the overlay may be mounted
+  // at the same time).
+  const legendEl = root.querySelector('[data-testid="local-map__legend"]');
+  const gapCount = 3 + (remembered.value.length > 0 ? 1 : 0);
+  const others =
+    sectionHeight(metaEl.value) +
+    sectionHeight(rememberedEl.value) +
+    sectionHeight(legendEl) +
+    sectionHeight(detailEl.value);
+  // The extra 1px of slack absorbs the island's 1px border top/bottom
+  // rounding so the island never needs to scroll a required surface.
+  const available = budget - others - gapCount * 8 - 18 - 2 - 5;
+  canvasMaxHeight.value = Math.max(40, Math.min(296, available));
+}
+
+onMounted(() => {
+  measureCanvasBudget();
+  const anchor = rootEl.value?.closest('[data-anchor="hud-right"]');
+  if (anchor && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => measureCanvasBudget()).observe(anchor);
+  }
+});
+onUpdated(() => {
+  measureCanvasBudget();
+});
 </script>
 
 <template>
-  <aside class="local-map" data-testid="local-map">
+  <aside class="local-map" data-testid="local-map" ref="rootEl">
     <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
       {{ reason }}
     </p>
@@ -179,7 +161,7 @@ function activateNode(node) {
       <!-- The island's top-meta line (design D9): the payload's title plus,
            on the coordinate-bearing layers only, the renderer's axis
            orientation legend. No bearing or distance is rendered. -->
-      <div class="local-map__meta" data-testid="local-map__title">
+      <div class="local-map__meta" data-testid="local-map__title" ref="metaEl">
         <span class="local-map__meta-title">{{ title }}</span>
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑
@@ -199,91 +181,24 @@ function activateNode(node) {
         </button>
       </div>
 
-      <svg
-        class="local-map__lattice"
-        :width="canvasWidth"
-        :height="canvasHeight"
-        :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
-        role="img"
-        aria-label="區域地圖縮圖"
-        data-testid="local-map__lattice"
-        @mouseleave="clearHover"
-      >
-        <line
-          v-for="edge in edgeGeoms"
-          :key="`edge-${edge.i}`"
-          class="local-map__edge"
-          :class="edgeClass(edges[edge.i])"
-          :data-testid="`local-map__edge--${edge.i}`"
-          :x1="edge.x1"
-          :y1="edge.y1"
-          :x2="edge.x2"
-          :y2="edge.y2"
-          :aria-label="edges[edge.i].label"
-        />
-        <g
-          v-for="node in nodes"
-          :key="node.id"
-          class="local-map__node"
-          :class="`local-map__node--${node.visibility}`"
-          :data-testid="`local-map__node--${node.id}`"
-          :data-node="node.id"
-          :data-node-id="node.id"
-          :data-visibility="node.visibility"
-          :transform="`translate(${nodePos(node).x}, ${nodePos(node).y})`"
-          @click="activateNode(node)"
-          @mouseenter="hoverNode(node)"
-        >
-          <rect
-            v-if="node.visibility === 'current'"
-            class="local-map__marker local-map__marker--current"
-            data-testid="local-map__marker--current"
-            x="-13"
-            y="-13"
-            width="26"
-            height="26"
-            aria-hidden="true"
-          />
-          <circle
-            v-else-if="node.visibility === 'visible_unvisited'"
-            class="local-map__marker local-map__marker--visible_unvisited"
-            r="12"
-            aria-hidden="true"
-          />
-          <circle
-            v-else-if="node.visibility === 'visible_visited'"
-            class="local-map__marker local-map__marker--visible_visited"
-            r="12"
-            aria-hidden="true"
-          />
-          <rect
-            v-else-if="node.visibility === 'remembered'"
-            class="local-map__marker local-map__marker--remembered"
-            x="-9"
-            y="-9"
-            width="18"
-            height="18"
-            transform="rotate(45)"
-            aria-hidden="true"
-          />
-          <circle
-            v-if="node.action"
-            class="local-map__actionable"
-            data-testid="local-map__actionable"
-            r="10"
-            aria-hidden="true"
-          />
-          <text class="local-map__node-label" y="24" text-anchor="middle">
-            <title>{{ node.label }}</title>{{ truncatedLabel(node.label) }}
-          </text>
-        </g>
-      </svg>
+      <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
+           minimap composes MapLattice at its default (post-crowding-fix)
+           scale; the dynamically measured height budget (the crowding fix)
+           is passed down as the canvas cap. -->
+      <MapLattice
+        :local-map="localMap"
+        :max-height="canvasMaxHeight || 296"
+        @select="selectNode"
+        @hover="hoverNode"
+        @leave="clearHover"
+        @move="(p) => emit('move', p)"
+      />
 
       <!-- The spec's bounded, focusable remembered-remote-node list (outside
            the coordinate canvas): each entry keeps its non-color diamond
            state indicator and selects (focuses) the node without emitting a
            travel action. -->
-      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered">
+      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
         <li
           v-for="node in remembered"
           :key="node.id"
@@ -309,31 +224,7 @@ function activateNode(node) {
         </li>
       </ul>
 
-      <ul class="local-map__legend" data-testid="local-map__legend">
-        <li
-          v-for="(entry, i) in legend"
-          :key="`legend-${i}`"
-          class="local-map__legend-item"
-          :data-testid="`local-map__legend-item--${i}`"
-        >
-          <svg
-            class="local-map__legend-glyph"
-            :class="`local-map__legend-glyph--${legendState(i)}`"
-            viewBox="-16 -16 32 32"
-            width="14"
-            height="14"
-            aria-hidden="true"
-          >
-            <rect v-if="legendState(i) === 'current'" x="-10" y="-10" width="20" height="20" />
-            <rect v-else-if="legendState(i) === 'remembered'" x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
-            <circle v-else-if="legendState(i) === 'visible_visited'" r="9" />
-            <circle v-else r="9" />
-          </svg>
-          {{ entry }}
-        </li>
-      </ul>
-
-      <p class="local-map__detail" data-testid="local-map-detail">
+      <p class="local-map__detail" data-testid="local-map-detail" ref="detailEl">
         {{ detailParts.join(" · ") }}
       </p>
     </template>
@@ -424,126 +315,6 @@ function activateNode(node) {
   font-size: 0.85em;
 }
 
-/* The canvas sizes from the model's exported lattice (cols × rows cells),
-   bounded to the island's content width; the legend, remembered list, and
-   detail line stay non-overlapping below it. */
-.local-map__lattice {
-  display: block;
-  /* Natural pixel size from the lattice (cols × rows × 24px cells): the SVG's
-     width/height attributes drive the render. The element keeps its attribute
-     width (not stretched to the container), and a wide lattice is capped by
-     max-width so the height scales down proportionally. */
-  max-width: 206px;
-  height: auto;
-  background: var(--ink-860);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  overflow: visible;
-}
-
-.local-map__node {
-  cursor: pointer;
-}
-
-.local-map__node-label {
-  fill: var(--paper-300);
-  font-family: var(--f-mono);
-  font-size: 11px;
-  /* Decorative label: must never intercept pointer events intended for the
-     node's actionable circle (the label sits in the cell below its node). */
-  pointer-events: none;
-}
-
-.local-map__marker--current {
-  fill: var(--gold-400);
-}
-
-.local-map__marker--visible_unvisited {
-  fill: transparent;
-  stroke: var(--vit-sp);
-  stroke-width: 2;
-}
-
-.local-map__marker--visible_visited {
-  fill: var(--vit-sp);
-}
-
-.local-map__marker--remembered {
-  fill: var(--paper-500);
-}
-
-.local-map__actionable {
-  fill: var(--seal-glow);
-  stroke: var(--seal-400);
-  stroke-width: 2;
-}
-
-/* Edges form a non-interactive connector layer: they never intercept the
-   pointer events intended for a node's actionable circle. */
-.local-map__edge {
-  pointer-events: none;
-}
-
-.local-map__edge--traversable {
-  stroke: var(--paper-300);
-  stroke-width: 1.5;
-}
-
-.local-map__edge--blocked {
-  stroke: var(--paper-500);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
-}
-
-.local-map__edge--unknown {
-  stroke: var(--paper-700);
-  stroke-width: 1.5;
-  stroke-opacity: 0.45;
-  stroke-dasharray: 2 5;
-}
-
-.local-map__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.local-map__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: 2px var(--sp-2);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-300);
-  font-size: var(--text-sm);
-}
-
-.local-map__legend-glyph {
-  flex: none;
-}
-
-.local-map__legend-glyph--current rect {
-  fill: var(--gold-400);
-}
-
-.local-map__legend-glyph--visible_unvisited circle {
-  fill: transparent;
-  stroke: var(--vit-sp);
-  stroke-width: 2;
-}
-
-.local-map__legend-glyph--visible_visited circle {
-  fill: var(--vit-sp);
-}
-
-.local-map__legend-glyph--remembered rect {
-  fill: var(--paper-500);
-}
-
 .local-map__detail {
   margin: 0;
   padding: var(--sp-1) var(--sp-3);
@@ -577,5 +348,17 @@ function activateNode(node) {
 
 .local-map__remembered .local-map__marker--remembered rect {
   fill: var(--paper-500);
+}
+
+/* The remembered list's plain-text label spans keep the lattice label
+   metrics (the extraction moved this rule into MapLattice's scoped CSS,
+   which no longer reaches the island's own list items): without it the
+   spans inherit the item's 13px font and grow every list row by 3px,
+   breaking the crowding fix's no-scroll guarantee at small viewports. */
+.local-map__node-label {
+  fill: var(--paper-300);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  pointer-events: none;
 }
 </style>

@@ -5,9 +5,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 The component SHALL render as a bounded HUD island anchored on the stage, not as a card inside a scrolling layout column. Its root element SHALL keep the stable `local-map` component identifier that the shell's mode-gated visibility rules and its focus-rescue path both select on, so re-chroming the surface never silently un-hides it in a mode whose matrix hides it.
 
-Layout SHALL be computed in the DOM-independent render model as a bounded integer lattice, not as a rescaling of payload coordinates into a fixed pixel box. The model SHALL place only current-field-of-view nodes (`current`, `visible_unvisited`, `visible_visited`) on that lattice, deriving each node's column and row from its payload coordinates relative to the minimum in-view coordinate, and SHALL export the lattice's column and row counts. When that span would exceed 64 columns or 64 rows, the model SHALL fall back to rank compression over the distinct sorted coordinate values, which cannot exceed the payload's node bound. The renderer SHALL size the map canvas from the exported lattice so the canvas reserves its own space **within the island's bounded height**, scaling the canvas down rather than requiring the island to scroll a required surface out of view, and SHALL NOT allow map content to overlap the island's title, its orientation legend, the state legend, the remembered-node list, the detail line, or any other island content. Node labels SHALL occupy a single line with an overflow indicator, and each node's full label SHALL remain available as its accessible name.
+Layout SHALL be computed in the DOM-independent render model as a bounded integer lattice, not as a rescaling of payload coordinates into a fixed pixel box. The model SHALL place only current-field-of-view nodes (`current`, `visible_unvisited`, `visible_visited`) on that lattice, deriving each node's column and row from its payload coordinates relative to the minimum in-view coordinate, and SHALL export the lattice's column and row counts. When that span would exceed 64 columns or 64 rows, the model SHALL fall back to rank compression over the distinct sorted coordinate values, which cannot exceed the payload's node bound. The renderer SHALL size the map canvas from the exported lattice so the canvas reserves its own space **within the island's bounded height**, scaling the canvas down rather than requiring the island to scroll a required surface out of view. The canvas's height cap SHALL be derived from the space the hud-right anchor's bounded height budget leaves after the island's other sections (meta line, remembered list, legend, detail line) — not from a fixed constant — so a long remembered list no longer forces the island's `overflow-y` scroll fallback. The renderer SHALL NOT allow map content to overlap the island's title, its orientation legend, the state legend, the remembered-node list, the detail line, or any other island content. Node labels SHALL occupy a single line with an overflow indicator, and each node's full label SHALL remain available as its accessible name.
 
 The renderer's column pitch, row pitch, and marker sizing SHALL be chosen so that, at every lattice size the model can produce, no rendered node marker's visual footprint and no rendered node label's visual footprint intersects the footprint of any other node's marker or label — this holds independently of any uniform scale-down applied to fit the island's bounded height. A connector edge between two node markers SHALL remain visually distinguishable rather than being fully occluded by the markers it connects.
+
+The lattice-rendering logic (node/marker placement, connector edges, per-node labels, and the state legend) SHALL be shared between the minimap island's own rendering and the full-map overlay's rendering, parameterized by scale rather than duplicated: the full-map overlay SHALL render the identical in-view nodes, edges, and legend entries the minimap island renders for the same committed payload, sized to the overlay surface's own available space rather than the minimap island's fixed small canvas, with the same non-overlap guarantee applying at that larger scale. The full-map overlay SHALL NOT render the `remembered` remote-node list or the hovered/selected-node detail line; both remain minimap-island-only, since selection state has no visual effect on the lattice itself and the detail line's content spans both the in-view lattice and the remembered list.
 
 The island SHALL carry the payload's `title`. It MAY additionally state the renderer's own axis orientation as a legend on a layer whose nodes are placed on coordinates, and SHALL omit that legend on a coordinate-free layer rather than assert a direction the payload does not support. It SHALL NOT render a bearing, a compass angle, or a distance in any form: node `x`/`y` are renderer-local presentation geometry, not canonical world coordinates, and no such figure may be derived from them.
 
@@ -68,18 +70,37 @@ The island SHALL carry the payload's `title`. It MAY additionally state the rend
   distinguishable rather than being fully covered by their markers
 
 #### Scenario: A densely populated lattice scales down without reintroducing overlap
-- **WHEN** the in-view lattice is wide or tall enough that the island's `max-width` cap scales the whole
-  SVG canvas down proportionally
+- **WHEN** the in-view lattice is wide or tall enough that the island's `max-width` or `max-height`
+  cap scales the whole SVG canvas down proportionally
 - **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled
   render remains free of marker/label collisions
+
+#### Scenario: A long remembered list keeps required island content in view
+- **WHEN** the payload combines a tall in-view lattice with a long remembered-node list (up to the
+  model's 64-node bound)
+- **THEN** the canvas's max-height cap shrinks to the space the hud-right anchor's height budget leaves
+  after the meta line, remembered list, legend, and detail line, so no required island content has to
+  be scrolled out of view
 
 #### Scenario: A single-node room states orientation without any collision risk
 - **WHEN** the in-view lattice contains exactly one node
 - **THEN** its marker and label render with no neighboring node to collide with, and the fix's pitch and
   sizing changes produce no regression versus the single-node case
 
+#### Scenario: The full-map overlay renders the same lattice at a larger scale
+- **WHEN** the player opens the full-map overlay for a committed `local_map` payload
+- **THEN** the overlay renders the identical in-view nodes, edges, and legend entries the minimap island
+  renders for that same payload, sized to the overlay's own available surface rather than the minimap
+  island's fixed canvas size, with no marker, label, or edge collision at the overlay's scale
+
+#### Scenario: The full-map overlay omits the remembered-node list and the detail line
+- **WHEN** the committed payload carries one or more `remembered` nodes, or a node is hovered inside the
+  overlay
+- **THEN** the full-map overlay does not render a remembered-node list or a hovered/selected-node detail
+  line; both disclosures remain reachable only from the minimap island
+
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
-The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity. A node with `action: null`, a remembered remote node, or a node whose `visibility` is not a current-field-of-view state SHALL NOT submit any travel action and SHALL remain inert or focus-only exactly as before. The component SHALL derive the submitted `exit_ref` and `current_node` only from the validated `local_map` payload, SHALL NOT construct an exit reference, destination, or room identity from entity data or prose, and SHALL leave the `local_map` panel payload contract, the `未探索` unvisited-node rule, and the remembered-node no-travel rule unchanged. On a successful or rejected submission the refreshed `local_map` payload at the newer revision SHALL replace the rendered minimap; the component SHALL NOT keep a client-side canonical map cache. The corrected node-pitch geometry (this change) SHALL NOT alter which node an activation targets: the enlarged marker's clickable/focusable area SHALL remain centered on the same lattice coordinate the payload assigned it.
+The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity. A node with `action: null`, a remembered remote node, or a node whose `visibility` is not a current-field-of-view state SHALL NOT submit any travel action and SHALL remain inert or focus-only exactly as before. The component SHALL derive the submitted `exit_ref` and `current_node` only from the validated `local_map` payload, SHALL NOT construct an exit reference, destination, or room identity from entity data or prose, and SHALL leave the `local_map` panel payload contract, the `未探索` unvisited-node rule, and the remembered-node no-travel rule unchanged. On a successful or rejected submission the refreshed `local_map` payload at the newer revision SHALL replace the rendered minimap; the component SHALL NOT keep a client-side canonical map cache. The corrected node-pitch geometry (this change) SHALL NOT alter which node an activation targets: the enlarged marker's clickable/focusable area SHALL remain centered on the same lattice coordinate the payload assigned it. This activation behavior SHALL be identical whether the lattice renders inside the minimap island or inside the full-map overlay, since both consume the same shared lattice-rendering logic.
 
 #### Scenario: Activating an adjacent traversable node submits explore.move
 - **WHEN** the player focuses an adjacent traversable node whose `action` is the exact `move` object and confirms it
@@ -97,3 +118,7 @@ The WebClient `local-map` component SHALL make a currently traversable adjacent 
 - **WHEN** the player activates a node marker after the pitch/sizing fix has been applied
 - **THEN** the `explore.move` submission carries the same node's `exit_ref` and destination as before the
   fix, unaffected by the marker's new visual size or position within its (now larger) cell
+
+#### Scenario: Move submission works identically from the full-map overlay
+- **WHEN** the player activates an adjacent traversable node while the full-map overlay is open
+- **THEN** the same single `explore.move` envelope is submitted as if the same node had been activated in the minimap island, and the overlay's rendered lattice reflects the refreshed payload
