@@ -629,16 +629,18 @@ def valid_art_panel() -> dict:
 
 
 def valid_character_panel(**overrides) -> dict:
-    """A schema-valid available character panel (schema version 3) for
+    """A schema-valid available character panel (schema version 4) for
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
     (``web/webclient/presentation/character.py``): a `magic_level` trait row,
-    a guild rank/merit, and an integer-copper wallet. ``overrides`` replace
+    a guild rank/merit, and an integer-copper wallet. The v4 exact-field set
+    includes the nullable ``intimate`` section (webclient-intimate-status-
+    section); a `None` value is schema-valid. ``overrides`` replace
     top-level fields for variant cases (e.g. an active disguise).
     """
     panel = {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "character",
         "traits": [
@@ -651,6 +653,7 @@ def valid_character_panel(**overrides) -> dict:
         "guild": {"rank": "銀牌", "merit": 120},
         "wallet": 3240,
         "persona": {"background": None},
+        "intimate": None,
     }
     panel.update(overrides)
     return panel

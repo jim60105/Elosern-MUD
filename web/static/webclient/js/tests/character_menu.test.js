@@ -16,7 +16,7 @@ const CharacterMenu = require("../elosern/character_menu.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "character",
       traits: [
@@ -53,6 +53,7 @@ function validPanel(overrides) {
       guild: { rank: null, merit: 0 },
       wallet: 100,
       persona: { background: null },
+      intimate: null,
     },
     overrides || {}
   );
