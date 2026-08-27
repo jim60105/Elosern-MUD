@@ -23,5 +23,5 @@ The binding design makes the bag drawer the single home for equipment and wallet
 ## Impact
 
 - `web/webclient-app/AppClient.vue`, `InventoryPanel.vue`, `EquipmentDoll.vue`, `CharacterStatusDrawer.vue`, and drawer/component stories change only in the Vue presentation layer.
-- The work serializes after `fix-webclient-character-status-drawer-order`, which currently owns the character drawer's section ordering, and consumes the completed `expose-inventory-item-presentation` contract without depending on its final grid styling.
+- Its prerequisite changes — `fix-webclient-character-status-drawer-order`, `add-item-presentation-metadata`, `expose-inventory-item-presentation`, and `add-webclient-intimate-status-section` — are all archived and complete, so this change is unblocked. It preserves the completed 親密狀態 section of the character drawer and removes only the moved equipment and wallet sections; it consumes the archived services-v2 presentation contract without depending on the later grid styling.
 - No OOB schema, persistence, server action, item mutation, data migration, or compatibility layer changes in this proposal.

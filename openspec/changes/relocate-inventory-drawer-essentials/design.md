@@ -2,7 +2,7 @@
 
 The reference drawer at `docs/design/elosern-redesign/index.html:957-985` owns three related pieces of information: its bag icon and wallet summary in the header, the equipment section, and the held-item listing. The current application reverses that hierarchy. `HudDrawer` already owns the drawer title but `InventoryPanel` repeats it, while `EquipmentDoll` and the one drawer-layer wallet figure are rendered by `CharacterStatusDrawer`.
 
-`HudDrawer` already provides a focus trap, scrim close, Escape handling, restore-to-opener behavior, responsive drawer geometry, and a local `inventory` SVG path. This change reuses those primitives. It follows `fix-webclient-character-status-drawer-order` so the two changes do not concurrently edit the character drawer template.
+`HudDrawer` already provides a focus trap, scrim close, Escape handling, restore-to-opener behavior, responsive drawer geometry, and a local `inventory` SVG path. This change reuses those primitives. Its serialization target, `fix-webclient-character-status-drawer-order`, is now archived (2026-08-27), and the completed intimate-status change (archived 2026-08-28) added the 親密狀態 section that this change preserves while removing the equipment and wallet sections from the character drawer.
 
 ## Goals / Non-Goals
 
@@ -47,11 +47,11 @@ This replaces the current generic bordered wrapper, which cannot reveal duplicat
 
 ## Risks / Trade-offs
 
-- [This conflicts with the active character-status order proposal] -> Declare and respect the dependency on `fix-webclient-character-status-drawer-order`; do not implement until that change is complete.
+- [Concurrent edits to the character drawer] -> Resolved: `fix-webclient-character-status-drawer-order` is archived, so this change owns the character-drawer template edits; the completed intimate-status section is preserved as the last main section.
 - [Two panels can become unavailable independently] -> Test all four relevant states and never substitute a wallet, equipment row, or zero count from the other panel.
 - [Moving the wallet surprises users of the status drawer] -> The binding design puts the wallet in the inventory header and the drawer remains a single action from the dock; no hidden or duplicated balance remains.
 - [The moved doll still looks unlike the reference slots] -> Keep visual square-slot and item-grid treatment deliberately deferred to the next one-day proposal rather than expanding this move into a combined redesign.
 
 ## Migration Plan
 
-Land after `fix-webclient-character-status-drawer-order` and before the item-grid visual redesign. The change is client-only and has no persisted layout state or external consumer. Run the affected Vue tests and Storybook visual review at 1280x720; a rollback restores the prior component placement with no data conversion.
+Land after the archived prerequisite changes (`fix-webclient-character-status-drawer-order`, `add-item-presentation-metadata`, `expose-inventory-item-presentation`, `add-webclient-intimate-status-section`) and before the item-grid visual redesign. The change is client-only and has no persisted layout state or external consumer. Run the affected Vue tests and Storybook visual review at 1280x720; a rollback restores the prior component placement with no data conversion.

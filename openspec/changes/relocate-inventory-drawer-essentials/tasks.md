@@ -1,6 +1,6 @@
 ## 1. Drawer Information Architecture
 
-- [ ] 1.1 Start only after `fix-webclient-character-status-drawer-order` is complete and preserve its final character-status ordering while removing the moved equipment and wallet sections.
+- [ ] 1.1 Prerequisite satisfied: `fix-webclient-character-status-drawer-order` is archived. Preserve the character drawer's final section ordering (including the archived intimate-status 親密狀態 section as the last main section) while removing the moved equipment and wallet sections.
 - [ ] 1.2 Pass the committed character panel to `InventoryPanel`, compose `EquipmentDoll` before held items, and implement the independent services-versus-character unavailable states.
 - [ ] 1.3 Configure the inventory `HudDrawer` with the existing local inventory SVG and a valid character-wallet subtitle; remove the duplicated panel-body heading and all secondary wallet renderings.
 
