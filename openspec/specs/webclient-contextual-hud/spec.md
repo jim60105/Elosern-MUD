@@ -466,6 +466,7 @@ the same change that alters the behaviour.
 - **THEN** its wording states that the key focuses the command line, and does not state that the key opens or closes it
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
+
 The dock SHALL render a breadcrumb line whenever the router's menu stack is deeper than its root
 frame, and SHALL hide it entirely at the root frame. The breadcrumb SHALL name the parent frame and
 the current frame, with the current frame visually distinguished, and SHALL carry a back control.
@@ -477,7 +478,12 @@ stack and depth, published through the committed view in the same pass as the fr
 client SHALL NOT maintain a second navigation state — no local pane selection, no locally accumulated
 crumb stack — so the breadcrumb can never disagree with what Escape will do. A frame's breadcrumb
 label SHALL come from the frame itself; for a frame scoped to one target, that label SHALL be the
-target's server-authored display name.
+target's server-authored display name. When the keyboard router's focus is on the `back` item (the
+non-rendered navigation cell of the exit outlet), the breadcrumb's back control SHALL carry a visible
+focused state — a background fill and border change together (the same non-color-alone treatment
+shared with every other dock row form), so the focused `back` row keeps a visible focus carrier;
+activating it with the back control or with Enter SHALL pop exactly one level, restore the parent
+frame's previously focused row, and dispatch no action.
 
 #### Scenario: The breadcrumb appears only below the root
 - **WHEN** the dock is at its root frame
@@ -489,6 +495,10 @@ target's server-authored display name.
 - **WHEN** the player activates the breadcrumb's back control at any depth
 - **THEN** exactly one menu level closes, the parent frame's rows render with the previously focused row marked, and no `ui_action` is emitted
 
+#### Scenario: A focused `back` row keeps a visible focus carrier
+- **WHEN** keyboard focus moves onto the move frame's `back` item, which is not rendered as an outlet tile
+- **THEN** the breadcrumb's back control renders a focused state (fill and border change together, not color alone), and Enter or a click on that control pops exactly one level back to the parent frame
+
 #### Scenario: The breadcrumb tracks a target frame's own name
 - **WHEN** the player opens an interact target's affordance frame
 - **THEN** the breadcrumb's current segment is that target's server-authored display name
@@ -498,6 +508,7 @@ target's server-authored display name.
 - **THEN** the breadcrumb's depth and labels match the router's frame stack in the same render, with no interval in which they describe a frame the router has already left
 
 ### Requirement: Dock panes render a per-kind vocabulary from backed fields only
+
 The dock's row region SHALL render the current frame in a form chosen for what that frame contains,
 using one shared row renderer for every form so the focused marker, the disabled marker and its
 `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined
@@ -522,10 +533,11 @@ together (the same non-color-alone treatment shared with every other dock row fo
 additionally render a focus caret glyph when the row already carries a persistent direction glyph — a
 second, focus-only glyph on top of one already shown is not an additional signal. The move frame SHALL
 render no companion detail panel or side surface: the outlet tile is self-contained, and the row region
-SHALL receive the pane's full available width. A disabled move row's server-authored explanation SHALL
-remain reachable by assistive technology directly from the tile (an accessible association such as
-`aria-describedby`), independent of whether any companion panel exists. The submitted move payload SHALL
-be unchanged.
+SHALL receive the pane's full available width, with the exit outlet laid out as a width-adaptive
+`repeat(auto-fit, minmax(min(150px, 100%), 1fr))` grid whose `1fr` tracks the tiles stretch to fill (no
+content-width cap on the tile). A disabled move row's server-authored explanation SHALL remain reachable
+by assistive technology directly from the tile (an accessible association such as `aria-describedby`),
+independent of whether any companion panel exists. The submitted move payload SHALL be unchanged.
 
 A navigation row SHALL render a decorative icon, the row's server-authored name, an optional sub-line
 and, when the row opens a deeper frame, a trailing affordance chevron. A sub-line SHALL contain only
@@ -564,7 +576,7 @@ server-authored explanation, and SHALL submit nothing.
 
 #### Scenario: The move frame has no companion panel
 - **WHEN** the move frame renders with any row focused
-- **THEN** no detail aside or other side panel renders beside the outlet grid, and the row region occupies the pane's full available width
+- **THEN** no detail aside or other side panel renders beside the outlet grid, the row region occupies the pane's full available width, and the `auto-fit` grid fills the remaining horizontal space (each column at least 150px wide, or the pane's own width when the pane is narrower)
 
 #### Scenario: A row renders only backed fields
 - **WHEN** a look frame renders a present entity
@@ -1118,26 +1130,29 @@ The settings surface SHALL offer no control it does not implement.
 - **WHEN** the settings surface's controls are enumerated
 - **THEN** every control changes an outcome the client actually implements, and no control is rendered that has no effect
 
-
 ### Requirement: A fixed-column-count dock pane sizes its columns to content, never stretching to fill the panel
 
-When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count
-SHALL govern only which cell each row occupies, never the rendered width of a column. A column's rendered
-width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows are fewer or
-narrower than the panel's available width SHALL leave the remaining width empty rather than stretching
-every column to consume it. When the pane's available width is narrower than the combined natural content
-width of the fixed columns, the columns SHALL compress (each track can shrink toward zero) rather than
-overflow the pane horizontally. This SHALL hold regardless of how many columns the keyboard geometry fixes,
-and changing a column's rendered width SHALL NOT change which row occupies which cell.
+When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count SHALL govern only which cell each row occupies, never the rendered width of a column. A column's rendered width SHALL fit the natural size of the tile or row content placed in it; a pane whose rows are fewer or narrower than the panel's available width SHALL leave the remaining width empty rather than stretching every column to consume it. When the pane's available width is narrower than the combined natural content width of the fixed columns, the columns SHALL compress (each track can shrink toward zero) rather than overflow the pane horizontally. This SHALL hold regardless of how many columns the keyboard geometry fixes, and changing a column's rendered width SHALL NOT change which row occupies which cell. The exit-outlet pane (the move frame) SHALL be exempt from the fixed-column rule: its row region SHALL be laid out with the width-adaptive `repeat(auto-fit, minmax(min(150px, 100%), 1fr))` grid, the column count SHALL follow the pane's available width, and the tiles SHALL stretch with their `1fr` tracks (no content-width cap) so the row region receives the pane's full available width. The track floor SHALL shrink to the pane's own width (`100%`) when the pane is narrower than 150px, so the outlet never overflows a very narrow pane. When the exit count exceeds the pane's rendered column count and the final row is partial, the last exit tile SHALL span the remaining columns of that row so no horizontal space is left blank. The move frame's keyboard geometry SHALL be a single-column list, so the arrow-key cell mapping SHALL NOT depend on the pane's rendered column count.
 
-#### Scenario: A short exit list renders content-sized tiles with a fixed keyboard column count
-- **WHEN** the move frame renders four exits under its two-column keyboard geometry
-- **THEN** each tile's rendered width fits its own glyph and text content, the pane's remaining width past the two tiles is left empty, and pressing the horizontal arrow key still moves focus between exactly the same two columns as before
+#### Scenario: A short exit list fills the pane width
+- **WHEN** the move frame renders one or two exits in a pane whose available width could fit many 150px columns
+- **THEN** the `auto-fit` grid collapses the empty tracks, the rendered tiles each occupy their full-width tracks, and no horizontal space in the pane is left empty
+- **WHEN** the move frame renders four or more exits in a pane whose available width fits N columns of at least 150px
+- **THEN** the outlet grid renders N columns, each tile stretches with its track, and no horizontal space in the pane is left empty
+
+#### Scenario: A very narrow pane does not overflow
+- **WHEN** the pane's available width is narrower than 150px
+- **THEN** the track floor shrinks to the pane's width (the `min(150px, 100%)` floor), a single full-width track renders the exits without horizontal overflow, and the tiles fill the available space
 
 #### Scenario: Column-count-driven layout never invents equal-width stretching
-- **WHEN** a dock pane applies a fixed column count for its keyboard geometry
-- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width
+- **WHEN** a fixed-column dock pane (a nav or combat pane) applies a fixed column count for its keyboard geometry
+- **THEN** no column in that pane stretches a narrower row's content to an equal share of the panel's width, and the exit-outlet pane is the exempted width-adaptive exception
 
 #### Scenario: A narrow pane compresses the fixed columns instead of overflowing
 - **WHEN** the pane's available width (e.g. the minimum supported 1280x720 viewport) is narrower than the combined natural width of the fixed columns
-- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width cap
+- **THEN** the columns compress to fit the pane without horizontal overflow, and each tile or row wraps long content within its width
+
+#### Scenario: The move frame navigates as a single-column list
+- **WHEN** the player presses ArrowUp or ArrowDown inside the move frame
+- **THEN** focus cycles through the move frame's items — the exit rows in order, then the `back` row — ArrowLeft and ArrowRight are no-ops, and the keyboard cell mapping does not depend on the pane's rendered column count
+

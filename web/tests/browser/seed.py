@@ -481,7 +481,31 @@ def _exploration_fixture(character) -> None:
     defeated_wolf.traits.hp.current = 0
     defeated_wolf.save()
 
-    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf")
+    # A third exit from the south gate: a training-grounds room so the
+    # 400x720 journey (3 exits at the 2-column pane width) exercises the
+    # partial last row (fix-webclient-hud-dock-exploration-grid-width D2:
+    # the last tile spans the remaining columns of a partial final row).
+    from typeclasses.exits import Exit
+    from typeclasses.rooms import Room
+    from world.maps.instance import spawn_instance_room
+
+    training_grounds = create_object(Room, key="訓練場", nohome=True, location=None)
+    training_grounds.db.desc = "A quiet training ground outside the city wall."
+    training_grounds.save()
+    create_object(Exit, key="前往訓練場", location=south_gate, destination=training_grounds)
+    create_object(Exit, key="離開訓練場", location=training_grounds, destination=south_gate)
+
+    # A fourth exit: an ephemeral instance cave (the minimap fixture's spawn
+    # logic, re-used here so the exploration fixture is self-contained).
+    spawn_instance_room(
+        south_gate,
+        {"prototype_parent": "instance_room", "key": "minimap-cave"},
+        exit_key="進洞窟",
+        return_key="離開",
+        ttl_seconds=3600,
+    )
+
+    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf + training grounds + cave")
 
 
 def _options_surface_fixture(character) -> None:

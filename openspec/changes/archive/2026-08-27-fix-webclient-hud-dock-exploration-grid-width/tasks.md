@@ -1,61 +1,31 @@
-## 1. Column sizing fix
+# Tasks — fix-webclient-hud-dock-exploration-grid-width
 
-- [x] 1.1 In `web/webclient-app/components/DockMenu.vue`, change `paneGridStyle`'s computed to emit
-      `minmax(0, max-content)` as the track-sizing function when `paneKind.value` is `outlet` or `nav`,
-      and keep `1fr` for every other pane kind — including `plain` (design.md Decision 1). Keep
-      `repeat(${gridCols}, ...)` exactly as-is — only the sizing function changes; the `0` minimum lets
-      the fixed columns compress on a narrow pane instead of overflowing it.
-- [x] 1.2 Add `max-width: 220px; min-width: 0; overflow-wrap: break-word;` to `.dock-menu__outlet-tile`
-      and `max-width: 320px; min-width: 0; overflow-wrap: break-word;` to `.dock-menu__nav-row`, and
-      add a new `min-width: 0; overflow-wrap: break-word;` rule on `.dock-menu__nav-text` (design.md
-      Decision 3), so long server-authored strings wrap inside the capped tile/row and the nav row's text
-      block cannot break through the 320px cap via its automatic min-content size.
-- [x] 1.3 Add a Vitest test rendering an outlet tile and a nav row with a long, generated destination
-      name / joined affordance-label string (well past the cap), asserting the long label renders inside
-      the tile/row and the loaded CSS rule carries the `max-width` / `min-width: 0` /
-      `overflow-wrap: break-word` safety net (asserted through the rule's `style.cssText`, since jsdom
-      leaves the camelCase accessors unpopulated).
-- [x] 1.4 Add a Vitest unit test asserting the rendered pane element's inline
-      `grid-template-columns` per pane kind (the script-setup computed is closed, so no `wrapper.vm`):
-      `repeat(2, minmax(0, max-content))` for `outlet`/`nav` with a non-null `gridCols`, `repeat(2, 1fr)`
-      for `plain`/`affordance`/`cards`/`skills`/`targets`/`scales`/`confirm` with the same `gridCols`,
-      and no inline grid template when `gridCols` is null/0 (the plain pane's computed `display` stays
-      `block` — the task 2.3 re-confirmation, asserted in the same test).
+## 1. Outlet pane layout (DockMenu.vue)
 
-## 2. Regression guard
+- [x] 1.1 Change `paneGridStyle` in `web/webclient-app/components/DockMenu.vue` so the `outlet` pane emits no inline `grid-template-columns` (return `{}` for `paneKind === 'outlet'`), and change the `.dock-menu__outlet` CSS class rule to `repeat(auto-fit, minmax(min(150px, 100%), 1fr))` so empty tracks collapse, the tiles fill the pane's full width (including 1-exit and 2-exit frames), and the track floor shrinks to the pane's own width when the pane is narrower than 150px (no horizontal overflow); keep `nav` panes on their fixed-column content-sized tracks.
+- [x] 1.2 Remove the `max-width: 220px` cap from `.dock-menu__outlet-tile` (keep `min-width: 0` + `overflow-wrap: break-word`) so tiles stretch with their `1fr` tracks and fill the available horizontal space.
+- [x] 1.3 Give the breadcrumb's back control a focused state: pass `:focused-key` from `ActionDock` to `DockBreadcrumb`, and when `focusedKey === "back"` render the back control with a background fill + border swap (the non-color-alone treatment) so the non-rendered `back` row keeps a visible focus carrier.
 
-- [x] 2.1 `grep -rn` `getBoundingClientRect\|bounding_box` across `web/tests/browser/` and
-      `web/webclient-app/tests/` for any test touching `dock-menu__outlet`, `dock-menu__nav`, or
-      `dock-menu-item` to confirm none asserts a specific rendered pixel width that this change would
-      alter; fix any hit found (none expected per design.md's research).
-- [x] 2.2 Run the existing keyboard-navigation Playwright coverage for the `move`/`look`/`interact`
-      menus unmodified — the `ArrowRight` "second grid column" assertions in
-      `test_browser_exploration.py` (`test_keyboard_move_charges_time_and_refreshes_map`,
-      `test_look_at_guard_shows_the_affinity_stage_line`,
-      `test_freeform_dialogue_degrades_offline_through_the_command_line`,
-      `test_cancelled_freeform_dialogue_cannot_capture_a_later_command`,
-      `test_unsafe_skip_rejects_before_any_clock_advance`,
-      `test_safe_wait_until_dawn_advances_the_clock`) and the `ArrowRight` assertions in
-      `test_browser_contextual_hud.py` (`test_combat_skills_bounded_master_detail`,
-      `test_destructive_combat_confirmation_two_step_panel`) — confirm every assertion still passes with
-      no test-file edits (column count and item-to-cell mapping are unchanged).
-- [x] 2.3 Re-confirm (do not skip, since this change's own research already found one such assumption
-      wrong) that the `wait` sub-menu is unaffected: the Vitest task 1.4 test asserts
-      `getComputedStyle(.dock-menu__plain).display === "block"`, and the new narrow-viewport browser test
-      re-confirms the 等待/休息 frame stays a non-grid block container after this change.
-- [x] 2.4 Add the narrow-viewport regression test
-      `test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport` to
-      `web/tests/browser/test_browser_exploration.py` (the minimum supported 1280x720 viewport): assert
-      the outlet tiles and nav rows stay within the pane's bounding box (no horizontal overflow), that
-      `ArrowRight` still moves focus to the second grid column, and that the wait/rest pane's computed
-      `display` remains `block`. Register the new test in `.github/browser-shards.json` so the
-      `test_browser_method_labels_preserve_exact_ownership` contract keeps passing.
+## 2. Move menu keyboard geometry (exploration_menu.js)
 
-## 3. Spec and verification
+- [x] 2.1 In `web/static/webclient/js/elosern/exploration_menu.js` `buildMenus`, set the move menu's `gridCols` from `2` to `null` (keep `grid: true` and the `back` row) so the keyboard router navigates the move frame as a single-column list.
 
-- [x] 3.1 Confirm `openspec validate fix-webclient-hud-dock-exploration-grid-width --strict` passes
-      against the added requirement in `specs/webclient-contextual-hud/spec.md`.
-- [x] 3.2 Re-check the live client (`podman compose`, `http://localhost:4001/webclient/`) with
-      `agent-browser`: open the 移動 frame on a multi-exit room, confirm tiles render at a content-sized
-      width (not stretched to half the panel), confirm `ArrowRight`/`ArrowDown` still move focus between
-      the same cells as before, and repeat for 查看/互動. Confirm 等待/休息 is visually unchanged.
+## 3. Update Vitest suite
+
+- [x] 3.1 Update `web/webclient-app/tests/action/dock_menu_panes.test.js`: the "outlet/nav panes emit content-sized tracks" test — the outlet case now expects an empty inline `gridTemplateColumns` on `.dock-menu__outlet` (the CSS `auto-fit` rule governs); the "long destination and affordance labels wrap" test drops the `max-width: 220px` CSS assertion.
+- [x] 3.2 Run `npm test` (Vitest) until green.
+
+## 4. Update Node gate suite
+
+- [x] 4.1 Update `web/static/webclient/js/tests/exploration_menu.test.js`: the "menu models carry the mockup grid geometry" test now asserts `model.menus.move.gridCols === null` (look/interact/wait keep `2`, root keeps `items.length`).
+- [x] 4.2 Run `node --test web/static/webclient/js/tests/*.test.js` until green.
+
+## 5. Update managed browser suite (CI)
+
+- [x] 5.1 In `web/tests/browser/test_browser_exploration.py`, replace the `assert_not_stretched(".dock-menu__outlet-tile", ".dock-menu__outlet")` check with a stretched-to-fill assertion: verify the first tile's left edge and the last tile's right edge align with the pane's content edges (the 8px gap between tiles is part of the occupied span), covering the 1-exit, 2-exit (`auto-fit` collapses the empty tracks), and multi-exit (tiles fill the width in N columns of at least 150px) cases. Update the post-ArrowRight focus assertion: in the move frame ArrowRight is a no-op (focus stays on the current item; ArrowUp/ArrowDown cycle the exit rows and then the `back` row). Add a breadcrumb back-focus assertion: when focus moves to the `back` row, the breadcrumb's back control renders the focused state, and Enter pops exactly one level.
+- [x] 5.2 Run the single focused browser test class locally (within the 10-minute budget); the full managed browser suite and `tools.spec_traceability verify --evidence` stay CI-owned.
+
+## 6. Traceability and validation
+
+- [x] 6.1 Run `uv run --locked python -m tools.spec_traceability check` and keep it green (the modified requirements keep their substantively matching tests).
+- [x] 6.2 Run `openspec validate fix-webclient-hud-dock-exploration-grid-width --strict` and fix any delta-spec formatting issues.

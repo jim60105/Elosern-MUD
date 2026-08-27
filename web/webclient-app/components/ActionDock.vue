@@ -155,6 +155,7 @@ function onCardAction(intent) {
       :trail="trail"
       :depth="depth"
       :guidance-prefix="guidancePrefix"
+      :focused-key="focusedKey"
       @back="onBack"
     />
     <!-- The scrolling pane: the active menu frame (a root menu, a sub-menu,

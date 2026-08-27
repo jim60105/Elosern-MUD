@@ -344,16 +344,17 @@ describe("store dispatch + focus", () => {
       );
       // Confirming the "move" root entry opens the move submenu.
       expect(store.focusConfirm("keyboard")).toBe(true);
-      // Move focus to the disabled "exit-north" (row 0, col 1) and confirm:
-      // a disabled item emits a `disabled` notice and never dispatches.
-      expect(store.focusPress("ArrowRight")).toBe(true);
+      // The move frame navigates as a single-column list: ArrowDown moves to
+      // the second list item (the disabled "exit-north"); a disabled item
+      // emits a `disabled` notice and never dispatches.
+      expect(store.focusPress("ArrowDown")).toBe(true);
       expect(store.view.focus.key).toBe("exit-north");
       expect(store.view.focus.enabled).toBe(false);
       expect(store.focusConfirm("keyboard")).toBe(false);
       expect(sender.sent.actions.length).toBe(0);
 
-       // Pointer activation shares the same gates (mutation-lock + enabled).
-       store.focusPress("ArrowLeft"); // back to the enabled "exit-east"
+      // Pointer activation shares the same gates (mutation-lock + enabled).
+      store.focusPress("ArrowUp"); // back to the enabled "exit-east"
        store.dispatchAction("explore.wait", { daypart: "dusk" });
        expect(store.focusConfirm("pointer")).toBe(false);
        expect(store.view.dispatch.inFlight).not.toEqual(null);
