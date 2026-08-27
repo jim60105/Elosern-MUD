@@ -1009,13 +1009,43 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         outlet = page.locator('[data-testid="dock-menu"]')
         tiles = outlet.locator(".dock-menu__outlet-tile")
         self.assertEqual(tiles.count(), 2, "the move frame renders one row per exit")
-        # Row 1: the canonical "南" (south) direction resolves to a glyph +
-        # the destination label from the committed local map.
+        # Row 1: the canonical "南" (south) direction resolves to a glyph,
+        # and the destination's display name is the tile's primary bold text
+        # (outlet-tile-presentation) — the raw exit label no longer renders
+        # as a separate headline.
         first = tiles.nth(0)
         first_text = first.inner_text()
         self.assertIn("↓", first_text, "the canonical direction renders its glyph")
-        self.assertIn("南", first_text, "the exit label renders")
-        self.assertIn("南大道", first_text, "the destination label resolves from the committed local map")
+        self.assertEqual(
+            first.locator("b").inner_text(),
+            "南大道",
+            "the destination's display name is the tile's primary bold text",
+        )
+        self.assertEqual(
+            first.locator("small").count(),
+            0,
+            "no destination sub-line renders beside the headline",
+        )
+        # The first exit is focused when the move frame opens; its focused
+        # state is a background + border + color swap (never color alone)
+        # with no second, focus-only caret glyph stacked on the tile's
+        # persistent direction glyph.
+        self.assertTrue(
+            "dock-menu__outlet-tile--focused" in (first.get_attribute("class") or ""),
+            "the first exit is focused when the move frame opens",
+        )
+        focused_before = first.evaluate("el => getComputedStyle(el, '::before').content")
+        unfocused_before = tiles.nth(1).evaluate("el => getComputedStyle(el, '::before').content")
+        self.assertIn(
+            focused_before,
+            ("normal", "none"),
+            "the focused tile renders no ::before caret content",
+        )
+        self.assertEqual(
+            focused_before,
+            unfocused_before,
+            "the focused tile's ::before content is not distinct from an unfocused one",
+        )
         # Row 2: a non-canonical door "南門" renders verbatim (no guessed direction),
         # and its destination node is absent from the committed lattice (no name).
         second = tiles.nth(1)
