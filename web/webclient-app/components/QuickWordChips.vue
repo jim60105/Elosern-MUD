@@ -14,6 +14,8 @@
 // hidden chips leave the accessibility tree and the tab order (REDESIGN.md
 // §0.1). No mnemonic key badge: the draft's letter badges are dropped
 // because the client binds no key to them and the label already is the verb.
+import { glyphPath } from "./dock-icons.js";
+
 const props = defineProps({
   // The committed mode (exploration / combat / creation).
   mode: { type: String, default: "exploration" },
@@ -30,6 +32,24 @@ const COMBAT_CHIPS = ["說", "施法"];
 function insert(verb) {
   emit("insert", verb);
 }
+
+// Map each chip's verb to the stable glyph key in the shared dock icon
+// table (H3 webclient-hud-03-action-dock). 交談 is this client's own D4
+// addition with no reference icon, so it reuses the dock's `character`
+// person-silhouette glyph; every other verb maps onto a concept the table
+// already covers.
+const VERB_GLYPH = {
+  看: "look",
+  拿: "get",
+  說: "interact",
+  交談: "character",
+  等待: "wait",
+  施法: "suggestions",
+};
+
+function chipGlyph(verb) {
+  return glyphPath(VERB_GLYPH[verb]);
+}
 </script>
 
 <template>
@@ -44,6 +64,17 @@ function insert(verb) {
         :data-testid="`quick-word-chip-${verb}`"
         @click="insert(verb)"
       >
+        <svg
+          v-if="chipGlyph(verb)"
+          class="qwc__chip-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path :d="chipGlyph(verb)" stroke="currentColor" stroke-width="1.8" />
+        </svg>
         {{ verb }}
       </button>
     </div>
@@ -57,6 +88,17 @@ function insert(verb) {
         :data-testid="`quick-word-chip-${verb}`"
         @click="insert(verb)"
       >
+        <svg
+          v-if="chipGlyph(verb)"
+          class="qwc__chip-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path :d="chipGlyph(verb)" stroke="currentColor" stroke-width="1.8" />
+        </svg>
         {{ verb }}
       </button>
     </div>
@@ -90,6 +132,9 @@ function insert(verb) {
 
 .qwc__chip {
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   font-family: var(--f-sans);
   font-size: var(--text-sm);
@@ -98,6 +143,10 @@ function insert(verb) {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.qwc__chip-icon {
+  flex: none;
 }
 
 .qwc__chip:hover {

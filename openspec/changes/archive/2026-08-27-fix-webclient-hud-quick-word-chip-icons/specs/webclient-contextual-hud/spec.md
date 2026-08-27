@@ -21,7 +21,7 @@ order, never dimmed.
 
 #### Scenario: The chip set follows the mode
 - **WHEN** the committed mode changes from exploration to combat
-- **THEN** the exploration-only chips are absent from the DOM and from the tab order, and the combat chip set renders in their place
+- **THEN** the exploration-only chips are hidden with `display:none` so they leave the accessibility tree and the tab order (never dimmed, and still present in the DOM), and the combat chip set renders in their place
 
 #### Scenario: No chip offers a verb the game does not have
 - **WHEN** the rendered chip set is enumerated in any mode
