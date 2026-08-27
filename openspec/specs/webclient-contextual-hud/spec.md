@@ -886,6 +886,13 @@ dropped — coloured per severity using the same severity-to-colour mapping the 
 condition chips use elsewhere in the HUD. These presentation rules apply identically
 whether a section is fully populated or marked with a registry-owned unavailable reason.
 
+The drawer's main sections SHALL render in the order 生命量 (vitals) → 屬性 (traits) → 計數・公會
+(guild counters) → 狀態 (conditions) → 偽裝 (disguise), matching the design draft's `#dr-status`
+section order. The `屬性` section SHALL render exactly the `character.traits` rows whose `key` is
+`atk_phys`, `agility`, `defense`, or `magic_level`, in that order, and SHALL NOT render any `traits`
+row whose value is already presented by the vitals section (`hp`, `mp`, `sp`) or the guild-counter
+section (`guild_merit`), so each quantity the drawer presents appears in exactly one section.
+
 #### Scenario: The drawer is useful in combat
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
 - **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet and persona sections with the registry-owned reason
@@ -913,6 +920,22 @@ whether a section is fully populated or marked with a registry-owned unavailable
 #### Scenario: The condition roster renders as coloured pill badges
 - **WHEN** the condition roster renders one or more committed conditions
 - **THEN** each condition renders as a rounded pill carrying its label, its visible severity word, its severity glyph, and its duration/modifier text — with no content dropped relative to today's rendering — coloured by the same severity-to-colour mapping the capped status-island chips use, and the pills wrap onto additional lines rather than clipping or scrolling horizontally
+
+#### Scenario: Sections render in design order
+- **WHEN** the character-status drawer renders with both `status` and `character` available
+- **THEN** the vitals section renders before the traits section, the traits section renders before the guild-counter section, the guild-counter section renders before the condition roster, and the condition roster renders before the disguise section
+
+#### Scenario: Traits never repeat a vitals or guild-counter value
+- **WHEN** `character.traits` contains `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, `magic_level`, and `guild_merit` rows
+- **THEN** the `屬性` section renders only the `atk_phys`, `agility`, `defense`, and `magic_level` rows, in that order, and renders no `hp`, `mp`, `sp`, or `guild_merit` row
+
+#### Scenario: The abbreviated attribute and guild-rank labels match the design draft
+- **WHEN** the `屬性` section renders the `magic_level` row, and the `計數・公會` section renders the guild rank row
+- **THEN** the `magic_level` row's label reads `魔階` and the guild rank row's label reads `公會階級`, matching the design draft's `#dr-status` markup
+
+#### Scenario: Character-backed sections are marked, not hidden
+- **WHEN** the `character` panel is unavailable (outside exploration mode)
+- **THEN** each character-backed section (trait, equipment, guild counters, disguise, wallet, persona) still renders its labelled small-caps heading and shows the registry-owned reason in place of value rows, and the wallet line renders no balance at all and no zero
 
 ### Requirement: The drawer layer renders the wallet exactly once
 Across every drawer, the player's wallet SHALL be rendered in exactly one place — the character-status
