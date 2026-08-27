@@ -3,7 +3,7 @@ import ShopPanel from "../../components/ShopPanel.vue";
 import { SERVICES_PANEL_MINIMAL_SAMPLE, SERVICES_PANEL_SAMPLE, SERVICES_PANEL_UNAVAILABLE_SAMPLE } from "../fixtures.js";
 
 // ShopPanel (B4 world / services family): renders the `shop` section of
-// the committed `services` v1 payload — open/closed status, stock rows
+// the committed `services` v2 payload — open/closed status, stock rows
 // with buy/sell copper prices and stock levels, held sellable rows, and
 // the player wallet. Read-only display; the `buy`/`sell` controls emit the
 // exact OOB action intents (the `action_id` and `payload` fields of the

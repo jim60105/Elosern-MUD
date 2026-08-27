@@ -48,7 +48,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 1
+SERVICES_SCHEMA_VERSION = 2
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -67,6 +67,8 @@ MAX_LABEL_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 MAX_QUANTITY = 1000
 MIN_QUANTITY = 1
+MAX_PRESENTATION_KEY_CODE_POINTS = 32
+MAX_PRESENTATION_SUMMARY_CODE_POINTS = 240
 
 QUEST_STATES = frozenset({"in_progress", "completed", "failed"})
 REGISTER_ACTION = "guild.register"
@@ -421,6 +423,38 @@ def _validate_shop(value: Any) -> dict[str, Any]:
     return {"open": open_now, "stock": stock, "sellable": sellable}
 
 
+def _validate_presentation_identifier(value: dict[str, Any], field: str) -> str:
+    key = value[field]
+    if not isinstance(key, str) or not 1 <= len(key) <= MAX_PRESENTATION_KEY_CODE_POINTS:
+        raise ProtocolValidationError(
+            f"presentation {field} must be 1..{MAX_PRESENTATION_KEY_CODE_POINTS} characters"
+        )
+    if not all(ch.isascii() and (ch.islower() or ch == "_") for ch in key):
+        raise ProtocolValidationError(
+            f"presentation {field} must be lowercase ASCII letters or underscores"
+        )
+    return key
+
+
+def _validate_presentation(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    _require_exact_fields(
+        value, "presentation", {"kind", "icon_key", "rarity", "summary"}, {}
+    )
+    kind = _validate_presentation_identifier(value, "kind")
+    icon_key = _validate_presentation_identifier(value, "icon_key")
+    rarity = _validate_presentation_identifier(value, "rarity")
+    summary = value["summary"]
+    if not isinstance(summary, str):
+        raise ProtocolValidationError("presentation summary must be a string")
+    if not 1 <= sum(1 for _ in summary) <= MAX_PRESENTATION_SUMMARY_CODE_POINTS:
+        raise ProtocolValidationError(
+            f"presentation summary must be 1..{MAX_PRESENTATION_SUMMARY_CODE_POINTS} Unicode code points"
+        )
+    return {"kind": kind, "icon_key": icon_key, "rarity": rarity, "summary": summary}
+
+
 def _validate_inventory(value: Any) -> dict[str, Any]:
     _require_exact_fields(value, "inventory", {"rows", "wallet"}, {})
     rows = value["rows"]
@@ -432,7 +466,10 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
     row_views = []
     for row in rows:
         _require_exact_fields(
-            row, "inventory row", {"item_key", "display_name", "held", "equipped"}, {}
+            row,
+            "inventory row",
+            {"item_key", "display_name", "held", "equipped", "presentation"},
+            {},
         )
         item_key = _require_str(row, "item_key", maximum=MAX_KEY_CODE_POINTS)
         display_name = _require_str(
@@ -440,12 +477,14 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
         )
         held = _require_int(row, "held", minimum=1, maximum=MAX_SAFE_INTEGER)
         equipped = _require_bool(row, "equipped")
+        presentation = _validate_presentation(row["presentation"])
         row_views.append(
             {
                 "item_key": item_key,
                 "display_name": display_name,
                 "held": held,
                 "equipped": equipped,
+                "presentation": presentation,
             }
         )
     return {"rows": row_views, "wallet": wallet}
@@ -720,6 +759,17 @@ def _serialize_shop(shop: ShopSectionView) -> dict[str, Any]:
     }
 
 
+def _serialize_presentation(row: InventoryRowView) -> dict[str, Any] | None:
+    if row.presentation is None:
+        return None
+    return {
+        "kind": row.presentation.kind.value,
+        "icon_key": row.presentation.icon_key.value,
+        "rarity": row.presentation.rarity.value,
+        "summary": row.presentation.summary_zh,
+    }
+
+
 def _serialize_inventory(inventory: InventorySectionView) -> dict[str, Any]:
     return {
         "rows": [
@@ -728,6 +778,7 @@ def _serialize_inventory(inventory: InventorySectionView) -> dict[str, Any]:
                 "display_name": row.display_name,
                 "held": row.held,
                 "equipped": row.equipped,
+                "presentation": _serialize_presentation(row),
             }
             for row in inventory.rows
         ],
@@ -807,6 +858,8 @@ __all__ = [
     "MAX_KEY_CODE_POINTS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_QUEST_ROWS",
+    "MAX_PRESENTATION_KEY_CODE_POINTS",
+    "MAX_PRESENTATION_SUMMARY_CODE_POINTS",
     "MAX_QUANTITY",
     "MAX_RANK_KEY_CODE_POINTS",
     "MAX_REASON_MESSAGE_CODE_POINTS",

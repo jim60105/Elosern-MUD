@@ -25,6 +25,7 @@ function ceilingBag() {
     display_name: `物品 ${i + 1}`,
     held: 1,
     equipped: i < 3,
+    presentation: null,
   }));
   return {
     ...SERVICES_PANEL_SAMPLE,

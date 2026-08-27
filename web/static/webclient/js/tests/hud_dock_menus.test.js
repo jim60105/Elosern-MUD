@@ -190,7 +190,7 @@ test("combat menus carry fixed breadcrumb titles", () => {
 
 test("service menus carry fixed breadcrumb titles", () => {
   const model = ServiceMenu.buildMenus({
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     guild: { registration: { registered: false }, board: [] },
     shop: { stock: [] },

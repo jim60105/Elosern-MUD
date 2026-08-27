@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-1 services panel.
+"""Frozen no-mutation read model for the version-2 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -30,7 +30,7 @@ from typing import Any
 
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
 from world.lore.guild import GUILD_RANK_REGISTRY
-from world.lore.items import ITEM_REGISTRY
+from world.lore.items import ITEM_REGISTRY, ItemPresentation
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.describe import (
     describe_deadline,
@@ -233,12 +233,19 @@ class ShopSectionView:
 
 @dataclass(frozen=True)
 class InventoryRowView:
-    """One aggregated repeated-key inventory row."""
+    """One aggregated repeated-key inventory row.
+
+    ``presentation`` carries the immutable registry visual identity for a
+    registered item key; unknown but structurally valid keys carry ``None``
+    so the UI can render a neutral unknown-item state without a fabricated
+    category, icon, rarity, or summary.
+    """
 
     item_key: str
     display_name: str
     held: int
     equipped: bool
+    presentation: ItemPresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -711,6 +718,7 @@ def _build_inventory(
                 display_name=display_name,
                 held=counts[item_key],
                 equipped=item_key in equipped,
+                presentation=definition.presentation if definition is not None else None,
             )
         )
         if len(rows) >= MAX_INVENTORY_ROWS:
@@ -776,6 +784,7 @@ __all__ = [
     "HostView",
     "InventoryRowView",
     "InventorySectionView",
+    "ItemPresentation",
     "MAX_BOARD_ROWS",
     "MAX_INVENTORY_ROWS",
     "MAX_QUEST_ROWS",

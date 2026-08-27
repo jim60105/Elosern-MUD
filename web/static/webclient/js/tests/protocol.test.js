@@ -1387,7 +1387,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
@@ -2039,7 +2039,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "services",
       host: null,
@@ -2062,7 +2062,27 @@ function validServicesPanel(overrides) {
       },
       shop: null,
       inventory: {
-        rows: [{ item_key: "meal", display_name: "普通餐食", held: 1, equipped: false }],
+        rows: [
+          {
+            item_key: "meal",
+            display_name: "普通餐食",
+            held: 1,
+            equipped: false,
+            presentation: {
+              kind: "food",
+              icon_key: "food",
+              rarity: "common",
+              summary: "供旅人充飢的普通餐食。",
+            },
+          },
+          {
+            item_key: "mystery_relic",
+            display_name: "mystery_relic",
+            held: 2,
+            equipped: false,
+            presentation: null,
+          },
+        ],
         wallet: 1000,
       },
       pagination: {
@@ -2070,7 +2090,7 @@ function validServicesPanel(overrides) {
         quest_total: 0,
         stock_total: 0,
         sellable_total: 0,
-        inventory_total: 1,
+        inventory_total: 2,
       },
     },
     overrides || {}
@@ -2083,7 +2103,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 1,
+    schema_version: 2,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
@@ -2243,7 +2263,18 @@ test("a structurally maximal realistic services payload fits the envelope", () =
     sellable.push(validServicesSellableRow());
   }
   for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
-    inventory.push({ item_key: "meal", display_name: "普通餐食", held: 2, equipped: false });
+    inventory.push({
+      item_key: "meal",
+      display_name: "普通餐食",
+      held: 2,
+      equipped: false,
+      presentation: {
+        kind: "food",
+        icon_key: "food",
+        rarity: "common",
+        summary: "供旅人充飢的普通餐食。",
+      },
+    });
   }
   const panel = validServicesPanel({
     guild: {
@@ -2342,8 +2373,16 @@ test("services payload maximizing every string field fails the byte gate", () =>
       }),
     });
   }
+  const presKey = "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY);
+  const presSummary = "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY);
   for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
-    inventory.push({ item_key: max64, display_name: max128, held: 20, equipped: false });
+    inventory.push({
+      item_key: max64,
+      display_name: max128,
+      held: 20,
+      equipped: false,
+      presentation: { kind: presKey, icon_key: presKey, rarity: presKey, summary: presSummary },
+    });
   }
   const panel = validServicesPanel({
     host: {
@@ -2394,8 +2433,132 @@ test("services payload maximizing every string field fails the byte gate", () =>
   assert.throws(() => Protocol.validateServicesPanel(panel), /envelope/);
 });
 
+test("services v2 accepts registered and unknown-key presentation rows", () => {
+  const panel = validServicesPanel();
+  const validated = Protocol.validateServicesPanel(panel);
+  assert.deepEqual(validated, panel);
+  const rows = validated.inventory.rows;
+  const registered = rows.find((r) => r.item_key === "meal");
+  assert.deepEqual(registered.presentation, {
+    kind: "food",
+    icon_key: "food",
+    rarity: "common",
+    summary: "供旅人充飢的普通餐食。",
+  });
+  const unknown = rows.find((r) => r.item_key === "mystery_relic");
+  assert.equal(unknown.presentation, null);
+
+  // The 240-code-point summary bound is inclusive on a small payload.
+  const boundary = validServicesPanel();
+  boundary.inventory.rows = [
+    {
+      item_key: "meal",
+      display_name: "普通餐食",
+      held: 1,
+      equipped: false,
+      presentation: {
+        kind: "food",
+        icon_key: "food",
+        rarity: "common",
+        summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY),
+      },
+    },
+  ];
+  boundary.pagination.inventory_total = 1;
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(boundary));
+});
+
+test("services v2 rejects invalid presentation fields", () => {
+  const mutate = (row) => {
+    const p = validServicesPanel();
+    p.inventory.rows = [row];
+    p.pagination.inventory_total = 1;
+    return p;
+  };
+  const missing = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: { kind: "food", icon_key: "food", summary: "供旅人充飢的普通餐食。" },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(missing)), /rarity/);
+
+  const extra = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: {
+      kind: "food",
+      icon_key: "food",
+      rarity: "common",
+      summary: "供旅人充飢的普通餐食。",
+      color: "red",
+    },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(extra)), /unknown fields/);
+
+  const overlong = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: {
+      kind: "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY + 1),
+      icon_key: "food",
+      rarity: "common",
+      summary: "供旅人充飢的普通餐食。",
+    },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(overlong)), /kind/);
+
+  const uppercase = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: {
+      kind: "Potion",
+      icon_key: "food",
+      rarity: "common",
+      summary: "供旅人充飢的普通餐食。",
+    },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(uppercase)), /kind/);
+
+  const longSummary = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: {
+      kind: "food",
+      icon_key: "food",
+      rarity: "common",
+      summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY + 1),
+    },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(longSummary)), /summary/);
+
+  const notObject = {
+    item_key: "meal",
+    display_name: "普通餐食",
+    held: 1,
+    equipped: false,
+    presentation: "food",
+  };
+  assert.throws(() => Protocol.validateServicesPanel(mutate(notObject)), /JSON object or null/);
+});
+
+test("services v1 payload is rejected by the v2 validator", () => {
+  const panel = { ...validServicesPanel(), schema_version: 1 };
+  panel.inventory.rows = panel.inventory.rows.map(({ presentation, ...rest }) => rest);
+  assert.throws(() => Protocol.validateServicesPanel(panel), /schema_version/);
+});
+
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

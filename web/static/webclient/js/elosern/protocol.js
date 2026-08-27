@@ -178,6 +178,8 @@
   var SERVICES_MAX_REASON_MESSAGE = 128;
   var SERVICES_MAX_QUANTITY = 1000;
   var SERVICES_MIN_QUANTITY = 1;
+  var SERVICES_MAX_PRESENTATION_KEY = 32;
+  var SERVICES_MAX_PRESENTATION_SUMMARY = 240;
   var SERVICES_QUEST_STATES = ["in_progress", "completed", "failed"];
   var SERVICES_ACTIONS = [
     "guild.register",
@@ -246,7 +248,7 @@
     status: 1,
     context_actions: 5,
     local_map: 1,
-    services: 1,
+    services: 2,
     creation: 1,
     exploration: 1,
     character: 4,
@@ -1882,6 +1884,43 @@
     return value;
   }
 
+  function requirePresentationKey(value, field) {
+    if (
+      typeof value !== "string" ||
+      value.length < 1 ||
+      value.length > SERVICES_MAX_PRESENTATION_KEY ||
+      !/^[a-z_]+$/.test(value)
+    ) {
+      throw new Error(
+        field + " must be 1.." + SERVICES_MAX_PRESENTATION_KEY + " lowercase ASCII letters or underscores"
+      );
+    }
+    return value;
+  }
+
+  function requirePresentation(value, field) {
+    if (value === null) {
+      return null;
+    }
+    if (!isPlainObject(value)) {
+      throw new Error(field + " must be a JSON object or null");
+    }
+    requireExactFields(value, field, ["kind", "icon_key", "rarity", "summary"], []);
+    var kind = requirePresentationKey(value.kind, field + ".kind");
+    var iconKey = requirePresentationKey(value.icon_key, field + ".icon_key");
+    var rarity = requirePresentationKey(value.rarity, field + ".rarity");
+    var summary = value.summary;
+    if (typeof summary !== "string") {
+      throw new Error(field + ".summary must be a string");
+    }
+    if (codePoints(summary) < 1 || codePoints(summary) > SERVICES_MAX_PRESENTATION_SUMMARY) {
+      throw new Error(
+        field + ".summary must be 1.." + SERVICES_MAX_PRESENTATION_SUMMARY + " Unicode code points"
+      );
+    }
+    return value;
+  }
+
   function validateServicesInventory(value) {
     requireExactFields(value, "inventory", ["rows", "wallet"], []);
     var rows = value.rows;
@@ -1892,7 +1931,12 @@
     }
     requireInt(value.wallet, "wallet", 0, MAX_SAFE_INTEGER);
     rows.forEach(function (row) {
-      requireExactFields(row, "inventory row", ["item_key", "display_name", "held", "equipped"], []);
+      requireExactFields(
+        row,
+        "inventory row",
+        ["item_key", "display_name", "held", "equipped", "presentation"],
+        []
+      );
       var inventoryItemKey = requireString(row.item_key, "item_key", SERVICES_MAX_KEY);
       if (!inventoryItemKey.trim()) {
         throw new Error("inventory item_key must be non-empty");
@@ -1903,6 +1947,7 @@
       }
       requireInt(row.held, "held", 1, MAX_SAFE_INTEGER);
       requireBool(row.equipped, "equipped");
+      requirePresentation(row.presentation, "inventory row.presentation");
     });
     return value;
   }
@@ -1922,7 +1967,7 @@
     return value;
   }
 
-  // Exact available services panel v1 schema (design D4).
+  // Exact available services panel v2 schema (design D4).
   function validateServicesPanel(payload) {
     requireExactFields(
       payload,
@@ -1941,7 +1986,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported services schema_version");
     }
     if (payload.available !== true || payload.kind !== "services") {
@@ -2012,7 +2057,7 @@
     validateServicesPaginationTotals(pagination, guild, shop, inventory);
 
     var result = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "services",
       host: payload.host,
@@ -3660,6 +3705,8 @@
     SERVICES_MAX_REASON_MESSAGE: SERVICES_MAX_REASON_MESSAGE,
     SERVICES_MAX_QUANTITY: SERVICES_MAX_QUANTITY,
     SERVICES_MIN_QUANTITY: SERVICES_MIN_QUANTITY,
+    SERVICES_MAX_PRESENTATION_KEY: SERVICES_MAX_PRESENTATION_KEY,
+    SERVICES_MAX_PRESENTATION_SUMMARY: SERVICES_MAX_PRESENTATION_SUMMARY,
     SERVICES_QUEST_STATES: SERVICES_QUEST_STATES.slice(),
     SERVICES_ACTIONS: SERVICES_ACTIONS.slice(),
     EXPLORATION_MAX_MOVE_EXITS: EXPLORATION_MAX_MOVE_EXITS,
