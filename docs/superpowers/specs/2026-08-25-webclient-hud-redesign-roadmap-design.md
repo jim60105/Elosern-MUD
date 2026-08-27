@@ -131,7 +131,13 @@ Verified against `web/webclient/presentation/` and `web/webclient/actions/regist
 | Companion / party panel (bond stage, affinity, follow) | none — `world.rules.party` gates affordances only, no roster read model | **not backed** |
 | Event toasts | none — no `event-log` panel; only the synchronous per-action `result.message` | **not backed** |
 | Persistent objective tracker | `services.guild.quests[]` carries one `objective_summary` string + `stage_index`/`stage_progress`; no per-objective array, and the `services` panel is absent outside a service host | **not backed as a persistent HUD surface** |
-| 親密狀態 collapsible (arousal / wetness / shame / exposure / climax) | none in `status` or `character` | **not backed** |
+| 親密狀態 collapsible (arousal / wetness / shame / exposure / climax) | `character.intimate` (schema version 4) | **backed** |
+
+> **Correction (2026-08-28, applied by `add-webclient-intimate-status-section`):** §2.4's
+> "not backed" verdict for the 親密狀態 collapsible is superseded: the change lands the
+> `character` panel's nullable `intimate` object (bumping `CHARACTER_SCHEMA_VERSION` 3 → 4)
+> and the drawer's collapsed-by-default 親密狀態 section, so the surface now has a backing
+> OOB read model and is no longer deferred.
 
 The first group is built. The second group is **not built and not mocked** — same rule as migration
 roadmap §7, and the existing `tests/overlays/deferred_surfaces_absent.test.js` assertion is extended,
@@ -160,8 +166,17 @@ not relaxed. A component is never faked to look real.
 
 - No server, OOB schema, action allowlist, or presenter change. The six changes consume the eight
   allowlisted panels as-is.
-- No new read model, and therefore no companion panel, no toast queue, no persistent objective
-  tracker, and no 親密狀態 block (§2.4). Each gets its own OOB change when its read model lands.
+- No new read model, and therefore no companion panel, no toast queue, and no persistent
+  objective tracker. Each gets its own OOB change when its read model lands. The 親密狀態
+  block was a non-goal of this roadmap, but `add-webclient-intimate-status-section`
+  (2026-08-28) supersedes that clause: it lands the `character` panel's nullable
+  `intimate` field (schema version 4) and the drawer's 親密狀態 section, so the block is
+  no longer deferred by the HUD redesign's non-goal.
+
+> **Correction (2026-08-28, applied by `add-webclient-intimate-status-section`):** §3's
+> "no 親密狀態 block" non-goal is superseded — the change adds the backing `intimate` read
+> model and the collapsed-by-default 親密狀態 section, so the block is built and governed by
+> `webclient-contextual-hud`'s character-status drawer requirement.
 - No mobile or tablet support. Desktop only.
 - No change to the narrative *text stream*. The client renders what the server sends; curating the
   prose the server emits (today the raw room description, exit list and ASCII map reach the graphical

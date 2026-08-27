@@ -243,7 +243,7 @@ SHALL emit `creation.*`. The `MapOverlay` SHALL re-render its available/unavaila
 `local_map` OOB read model is updated, so a replaced payload never leaves a stale state; because the
 overlay is mounted in the running client, this SHALL hold against live read-model replacement and not
 only against a story's args. A surface with no backing OOB read model today — a dedicated Party/companion panel, the
-intimate/adult status collapsible, the event-log Toasts surface, the design draft's category-to-entry
+event-log Toasts surface, the design draft's category-to-entry
 game-help browser (the `help` command's output reaches the client only as narrative text; no committed
 panel carries it), and a persistent objective tracker — MUST NOT be built or mocked to look real, and each
 SHALL be named in the deferred-surface assertion together with the read model it waits on; the help overlay
@@ -252,7 +252,10 @@ authored game-help content. The held-item bag is
 NOT among them: it is backed by the `services` panel's `inventory` section, which the server builds for
 any actor in exploration mode independently of any service host, so the bag SHALL be built from
 `services.inventory.rows`, bounded by the payload's row cap, with `pagination.inventory_total` surfaced
-only as the count of rows actually shipped and never as a claim about untruncated holdings. On completion of the contextual HUD redesign the required-component manifest SHALL
+only as the count of rows actually shipped and never as a claim about untruncated holdings. The intimate/adult status collapsible is likewise NOT among the deferred surfaces: it is backed by the
+`character` panel's `intimate` field (`webclient-exploration-menu`'s version-4 character-panel
+requirement), and its completeness and absence-when-`null` behaviour are governed by
+`webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. On completion of the contextual HUD redesign the required-component manifest SHALL
 be re-frozen at the complete redesign set and the component-coverage gate SHALL enforce that frozen set.
 
 #### Scenario: Creation gate rejects both underage fields
@@ -277,7 +280,11 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 #### Scenario: Deferred surfaces are absent, not mocked
 - **WHEN** the complete component set is enumerated
-- **THEN** no Party panel, intimate/adult collapsible, event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+- **THEN** no Party panel, event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+
+#### Scenario: The intimate/adult status collapsible is no longer deferred
+- **WHEN** the complete component set and its deferred-surface assertion are enumerated
+- **THEN** the intimate/adult status collapsible is absent from the deferred-surface list, because it now has a backing OOB read model (`character.intimate`), and its presence/absence behaviour is asserted by `webclient-contextual-hud`'s character-status drawer requirement instead
 
 #### Scenario: The held-item bag is built from its backing section
 - **WHEN** the `services` panel commits an `inventory` section

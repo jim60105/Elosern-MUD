@@ -44,7 +44,7 @@ appears in exactly one section.
 
 #### Scenario: The drawer is useful in combat
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
-- **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet, persona, and intimate-status sections with the registry-owned reason
+- **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet, and persona sections with the registry-owned reason; the intimate-status section is entirely absent from the DOM, not collapsed and not placeholder-rendered
 
 #### Scenario: Conditions are never colour-only
 - **WHEN** the condition roster renders a committed condition
@@ -85,6 +85,10 @@ appears in exactly one section.
 #### Scenario: The abbreviated attribute and guild-rank labels match the design draft
 - **WHEN** the `屬性` section renders the `magic_level` row, and the `計數・公會` section renders the guild rank row
 - **THEN** the `magic_level` row's label reads `魔階` and the guild rank row's label reads `公會階級`, matching the design draft's `#dr-status` markup
+
+#### Scenario: Character-backed sections are marked, not hidden
+- **WHEN** the `character` panel is unavailable (outside exploration mode)
+- **THEN** each character-backed section (trait, equipment, guild counters, disguise, wallet, persona) still renders its labelled small-caps heading and shows the registry-owned reason in place of value rows, the wallet line renders no balance at all and no zero, and the intimate-status section is absent from the DOM rather than marked
 
 ### Requirement: The drawer layer renders the wallet exactly once
 Across every drawer, the player's wallet SHALL be rendered in exactly one place — the character-status

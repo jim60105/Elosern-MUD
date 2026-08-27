@@ -5,17 +5,21 @@ import {
   STATUS_PANEL_COMBAT_SAMPLE,
   STATUS_PANEL_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
+  CHARACTER_PANEL_UNDISGUISED_SAMPLE,
 } from "../../stories/fixtures.js";
 
 // CharacterStatusDrawer (H4, task 5.8): the 角色狀態 drawer body. The
 // status sections (vitals + the FULL condition roster) render in every mode
 // from the committed `status` payload; the `character`-backed sections show
 // the registry-owned reason (and invent nothing) when the `character` panel
-// is unavailable. The 親密狀態 block the 設計稿 shows has no backing field
-// and is absent.
+// is unavailable. The 親密狀態 (intimate-status) section renders as a
+// collapsed-by-default `<details>` disclosure when the committed `character`
+// v4 payload's `intimate` field is present, and is entirely absent from the
+// DOM when it is `null` or the `character` panel is unavailable (never a
+// placeholder or a collapsed-empty widget).
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
@@ -89,13 +93,38 @@ describe("CharacterStatusDrawer", () => {
     expect(w.get('[data-testid="character-status-drawer__wallet-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__persona-unavailable"]').exists()).toBe(true);
+    // The intimate section is entirely absent from the DOM when the
+    // `character` panel is unavailable — no placeholder or collapsed-empty
+    // widget stands in for it.
+    expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);
   });
 
-  it("invents no 親密狀態 block (no arousal / wetness / shame / exposure / climax element)", () => {
+  it("renders the 親密狀態 section as a collapsed-by-default disclosure (expandable)", async () => {
     const w = mountDrawer();
-    for (const word of ["親密", "興奮", "濕潤", "羞恥", "高潮", "露出部位", "敏感度", "處女"]) {
-      expect(w.text()).not.toContain(word);
-    }
+    const details = w.get('[data-testid="character-status-drawer__intimate"]');
+    // Collapsed by default: the native <details> element carries no `open`
+    // attribute; clicking the summary expands it.
+    expect(details.attributes("open")).toBeUndefined();
+    const summary = w.get('[data-testid="character-status-drawer__intimate-summary"]');
+    await summary.trigger("click");
+    expect(details.attributes("open")).toBe("");
+  });
+
+  it("renders the six intimate values and the vocabulary-closed hint verbatim", () => {
+    const w = mountDrawer();
+    expect(w.get('[data-testid="character-status-drawer__intimate--arousal"]').text()).toContain("中等");
+    expect(w.get('[data-testid="character-status-drawer__intimate--wetness"]').text()).toContain("微濕");
+    expect(w.get('[data-testid="character-status-drawer__intimate--shame"]').text()).toContain("輕微");
+    expect(w.get('[data-testid="character-status-drawer__intimate--exposure"]').text()).toContain("低");
+    expect(w.get('[data-testid="character-status-drawer__intimate--climax_phase"]').text()).toContain("未達");
+    expect(w.get('[data-testid="character-status-drawer__intimate--climax_today"]').text()).toContain("2 次");
+    expect(w.get('[data-testid="character-status-drawer__intimate-hint"]').text()).toBe("詞彙封閉；數值依設定折線/級別顯示。");
+  });
+
+  it("omits the intimate section entirely when the character panel's intimate field is null", () => {
+    const w = mountDrawer({ character: CHARACTER_PANEL_UNDISGUISED_SAMPLE });
+    expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("親密");
   });
 
   it("renders the disguise 真值 / 顯示 comparison with the standing combat-on-true-traits note", () => {
@@ -110,10 +139,10 @@ describe("CharacterStatusDrawer", () => {
   it("marks every drawer section with a labelled small-caps heading", () => {
     const w = mountDrawer();
     const labels = w.findAll(".character-status-drawer__section-label");
-    expect(labels).toHaveLength(6);
+    expect(labels).toHaveLength(7);
     // DOM order (設計稿 #dr-status): vitals, traits, guild counters,
-    // conditions, disguise, persona.
-    expect(labels.map((el) => el.text())).toEqual(["生命量", "屬性", "計數 · 公會", "狀態", "偽裝", "背景"]);
+    // conditions, disguise, intimate status, persona.
+    expect(labels.map((el) => el.text())).toEqual(["生命量", "屬性", "計數 · 公會", "狀態", "偽裝", "親密狀態", "背景"]);
   });
 
   it("renders every section in the 設計稿 DOM order", () => {
@@ -134,6 +163,7 @@ describe("CharacterStatusDrawer", () => {
       '[data-testid="character-status-drawer__guild"]',
       '[data-testid="character-status-drawer__conditions"]',
       '[data-testid="character-status-drawer__disguise"]',
+      '[data-testid="character-status-drawer__intimate"]',
       '[data-testid="character-status-drawer__wallet"]',
       '[data-testid="character-status-drawer__persona"]',
     ];
@@ -167,12 +197,15 @@ describe("CharacterStatusDrawer", () => {
     expect(w.get('[data-testid="character-status-drawer__disguise-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
+    // The intimate section is entirely absent in combat, where the `character`
+    // panel is unavailable.
+    expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);
   });
 
   it("renders vitals, traits and guild counters as bordered card tiles in a two-column grid", () => {
     const w = mountDrawer();
-    // Three grids: vitals, traits, guild counters.
-    expect(w.findAll(".character-status-drawer__statgrid").length).toBe(3);
+    // Four grids: vitals, traits, guild counters, and the intimate section.
+    expect(w.findAll(".character-status-drawer__statgrid").length).toBe(4);
     const vitals = w.findAll('[data-testid^="character-status-drawer__vital--"]');
     expect(vitals).toHaveLength(3);
     // The 屬性 section renders exactly the four true-attribute rows; the

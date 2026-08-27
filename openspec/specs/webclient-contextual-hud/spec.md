@@ -869,11 +869,14 @@ they describe, distinctly labelled, together with the statement that a disguise 
 registration and identification only and that combat always resolves against true values. A displayed
 value SHALL NEVER replace a true trait row.
 
-The intimate and adult state block the design draft shows in this drawer SHALL be absent: no arousal,
-wetness, shame, exposure, climax-phase, per-part sensitivity or virginity element, and no placeholder
-standing in for one, because no committed panel carries such a field.
+The intimate-status (親密狀態) section SHALL render as a collapsed-by-default disclosure widget when
+the committed `character` panel's `intimate` field is present, showing its `arousal`, `wetness`,
+`shame`, `exposure`, `climax_phase`, and `climax_today` values verbatim as level words (never a raw
+numeric gauge) alongside the vocabulary-closed hint copy, and SHALL be entirely absent from the DOM —
+not collapsed, not placeholder-rendered — when `intimate` is `null` or the `character` panel is
+unavailable.
 
-Each of the drawer's sections (vitals, traits, conditions, guild counters, disguise, persona) SHALL carry
+Each of the drawer's sections (vitals, traits, conditions, guild counters, disguise, intimate status, persona) SHALL carry
 a labelled, small-caps section heading naming what it presents, using the same heading treatment the
 HUD's other islands use. The vitals, traits, and guild-counter sections SHALL render each value as its
 own bordered card tile in a two-column grid rather than a plain text row, with the tile's label at the
@@ -887,15 +890,15 @@ condition chips use elsewhere in the HUD. These presentation rules apply identic
 whether a section is fully populated or marked with a registry-owned unavailable reason.
 
 The drawer's main sections SHALL render in the order 生命量 (vitals) → 屬性 (traits) → 計數・公會
-(guild counters) → 狀態 (conditions) → 偽裝 (disguise), matching the design draft's `#dr-status`
-section order. The `屬性` section SHALL render exactly the `character.traits` rows whose `key` is
+(guild counters) → 狀態 (conditions) → 偽裝 (disguise) → 親密狀態 (intimate status, when present),
+matching the design draft's `#dr-status` section order. The `屬性` section SHALL render exactly the `character.traits` rows whose `key` is
 `atk_phys`, `agility`, `defense`, or `magic_level`, in that order, and SHALL NOT render any `traits`
 row whose value is already presented by the vitals section (`hp`, `mp`, `sp`) or the guild-counter
 section (`guild_merit`), so each quantity the drawer presents appears in exactly one section.
 
 #### Scenario: The drawer is useful in combat
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
-- **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet and persona sections with the registry-owned reason
+- **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet, and persona sections with the registry-owned reason; the intimate-status section is entirely absent from the DOM, not collapsed and not placeholder-rendered
 
 #### Scenario: Conditions are never colour-only
 - **WHEN** the condition roster renders a committed condition
@@ -905,9 +908,13 @@ section (`guild_merit`), so each quantity the drawer presents appears in exactly
 - **WHEN** the committed `character` panel carries an active disguise with displayed values
 - **THEN** the drawer renders each displayed value beside the true trait row it describes with an explicit label, states that combat resolves against true values, and shows no true row replaced by a displayed one
 
-#### Scenario: The intimate block is absent
-- **WHEN** the character-status drawer renders in any mode
-- **THEN** no arousal, wetness, shame, exposure, climax-phase, sensitivity or virginity element is present and no placeholder stands in for one
+#### Scenario: The intimate-status section renders collapsed with level words only
+- **WHEN** the committed `character` panel's `intimate` field is present
+- **THEN** the drawer renders a collapsed-by-default `親密狀態` disclosure widget whose expanded content shows `arousal`/`wetness`/`shame`/`exposure`/`climax_phase` as their exact level words and `climax_today` as its exact count, with no raw numeric gauge value rendered anywhere in the section
+
+#### Scenario: The intimate-status section is absent, not placeholder-rendered, when there is no data
+- **WHEN** the committed `character` panel's `intimate` field is `null`, or the `character` panel itself is unavailable
+- **THEN** no intimate-status element exists in the DOM or in the tab order, and no placeholder or collapsed-empty widget stands in for one
 
 #### Scenario: Every section states what it is
 - **WHEN** the character-status drawer renders any of its sections
@@ -922,8 +929,8 @@ section (`guild_merit`), so each quantity the drawer presents appears in exactly
 - **THEN** each condition renders as a rounded pill carrying its label, its visible severity word, its severity glyph, and its duration/modifier text — with no content dropped relative to today's rendering — coloured by the same severity-to-colour mapping the capped status-island chips use, and the pills wrap onto additional lines rather than clipping or scrolling horizontally
 
 #### Scenario: Sections render in design order
-- **WHEN** the character-status drawer renders with both `status` and `character` available
-- **THEN** the vitals section renders before the traits section, the traits section renders before the guild-counter section, the guild-counter section renders before the condition roster, and the condition roster renders before the disguise section
+- **WHEN** the character-status drawer renders with both `status` and `character` available, `character.intimate` present
+- **THEN** the vitals section renders before the traits section, the traits section renders before the guild-counter section, the guild-counter section renders before the condition roster, the condition roster renders before the disguise section, and the disguise section renders before the intimate-status section
 
 #### Scenario: Traits never repeat a vitals or guild-counter value
 - **WHEN** `character.traits` contains `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, `magic_level`, and `guild_merit` rows
@@ -935,7 +942,7 @@ section (`guild_merit`), so each quantity the drawer presents appears in exactly
 
 #### Scenario: Character-backed sections are marked, not hidden
 - **WHEN** the `character` panel is unavailable (outside exploration mode)
-- **THEN** each character-backed section (trait, equipment, guild counters, disguise, wallet, persona) still renders its labelled small-caps heading and shows the registry-owned reason in place of value rows, and the wallet line renders no balance at all and no zero
+- **THEN** each character-backed section (trait, equipment, guild counters, disguise, wallet, persona) still renders its labelled small-caps heading and shows the registry-owned reason in place of value rows, the wallet line renders no balance at all and no zero, and the intimate-status section is absent from the DOM rather than marked
 
 ### Requirement: The drawer layer renders the wallet exactly once
 Across every drawer, the player's wallet SHALL be rendered in exactly one place — the character-status

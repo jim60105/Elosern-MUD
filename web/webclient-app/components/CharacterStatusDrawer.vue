@@ -2,12 +2,15 @@
 // CharacterStatusDrawer (H4, webclient-hud-04-reference-drawers, task 5.3):
 // the 角色狀態 drawer body. It presents the committed `status` v1 payload's
 // vitals (hp/mp/sp gauges) and the FULL condition roster (no 6-chip cap,
-// unlike H2's ConditionChips island), plus the `character` v3 payload body
-// (traits, equipment, disguise, guild, wallet, persona). In every mode the
-// status sections render; when the `character` panel is unavailable the
-// drawer shows the registry-owned reason and invents nothing. The 親密狀態
-// (intimate) block the 設計稿 shows has no backing field, so it is absent
-// (task 5.6). A single labelled control opens the skill drawer (task 5.5).
+// unlike H2's ConditionChips island), plus the `character` v4 payload body
+// (traits, equipment, disguise, guild, wallet, persona, intimate). In every
+// mode the status sections render; when the `character` panel is unavailable
+// the drawer shows the registry-owned reason and invents nothing. The 親密狀態
+// (intimate-status) section renders as a collapsed-by-default native
+// `<details>` disclosure when the panel's `intimate` field is present, and is
+// entirely absent from the DOM when `intimate` is null or the panel is
+// unavailable — never a placeholder. A single labelled control opens the
+// skill drawer (task 5.5).
 import { computed } from "vue";
 import { gaugeRatio } from "./vitals.js";
 import EquipmentDoll from "./EquipmentDoll.vue";
@@ -132,6 +135,20 @@ function formatCopper(value) {
 }
 const wallet = computed(() => (characterAvailable.value ? Math.max(0, props.character?.wallet ?? 0) : 0));
 const personaBackground = computed(() => (characterAvailable.value ? (props.character?.persona?.background ?? null) : null));
+
+const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
+
+// The 親密狀態 (intimate status) section rows: the 設計稿's #dr-status stat
+// grid. The first five rows are level words from the fixed vocabulary, and
+// the last row is the daily climax count.
+const INTIMATE_ROWS = [
+  { key: "arousal", label: "興奮" },
+  { key: "wetness", label: "濕潤" },
+  { key: "shame", label: "羞恥" },
+  { key: "exposure", label: "露出" },
+  { key: "climax_phase", label: "高潮" },
+  { key: "climax_today", label: "今日" },
+];
 </script>
 
 <template>
@@ -331,6 +348,39 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
         {{ characterReason?.message }}
       </p>
     </section>
+
+    <!-- The 親密狀態 (intimate status) section: a native `<details>`
+         disclosure, collapsed by default, rendered after 偽裝 and before
+         the wallet row. It is entirely absent from the DOM when `intimate`
+         is null or the `character` panel is unavailable — never a placeholder
+         or a collapsed-empty widget. -->
+    <details
+      v-if="intimate"
+      class="character-status-drawer__section character-status-drawer__intimate"
+      data-testid="character-status-drawer__intimate"
+      aria-label="親密狀態"
+    >
+      <summary class="character-status-drawer__intimate-summary" data-testid="character-status-drawer__intimate-summary">
+        <span class="character-status-drawer__section-label">親密狀態</span>
+        <span class="character-status-drawer__intimate-marker" aria-hidden="true">›</span>
+      </summary>
+      <p class="character-status-drawer__intimate-hint" data-testid="character-status-drawer__intimate-hint">
+        詞彙封閉；數值依設定折線/級別顯示。
+      </p>
+      <div class="character-status-drawer__statgrid">
+        <div
+          v-for="row in INTIMATE_ROWS"
+          :key="row.key"
+          class="character-status-drawer__statrow"
+          :data-testid="`character-status-drawer__intimate--${row.key}`"
+        >
+          <span class="character-status-drawer__statrow-key">{{ row.label }}</span>
+          <span class="character-status-drawer__statrow-value">
+            {{ row.key === "climax_today" ? `${intimate.climax_today} 次` : intimate[row.key] }}
+          </span>
+        </div>
+      </div>
+    </details>
 
     <!-- The wallet renders no balance at all (and no zero) when the panel
          that carries it is unavailable. -->
@@ -651,5 +701,34 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
   color: var(--paper-300);
   font-size: 0.85em;
   line-height: 1.6;
+}
+
+/* The design's 親密狀態 disclosure: the native `<details>` header carries the
+   label and the trailing marker; the hint line sits above the shared
+   two-column stat grid. The details element is collapsed by default (no
+   `open` attribute) and needs no script. */
+.character-status-drawer__intimate-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-bottom: 7px;
+  color: var(--paper-100);
+  cursor: pointer;
+  list-style: none;
+}
+
+.character-status-drawer__intimate-summary::-webkit-details-marker {
+  display: none;
+}
+
+.character-status-drawer__intimate-marker {
+  margin-left: auto;
+  color: var(--paper-500);
+}
+
+.character-status-drawer__intimate-hint {
+  margin: 0 0 7px;
+  color: var(--paper-500);
+  font-size: 0.8em;
 }
 </style>

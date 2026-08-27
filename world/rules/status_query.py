@@ -12,14 +12,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
-from world.lore.sexual_vocab import EXPOSURE_LEVELS
+from world.lore.sexual_vocab import (
+    AROUSAL_LEVELS,
+    CLIMAX_PHASE_LEVELS,
+    EXPOSURE_LEVELS,
+    SHAME_LEVELS,
+    WETNESS_LEVELS,
+)
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import matched_combat_modifiers
-from world.rules.sexual_state import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, PLEASURE_CONFIG
+from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
 from world.skills.equipment import dual_wielding_from_storage
-from world.skills.handler import INNATE_SKILL_KEYS
+from world.skills.handler import INNATE_SKILL_KEYS, INNATE_SKILL_ORDER
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
+from world.skills.sexual_acts import unlocked_act_keys_for
 
 # Stable Traditional Chinese labels for the canonical trait keys, shared by
 # every presentation surface: the WebClient character panel and the
@@ -181,8 +188,20 @@ class CharacterCategoryGroupView:
 
 
 @dataclass(frozen=True)
+class IntimateView:
+    """Read-only intimate-status values: level words plus the daily climax count."""
+
+    arousal: str
+    wetness: str
+    shame: str
+    exposure: str
+    climax_phase: str
+    climax_today: int
+
+
+@dataclass(frozen=True)
 class CharacterReadModel:
-    """The complete read-only inputs of the version-3 ``character`` panel.
+    """The complete read-only inputs of the version-4 ``character`` panel.
 
     Shares the same canonical trait storage the compact ``status`` panel reads,
     so the two panels cannot drift apart: gauges go through the same strict
@@ -200,6 +219,7 @@ class CharacterReadModel:
     guild_rank: str | None
     guild_merit: int
     wallet: int
+    intimate: IntimateView | None
 
 
 def _read_attribute(entity: Any, key: str, default=None, category: str | None = None) -> Any:
@@ -313,6 +333,129 @@ def _ordinal_of(levels: tuple[str, ...], label: str) -> int:
         return levels.index(label)
     except ValueError as error:
         raise StatusQueryError(f"unknown level {label!r}") from error
+
+
+_INTIMATE_LEVEL_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("wetness", WETNESS_LEVELS),
+    ("shame", SHAME_LEVELS),
+    ("exposure", EXPOSURE_LEVELS),
+    ("climax_phase", CLIMAX_PHASE_LEVELS),
+)
+
+
+def _sexual_counter(entity: Any, field: str) -> int | None:
+    """Read one sexual counter trait in memory without a handler.
+
+    Reads the materialized ``sexual_traits`` entry the same way
+    ``_require_static_trait`` prefers ``raw.get("current", raw.get("base"))``.
+    Absent a materialized record, falls back to the baseline's ``climax_today``
+    (default ``0`` when the key is missing), or ``None`` when no record exists
+    at all. A present-but-malformed record fails closed. Never creates
+    ``entity.sexual``.
+    """
+    traits = _read_attribute(
+        entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
+    )
+    if isinstance(traits, Mapping) and field in traits:
+        raw = traits[field]
+        if not isinstance(raw, Mapping):
+            raise StatusQueryError(f"sexual counter {field!r} is malformed")
+        value = raw.get("current", raw.get("base"))
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise StatusQueryError(f"sexual counter {field!r} is malformed")
+        return value
+    baseline = _read_attribute(entity, "sexual", default=None)
+    if baseline is None:
+        return None
+    if not isinstance(baseline, Mapping):
+        raise StatusQueryError("sexual baseline is malformed")
+    value = baseline.get(field, 0)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise StatusQueryError(f"sexual baseline {field!r} is malformed")
+    return value
+
+
+def _validate_intimate_level_entry(raw: Any, vocabulary: tuple[str, ...]) -> str:
+    """Strictly validate one materialized ordered-level entry, fail-closed."""
+    if not isinstance(raw, Mapping):
+        raise StatusQueryError("materialized sexual level entry is malformed")
+    levels = raw.get("levels")
+    # Evennia deserializes nested lists as `_SaverList` (a MutableSequence,
+    # not a list/tuple), so accept any non-str sequence and compare its
+    # contents against the field's fixed vocabulary.
+    if isinstance(levels, str) or not isinstance(levels, Sequence) or tuple(levels) != vocabulary:
+        raise StatusQueryError(
+            f"materialized sexual level entry levels do not match the fixed vocabulary"
+        )
+    value = raw.get("value")
+    if isinstance(value, bool):
+        raise StatusQueryError("materialized sexual level value must not be a boolean")
+    if isinstance(value, int) and 0 <= value < len(vocabulary):
+        return vocabulary[value]
+    if isinstance(value, str) and value in vocabulary:
+        return value
+    raise StatusQueryError("materialized sexual level value is malformed")
+
+
+def _read_intimate(entity: Any) -> IntimateView | None:
+    """Build the intimate view from no-create-safe readers, or return None.
+
+    A materialized ``sexual_traits`` record must be complete (the ``SexualState``
+    handler always writes every intimate entry, so a missing entry is
+    corruption that fails the panel closed, never a silent baseline fallback).
+    Absent a materialized record, level fields resolve from the import-time
+    baseline; absent both, the whole view is ``None``.
+    """
+    traits = _read_attribute(
+        entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
+    )
+    if isinstance(traits, Mapping):
+        required = ("pleasure", "climax_today") + tuple(field for field, _ in _INTIMATE_LEVEL_FIELDS)
+        for field in required:
+            if field not in traits:
+                raise StatusQueryError(f"materialized sexual state is missing {field!r}")
+        pleasure = traits["pleasure"]
+        if not isinstance(pleasure, Mapping):
+            raise StatusQueryError("materialized pleasure counter is malformed")
+        base = pleasure.get("base")
+        if isinstance(base, bool) or not isinstance(base, int) or not 0 <= base <= 100:
+            raise StatusQueryError("materialized pleasure counter base is malformed")
+        values = {"arousal": AROUSAL_LEVELS[PLEASURE_CONFIG.ordinal_for(base)]}
+        for field, vocabulary in _INTIMATE_LEVEL_FIELDS:
+            values[field] = _validate_intimate_level_entry(traits[field], vocabulary)
+        return IntimateView(
+            arousal=values["arousal"],
+            wetness=values["wetness"],
+            shame=values["shame"],
+            exposure=values["exposure"],
+            climax_phase=values["climax_phase"],
+            climax_today=_sexual_counter(entity, "climax_today"),
+        )
+    baseline = _read_attribute(entity, "sexual", default=None)
+    if baseline is None:
+        return None
+    if not isinstance(baseline, Mapping):
+        raise StatusQueryError("sexual baseline is malformed")
+    values = {}
+    for field, vocabulary in (("arousal", AROUSAL_LEVELS), *_INTIMATE_LEVEL_FIELDS):
+        value = baseline.get(field)
+        if value is None:
+            raise StatusQueryError(f"sexual baseline is missing {field!r}")
+        if isinstance(value, str) and value in vocabulary:
+            values[field] = value
+        else:
+            raise StatusQueryError(f"sexual baseline {field!r} is malformed")
+    climax_today = _sexual_counter(entity, "climax_today")
+    if climax_today is None:
+        return None
+    return IntimateView(
+        arousal=values["arousal"],
+        wetness=values["wetness"],
+        shame=values["shame"],
+        exposure=values["exposure"],
+        climax_phase=values["climax_phase"],
+        climax_today=climax_today,
+    )
 
 
 def _sexual_condition_context(entity: Any) -> dict[str, Any]:
@@ -431,18 +574,18 @@ def _read_guild_merit(traits_data: dict[str, Any]) -> int:
 def _split_active_passive_keys(entity: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Split the entity's owned skill keys into active and passive buckets.
 
-    Iterates ``SkillHandler.owned_keys()`` — the single source of truth for
-    owned skills, including handler-contributed keys that are never written
-    into ``entity.db.skills`` (the innate grants today, and the future
-    unlocked sexual acts) — with a ``seen`` guard because ``owned_keys()``
-    itself does not de-duplicate. Each key is routed by its registry
-    ``SkillKind``; a key absent from ``SKILL_REGISTRY`` stays in whichever
-    stored bucket it was actually recorded in (defaulting to passive),
-    matching the pre-change raw-list semantics so unknown keys degrade rather
-    than raise. A key that is neither registry-known, nor stored, nor innate
-    is dropped: it can only come from a malformed stored list being splatted
-    by ``owned_keys()`` (for example ``"passive": "none"``), and must never
-    surface as junk rows.
+    Pure no-create read: base owned keys come from the stored
+    ``entity.db.skills`` lists plus the innate grants (the same set
+    ``SkillHandler.base_owned_keys()`` returns), and the unlocked sexual acts
+    are computed from the registry and the materialized counters via
+    ``unlocked_act_keys_for`` — without ever mounting ``entity.skills`` or
+    ``entity.sexual``. Each key is routed by its registry ``SkillKind``; a
+    key absent from ``SKILL_REGISTRY`` stays in whichever stored bucket it
+    was actually recorded in (defaulting to passive), matching the
+    pre-change raw-list semantics so unknown keys degrade rather than raise.
+    A key that is neither registry-known, nor stored, nor innate is dropped:
+    it can only come from a malformed stored list (for example
+    ``"passive": "none"``), and must never surface as junk rows.
     """
     raw = entity.db.skills
     if not isinstance(raw, Mapping):
@@ -457,10 +600,38 @@ def _split_active_passive_keys(entity: Any) -> tuple[tuple[str, ...], tuple[str,
         key for key in (*raw_active, *raw_passive) if isinstance(key, str) and key
     }
     raw_active_keys = {key for key in raw_active if isinstance(key, str) and key}
+
+    base_keys: list[str] = [
+        key for key in (*raw_active, *raw_passive) if isinstance(key, str) and key
+    ]
+    base_keys.extend(INNATE_SKILL_ORDER)
+
+    # Act-unlock counters: a materialized ``sexual_traits`` record supplies
+    # ``climax_today`` and the lifetime counters (``current`` wins over
+    # ``base``); an unmaterialized state reads every counter as zero. A
+    # present-but-malformed counter value fails closed, matching the
+    # intimate reader's discipline.
+    traits = _read_attribute(
+        entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
+    )
+    counter_values: dict[str, int] = {}
+    if isinstance(traits, Mapping):
+        for field in ("climax_today", *_LIFETIME_COUNTER_KEYS):
+            entry = traits.get(field)
+            if entry is None:
+                continue
+            if not isinstance(entry, Mapping):
+                raise StatusQueryError(f"sexual counter {field!r} is malformed")
+            value = entry.get("current", entry.get("base"))
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise StatusQueryError(f"sexual counter {field!r} is malformed")
+            counter_values[field] = value
+
+    unlocked = sorted(unlocked_act_keys_for(base_keys, counter_values))
     seen: set[str] = set()
     active: list[str] = []
     passive: list[str] = []
-    for key in entity.skills.owned_keys():
+    for key in (*base_keys, *unlocked):
         if not isinstance(key, str) or not key or key in seen:
             continue
         skill = SKILL_REGISTRY.get(key)
@@ -614,8 +785,9 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
 
     Reads the same canonical trait dict the status model reads, so the expanded
     character surface and the compact status surface agree on every shared
-    value. Equipment, disguise, guild, and wallet are read strictly and fail
-    closed when malformed; no handler is materialized and nothing is written.
+    value. Equipment, disguise, guild, wallet, and the intimate view are read
+    strictly and fail closed when malformed; no handler is materialized and
+    nothing is written.
     """
     traits_data = _read_attribute(
         entity, "traits", default=None, category="traits"
@@ -632,6 +804,10 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         traits.append(CharacterTraitView(key, _require_static_trait(traits_data, key), None))
 
     disguise_active, disguise_displayed = _read_disguise(entity)
+    # The intimate view is read before the skill path so a corrupted (partial)
+    # materialized record fails the completeness check before anything else in
+    # the model build can observe or repair it.
+    intimate = _read_intimate(entity)
     active_keys, passive_keys = _split_active_passive_keys(entity)
     return CharacterReadModel(
         traits=tuple(traits),
@@ -643,4 +819,5 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         guild_rank=getattr(entity, "guild_rank", None),
         guild_merit=_read_guild_merit(traits_data),
         wallet=_read_wallet(entity),
+        intimate=intimate,
     )

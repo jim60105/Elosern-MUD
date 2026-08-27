@@ -227,13 +227,19 @@ services, creation, exploration, character) and the text stream deliver. The per
 **Deferred** — separate OOB changes, not built in this migration because they have no backing read model
 in the current allowlist:
 - a dedicated Party / companion data panel (bond, affinity, follow);
-- the intimate / adult status collapsible (the current status/character OOB payload has no such fields);
+- ~~the intimate / adult status collapsible (the current status/character OOB payload has no such fields)~~ — superseded 2026-08-28 by `add-webclient-intimate-status-section`: it now has a backing read model (the `character` panel's `intimate` field, schema version 4);
 - a full inventory bag (only equipped items are modeled today);
 - the event-log Toasts surface (no `event-log` panel in the allowlist today).
 
 B5 asserts these surfaces are **absent** rather than mocked. Each deferred surface gets its own OpenSpec
 change when its OOB read model lands; that change will `MODIFIED` the component-showcase manifest to add
 it.
+
+> **Correction (2026-08-28, applied by `add-webclient-intimate-status-section`):** §7's deferred
+> "intimate / adult status collapsible" line is superseded: the change adds the `character` panel's
+> nullable `intimate` field (bumping `CHARACTER_SCHEMA_VERSION` 3 → 4) and the drawer's
+> collapsed-by-default 親密狀態 section, so that surface now has a backing OOB read model and is
+> removed from the deferred list.
 
 ---
 
