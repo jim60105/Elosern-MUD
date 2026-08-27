@@ -18,6 +18,9 @@ export const GLYPHS = {
   inventory: "M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z",
   wait: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 4v7l5 3-1.5 2.4L11 14V7h2z",
   suggestions: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
+  // The reference's own get-icon (the command line's 拿 chip,
+  // docs/design/elosern-redesign/index.html:870).
+  get: "M6 11V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 11h16v9H4z",
   // Combat root item keys (same reference source, combat-root section).
   attack: "M5 19 19 5M5 19h4M5 19v-4",
   skills: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",

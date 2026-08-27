@@ -959,9 +959,12 @@ exists.
 
 Each chip's visible label SHALL be the literal command verb it inserts, and every chip SHALL insert a
 verb the server's installed command set actually accepts — a chip SHALL NOT offer a verb the parser
-would reject. Chips SHALL carry no key-mnemonic badge unless this client binds that key. Chips that do
-not apply to the committed mode SHALL be removed with `display:none` so they leave the accessibility
-tree and the tab order, never dimmed.
+would reject. Each chip SHALL carry a decorative icon beside its text label, drawn from this client's
+stable glyph vocabulary (the same table the action dock's tab bar and pane rows draw from); the icon
+SHALL be hidden from assistive technology and SHALL NOT appear without its accompanying text label.
+Chips SHALL carry no key-mnemonic badge unless this client binds that key. Chips that do not apply to
+the committed mode SHALL be removed with `display:none` so they leave the accessibility tree and the tab
+order, never dimmed.
 
 #### Scenario: A chip prepares, it does not send
 - **WHEN** the player activates a quick-word chip
@@ -969,11 +972,15 @@ tree and the tab order, never dimmed.
 
 #### Scenario: The chip set follows the mode
 - **WHEN** the committed mode changes from exploration to combat
-- **THEN** the exploration-only chips are absent from the DOM and from the tab order, and the combat chip set renders in their place
+- **THEN** the exploration-only chips are hidden with `display:none` so they leave the accessibility tree and the tab order (never dimmed, and still present in the DOM), and the combat chip set renders in their place
 
 #### Scenario: No chip offers a verb the game does not have
 - **WHEN** the rendered chip set is enumerated in any mode
 - **THEN** every chip's inserted text is a command key or alias the server installs, and no chip advertises a key mnemonic that this client does not bind
+
+#### Scenario: Every chip carries a decorative icon paired with its label
+- **WHEN** the rendered chip set is enumerated in any mode
+- **THEN** every chip renders an `aria-hidden` icon alongside its visible text label, and no chip renders an icon without that label
 
 ### Requirement: The command line advertises only affordances this client implements
 The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
