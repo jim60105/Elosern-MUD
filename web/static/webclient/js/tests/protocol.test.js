@@ -1391,7 +1391,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 4);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
     8,
@@ -3290,7 +3290,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 4);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -3314,7 +3314,7 @@ test("exploration and character are in the production panel allowlist", () => {
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "character",
       traits: [
@@ -3350,6 +3350,7 @@ function validCharacterPanel(overrides) {
       guild: { rank: null, merit: 0 },
       wallet: 100,
       persona: { background: null },
+      intimate: null,
     },
     overrides || {}
   );
@@ -3372,15 +3373,15 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
-  // The unavailable fixture carries the registered version (3), and the real
+  // The unavailable fixture carries the registered version (4), and the real
   // validatePanel dispatch path is exercised.
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
-      unavailableStatusPanel({ schema_version: 3 })
+      unavailableStatusPanel({ schema_version: 4 })
     ),
-    unavailableStatusPanel({ schema_version: 3 })
+    unavailableStatusPanel({ schema_version: 4 })
   );
   assert.throws(() =>
     Protocol.validatePanel(
@@ -3394,22 +3395,26 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
-  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
+  assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
   const missing = validCharacterPanel();
   delete missing.actives;
   assert.throws(() => Protocol.validateCharacterPanel(missing));
+  const missingIntimate = validCharacterPanel();
+  delete missingIntimate.intimate;
+  assert.throws(() => Protocol.validateCharacterPanel(missingIntimate));
 });
 
 test("a character unavailable snapshot at the registered version is accepted atomically", () => {
   const store = Protocol.createStore();
   store.beginTransport(1);
   const status = validStatusPanel();
-  const version3 = unavailableStatusPanel({ schema_version: 3 });
-  const accepted = snapshot({ panels: { status: status, character: version3 } });
+  const version4 = unavailableStatusPanel({ schema_version: 4 });
+  const accepted = snapshot({ panels: { status: status, character: version4 } });
   const result = store.receive(1, "ui_snapshot", [accepted], {});
   assert.equal(result.accepted, true);
   assert.deepEqual(store.getState().panels.status, status, "healthy status panel stays intact");
-  assert.deepEqual(store.getState().panels.character, version3);
+  assert.deepEqual(store.getState().panels.character, version4);
 
   // The identical snapshot at the stale version is rejected with no panel
   // replaced or merged: a different-but-valid status panel must not leak in.
@@ -3420,9 +3425,9 @@ test("a character unavailable snapshot at the registered version is accepted ato
     panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
   });
   assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
-  assert.equal(store.getState().phase, "active", "the version-3 state remains committed");
+  assert.equal(store.getState().phase, "active", "the version-4 state remains committed");
   assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
-  assert.deepEqual(store.getState().panels.character, version3, "character panel untouched");
+  assert.deepEqual(store.getState().panels.character, version4, "character panel untouched");
 });
 
 test("enforces character D10 bounds and disguise honesty", () => {
@@ -3469,6 +3474,55 @@ test("enforces character D10 bounds and disguise honesty", () => {
   );
   // A wallet is a non-negative safe integer.
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ wallet: -1 })));
+});
+
+test("character panel v4 validates the intimate status section", () => {
+  // A null intimate section (no sexual-state record) is valid.
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(validCharacterPanel({ intimate: null }))
+  );
+  const intimate = {
+    arousal: "中等",
+    wetness: "濕潤",
+    shame: "輕微",
+    exposure: "低",
+    climax_phase: "未達",
+    climax_today: 0,
+  };
+  const normalized = Protocol.validateCharacterPanel(validCharacterPanel({ intimate }));
+  assert.deepEqual(normalized.intimate, intimate, "a valid intimate section normalizes to itself");
+  // A level outside its fixed vocabulary is rejected.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ intimate: { ...intimate, arousal: "極高" } })
+    )
+  );
+  // An over-long level string is rejected.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ intimate: { ...intimate, wetness: "a".repeat(129) } })
+    )
+  );
+  // climax_today must be a non-negative integer.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ intimate: { ...intimate, climax_today: -1 } })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ intimate: { ...intimate, climax_today: 1.5 } })
+    )
+  );
+  // A missing or unknown field in the intimate section is rejected.
+  const missingField = { ...intimate };
+  delete missingField.shame;
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ intimate: missingField })));
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ intimate: { ...intimate, extra: 1 } })
+    )
+  );
 });
 
 test("character panel v3 validates the category-grouped skill shape", () => {

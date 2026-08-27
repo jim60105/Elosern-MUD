@@ -249,7 +249,7 @@
     services: 1,
     creation: 1,
     exploration: 1,
-    character: 3,
+    character: 4,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -2905,6 +2905,13 @@
   var CHARACTER_MAX_LABEL = 128;
   var CHARACTER_MAX_DESCRIPTION = 256;
   var CHARACTER_MAX_SLOT = 32;
+  // Fixed level vocabularies for the character panel's intimate section
+  // (mirror of world/lore/sexual_vocab.py, the shared vocabulary source).
+  var CHARACTER_INTIMATE_AROUSAL_LEVELS = ["平靜", "微興奮", "中等", "高度", "極限"];
+  var CHARACTER_INTIMATE_WETNESS_LEVELS = ["乾燥", "微濕", "濕潤", "大量", "泛濫"];
+  var CHARACTER_INTIMATE_SHAME_LEVELS = ["無", "輕微", "中等", "強烈", "成癮"];
+  var CHARACTER_INTIMATE_EXPOSURE_LEVELS = ["極低", "低", "中等", "高", "極高"];
+  var CHARACTER_INTIMATE_CLIMAX_PHASE_LEVELS = ["未達", "接近", "進行中", "餘韻"];
 
   function validateCharacterKey(value, field) {
     var key = validateIdentifier(value, field);
@@ -3099,16 +3106,62 @@
     return { background: background.trim() };
   }
 
-  // Exact available character panel v3 schema (design D10 + skill category
-  // grouping). Shared bounds are guarded by a dual-direction parity test.
+  // Nullable intimate section of the character panel v4 (webclient-intimate-status-section).
+  // `null` means the actor has no sexual-state record; otherwise the section
+  // carries exactly the six intimate fields, each level field checked against
+  // its fixed vocabulary and `climax_today` as a non-negative safe integer.
+  function validateCharacterIntimateLevel(value, field, vocabulary) {
+    var level = requireString(value, field, CHARACTER_MAX_LABEL);
+    if (vocabulary.indexOf(level) === -1) {
+      throw new Error(field + " is not a member of its fixed vocabulary");
+    }
+    return level;
+  }
+
+  function validateCharacterIntimate(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(
+      value,
+      "intimate",
+      ["arousal", "wetness", "shame", "exposure", "climax_phase", "climax_today"],
+      []
+    );
+    return {
+      arousal: validateCharacterIntimateLevel(value.arousal, "intimate.arousal", CHARACTER_INTIMATE_AROUSAL_LEVELS),
+      wetness: validateCharacterIntimateLevel(value.wetness, "intimate.wetness", CHARACTER_INTIMATE_WETNESS_LEVELS),
+      shame: validateCharacterIntimateLevel(value.shame, "intimate.shame", CHARACTER_INTIMATE_SHAME_LEVELS),
+      exposure: validateCharacterIntimateLevel(value.exposure, "intimate.exposure", CHARACTER_INTIMATE_EXPOSURE_LEVELS),
+      climax_phase: validateCharacterIntimateLevel(value.climax_phase, "intimate.climax_phase", CHARACTER_INTIMATE_CLIMAX_PHASE_LEVELS),
+      climax_today: requireInt(value.climax_today, "intimate.climax_today", 0, MAX_SAFE_INTEGER),
+    };
+  }
+
+  // Exact available character panel v4 schema (design D10 + skill category
+  // grouping + the intimate-status section from webclient-intimate-status-section).
+  // Shared bounds are guarded by a dual-direction parity test.
   function validateCharacterPanel(payload) {
     requireExactFields(
       payload,
       "character panel",
-      ["schema_version", "available", "kind", "traits", "actives", "passives", "equipment", "disguise", "guild", "wallet", "persona"],
+      [
+        "schema_version",
+        "available",
+        "kind",
+        "traits",
+        "actives",
+        "passives",
+        "equipment",
+        "disguise",
+        "guild",
+        "wallet",
+        "persona",
+        "intimate",
+      ],
       []
     );
-    if (payload.schema_version !== 3) {
+    if (payload.schema_version !== 4) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
@@ -3160,8 +3213,9 @@
     requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
     var persona = validateCharacterPersona(payload.persona);
 
+    var intimate = validateCharacterIntimate(payload.intimate);
     var result = {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -3172,6 +3226,7 @@
       guild: payload.guild,
       wallet: payload.wallet,
       persona: persona,
+      intimate: intimate,
     };
     // Envelope guarantee (design D10): an over-limit payload fails closed.
     if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {

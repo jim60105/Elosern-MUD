@@ -78,15 +78,15 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(walletNodes).toHaveLength(1);
   });
 
-  // The character panel is an exact-schema v3 payload: the
+  // The character panel is an exact-schema v4 payload: the
   // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
   // character-panel active-row schema does not register, so it is stripped
   // before committing. The other exact fields (traits, equipment, disguise,
-  // guild, wallet, persona) come from the already-valid
+  // guild, wallet, persona, intimate) come from the already-valid
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "character",
       traits: CHARACTER_PANEL_SAMPLE.traits,
@@ -106,6 +106,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       guild: CHARACTER_PANEL_SAMPLE.guild,
       wallet: CHARACTER_PANEL_SAMPLE.wallet,
       persona: CHARACTER_PANEL_SAMPLE.persona,
+      intimate: CHARACTER_PANEL_SAMPLE.intimate,
     };
   }
 
@@ -168,7 +169,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 3,
+              schema_version: 4,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },

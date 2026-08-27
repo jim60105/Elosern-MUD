@@ -74,7 +74,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
 
   it("unavailable character: renders the registry-owned reason, no fabricated slots", () => {
     const w = mountDoll({ character: {
-      schema_version: 3, available: false, kind: "character",
+      schema_version: 4, available: false, kind: "character",
        reason: { code: "no_puppet", message: "你已離開角色" },
      } });
     const reason = w.get('[data-testid="equipment-doll__unavailable"]');
