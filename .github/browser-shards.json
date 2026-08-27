@@ -104,6 +104,7 @@
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_reconnect_rebuilds_exploration_without_replay",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_pointer_back_cell_returns_to_the_root_without_an_action",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",

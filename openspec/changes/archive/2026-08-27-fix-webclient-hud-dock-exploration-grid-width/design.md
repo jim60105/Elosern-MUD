@@ -51,10 +51,14 @@ corrected, narrower, and verified claim is in Decision 2.
 **Goals:**
 - The exploration move/look/interact frames render content-sized tiles/rows, not tiles stretched to half
   (or a third, etc.) of the dock's width.
+- At the minimum supported 1280x720 viewport the fixed two columns compress to fit the pane's available
+  width (the `minmax(0, max-content)` track sizing plus the tiles'/rows' `min-width: 0`), so the frames
+  never overflow the dock or the still-present `dock-detail` aside.
 - Zero change to keyboard navigation: the same column count, the same item-to-cell mapping, every
   existing `ArrowRight`/`ArrowDown` test assertion for these menus keeps passing unmodified.
-- No tile or row can grow unboundedly from `max-content` sizing on a long server-authored string — a
-  fixed `max-width` safety net catches that case.
+- No tile or row can grow unboundedly from `max-content` sizing on a long server-authored string — the
+  fixed `max-width` + `overflow-wrap` safety net catches that case, and the nav row's text block carries
+  its own `min-width: 0` so a long string wraps inside the capped row instead of breaking the cap.
 
 **Non-Goals:**
 - No change to `exploration_menu.js`'s `gridCols: 2` values, `keyboard_router.js`'s row/col math, or the
@@ -73,19 +77,25 @@ corrected, narrower, and verified claim is in Decision 2.
 
 ## Decisions
 
-**1. Change only the track-sizing function (`1fr` → `max-content`) for the `outlet`/`nav` pane kinds;
-leave the column-count mechanism and every other pane kind — including `plain` — untouched.**
+**1. Change only the track-sizing function (`1fr` → `minmax(0, max-content)`) for the `outlet`/`nav`
+pane kinds; leave the column-count mechanism and every other pane kind — including `plain` — untouched.**
 ```js
 const paneGridStyle = computed(() => {
   if (!props.gridCols) {
     return {};
   }
-  const sizeFn = ["outlet", "nav"].includes(paneKind.value) ? "max-content" : "1fr";
+  const sizeFn = ["outlet", "nav"].includes(paneKind.value)
+    ? "minmax(0, max-content)"
+    : "1fr";
   return { "grid-template-columns": `repeat(${props.gridCols}, ${sizeFn})` };
 });
 ```
 `max-content` sizes each grid track to the largest max-content contribution of the items placed in it —
 i.e. each tile/row takes only the width its own text/icon needs, exactly like `width: fit-content` would.
+The `min` of `0` (as opposed to the auto minimum of the item's min-content size) lets the tracks
+compress below their content width when the pane is narrower than the combined content width, so a
+narrow dock (the minimum supported 1280x720 viewport) never overflows horizontally; the tiles/rows
+carry `min-width: 0` so their internal text wraps instead of forcing a minimum width.
 The grid's own auto-placement algorithm (which item lands in which row/column) is governed purely by the
 *count* of tracks (`repeat(2, ...)`), never by their size function, so switching `1fr` → `max-content`
 cannot change which item ends up in which cell — the exact property `keyboard_router.js`'s row/col math
@@ -123,8 +133,11 @@ touched by this change regardless — the corrected scope is exactly `outlet` an
 kind in the codebase today resolves to either of those two kinds with a non-null `gridCols` except
 `move`/`look`/`interact`.
 
-**3. Add a `max-width` safety cap on the tile/row itself (`.dock-menu__outlet-tile`,
-`.dock-menu__nav-row`), not on the grid track, to bound `max-content`'s otherwise-unbounded growth.**
+**3. Add a `max-width` safety cap plus `min-width: 0` and `overflow-wrap: break-word` on the tile/row
+itself (`.dock-menu__outlet-tile`, `.dock-menu__nav-row`), not on the grid track, to bound
+`max-content`'s otherwise-unbounded growth. Also add a `min-width: 0; overflow-wrap: break-word;`
+rule on `.dock-menu__nav-text`, because the nav row is a flex container and its text block's automatic
+min-content size would otherwise let a long server-authored string push the row past its 320px cap.**
 Unlike the rejected `minmax(150px, 260px)` track-level cap (Decision 1), which would apply one arbitrary
 number to *both* pane kinds' tracks regardless of their very different content shapes, a per-selector
 `max-width` is scoped to each pane's own real content: outlet tiles hold a glyph plus a destination name
@@ -160,6 +173,14 @@ guard against.
   `dock-detail` aside on the `nav` pane.** → Fixed by Decision 3's per-selector `max-width` cap plus
   `overflow-wrap: break-word`; tested with a long-label fixture (task 1.3), not just the short 4-exit
   case this change was originally reproduced against.
+- **[Risk, rubber-duck-flagged and fixed] `repeat(2, max-content)` on a narrow pane (the minimum
+  supported 1280x720 viewport, or whenever the detail aside squeezes the dock) could push the two
+  content-sized tracks past the pane's available width, producing the very horizontal overflow this
+  change exists to remove.** → Fixed by sizing the tracks as `minmax(0, max-content)` (Decision 1) and
+  adding `min-width: 0` on the tiles/rows (Decision 3), so the columns compress instead of overflowing;
+  verified by the new narrow-viewport Playwright test in `test_browser_exploration.py` (task 2.4) that
+  asserts the outlet tiles and nav rows stay within the pane's bounding box and that `ArrowRight` still
+  lands on the second grid column.
 - **[Risk, rubber-duck-flagged and fixed] The first draft incorrectly generalized the defect to `wait`
   (the `plain` pane kind) and, on that same incorrect basis, claimed no other menu in the codebase shared
   the affected pane kinds with a non-null `gridCols`.** → Both corrected: `wait` is removed from scope
@@ -174,8 +195,9 @@ guard against.
 
 ## Migration Plan
 
-Not applicable — no data migration, no feature flag. A computed-function edit plus two scoped CSS rules
-in one file, landed and reviewed as one change.
+Not applicable — no data migration, no feature flag. A computed-function edit plus three scoped CSS rule
+changes in one file (the `.dock-menu__outlet-tile` cap, the `.dock-menu__nav-row` cap, and the new
+`.dock-menu__nav-text` rule), landed and reviewed as one change.
 
 ## Open Questions
 

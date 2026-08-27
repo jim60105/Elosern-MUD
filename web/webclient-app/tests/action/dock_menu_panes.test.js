@@ -77,6 +77,20 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "move", label: "移動", enabled: true, navigation: true, surface: "move" },
     { key: "look", label: "查看", enabled: true, navigation: true, surface: "look" },
   ];
+  const LONG_LABEL = "北岸大道之北岸大道之北岸大道之北岸大道之北岸大道";
+  const longOutlet = [
+    { key: "exit-north", label: LONG_LABEL, enabled: true, action_id: "explore.move", direction: "north" },
+  ];
+  const longNavLabels = ["交戰", "查驗", "取物", "查看"];
+  const longNav = [
+    {
+      key: "look-keeper",
+      label: LONG_LABEL,
+      enabled: true,
+      action_id: "explore.look",
+      affordanceLabels: longNavLabels,
+    },
+  ];
 
   it("outlet: rows equal the committed move items in order", () => {
     const w = mountMenu(outletItems, "exploration-row");
@@ -160,5 +174,132 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     expect(w.find(".dock-menu__skill-cost").exists()).toBe(false);
     expect(w.find(".dock-menu__outlet-glyph").exists()).toBe(false);
     expect(w.find(".dock-menu__nav-sub").exists()).toBe(false);
+  });
+
+  // fix-webclient-hud-dock-exploration-grid-width: the fixed keyboard column
+  // count drives the rendered track sizing per pane kind. The pane element's
+  // inline `grid-template-columns` is asserted on the rendered element (the
+  // script-setup computed is closed, so `wrapper.vm` is not relied upon).
+  const PANE_SELECTORS = {
+    outlet: ".dock-menu__outlet",
+    nav: ".dock-menu__nav",
+    affordance: ".dock-menu__aff",
+    cards: ".dock-menu__cards",
+    skills: ".dock-menu__skills",
+    targets: ".dock-menu__targets",
+    scales: ".dock-menu__scales",
+    confirm: ".dock-menu__confirm",
+    plain: ".dock-menu__plain",
+  };
+
+  function mountMenuWithCols(items, cols, idPrefix = "exploration-row") {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const w = mount(DockMenu, {
+      attachTo: host,
+      props: { items, depth: 2, gridCols: cols, idPrefix },
+    });
+    return w;
+  }
+
+  function cssRuleFor(selector) {
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        const hit = Array.from(sheet.cssRules || []).find((rule) => {
+          if (!rule.selectorText) return false;
+          // Vue's `<style scoped>` appends a `[data-v-…]` attribute to each
+          // selector; compare the core selector (the part before that attribute)
+          // so the base tile/row rule is matched without grabbing the
+          // `--focused` derivative rules.
+          const core = rule.selectorText.split("[")[0].trim();
+          return core === selector;
+        });
+        if (hit) {
+          return hit;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  it("outlet/nav panes emit content-sized tracks; every other kind keeps 1fr; no gridCols emits none", () => {
+    const contentCases = [
+      { items: outletItems, sel: PANE_SELECTORS.outlet, expected: "repeat(2, minmax(0, max-content))" },
+      { items: navItems, sel: PANE_SELECTORS.nav, expected: "repeat(2, minmax(0, max-content))" },
+    ];
+    const stretchCases = [
+      { items: affordanceItems, sel: PANE_SELECTORS.affordance, expected: "repeat(2, 1fr)" },
+      { items: cardItems, sel: PANE_SELECTORS.cards, expected: "repeat(2, 1fr)" },
+      { items: skillItems, sel: PANE_SELECTORS.skills, expected: "repeat(2, 1fr)" },
+      { items: targetItems, sel: PANE_SELECTORS.targets, expected: "repeat(2, 1fr)" },
+      { items: scaleItems, sel: PANE_SELECTORS.scales, expected: "repeat(2, 1fr)" },
+      { items: confirmItems, sel: PANE_SELECTORS.confirm, expected: "repeat(2, 1fr)" },
+      { items: plainItems, sel: PANE_SELECTORS.plain, expected: "repeat(2, 1fr)" },
+    ];
+    for (const { items, sel, expected } of [...contentCases, ...stretchCases]) {
+      const w = mountMenuWithCols(items, 2);
+      const pane = w.find(sel);
+      expect(pane.exists()).toBe(true, sel + " pane rendered");
+      expect(pane.element.style.gridTemplateColumns).toBe(expected);
+      w.unmount();
+      document.body.innerHTML = "";
+    }
+    // No `gridCols` (null) or a zero value: the pane carries no inline grid
+    // template (the computed returns an empty object).
+    for (const cols of [null, 0]) {
+      const w = mountMenuWithCols(plainItems, cols);
+      const pane = w.find(PANE_SELECTORS.plain);
+      expect(pane.element.style.gridTemplateColumns).toBe("");
+      // The plain pane is not a grid container (task 2.3 re-confirmation):
+      // its computed display stays block, so the inline grid template (and
+      // this change) is inert on the 等待/休息 frame.
+      expect(getComputedStyle(pane.element).display).toBe("block");
+      w.unmount();
+      document.body.innerHTML = "";
+    }
+  });
+
+  it("long destination and affordance labels wrap within the bounded tile/row", () => {
+    // OUTLET: a long destination name wraps inside the capped tile instead of
+    // pushing the layout past the pane.
+    const w = mountMenuWithCols(longOutlet, 2, "exploration-row");
+    const tile = w.find(".dock-menu__outlet-tile");
+    expect(tile.exists()).toBe(true);
+    expect(tile.text()).toContain(LONG_LABEL);
+    const tileRule = cssRuleFor(".dock-menu__outlet-tile");
+    expect(tileRule).toBeTruthy("the tile safety-net CSS rule is loaded");
+    const tileCss = tileRule.style.cssText;
+    // jsdom keeps the parsed declarations in `style.cssText` (its
+    // camelCase accessors are unpopulated), so the safety net is asserted
+    // on the declaration text.
+    expect(tileCss).toContain("max-width: 220px");
+    expect(tileCss).toContain("min-width: 0");
+    expect(tileCss).toContain("overflow-wrap: break-word");
+    w.unmount();
+    document.body.innerHTML = "";
+
+    // NAV: a long joined affordance-label sub-line wraps inside the capped
+    // row.
+    const w2 = mountMenuWithCols(longNav, 2, "exploration-row");
+    const row = w2.find(".dock-menu__nav-row");
+    expect(row.exists()).toBe(true);
+    expect(row.text()).toContain(LONG_LABEL);
+    const rowRule = cssRuleFor(".dock-menu__nav-row");
+    expect(rowRule).toBeTruthy("the row safety-net CSS rule is loaded");
+    const rowCss = rowRule.style.cssText;
+    expect(rowCss).toContain("max-width: 320px");
+    expect(rowCss).toContain("min-width: 0");
+    expect(rowCss).toContain("overflow-wrap: break-word");
+    // The nav row's flex text block carries its own `min-width: 0` so a
+    // long server-authored string wraps inside the capped row.
+    const textRule = cssRuleFor(".dock-menu__nav-text");
+    expect(textRule).toBeTruthy("the nav-text min-width rule is loaded");
+    const textCss = textRule.style.cssText;
+    expect(textCss).toContain("min-width: 0");
+    expect(textCss).toContain("overflow-wrap: break-word");
+    w2.unmount();
+    document.body.innerHTML = "";
   });
 });

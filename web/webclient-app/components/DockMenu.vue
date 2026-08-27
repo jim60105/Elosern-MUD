@@ -98,12 +98,20 @@ function onCellClick(row) {
 // carries the attribute the B2 gate reads); the row container applies the
 // same `grid-template-columns` so the fixed column count actually lays out
 // the rows (the draft's `repeat(auto-fill, …)` default is overridden).
-const paneGridStyle = computed(
-  () =>
-    props.gridCols
-      ? { 'grid-template-columns': "repeat(" + String(props.gridCols) + ", 1fr)" }
-      : {},
-);
+// Outlet/nav panes size each fixed column to its content (`minmax(0,
+// max-content)`) so a short exit list leaves the pane's remaining width
+// empty instead of stretching; `min` of 0 lets the tracks compress — never
+// overflow — when the pane is narrower than the combined content widths.
+// Every other pane kind keeps the stretch-to-fill `1fr` track function.
+const paneGridStyle = computed(() => {
+  if (!props.gridCols) {
+    return {};
+  }
+  const sizeFn = ["outlet", "nav"].includes(paneKind.value)
+    ? "minmax(0, max-content)"
+    : "1fr";
+  return { "grid-template-columns": `repeat(${props.gridCols}, ${sizeFn})` };
+});
 
 // The focused row scrolls into view (task 5.9).
 function scrollToFocused() {
@@ -431,6 +439,9 @@ watch(
   font-size: 12.5px;
   color: var(--paper-300);
   cursor: pointer;
+  max-width: 220px;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .dock-menu__outlet-tile b {
   display: block;
@@ -475,6 +486,9 @@ watch(
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
+  max-width: 320px;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .dock-menu__nav-row--focused {
   background: var(--seal-600);
@@ -492,6 +506,10 @@ watch(
   height: 26px;
   flex: none;
   color: var(--gold-400);
+}
+.dock-menu__nav-text {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .dock-menu__nav-name {
   font-size: 14px;
