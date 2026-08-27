@@ -1,5 +1,7 @@
 """Tests for immutable economy identities and the guild-economy catalog loader (tasks 2.1-2.5)."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from dataclasses import fields
 from pathlib import Path
@@ -8,7 +10,15 @@ import yaml
 
 from world.lore.economy import PRICE_TABLE
 from world.lore.guild import GUILD_RANK_REGISTRY
-from world.lore.items import ITEM_REGISTRY
+from world.lore.items import (
+    ITEM_REGISTRY,
+    ItemDefinition,
+    ItemIconKey,
+    ItemKind,
+    ItemPresentation,
+    ItemRarity,
+    SUMMARY_MAX,
+)
 from world.lore.shops import SHOP_REGISTRY
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.catalog import register_catalog
@@ -63,13 +73,25 @@ def raw_rulebook() -> dict:
 
 
 class ItemDefinitionTests(unittest.TestCase):
+    @covers_requirement(
+        "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
+    )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
         self.assertEqual(
             set(ITEM_REGISTRY), {"meal", "healing_potion", "plain_sword"}
         )
-        for definition in ITEM_REGISTRY.values():
-            self.assertIn(definition.price_table_key, PRICE_TABLE)
-            self.assertTrue(definition.sellable)
+        for key, definition in ITEM_REGISTRY.items():
+            with self.subTest(item=key):
+                self.assertIn(definition.price_table_key, PRICE_TABLE)
+                self.assertTrue(definition.sellable)
+                self.assertIsInstance(definition.presentation, ItemPresentation)
+                self.assertIsInstance(definition.presentation.kind, ItemKind)
+                self.assertIsInstance(definition.presentation.icon_key, ItemIconKey)
+                self.assertIsInstance(definition.presentation.rarity, ItemRarity)
+                self.assertTrue(definition.presentation.summary_zh.strip())
+                self.assertLessEqual(
+                    sum(1 for _ in definition.presentation.summary_zh), SUMMARY_MAX
+                )
 
     def test_item_definitions_are_deeply_immutable(self):
         definition = ITEM_REGISTRY["meal"]
@@ -81,6 +103,32 @@ class ItemDefinitionTests(unittest.TestCase):
         self.assertEqual(set(SHOP_REGISTRY), {"altoria_general_store"})
         shop = SHOP_REGISTRY["altoria_general_store"]
         self.assertTrue(all(key in ITEM_REGISTRY for key in shop.offered_item_keys))
+
+    @covers_requirement(
+        "item-presentation-metadata::presentation-metadata-does-not-claim-unimplemented-mechanics"
+    )
+    def test_presentation_swap_leaves_economy_outputs_unchanged(self):
+        raw = raw_rulebook()["shops"]
+        baseline = validate_shop_configs(raw)
+        original = ITEM_REGISTRY["meal"]
+        altered = ItemDefinition(
+            key="meal",
+            display_name_zh=original.display_name_zh,
+            price_table_key=original.price_table_key,
+            sellable=original.sellable,
+            presentation=ItemPresentation(
+                kind=ItemKind.FOOD,
+                icon_key=ItemIconKey.FOOD,
+                rarity=ItemRarity.LEGENDARY,
+                summary_zh="旅人充飢的普通餐食。",
+            ),
+        )
+        ITEM_REGISTRY["meal"] = altered
+        try:
+            changed = validate_shop_configs(raw)
+            self.assertEqual(changed, baseline)
+        finally:
+            ITEM_REGISTRY["meal"] = original
 
 
 class OfferDefinitionTests(CatalogRegistryIsolation):
