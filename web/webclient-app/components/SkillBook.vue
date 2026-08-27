@@ -43,8 +43,8 @@ function skillCount(rows) {
   return count;
 }
 
-const activeCount = computed(() => skillCount(props.skills?.actives));
-const passiveCount = computed(() => skillCount(props.skills?.passives));
+// The active/passive totals now render in the drawer head (`HudDrawer`'s
+// subtitle, computed in `AppClient`); the book itself no longer shows them.
 
 function matches(row, group, category) {
   const q = query.value.trim().toLowerCase();
@@ -121,13 +121,8 @@ function castText(row) {
 
 <template>
   <section class="skill-book" data-testid="skill-book">
-    <h3 class="skill-book__title">
-      技能書
-      <span class="skill-book__counts" data-testid="skill-book__counts">
-        主動 {{ activeCount }} · 被動 {{ passiveCount }}
-      </span>
-    </h3>
-
+    <!-- The book's title and active/passive counts now render once, in the
+         drawer head (`HudDrawer`'s `title` + `subtitle`), not here. -->
     <div class="skill-book__tabs" role="tablist" data-testid="skill-book__tabs">
       <button
         type="button"
@@ -153,13 +148,22 @@ function castText(row) {
       </button>
     </div>
 
-    <input
-      v-model="query"
-      class="skill-book__search"
-      type="search"
-      placeholder="搜尋技能（例：火 / 治癒 / 逃跑）"
-      data-testid="skill-book__search"
-    />
+    <!-- The search field reads as one single-bordered control with a leading
+         magnifying-glass icon (the reference's `.searchbox`): the icon +
+         input share one bordered wrapper; the input itself is borderless. -->
+    <div class="skill-book__search-wrap">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="11" cy="11" r="6"></circle>
+        <path d="M20 20l-4-4" stroke-linecap="round"></path>
+      </svg>
+      <input
+        v-model="query"
+        class="skill-book__search"
+        type="search"
+        placeholder="搜尋技能（例：火 / 治癒 / 逃跑）"
+        data-testid="skill-book__search"
+      />
+    </div>
 
     <p
       v-if="visibleTotal === 0"
@@ -249,27 +253,19 @@ function castText(row) {
   font-family: var(--f-sans);
 }
 
-.skill-book__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
-}
-
-.skill-book__counts {
-  color: var(--paper-500);
-  font-family: var(--f-sans);
-  font-size: 0.75em;
-  margin-left: var(--sp-2);
-}
-
+/* The 主動/被動 pair: a full-width, evenly-split segmented control (each
+   tab takes `flex: 1`, centered text), matching the reference's two-up tab
+   pair that spans the drawer width. */
 .skill-book__tabs {
   display: flex;
   gap: var(--sp-1);
+  width: 100%;
 }
 
 .skill-book__tab {
-  padding: 2px var(--sp-3);
+  flex: 1;
+  padding: 4px var(--sp-3);
+  text-align: center;
   color: var(--paper-500);
   background: none;
   border: var(--line);
@@ -283,13 +279,41 @@ function castText(row) {
   border-color: var(--seal-600);
 }
 
+/* One single-bordered control (the reference's `.searchbox`): the wrapper
+   carries the border/background; the input is borderless and flex-grows. */
+.skill-book__search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  background: var(--ink-820);
+  border: 1px solid var(--ink-600);
+  border-radius: 9px;
+}
+
+.skill-book__search-wrap svg {
+  flex: none;
+  color: var(--paper-500);
+}
+
+/* Keyboard focus: the borderless input shows no ring of its own
+   (`outline: none`), so the wrapper carries the shared `--focus` shadow
+   token when the input holds focus — a visible focus indicator for
+   keyboard users. */
+.skill-book__search-wrap:focus-within {
+  border-color: var(--gold-500);
+  box-shadow: var(--focus);
+}
+
 .skill-book__search {
-  padding: 3px var(--sp-2);
-  color: var(--paper-100);
-  background: var(--ink-900);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  flex: 1;
+  min-width: 0;
+  color: var(--paper-50);
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 13px;
+  font-family: var(--f-sans);
 }
 
 .skill-book__empty {

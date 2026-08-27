@@ -9,7 +9,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
+import {
+  CHARACTER_PANEL_SAMPLE,
+  SKILLS_SLICE_SAMPLE,
+} from "../stories/fixtures.js";
 import { useElosernStore } from "../stores/elosern.js";
+import * as fx from "./store/protocol_fixtures.js";
 
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
@@ -71,5 +76,114 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // No other body (shop, inventory, quest, lore, skill) carries a wallet node.
     const walletNodes = wrapper.findAll("[class*='__wallet']");
     expect(walletNodes).toHaveLength(1);
+  });
+
+  // The character panel is an exact-schema v3 payload: the
+  // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
+  // character-panel active-row schema does not register, so it is stripped
+  // before committing. The other exact fields (traits, equipment, disguise,
+  // guild, wallet, persona) come from the already-valid
+  // `CHARACTER_PANEL_SAMPLE`.
+  function characterPanelWithSkillSlice() {
+    return {
+      schema_version: 3,
+      available: true,
+      kind: "character",
+      traits: CHARACTER_PANEL_SAMPLE.traits,
+      actives: SKILLS_SLICE_SAMPLE.actives.map(
+        (category) => ({
+          ...category,
+          groups: category.groups.map(
+            (group) => ({
+              ...group,
+              skills: group.skills.map(({ shorthands, ...row }) => row),
+            }),
+          ),
+        })),
+      passives: SKILLS_SLICE_SAMPLE.passives,
+      equipment: CHARACTER_PANEL_SAMPLE.equipment,
+      disguise: CHARACTER_PANEL_SAMPLE.disguise,
+      guild: CHARACTER_PANEL_SAMPLE.guild,
+      wallet: CHARACTER_PANEL_SAMPLE.wallet,
+      persona: CHARACTER_PANEL_SAMPLE.persona,
+    };
+  }
+
+  it("gives the skill drawer its skill glyph, skill-count subtitle, and cast-syntax footer", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    // Prime the transport so the snapshot's generation 1 is the current one
+    // (mirrors the resync test's `connect()`); without it the reducer
+    // rejects the snapshot as `stale_generation`.
+    store.beginTransport(1);
+    store.setConnected(true);
+    // Populate the character panel with the deterministic skill fixture
+    // (actives=8, passives=3 per SKILLS_SLICE_SAMPLE).
+    store.receive(
+      1,
+      "ui_snapshot",
+      [fx.snapshot({ panels: { character: characterPanelWithSkillSlice() } })],
+    );
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    // The composed drawer head: the `skills` glyph + the 主動 8 · 被動 3
+    // subtitle (the fixture's own row counts, not invented data).
+    const icon = wrapper.find(".hud-drawer__icon");
+    expect(icon.exists()).toBe(true);
+    expect(icon.find("path").attributes("d")).toBe(
+      "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
+    );
+    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("主動 8 · 被動 3");
+    // The footer states the client's own `/cast` syntax as static copy.
+    expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
+      "施放入口：cast <技法>[@威力]=<代號>",
+    );
+    // The other five drawers keep the head icon-less / footer-less chrome.
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".hud-drawer__icon").exists()).toBe(false);
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
+  });
+
+  it("leaves the skill drawer subtitle empty when the character panel is missing or unavailable", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    // Panel missing: the drawer opens before any snapshot commits, so the
+    // subtitle is empty (the degrade-without-inventing-data contract).
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    // A committed `ui_snapshot` (an epoch/mode change) tears down the open
+    // drawer, so close it, commit the unavailable panel, then re-open.
+    store.closeHudDrawer({});
+    store.beginTransport(1);
+    store.setConnected(true);
+    // The exact unavailable form: schema_version + available:false + a
+    // bounded reason.
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            character: {
+              schema_version: 3,
+              available: false,
+              reason: { code: "character_missing", message: "character not created" },
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    // Panel unavailable: still no subtitle, but the head icon and the
+    // static footer hint are client-local chrome — they render regardless
+    // of the panel's availability.
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find(".hud-drawer__icon").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(true);
   });
 });

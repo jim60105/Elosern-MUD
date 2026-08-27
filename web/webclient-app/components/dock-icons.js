@@ -47,6 +47,9 @@ export const GLYPHS = {
   // Participant teams (the combat participant frame, task 6.1).
   allies: "M12 2l4 4 4-1 1 4 4 4-4 3 1 4-4 1-3 4-3-4-4-1 1-4-4-3-4-4 1-4 4-1 3-4 3 4z",
   foes: "M3 3l18 18M21 3L3 21",
+  // The drawer chrome's close glyph (the reference's `.closebtn` X,
+  // docs/design/elosern-redesign/index.html).
+  close: "M6 6l12 12M18 6 6 18",
 };
 
 // Per-key stroke attributes copied selectively from the reference: `move`
@@ -58,6 +61,8 @@ const STROKE_ATTRS = {
   interact: { "stroke-linejoin": "round" },
   attack: { "stroke-linecap": "round" },
   flee: { "stroke-linecap": "round" },
+  // The close X must render with rounded caps, matching the reference.
+  close: { "stroke-linecap": "round" },
 };
 
 // Return the reference's per-key stroke attributes for a stable key, or an

@@ -15,6 +15,7 @@
 // the control that opened it.
 import { onMounted, ref } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
+import { glyphAttrs, glyphPath } from "./dock-icons.js";
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -23,6 +24,9 @@ const props = defineProps({
   // The drawer's `data-testid` identity key (the drawer name) so browser
   // assertions can target the open drawer.
   drawerKey: { type: String, default: "" },
+  // Optional leading head icon: a `dock-icons.js` glyph key. Unset (the
+  // default) renders no icon — the other five drawers keep today's head.
+  icon: { type: String, default: null },
 });
 
 const emit = defineEmits(["close"]);
@@ -110,6 +114,22 @@ function onScrimClick() {
     @keydown="onKeydown"
   >
     <div class="hud-drawer__head">
+      <svg
+        v-if="icon && glyphPath(icon)"
+        class="hud-drawer__icon"
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          :d="glyphPath(icon)"
+          stroke="currentColor"
+          stroke-width="1.8"
+          v-bind="glyphAttrs(icon)"
+        />
+      </svg>
       <h3 class="hud-drawer__title" data-testid="hud-drawer__title">
         {{ title }}
       </h3>
@@ -120,9 +140,17 @@ function onScrimClick() {
         class="hud-drawer__close"
         data-testid="hud-drawer-close"
         :tabindex="open ? 0 : -1"
+        aria-label="關閉"
         @click="close"
       >
-        關閉
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none">
+          <path
+            :d="glyphPath('close')"
+            stroke="currentColor"
+            stroke-width="1.8"
+            v-bind="glyphAttrs('close')"
+          />
+        </svg>
       </button>
     </div>
     <div class="hud-drawer__body">
@@ -189,19 +217,38 @@ function onScrimClick() {
   font-size: 0.85em;
 }
 
+/* The head icon (the reference's `.dhead .ic`, index.html:409-410). */
+.hud-drawer__icon {
+  width: 20px;
+  height: 20px;
+  color: var(--gold-400);
+  flex: none;
+}
+
+/* The icon-only close control (the reference's `.closebtn`, 34x34 square). */
 .hud-drawer__close {
-  padding: 2px var(--sp-3);
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
   color: var(--paper-300);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
-  border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  border-radius: 9px;
   cursor: pointer;
 }
 
 .hud-drawer__close:hover {
-  border-color: var(--gold-500);
+  border-color: var(--seal-500);
   color: var(--paper-50);
+}
+
+/* The skill drawer's static cast-syntax hint (the reference's footer copy). */
+.hud-drawer__cast-hint {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: 0.85em;
 }
 
 /* The body is the drawer's only scrolling region; the head and foot are

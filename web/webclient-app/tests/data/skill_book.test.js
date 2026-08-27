@@ -33,10 +33,9 @@ describe("SkillBook (B3 data family)", () => {
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
-  it("renders the tab counts derived from the payload only", () => {
-    const w = mountBook();
-    expect(w.get('[data-testid="skill-book__counts"]').text()).toBe("主動 8 · 被動 3");
-  });
+  // The book's own title/count heading is gone (the counts now render once,
+  // in the drawer head's subtitle, computed in AppClient). The remaining
+  // tab / search assertions keep their `data-testid` values, unchanged.
 
   it("opens on the active tab with the payload's category, group, and skill ordering", async () => {
     const w = mountBook();

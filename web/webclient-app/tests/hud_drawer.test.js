@@ -26,6 +26,35 @@ describe("HudDrawer (H4 D1)", () => {
     return wrapper;
   }
 
+  it("renders the leading head icon only when the icon prop is set and resolvable", () => {
+    const w = mountDrawer({ icon: "skills" });
+    const icon = w.find(".hud-drawer__icon");
+    expect(icon.exists()).toBe(true);
+    // The `skills` glyph path from the shared table.
+    expect(icon.find("path").attributes("d")).toBe(
+      "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
+    );
+    // Unset (the default): no icon, the head renders exactly as before.
+    const w2 = mountDrawer();
+    expect(w2.find(".hud-drawer__icon").exists()).toBe(false);
+    // An unknown glyph key degrades to no icon (an unset-key is a no-op).
+    const w3 = mountDrawer({ icon: "not-a-glyph" });
+    expect(w3.find(".hud-drawer__icon").exists()).toBe(false);
+  });
+
+  it("renders the close control icon-only with its accessible name preserved", () => {
+    const w = mountDrawer({ open: true });
+    const close = w.get('[data-testid="hud-drawer-close"]');
+    expect(close.attributes("aria-label")).toBe("關閉");
+    // No visible text node: the button's content is the close glyph only.
+    expect(close.text()).toBe("");
+    const path = close.find("path");
+    // The registered `close` glyph path with rounded caps (the reference's
+    // `.closebtn`), bound through the shared `STROKE_ATTRS` table.
+    expect(path.attributes("d")).toBe("M6 6l12 12M18 6 6 18");
+    expect(path.attributes("stroke-linecap")).toBe("round");
+  });
+
   it("renders no scrim while the drawer is closed", () => {
     mountDrawer({ open: false });
     expect(wrapper.find('[data-testid="hud-drawer-scrim"]').exists()).toBe(false);
