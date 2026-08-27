@@ -40,14 +40,18 @@ no opinion on how wide a track renders.
 - In `DockMenu.vue`'s `paneGridStyle` computed, when the active pane kind is `outlet` or `nav` (the
   exploration move/look/interact frames — the two pane kinds that are actual CSS grid containers among
   `exploration_menu.js`'s affected `gridCols: 2` menus), change the inline override's track-sizing
-  function from `1fr` to `max-content`: `grid-template-columns: repeat(2, max-content)`. The column
-  **count** (and therefore every keyboard row/col computation) is completely unchanged; only how wide
-  each of those 2 columns renders changes — each now sizes to its own tile's natural content width
-  instead of stretching to fill half the dock.
-- Add a `max-width` safety cap directly on `.dock-menu__outlet-tile` and `.dock-menu__nav-row` (not on
-  the grid track) so an unusually long server-authored destination name or affordance-label list wraps
-  within a bounded tile instead of letting `max-content`'s unbounded sizing push the tile past the pane's
-  available width.
+  function from `1fr` to `minmax(0, max-content)`: `grid-template-columns: repeat(2, minmax(0, max-content)`.
+  The column **count** (and therefore every keyboard row/col computation) is completely unchanged; only
+  how wide each of those 2 columns renders changes — each now sizes to its own tile's natural content
+  width instead of stretching to fill half the dock. The `min` of `0` lets the tracks compress (not
+  overflow) when the pane is narrower than the combined content width, which matters at the minimum
+  supported 1280x720 viewport where the dock's available width can be squeezed by the detail aside.
+- Add a `max-width` safety cap plus `min-width: 0` and `overflow-wrap: break-word` on
+  `.dock-menu__outlet-tile` (220px) and `.dock-menu__nav-row` (320px), and add a `min-width: 0;
+  overflow-wrap: break-word;` rule on `.dock-menu__nav-text`, so an unusually long server-authored
+  destination name or joined affordance-label list wraps within the bounded tile/row instead of pushing
+  the layout past the pane's available width (the flex text block's automatic min-content size would
+  otherwise let a long string break the 320px row cap).
 - Leave `paneGridStyle`'s behavior for every other pane kind (`affordance`, `cards`, `skills`, `targets`,
   `scales`, `confirm`, `plain` — the suggestions, combat, and every service/creation/wait frame) exactly
   as it is today. None of those is a CSS grid container whose inline override is doing anything visible
@@ -70,17 +74,24 @@ None.
 
 - `webclient-contextual-hud`: gains a new requirement that a dock pane's forced-column-count layout
   (used where the keyboard router needs a fixed grid geometry) sizes each column to its content, never
-  stretching a narrow-content row or tile to fill the panel's remaining width.
+  stretching a narrow-content row or tile to fill the panel's remaining width, and compresses the fixed
+  columns (min track size 0) when the pane is narrower than the combined content width instead of
+  overflowing it.
 
 ## Impact
 
-- **Code**: `web/webclient-app/components/DockMenu.vue` (`paneGridStyle` computed; the `max-width` safety
-  cap on `.dock-menu__outlet-tile` and `.dock-menu__nav-row`).
-- **Tests**: a new Vitest assertion on `paneGridStyle`'s computed output per pane kind (verifying the
-  `outlet`/`nav` branch emits `max-content` and every other pane kind — including `plain` — still emits
-  `1fr`, unchanged); a rendering test with a long destination/affordance label confirming the tile wraps
-  within its `max-width` cap rather than overflowing; no existing Playwright keyboard-navigation
-  assertion needs to change, since column count and item-to-cell mapping are untouched — task-tracked
-  confirmation, not merely assumed.
+- **Code**: `web/webclient-app/components/DockMenu.vue` (`paneGridStyle` computed; the `max-width` +
+  `min-width: 0` + `overflow-wrap: break-word` safety caps on `.dock-menu__outlet-tile` and
+  `.dock-menu__nav-row`, plus the new `.dock-menu__nav-text` rule).
+- **Tests**: a new Vitest assertion on the pane element's inline `grid-template-columns` per pane kind
+  (verifying the `outlet`/`nav` branch emits `minmax(0, max-content)` and every other pane kind —
+  including `plain` — still emits `1fr`, unchanged); a rendering test with a long destination/affordance
+  label confirming the tile wraps within its `max-width` cap rather than overflowing; a new Playwright test
+  at the minimum supported 1280x720 viewport (`test_browser_exploration.py`) confirming the outlet tiles
+  and nav rows stay within the pane's width, that `ArrowRight` still moves focus to the second grid
+  column, and that the 等待/休息 (plain) pane stays a non-grid block container; registered in
+  `.github/browser-shards.json` so the CI shard-ownership contract keeps passing. No existing
+  Playwright keyboard-navigation assertion needs to change, since column count and item-to-cell mapping
+  are untouched — task-tracked confirmation, not merely assumed.
 - **Docs**: none.
 - **No protocol, read-model, dispatch, keyboard-router, or `exploration_menu.js` changes.**

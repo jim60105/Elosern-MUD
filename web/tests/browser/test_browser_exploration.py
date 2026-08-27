@@ -787,6 +787,175 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "move",
         )
 
+    @covers_requirement("webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel")
+    def test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport(self):
+        # fix-webclient-hud-dock-exploration-grid-width: at the minimum
+        # supported viewport the content-sized tracks must not overflow the
+        # pane, the fixed two-column keyboard mapping must hold, and the
+        # wait/rest (plain) pane must stay a non-grid block container.
+        page = self.logged_in_page((1280, 720))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        def press_right_wait_focus(page: "Page") -> None:
+            # Press ArrowRight and wait until the store's committed focus key
+            # actually moves to the next cell (the second grid column of the
+            # same row under the fixed two-column geometry).
+            state = store_state(page)
+            focus_key_before = (state.get("focus") or {}).get("key")
+            _press(page, "ArrowRight")  # second grid column
+            wait_for_store_state(
+                page,
+                lambda s: (s.get("focus") or {}).get("key") not in (None, focus_key_before),
+                timeout=15000,
+            )
+
+        def assert_within_pane(item_selector: str, pane_selector: str) -> None:
+            items = page.locator(item_selector)
+            self.assertGreater(
+                items.count(), 0, item_selector + " must render at least one row"
+            )
+            pane_box = page.locator(pane_selector).bounding_box()
+            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
+            pane_right_edge = pane_box["x"] + pane_box["width"]
+            for i in range(items.count()):
+                box = items.nth(i).bounding_box()
+                self.assertIsNotNone(
+                    box, item_selector + " row " + str(i) + " must have a bounding box"
+                )
+                self.assertLessEqual(
+                    box["x"] + box["width"],
+                    pane_right_edge + 1,
+                    item_selector + " row " + str(i) + " overflows the pane horizontally",
+                )
+                self.assertGreaterEqual(
+                    box["x"],
+                    pane_box["x"] - 1,
+                    item_selector + " row " + str(i) + " starts left of the pane",
+                )
+
+        # A long, spaceless server-authored string (e.g. a destination name
+        # with no break opportunities) must wrap inside the capped tile/row
+        # instead of forcing the layout past the pane.
+        LONG_LABEL = "北岸大道之" * 8
+
+        def assert_not_stretched(item_selector: str, pane_selector: str) -> None:
+            # The original visual regression: tiles/rows stretched to fill
+            # half the panel (~450px at the 1280x720 viewport). Content-sized
+            # tiles/rows must render well below the half-pane width.
+            items = page.locator(item_selector)
+            pane_box = page.locator(pane_selector).bounding_box()
+            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
+            pane_half = pane_box["width"] / 2
+            for i in range(items.count()):
+                box = items.nth(i).bounding_box()
+                self.assertLess(
+                    box["width"],
+                    pane_half,
+                    item_selector + " row " + str(i) + " must be content-sized, not stretched to half the pane",
+                )
+
+        def assert_long_label_wraps(item_selector: str, pane_selector: str, label_selector: str) -> None:
+            # Override the label text with a long spaceless string and assert
+            # it wraps (scrollWidth <= clientWidth, no horizontal scroll) and
+            # the item stays within the pane's width (the max-width + min-width: 0
+            # + overflow-wrap: break-word safety net).
+            items = page.locator(item_selector)
+            pane_box = page.locator(pane_selector).bounding_box()
+            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
+            pane_right_edge = pane_box["x"] + pane_box["width"]
+            for i in range(items.count()):
+                el = items.nth(i)
+                el.locator(label_selector).evaluate(
+                    "(el, t) => { el.textContent = t; }", LONG_LABEL
+                )
+                page.wait_for_timeout(50)
+                metrics = el.evaluate("el => ({ sw: el.scrollWidth, cw: el.clientWidth })")
+                self.assertLessEqual(
+                    metrics["sw"],
+                    metrics["cw"] + 1,
+                    item_selector + " row " + str(i) + ": long spaceless label must wrap (scrollWidth <= clientWidth)",
+                )
+                box = el.bounding_box()
+                self.assertLessEqual(
+                    box["x"] + box["width"],
+                    pane_right_edge + 1,
+                    item_selector + " row " + str(i) + " (long label) overflows the pane horizontally",
+                )
+
+        # Move: the exit tiles render content-sized (never stretched to half
+        # the panel) and stay inside the pane's width.
+        self._open_root(page, 0)  # Move
+        assert_within_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
+        assert_not_stretched(".dock-menu__outlet-tile", ".dock-menu__outlet")
+        assert_long_label_wraps(".dock-menu__outlet-tile", ".dock-menu__outlet", "b")
+        press_right_wait_focus(page)
+        # The second grid column of the two-column geometry is the item at
+        # index 1 of the frame's ordered items (a `back` row when the frame
+        # has fewer than two content items).
+        _state = store_state(page)
+        _move = ((_state.get("panels") or {}).get("exploration") or {}).get("move") or []
+        _move_keys = ["exit-" + str(m.get("exit_ref")) for m in _move] + ["back"]
+        _second_col_key = _move_keys[1] if len(_move_keys) > 1 else "back"
+        self.assertEqual(
+            (_state.get("focus") or {}).get("key"),
+            _second_col_key,
+            "ArrowRight must move focus to the second grid column",
+        )
+        _press(page, "Escape")
+        page.wait_for_timeout(80)
+
+        # Look: the look rows stay within the nav pane; the keyboard column
+        # mapping is unchanged.
+        self._open_root(page, 1)  # Look
+        assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
+        press_right_wait_focus(page)
+        _state = store_state(page)
+        _look = ((_state.get("panels") or {}).get("exploration") or {}).get("look") or {}
+        _look_keys = []
+        if _look.get("room"):
+            _look_keys.append("look-room")
+        for _e in _look.get("entities") or []:
+            _look_keys.append("entity-" + str(_e.get("identity")))
+        for _o in _look.get("objects") or []:
+            _look_keys.append("object-" + str(_o.get("identity")))
+        _look_keys.append("back")
+        self.assertEqual(
+            (_state.get("focus") or {}).get("key"),
+            _look_keys[1] if len(_look_keys) > 1 else "back",
+            "ArrowRight must move focus to the second grid column",
+        )
+        _press(page, "Escape")
+        page.wait_for_timeout(80)
+
+        # Interact: same width and keyboard-mapping checks for the target rows.
+        self._open_root(page, 2)  # Interact
+        assert_within_pane(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_not_stretched(".dock-menu__nav-row", ".dock-menu__nav")
+        assert_long_label_wraps(".dock-menu__nav-row", ".dock-menu__nav", ".dock-menu__nav-text")
+        press_right_wait_focus(page)
+        _state = store_state(page)
+        _interact = ((_state.get("panels") or {}).get("exploration") or {}).get("interact") or []
+        _interact_keys = ["target-" + str(t.get("identity")) for t in _interact] + ["back"]
+        self.assertEqual(
+            (_state.get("focus") or {}).get("key"),
+            _interact_keys[1] if len(_interact_keys) > 1 else "back",
+            "ArrowRight must move focus to the second grid column",
+        )
+        _press(page, "Escape")
+        page.wait_for_timeout(80)
+
+        # Wait/rest (task 2.3 re-confirmation): the plain pane is not a grid
+        # container, so this change is inert on the 等待/休息 frame.
+        self._open_root(page, 6)  # Wait
+        self.assertEqual(
+            page.locator(".dock-menu__plain").evaluate("el => getComputedStyle(el).display"),
+            "block",
+            "the wait/rest pane stays a non-grid block container",
+        )
+
 
 if __name__ == "__main__":
     import unittest
