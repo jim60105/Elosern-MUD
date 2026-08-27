@@ -3,7 +3,8 @@
 // drawer is closed, (2) each reference surface is reachable in at most two
 // actions from the dock root (the store's single openHudDrawer call is one
 // action), and (3) exactly one wallet rendering exists across the whole
-// drawer layer (the wallet lives only in CharacterStatusDrawer).
+// drawer layer — the wallet lives only in the inventory drawer's shared
+// header (relocate-inventory-drawer-essentials).
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -11,6 +12,9 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
+  SERVICES_PANEL_MINIMAL_SAMPLE,
+  SERVICES_PANEL_SAMPLE,
+  SERVICES_PANEL_UNAVAILABLE_SAMPLE,
   SKILLS_SLICE_SAMPLE,
 } from "../stories/fixtures.js";
 import { useElosernStore } from "../stores/elosern.js";
@@ -68,14 +72,43 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   it("renders the wallet exactly once across the whole drawer layer", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
-    store.openHudDrawer("status");
+    // Prime the transport and commit both panels: the character panel owns
+    // the wallet (3240 copper); the services panel's own inventory wallet
+    // carries a different value (1200), proving the drawer-layer balance is
+    // sourced only from the committed character panel — the services-side
+    // wallet is never rendered.
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            character: CHARACTER_PANEL_SAMPLE,
+            services: {
+              ...SERVICES_PANEL_SAMPLE,
+              inventory: { ...SERVICES_PANEL_SAMPLE.inventory, wallet: 1200 },
+            },
+          },
+        }),
+      ],
+    );
     await wrapper.vm.$nextTick();
-    // The wallet line exists in exactly one drawer body (CharacterStatusDrawer);
-    // the other bodies render no wallet (the single-wallet invariant).
-    expect(wrapper.findAll('[data-testid="character-status-drawer__wallet"]')).toHaveLength(1);
-    // No other body (shop, inventory, quest, lore, skill) carries a wallet node.
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    // The single wallet figure now lives in the inventory drawer's shared
+    // header (relocate-inventory-drawer-essentials): thousands-grouped
+    // integer copper from the character panel (3,240 — not the services-side
+    // 1,200).
+    const subtitle = wrapper.get(".hud-drawer__subtitle");
+    expect(subtitle.text()).toBe("錢袋 3,240 銅");
+    // The character-status drawer renders no wallet figure of its own.
+    expect(wrapper.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(false);
+    // No body (shop, inventory, quest, lore, skill, status) carries a wallet
+    // node; exactly one wallet value renders in the drawer layer.
     const walletNodes = wrapper.findAll("[class*='__wallet']");
-    expect(walletNodes).toHaveLength(1);
+    expect(walletNodes).toHaveLength(0);
   });
 
   // The character panel is an exact-schema v4 payload: the
@@ -123,7 +156,14 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.receive(
       1,
       "ui_snapshot",
-      [fx.snapshot({ panels: { character: characterPanelWithSkillSlice() } })],
+      [
+        fx.snapshot({
+          panels: {
+            character: characterPanelWithSkillSlice(),
+            services: SERVICES_PANEL_SAMPLE,
+          },
+        }),
+      ],
     );
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
@@ -139,11 +179,15 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
       "施放入口：cast <技法>[@威力]=<代號>",
     );
-    // The other five drawers keep the head icon-less / footer-less chrome.
+    // The inventory drawer carries the local `inventory` bag glyph and its
+    // header wallet subtitle (relocate-inventory-drawer-essentials); the
+    // remaining four drawers keep the icon-less / footer-less chrome.
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".hud-drawer__icon").exists()).toBe(false);
-    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    const invIcon = wrapper.find(".hud-drawer__icon");
+    expect(invIcon.exists()).toBe(true);
+    expect(invIcon.find("path").attributes("d")).toBe("M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z");
+    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("錢袋 3,240 銅");
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
   });
 
@@ -186,5 +230,99 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
     expect(wrapper.find(".hud-drawer__icon").exists()).toBe(true);
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(true);
+  });
+
+  it("leaves the inventory drawer subtitle blank when the character panel is unavailable", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    // Prime the transport and commit the character panel in its registry-
+    // owned unavailable form (a bounded reason, no wallet field).
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            character: {
+              schema_version: 4,
+              available: false,
+              reason: { code: "no_puppet", message: "你已離開角色" },
+            },
+            services: SERVICES_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    // No balance and no zero: the header keeps the local `inventory` bag
+    // glyph but renders no wallet subtitle (relocate-inventory-drawer-
+    // essentials: an unavailable panel renders no balance at all).
+    const icon = wrapper.find(".hud-drawer__icon");
+    expect(icon.exists()).toBe(true);
+    expect(icon.find("path").attributes("d")).toBe("M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z");
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+  });
+
+  it("renders no wallet subtitle when the services panel is unavailable", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    // The services panel commits its registry-owned unavailable form (no
+    // inventory section, no wallet): the bag fabricates no wallet.
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            services: SERVICES_PANEL_UNAVAILABLE_SAMPLE,
+            character: CHARACTER_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    // The bag body renders only the registry-owned reason; the header keeps
+    // the bag glyph but renders no wallet subtitle (no balance, no zero).
+    expect(wrapper.find('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
+    const icon = wrapper.find(".hud-drawer__icon");
+    expect(icon.exists()).toBe(true);
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+  });
+
+  it("renders no wallet subtitle when the services inventory section is absent", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    // The reduced services payload (SERVICES_PANEL_MINIMAL_SAMPLE) carries no
+    // inventory section: the bag shows its honest absent message and the
+    // header renders no wallet subtitle.
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            services: SERVICES_PANEL_MINIMAL_SAMPLE,
+            character: CHARACTER_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="inventory-panel__absent"]').exists()).toBe(true);
+    const icon = wrapper.find(".hud-drawer__icon");
+    expect(icon.exists()).toBe(true);
+    expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
   });
 });

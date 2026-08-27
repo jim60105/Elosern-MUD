@@ -12,6 +12,9 @@ import {
 // inside the shared right-anchored HudDrawer chrome. Deterministic and
 // offline. The combat story keeps the status vitals + conditions visible
 // while the character sections are unavailable (registry-owned reason).
+// The equipment doll and the single drawer-layer wallet moved to the
+// inventory drawer (relocate-inventory-drawer-essentials), so this body
+// renders no wallet figure and no equipment doll.
 
 // The component story title must be the first title key in the file, because
 // the component-coverage gate keys off the first match. Placing the default

@@ -1,24 +1,42 @@
 <script setup>
-// InventoryPanel (H4, webclient-hud-04-reference-drawers, tasks 6.1/6.2/6.5):
-// the 背包 · 裝備 drawer body. H4 removes the old `equipped === true` filter
-// so the full `services.inventory.rows` bag is rendered (display_name, held,
-// and an equipped marker on the equipped rows), and removes the wallet line
-// (the wallet now lives in the CharacterStatusDrawer — exactly one wallet
-// rendering across the drawer layer, task 7.7). When the listing holds the
-// 32-row ceiling (SERVICES_MAX_INVENTORY_ROWS) a worded ceiling note renders;
-// otherwise no total is presented. `pagination.inventory_total` is the
-// shipped-row count and is never presented as untruncated holdings.
+// InventoryPanel (H4, webclient-hud-04-reference-drawers, tasks 6.1/6.2/6.5;
+// relocate-inventory-drawer-essentials): the 背包 · 裝備 drawer body. H4
+// removed the old `equipped === true` filter so the full
+// `services.inventory.rows` bag is rendered (display_name, held, and an
+// equipped marker on the equipped rows). The equipment doll and the single
+// drawer-layer wallet moved here from the character-status drawer: the doll
+// composes before the held rows, and the header wallet renders only when
+// the committed `character` panel is available with a valid integer
+// balance. When the listing holds the 32-row ceiling (SERVICES_MAX_INVENTORY_
+// ROWS) a worded ceiling note renders; otherwise no total is presented.
+// `pagination.inventory_total` is the shipped-row count and is never
+// presented as untruncated holdings.
 import { computed } from "vue";
+import EquipmentDoll from "./EquipmentDoll.vue";
 
 const props = defineProps({
   // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
+  // The committed `character` v4 panel payload (or the unavailable form). A
+  // completely missing panel arrives as `null`; the doll mounts only when a
+  // committed character panel exists (never fabricating empty slots for a
+  // missing panel).
+  character: { type: Object, required: false, default: null },
 });
 
 // The registry-owned unavailable form (available: false) carries only the
 // reason — no rows, no default wallet value.
 const unavailable = computed(() => props.services?.available === false);
 const inventory = computed(() => (unavailable.value ? null : (props.services?.inventory ?? null)));
+
+// The equipment doll renders only when the bag itself is available (the
+// services panel is not in its unavailable form) AND the inventory section
+// is present AND a committed character panel exists. A missing character
+// panel (`null`) or an absent inventory section must not fabricate an
+// equipment state (no empty-slot boxes, no rows, no count).
+const dollVisible = computed(
+  () => !unavailable.value && inventory.value !== null && props.character !== null,
+);
 
 // The full bag: every committed row, equipped marker only on equipped rows.
 const rows = computed(() => {
@@ -34,8 +52,6 @@ const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
 
 <template>
   <aside class="inventory-panel" data-testid="inventory-panel">
-    <h3 class="inventory-panel__title" data-testid="inventory-panel__title">背包 · 裝備</h3>
-
     <p
       v-if="unavailable"
       class="inventory-panel__unavailable"
@@ -48,6 +64,14 @@ const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
     <p v-else-if="inventory === null" class="inventory-panel__absent" data-testid="inventory-panel__absent">
       背包目前是空的。
     </p>
+
+    <!-- The equipment doll (moved here from the character-status drawer):
+         it reads the committed `character` panel's equipment rows itself and
+         renders its registered unavailable message when that panel is in its
+         unavailable form. It mounts before the held-item listing and only
+         when the bag is available, the inventory section is present, and a
+         committed character panel exists. -->
+    <EquipmentDoll v-if="dollVisible" :character="character" />
 
     <div
       v-for="row in rows"
@@ -77,13 +101,6 @@ const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
   border: var(--line);
   border-radius: var(--radius);
   font-family: var(--f-sans);
-}
-
-.inventory-panel__title {
-  margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
 }
 
 .inventory-panel__unavailable {

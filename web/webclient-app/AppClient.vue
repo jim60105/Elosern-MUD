@@ -7,6 +7,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { classifyPane } from "./components/dock-panes.js";
+import { formatCopper } from "./components/character-identity.js";
 import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import ArtPanel from "./components/ArtPanel.vue";
@@ -544,6 +545,39 @@ const skillBookSubtitle = computed(() => {
   const character = panel("character");
   return `主動 ${skillCount(character?.actives)} · 被動 ${skillCount(character?.passives)}`;
 });
+
+// The inventory drawer's head subtitle (relocate-inventory-drawer-essentials):
+// the committed `character` panel's wallet, formatted as thousands-grouped
+// integer copper (the shared `character-identity.js` formatter, the same one
+// the character head card uses). It renders only when:
+//  - the open drawer is the inventory drawer,
+//  - the `services` panel is available and its `inventory` section is
+//    present (when the bag is unavailable or the section is absent the bag
+//    states its registry-owned reason / absent message and fabricates no
+//    wallet),
+//  - the `character` panel is available and carries a valid non-negative
+//    integer balance (a missing or unavailable panel leaves the subtitle
+//    blank — no balance, and never a zero).
+const inventoryWalletSubtitle = computed(() => {
+  if (store.view.hudDrawer !== "inventory") {
+    return "";
+  }
+  const services = panel("services");
+  const servicesAvailable = !!services && services.available !== false;
+  const inventorySection = services ? (services.inventory ?? null) : null;
+  if (!servicesAvailable || inventorySection === null) {
+    return "";
+  }
+  if (!panelAvailable("character")) {
+    return "";
+  }
+  const character = panel("character");
+  const wallet = character?.wallet;
+  if (typeof wallet !== "number" || !Number.isInteger(wallet) || wallet < 0) {
+    return "";
+  }
+  return `錢袋 ${formatCopper(wallet)} 銅`;
+});
 // The skill drawer's footer: the client's own `/cast` syntax as static,
 // client-local presentation copy (no OOB field carries it).
 const SKILL_CAST_HINT = "施放入口：cast <技法>[@威力]=<代號>";
@@ -732,8 +766,8 @@ onMounted(() => {
       v-if="store.view.hudDrawer"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'skill' ? skillBookSubtitle : ''"
-      :icon="store.view.hudDrawer === 'skill' ? 'skills' : null"
+      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : '')"
+      :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : null)"
       :drawer-key="store.view.hudDrawer"
       @close="onHudDrawerClose"
     >
@@ -741,6 +775,7 @@ onMounted(() => {
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
+        :character="panel('character')"
       />
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"

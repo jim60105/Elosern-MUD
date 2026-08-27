@@ -5,7 +5,15 @@ import {
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
+  CHARACTER_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
+
+const CHARACTER_UNAVAILABLE = {
+  schema_version: 4,
+  available: false,
+  kind: "character",
+  reason: { code: "no_puppet", message: "你已離開角色" },
+};
 
 describe("InventoryPanel (H4 背包 · 裝備 drawer body)", () => {
   let wrapper;
@@ -20,6 +28,7 @@ describe("InventoryPanel (H4 背包 · 裝備 drawer body)", () => {
     wrapper = mount(InventoryPanel, {
       props: {
         services: SERVICES_PANEL_SAMPLE,
+        character: CHARACTER_PANEL_SAMPLE,
         ...props,
       },
     });
@@ -93,5 +102,49 @@ describe("InventoryPanel (H4 背包 · 裝備 drawer body)", () => {
     expect(w.find('[data-testid="inventory-panel__absent"]').exists()).toBe(false);
     expect(w.find('[data-testid="inventory-panel__ceiling"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="inventory-panel__row--"]')).toHaveLength(0);
+  });
+
+  it("composes the equipment doll before the held-item rows (relocate-inventory-drawer-essentials)", () => {
+    const w = mountPanel();
+    const doll = w.get('[data-testid="equipment-doll"]').element;
+    const firstRow = w.get('[data-testid="inventory-panel__row--item_iron_sword"]').element;
+    // The body begins with the doll; the held rows follow it.
+    const pos = doll.compareDocumentPosition(firstRow);
+    expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    // The doll shows the committed character panel's own equipment rows.
+    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__slot-empty--weapon_off"]').text()).toBe("未裝備");
+  });
+
+  it("renders no equipment doll when the services panel commits its unavailable form", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_UNAVAILABLE_SAMPLE });
+    // Only the registry-owned reason renders; the doll is not mounted, so
+    // no equipment slot or count is fabricated.
+    expect(w.get('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
+    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
+  });
+
+  it("renders no equipment doll when the inventory section is absent", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_MINIMAL_SAMPLE });
+    // The absent message renders and the doll is not mounted (no
+    // fabricated empty-slot boxes).
+    expect(w.get('[data-testid="inventory-panel__absent"]').exists()).toBe(true);
+    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
+  });
+
+  it("shows the doll's registered unavailable message when the character panel is unavailable", () => {
+    const w = mountPanel({ character: CHARACTER_UNAVAILABLE });
+    // The held rows remain available; the doll mounts and renders its
+    // registry-owned reason.
+    expect(w.findAll('[data-testid^="inventory-panel__row--"]').length).toBe(4);
+    expect(w.get('[data-testid="equipment-doll__unavailable"]').text()).toBe("你已離開角色");
+  });
+
+  it("renders no doll (and no fabricated empty slots) when the character panel is missing", () => {
+    const w = mountPanel({ character: null });
+    // The rows still render; the doll is not mounted — a missing panel is
+    // never treated as an empty-equipment state.
+    expect(w.findAll('[data-testid^="inventory-panel__row--"]').length).toBe(4);
+    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
   });
 });
