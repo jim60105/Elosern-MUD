@@ -28,6 +28,15 @@ const TARGET_LABELS = {
   area: "範圍",
 };
 
+// The design reference colour-codes exactly three elemental groups (fire,
+// water, wind); the dot colours reuse existing tokens rather than inventing
+// a new palette.
+const ELEMENT_DOT_COLORS = {
+  fire: "var(--seal-500)",
+  water: "var(--vit-mp)",
+  wind: "var(--warn)",
+};
+
 const tab = ref(
   props.initialTab === "passive" ? "passive" : "active",
 );
@@ -41,6 +50,28 @@ function skillCount(rows) {
     }
   }
   return count;
+}
+
+// The category summary's count is the flattened total of that category's
+// own skill rows (sum of group.skills.length) — a plain digit, not the
+// draft's richer "8 元素 · 87" qualifier text (no backing field for it).
+function categorySkillCount(category) {
+  let count = 0;
+  for (const group of category.groups ?? []) {
+    count += (group.skills ?? []).length;
+  }
+  return count;
+}
+
+// Only the three elements the design reference actually colour-codes get a
+// group dot; sexual-act groups share one uniform seal-500 dot; every other
+// group renders its label with no dot (no invented colour).
+function groupDotColor(category, group) {
+  if (category === "sexual_act") return "var(--seal-500)";
+  if (category === "elemental_magic" && ELEMENT_DOT_COLORS[group]) {
+    return ELEMENT_DOT_COLORS[group];
+  }
+  return null;
 }
 
 // The active/passive totals now render in the drawer head (`HudDrawer`'s
@@ -94,6 +125,17 @@ function costText(row) {
   if (cost.mp) parts.push(`${cost.mp} mp`);
   if (cost.sp) parts.push(`${cost.sp} sp`);
   return parts.length > 0 ? parts.join(" ・ ") : "免費";
+}
+
+// The cost cell's colour mirrors `costText`'s normalization: only positive
+// values count as a spend, so a zero-value key (or an empty cost object)
+// reads as free and never a resource colour. An `sp`-spending (or mixed)
+// row reads the SP tone (the draft's `.cost.sp` override precedence).
+function costColorClass(row) {
+  const cost = row.cost ?? {};
+  if (cost.sp > 0) return "sp";
+  if (cost.mp > 0) return "mp";
+  return "free";
 }
 
 function targetText(row) {
@@ -173,6 +215,10 @@ function castText(row) {
       沒有符合的技能
     </p>
 
+    <div v-if="tab === 'active'" class="skill-book__legend" data-testid="skill-book__legend">
+      依分類分群；<span style="color: var(--ok)">戰鬥外</span> 表示非戰鬥亦可施放；未解鎖之性愛行為「藏而不列」。
+    </div>
+
     <details
       v-for="(category, index) in visibleCategories"
       :key="category.category"
@@ -183,19 +229,29 @@ function castText(row) {
     >
       <summary class="skill-book__category-summary">
         <span class="skill-book__category-label">{{ category.label }}</span>
+        <span class="skill-book__category-count" data-testid="skill-book__category-count">{{ categorySkillCount(category) }}</span>
+        <span class="skill-book__category-chevron" data-testid="skill-book__category-chevron" aria-hidden="true">›</span>
       </summary>
       <div
         v-for="group in category.groups"
         :key="group.group ?? `${category.category}-ungrouped`"
         class="skill-book__group"
+        :class="group.label ? '' : 'skill-book__group--ungrouped'"
         :data-testid="`skill-book__group--${group.group ?? 'ungrouped'}`"
         :data-group="group.group ?? ''"
       >
         <p
           v-if="group.label"
           class="skill-book__group-label"
+          :class="category.category === 'sexual_act' ? 'skill-book__group-label--seal' : ''"
           data-testid="skill-book__group-label"
         >
+          <span
+            v-if="groupDotColor(category.category, group.group)"
+            class="skill-book__group-dot"
+            data-testid="skill-book__group-dot"
+            :style="{ background: groupDotColor(category.category, group.group) }"
+          ></span>
           {{ group.label }}
         </p>
         <div
@@ -214,13 +270,6 @@ function castText(row) {
             combat
           </span>
           <span
-            v-if="costText(row) !== null"
-            class="skill-book__cost"
-            data-testid="skill-book__cost"
-          >
-            {{ costText(row) }}
-          </span>
-          <span
             v-if="targetText(row) !== null"
             class="skill-book__target"
             data-testid="skill-book__target"
@@ -234,6 +283,17 @@ function castText(row) {
           >
             {{ castText(row) }}
           </span>
+          <!-- The reference's `.srow .cost{margin-left:auto}`: the cost cell is
+               the row's rightmost column, after the name-side detail cells. -->
+          <span
+            v-if="costText(row) !== null"
+            class="skill-book__cost"
+            :class="costColorClass(row)"
+            data-testid="skill-book__cost"
+          >
+            {{ costText(row) }}
+          </span>
+          <span v-if="tab === 'passive'" class="skill-book__passive-badge" data-testid="skill-book__passive-badge">被動</span>
         </div>
       </div>
     </details>
@@ -327,20 +387,68 @@ function castText(row) {
   padding-top: var(--sp-2);
 }
 
+/* The reference's `details>summary` layout: the count and chevron trail the
+   label on one flex line; the chevron rotates 90° off the native `details`
+   `open` attribute, so no JS-tracked open state is needed. */
 .skill-book__category-summary {
   cursor: pointer;
   color: var(--paper-100);
   font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
-.skill-book__group {
-  margin-top: var(--sp-2);
+/* The reference's `details.cat>summary` label / count / chevron rules. */
+.skill-book__category-label {
+  color: var(--gold-400);
+  font-weight: 600;
 }
 
+.skill-book__category-count {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--paper-500);
+}
+
+.skill-book__category-chevron {
+  color: var(--paper-500);
+  transition: transform 0.2s;
+}
+
+details[open] > .skill-book__category-summary .skill-book__category-chevron {
+  transform: rotate(90deg);
+}
+
+/* The reference's `.grp` rule: the group heading and its colour dot share
+   one flex line; the dot's spacing comes from the `gap`, not a margin, and
+   the label carries the `.grp` margin itself. */
 .skill-book__group-label {
-  margin: 0 0 var(--sp-1);
-  color: var(--warn);
-  font-size: 0.8em;
+  margin: 11px 2px 3px;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  color: var(--paper-500);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Sexual-act group labels read in the reference's `.grp .line` seal tone. */
+.skill-book__group-label--seal {
+  color: var(--seal-400);
+}
+
+.skill-book__group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+/* Label-less groups render no `.grp` label, so they keep the previous 8px
+   top spacing via this modifier (no visual regression against pre-change). */
+.skill-book__group--ungrouped {
+  margin-top: var(--sp-2);
 }
 
 .skill-book__skill {
@@ -356,7 +464,11 @@ function castText(row) {
   color: var(--paper-100);
 }
 
-.skill-book__cost,
+/* The reference's `.srow .cost` / `.cost.sp` / `.cost.free` cascade: the
+   base cost colour is the MP tone, an `sp`-spending (or mixed) row reads the
+   SP tone, and a free cast reads muted paper. The cost cell keeps the
+   reference's `margin-left:auto` (it right-aligns; the target/cast cells
+   wrap after it in the row's flex-wrap layout). */
 .skill-book__target,
 .skill-book__cast {
   color: var(--paper-500);
@@ -364,12 +476,50 @@ function castText(row) {
   font-size: 0.85em;
 }
 
-.skill-book__ooc {
-  color: var(--paper-500);
-  border: var(--line);
-  border-radius: 999px;
-  padding: 0 var(--sp-1);
+.skill-book__cost {
+  color: var(--vit-mp);
   font-family: var(--f-mono);
-  font-size: 0.75em;
+  font-size: 0.85em;
+  margin-left: auto;
+}
+
+.skill-book__cost.mp {
+  color: var(--vit-mp);
+}
+
+.skill-book__cost.sp {
+  color: var(--vit-sp);
+}
+
+.skill-book__cost.free {
+  color: var(--paper-500);
+}
+
+/* The reference's `.srow .ooc` exact rule. The pill is a gap-spaced sibling
+   in the row's flex layout, so the draft's `margin-left` is dropped (the
+   parent's `gap` already provides 8px of spacing). */
+.skill-book__ooc {
+  font-size: 9px;
+  letter-spacing: .04em;
+  color: var(--ok);
+  border: 1px solid rgba(112, 150, 122, 0.5);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+/* The reference's `.srow .prf`: passive-tab rows carry a visible 被動 badge
+   with its own text, never a bare colour swatch. */
+.skill-book__passive-badge {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--paper-700);
+  margin-left: 8px;
+}
+
+/* The reference's `.log` legend, rendered above the active-tab list. */
+.skill-book__legend {
+  font-size: 12.5px;
+  color: var(--paper-500);
+  margin-bottom: 8px;
 }
 </style>

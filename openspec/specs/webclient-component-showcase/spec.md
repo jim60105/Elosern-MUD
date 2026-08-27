@@ -99,6 +99,20 @@ resolve against the skill registry; a passive skill row SHALL carry only `key` a
 active row whose key the registry cannot resolve SHALL carry only `key` and `label` as well (nothing is
 invented for an unregistered key).
 
+The skill book's category summaries, group labels, and per-skill rows SHALL NOT convey their meaning by
+colour alone: a category summary pairs its skill count with the visible digit text and its
+expand/collapse state with a rotating chevron shape (not a colour change); a cost cell's resource
+colour-coding (MP/SP/free) always pairs with the resource unit or the word "免費" already present in
+the cost text; the out-of-combat `combat` pill and the passive `被動` badge each carry their own visible
+text, never a bare colour swatch. An elemental group's colour dot is decorative and SHALL be present
+only for an element the binding visual reference (`docs/design/elosern-redesign/index.html`) itself
+colour-codes; a group for any other element renders its text label with no dot — no dot colour is
+invented for an element the reference never colour-codes. A skill row that carries target or cast detail
+renders that detail on the name side of the row, with the cost cell as the row's rightmost column
+(matching the reference's `.srow .cost` right-alignment via `margin-left:auto`). A group without a
+label SHALL keep the pre-change 8px top spacing, so removing the group-container margin does not regress
+ungrouped content.
+
 `StatusPanel` SHALL present its share of that data as the stage's left HUD island stack rather than as
 a single boxed column card: a character head card, a vitals island, and a conditions island, composed
 from the `CharacterHead`, `VitalsTrack`, and `ConditionChips` components. The head card SHALL render
@@ -158,6 +172,22 @@ field (the intimate/adult block has no backing field and is not built).
 #### Scenario: A passive row and an unregistered active key stay bare
 - **WHEN** the character panel's presenter serializes a passive skill row, or an active skill row whose key does not resolve in the skill registry
 - **THEN** the row carries only `key` and `label`, and `SkillBook` renders it with no cost, target, cast, or `combat` pill
+
+#### Scenario: A skill category and cost cell are never color-only
+- **WHEN** a skill category summary or a skill row's cost cell renders
+- **THEN** the category summary shows its skill count as a digit and its open/closed state as a rotating chevron shape, and the cost cell's colour always accompanies the `mp`/`sp`/`免費` text already in the cell — no state is conveyed by colour alone
+
+#### Scenario: A group dot renders only for a reference-sampled element
+- **WHEN** an elemental-magic group renders whose element the binding visual reference colour-codes (fire, water, wind) or whose category is `sexual_act`
+- **THEN** its label is preceded by the reference's exact colour dot; a group for any other element renders with no dot, because no dot colour is invented for an element the reference never colour-codes
+
+#### Scenario: A passive row carries a visible passive badge
+- **WHEN** the skill book renders a skill row on the passive tab
+- **THEN** the row displays a `被動` badge that carries its own visible text, never a bare colour swatch, and the badge is absent from active-tab rows
+
+#### Scenario: The active tab shows the list-conventions legend
+- **WHEN** the skill book's active tab renders its category list
+- **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
 The `LocalMap`, `ArtPanel`, and the `services`-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and
