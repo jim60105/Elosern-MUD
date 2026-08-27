@@ -27,12 +27,7 @@ from world.rules.combat_session import (
     reconstruct_battlefield,
 )
 from world.rules.player_messages import rejection_message
-from world.rules.progression import (
-    FREEFORM_CAST_SCALES,
-    freeform_scales_for,
-    scaled_mp_cost,
-)
-from world.skills.cost_tiers import is_freeform_eligible
+from world.rules.progression import freeform_scale_entries_for
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 
 # Presentation bounds owned by the combat view (equal or below protocol limits).
@@ -342,29 +337,6 @@ def _build_participants(
     return tuple(participants)
 
 
-def _freeform_scales_for_skill(actor: Any, skill: Any) -> tuple[tuple[float, str, int], ...]:
-    """Return the actor's allowed scale entries for one eligible skill.
-
-    Entries are strictly ascending ``(scale, label, mp_cost)`` where
-    ``mp_cost`` is computed server-side with the shared rounding helper, so
-    the browser never re-implements cost scaling. An ineligible skill or an
-    actor without direct mastery ownership of the skill's element yields an
-    empty tuple, so the panel can omit the field entirely (the freeform
-    feature is invisible to non-masters).
-    """
-    if not is_freeform_eligible(skill) or skill.element is None:
-        return ()
-    allowed = frozenset(freeform_scales_for(actor, skill.element.key))
-    if not allowed:
-        return ()
-    base_mp = int(skill.cost["mp"])
-    return tuple(
-        (scale, label, scaled_mp_cost(base_mp, scale))
-        for scale, label in FREEFORM_CAST_SCALES
-        if scale in allowed
-    )
-
-
 def _build_skills(
     actor: Any,
     record: Any,
@@ -428,7 +400,7 @@ def _build_skills(
                 reason_message=reason_message,
                 valid_target_ids=valid_ids,
                 shorthands=preview.shorthands,
-                freeform_scales=_freeform_scales_for_skill(actor, skill),
+                freeform_scales=freeform_scale_entries_for(actor, skill),
             )
         )
     return tuple(descriptors)

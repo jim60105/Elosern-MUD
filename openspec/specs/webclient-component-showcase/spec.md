@@ -84,13 +84,20 @@ components SHALL present the `status` panel payload (schema version 1), the `cha
 payload (schema version 3), and the character's skill data: gauges (hp/mp/sp), counters (magic_level,
 guild_merit), static traits, wallet, and conditions with their derived modifiers; character
 details, the equipment doll's equipped items, disguise, guild rank/merit, and persona; and a skill
-book with active/passive tabs, categories, search, and per-skill cost/target/cast detail. The gauges and conditions come from the `status` payload; the counters,
+book with active/passive tabs, categories, search, and per-skill cost/target/cast/availability detail. The gauges and conditions come from the `status` payload; the counters,
 static traits, wallet, character details, equipment, disguise, guild, and persona come from the
-`character` payload. Per-skill cost, target, and cast detail fields are rendered only when the
+`character` payload. Per-skill cost, target, cast, and out-of-combat-availability detail fields are rendered only when the
 character's skill data provides them (a row the data gives without detail renders without detail
 cells, so nothing is invented); where the slice carries them they are the display subset of the
 `context_actions` v5 skill descriptor (a `cost` object — the empty object is the free form —,
-`target_spec`, and the optional `freeform_scales` / `shorthands`).
+`target_spec`, the optional `freeform_scales`, and the boolean `usable_out_of_combat`). `shorthands`
+is a combat-only field: the character panel's skill data SHALL NOT carry it, because the shorthand set
+depends on a live battlefield/participant roster that does not exist outside combat. The character
+panel's presenter SHALL populate `cost`, `target_spec`, `usable_out_of_combat`, and (for a freeform-
+eligible skill the actor has mastery to scale) `freeform_scales` for every **active** skill row it can
+resolve against the skill registry; a passive skill row SHALL carry only `key` and `label`, and an
+active row whose key the registry cannot resolve SHALL carry only `key` and `label` as well (nothing is
+invented for an unregistered key).
 
 `StatusPanel` SHALL present its share of that data as the stage's left HUD island stack rather than as
 a single boxed column card: a character head card, a vitals island, and a conditions island, composed
@@ -126,7 +133,7 @@ field (the intimate/adult block has no backing field and is not built).
 
 #### Scenario: Only backed fields render
 - **WHEN** the status, character, or skill surface renders
-- **THEN** every shown field comes from the `status`/`character`/`skill` OOB payload and no field (including any intimate/adult field, and any race, subrace, class, or faction line) is invented
+- **THEN** every shown field comes from the `status`/`character`/`skill` OOB payload and no field (including any intimate/adult field, any race, subrace, class, or faction line, and any `shorthands` value on a character-panel skill row) is invented
 
 #### Scenario: The status surface renders as an island stack
 - **WHEN** the `StatusPanel` renders with the `status` and `character` panels available
@@ -143,6 +150,14 @@ field (the intimate/adult block has no backing field and is not built).
 #### Scenario: The character status drawer presents only the backed character fields
 - **WHEN** the character status drawer renders with the `character` panel available
 - **THEN** it presents the character details, the equipment doll's equipped items, disguise, guild rank/merit, and persona, and no field the payload does not carry is rendered
+
+#### Scenario: An active skill row carries its registry-backed descriptor detail
+- **WHEN** the character panel's presenter serializes an active skill row whose key resolves in the skill registry
+- **THEN** the row carries `cost`, `target_spec`, `usable_out_of_combat`, and — when the skill is freeform-eligible and the actor holds scaling mastery — `freeform_scales`, and the `SkillBook` renders a `combat` pill for a row whose `usable_out_of_combat` is `true`
+
+#### Scenario: A passive row and an unregistered active key stay bare
+- **WHEN** the character panel's presenter serializes a passive skill row, or an active skill row whose key does not resolve in the skill registry
+- **THEN** the row carries only `key` and `label`, and `SkillBook` renders it with no cost, target, cast, or `combat` pill
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
 The `LocalMap`, `ArtPanel`, and the `services`-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and

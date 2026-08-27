@@ -219,7 +219,7 @@ def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
     return {"code": value["code"], "message": message}
 
 
-def _validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str, Any]]:
+def validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str, Any]]:
     """Validate the optional ``freeform_scales`` array of one skill.
 
     When absent (the server omits the field for every non-eligible skill and
@@ -232,7 +232,7 @@ def _validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str,
     """
     if value is None:
         return []
-    if base_mp is None:
+    if base_mp is None or base_mp <= 0:
         raise ProtocolValidationError(
             "a skill without an mp cost cannot carry freeform_scales"
         )
@@ -351,7 +351,7 @@ def _validate_skill(value: Any) -> dict[str, Any]:
         "targets": list(targets),
         "shorthands": list(shorthands),
     }
-    scales = _validate_freeform_scales(
+    scales = validate_freeform_scales(
         value.get("freeform_scales"),
         cost.get("mp") if isinstance(cost.get("mp"), int) else None,
     )

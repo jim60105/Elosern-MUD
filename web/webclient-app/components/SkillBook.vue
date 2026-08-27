@@ -1,12 +1,13 @@
 <script setup>
 // SkillBook (B3 data family): the character's skill data as a two-level
 // book — active/passive tabs, a bounded search, and the payload's own
-// category → group → skill ordering (never re-sorted). Per-skill cost,
-// target, and cast detail cells render only when the slice provides the
-// backing field (the OOB skill-descriptor shape: cost, target_spec,
-// freeform_scales, shorthands); a row the payload gives without detail
-// (e.g. an unregistered-key fallback row) renders without detail cells, so
-// nothing is invented. Tab and search are view-local UI state.
+// category → group → skill ordering (never re-sorted). The character
+// presenter now enriches every registry-resolvable active skill row with
+// cost, target_spec, usable_out_of_combat, and (for a freeform-eligible
+// skill the actor has mastery to scale) freeform_scales; a row the payload
+// gives without detail (e.g. an unregistered-key fallback row) renders
+// without detail cells, so nothing is invented. Tab and search are view-local
+// UI state.
 import { ref, computed } from "vue";
 
 const props = defineProps({
@@ -202,6 +203,13 @@ function castText(row) {
         >
           <span class="skill-book__skill-name">{{ row.label }}</span>
           <span
+            v-if="row.usable_out_of_combat === true"
+            class="skill-book__ooc"
+            data-testid="skill-book__ooc"
+          >
+            combat
+          </span>
+          <span
             v-if="costText(row) !== null"
             class="skill-book__cost"
             data-testid="skill-book__cost"
@@ -330,5 +338,14 @@ function castText(row) {
   color: var(--paper-500);
   font-family: var(--f-mono);
   font-size: 0.85em;
+}
+
+.skill-book__ooc {
+  color: var(--paper-500);
+  border: var(--line);
+  border-radius: 999px;
+  padding: 0 var(--sp-1);
+  font-family: var(--f-mono);
+  font-size: 0.75em;
 }
 </style>
