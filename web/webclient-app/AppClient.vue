@@ -522,6 +522,32 @@ const DRAWER_TITLES = {
 };
 const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
 
+// The skill drawer's head subtitle: the owner's active/passive skill counts,
+// counted from the `character` panel exactly the way `SkillBook` counts its
+// rows (the counting logic moved up one level so the drawer head is the
+// single place the counts render). Empty when the drawer is not the skill
+// drawer or the `character` panel is missing/unavailable (degrade without
+// inventing data).
+function skillCount(rows) {
+  let count = 0;
+  for (const category of rows ?? []) {
+    for (const group of category.groups ?? []) {
+      count += (group.skills ?? []).length;
+    }
+  }
+  return count;
+}
+const skillBookSubtitle = computed(() => {
+  if (store.view.hudDrawer !== "skill" || !panelAvailable("character")) {
+    return "";
+  }
+  const character = panel("character");
+  return `主動 ${skillCount(character?.actives)} · 被動 ${skillCount(character?.passives)}`;
+});
+// The skill drawer's footer: the client's own `/cast` syntax as static,
+// client-local presentation copy (no OOB field carries it).
+const SKILL_CAST_HINT = "施放入口：cast <技法>[@威力]=<代號>";
+
 // The drawer chrome's close entry (Escape / close control / scrim): route
 // through the store's single close entry, popping exactly one menu level
 // when the drawer hosts a service frame (task 4.2).
@@ -706,6 +732,8 @@ onMounted(() => {
       v-if="store.view.hudDrawer"
       :open="true"
       :title="drawerTitle"
+      :subtitle="store.view.hudDrawer === 'skill' ? skillBookSubtitle : ''"
+      :icon="store.view.hudDrawer === 'skill' ? 'skills' : null"
       :drawer-key="store.view.hudDrawer"
       @close="onHudDrawerClose"
     >
@@ -754,6 +782,12 @@ onMounted(() => {
         @focus-change="onDockFocusChange"
         @activate="onDockActivate"
       />
+      <!-- The cast-syntax footer hint is skill-drawer-only: a conditional
+           named slot means the other five drawers provide no `foot` slot, so
+           `HudDrawer` renders no footer for them. -->
+      <template v-if="store.view.hudDrawer === 'skill'" #foot>
+        <p class="hud-drawer__cast-hint" data-testid="skill-book-cast-hint">{{ SKILL_CAST_HINT }}</p>
+      </template>
     </HudDrawer>
 
     <!-- H5 (tasks 5.4/6.4): the single shared full-screen overlay surface.
