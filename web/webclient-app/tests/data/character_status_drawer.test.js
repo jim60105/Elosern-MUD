@@ -8,7 +8,8 @@ import {
   CHARACTER_PANEL_UNDISGUISED_SAMPLE,
 } from "../../stories/fixtures.js";
 
-// CharacterStatusDrawer (H4, task 5.8): the 角色狀態 drawer body. The
+// CharacterStatusDrawer (H4, task 5.8;
+// relocate-inventory-drawer-essentials): the 角色狀態 drawer body. The
 // status sections (vitals + the FULL condition roster) render in every mode
 // from the committed `status` payload; the `character`-backed sections show
 // the registry-owned reason (and invent nothing) when the `character` panel
@@ -16,7 +17,9 @@ import {
 // collapsed-by-default `<details>` disclosure when the committed `character`
 // v4 payload's `intimate` field is present, and is entirely absent from the
 // DOM when it is `null` or the `character` panel is unavailable (never a
-// placeholder or a collapsed-empty widget).
+// placeholder or a collapsed-empty widget). The equipment doll and the
+// single drawer-layer wallet now live in the inventory drawer, so this body
+// renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
   schema_version: 4,
@@ -81,16 +84,14 @@ describe("CharacterStatusDrawer", () => {
     expect(w.findAll('[data-testid^="character-status-drawer__trait--"]').length).toBe(0);
     expect(w.find('[data-testid="character-status-drawer__traits"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__traits-unavailable"]').text()).toBe("你已離開角色");
-    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(true);
-    expect(w.get('[data-testid="equipment-doll__unavailable"]').text()).toBe("你已離開角色");
+    // The equipment doll and the wallet moved to the inventory drawer
+    // (relocate-inventory-drawer-essentials): this body renders neither.
+    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
+    expect(w.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(false);
     expect(w.find('[data-testid="character-status-drawer__guild"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__guild-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__disguise"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__disguise-unavailable"]').exists()).toBe(true);
-    // The wallet renders no balance at all (no zero) when the panel is
-    // unavailable, and its own reason line marks the section.
-    expect(w.get('[data-testid="character-status-drawer__wallet"]').text()).toBe("錢包：");
-    expect(w.get('[data-testid="character-status-drawer__wallet-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__persona-unavailable"]').exists()).toBe(true);
     // The intimate section is entirely absent from the DOM when the
@@ -156,15 +157,16 @@ describe("CharacterStatusDrawer", () => {
       },
       attachTo: host,
     });
+    // The equipment doll and wallet no longer belong to this body
+    // (relocate-inventory-drawer-essentials): the section order is
+    // vitals → traits → guild → conditions → disguise → 親密狀態 → 背景.
     const selectors = [
       '[data-testid="character-status-drawer__vitals"]',
       '[data-testid="character-status-drawer__traits"]',
-      '[data-testid="equipment-doll"]',
       '[data-testid="character-status-drawer__guild"]',
       '[data-testid="character-status-drawer__conditions"]',
       '[data-testid="character-status-drawer__disguise"]',
       '[data-testid="character-status-drawer__intimate"]',
-      '[data-testid="character-status-drawer__wallet"]',
       '[data-testid="character-status-drawer__persona"]',
     ];
     const els = selectors.map((sel) => wrapper.find(sel).element);
@@ -189,14 +191,15 @@ describe("CharacterStatusDrawer", () => {
     // reason, not hidden.
     expect(w.find('[data-testid="character-status-drawer__traits"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__traits-unavailable"]').exists()).toBe(true);
-    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(true);
-    expect(w.get('[data-testid="equipment-doll__unavailable"]').exists()).toBe(true);
+    // The equipment doll and the wallet moved to the inventory drawer
+    // (relocate-inventory-drawer-essentials): this body renders neither.
+    expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
+    expect(w.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(false);
     expect(w.find('[data-testid="character-status-drawer__guild"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__guild-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__disguise"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__disguise-unavailable"]').exists()).toBe(true);
-    expect(w.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(true);
-    expect(w.get('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
+    expect(w.find('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
     // The intimate section is entirely absent in combat, where the `character`
     // panel is unavailable.
     expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);

@@ -3,17 +3,17 @@
 // the 角色狀態 drawer body. It presents the committed `status` v1 payload's
 // vitals (hp/mp/sp gauges) and the FULL condition roster (no 6-chip cap,
 // unlike H2's ConditionChips island), plus the `character` v4 payload body
-// (traits, equipment, disguise, guild, wallet, persona, intimate). In every
-// mode the status sections render; when the `character` panel is unavailable
-// the drawer shows the registry-owned reason and invents nothing. The 親密狀態
-// (intimate-status) section renders as a collapsed-by-default native
-// `<details>` disclosure when the panel's `intimate` field is present, and is
-// entirely absent from the DOM when `intimate` is null or the panel is
-// unavailable — never a placeholder. A single labelled control opens the
-// skill drawer (task 5.5).
+// (traits, disguise, guild, persona, intimate). In every mode the status
+// sections render; when the `character` panel is unavailable the drawer
+// shows the registry-owned reason and invents nothing. The equipment doll
+// and the single drawer-layer wallet now live in the inventory drawer
+// (relocate-inventory-drawer-essentials). The 親密狀態 (intimate-status)
+// section renders as a collapsed-by-default native `<details>` disclosure
+// when the panel's `intimate` field is present, and is entirely absent from
+// the DOM when `intimate` is null or the panel is unavailable — never a
+// placeholder. A single labelled control opens the skill drawer (task 5.5).
 import { computed } from "vue";
 import { gaugeRatio } from "./vitals.js";
-import EquipmentDoll from "./EquipmentDoll.vue";
 
 const props = defineProps({
   // The committed `status` v1 panel payload (vitals + conditions).
@@ -130,10 +130,6 @@ const displayedRows = computed(() => {
 
 const guild = computed(() => (characterAvailable.value ? (props.character?.guild ?? null) : null));
 
-function formatCopper(value) {
-  return String(value ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-const wallet = computed(() => (characterAvailable.value ? Math.max(0, props.character?.wallet ?? 0) : 0));
 const personaBackground = computed(() => (characterAvailable.value ? (props.character?.persona?.background ?? null) : null));
 
 const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
@@ -233,13 +229,11 @@ const INTIMATE_ROWS = [
       </p>
     </section>
 
-    <!-- H4 (task 6.3): the equipment doll replaces the old flat equipment
-         list — the named 主手/副手/盔甲 boxes, the accessory group, and the
-         labelled passthrough row for other server-authored slot keys. The
-         doll renders its own registry-owned reason line when the panel is
-         unavailable, so it mounts in every mode. -->
-    <EquipmentDoll :character="character" />
-
+    <!-- The equipment doll moved to the inventory drawer
+         (relocate-inventory-drawer-essentials): the 角色狀態 body keeps its
+         section order vitals → traits → guild → conditions → disguise →
+         親密狀態 (intimate) → persona, with the intimate disclosure as the
+         last main section. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__guild" aria-label="公會">
       <p class="character-status-drawer__section-label">計數 · 公會</p>
       <div v-if="characterAvailable" class="character-status-drawer__statgrid">
@@ -382,20 +376,9 @@ const INTIMATE_ROWS = [
       </div>
     </details>
 
-    <!-- The wallet renders no balance at all (and no zero) when the panel
-         that carries it is unavailable. -->
-    <p class="character-status-drawer__wallet" data-testid="character-status-drawer__wallet">
-      錢包：<template v-if="characterAvailable">{{ formatCopper(wallet) }} 銅</template>
-    </p>
-    <p
-      v-if="!characterAvailable && characterReason"
-      class="character-status-drawer__section-reason"
-      data-testid="character-status-drawer__wallet-unavailable"
-      :data-reason-code="characterReason.code"
-    >
-      {{ characterReason.message }}
-    </p>
-
+    <!-- The single drawer-layer wallet moved to the inventory drawer's
+         shared header (relocate-inventory-drawer-essentials); the 角色狀態
+         body renders no balance of its own (and never a zero). -->
     <!-- The 背景 section shows the committed persona background; when the
          `character` panel is unavailable the section stays visible and is
          marked with the registry-owned reason. -->
@@ -688,12 +671,6 @@ const INTIMATE_ROWS = [
   color: var(--paper-500);
   font-size: 0.8em;
   line-height: 1.5;
-}
-
-.character-status-drawer__wallet {
-  margin: 0;
-  color: var(--paper-300);
-  font-size: 0.9em;
 }
 
 .character-status-drawer__persona-background {

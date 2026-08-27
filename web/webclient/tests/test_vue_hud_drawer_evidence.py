@@ -122,8 +122,9 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         "webclient-contextual-hud::the-drawer-layer-renders-the-wallet-exactly-once"
     )
     def test_drawer_layer_single_wallet(self):
-        # The wallet renders in exactly one place (the character-status drawer);
-        # the shop / lore / bag render no balance of their own, and an
+        # The wallet renders in exactly one place (the inventory drawer's shared
+        # header, thousands-grouped integer copper from the committed character
+        # panel); no other drawer body renders a balance of its own, and an
         # unavailable panel renders no balance (never a zero).
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "app_client_drawers.test.js"),
