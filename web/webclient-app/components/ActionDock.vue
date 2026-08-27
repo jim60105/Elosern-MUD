@@ -219,7 +219,7 @@ function onCardAction(intent) {
   background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
   border-top: var(--line);
   border-radius: 0 0 12px 12px;
-  box-shadow: 0 -14px 34px -24px #000;
+  box-shadow: 0 -14px 34px -24px rgba(0, 0, 0, 0.9);
   font-family: var(--f-sans);
 }
 
@@ -253,6 +253,17 @@ function onCardAction(intent) {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+}
+
+/* The legacy suggestions section's card row (B2 action family): laid out as
+   the reference `.sugs` grid (auto-fill minmax(210px,1fr) + 10px gap) so the
+   cards sit side by side and the whole section stays inside the dock's fixed
+   height — the bottom card's clickable center no longer falls in the
+   command-line band. */
+.suggestions-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
 }
 
 .action-dock__pane::-webkit-scrollbar {
