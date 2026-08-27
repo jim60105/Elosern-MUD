@@ -1,13 +1,13 @@
 <script setup>
 // QuestBoard (B4 services family): the guild quest surface of the `services`
 // panel. Design D2: the surface is a host, not a data source — it renders
-// only the committed `services` v1 payload (guild section: registration,
+// only the committed `services` v2 payload (guild section: registration,
 // quest board (接取), active quest records (回報·放棄·詳情), rank) and
 // invents nothing. A missing guild section renders an honest absent marker.
 import { computed, ref } from "vue";
 
 const props = defineProps({
-  // The committed `services` v1 panel payload.
+  // The committed `services` v2 panel payload.
   services: { type: Object, required: true },
 });
 

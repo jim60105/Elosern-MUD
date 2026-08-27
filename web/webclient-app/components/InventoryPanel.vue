@@ -11,7 +11,7 @@
 import { computed } from "vue";
 
 const props = defineProps({
-  // The committed `services` v1 panel payload (or the unavailable form).
+  // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
 });
 

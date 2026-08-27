@@ -1,7 +1,7 @@
 <script setup>
 // LoreDrawer (B4 services family): the "圖鑑抽屜" (codex drawer). It
 // surfaces the world lore the player has learned, rendered only from the
-// committed `services` v1 payload (design D2: a host, not a data source) —
+// committed `services` v2 payload (design D2: a host, not a data source) —
 // the host line and the guild lore (quest-board objective/reward summaries
 // + the active quest's story detail). H4 (task 5.2) removed the duplicated
 // wallet line and player-summary rows; the wallet and guild summary now live
@@ -11,7 +11,7 @@
 import { computed } from "vue";
 
 const props = defineProps({
-  // The committed `services` v1 panel payload.
+  // The committed `services` v2 panel payload.
   services: { type: Object, required: true },
 });
 

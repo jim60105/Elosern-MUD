@@ -7,7 +7,7 @@ import {
 } from "../fixtures.js";
 
 // LoreDrawer (B4 services family): the 圖鑑 drawer. Prop: services — the
-// committed `services` v1 payload. It renders only the world lore the player
+// committed `services` v2 payload. It renders only the world lore the player
 // has learned: the host line, the player summary (wallet in thousands-separated
 // copper, guild registration, rank, merit, next rank/threshold), and the
 // guild lore (board objective/reward summaries + the active quest's detail).

@@ -28,7 +28,7 @@ function action(overrides) {
 
 function validPanel(overrides) {
   const panel = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "services",
     host: null,
@@ -95,7 +95,18 @@ function validPanel(overrides) {
     },
     inventory: {
       rows: [
-        { item_key: "meal", display_name: "普通餐食", held: 2, equipped: false },
+        {
+          item_key: "meal",
+          display_name: "普通餐食",
+          held: 2,
+          equipped: false,
+          presentation: {
+            kind: "food",
+            icon_key: "food",
+            rarity: "common",
+            summary: "供旅人充飢的普通餐食。",
+          },
+        },
       ],
       wallet: 1000,
     },

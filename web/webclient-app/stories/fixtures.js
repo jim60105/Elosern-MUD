@@ -521,7 +521,7 @@ export const SKILLS_SLICE_SAMPLE = {
 // ---------------------------------------------------------------------------
 // B4 (webclient-vue-05-showcase-world): world + services family fixtures.
 // Mirror the bounded OOB panel payloads — local_map v1, art v1, and
-// services v1 — so the offline showcase asserts truthfulness: the lattice
+// services v2 — so the offline showcase asserts truthfulness: the lattice
 // states, the art placeholder contract, the services-backed shop/quest/
 // lore/inventory surfaces, and the equipped-only inventory (no full bag,
 // no party panel — both deferred, roadmap §7). No live server, LLM, or
@@ -1065,7 +1065,7 @@ export const ART_PANEL_UNAVAILABLE_SAMPLE = {
 // present). Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -1164,9 +1164,21 @@ export const SERVICES_PANEL_SAMPLE = {
   },
   inventory: {
     rows: [
-      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true },
-      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true },
-      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false },
+      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true, presentation: null },
+      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true, presentation: null },
+      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false, presentation: null },
+      {
+        item_key: "healing_potion",
+        display_name: "治療藥水",
+        held: 2,
+        equipped: false,
+        presentation: {
+          kind: "potion",
+          icon_key: "potion",
+          rarity: "rare",
+          summary: "盛裝於小瓶中的治療藥水。",
+        },
+      },
     ],
     wallet: 3240,
   },
@@ -1175,7 +1187,7 @@ export const SERVICES_PANEL_SAMPLE = {
     quest_total: 1,
     stock_total: 2,
     sellable_total: 1,
-    inventory_total: 3,
+    inventory_total: 4,
   },
 };
 
@@ -1183,7 +1195,7 @@ export const SERVICES_PANEL_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -1191,7 +1203,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop/inventory sections
 // (all null with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   kind: "services",
   host: null,

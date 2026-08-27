@@ -1,6 +1,6 @@
 """Exact ``services`` schema, presenter, and surface-isolation tests.
 
-Covers the D4 shared bounds, the version-1 payload validation, deterministic
+Covers the D4 shared bounds, the version-2 payload validation, deterministic
 row ordering, pagination totals, host identity/display-name limits,
 action-descriptor shapes, the worst-case envelope size, and the isolation of a
 corrupt quest log, malformed merchant stock, and non-exploration modes.
@@ -37,6 +37,8 @@ from web.webclient.presentation.services import (
     MAX_KEY_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_QUEST_ROWS,
+    MAX_PRESENTATION_KEY_CODE_POINTS,
+    MAX_PRESENTATION_SUMMARY_CODE_POINTS,
     MAX_QUANTITY,
     MAX_RANK_KEY_CODE_POINTS,
     MAX_REASON_MESSAGE_CODE_POINTS,
@@ -89,7 +91,18 @@ def _valid_payload(**overrides):
         "shop": None,
         "inventory": {
             "rows": [
-                {"item_key": "meal", "display_name": "普通餐食", "held": 1, "equipped": False}
+                {
+                    "item_key": "meal",
+                    "display_name": "普通餐食",
+                    "held": 1,
+                    "equipped": False,
+                    "presentation": {
+                        "kind": "food",
+                        "icon_key": "food",
+                        "rarity": "common",
+                        "summary": "供旅人充飢的普通餐食。",
+                    },
+                }
             ],
             "wallet": 0,
         },
@@ -228,6 +241,12 @@ def _all_ceilings_payload():
             "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
             "held": 20,
             "equipped": False,
+            "presentation": {
+                "kind": "k" * MAX_PRESENTATION_KEY_CODE_POINTS,
+                "icon_key": "i" * MAX_PRESENTATION_KEY_CODE_POINTS,
+                "rarity": "r" * MAX_PRESENTATION_KEY_CODE_POINTS,
+                "summary": "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
+            },
         }
         for _ in range(MAX_INVENTORY_ROWS)
     ]
@@ -335,7 +354,18 @@ def _realistic_maximal_payload():
         for _ in range(MAX_SELLABLE_ROWS)
     ]
     inventory = [
-        {"item_key": "meal", "display_name": "普通餐食", "held": 2, "equipped": False}
+        {
+            "item_key": "meal",
+            "display_name": "普通餐食",
+            "held": 2,
+            "equipped": False,
+            "presentation": {
+                "kind": "food",
+                "icon_key": "food",
+                "rarity": "common",
+                "summary": "供旅人充飢的普通餐食。",
+            },
+        }
         for _ in range(MAX_INVENTORY_ROWS)
     ]
     return _valid_payload(
@@ -448,7 +478,18 @@ class ServicesSchemaTests(unittest.TestCase):
             validate_services(_valid_payload(shop=shop))
 
     def test_inventory_row_cap_enforced(self):
-        row = {"item_key": "meal", "display_name": "普通餐食", "held": 1, "equipped": False}
+        row = {
+            "item_key": "meal",
+            "display_name": "普通餐食",
+            "held": 1,
+            "equipped": False,
+            "presentation": {
+                "kind": "food",
+                "icon_key": "food",
+                "rarity": "common",
+                "summary": "供旅人充飢的普通餐食。",
+            },
+        }
         inventory = {
             "rows": [row for _ in range(MAX_INVENTORY_ROWS + 1)],
             "wallet": 0,
@@ -580,6 +621,111 @@ class ServicesSchemaTests(unittest.TestCase):
         with self.assertRaises(ServicesPanelError):
             validate_services(payload)
 
+    def _inventory_payload(self, presentation):
+        return _valid_payload(
+            inventory={
+                "rows": [
+                    {
+                        "item_key": "meal",
+                        "display_name": "普通餐食",
+                        "held": 1,
+                        "equipped": False,
+                        "presentation": presentation,
+                    }
+                ],
+                "wallet": 0,
+            }
+        )
+
+    def test_presentation_null_for_unknown_key_passes(self):
+        validated = validate_services(self._inventory_payload(None))
+        self.assertIsNone(validated["inventory"]["rows"][0]["presentation"])
+
+    def test_presentation_object_passes(self):
+        presentation = {
+            "kind": "food",
+            "icon_key": "food",
+            "rarity": "common",
+            "summary": "供旅人充飢的普通餐食。",
+        }
+        validated = validate_services(self._inventory_payload(presentation))
+        self.assertEqual(validated["inventory"]["rows"][0]["presentation"], presentation)
+
+    def test_presentation_missing_field_rejected(self):
+        presentation = {
+            "kind": "food",
+            "icon_key": "food",
+            "rarity": "common",
+        }
+        with self.assertRaises(ProtocolValidationError):
+            validate_services(self._inventory_payload(presentation))
+
+    def test_presentation_extra_field_rejected(self):
+        presentation = {
+            "kind": "food",
+            "icon_key": "food",
+            "rarity": "common",
+            "summary": "供旅人充飢的普通餐食。",
+            "color": "red",
+        }
+        with self.assertRaises(ProtocolValidationError):
+            validate_services(self._inventory_payload(presentation))
+
+    def test_presentation_identifier_bound_enforced(self):
+        presentation = {
+            "kind": "k" * (MAX_PRESENTATION_KEY_CODE_POINTS + 1),
+            "icon_key": "food",
+            "rarity": "common",
+            "summary": "供旅人充飢的普通餐食。",
+        }
+        with self.assertRaises(ProtocolValidationError):
+            validate_services(self._inventory_payload(presentation))
+
+    def test_presentation_identifier_case_and_charset_enforced(self):
+        for bad in ("Food", "food ", "food-food", "foöd"):
+            presentation = {
+                "kind": bad,
+                "icon_key": "food",
+                "rarity": "common",
+                "summary": "供旅人充飢的普通餐食。",
+            }
+            with self.assertRaises(ProtocolValidationError, msg=bad):
+                validate_services(self._inventory_payload(presentation))
+
+    def test_presentation_summary_bound_enforced(self):
+        presentation = {
+            "kind": "food",
+            "icon_key": "food",
+            "rarity": "common",
+            "summary": "獎" * (MAX_PRESENTATION_SUMMARY_CODE_POINTS + 1),
+        }
+        with self.assertRaises(ProtocolValidationError):
+            validate_services(self._inventory_payload(presentation))
+
+    def test_presentation_summary_at_the_bound_is_accepted(self):
+        presentation = {
+            "kind": "food",
+            "icon_key": "food",
+            "rarity": "common",
+            "summary": "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
+        }
+        validated = validate_services(self._inventory_payload(presentation))
+        self.assertEqual(
+            validated["inventory"]["rows"][0]["presentation"]["summary"],
+            "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
+        )
+
+    def test_presentation_summary_type_enforced(self):
+        for bad in (128, ["x"], True):
+            presentation = {
+                "kind": "food",
+                "icon_key": "food",
+                "rarity": "common",
+                "summary": bad,
+            }
+            with self.assertRaises(ProtocolValidationError, msg=bad):
+                validate_services(self._inventory_payload(presentation))
+
 
 class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
@@ -709,6 +855,50 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["shop"])
         self.assertIsNotNone(payload["inventory"])
+
+    @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
+    def test_registered_inventory_projects_registry_presentation(self):
+        self.player.db.inventory = ["healing_potion", "healing_potion", "plain_sword"]
+        payload = self._render()
+        rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
+        self.assertEqual(
+            rows["healing_potion"]["presentation"],
+            {
+                "kind": "potion",
+                "icon_key": "potion",
+                "rarity": "rare",
+                "summary": "盛裝於小瓶中的治療藥水。",
+            },
+        )
+        self.assertEqual(rows["healing_potion"]["held"], 2)
+        self.assertEqual(rows["plain_sword"]["presentation"]["rarity"], "common")
+
+    @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
+    def test_unknown_inventory_key_projects_null_presentation(self):
+        self.player.db.inventory = ["mystery_relic", "mystery_relic", "healing_potion"]
+        payload = self._render()
+        rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
+        self.assertIsNone(rows["mystery_relic"]["presentation"])
+        self.assertEqual(rows["mystery_relic"]["display_name"], "mystery_relic")
+        self.assertIsNotNone(rows["healing_potion"]["presentation"])
+
+    @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
+    def test_rendering_inventory_never_mutates_canonical_state(self):
+        self.player.db.inventory = ["healing_potion", "healing_potion", "mystery_relic", "plain_sword"]
+        self.player.db.equipment = {"weapon_main": "plain_sword", "armor": "leather_armor"}
+        before = {
+            "inventory": list(self.player.db.inventory or []),
+            "equipment": dict(self.player.db.equipment or {}),
+            "wallet": self.player.db.wallet,
+            "quest_log": list(self.player.db.quest_log or []),
+        }
+        payload = self._render()
+        self.assertEqual(list(self.player.db.inventory or []), before["inventory"])
+        self.assertEqual(dict(self.player.db.equipment or {}), before["equipment"])
+        self.assertEqual(self.player.db.wallet, before["wallet"])
+        self.assertEqual(list(self.player.db.quest_log or []), before["quest_log"])
+        row = next(r for r in payload["inventory"]["rows"] if r["item_key"] == "plain_sword")
+        self.assertTrue(row["equipped"])
 
     def test_unregistered_presenter_is_honest(self):
         newcomer = create_object(PlayerCharacter, key="newcomer")
@@ -944,7 +1134,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
 
     def test_panel_level_branch_rejections(self):
         with self.assertRaises(ServicesPanelError):
-            validate_services(_valid_payload(schema_version=2))
+            validate_services(_valid_payload(schema_version=1))
         with self.assertRaises(ServicesPanelError):
             validate_services(_valid_payload(available=False))
         with self.assertRaises(ServicesPanelError):

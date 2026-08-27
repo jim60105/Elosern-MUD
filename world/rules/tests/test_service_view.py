@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
+from world.lore.items import ITEM_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -690,6 +691,28 @@ class InventoryTests(ServiceRegistryIsolation):
         self.assertEqual(rows["plain_sword"].equipped, True)
         self.assertEqual(view.inventory.wallet, 42)
         self.assertEqual(view.player.wallet, 42)
+
+    @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
+    def test_registered_inventory_key_projects_registry_presentation(self):
+        room = FakeRoom()
+        player = actor(
+            location=room,
+            wallet=42,
+            inventory=["healing_potion", "healing_potion", "mystery_relic"],
+        )
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            view = build_services_view(player)
+        rows = {row.item_key: row for row in view.inventory.rows}
+        self.assertEqual(
+            rows["healing_potion"].presentation,
+            ITEM_REGISTRY["healing_potion"].presentation,
+        )
+        self.assertEqual(rows["healing_potion"].held, 2)
+        self.assertIsNone(rows["mystery_relic"].presentation)
+        self.assertEqual(rows["mystery_relic"].display_name, "mystery_relic")
 
 
 class SurfaceIsolationTests(ServiceRegistryIsolation):

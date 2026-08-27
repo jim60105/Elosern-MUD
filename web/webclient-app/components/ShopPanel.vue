@@ -1,6 +1,6 @@
 <script setup>
 // ShopPanel (B4 world / services family): renders the `shop` section of
-// the committed `services` v1 payload — open/closed status line, stock
+// the committed `services` v2 payload — open/closed status line, stock
 // rows with buy/sell copper prices and stock levels, held sellable rows,
 // and the player wallet. Currency is integer copper: displayed
 // thousands-separated, never float money. When the section is absent
@@ -10,7 +10,7 @@
 import { computed, reactive, ref, watch } from "vue";
 
 const props = defineProps({
-  // The committed `services` v1 panel payload (or the unavailable form).
+  // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
   // The store's bounded quantity form (a local UI exception). When the
   // keyboard flow opens the form, the panel highlights the activated row
