@@ -525,6 +525,11 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "  Elosern.narrativeInput.appendInput('probe');"
             "}"
         )
+        # Gate on the unread count rising past the captured baseline. The input
+        # event contributes exactly one increment; a concurrent server narrative
+        # line (the shared foundation server replies to the sent text) may add
+        # further increments, so the assertion is load-robust as "at least one"
+        # rather than a strict equality that a racing server line would break.
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
@@ -532,9 +537,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                 "selector": "#narrative-unread",
                 "predicate": (
                     "() => parseInt(document.getElementById('narrative-unread')"
-                    ".getAttribute('data-count')) === window.__unreadBefore + 1"
+                    ".getAttribute('data-count')) >= window.__unreadBefore + 1"
                 ),
-                "description": "narrative-unread count incremented by one",
+                "description": "narrative-unread count incremented (at least one)",
             },
         )
         self.assertEqual(
