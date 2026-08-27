@@ -16,6 +16,13 @@ const AFFORDANCES = [
   },
 ];
 
+const ROOT_ITEMS = [
+  { key: "move", label: "移動", enabled: true },
+  { key: "look", label: "查看", enabled: true },
+  { key: "interact", label: "互動", enabled: true },
+  { key: "suggestions", label: "建議", enabled: true },
+];
+
 const READY = {
   status: "ready",
   cards: [
@@ -73,14 +80,14 @@ describe("ActionDock (B2 action-dock family)", () => {
       w.get('[data-testid="action-dock-guidance"]').exists(),
     ).toBe(true);
     expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
     );
   });
 
   it("renders the bare shortcut legend without a prefix", () => {
     const w = mountDock();
     expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+      "方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
     );
   });
 
@@ -190,12 +197,49 @@ describe("ActionDock (B2 action-dock family)", () => {
   it("refreshes the guidance note when the surface prefix changes", async () => {
     const w = mountDock({ guidancePrefix: "附近動作" });
     expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
     );
     w.setProps({ guidancePrefix: "戰鬥動作" });
     await nextTick();
     expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "戰鬥動作　方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令",
+      "戰鬥動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
     );
+  });
+
+  it("renders exactly one visible legend: the description is hidden, the tab-bar hint is the visible copy", () => {
+    // Mount with rootItems so the tab bar (and its trailing hint) renders;
+    // the default mount has no tabs, so the duplicate copy check needs the
+    // tab-bar present to be meaningful.
+    const w = mountDock({ rootItems: ROOT_ITEMS });
+    const desc = w.get('[data-testid="action-dock-description"]');
+    const descStyle = getComputedStyle(desc.element);
+    // Assert the rendered state, not merely the class-name presence: the
+    // element is 1x1, absolutely positioned, and clipped.
+    expect(desc.attributes("aria-hidden")).toBe("true");
+    expect(desc.classes()).toContain("visually-hidden");
+    expect(descStyle.position).toBe("absolute");
+    expect(descStyle.width).toBe("1px");
+    expect(descStyle.height).toBe("1px");
+    if (descStyle.clip) {
+      expect(descStyle.clip).toMatch(/0px,\s*0px,\s*0px,\s*0px/);
+    }
+    const hint = w.find(".dock-tab-bar__hint");
+    expect(hint.exists()).toBe(true);
+    expect(hint.text()).toBe("方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列");
+    const hintStyle = getComputedStyle(hint.element);
+    expect(hintStyle.display).not.toBe("none");
+    expect(hintStyle.width).not.toBe("1px");
+    // The tab icon's `<path>` carries the reference's per-key stroke
+    // attributes: `move` has both cap+join, `interact` has join only,
+    // `suggestions` (the star) has neither.
+    const movePath = w.find('.dock-tab-bar__tab[data-item-key="move"] .dock-tab-bar__icon path');
+    expect(movePath.attributes("stroke-linecap")).toBe("round");
+    expect(movePath.attributes("stroke-linejoin")).toBe("round");
+    const interactPath = w.find('.dock-tab-bar__tab[data-item-key="interact"] .dock-tab-bar__icon path');
+    expect(interactPath.attributes("stroke-linejoin")).toBe("round");
+    expect(interactPath.attributes("stroke-linecap")).toBeUndefined();
+    const suggPath = w.find('.dock-tab-bar__tab[data-item-key="suggestions"] .dock-tab-bar__icon path');
+    expect(suggPath.attributes("stroke-linecap")).toBeUndefined();
+    expect(suggPath.attributes("stroke-linejoin")).toBeUndefined();
   });
 });

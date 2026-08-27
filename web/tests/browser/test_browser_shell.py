@@ -752,7 +752,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             # `action-dock-description` line (the `action-dock-guidance` line
             # only renders when a per-surface prefix is committed).
             description = page.locator('[data-testid="action-dock-description"]').inner_text()
-            for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 開啟指令"):
+            for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 聚焦指令列"):
                 self.assertIn(keyword, description)
             # The root is now the tab bar (H3): one row of tabs (the root
             # frame's items as tabs). The tab count varies 5-7 with
@@ -818,6 +818,50 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 detail.inner_text(),
                 "the detail pane names the back cell's next key action",
             )
+ 
+    @covers_requirement(
+        "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
+    )
+    def test_dock_shortcut_legend_renders_once_with_real_behaviour_wording(self):
+        """The dock's shortcut legend renders as exactly one visible instance,
+        and names only the keyboard behaviour the client actually implements
+        (H5: the ``/`` key *focuses* the permanently present command line —
+        it no longer opens or closes a drawer).
+
+        The Node-contract copy (``action-dock-description``) is kept in the
+        DOM for the gate but is the visually hidden duplicate: 1x1 clipped,
+        out of the accessibility tree (``aria-hidden``). The visible copy is
+        the tab bar's trailing hint.
+        """
+        page = self.logged_in_page()
+        focus_action_dock(page)
+        desc = page.locator('[data-testid="action-dock-description"]')
+        hint = page.locator(".dock-tab-bar__hint")
+        # Exactly one visible instance: the tab-bar hint is visible; the
+        # description copy is the hidden duplicate.
+        self.assertEqual(hint.count(), 1, "the tab-bar carries the visible legend")
+        self.assertTrue(hint.first.is_visible(), "the tab-bar hint is the visible legend")
+        self.assertEqual(desc.count(), 1, "the hidden description copy remains in the DOM")
+        self.assertEqual(desc.first.get_attribute("aria-hidden"), "true")
+        # Assert the rendered state (computed clip/size), not merely the
+        # class name, per the change's acceptance check.
+        desc_style = desc.first.evaluate(
+            """el => {
+              const s = getComputedStyle(el);
+              return { position: s.position, width: s.width,
+                       height: s.height, clip: s.clip };
+            }"""
+        )
+        self.assertEqual(desc_style["position"], "absolute")
+        self.assertEqual(desc_style["width"], "1px")
+        self.assertEqual(desc_style["height"], "1px")
+        self.assertIn("0px", desc_style["clip"])
+        # The two copies stay byte-identical in text content.
+        self.assertEqual(desc.first.inner_text(), hint.first.inner_text())
+        # The visible legend names the command line's real focus behaviour.
+        hint_text = hint.first.inner_text()
+        self.assertIn("/ 聚焦指令列", hint_text)
+        self.assertNotIn("/ 開啟指令", hint_text)
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"

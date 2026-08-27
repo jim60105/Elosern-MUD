@@ -84,10 +84,14 @@ against the same roadmap.
   (Decision 5 below), so the floating dock panel reads as sinking into shadow rather than as a lit
   violet-glass card. The panel's existing `border-radius: 0 0 12px 12px` and `border-top: var(--line)`
   are unchanged — they are a deliberate H1 "floating anchored card" adaptation, not part of this defect.
-- Update the one Node-contract test that asserts the legend's literal text
-  (`web/static/webclient/js/tests/*.test.js`, the `action-dock-description` hook check) to the reworded
-  string, and add a fast component-level assertion that `.action-dock__description` and
-  `.dock-tab-bar__hint` are never both visible at once.
+- Update the literal-text assertions for the legend: the four checks in the Vitest suite
+  (`web/webclient-app/tests/action/action_dock.test.js`, lines 76, 83, 193, 198) and the
+  Playwright keyword-substring check in `web/tests/browser/test_browser_shell.py` (~line 755) —
+  no Node-contract test under `web/static/webclient/js/tests/` asserts the legend text (verified by
+  grep). Also add a fast component-level assertion that `.action-dock__description` (visually
+  hidden, `aria-hidden`) and `.dock-tab-bar__hint` (the single visible copy) are never both
+  visible at once, plus a check that the tab-bar's rendered `<path>` carries the reference's
+  per-key `stroke-linecap`/`stroke-linejoin` attributes.
 - **BREAKING**: none. No prop, event, DOM id, `data-testid`, dispatch, or protocol contract changes; the
   visible legend text and the tab icons are the only observable differences, and both are presentation
   content already scoped as "not story content."
@@ -114,9 +118,14 @@ None.
   description div; the panel's `background`/`box-shadow`), `web/webclient-app/components/DockTabBar.vue`
   (reworded hint string; `stroke-linecap`/`stroke-linejoin` on the tab icon), `web/webclient-app/components/dock-icons.js`
   (glyph path table for the redesign-matched keys).
-- **Tests**: `web/static/webclient/js/tests/*.test.js` (update the literal legend-text assertion),
-  a new Vitest/component check that the two legend elements are never both visible, and a Storybook
-  visual diff (`Action/ActionDock`, `Action/DockTabBar` stories) confirming the new icon shapes render.
+- **Tests**: `web/webclient-app/tests/action/action_dock.test.js` (four literal legend-text assertions
+  reworded, plus a new component check that the hidden description and the visible tab-bar hint are
+  never both visible, and that the tab icon `<path>` carries the reference's per-key stroke
+  attributes), a new `web/webclient-app/tests/action/dock_icons.test.js` (literal `d` strings for the
+  ten replaced keys, `glyphAttrs` per key, and the unchanged-key regression check),
+  `web/tests/browser/test_browser_shell.py` (the `"/ 開啟指令"` keyword replaced by
+  `"/ 聚焦指令列"`), and the `Action/ActionDock` / `Action/DockTabBar` Storybook stories confirming
+  the new icon shapes render.
 - **Docs**: none — no capability-spec precedence or roadmap document changes; this is a same-tier fix
   against already-`Done` HUD-redesign waves, matching the `fix-webclient-hud-integration-gaps` precedent.
 - **No protocol, read-model, dispatch, or component-inventory changes.** `component-manifest.json` stays
