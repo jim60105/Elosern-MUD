@@ -157,4 +157,28 @@ describe("SkillBook (B3 data family)", () => {
     expect(rows).toHaveLength(3);
     expect(rows.map((r) => r.text())).toEqual(["強化身體", "防衛本能", "精靈長壽"]);
   });
+
+  it("renders the combat pill only for rows whose usable_out_of_combat is true", () => {
+    const w = mountBook();
+    // The only fixture row carrying the field renders the pill.
+    const firebolt = w.find('[data-testid="skill-book__skill"][data-key="firebolt"]');
+    const pill = firebolt.find('[data-testid="skill-book__ooc"]');
+    expect(pill.exists()).toBe(true);
+    expect(pill.text()).toBe("combat");
+
+    // Every other active row lacks the field, so the pill is absent.
+    for (const key of ["fireball", "firestorm", "mend_glow", "basic_attack", "light_blade", "flee", "legacy_stance"]) {
+      const row = w.find(`[data-testid="skill-book__skill"][data-key="${key}"]`);
+      expect(row.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
+    }
+
+    // The unregistered-key fallback row carries no detail fields at all.
+    const legacy = w.find('[data-testid="skill-book__skill"][data-key="legacy_stance"]');
+    expect(legacy.text()).toBe("legacy_stance");
+  });
+
+  it("renders no combat pill on the passive tab", () => {
+    const w = mountBook({ initialTab: "passive" });
+    expect(w.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
+  });
 });

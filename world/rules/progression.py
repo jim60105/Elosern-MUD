@@ -11,7 +11,7 @@ from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import growth_rate_multiplier
 from world.rules.clock import AdvanceSource
-from world.skills.cost_tiers import spell_tier_for
+from world.skills.cost_tiers import is_freeform_eligible, spell_tier_for
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -340,6 +340,29 @@ def freeform_scales_for(entity: Any, element: str) -> tuple[float, ...]:
     if f"{element}_mastery" in entity.skills.owned_keys():
         return FREEFORM_SCALE_VALUES
     return ()
+
+
+def freeform_scale_entries_for(actor: Any, skill: Any) -> tuple[tuple[float, str, int], ...]:
+    """Return the actor's allowed scale entries for one eligible skill.
+
+    Entries are strictly ascending ``(scale, label, mp_cost)`` where
+    ``mp_cost`` is computed server-side with the shared rounding helper, so
+    the browser never re-implements cost scaling. An ineligible skill or an
+    actor without direct mastery ownership of the skill's element yields an
+    empty tuple, so the panel can omit the field entirely (the freeform
+    feature is invisible to non-masters).
+    """
+    if not is_freeform_eligible(skill) or skill.element is None:
+        return ()
+    allowed = frozenset(freeform_scales_for(actor, skill.element.key))
+    if not allowed:
+        return ()
+    base_mp = int(skill.cost["mp"])
+    return tuple(
+        (scale, label, scaled_mp_cost(base_mp, scale))
+        for scale, label in FREEFORM_CAST_SCALES
+        if scale in allowed
+    )
 
 
 def scale_label_for(scale: float) -> str | None:

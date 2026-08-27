@@ -30,6 +30,7 @@ from world.rules.progression import (
     FREEFORM_CAST_SCALES,
     FREEFORM_SCALE_VALUES,
     _load_freeform_cast_scales,
+    freeform_scale_entries_for,
     freeform_scales_for,
     scale_for_label,
     scale_label_for,
@@ -223,6 +224,67 @@ class FreeformScalesForTests(EvenniaTestCase):
         self.entity.db.skills = {"active": [], "passive": ["not_an_element_mastery"]}
         with self.assertRaises(ValueError):
             freeform_scales_for(self.entity, "not_an_element")
+
+
+class FreeformScaleEntriesForTests(EvenniaTestCase):
+    """The relocated ``freeform_scale_entries_for`` behaves as the old combat-view helper did."""
+
+    def setUp(self):
+        super().setUp()
+        self.entity = _player()
+        self.entity.db.skills = {"active": [], "passive": []}
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_mastery_holder_receives_the_full_entry_set(self):
+        self.entity.db.skills = {
+            "active": ["wind_blade"],
+            "passive": ["wind_mastery"],
+        }
+        skill = SKILL_REGISTRY["wind_blade"]
+        self.assertEqual(
+            freeform_scale_entries_for(self.entity, skill),
+            (
+                (0.25, "1/4", 4),
+                (0.5, "1/2", 7),
+                (1.0, "1", 14),
+                (2.0, "2", 28),
+                (4.0, "4", 56),
+            ),
+        )
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_without_mastery_the_entry_set_is_empty(self):
+        self.entity.db.skills = {"active": ["wind_blade"], "passive": []}
+        skill = SKILL_REGISTRY["wind_blade"]
+        self.assertEqual(freeform_scale_entries_for(self.entity, skill), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_ineligible_skill_yields_an_empty_set(self):
+        self.entity.db.skills = {"active": [], "passive": ["wind_mastery"]}
+        skill = SKILL_REGISTRY["wind_mastery"]
+        self.assertEqual(freeform_scale_entries_for(self.entity, skill), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_entry_mp_costs_match_the_shared_rounding_helper(self):
+        self.entity.db.skills = {
+            "active": ["wind_blade"],
+            "passive": ["wind_mastery"],
+        }
+        skill = SKILL_REGISTRY["wind_blade"]
+        entries = freeform_scale_entries_for(self.entity, skill)
+        base_mp = int(skill.cost["mp"])
+        self.assertEqual(
+            [c for _, _, c in entries],
+            [scaled_mp_cost(base_mp, s) for s, _, _ in entries],
+        )
 
 
 class FreeformResolverGateTests(EvenniaTestCase):

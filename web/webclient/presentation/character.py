@@ -19,6 +19,11 @@ by a dual-direction parity test.
 
 from typing import Any
 
+from web.webclient.presentation.combat_panel import (
+    MAX_COST_KEYS,
+    TARGET_SPECS,
+    validate_freeform_scales,
+)
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -33,6 +38,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.items import ITEM_REGISTRY
+from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_query import (
     CharacterReadModel,
     StatusQueryError,
@@ -40,7 +46,7 @@ from world.rules.status_query import (
     build_character_read_model,
     group_skill_keys,
 )
-from world.skills.registry import SkillCategory
+from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
 CHARACTER_SCHEMA_VERSION = 3
 
@@ -104,7 +110,74 @@ def _validate_passive_row(value: Any) -> dict[str, Any]:
     return {"key": key, "label": label}
 
 
-def _validate_character_skill_group(value: Any) -> dict[str, Any]:
+def _validate_active_skill_row(value: Any) -> dict[str, Any]:
+    """Validate one active skill row of the ``character`` payload.
+
+    The row is the display subset of the ``context_actions`` v5 skill
+    descriptor: the required ``key``/``label`` plus the optional, omittable
+    ``cost`` (a bounded resource-key mapping, validated with the same
+    bounded-identifier-key and non-negative-int checks the combat panel uses),
+    ``target_spec`` (validated against the combat panel's stable values),
+    ``usable_out_of_combat`` (a boolean the character panel serves for the
+    first time), and ``freeform_scales`` (validated by the combat panel's
+    shared ``validate_freeform_scales``). A skill without an ``mp`` cost can
+    never carry ``freeform_scales``.
+    """
+    _require_exact_fields(
+        value,
+        "active skill row",
+        {"key", "label"},
+        {
+            "cost": "optional",
+            "target_spec": "optional",
+            "usable_out_of_combat": "optional",
+            "freeform_scales": "optional",
+        },
+    )
+    key = _validate_key(value["key"], "active key")
+    label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise ProtocolValidationError("active skill label must be non-empty")
+    cost = value.get("cost")
+    if "cost" in value and cost is None:
+        raise ProtocolValidationError("skill cost must be a bounded object")
+    if cost is not None:
+        if not isinstance(cost, dict) or len(cost) > MAX_COST_KEYS:
+            raise ProtocolValidationError("skill cost must be a bounded object")
+        for resource, amount in cost.items():
+            _validate_identifier(resource, "cost resource key")
+            if isinstance(amount, bool) or not isinstance(amount, int):
+                raise ProtocolValidationError("skill cost amount must be an integer")
+            if amount < 0 or amount > MAX_SAFE_INTEGER:
+                raise ProtocolValidationError("skill cost amount is out of bounds")
+    target_spec = value.get("target_spec")
+    if "target_spec" in value and target_spec is None:
+        raise ProtocolValidationError("skill target_spec is not a stable value")
+    if target_spec is not None and target_spec not in TARGET_SPECS:
+        raise ProtocolValidationError("skill target_spec is not a stable value")
+    usable_out_of_combat = value.get("usable_out_of_combat")
+    if "usable_out_of_combat" in value and usable_out_of_combat is None:
+        raise ProtocolValidationError("skill usable_out_of_combat must be a boolean")
+    if usable_out_of_combat is not None and not isinstance(usable_out_of_combat, bool):
+        raise ProtocolValidationError("skill usable_out_of_combat must be a boolean")
+    raw_mp = cost.get("mp") if isinstance(cost, dict) else None
+    base_mp = raw_mp if isinstance(raw_mp, int) and not isinstance(raw_mp, bool) else None
+    scales = validate_freeform_scales(value.get("freeform_scales"), base_mp)
+    row = {"key": key, "label": label}
+    if cost is not None:
+        row["cost"] = dict(cost)
+    if target_spec is not None:
+        row["target_spec"] = target_spec
+    if usable_out_of_combat is not None:
+        row["usable_out_of_combat"] = usable_out_of_combat
+    if scales:
+        row["freeform_scales"] = scales
+    return row
+
+
+def _validate_character_skill_group(
+    value: Any, row_validator: Any = _validate_passive_row
+) -> dict[str, Any]:
     """Validate one ``{group, label, skills}`` sub-group of a category group."""
     _require_exact_fields(value, "skill group", {"group", "label", "skills"}, {})
     group = value["group"]
@@ -124,11 +197,13 @@ def _validate_character_skill_group(value: Any) -> dict[str, Any]:
     skills = value["skills"]
     if not isinstance(skills, list):
         raise ProtocolValidationError("skills must be a list")
-    skills = [_validate_passive_row(row) for row in skills]
+    skills = [row_validator(row) for row in skills]
     return {"group": group, "label": label, "skills": skills}
 
 
-def _validate_character_category_group(value: Any) -> dict[str, Any]:
+def _validate_character_category_group(
+    value: Any, row_validator: Any = _validate_passive_row
+) -> dict[str, Any]:
     """Validate one ``{category, label, groups}`` category-group entry."""
     _require_exact_fields(value, "category group", {"category", "label", "groups"}, {})
     category = _validate_key(value["category"], "category key")
@@ -140,7 +215,9 @@ def _validate_character_category_group(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError(
             "a category group must carry a non-empty groups list"
         )
-    groups = [_validate_character_skill_group(group) for group in groups]
+    groups = [
+        _validate_character_skill_group(group, row_validator) for group in groups
+    ]
     return {"category": category, "label": label, "groups": groups}
 
 
@@ -272,7 +349,9 @@ def validate_character(payload: Any) -> dict[str, Any]:
         raise CharacterPanelError(
             f"actives must be a list of at most {MAX_CATEGORY_GROUPS} category groups"
         )
-    actives = [_validate_character_category_group(row) for row in actives]
+    actives = [
+        _validate_character_category_group(row, _validate_active_skill_row) for row in actives
+    ]
     if _flattened_skill_count(actives) > MAX_ACTIVE_ROWS:
         raise CharacterPanelError(
             f"actives must contain at most {MAX_ACTIVE_ROWS} skill rows in total"
@@ -283,7 +362,9 @@ def validate_character(payload: Any) -> dict[str, Any]:
         raise CharacterPanelError(
             f"passives must be a list of at most {MAX_CATEGORY_GROUPS} category groups"
         )
-    passives = [_validate_character_category_group(row) for row in passives]
+    passives = [
+        _validate_character_category_group(row, _validate_passive_row) for row in passives
+    ]
     if _flattened_skill_count(passives) > MAX_PASSIVE_ROWS:
         raise CharacterPanelError(
             f"passives must contain at most {MAX_PASSIVE_ROWS} skill rows in total"
@@ -347,7 +428,7 @@ def _in_exploration_mode(actor: Any) -> bool:
     return True
 
 
-def _serialize_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:
+def _serialize_passive_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:
     """Serialize grouped skill keys into the payload's ``{category, groups}`` shape."""
     return [
         {
@@ -369,7 +450,55 @@ def _serialize_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:
     ]
 
 
-def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, Any]:
+def _active_skill_row(row: Any, actor: Any) -> dict[str, Any]:
+    """Build one active skill row, enriching registry-resolvable keys.
+
+    A key the ``SKILL_REGISTRY`` cannot resolve keeps the bare ``{key,
+    label}`` shape (the unregistered-key fallback); a resolvable key gains
+    the registry-backed ``cost``, ``target_spec``, ``usable_out_of_combat``,
+    and — for a freeform-eligible skill the actor has mastery to scale —
+    ``freeform_scales``.
+    """
+    skill = SKILL_REGISTRY.get(row.key)
+    entry = {"key": row.key, "label": row.label}
+    if skill is None:
+        return entry
+    entry["cost"] = dict(skill.cost)
+    entry["target_spec"] = skill.target_spec.value
+    entry["usable_out_of_combat"] = skill.usable_out_of_combat
+    scales = freeform_scale_entries_for(actor, skill)
+    if scales:
+        entry["freeform_scales"] = [
+            {"scale": s, "label": l, "mp_cost": c} for s, l, c in scales
+        ]
+    return entry
+
+
+def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[dict[str, Any]]:
+    """Serialize grouped active skill keys, enriched per row via the registry."""
+    return [
+        {
+            "category": category.category,
+            "label": category.label,
+            "groups": [
+                {
+                    "group": group.group,
+                    "label": group.label,
+                    "skills": [
+                        _active_skill_row(row, actor)
+                        for row in group.skills
+                    ],
+                }
+                for group in category.groups
+            ],
+        }
+        for category in group_skill_keys(keys)
+    ]
+
+
+def _serialize(
+    model: CharacterReadModel, background: str | None, actor: Any
+) -> dict[str, Any]:
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
     return {
         "schema_version": CHARACTER_SCHEMA_VERSION,
@@ -379,8 +508,8 @@ def _serialize(model: CharacterReadModel, background: str | None) -> dict[str, A
             {"key": view.key, "label": _trait_label(view.key), "current": view.current, "max": view.maximum}
             for view in model.traits
         ],
-        "actives": _serialize_skill_groups(model.active_keys),
-        "passives": _serialize_skill_groups(model.passive_keys),
+        "actives": _serialize_active_skill_groups(model.active_keys, actor),
+        "passives": _serialize_passive_skill_groups(model.passive_keys),
         "equipment": [
             {
                 "slot": view.slot,
@@ -417,7 +546,7 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         background = None
     if background is not None and not background.strip():
         background = None
-    return validate_character(_serialize(model, background))
+    return validate_character(_serialize(model, background, actor))
 
 
 __all__ = [

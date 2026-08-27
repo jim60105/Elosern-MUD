@@ -86,6 +86,40 @@ def _flattened_keys(category_groups):
     ]
 
 
+def _skill_categories_enriched(keys, category="elemental_magic", label="元素魔法", group="fire", group_label="火"):
+    """One valid category group carrying registry-backed detail on every row."""
+    scales = [
+        {"scale": 0.25, "label": "1/4", "mp_cost": 4},
+        {"scale": 0.5, "label": "1/2", "mp_cost": 7},
+        {"scale": 1, "label": "1", "mp_cost": 14},
+        {"scale": 2, "label": "2", "mp_cost": 28},
+        {"scale": 4, "label": "4", "mp_cost": 56},
+    ]
+    return [
+        {
+            "category": category,
+            "label": label,
+            "groups": [
+                {
+                    "group": group,
+                    "label": group_label,
+                    "skills": [
+                        {
+                            "key": key,
+                            "label": key,
+                            "cost": {"mp": 14},
+                            "target_spec": "single",
+                            "usable_out_of_combat": True,
+                            "freeform_scales": scales,
+                        }
+                        for key in keys
+                    ],
+                }
+            ],
+        }
+    ]
+
+
 def _valid_panel(**overrides):
     value = {
         "schema_version": 3,
@@ -472,6 +506,82 @@ class CharacterSchemaTests(unittest.TestCase):
         with self.assertRaises(CharacterPanelError):
             validate_character(payload)
 
+    def test_active_row_with_registry_backed_detail_fields_validates(self):
+        normalized = validate_character(_valid_panel(actives=_skill_categories_enriched(["fire_ball"])))
+        row = normalized["actives"][0]["groups"][0]["skills"][0]
+        self.assertEqual(row["cost"], {"mp": 14})
+        self.assertEqual(row["target_spec"], "single")
+        self.assertIs(row["usable_out_of_combat"], True)
+        self.assertEqual(len(row["freeform_scales"]), 5)
+
+    def test_active_row_detail_fields_are_omittable(self):
+        normalized = validate_character(_valid_panel(actives=_skill_categories(["fire_ball"])))
+        row = normalized["actives"][0]["groups"][0]["skills"][0]
+        self.assertEqual(set(row), {"key", "label"})
+
+    def test_active_row_rejects_malformed_detail_fields(self):
+        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload["actives"][0]["groups"][0]["skills"][0]["shorthands"] = ["all"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(payload)
+        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload["actives"][0]["groups"][0]["skills"][0]["target_spec"] = "wild"
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(payload)
+        payload = _valid_panel(actives=_skill_categories(["fire_ball"]))
+        payload["actives"][0]["groups"][0]["skills"][0]["usable_out_of_combat"] = "yes"
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(payload)
+
+    def test_freeform_scales_without_an_mp_cost_fails_closed(self):
+        # The empty cost object (the free form) and a zero mp cost both fail
+        # closed when freeform_scales is present.
+        for mp_value in (None, 0):
+            with self.subTest(mp_value=mp_value):
+                payload = _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+                cost = {} if mp_value is None else {"mp": mp_value}
+                payload["actives"][0]["groups"][0]["skills"][0]["cost"] = cost
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(payload)
+
+    def test_explicit_null_detail_fields_are_rejected(self):
+        # The JS mirror rejects present-but-null optional fields; Python must
+        # agree (schema parity, fix-webclient-skillbook-descriptor-data).
+        for null_field in ("cost", "target_spec", "usable_out_of_combat"):
+            with self.subTest(null_field=null_field):
+                candidate = _valid_panel(actives=_skill_categories(["fire_ball"]))
+                candidate["actives"][0]["groups"][0]["skills"][0][null_field] = None
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(candidate)
+        # A null freeform_scales is accepted and the field is omitted.
+        normalized = validate_character(
+            _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+        )
+        row = normalized["actives"][0]["groups"][0]["skills"][0]
+        self.assertEqual(
+            row["freeform_scales"],
+            [
+                {"scale": 0.25, "label": "1/4", "mp_cost": 4},
+                {"scale": 0.5, "label": "1/2", "mp_cost": 7},
+                {"scale": 1, "label": "1", "mp_cost": 14},
+                {"scale": 2, "label": "2", "mp_cost": 28},
+                {"scale": 4, "label": "4", "mp_cost": 56},
+            ],
+        )
+        null_scales = _valid_panel(actives=_skill_categories_enriched(["fire_ball"]))
+        null_scales["actives"][0]["groups"][0]["skills"][0]["freeform_scales"] = None
+        normalized = validate_character(null_scales)
+        self.assertNotIn("freeform_scales", normalized["actives"][0]["groups"][0]["skills"][0])
+
+    def test_worst_case_active_rows_with_detail_fields_fit_the_envelope(self):
+        # Every one of the 32 active rows carries cost + target_spec +
+        # usable_out_of_combat + the full five-entry freeform_scales set.
+        actives = _skill_categories_enriched([f"active_{i}" for i in range(MAX_ACTIVE_ROWS)])
+        payload = _valid_panel(actives=actives)
+        normalized = validate_character(payload)
+        self.assertLessEqual(json_byte_size(normalized), MAX_CANONICAL_JSON_BYTES)
+        self.assertEqual(_flattened_keys(normalized["actives"]), _flattened_keys(actives))
+
 
 class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
@@ -683,6 +793,61 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             payload = self._render()
         self.assertFalse(payload["available"])
         self.assertNotIn("traits", payload)
+
+    @covers_requirement(
+        "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"
+    )
+    def test_active_skill_rows_are_enriched_by_the_registry(self):
+        payload = self._render()
+        row = next(
+            r
+            for c in payload["actives"]
+            for g in c["groups"]
+            for r in g["skills"]
+            if r["key"] == "fire_ball"
+        )
+        self.assertEqual(row["cost"], {"mp": 14})
+        self.assertEqual(row["target_spec"], "single")
+        self.assertIs(row["usable_out_of_combat"], False)
+        self.assertNotIn("freeform_scales", row)
+        # Passive rows stay bare {key, label}.
+        for c in payload["passives"]:
+            for g in c["groups"]:
+                for r in g["skills"]:
+                    self.assertEqual(set(r), {"key", "label"})
+
+    @covers_requirement(
+        "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"
+    )
+    def test_freeform_scales_populated_for_mastery_holder(self):
+        self.player.db.skills = {
+            "active": ["fire_ball"],
+            "passive": ["defense_instinct", "fire_mastery"],
+        }
+        payload = self._render()
+        row = next(
+            r
+            for c in payload["actives"]
+            for g in c["groups"]
+            for r in g["skills"]
+            if r["key"] == "fire_ball"
+        )
+        self.assertEqual(
+            [entry["mp_cost"] for entry in row["freeform_scales"]],
+            [4, 7, 14, 28, 56],
+        )
+
+    @covers_requirement(
+        "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"
+    )
+    def test_unregistered_active_key_stays_bare_in_presenter(self):
+        self.player.db.skills = {"active": ["no_such_skill"], "passive": []}
+        payload = self._render()
+        fallback = next(c for c in payload["actives"] if c["category"] == "unknown")
+        self.assertEqual(
+            fallback["groups"][0]["skills"][0],
+            {"key": "no_such_skill", "label": "no_such_skill"},
+        )
 
 
 if __name__ == "__main__":

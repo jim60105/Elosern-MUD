@@ -359,6 +359,7 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "火矢",
               cost: { mp: 10 },
               target_spec: "single",
+              usable_out_of_combat: true,
             },
             {
               key: "fireball",

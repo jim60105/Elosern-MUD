@@ -3579,3 +3579,165 @@ test("character panel v3 persona.background round-trips bounded text", () => {
     /exceeds/
   );
 });
+
+// ---------------------------------------------------------------------------
+// character panel v3 active skill row descriptor detail (fix-webclient-
+// skillbook-descriptor-data)
+// ---------------------------------------------------------------------------
+
+function enrichedActiveRow(key, label) {
+  // Matches what Python's _serialize_active_skill_groups emits for a
+  // registry-resolvable active skill row.
+  return {
+    key: key,
+    label: label,
+    cost: { mp: 14 },
+    target_spec: "single",
+    usable_out_of_combat: true,
+    freeform_scales: [
+      { scale: 0.25, label: "1/4", mp_cost: 4 },
+      { scale: 0.5, label: "1/2", mp_cost: 7 },
+      { scale: 1, label: "1", mp_cost: 14 },
+      { scale: 2, label: "2", mp_cost: 28 },
+      { scale: 4, label: "4", mp_cost: 56 },
+    ],
+  };
+}
+
+test("character active skill rows accept the registry-backed descriptor subset", () => {
+  // A Python-serialized enriched active row validates, and a bare
+  // {key, label} row (the unregistered-key fallback shape) still validates.
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterActiveSkillRow(enrichedActiveRow("fire_ball", "火球術"))
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterActiveSkillRow({ key: "no_such_skill", label: "no_such_skill" })
+  );
+  // Malformed detail fields fail closed.
+  assert.throws(() =>
+    Protocol.validateCharacterActiveSkillRow(
+      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { target_spec: "wild" })
+    ),
+    /target_spec/
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterActiveSkillRow(
+      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { usable_out_of_combat: "yes" })
+    ),
+    /boolean/
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterActiveSkillRow(
+      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { cost: { mp: -1 } })
+    ),
+    /within/
+  );
+});
+
+test("character panel wires active and passive rows through their distinct validators", () => {
+  // The live-client regression guard: a full character payload carrying an
+  // enriched active row and a bare passive row must pass validateCharacterPanel.
+  const payload = validCharacterPanel({
+    actives: [
+      {
+        category: "elemental_magic",
+        label: "元素魔法",
+        groups: [
+          {
+            group: "fire",
+            label: "火",
+            skills: [enrichedActiveRow("fire_ball", "火球術")],
+          },
+        ],
+      },
+    ],
+  });
+  const validated = Protocol.validateCharacterPanel(payload);
+  assert.deepEqual(validated.actives[0].groups[0].skills[0].cost, { mp: 14 });
+  assert.equal(validated.actives[0].groups[0].skills[0].usable_out_of_combat, true);
+  assert.equal(validated.actives[0].groups[0].skills[0].target_spec, "single");
+  assert.equal(validated.actives[0].groups[0].skills[0].freeform_scales.length, 5);
+  assert.deepEqual(validated.passives[0].groups[0].skills[0], {
+    key: "defense_instinct",
+    label: "防禦直覺",
+  });
+  // A freeform_scales entry whose mp_cost does not match the deterministic
+  // scaling of the base cost is rejected.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        actives: [
+          {
+            category: "elemental_magic",
+            label: "元素魔法",
+            groups: [
+              {
+                group: "fire",
+                label: "火",
+                skills: [
+                  Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), {
+                    freeform_scales: [
+                      { scale: 0.25, label: "1/4", mp_cost: 99 },
+                      { scale: 0.5, label: "1/2", mp_cost: 7 },
+                      { scale: 1, label: "1", mp_cost: 14 },
+                      { scale: 2, label: "2", mp_cost: 28 },
+                      { scale: 4, label: "4", mp_cost: 56 },
+                    ],
+                  }),
+                ],
+              },
+            ],
+          },
+        ],
+      })
+    ),
+    /inconsistent/
+  );
+});
+
+test("character active row parity with the Python presenter (nullable fields, mp=0)", () => {
+  // A present-but-null freeform_scales is accepted and omitted from the
+  // normalized row (mirrors Python's field omission).
+  const nullScales = validCharacterPanel({
+    actives: [
+      {
+        category: "elemental_magic",
+        label: "元素魔法",
+        groups: [
+          {
+            group: "fire",
+            label: "火",
+            skills: [Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { freeform_scales: null })],
+          },
+        ],
+      },
+    ],
+  });
+  const validated = Protocol.validateCharacterPanel(nullScales);
+  const row = validated.actives[0].groups[0].skills[0];
+  assert.equal(row.freeform_scales, undefined, "null freeform_scales is omitted");
+  assert.deepEqual(row.cost, { mp: 14 });
+
+  // cost {mp: 0} with freeform_scales present fails closed on both ends.
+  const zeroMp = validCharacterPanel({
+    actives: [
+      {
+        category: "elemental_magic",
+        label: "元素魔法",
+        groups: [
+          {
+            group: "fire",
+            label: "火",
+            skills: [
+              Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { cost: { mp: 0 } }),
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  assert.throws(
+    () => Protocol.validateCharacterPanel(zeroMp),
+    /a skill without an mp cost cannot carry freeform_scales/
+  );
+});

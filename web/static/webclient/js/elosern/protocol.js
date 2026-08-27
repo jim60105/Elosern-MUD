@@ -739,7 +739,19 @@
     return value;
   }
 
-  function validateFreeformScales(value) {
+  function validateFreeformScales(value, baseMp) {
+    if (value === null || value === undefined) {
+      return [];
+    }
+    if (
+      baseMp === null ||
+      baseMp === undefined ||
+      typeof baseMp !== "number" ||
+      !Number.isInteger(baseMp) ||
+      baseMp <= 0
+    ) {
+      throw new Error("a skill without an mp cost cannot carry freeform_scales");
+    }
     if (!Array.isArray(value) || value.length === 0) {
       throw new Error("freeform_scales must be a non-empty array when present");
     }
@@ -756,7 +768,10 @@
       if (label !== FREEFORM_LABELS_ALLOWED[index]) {
         throw new Error("freeform_scales label must be the canonical label of its scale");
       }
-      requireInt(entry.mp_cost, "freeform_scales mp_cost", 1, MAX_SAFE_INTEGER);
+      var mpCost = requireInt(entry.mp_cost, "freeform_scales mp_cost", 1, MAX_SAFE_INTEGER);
+      if (mpCost !== Math.max(1, Math.floor(baseMp * scale + 0.5))) {
+        throw new Error("freeform_scales mp_cost is inconsistent with the scaled base cost");
+      }
     });
     return value;
   }
@@ -834,7 +849,7 @@
       if (typeof value.cost.mp !== "number" || !Number.isInteger(value.cost.mp) || value.cost.mp <= 0) {
         throw new Error("a skill without an mp cost cannot carry freeform_scales");
       }
-      validateFreeformScales(value.freeform_scales);
+      validateFreeformScales(value.freeform_scales, value.cost.mp);
     }
     return value;
   }
@@ -2926,7 +2941,47 @@
     return value;
   }
 
-  function validateCharacterSkillGroup(value) {
+  function validateCharacterActiveSkillRow(value) {
+    requireExactFields(
+      value,
+      "active skill row",
+      ["key", "label"],
+      ["cost", "target_spec", "usable_out_of_combat", "freeform_scales"]
+    );
+    validateCharacterKey(value.key, "active key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("active skill label must be non-empty");
+    }
+    var cost = value.cost;
+    if (cost !== undefined) {
+      if (!isPlainObject(cost) || Object.keys(cost).length > MAX_COST_KEYS) {
+        throw new Error("skill cost must be a bounded object");
+      }
+      Object.keys(cost).forEach(function (resource) {
+        validateIdentifier(resource, "cost resource key");
+        requireInt(cost[resource], "cost amount", 0, MAX_SAFE_INTEGER);
+      });
+    }
+    if (value.target_spec !== undefined && TARGET_SPECS.indexOf(value.target_spec) === -1) {
+      throw new Error("skill target_spec is not a stable value");
+    }
+    if (value.usable_out_of_combat !== undefined && typeof value.usable_out_of_combat !== "boolean") {
+      throw new Error("skill usable_out_of_combat must be a boolean");
+    }
+    var baseMp =
+      isPlainObject(cost) && Number.isInteger(cost.mp) && cost.mp > 0 ? cost.mp : null;
+    if (value.freeform_scales !== undefined) {
+      validateFreeformScales(value.freeform_scales, baseMp);
+    }
+    // Python omits the field when it is null; normalize identically.
+    if (value.freeform_scales === null) {
+      delete value.freeform_scales;
+    }
+    return value;
+  }
+
+  function validateCharacterSkillGroup(value, rowValidator) {
     requireExactFields(value, "skill group", ["group", "label", "skills"], []);
     if (value.group !== null) {
       var group = requireString(value.group, "group", CHARACTER_MAX_KEY);
@@ -2946,11 +3001,11 @@
     if (!Array.isArray(value.skills)) {
       throw new Error("skills must be a list");
     }
-    value.skills.forEach(validateCharacterPassiveRow);
+    value.skills.forEach(rowValidator || validateCharacterPassiveRow);
     return value;
   }
 
-  function validateCharacterCategoryGroup(value) {
+  function validateCharacterCategoryGroup(value, rowValidator) {
     requireExactFields(value, "category group", ["category", "label", "groups"], []);
     validateCharacterKey(value.category, "category key");
     var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
@@ -2960,7 +3015,9 @@
     if (!Array.isArray(value.groups) || value.groups.length === 0) {
       throw new Error("a category group must carry a non-empty groups list");
     }
-    value.groups.forEach(validateCharacterSkillGroup);
+    value.groups.forEach(function (group) {
+      validateCharacterSkillGroup(group, rowValidator);
+    });
     return value;
   }
 
@@ -3073,7 +3130,9 @@
         "actives must be a list of at most " + CHARACTER_MAX_CATEGORY_GROUPS + " category groups"
       );
     }
-    payload.actives.forEach(validateCharacterCategoryGroup);
+    payload.actives.forEach(function (group) {
+      validateCharacterCategoryGroup(group, validateCharacterActiveSkillRow);
+    });
     if (characterFlattenedSkillCount(payload.actives) > CHARACTER_MAX_ACTIVE_ROWS) {
       throw new Error(
         "actives must contain at most " + CHARACTER_MAX_ACTIVE_ROWS + " skill rows in total"
@@ -3084,7 +3143,9 @@
         "passives must be a list of at most " + CHARACTER_MAX_CATEGORY_GROUPS + " category groups"
       );
     }
-    payload.passives.forEach(validateCharacterCategoryGroup);
+    payload.passives.forEach(function (group) {
+      validateCharacterCategoryGroup(group, validateCharacterPassiveRow);
+    });
     if (characterFlattenedSkillCount(payload.passives) > CHARACTER_MAX_PASSIVE_ROWS) {
       throw new Error(
         "passives must contain at most " + CHARACTER_MAX_PASSIVE_ROWS + " skill rows in total"
@@ -3623,6 +3684,7 @@
     validateArtPanel: validateArtPanel,
     validateExplorationPanel: validateExplorationPanel,
     validateCharacterPanel: validateCharacterPanel,
+    validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
     validateContextActionsPanel: validateContextActionsPanel,
     validateSuggestions: validateSuggestions,
     validateSuggestionCard: validateSuggestionCard,
