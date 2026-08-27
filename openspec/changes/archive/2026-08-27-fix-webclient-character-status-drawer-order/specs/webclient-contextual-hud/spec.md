@@ -42,6 +42,10 @@ section (`guild_merit`), so each quantity the drawer presents appears in exactly
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
 - **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, equipment, guild, wallet and persona sections with the registry-owned reason
 
+#### Scenario: Character-backed sections are marked, not hidden
+- **WHEN** the `character` panel is unavailable (outside exploration mode)
+- **THEN** each character-backed section (trait, equipment, guild counters, disguise, wallet, persona) still renders its labelled small-caps heading and shows the registry-owned reason in place of value rows, and the wallet line renders no balance at all and no zero
+
 #### Scenario: Conditions are never colour-only
 - **WHEN** the condition roster renders a committed condition
 - **THEN** it pairs a non-colour severity glyph with the condition's label and every numeric or derived-modifier value the payload provides

@@ -45,8 +45,8 @@ const resources = computed(() => props.status?.resources ?? null);
 // yield a null ratio (no value is invented); a non-positive maximum yields 0.
 const VITALS = [
   { key: "hp", label: "生命" },
-  { key: "mp", label: "氣力" },
-  { key: "sp", label: "精力" },
+  { key: "mp", label: "魔力" },
+  { key: "sp", label: "耐力" },
 ];
 
 function gaugeRatioPct(gauge) {
@@ -80,6 +80,23 @@ const characterAvailable = computed(() => props.character?.available !== false);
 const characterReason = computed(() => (characterAvailable.value ? null : (props.character?.reason ?? null)));
 
 const traits = computed(() => (characterAvailable.value && Array.isArray(props.character?.traits) ? props.character.traits : []));
+
+// The 設計稿's #dr-status 屬性 section shows only the four true-attribute
+// rows. The gauge (hp/mp/sp) and counter (guild_merit) values are already
+// owned by the 生命量 and 計數・公會 sections, so the 屬性 section filters
+// to an allowlist (fails closed: a new server trait key renders nowhere
+// until reviewed in) rather than rendering every trait row.
+const ATTRIBUTE_KEYS = ["atk_phys", "agility", "defense", "magic_level"];
+
+const attributeRows = computed(() => {
+  const byKey = new Map(traits.value.map((row) => [row.key, row]));
+  return ATTRIBUTE_KEYS.map((key) => byKey.get(key)).filter(Boolean);
+});
+
+// Client-side display override: the 設計稿 abbreviates `magic_level` to 魔階
+// inside #dr-status; the server's shared TRAIT_LABELS (魔法階級) is preserved
+// for every other consumer (e.g., the disguise displayed rows).
+const TRAIT_LABEL_OVERRIDES = { magic_level: "魔階" };
 
 function traitValue(row) {
   return row.max === null ? String(row.current) : `${row.current} / ${row.max}`;
@@ -161,7 +178,78 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
       </div>
     </section>
 
-    <!-- The full condition roster (no cap, unlike H2's island). -->
+    <!-- The character body (task 5.3): the character-backed sections. When the
+         panel is unavailable, the registry-owned reason is shown and nothing
+         is fabricated. -->
+    <p
+      v-if="!characterAvailable && characterReason"
+      class="character-status-drawer__unavailable"
+      data-testid="character-status-drawer__unavailable"
+      :data-reason-code="characterReason.code"
+    >
+      {{ characterReason.message }}
+    </p>
+
+    <!-- The 屬性 section shell stays visible in every mode: when the
+         `character` panel is unavailable, the section shows the registry-
+         owned reason in place of value rows — never hidden, never inventing. -->
+    <section class="character-status-drawer__section" data-testid="character-status-drawer__traits" aria-label="屬性">
+      <p class="character-status-drawer__section-label">屬性</p>
+      <div v-if="characterAvailable" class="character-status-drawer__statgrid">
+        <div
+          v-for="row in attributeRows"
+          :key="row.key"
+          class="character-status-drawer__statrow"
+          :data-testid="`character-status-drawer__trait--${row.key}`"
+        >
+          <span class="character-status-drawer__statrow-key">{{ TRAIT_LABEL_OVERRIDES[row.key] ?? row.label }}</span>
+          <span class="character-status-drawer__statrow-value">{{ traitValue(row) }}</span>
+        </div>
+      </div>
+      <p
+        v-else
+        class="character-status-drawer__section-reason"
+        data-testid="character-status-drawer__traits-unavailable"
+        :data-reason-code="characterReason?.code"
+      >
+        {{ characterReason?.message }}
+      </p>
+    </section>
+
+    <!-- H4 (task 6.3): the equipment doll replaces the old flat equipment
+         list — the named 主手/副手/盔甲 boxes, the accessory group, and the
+         labelled passthrough row for other server-authored slot keys. The
+         doll renders its own registry-owned reason line when the panel is
+         unavailable, so it mounts in every mode. -->
+    <EquipmentDoll :character="character" />
+
+    <section class="character-status-drawer__section" data-testid="character-status-drawer__guild" aria-label="公會">
+      <p class="character-status-drawer__section-label">計數 · 公會</p>
+      <div v-if="characterAvailable" class="character-status-drawer__statgrid">
+        <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-rank">
+          <span class="character-status-drawer__statrow-key">公會階級</span>
+          <span class="character-status-drawer__statrow-value">{{ guild?.rank ?? "未加入公會" }}</span>
+        </div>
+        <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-merit">
+          <span class="character-status-drawer__statrow-key">功績</span>
+          <span class="character-status-drawer__statrow-value">{{ guild?.merit ?? 0 }}</span>
+        </div>
+      </div>
+      <p
+        v-else
+        class="character-status-drawer__section-reason"
+        data-testid="character-status-drawer__guild-unavailable"
+        :data-reason-code="characterReason?.code"
+      >
+        {{ characterReason?.message }}
+      </p>
+    </section>
+
+    <!-- The full condition roster (no cap, unlike H2's island). The status
+         panel is available in every mode, so the roster renders even when the
+         character panel is unavailable; the 設計稿 order is 計數・公會 →
+         條件/修正 → 偽裝, so this section is placed between the two
+         character-backed blocks. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__conditions" aria-label="狀態">
       <p class="character-status-drawer__section-label">狀態</p>
       <p v-if="conditions.length === 0" class="character-status-drawer__empty" data-testid="character-status-drawer__conditions-empty">
@@ -202,42 +290,12 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
       </div>
     </section>
 
-    <!-- The character body (task 5.3): the character-backed sections. When the
-         panel is unavailable, the registry-owned reason is shown and nothing
-         is fabricated. -->
-    <p
-      v-if="!characterAvailable && characterReason"
-      class="character-status-drawer__unavailable"
-      data-testid="character-status-drawer__unavailable"
-      :data-reason-code="characterReason.code"
-    >
-      {{ characterReason.message }}
-    </p>
-
-    <template v-if="characterAvailable">
-      <section class="character-status-drawer__section" data-testid="character-status-drawer__traits" aria-label="屬性">
-        <p class="character-status-drawer__section-label">屬性</p>
-        <div class="character-status-drawer__statgrid">
-          <div
-            v-for="row in traits"
-            :key="row.key"
-            class="character-status-drawer__statrow"
-            :data-testid="`character-status-drawer__trait--${row.key}`"
-          >
-            <span class="character-status-drawer__statrow-key">{{ row.label }}</span>
-            <span class="character-status-drawer__statrow-value">{{ traitValue(row) }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- H4 (task 6.3): the equipment doll replaces the old flat equipment
-           list — the named 主手/副手/盔甲 boxes, the accessory group, and the
-           labelled passthrough row for other server-authored slot keys. -->
-      <EquipmentDoll :character="character" />
-
-      <!-- The disguise section (task 5.4): 真值 / 顯示 comparison. -->
-      <section class="character-status-drawer__section" data-testid="character-status-drawer__disguise" :data-active="String(disguiseActive)" aria-label="偽裝">
-        <p class="character-status-drawer__section-label">偽裝</p>
+    <!-- The 偽裝 section shell stays visible in every mode: when the
+         `character` panel is unavailable, the section shows the registry-
+         owned reason instead of the 真值 / 顯示 comparison. -->
+    <section class="character-status-drawer__section" data-testid="character-status-drawer__disguise" :data-active="String(disguiseActive)" aria-label="偽裝">
+      <p class="character-status-drawer__section-label">偽裝</p>
+      <template v-if="characterAvailable">
         <template v-if="disguiseActive">
           <p class="character-status-drawer__disguise-description" data-testid="character-status-drawer__disguise-description">
             {{ disguise.description }}
@@ -263,38 +321,53 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
         <p v-else class="character-status-drawer__disguise-inactive" data-testid="character-status-drawer__disguise-inactive">
           目前沒有偽裝狀態。
         </p>
-      </section>
-
-      <section class="character-status-drawer__section" data-testid="character-status-drawer__guild" aria-label="公會">
-        <p class="character-status-drawer__section-label">計數 · 公會</p>
-        <div class="character-status-drawer__statgrid">
-          <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-rank">
-            <span class="character-status-drawer__statrow-key">階級</span>
-            <span class="character-status-drawer__statrow-value">{{ guild?.rank ?? "未加入公會" }}</span>
-          </div>
-          <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-merit">
-            <span class="character-status-drawer__statrow-key">功績</span>
-            <span class="character-status-drawer__statrow-value">{{ guild?.merit ?? 0 }}</span>
-          </div>
-        </div>
-      </section>
-
-      <p class="character-status-drawer__wallet" data-testid="character-status-drawer__wallet">
-        錢包：{{ formatCopper(wallet) }} 銅
-      </p>
-
-      <section
-        v-if="personaBackground"
-        class="character-status-drawer__section"
-        data-testid="character-status-drawer__persona"
-        aria-label="背景"
+      </template>
+      <p
+        v-else
+        class="character-status-drawer__section-reason"
+        data-testid="character-status-drawer__disguise-unavailable"
+        :data-reason-code="characterReason?.code"
       >
-        <p class="character-status-drawer__section-label">背景</p>
-        <p class="character-status-drawer__persona-background" data-testid="character-status-drawer__persona-background">
-          {{ personaBackground }}
-        </p>
-      </section>
-    </template>
+        {{ characterReason?.message }}
+      </p>
+    </section>
+
+    <!-- The wallet renders no balance at all (and no zero) when the panel
+         that carries it is unavailable. -->
+    <p class="character-status-drawer__wallet" data-testid="character-status-drawer__wallet">
+      錢包：<template v-if="characterAvailable">{{ formatCopper(wallet) }} 銅</template>
+    </p>
+    <p
+      v-if="!characterAvailable && characterReason"
+      class="character-status-drawer__section-reason"
+      data-testid="character-status-drawer__wallet-unavailable"
+      :data-reason-code="characterReason.code"
+    >
+      {{ characterReason.message }}
+    </p>
+
+    <!-- The 背景 section shows the committed persona background; when the
+         `character` panel is unavailable the section stays visible and is
+         marked with the registry-owned reason. -->
+    <section
+      v-if="characterAvailable ? !!personaBackground : true"
+      class="character-status-drawer__section"
+      data-testid="character-status-drawer__persona"
+      aria-label="背景"
+    >
+      <p class="character-status-drawer__section-label">背景</p>
+      <p v-if="personaBackground" class="character-status-drawer__persona-background" data-testid="character-status-drawer__persona-background">
+        {{ personaBackground }}
+      </p>
+      <p
+        v-else
+        class="character-status-drawer__section-reason"
+        data-testid="character-status-drawer__persona-unavailable"
+        :data-reason-code="characterReason?.code"
+      >
+        {{ characterReason?.message }}
+      </p>
+    </section>
   </section>
 </template>
 
@@ -465,7 +538,8 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 }
 
 .character-status-drawer__empty,
-.character-status-drawer__unavailable {
+.character-status-drawer__unavailable,
+.character-status-drawer__section-reason {
   margin: 0;
   color: var(--paper-500);
   font-size: 0.85em;

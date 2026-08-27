@@ -544,6 +544,20 @@ class CharacterReadModelTests(EvenniaTestCase):
         )
         self.assertEqual(model.passive_keys, ("defense_instinct",))
 
+    def test_trait_key_union_matches_the_client_attribute_allowlist(self):
+        # Pinned contract: the four true-attribute keys the WebClient's
+        # CharacterStatusDrawer.vue ATTRIBUTE_KEYS allowlist hardcodes
+        # (web/webclient-app/components/CharacterStatusDrawer.vue). If a
+        # fifth key is ever added to _STATIC_KEYS or _COUNTER_KEYS, this
+        # test fails by name and forces a conscious, lockstep update of the
+        # client allowlist rather than a silent gap in the 屬性 section.
+        from world.rules import status_query
+
+        self.assertEqual(
+            tuple(k for k in status_query._STATIC_KEYS + status_query._COUNTER_KEYS if k != "guild_merit"),
+            ("atk_phys", "agility", "defense", "magic_level"),
+        )
+
 
 class GroupSkillKeysTests(unittest.TestCase):
     """Pure grouping tests for the out-of-combat skill taxonomy.
