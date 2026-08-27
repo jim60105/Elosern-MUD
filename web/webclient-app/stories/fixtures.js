@@ -237,12 +237,13 @@ export const STATUS_PANEL_MINIMAL_SAMPLE = {
   combat: null,
 };
 
-// The committed `character` v3 payload for the same actor: all eight trait
+// The committed `character` v4 payload for the same actor: all eight trait
 // rows (gauges carry max, statics/counters carry null max), grouped active
 // and passive skills, equipped items, an active disguise whose displayed
-// values differ from the true traits, guild rank/merit, wallet, and persona.
+// values differ from the true traits, guild rank/merit, wallet, persona,
+// and the populated intimate status (the 設計稿's 親密狀態 values verbatim).
 export const CHARACTER_PANEL_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   kind: "character",
   traits: [
@@ -313,12 +314,20 @@ export const CHARACTER_PANEL_SAMPLE = {
       { key: "magic_level", label: "魔法階級", value: 12 },
     ],
   },
-  guild: { rank: "E", merit: 140 },
-  wallet: 3240,
-  persona: {
-    background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
-  },
-};
+   guild: { rank: "E", merit: 140 },
+   wallet: 3240,
+   persona: {
+     background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
+   },
+   intimate: {
+     arousal: "中等",
+     wetness: "微濕",
+     shame: "輕微",
+     exposure: "低",
+     climax_phase: "未達",
+     climax_today: 2,
+   },
+ };
 
 // The same actor without a disguise, no guild, no persona background — the
 // honest empty-state story (displayed list must be empty, rank → 未加入公會,
@@ -332,6 +341,7 @@ export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   guild: { rank: null, merit: 0 },
   wallet: 0,
   persona: { background: null },
+  intimate: null,
 };
 
 // The character's skill data as the SkillBook consumes it: the character

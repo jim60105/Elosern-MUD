@@ -122,7 +122,7 @@ def _skill_categories_enriched(keys, category="elemental_magic", label="元素�
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "character",
         "traits": [_trait(), _trait(key="atk_phys", label="攻擊", current=5, max=None)],
@@ -139,6 +139,7 @@ def _valid_panel(**overrides):
         "guild": {"rank": None, "merit": 0},
         "wallet": 100,
         "persona": {"background": None},
+        "intimate": None,
     }
     value.update(overrides)
     return value
@@ -361,7 +362,7 @@ class CharacterSchemaTests(unittest.TestCase):
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(schema_version=2))
         with self.assertRaises(CharacterPanelError):
-            validate_character(_valid_panel(schema_version=4))
+            validate_character(_valid_panel(schema_version=3))
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(available=False))
         with self.assertRaises(CharacterPanelError):
@@ -392,6 +393,54 @@ class CharacterSchemaTests(unittest.TestCase):
                     ]
                 )
             )
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    def test_intimate_field_validation(self):
+        # ``intimate: None`` is valid — the section is omitted when the actor has
+        # no sexual-state record.
+        normalized = validate_character(_valid_panel())
+        self.assertIsNone(normalized["intimate"])
+
+        # A populated intimate section is validated against its fixed vocabulary.
+        intimate = {
+            "arousal": "中等",
+            "wetness": "微濕",
+            "shame": "輕微",
+            "exposure": "低",
+            "climax_phase": "未達",
+            "climax_today": 2,
+        }
+        normalized = validate_character(_valid_panel(intimate=intimate))
+        self.assertEqual(normalized["intimate"], intimate)
+
+        # Unknown fields are rejected.
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(intimate={**intimate, "bogus": 1}))
+
+        # Missing fields are rejected.
+        partial = dict(intimate)
+        del partial["climax_phase"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(intimate=partial))
+
+        # A level word that is not a member of the fixed vocabulary is rejected.
+        bad = dict(intimate)
+        bad["arousal"] = "很高"
+        with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(intimate=bad))
+
+        # Non-string level fields are rejected.
+        bad = dict(intimate)
+        bad["wetness"] = 1
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(intimate=bad))
+
+        # ``climax_today`` must be a non-negative integer.
+        for value in (True, -1, "2"):
+            bad = dict(intimate)
+            bad["climax_today"] = value
+            with self.assertRaises(ProtocolValidationError):
+                validate_character(_valid_panel(intimate=bad))
 
     @covers_requirement(
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
@@ -616,7 +665,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -657,9 +706,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, before_wallet)
         self.assertEqual(self.player.db.equipment, before_equipment)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
     @covers_requirement(
-        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel",
+        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel",
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel",
     )
     def test_innate_active_skills_are_visible_for_the_first_time(self):
@@ -697,7 +746,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             ["flee"],
         )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -710,7 +759,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotEqual(atk["current"], 12)
         self.assertEqual(self.player.traits.atk_phys.base, atk["current"])
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -733,7 +782,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["rank"], "F")
         self.assertEqual(payload["guild"]["merit"], 60)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-3-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()

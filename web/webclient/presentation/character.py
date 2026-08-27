@@ -1,4 +1,4 @@
-"""Exact schema-version-3 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-4 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
@@ -8,9 +8,16 @@ and it never substitutes a disguised value for a true trait. Version 2 added
 the display-only ``persona`` section carrying the character's own background
 flavor text; it is never used to infer any mechanical value. Version 3 adds
 the ``actives`` field and regroups both ``actives`` and ``passives`` by the
-skill-category taxonomy, reading owned skills through
-``SkillHandler.owned_keys()`` for the first time — which makes the innate
-``flee`` and ``basic_attack`` skills visible out of combat.
+skill-category taxonomy — which makes the innate
+``flee`` and ``basic_attack`` skills visible out of combat. Version 4 adds the
+nullable ``intimate`` object: the 親密狀態 (intimate status) level words from the
+canonical sexual state (arousal, wetness, shame, exposure, climax phase) plus the
+daily climax count; it is ``null`` when the actor has no sexual-state record at
+all. The skill-ownership read is handler-free: base keys come from the stored
+``entity.db.skills`` lists plus the innate grants, and the unlocked intimate acts
+are computed by ``world.skills.sexual_acts.unlocked_act_keys_for`` from the
+materialized counters (zeros when unmaterialized), so building the panel no longer
+mounts the ``entity.skills`` or ``entity.sexual`` handlers.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -38,6 +45,13 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.items import ITEM_REGISTRY
+from world.lore.sexual_vocab import (
+    AROUSAL_LEVELS,
+    CLIMAX_PHASE_LEVELS,
+    EXPOSURE_LEVELS,
+    SHAME_LEVELS,
+    WETNESS_LEVELS,
+)
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_query import (
     CharacterReadModel,
@@ -48,7 +62,7 @@ from world.rules.status_query import (
 )
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 3
+CHARACTER_SCHEMA_VERSION = 4
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -303,6 +317,61 @@ def _validate_persona(value: Any) -> dict[str, Any]:
     return {"background": text}
 
 
+def _validate_intimate_level(
+    value: Any, field: str, vocabulary: tuple[str, ...]
+) -> str:
+    level = _require_str(value, field, maximum=MAX_LABEL_CODE_POINTS)
+    if level not in vocabulary:
+        raise CharacterPanelError(f"intimate.{field} is not a member of its fixed vocabulary")
+    return level
+
+
+def _validate_intimate(value: Any) -> dict[str, Any] | None:
+    """Validate the nullable ``intimate`` section of the character payload.
+
+    ``None`` is valid (no sexual-state record); otherwise the section carries
+    exactly the six intimate fields, each level field checked against its fixed
+    vocabulary and ``climax_today`` as a non-negative safe integer.
+    """
+    if value is None:
+        return None
+    _require_exact_fields(
+        value,
+        "intimate",
+        {
+            "arousal",
+            "wetness",
+            "shame",
+            "exposure",
+            "climax_phase",
+            "climax_today",
+        },
+        {},
+    )
+    return {
+        "arousal": _validate_intimate_level(value, "arousal", AROUSAL_LEVELS),
+        "wetness": _validate_intimate_level(value, "wetness", WETNESS_LEVELS),
+        "shame": _validate_intimate_level(value, "shame", SHAME_LEVELS),
+        "exposure": _validate_intimate_level(value, "exposure", EXPOSURE_LEVELS),
+        "climax_phase": _validate_intimate_level(value, "climax_phase", CLIMAX_PHASE_LEVELS),
+        "climax_today": _require_int(value, "climax_today", minimum=0, maximum=MAX_SAFE_INTEGER),
+    }
+
+
+def _serialize_intimate(view: Any) -> dict[str, Any] | None:
+    """Serialize the read model's intimate view into the payload section."""
+    if view is None:
+        return None
+    return {
+        "arousal": view.arousal,
+        "wetness": view.wetness,
+        "shame": view.shame,
+        "exposure": view.exposure,
+        "climax_phase": view.climax_phase,
+        "climax_today": view.climax_today,
+    }
+
+
 def validate_character(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``character`` payload.
 
@@ -324,6 +393,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
             "guild",
             "wallet",
             "persona",
+            "intimate",
         },
         {},
     )
@@ -394,6 +464,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
         "guild": guild,
         "wallet": wallet,
         "persona": persona,
+        "intimate": _validate_intimate(payload["intimate"]),
     }
     # Envelope guarantee (design D10): a conforming payload must serialize
     # within the OOB envelope limit; an over-limit payload fails closed.
@@ -529,6 +600,7 @@ def _serialize(
         "guild": {"rank": model.guild_rank, "merit": model.guild_merit},
         "wallet": model.wallet,
         "persona": {"background": background},
+        "intimate": _serialize_intimate(model.intimate),
     }
 
 

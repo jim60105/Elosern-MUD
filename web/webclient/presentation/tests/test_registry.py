@@ -158,9 +158,9 @@ class RegistryTests(unittest.TestCase):
     )
     def test_character_unavailable_payload_stamps_the_registered_version(self):
         registry = build_production_registry()
-        self.assertEqual(registry.spec("character").schema_version, 3)
+        self.assertEqual(registry.spec("character").schema_version, 4)
         payload = registry.build_unavailable("character")
-        self.assertEqual(payload["schema_version"], 3)
+        self.assertEqual(payload["schema_version"], 4)
         self.assertFalse(payload["available"])
         self.assertEqual(payload["reason"]["code"], "character_unavailable")
 

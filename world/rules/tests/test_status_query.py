@@ -1,5 +1,6 @@
 """Frozen no-create status read model tests (foundation section 3.3)."""
 
+from collections.abc import Mapping, Sequence
 import unittest
 from unittest.mock import patch
 
@@ -9,8 +10,16 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from world.lore.sexual_vocab import (
+    AROUSAL_LEVELS,
+    CLIMAX_PHASE_LEVELS,
+    EXPOSURE_LEVELS,
+    SHAME_LEVELS,
+    WETNESS_LEVELS,
+)
 from world.rules.buffs import _add_buff
 from world.rules.combat_session import engage
+from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
 from world.rules.status_query import (
     StatusQueryError,
     build_character_read_model,
@@ -466,6 +475,205 @@ class CharacterReadModelTests(EvenniaTestCase):
             with self.assertRaises(StatusQueryError):
                 self._model()
 
+    def _materialized_sexual_traits(self, pleasure_base=42, climax_today=2):
+        def ordered(key, levels, value):
+            return {
+                "name": key.title(),
+                "trait_type": "ordered_level",
+                "value": value,
+                "levels": list(levels),
+                "min": 0,
+                "max": len(levels) - 1,
+            }
+
+        return {
+            "pleasure": {
+                "name": "Pleasure",
+                "trait_type": "counter",
+                "base": pleasure_base,
+                "min": 0,
+                "max": 100,
+            },
+            "wetness": ordered("wetness", WETNESS_LEVELS, 1),
+            "shame": ordered("shame", SHAME_LEVELS, 1),
+            "exposure": ordered("exposure", EXPOSURE_LEVELS, 1),
+            "climax_phase": ordered("climax_phase", CLIMAX_PHASE_LEVELS, 0),
+            "climax_today": {
+                "name": "Climax Today",
+                "trait_type": "counter",
+                "base": climax_today,
+                "min": 0,
+            },
+            **{
+                key: {
+                    "name": key.title(),
+                    "trait_type": "counter",
+                    "base": 0,
+                    "min": 0,
+                }
+                for key in _LIFETIME_COUNTER_KEYS
+            },
+        }
+
+    def _materialize_sexual_traits(self, data):
+        self.actor.attributes.add("sexual_traits", data, category="traits")
+
+    def test_intimate_view_builds_from_materialized_record(self):
+        self._materialize_sexual_traits(self._materialized_sexual_traits())
+        model = self._model()
+        self.assertEqual(model.intimate.arousal, "中等")
+        self.assertEqual(model.intimate.wetness, "微濕")
+        self.assertEqual(model.intimate.shame, "輕微")
+        self.assertEqual(model.intimate.exposure, "低")
+        self.assertEqual(model.intimate.climax_phase, "未達")
+        self.assertEqual(model.intimate.climax_today, 2)
+
+    def test_intimate_view_resolves_from_baseline_only(self):
+        self.actor.db.sexual = {
+            "arousal": "中等",
+            "wetness": "微濕",
+            "shame": "輕微",
+            "exposure": "低",
+            "climax_phase": "未達",
+            "climax_today": 2,
+            "virgin": False,
+            "sensitivity": {},
+            "experience_types": frozenset(),
+        }
+        model = self._model()
+        self.assertEqual(model.intimate.arousal, "中等")
+        self.assertEqual(model.intimate.climax_today, 2)
+        self.assertIsNone(self.actor.attributes.get("sexual_traits", category="traits"))
+
+    def test_intimate_view_is_none_without_any_record(self):
+        model = self._model()
+        self.assertIsNone(model.intimate)
+
+    def test_partial_materialized_record_fails_closed(self):
+        data = self._materialized_sexual_traits()
+        del data["climax_today"]
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+    def test_malformed_materialized_level_entries_fail_closed(self):
+        # A truncated `levels` list (still non-empty, so the trait
+        # deserializer accepts it) is rejected because it does not match
+        # the field's fixed vocabulary.
+        data = self._materialized_sexual_traits()
+        data["wetness"]["levels"] = list(WETNESS_LEVELS[:2])
+        data["wetness"]["max"] = 1
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits()
+        data["shame"]["levels"] = list(reversed(list(SHAME_LEVELS)))
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits()
+        data["exposure"]["value"] = True
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits()
+        data["climax_phase"]["value"] = 99
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+    def test_malformed_pleasure_counter_fails_closed(self):
+        data = self._materialized_sexual_traits()
+        data["pleasure"] = "junk"
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits()
+        data["pleasure"]["base"] = True
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits(pleasure_base=101)
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        data = self._materialized_sexual_traits(pleasure_base=-3)
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+    def test_malformed_baseline_climax_today_fails_closed(self):
+        baseline = {
+            "arousal": "中等",
+            "wetness": "微濕",
+            "shame": "輕微",
+            "exposure": "低",
+            "climax_phase": "未達",
+            "virgin": False,
+            "sensitivity": {},
+            "experience_types": frozenset(),
+        }
+        for value in (True, -2, "2"):
+            self.actor.db.sexual = {**baseline, "climax_today": value}
+            with self.assertRaises(StatusQueryError):
+                self._model()
+
+    def test_build_model_has_no_attribute_side_effects(self):
+        # The no-create read model must not create, materialize, or rewrite
+        # any Attribute. Snapshots compare the `traits` and `sexual_traits`
+        # attributes before and after the build; nested sequences are
+        # normalized to tuples so the trait deserializer's in-memory
+        # mutations (list-to-tuple) do not mask a genuine rewrite.
+
+        def normalized(value):
+            if isinstance(value, Mapping):
+                return {key: normalized(item) for key, item in value.items()}
+            if isinstance(value, Sequence) and not isinstance(value, str):
+                return tuple(normalized(item) for item in value)
+            return value
+
+        def snapshot():
+            return {
+                "traits": normalized(
+                    self.actor.attributes.get("traits", category="traits")
+                ),
+                "sexual_traits": normalized(
+                    self.actor.attributes.get("sexual_traits", default=None, category="traits")
+                ),
+            }
+
+        before = snapshot()
+        self._model()
+        self.assertEqual(snapshot(), before)
+        self.assertIsNone(snapshot()["sexual_traits"])
+
+        self.actor.db.sexual = {
+            "arousal": "中等",
+            "wetness": "微濕",
+            "shame": "輕微",
+            "exposure": "低",
+            "climax_phase": "未達",
+            "climax_today": 2,
+            "virgin": False,
+            "sensitivity": {},
+            "experience_types": frozenset(),
+        }
+        before = snapshot()
+        self._model()
+        self.assertEqual(snapshot(), before)
+        self.assertIsNone(snapshot()["sexual_traits"])
+
+        self._materialize_sexual_traits(self._materialized_sexual_traits())
+        before = snapshot()
+        self._model()
+        self.assertEqual(snapshot(), before)
+
     def test_fresh_character_active_keys_include_innate_skills(self):
         # Regression for the shipped defect: ``flee`` and ``basic_attack`` are
         # contributed by ``owned_keys()`` and never written into
@@ -480,17 +688,17 @@ class CharacterReadModelTests(EvenniaTestCase):
         self.assertEqual(model.passive_keys, ())
 
     def test_split_reads_keys_contributed_by_the_handler_beyond_storage(self):
-        # Regression guard for the owned_keys() contract: a key contributed by
-        # the handler without being written into db.skills (as the future
-        # unlocked sexual acts will be) must still surface. The patched list
-        # simulates such a handler extension.
+        # Regression guard for the owned-acts contract: a key unlocked by the
+        # sexual state (as the future unlocked sexual acts are) must surface
+        # even though it is never written into db.skills. The patched
+        # unlocked_act_keys_for simulates such a registry extension.
         self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
-        from world.skills.handler import SkillHandler
+        from world.rules import status_query
 
         with patch.object(
-            SkillHandler,
-            "owned_keys",
-            return_value=["fire_ball", "flash_step", "flee", "basic_attack"],
+            status_query,
+            "unlocked_act_keys_for",
+            return_value=frozenset({"flash_step"}),
         ):
             model = self._model()
         self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))

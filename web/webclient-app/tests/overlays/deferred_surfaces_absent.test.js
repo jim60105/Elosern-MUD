@@ -18,11 +18,15 @@ import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE } from "../../stories/fixtures.
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
-// (roadmap §7 — no Party panel, no intimate/adult status collapsible, no
-// full inventory bag, no event-log Toasts) MUST NOT be built or mocked, and
+// (roadmap §7 — no Party panel, no event-log Toasts, no persistent objective
+// tracker, no authored game-help browser) MUST NOT be built or mocked, and
 // the required-component manifest is frozen at the complete set (design D2/D3;
 // the delta spec's "deferred surfaces are absent, not mocked" + "manifest is
-// frozen" scenarios).
+// frozen" scenarios). The intimate/adult status collapsible is NO LONGER
+// deferred: add-webclient-intimate-status-section backed it with the
+// `character` panel's `intimate` field (schema version 4), so it is removed
+// from the deferred-surface list; its presence/absence behaviour is governed
+// by the `webclient-contextual-hud` character-status drawer requirement.
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
 function collectStoryTitles(dir) {
@@ -106,11 +110,6 @@ const DEFERRED_SURFACES = [
     name: "persistent objective tracker",
     waitsOn: "the `objectives` read model (the persistent objectives field)",
     testidPrefixes: ["objective-"],
-  },
-  {
-    name: "intimate/adult status collapsible",
-    waitsOn: "the `intimate` / `adult` status field (no backing read model yet)",
-    testidPrefixes: ["intimate-", "adult-"],
   },
 ];
 

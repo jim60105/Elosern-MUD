@@ -26,7 +26,7 @@ function renderDrawer(args) {
   // rows) for the combat story.
   const character =
     args.combat
-      ? { schema_version: 3, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } }
+      ? { schema_version: 4, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } }
       : args.undisguised
         ? CHARACTER_PANEL_UNDISGUISED_SAMPLE
         : CHARACTER_PANEL_SAMPLE;
@@ -67,4 +67,18 @@ export const Undisguised = {
 export const Combat = {
   render: renderDrawer,
   args: { combat: true },
+};
+
+// The 親密狀態 section states for the add-webclient-intimate-status-section
+// change: a populated `character.intimate` renders the native `<details>`
+// disclosure, collapsed by default and expandable; a null `intimate` renders
+// no section at all (absent from the DOM, not a placeholder).
+export const IntimateCollapsed = {
+  render: renderDrawer,
+  args: {},
+};
+
+export const IntimateAbsent = {
+  render: renderDrawer,
+  args: { undisguised: true },
 };

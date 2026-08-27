@@ -71,6 +71,26 @@ silently showing garbage. `_sexual_level()`'s own body is left unmodified (its e
 tolerant behaviour is unrelated to this change and stays exactly as shipped); the stricter contract is
 enforced entirely at the new call site.
 
+**Fail-closed completeness and strict per-entry validation at the new call site.**
+Once a materialized `sexual_traits` record exists, the record must be *complete*: the
+`pleasure` counter, the four ordered-level fields (`wetness`, `shame`, `exposure`,
+`climax_phase`), and the `climax_today` counter must all be present — a partial
+materialized record is corruption, so it fails the panel closed (`StatusQueryError`),
+never silently falling back to a stale import-time baseline (a partial record mixing
+live materialized values with old baseline values would present a hybrid view). Each
+materialized ordered-level entry is validated strictly at the caller: its `levels` must
+equal the field's fixed vocabulary *exactly* (an empty, truncated, or reordered `levels`
+is rejected even when the currently resolved label still happens to be a vocabulary
+member), and its `value` must be a non-bool in-range ordinal or a vocabulary string —
+a stored `bool` (Python's `isinstance(True, int)` is `True`, so a stray `True`/`False`
+would otherwise be misread as ordinal `1`/`0`) is rejected. The `arousal` field is
+resolved from the materialized `pleasure` counter's strictly validated `base` (a
+non-bool integer within 0..100) through `PLEASURE_CONFIG.ordinal_for`; a corrupted
+persisted `base` is rejected, never clamped in the read model. When no materialized
+record exists, the baseline's level fields must each be a vocabulary string, and its
+`climax_today` is strictly validated: a missing key defaults to `0`, but a present key
+must be a non-bool, non-negative integer.
+
 `climax_today` is a `CounterTrait`, not an `OrderedLevelTrait`, so it needs its own small reader
 following the same shape and the same file's own established counter/gauge-reading precedent: like
 `_require_static_trait`, which reads `raw.get("current", raw.get("base"))` rather than `.base` alone,
