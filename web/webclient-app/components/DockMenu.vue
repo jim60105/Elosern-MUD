@@ -76,6 +76,32 @@ function destinationLabel(item) {
   return node ? node.label : null;
 }
 
+// The fixed client-side direction-glyph table (H3 design D9): a move row's
+// canonical direction resolves to a glyph; a direction string outside the
+// table (named doors, dynamic wilderness gates) resolves to no glyph, and
+// the row keeps its own label as primary text. The table is built on a
+// null prototype so an out-of-table direction can never collide with an
+// inherited `Object.prototype` property name.
+const DIRECTION_GLYPHS = Object.assign(Object.create(null), {
+  north: "↑",
+  south: "↓",
+  east: "→",
+  west: "←",
+  northeast: "↗",
+  northwest: "↖",
+  southeast: "↘",
+  southwest: "↙",
+  up: "↑",
+  down: "↓",
+});
+
+function directionGlyph(direction) {
+  if (direction === null || direction === undefined) {
+    return null;
+  }
+  return DIRECTION_GLYPHS[direction] ?? null;
+}
+
 function onCellFocus(key) {
   emit("focus-change", key);
 }
@@ -157,9 +183,11 @@ watch(
       :style="gridCols ? { 'grid-template-columns': 'repeat(' + gridCols + ', 1fr)' } : {}"
       v-bind="depth >= 2 ? { 'data-testid': 'dock-menu' } : {}"
     >
-      <!-- OUTLET: exit tiles — direction glyph, destination name, no
-           sub-line when the destination is not in the committed lattice
-           (task 5.4). -->
+      <!-- OUTLET: exit tiles — one direction glyph plus a single bold
+           headline (task 5.4, outlet-tile-presentation): the destination's
+           display name when enabled + canonical + known destination, else
+           the exit's own label (it carries the （無法通行） suffix on
+           disabled rows — the only visible disabled marker). -->
       <div v-if="paneKind === 'outlet'" class="dock-menu__outlet" :style="paneGridStyle">
         <button
           v-for="row in outletRows"
@@ -167,17 +195,25 @@ watch(
           type="button"
           role="option"
           :aria-selected="row.key === focusedKey"
+          :aria-describedby="!row.item.enabled && row.reason ? row.rowId + '-reason' : null"
           class="dock-menu__outlet-tile"
           :class="{ 'dock-menu__outlet-tile--focused': row.key === focusedKey }"
           :data-item-key="row.key"
           tabindex="-1"
           @click="onCellClick(row)"
         >
-          <span v-if="row.item.direction" class="dock-menu__outlet-glyph" aria-hidden="true">
-            {{ { north: "↑", south: "↓", east: "→", west: "←", northeast: "↗", northwest: "↖", southeast: "↘", southwest: "↙", up: "↑", down: "↓" }[row.item.direction] }}
+          <span v-if="directionGlyph(row.item.direction)" class="dock-menu__outlet-glyph" aria-hidden="true">
+            {{ directionGlyph(row.item.direction) }}
           </span>
-          <b>{{ row.item.label }}</b>
-          <small v-if="destinationLabel(row.item)">{{ destinationLabel(row.item) }}</small>
+          <!-- Disabled rows keep their own label (with the `（無法通行）`
+               suffix baked in by moveItems), never the destination name:
+               the label is this row's only visible disabled marker. -->
+          <b>{{ (row.item.enabled && directionGlyph(row.item.direction) && destinationLabel(row.item)) || row.item.label }}</b>
+          <span
+            v-if="!row.item.enabled && row.reason"
+            :id="row.rowId + '-reason'"
+            class="visually-hidden"
+          >{{ row.reason }}</span>
         </button>
       </div>
 
@@ -373,9 +409,13 @@ watch(
       </div>
     </div>
 
-    <!-- The detail pane: names the focused skill/item (tasks 5.8/6.5). -->
+    <!-- The detail pane: names the focused skill/item (tasks 5.8/6.5).
+         The outlet pane's tiles are self-contained, so the aside is
+         suppressed for `paneKind === 'outlet'` — including when a
+         `detailMessage` is set, so the move frame keeps the pane's full
+         width (outlet-tile-presentation). -->
     <aside
-      v-if="((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
+      v-if="paneKind !== 'outlet' && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
       class="dock-detail"
       :data-testid="props.detailTestId"
       tabindex="-1"
@@ -421,8 +461,11 @@ watch(
   outline-offset: 2px;
 }
 
-/* OUTLET (task 5.4): the draft's `.outlet` grid — direction glyph,
-   destination name, no sub-line when the destination is not in the lattice. */
+/* OUTLET (task 5.4 + outlet-tile-presentation): the draft's `.outlet`
+   grid — one direction glyph plus a single bold headline (the destination
+   name when known, else the exit's own label). The focused state is a
+   background + border + color swap (not color alone); the tile's own
+   direction glyph is the only glyph-shaped element, focused or not. */
 .dock-menu__outlet {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -448,25 +491,19 @@ watch(
   font-size: 15px;
   color: var(--paper-100);
   font-family: var(--f-mono);
-  margin-bottom: 2px;
-}
-.dock-menu__outlet-tile small {
-  font-size: 10.5px;
-  color: var(--paper-500);
 }
 .dock-menu__outlet-glyph {
   font-size: 14px;
   color: var(--gold-400);
 }
+/* The focused outlet tile is marked by a bundled fill + border swap (the
+   same non-color-alone treatment as every other dock row form); no extra
+   focus-only caret glyph is stacked on the tile's persistent direction
+   glyph (outlet-tile-presentation). */
 .dock-menu__outlet-tile--focused {
   background: var(--seal-600);
   border-color: var(--seal-500);
   color: var(--paper-50);
-}
-.dock-menu__outlet-tile--focused::before {
-  content: "▶";
-  color: var(--gold-400);
-  font-size: 0.8em;
 }
 
 /* NAV (task 5.5): the draft's `.nrow` rows — icon, name, backed sub-line,

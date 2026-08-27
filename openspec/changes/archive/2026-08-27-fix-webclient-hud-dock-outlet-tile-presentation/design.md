@@ -50,11 +50,14 @@ Concretely, replace:
 <b>{{ row.item.label }}</b>
 <small v-if="destinationLabel(row.item)">{{ destinationLabel(row.item) }}</small>
 ```
-with:
+with a single bold field whose content is
 ```html
-<b>{{ destinationLabel(row.item) || row.item.label }}</b>
+<b>{{ (row.item.enabled && directionGlyph(row.item.direction) && destinationLabel(row.item)) || row.item.label }}</b>
 ```
-(the leading glyph span is unchanged). For a canonical exit with a known destination, the bold text
+(the leading glyph span is unchanged, but now rendered through the new
+`directionGlyph()` helper — a shared client-side table that resolves only
+canonical direction strings to a glyph; an unknown string (a named door or
+dynamic wilderness gate) resolves to no glyph and keeps the label). For a canonical exit with a known destination, the bold text
 becomes the destination's display name (e.g. `北岸大道`) instead of the raw direction word — matching
 both the redesign's own tiles and the `webclient-contextual-hud` requirement's "leading glyph together
 with the destination's display name" wording, which names exactly two pieces of information. For a
@@ -72,17 +75,20 @@ existing "A non-canonical exit keeps its own name" requirement (a scenario this 
 The template therefore keeps the two branches distinct — and, per the rubber-duck review's blocking
 finding below, adds a third condition: **a disabled row never substitutes the destination name**, because
 `moveItems()` (`exploration_menu.js:257`) bakes the only generic disabled marker directly into
-`row.item.label` itself (`row.label + (row.enabled ? "" : "（無法通行）")`). If a disabled canonical
-exit's destination happens to already be in the committed local-map lattice (a normal case — e.g. a
-temporarily-blocked exit to an already-visited room), substituting the bare destination name would
-silently drop the only visible "（無法通行）" marker this row has, with nothing else on the tile
-indicating it cannot be used. The final expression:
+`row.item.label` itself (`row.label + (row.enabled ? "" : "（無法通行）")`) — client-side baking, not a
+server field. If a disabled canonical exit's destination happens to already be in the committed local-map
+lattice (a normal case — e.g. a temporarily-blocked exit to an already-visited room), substituting the
+bare destination name would silently drop the only visible "（無法通行）" marker this row has, with
+nothing else on the tile indicating it cannot be used. The final expression:
 ```html
-<b>{{ (row.item.enabled && row.item.direction && destinationLabel(row.item)) || row.item.label }}</b>
+<b>{{ (row.item.enabled && directionGlyph(row.item.direction) && destinationLabel(row.item)) || row.item.label }}</b>
 ```
-— the destination name is used only when the row is enabled, canonical, and the destination is known;
-every other case (disabled, non-canonical, or unknown destination) falls back to `row.item.label`, which
-already carries the `（無法通行）` suffix when disabled.
+— the destination name is used only when the row is enabled, its direction resolves to a known glyph, and
+the destination is known; every other case (disabled, non-canonical, or unknown destination) falls back to
+`row.item.label`, which already carries the `（無法通行）` suffix when disabled.
+The glyph table is a null-prototype object (`Object.assign(Object.create(null), {...})`): an
+out-of-table direction such as `"constructor"` or `"toString"` must resolve to no glyph (and thus keep the
+row's own label), never to an inherited `Object.prototype` property.
 Alternative considered: keep the raw label as `<b>` and only reorder which is visually larger via CSS
 (swap font sizes between `<b>` and `<small>`) without changing which field holds which role. Rejected —
 that still renders the direction word twice (once as glyph, once as enlarged text) for every canonical
@@ -109,7 +115,9 @@ background/border state change already exists and is not itself in question.
 `DockMenu.vue`'s own internal `paneKind`, not a new prop.**
 `paneKind` is already a local `computed()` in `DockMenu.vue` (`classifyPane({ items: props.items })`);
 the aside's guard becomes
-`v-if="((props.showDetail && focusedRow && !props.hideGenericDetail && paneKind !== 'outlet') || props.detailMessage)"`.
+`v-if="paneKind !== 'outlet' && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"`
+(per the rubber-duck review's blocking finding: the outlet exclusion wraps the *entire* guard, so a
+`detailMessage` alone can no longer render the aside on the outlet pane).
 This mirrors the existing `hideGenericDetail` prop's *intent* (suppress the generic aside when a more
 specific or no-aside-needed surface applies) without requiring `AppClient.vue` (the caller) to know about
 pane-kind internals it has no other reason to reach into — `hideGenericDetail` stays reserved for the

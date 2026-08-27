@@ -18,6 +18,13 @@ services:
     environment:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.containers.internal:11434}
       SD_WEBUI_BASE_URL: ${SD_WEBUI_BASE_URL:-http://host.containers.internal:7860}
+      # Non-interactive superuser creation for a fresh database: the Evennia
+      # launcher's `check_database` creates Account #1 from these vars at
+      # boot; without them it falls back to an interactive prompt and
+      # recurses until it crashes (RecursionError) on a fresh volume.
+      EVENNIA_SUPERUSER_USERNAME: ${EVENNIA_SUPERUSER_USERNAME:-browserplayer}
+      EVENNIA_SUPERUSER_EMAIL: ${EVENNIA_SUPERUSER_EMAIL:-browser@example.test}
+      EVENNIA_SUPERUSER_PASSWORD: ${EVENNIA_SUPERUSER_PASSWORD:-ElosernBrowserTest!2026}
     security_opt:
       - no-new-privileges
     stop_signal: SIGINT
