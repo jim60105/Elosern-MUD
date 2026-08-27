@@ -371,6 +371,11 @@ no dock content is ever pushed outside the anchor. The panel SHALL be the same s
 element in every mode, carrying its existing tab index, its `data-mode` attribute and its role as the
 surface's documented focus target, and SHALL NOT be remounted when the mode changes.
 
+The panel's background gradient and shadow SHALL match the values
+`docs/design/elosern-redesign/index.html`
+(the binding visual reference) draws for its dock surface — the panel reads as receding into shadow
+toward its lower edge, not as a lit, tinted card.
+
 #### Scenario: The dock is one centred floating panel
 - **WHEN** the shell renders at 1440x900 in exploration mode
 - **THEN** the dock renders as a single centred panel inside the dock anchor with a bounded maximum width, a top border and an upward shadow, and its height equals the shared dock-height token
@@ -386,6 +391,10 @@ surface's documented focus target, and SHALL NOT be remounted when the mode chan
 #### Scenario: The panel stays inside its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with the deepest combat frame open
 - **THEN** the dock panel's rendered box stays within the dock anchor, and the frame's confirm control is reachable by scrolling the row region without being clipped
+
+#### Scenario: The panel's background matches the reference's shadowed gradient
+- **WHEN** the dock panel renders in any mode
+- **THEN** its background gradient and box-shadow are the same values `docs/design/elosern-redesign/index.html` draws for its dock surface
 
 ### Requirement: The dock's root frame renders as an icon tab bar with truthful count badges
 The current dock surface's root menu frame SHALL render as a horizontal tab bar, one tab per root
@@ -406,9 +415,19 @@ The root menu's focus geometry SHALL match the rendered tab order: the root fram
 SHALL equal its item count, so the horizontal arrow keys traverse the visible tabs and the vertical
 arrow keys are a no-op on the root.
 
+A tab's decorative glyph SHALL match the icon `docs/design/elosern-redesign/index.html` (the binding
+visual reference) draws for that same tab concept, for every root or combat-root key the reference
+itself draws an icon for. A key with no counterpart in the reference (a client-local entry the
+reference's static draft never modelled, such as a sub-dock shortcut) SHALL carry whatever glyph best
+represents it and is never required to match a reference that does not exist.
+
 #### Scenario: The root renders as tabs and owns the listbox
 - **WHEN** the dock is at its root frame
 - **THEN** each root item renders as a tab with a glyph and its label, the tab bar carries the listbox role with a single tab stop and an active-descendant reference, and each tab carries its preserved row identity attribute
+
+#### Scenario: A tab glyph matches the reference design's icon for the same concept
+- **WHEN** the exploration root renders the 移動/查看/互動/建議 tabs, or the combat root renders the 攻擊/技能/道具/防禦/逃跑/投降 tabs
+- **THEN** each tab's glyph is the same pictogram `docs/design/elosern-redesign/index.html` draws for that tab's concept
 
 #### Scenario: Badges equal a real count
 - **WHEN** the committed exploration panel carries two interact targets and the committed suggestions payload carries four ready cards
@@ -425,6 +444,26 @@ arrow keys are a no-op on the root.
 #### Scenario: An open deeper frame leaves the tab bar inert
 - **WHEN** a deeper frame is open
 - **THEN** the tab bar marks which root entry is open, the deeper frame's row container is the surface's only listbox and only tab stop, and no tab is reachable by sequential keyboard navigation
+
+### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
+The action dock SHALL carry a shortcut-legend text naming the keyboard behaviour it actually implements.
+The legend SHALL render exactly once as visible content; any additional copy kept only to satisfy a
+test hook on a different element SHALL be rendered visually hidden (removed from the visual layout and
+from the accessibility narration order a sighted-equivalent reading would follow) while remaining present
+in the DOM and readable by its `data-testid`.
+
+The legend SHALL NOT name a key, gesture, or affordance this client does not implement or that no longer
+behaves as named. When a named affordance's behaviour changes (for example, a control that used to open
+a surface and now only moves focus into an always-present one), the legend's wording SHALL be updated in
+the same change that alters the behaviour.
+
+#### Scenario: The legend renders once
+- **WHEN** the dock renders in a mode where its chrome (tab bar) is shown
+- **THEN** exactly one element carrying the shortcut-legend text is visible, and any other element carrying the same text is visually hidden
+
+#### Scenario: The legend names the command line's real focus behaviour, not an open/close toggle
+- **WHEN** the shortcut legend names the command-line-focus key
+- **THEN** its wording states that the key focuses the command line, and does not state that the key opens or closes it
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 The dock SHALL render a breadcrumb line whenever the router's menu stack is deeper than its root

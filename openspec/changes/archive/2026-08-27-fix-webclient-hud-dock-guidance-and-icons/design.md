@@ -110,14 +110,20 @@ architecture change, and `glyphPath`'s single-`d`-string contract already serves
 keys correctly.
 
 The reference also sets `stroke-linecap="round"` and/or `stroke-linejoin="round"` on several of the
-copied icons (`move`, `attack`, `flee`: `stroke-linecap="round"`; `move`, `interact`: also
-`stroke-linejoin="round"`) — attributes the current single `<svg><path :d="tab.glyph" stroke-width="1.8">`
-in `DockTabBar.vue` does not set, so it renders with the SVG defaults (`butt` caps, `miter` joins).
-`move`'s glyph is three one-segment subpaths converging at a single point to form an arrowhead; with
-default `butt` caps that convergence point renders visibly sharper/gapped than the reference's rounded
-one. This change adds `stroke-linecap="round" stroke-linejoin="round"` to `DockTabBar.vue`'s `<path>`
-element unconditionally — safe for every glyph, since round vs. the default is imperceptible on any path
-with no sharp corner or open segment end, and correct for the ones that do have one.
+copied icons — selectively, not on every icon: `move` carries both cap and join, `interact` carries
+join only, `attack` and `flee` carry cap only, while the star glyphs (`suggestions`/`skills`),
+`items`, `defend`, `look`, and `forfeit` carry neither (the star's points would visibly soften under a
+round join, which is why the reference omits the attributes there). This change therefore applies the
+attributes **per key**, not unconditionally: `dock-icons.js` gains a `STROKE_ATTRS` map
+(`move`: cap+join, `interact`: join, `attack`/`flee`: cap, all other keys: none) exposed through a
+`glyphAttrs(key)` export, and `DockTabBar.vue`'s tab icon `<path>` binds them via
+`v-bind="glyphAttrs(tab.key)"`. `glyphSvg`'s path child merges the same per-key attributes. This
+keeps every rendered glyph visually identical to the reference — an unconditional attribute set would
+have rounded the star tips and diverged from the binding visual reference. The tab icon's
+`stroke-width` also moves from the client's `1.8` to the reference's `1.9` (every `.tab svg.ic` in
+the reference carries `stroke-width="1.9"`), and `glyphSvg`'s path uses the same value; the helper's
+outer decorative `<circle>` outline (a client-side addition with no reference counterpart) keeps its
+existing width.
 
 **4. The exact key → path mapping this change applies (all copied from
 `docs/design/elosern-redesign/index.html`, byte-verified against the lines quoted):**

@@ -12,7 +12,7 @@
 // ("pointer"), bounded by `router.depth()`; a click on the already-open tab
 // is a no-op. The store owns the router — this component only emits.
 import { computed } from "vue";
-import { glyphPath } from "./dock-icons.js";
+import { glyphPath, glyphAttrs } from "./dock-icons.js";
 import { badgeCount, badgeVisible } from "./dock-panes.js";
 
 const props = defineProps({
@@ -130,7 +130,7 @@ function onTabClick(tab) {
         fill="none"
         aria-hidden="true"
       >
-        <path :d="tab.glyph" stroke="currentColor" stroke-width="1.8" />
+         <path :d="tab.glyph" stroke="currentColor" stroke-width="1.9" v-bind="glyphAttrs(tab.key)" />
       </svg>
       <span class="dock-tab-bar__label">{{ tab.label }}</span>
       <span v-if="tab.showBadge" class="dock-tab-bar__badge">{{ tab.badgeCount }}</span>
@@ -141,7 +141,7 @@ function onTabClick(tab) {
          hook is carried by ActionDock (the Node-contract gate), so the hint keeps
          the class only (no duplicate testid). -->
     <span class="dock-tab-bar__hint">
-      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令
+      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列
     </span>
   </div>
 </template>

@@ -129,9 +129,17 @@ function onCardAction(intent) {
     </div>
     <!-- The shortcut legend (the B2 Node-contract hook `action-dock-description`),
          reactive to `guidancePrefix`. Carried by ActionDock so the Node gate
-         reads it from this file even when the tab bar is absent. -->
-    <div class="action-dock__description" data-testid="action-dock-description">
-      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 開啟指令
+         reads it from this file even when the tab bar is absent. The visible
+         copy is the tab bar's trailing hint, so this element is the visually
+         hidden duplicate: the `visually-hidden` class plus `aria-hidden` keep
+         it in the DOM (the gate reads `inner_text()`/`textContent`) but remove
+         it from both the visual layout and the accessibility narration order. -->
+    <div
+      class="visually-hidden action-dock__description"
+      data-testid="action-dock-description"
+      aria-hidden="true"
+    >
+      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列
     </div>
     <DockTabBar
       v-if="showChrome"
@@ -208,16 +216,32 @@ function onCardAction(intent) {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
   border-top: var(--line);
   border-radius: 0 0 12px 12px;
-  box-shadow: 0 -12px 40px -20px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 -14px 34px -24px #000;
   font-family: var(--f-sans);
 }
 
 .action-dock:focus {
   outline: 2px solid var(--gold-400);
   outline-offset: 2px;
+}
+
+/* The hidden legend copy: the same sr-only clip definition duplicated
+   independently in `DockMenuItem.vue` and `DockMenu.vue` — Vue's scoped CSS
+   does not cross component boundaries, so this component must carry its
+   own rule or the class name alone is an inert no-op. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The scrolling pane (task 4.1): bounded height with internal scroll. */
