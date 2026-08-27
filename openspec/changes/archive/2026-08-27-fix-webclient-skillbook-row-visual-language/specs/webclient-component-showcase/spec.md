@@ -29,7 +29,11 @@ the cost text; the out-of-combat `combat` pill and the passive `被動` badge ea
 text, never a bare colour swatch. An elemental group's colour dot is decorative and SHALL be present
 only for an element the binding visual reference (`docs/design/elosern-redesign/index.html`) itself
 colour-codes; a group for any other element renders its text label with no dot — no dot colour is
-invented for an element the reference never colour-codes.
+invented for an element the reference never colour-codes. A skill row that carries target or cast detail
+renders that detail on the name side of the row, with the cost cell as the row's rightmost column
+(matching the reference's `.srow .cost` right-alignment via `margin-left:auto`). A group without a
+label SHALL keep the pre-change 8px top spacing, so removing the group-container margin does not regress
+ungrouped content.
 
 `StatusPanel` SHALL present its share of that data as the stage's left HUD island stack rather than as
 a single boxed column card: a character head card, a vitals island, and a conditions island, composed
@@ -98,3 +102,11 @@ field (the intimate/adult block has no backing field and is not built).
 #### Scenario: A group dot renders only for a reference-sampled element
 - **WHEN** an elemental-magic group renders whose element the binding visual reference colour-codes (fire, water, wind) or whose category is `sexual_act`
 - **THEN** its label is preceded by the reference's exact colour dot; a group for any other element renders with no dot, because no dot colour is invented for an element the reference never colour-codes
+
+#### Scenario: A passive row carries a visible passive badge
+- **WHEN** the skill book renders a skill row on the passive tab
+- **THEN** the row displays a `被動` badge that carries its own visible text, never a bare colour swatch, and the badge is absent from active-tab rows
+
+#### Scenario: The active tab shows the list-conventions legend
+- **WHEN** the skill book's active tab renders its category list
+- **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend

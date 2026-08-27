@@ -49,6 +49,7 @@ describe("SkillBook (B3 data family)", () => {
       "elemental_magic",
       "martial_arts",
       "movement",
+      "sexual_act",
     ]);
     expect(cats[0].text()).toContain("元素魔法");
     expect(cats[0].text()).toContain("火");
@@ -154,19 +155,24 @@ describe("SkillBook (B3 data family)", () => {
     const w = mountBook({ initialTab: "passive" });
     const rows = w.findAll('[data-testid="skill-book__skill"]');
     expect(rows).toHaveLength(3);
-    expect(rows.map((r) => r.text())).toEqual(["強化身體", "防衛本能", "精靈長壽"]);
+    // Each passive row now carries a trailing 被動 badge.
+    // Vue drops the whitespace-only text nodes between the row's elements,
+    // so the badge text concatenates directly onto the skill label.
+    expect(rows.map((r) => r.text())).toEqual(["強化身體被動", "防衛本能被動", "精靈長壽被動"]);
   });
 
   it("renders the combat pill only for rows whose usable_out_of_combat is true", () => {
     const w = mountBook();
-    // The only fixture row carrying the field renders the pill.
-    const firebolt = w.find('[data-testid="skill-book__skill"][data-key="firebolt"]');
-    const pill = firebolt.find('[data-testid="skill-book__ooc"]');
-    expect(pill.exists()).toBe(true);
-    expect(pill.text()).toBe("combat");
+    // Three fixture rows carry usable_out_of_combat: true → the pill renders.
+    for (const key of ["firebolt", "gale_dash", "solace"]) {
+      const row = w.find(`[data-testid="skill-book__skill"][data-key="${key}"]`);
+      const pill = row.find('[data-testid="skill-book__ooc"]');
+      expect(pill.exists()).toBe(true);
+      expect(pill.text()).toBe("combat");
+    }
 
     // Every other active row lacks the field, so the pill is absent.
-    for (const key of ["fireball", "firestorm", "mend_glow", "basic_attack", "light_blade", "flee", "legacy_stance"]) {
+    for (const key of ["fireball", "firestorm", "mend_glow", "quake", "basic_attack", "light_blade", "flee", "legacy_stance"]) {
       const row = w.find(`[data-testid="skill-book__skill"][data-key="${key}"]`);
       expect(row.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
     }
@@ -179,5 +185,165 @@ describe("SkillBook (B3 data family)", () => {
   it("renders no combat pill on the passive tab", () => {
     const w = mountBook({ initialTab: "passive" });
     expect(w.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
+  });
+
+  it("rotates the category chevron with the details open state", async () => {
+    // Attach to the document so jsdom recomputes styles when the native
+    // `open` attribute changes (a detached tree does not track it reliably).
+    const w = mount(SkillBook, {
+      props: { skills: SKILLS_SLICE_SAMPLE },
+      attachTo: document.body,
+    });
+    const cats = categories(w);
+    // The first category starts open, the second closed (the component's
+    // `:open="index === 0"` binding).
+    expect(cats[0].element.hasAttribute("open")).toBe(true);
+    expect(cats[1].element.hasAttribute("open")).toBe(false);
+    // The open category's chevron resolves to the draft's 90° rotation; a
+    // closed category's chevron has no transform set (jsdom reports "").
+    expect(
+      window.getComputedStyle(cats[0].find('[data-testid="skill-book__category-chevron"]').element).transform,
+    ).toBe("rotate(90deg)");
+    expect(
+      window.getComputedStyle(cats[1].find('[data-testid="skill-book__category-chevron"]').element).transform,
+    ).toBe("");
+    // Setting the native `open` attribute flips the computed transform.
+    cats[1].element.open = true;
+    await nextTick();
+    expect(
+      window.getComputedStyle(cats[1].find('[data-testid="skill-book__category-chevron"]').element).transform,
+    ).toBe("rotate(90deg)");
+    w.unmount();
+  });
+
+  it("renders group colour dots only for reference-sampled elements", () => {
+    const w = mountBook();
+    const fireDot = w.find('[data-testid="skill-book__group--fire"] [data-testid="skill-book__group-dot"]');
+    expect(fireDot.element.style.background).toBe("var(--seal-500)");
+    const waterDot = w.find('[data-testid="skill-book__group--water"] [data-testid="skill-book__group-dot"]');
+    expect(waterDot.element.style.background).toBe("var(--vit-mp)");
+    const windDot = w.find('[data-testid="skill-book__group--wind"] [data-testid="skill-book__group-dot"]');
+    expect(windDot.element.style.background).toBe("var(--warn)");
+    const soloDot = w.find('[data-testid="skill-book__group--solo"] [data-testid="skill-book__group-dot"]');
+    expect(soloDot.element.style.background).toBe("var(--seal-500)");
+    // A group for an element the reference never colour-codes renders with no dot.
+    expect(
+      w.find('[data-testid="skill-book__group--earth"] [data-testid="skill-book__group-dot"]').exists(),
+    ).toBe(false);
+  });
+
+  it("colour-codes cost cells by the resource they spend", () => {
+    const w = mountBook();
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="firebolt"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("mp");
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="light_blade"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("sp");
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="gale_dash"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("sp");
+    // A mixed mp+sp cost reads the SP tone — sp wins when both are present.
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="firestorm"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("sp");
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="basic_attack"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("free");
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="flee"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("free");
+    expect(
+      w.find('[data-testid="skill-book__skill"][data-key="solace"] [data-testid="skill-book__cost"]').classes(),
+    ).toContain("free");
+  });
+
+  it("keeps a zero-value resource key on the free colour", () => {
+    const skills = {
+      actives: [
+        {
+          category: "elemental_magic",
+          label: "元素魔法",
+          groups: [
+            {
+              group: "earth",
+              label: "土",
+              skills: [
+                { key: "z1", label: "土刺", cost: { sp: 0 }, target_spec: "single" },
+                { key: "z2", label: "土盾", cost: { mp: 0, sp: 0 }, target_spec: "self" },
+              ],
+            },
+          ],
+        },
+      ],
+      passives: [],
+    };
+    const w = mountBook({ skills });
+    const z1 = w.find('[data-testid="skill-book__skill"][data-key="z1"]');
+    expect(z1.find('[data-testid="skill-book__cost"]').text()).toBe("免費");
+    expect(z1.find('[data-testid="skill-book__cost"]').classes()).toContain("free");
+    const z2 = w.find('[data-testid="skill-book__skill"][data-key="z2"]');
+    expect(z2.find('[data-testid="skill-book__cost"]').classes()).toContain("free");
+  });
+
+  it("renders the combat pill with the reference's bordered-pill styling", () => {
+    const w = mountBook();
+    const pill = w.get('[data-testid="skill-book__ooc"]');
+    expect(pill.text()).toBe("combat");
+    const cs = window.getComputedStyle(pill.element);
+    expect(cs.borderRadius).toBe("4px");
+    expect(cs.fontSize).toBe("9px");
+    expect(cs.color).toContain("var(--ok)");
+  });
+
+  it("renders the 被動 badge on passive-tab rows only", () => {
+    const wp = mountBook({ initialTab: "passive" });
+    const rows = wp.findAll('[data-testid="skill-book__skill"]');
+    for (const row of rows) {
+      expect(row.find('[data-testid="skill-book__passive-badge"]').text()).toBe("被動");
+    }
+    wp.unmount();
+    const wa = mountBook();
+    expect(wa.find('[data-testid="skill-book__passive-badge"]').exists()).toBe(false);
+  });
+
+  it("shows the list-conventions legend on the active tab only", () => {
+    const wa = mountBook();
+    const legend = wa.find('[data-testid="skill-book__legend"]');
+    expect(legend.exists()).toBe(true);
+    expect(legend.text().replace(/\s+/g, " ").trim()).toBe(
+      "依分類分群；戰鬥外 表示非戰鬥亦可施放；未解鎖之性愛行為「藏而不列」。",
+    );
+    const okSpan = legend.find("span");
+    expect(okSpan.text()).toBe("戰鬥外");
+    expect(okSpan.element.style.color).toBe("var(--ok)");
+    wa.unmount();
+    const wp = mountBook({ initialTab: "passive" });
+    expect(wp.find('[data-testid="skill-book__legend"]').exists()).toBe(false);
+  });
+
+  it("right-aligns the cost cell as the row's last column", () => {
+    const w = mountBook();
+    // The reference's `.srow .cost{margin-left:auto}`: target/cast detail
+    // stays on the name side; the cost cell is the row's rightmost column.
+    const firestorm = w.find('[data-testid="skill-book__skill"][data-key="firestorm"]');
+    expect(
+      Array.from(firestorm.element.children).map((el) => el.className),
+    ).toEqual([
+      "skill-book__skill-name",
+      "skill-book__target",
+      "skill-book__cast",
+      "skill-book__cost sp",
+    ]);
+    expect(window.getComputedStyle(firestorm.element.children[3]).marginLeft).toBe("auto");
+  });
+
+  it("keeps the previous 8px top spacing for label-less groups", () => {
+    const w = mountBook();
+    const ungrouped = w.get('[data-testid="skill-book__group--ungrouped"]');
+    expect(ungrouped.classes()).toContain("skill-book__group--ungrouped");
+    // jsdom reports the unresolved token reference verbatim (tokens.css is
+    // not loaded in the test DOM): `var(--sp-2)` = 8px in the app.
+    expect(window.getComputedStyle(ungrouped.element).marginTop).toBe("var(--sp-2)");
   });
 });

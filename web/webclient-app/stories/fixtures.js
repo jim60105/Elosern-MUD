@@ -395,6 +395,31 @@ export const SKILLS_SLICE_SAMPLE = {
             },
           ],
         },
+        {
+          group: "wind",
+          label: "風",
+          skills: [
+            {
+              key: "gale_dash",
+              label: "疾風突進",
+              cost: { sp: 8 },
+              target_spec: "self",
+              usable_out_of_combat: true,
+            },
+          ],
+        },
+        {
+          group: "earth",
+          label: "土",
+          skills: [
+            {
+              key: "quake",
+              label: "震地",
+              cost: { mp: 24 },
+              target_spec: "area",
+            },
+          ],
+        },
       ],
     },
     {
@@ -436,6 +461,25 @@ export const SKILLS_SLICE_SAMPLE = {
               target_spec: "none",
             },
             { key: "legacy_stance", label: "legacy_stance" },
+          ],
+        },
+      ],
+    },
+    {
+      category: "sexual_act",
+      label: "性愛行為",
+      groups: [
+        {
+          group: "solo",
+          label: "獨處",
+          skills: [
+            {
+              key: "solace",
+              label: "自我撫慰",
+              cost: {},
+              target_spec: "self",
+              usable_out_of_combat: true,
+            },
           ],
         },
       ],

@@ -118,7 +118,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.beginTransport(1);
     store.setConnected(true);
     // Populate the character panel with the deterministic skill fixture
-    // (actives=8, passives=3 per SKILLS_SLICE_SAMPLE).
+    // (actives=11, passives=3 per SKILLS_SLICE_SAMPLE).
     store.receive(
       1,
       "ui_snapshot",
@@ -126,14 +126,14 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
-    // The composed drawer head: the `skills` glyph + the 主動 8 · 被動 3
+    // The composed drawer head: the `skills` glyph + the 主動 11 · 被動 3
     // subtitle (the fixture's own row counts, not invented data).
     const icon = wrapper.find(".hud-drawer__icon");
     expect(icon.exists()).toBe(true);
     expect(icon.find("path").attributes("d")).toBe(
       "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     );
-    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("主動 8 · 被動 3");
+    expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("主動 11 · 被動 3");
     // The footer states the client's own `/cast` syntax as static copy.
     expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
       "施放入口：cast <技法>[@威力]=<代號>",
