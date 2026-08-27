@@ -4,6 +4,7 @@
 // payload does not carry. Mounts DockMenu at depth 2 (the pane depth).
 
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import DockMenu from "../../components/DockMenu.vue";
 
@@ -16,6 +17,7 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
+    delete globalThis.ResizeObserver;
   });
 
   function mountMenu(items, idPrefix = "combat-row") {
@@ -224,11 +226,11 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     return null;
   }
 
-  it("outlet/nav panes emit content-sized tracks; every other kind keeps 1fr; no gridCols emits none", () => {
+  it("the nav pane emits content-sized tracks; the outlet pane and every other kind keep 1fr or none; no gridCols emits none", () => {
     const contentCases = [
-      { items: outletItems, sel: PANE_SELECTORS.outlet, expected: "repeat(2, minmax(0, max-content))" },
       { items: navItems, sel: PANE_SELECTORS.nav, expected: "repeat(2, minmax(0, max-content))" },
     ];
+    const outletCase = { items: outletItems, sel: PANE_SELECTORS.outlet, expected: "" };
     const stretchCases = [
       { items: affordanceItems, sel: PANE_SELECTORS.affordance, expected: "repeat(2, 1fr)" },
       { items: cardItems, sel: PANE_SELECTORS.cards, expected: "repeat(2, 1fr)" },
@@ -238,7 +240,7 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
       { items: confirmItems, sel: PANE_SELECTORS.confirm, expected: "repeat(2, 1fr)" },
       { items: plainItems, sel: PANE_SELECTORS.plain, expected: "repeat(2, 1fr)" },
     ];
-    for (const { items, sel, expected } of [...contentCases, ...stretchCases]) {
+    for (const { items, sel, expected } of [outletCase, ...contentCases, ...stretchCases]) {
       const w = mountMenuWithCols(items, 2);
       const pane = w.find(sel);
       expect(pane.exists()).toBe(true, sel + " pane rendered");
@@ -261,9 +263,9 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     }
   });
 
-  it("long destination and affordance labels wrap within the bounded tile/row", () => {
-    // OUTLET: a long destination name wraps inside the capped tile instead of
-    // pushing the layout past the pane.
+  it("long destination and affordance labels wrap within the uncapped tile/row", () => {
+    // OUTLET: a long destination name wraps inside the track (no content-width
+    // cap on the tile) instead of pushing the layout past the pane.
     const w = mountMenuWithCols(longOutlet, 2, "exploration-row");
     const tile = w.find(".dock-menu__outlet-tile");
     expect(tile.exists()).toBe(true);
@@ -273,10 +275,16 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     const tileCss = tileRule.style.cssText;
     // jsdom keeps the parsed declarations in `style.cssText` (its
     // camelCase accessors are unpopulated), so the safety net is asserted
-    // on the declaration text.
-    expect(tileCss).toContain("max-width: 220px");
+    // on the declaration text. The tile carries no content-width cap: the
+    // `1fr` tracks of the `auto-fit` grid stretch the tile to the track.
+    expect(tileCss).not.toContain("max-width");
     expect(tileCss).toContain("min-width: 0");
     expect(tileCss).toContain("overflow-wrap: break-word");
+    // The outlet grid is the width-adaptive `auto-fit` rule (empty tracks
+    // collapse, the `min(150px, 100%)` floor never overflows a narrow pane).
+    const outletRule = cssRuleFor(".dock-menu__outlet");
+    expect(outletRule).toBeTruthy("the outlet grid CSS rule is loaded");
+    expect(outletRule.style.cssText).toContain("repeat(auto-fit, minmax(min(150px, 100%), 1fr)");
     w.unmount();
     document.body.innerHTML = "";
 
@@ -299,6 +307,95 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     const textCss = textRule.style.cssText;
     expect(textCss).toContain("min-width: 0");
     expect(textCss).toContain("overflow-wrap: break-word");
+    w2.unmount();
+    document.body.innerHTML = "";
+  });
+
+  it("outlet: a partial last row spans its remaining columns (no blank space)", async () => {
+    // 8 exits in a pane that fits 7 columns of 150px tracks: row 1 holds 7
+    // tiles, row 2 holds a single tile that must span the rest of the row.
+    const exits = Array.from({ length: 8 }, (_, i) => ({
+      key: `exit-${i + 1}`,
+      label: `出口${i + 1}`,
+      enabled: true,
+      action_id: "explore.move",
+    }));
+    // Fake the pane's own measured width (1140px → floor(1148/158) = 7 cols).
+    globalThis.ResizeObserver = class {
+      constructor(cb) {
+        this.cb = cb;
+      }
+      observe(el) {
+        const entry = { contentRect: { width: 1140 } };
+        this.cb([entry], this);
+      }
+      disconnect() {}
+      unobserve() {}
+    };
+    const w = mountMenuWithCols(exits, null, "exploration-row");
+    await w.vm.$nextTick();
+    const tiles = w.findAll(".dock-menu__outlet-tile");
+    expect(tiles).toHaveLength(8);
+    // The last tile (the lone row-2 tile) spans from its own column (1) to
+    // the row's end; no tile before it carries the span.
+    expect(tiles[tiles.length - 1].element.style.gridColumn).toBe("1 / -1");
+    expect(tiles[0].element.style.gridColumn).toBe("");
+    w.unmount();
+    document.body.innerHTML = "";
+  });
+
+  it("outlet: a complete last row carries no span", async () => {
+    // 14 exits at 7 columns: two complete rows, no partial row to fill.
+    const exits = Array.from({ length: 14 }, (_, i) => ({
+      key: `exit-${i + 1}`,
+      label: `出口${i + 1}`,
+      enabled: true,
+      action_id: "explore.move",
+    }));
+    globalThis.ResizeObserver = class {
+      constructor(cb) {
+        this.cb = cb;
+      }
+      observe(el) {
+        const entry = { contentRect: { width: 1140 } };
+        this.cb([entry], this);
+      }
+      disconnect() {}
+      unobserve() {}
+    };
+    const w = mountMenuWithCols(exits, null, "exploration-row");
+    await w.vm.$nextTick();
+    const tiles = w.findAll(".dock-menu__outlet-tile");
+    expect(tiles).toHaveLength(14);
+    for (const t of tiles) {
+      expect(t.element.style.gridColumn).toBe("");
+    }
+    w.unmount();
+    document.body.innerHTML = "";
+  });
+
+  it("the listbox active descendant never dangles on a focused back row", async () => {
+    const backItem = { key: "back", label: "返回上一層", enabled: true, navigation: true, surface: "back" };
+    // OUTLET: the back row is not rendered as an outlet tile, so the
+    // listbox must not name a non-existent row id as its active descendant.
+    const w = mountMenu([...outletItems, backItem], "exploration-row");
+    w.setProps({ focusedKey: "back" });
+    await w.vm.$nextTick();
+    const listbox = w.find('[role="listbox"]');
+    expect(listbox.attributes("aria-activedescendant")).toBeUndefined();
+    w.unmount();
+    document.body.innerHTML = "";
+
+    // NAV: the back row IS rendered as a nav row, so the active descendant
+    // keeps naming its real row id.
+    const navWithBack = [...navItems, backItem];
+    const w2 = mountMenu(navWithBack, "exploration-row");
+    w2.setProps({ focusedKey: "back" });
+    await w2.vm.$nextTick();
+    const listbox2 = w2.find('[role="listbox"]');
+    expect(listbox2.attributes("aria-activedescendant")).toBe(
+      `exploration-row-${navWithBack.length - 1}`,
+    );
     w2.unmount();
     document.body.innerHTML = "";
   });

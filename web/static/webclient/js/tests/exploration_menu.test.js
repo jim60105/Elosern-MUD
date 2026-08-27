@@ -169,7 +169,12 @@ test("menu models carry the mockup grid geometry", () => {
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
   assert.equal(model.menus.root.grid, true);
   assert.equal(model.menus.root.gridCols, 7);
-  ["move", "look", "interact", "wait"].forEach((key) => {
+  // The move frame navigates as a single-column list: its keyboard geometry
+  // carries no fixed column count (the rendered exit-outlet grid is
+  // width-adaptive, so the DOM-independent router assumes no column count).
+  assert.equal(model.menus.move.grid, true, "move must be a grid");
+  assert.equal(model.menus.move.gridCols, null, "move must use no fixed column count");
+  ["look", "interact", "wait"].forEach((key) => {
     assert.equal(model.menus[key].grid, true, `${key} must be a grid`);
     assert.equal(model.menus[key].gridCols, 2, `${key} must use 2 columns`);
   });

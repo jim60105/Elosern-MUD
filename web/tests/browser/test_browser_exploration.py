@@ -855,6 +855,30 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     item_selector + " row " + str(i) + " must be content-sized, not stretched to half the pane",
                 )
 
+        def assert_tiles_fill_pane(item_selector: str, pane_selector: str) -> None:
+            # The outlet grid is width-adaptive (auto-fit): the tiles stretch
+            # with their 1fr tracks, so the first tile's left edge aligns
+            # with the pane's left edge and the last tile's right edge with
+            # the pane's right edge (the 8px gaps count as occupied space).
+            items = page.locator(item_selector)
+            self.assertGreater(items.count(), 0, item_selector + " must render at least one tile")
+            pane_box = page.locator(pane_selector).bounding_box()
+            self.assertIsNotNone(pane_box, pane_selector + " must be visible at 1280x720")
+            first_box = items.first.bounding_box()
+            last_box = items.last.bounding_box()
+            self.assertIsNotNone(first_box, "the first tile must have a bounding box")
+            self.assertIsNotNone(last_box, "the last tile must have a bounding box")
+            self.assertLessEqual(
+                abs(first_box["x"] - pane_box["x"]),
+                1,
+                "the first tile must start at the pane's left edge",
+            )
+            self.assertLessEqual(
+                abs((last_box["x"] + last_box["width"]) - (pane_box["x"] + pane_box["width"])),
+                2,
+                "the last tile must end at the pane's right edge",
+            )
+
         def assert_long_label_wraps(item_selector: str, pane_selector: str, label_selector: str) -> None:
             # Override the label text with a long spaceless string and assert
             # it wraps (scrollWidth <= clientWidth, no horizontal scroll) and
@@ -883,27 +907,60 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     item_selector + " row " + str(i) + " (long label) overflows the pane horizontally",
                 )
 
-        # Move: the exit tiles render content-sized (never stretched to half
-        # the panel) and stay inside the pane's width.
+        # Move: the exit tiles stretch with their tracks and fill the
+        # pane's full width — no blank space on the right.
         self._open_root(page, 0)  # Move
         assert_within_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
-        assert_not_stretched(".dock-menu__outlet-tile", ".dock-menu__outlet")
+        assert_tiles_fill_pane(".dock-menu__outlet-tile", ".dock-menu__outlet")
         assert_long_label_wraps(".dock-menu__outlet-tile", ".dock-menu__outlet", "b")
-        press_right_wait_focus(page)
-        # The second grid column of the two-column geometry is the item at
-        # index 1 of the frame's ordered items (a `back` row when the frame
-        # has fewer than two content items).
+        # The move frame navigates as a single-column list: ArrowRight is a
+        # no-op (focus stays on the current item), ArrowDown cycles the
+        # exit rows then the `back` row.
+        _state = store_state(page)
+        _focus_key_before = (_state.get("focus") or {}).get("key")
+        _press(page, "ArrowRight")
+        page.wait_for_timeout(80)
+        self.assertEqual(
+            (store_state(page).get("focus") or {}).get("key"),
+            _focus_key_before,
+            "ArrowRight is a no-op in the move frame (single-column list geometry)",
+        )
+        _press(page, "ArrowDown")
+        page.wait_for_timeout(80)
         _state = store_state(page)
         _move = ((_state.get("panels") or {}).get("exploration") or {}).get("move") or []
         _move_keys = ["exit-" + str(m.get("exit_ref")) for m in _move] + ["back"]
-        _second_col_key = _move_keys[1] if len(_move_keys) > 1 else "back"
         self.assertEqual(
             (_state.get("focus") or {}).get("key"),
-            _second_col_key,
-            "ArrowRight must move focus to the second grid column",
+            _move_keys[1] if len(_move_keys) > 1 else "back",
+            "ArrowDown moves focus to the second item (the next exit or the back row)",
         )
-        _press(page, "Escape")
+        # Cycle focus onto the `back` row: the breadcrumb's back control must
+        # carry the focused presentation (fill + ring, not color alone), and
+        # Enter on it pops exactly one level back to the root. From the first
+        # exit row, `len(_move) - 1` more ArrowDown presses reach the back
+        # row (the last item of the move list).
+        for _ in range(len(_move) - 1):
+            _press(page, "ArrowDown")
         page.wait_for_timeout(80)
+        _state = store_state(page)
+        self.assertEqual(
+            (_state.get("focus") or {}).get("key"),
+            "back",
+            "ArrowDown cycles focus onto the back row",
+        )
+        _back_btn = page.locator(".dock-crumb__back")
+        self.assertTrue(
+            "dock-crumb__back--focused" in (_back_btn.get_attribute("class") or ""),
+            "the breadcrumb back control must show the focused state",
+        )
+        _press(page, "Enter")
+        page.wait_for_timeout(80)
+        self.assertEqual(
+            page.evaluate("window.__elosernBridge.router.depth()"),
+            1,
+            "Enter on the back row must pop exactly one level",
+        )
 
         # Look: the look rows stay within the nav pane; the keyboard column
         # mapping is unchanged.
@@ -954,6 +1011,42 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             page.locator(".dock-menu__plain").evaluate("el => getComputedStyle(el).display"),
             "block",
             "the wait/rest pane stays a non-grid block container",
+        )
+
+    def test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport(self):
+        # fix-webclient-hud-dock-exploration-grid-width: at 400x720 the pane
+        # content width is ~384px, so the `auto-fit` grid fits only 2 columns
+        # (floor((384 + 8) / 158) = 2). The exploration fixture's 3-exit move
+        # frame wraps the third exit onto a partial second row; the last tile
+        # must span the remaining column so no horizontal space is left blank.
+        page = self.logged_in_page((400, 720))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        self._open_root(page, 0)  # Move
+        pane_box = page.locator(".dock-menu__outlet").bounding_box()
+        self.assertIsNotNone(pane_box, "the outlet pane must be visible at 400x720")
+        tiles = page.locator(".dock-menu__outlet-tile")
+        self.assertGreaterEqual(
+            tiles.count(), 3, "the move frame must render at least 3 exit tiles"
+        )
+        first_box = tiles.first.bounding_box()
+        last_box = tiles.last.bounding_box()
+        self.assertIsNotNone(first_box, "the first tile must have a bounding box")
+        self.assertIsNotNone(last_box, "the last tile must have a bounding box")
+        self.assertLessEqual(
+            abs(first_box["x"] - pane_box["x"]),
+            1,
+            "the first tile must start at the pane's left edge",
+        )
+        self.assertLessEqual(
+            abs((last_box["x"] + last_box["width"]) - (pane_box["x"] + pane_box["width"])),
+            2,
+            "the partial second row's tile must end at the pane's right edge",
+        )
+        self.assertIn(
+            "grid-column",
+            tiles.last.get_attribute("style") or "",
+            "the partial-row tile must carry the inline span style",
         )
 
 

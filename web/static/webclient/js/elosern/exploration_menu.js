@@ -645,7 +645,7 @@
           items: moveItems(panel, currentNode),
           focusKey: null,
           grid: true,
-          gridCols: 2,
+          gridCols: null,
           title: "移動",
         },
         look: {
