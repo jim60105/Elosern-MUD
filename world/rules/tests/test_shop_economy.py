@@ -282,6 +282,58 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(self._contained("healing_potion"), [])
 
+    @covers_requirement(
+        "item-presentation-metadata::presentation-metadata-does-not-claim-unimplemented-mechanics"
+    )
+    def test_presentation_swap_leaves_buy_sell_outcomes_unchanged(self):
+        """Swapping a registry item's presentation must not change trade results."""
+        from world.lore.items import (
+            ITEM_REGISTRY,
+            ItemDefinition,
+            ItemIconKey,
+            ItemKind,
+            ItemPresentation,
+            ItemRarity,
+        )
+
+        original = ITEM_REGISTRY["meal"]
+        altered = ItemDefinition(
+            key="meal",
+            display_name_zh=original.display_name_zh,
+            price_table_key=original.price_table_key,
+            sellable=original.sellable,
+            presentation=ItemPresentation(
+                kind=ItemKind.FOOD,
+                icon_key=ItemIconKey.FOOD,
+                rarity=ItemRarity.LEGENDARY,
+                summary_zh="旅人充飢的普通餐食。",
+            ),
+        )
+
+        def trade_round():
+            self.player.db.wallet = 100
+            self.player.db.inventory = []
+            self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+            with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+                buy_result = buy(self.player, self.merchant_npc, "meal", 2)
+                sell_result = sell(self.player, self.merchant_npc, "meal", 2)
+            return (
+                buy_result,
+                sell_result,
+                list_items(self.player),
+                parse_merchant_stock(self.merchant),
+                self.player.db.wallet,
+            )
+
+        baseline = trade_round()
+        ITEM_REGISTRY["meal"] = altered
+        try:
+            swapped = trade_round()
+        finally:
+            ITEM_REGISTRY["meal"] = original
+
+        self.assertEqual(swapped, baseline)
+
 
 class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTestCase):
     @covers_requirement("shop-economy::merchant-stock-is-finite-persistent-repeated-item-quantity-state")
