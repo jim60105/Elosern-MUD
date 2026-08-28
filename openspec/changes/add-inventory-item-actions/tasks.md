@@ -47,7 +47,7 @@
 
 ## 8. Traceability And Verification
 
-- [ ] 8.1 Obtain canonical requirement IDs with `uv run --locked python -m tools.spec_traceability list`, add substantive `covers_requirement` annotations for modified main requirements where applicable, and run `uv run --locked python -m tools.spec_traceability check`.
-- [ ] 8.2 Run focused uv-managed tests for lore items, item rules, equipment/inventory, combat sessions, services presentation, UI action adapters, commands, and command documentation.
-- [ ] 8.3 Run the dependency-free WebClient Node gate, `npm test`, `npm run build`, `npm run build-storybook`, and `npm run showcase-coverage`, fixing authored sources rather than hand-editing built output.
-- [ ] 8.4 Run `uv run --locked python -m compileall -q world typeclasses commands server`, `openspec validate add-inventory-item-actions --strict`, and `git diff --check`, then compare implementation and tests against every proposal, design, and delta-spec requirement before marking the change complete.
+- [x] 8.1 Obtain canonical requirement IDs with `uv run --locked python -m tools.spec_traceability list`, add substantive `covers_requirement` annotations for modified main requirements where applicable, and run `uv run --locked python -m tools.spec_traceability check`.
+- [x] 8.2 Run focused uv-managed tests for lore items, item rules, equipment/inventory, combat sessions, services presentation, UI action adapters, commands, and command documentation.
+- [x] 8.3 Run the dependency-free WebClient Node gate, `npm test`, `npm run build`, `npm run build-storybook`, and `npm run showcase-coverage`, fixing authored sources rather than hand-editing built output.
+- [x] 8.4 Run `uv run --locked python -m compileall -q world typeclasses commands server`, `openspec validate add-inventory-item-actions --strict`, and `git diff --check`, then compare implementation and tests against every proposal, design, and delta-spec requirement before marking the change complete.
