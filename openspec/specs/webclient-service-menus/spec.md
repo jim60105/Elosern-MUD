@@ -227,7 +227,7 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost browser suite SHALL exercise, using keyboard controls at 1440x900 and 1280x720, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation, full-HP refusal, combat item use, direct equipment toggle, singleton replacement, five accessories, and sixth-accessory warning. Exploration service submenus SHALL retain their existing roots and drawer-hosted shared row renderer. The bag SHALL retain its frameless client-local drawer model in exploration and combat. Every pointer affordance SHALL emit the same server-authored action identifier and payload as keyboard activation through the same dispatch entry and gates. Tests SHALL use deterministic fixtures and make no remote, LLM, or image-generation request. No remote or ambiguous host control SHALL render, no inspect-only item SHALL gain an action, and no reference surface SHALL be present while its drawer is closed.
+The managed localhost browser suite SHALL exercise, using keyboard controls at 1440x900 and 1280x720, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. Exploration service submenus SHALL retain their existing roots and drawer-hosted shared row renderer. The bag SHALL retain its frameless client-local drawer model in exploration and combat. Every pointer affordance SHALL emit the same server-authored action identifier and payload as keyboard activation through the same dispatch entry and gates. Tests SHALL use deterministic fixtures and make no remote, LLM, or image-generation request. No remote or ambiguous host control SHALL render, no inspect-only item SHALL gain an action, and no reference surface SHALL be present while its drawer is closed.
 
 #### Scenario: Guild board journey completes in Chromium
 - **WHEN** a seeded registered member uses arrows and Enter to reach and accept an eligible board offer
@@ -241,9 +241,9 @@ The managed localhost browser suite SHALL exercise, using keyboard controls at 1
 - **WHEN** an eligible potion tile is activated by keyboard at 1440x900 or 1280x720
 - **THEN** the accessible confirmation remains fully operable, no request precedes confirm, and focus returns to the tile on cancel
 
-#### Scenario: Equipment and cap behavior are keyboard reachable
-- **WHEN** the player toggles singleton and accessory tiles using only the keyboard
-- **THEN** singleton replacement dispatches once, five accessories can be equipped, and a sixth presents the warning without dispatch
+#### Scenario: Equipment and cap behavior are enforced deterministically
+- **WHEN** rule and adapter tests drive a singleton replacement and fill the accessory slots to the cap
+- **THEN** singleton replacement dispatches once, five accessories can be equipped, a sixth refuses with the committed warning without dispatch, and the showcase renders the capped state
 
 #### Scenario: Minimum viewport retains service essentials
 - **WHEN** shop or bag is open at 1280x720 with a disabled action focused

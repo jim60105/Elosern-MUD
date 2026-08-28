@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-3 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact

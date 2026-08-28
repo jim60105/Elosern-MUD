@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-2 services panel.
+"""Frozen no-mutation read model for the version-3 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
