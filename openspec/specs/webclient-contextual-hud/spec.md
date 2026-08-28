@@ -692,11 +692,15 @@ without ending the session.
 
 ### Requirement: Reference surfaces render in a right-anchored drawer with one modal contract
 The client's reference surfaces SHALL render inside a drawer anchored to the right edge of the stage,
-spanning the full stage height, bounded to a width that never exceeds the viewport, drawn on the solid
-panel background with a left border so it reads as a surface laid over the stage rather than a region
-of it. The drawer SHALL enter and leave by a horizontal slide expressed through the shared motion
-tokens, over a blurred scrim that covers the whole stage. Its header, its scrolling body and its
-optional footer SHALL be one column, and the body SHALL be the drawer's only scrolling region. A drawer
+its top edge inset from the stage top by one persistent command-line strip height (the
+`--command-line-h` token, the reference's 46px clearance) and its bottom edge at the stage bottom,
+bounded to a width that never exceeds the viewport, drawn on the solid panel background with a left
+border so it reads as a surface laid over the stage rather than a region of it. The drawer SHALL
+enter and leave by a horizontal slide expressed through the shared motion tokens, over a blurred
+scrim that covers the whole stage. Its header, its scrolling body and its optional footer SHALL be
+one column, and the body SHALL be the drawer's only scrolling region. The head SHALL render the
+reference's display type scale: the title in the display face at the reference's 20px scale with
+slight tracking, and the subtitle as the small muted line beside it. A drawer
 MAY declare one leading head icon (a decorative, `aria-hidden` glyph rendered before its title); a
 drawer that declares none renders its title with no icon, unchanged. The drawer's close control SHALL
 carry an accessible name (e.g. an `aria-label`) but MAY be rendered icon-only, with no visible text
@@ -719,7 +723,11 @@ protocol carries, so its presence does not depend on any panel's availability.
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
-- **THEN** the drawer slides in against the right edge for the full stage height over a blurred scrim, its body is the only scrolling region, and the stage behind it carries the recession mark
+- **THEN** the drawer slides in against the right edge, its top edge sits one `--command-line-h` below the stage top and its bottom edge at the stage bottom, over a blurred scrim that covers the whole stage, its body is the only scrolling region, and the stage behind it carries the recession mark
+
+#### Scenario: The head carries the reference display type scale
+- **WHEN** a reference drawer renders its head
+- **THEN** the title renders in the display face at the reference's 20px scale with slight tracking and the subtitle renders as the small muted line beside it
 
 #### Scenario: Only one drawer is open at a time
 - **WHEN** a drawer is open and the player opens a different one
