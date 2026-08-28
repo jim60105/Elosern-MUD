@@ -1,8 +1,8 @@
 ## 1. Item Mechanics Registry
 
-- [ ] 1.1 Add immutable usable-item and equipment mechanics definitions to `world.lore.items`, enforce their mutually exclusive validated shapes, and bind `healing_potion` plus existing equipment to canonical mechanics without changing presentation semantics.
-- [ ] 1.2 Add the deterministic item-effect rulebook and loader validation for positive bounded effect data, with healing magnitude read only from that canonical source.
-- [ ] 1.3 Add registry and rulebook tests for valid usable, reusable, equipment, inspect-only, unknown-effect, malformed-slot, and ambiguous definitions.
+- [x] 1.1 Add immutable usable-item and equipment mechanics definitions to `world.lore.items`, enforce their mutually exclusive validated shapes, and bind `healing_potion` plus existing equipment to canonical mechanics without changing presentation semantics.
+- [x] 1.2 Add the deterministic item-effect rulebook and loader validation for positive bounded effect data, with healing magnitude read only from that canonical source.
+- [x] 1.3 Add registry and rulebook tests for valid usable, reusable, equipment, inspect-only, unknown-effect, malformed-slot, and ambiguous definitions.
 
 ## 2. Deterministic Item Use
 

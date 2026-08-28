@@ -1,0 +1,12 @@
+# Deterministic item-effect rulebook (add-inventory-item-actions D1).
+# Item mechanics identity lives in the immutable lore registry; every tunable
+# magnitude and the canonical out-of-combat item-use time cost live here and
+# are read only through the validated loader in world/rules/items.py.
+# Amounts are positive integers bounded by the loader; the world clock settles
+# item_use_seconds through the same command-source advance path as casts.
+
+item_use_seconds: 6
+
+effects:
+  self_heal:
+    amount: 40
