@@ -492,6 +492,8 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
         action = row["action"]
         if action is not None:
             action = _validate_action(action)
+            if action["action_id"] not in (INVENTORY_USE_ACTION, INVENTORY_TOGGLE_ACTION):
+                raise ProtocolValidationError("inventory row action id is not allowed")
         row_views.append(
             {
                 "item_key": item_key,

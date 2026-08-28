@@ -2604,6 +2604,15 @@ test("services v3 validates inventory row actions exactly", () => {
     quantity: null,
   };
   assert.throws(() => Protocol.validateServicesPanel(unknownId));
+  const crossServiceId = validServicesPanel();
+  crossServiceId.inventory.rows[0].action = {
+    action_id: "shop.buy",
+    label: "購買",
+    enabled: true,
+    disabled_reason: null,
+    quantity: null,
+  };
+  assert.throws(() => Protocol.validateServicesPanel(crossServiceId));
   const toggleGood = validServicesPanel();
   toggleGood.inventory.rows[0].action = {
     action_id: "inventory.toggle_equip",

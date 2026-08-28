@@ -10,6 +10,8 @@ free action in both modes.
 
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
@@ -221,6 +223,9 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
             command.func()
         return messages
 
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
     def test_combat_use_consumes_exactly_one_round(self):
         maximum = int(self.player.traits.hp.max)
         self.player.traits.hp.current = maximum - 20
@@ -231,6 +236,9 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(list_items(self.player), [])
 
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
     def test_combat_full_hp_refusal_consumes_no_round(self):
         maximum = int(self.player.traits.hp.max)
         self.player.traits.hp.current = maximum

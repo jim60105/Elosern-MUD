@@ -107,6 +107,7 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "combat_not_allowed": "戰鬥中無法使用這個物品。",
     "unknown_effect": "這個物品的效果尚未設定。",
     "accessory_slots_full": "飾品欄已經滿了，最多同時佩戴五個。",
+    "equipped_item": "已裝備的物品不能這樣賣出。",
     "malformed_inventory": "背包資料有誤。",
     "malformed_traits": "角色資料有誤。",
 }

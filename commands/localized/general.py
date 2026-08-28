@@ -30,6 +30,7 @@ from evennia.utils import utils
 
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment import (
+    EquippedRemovalError,
     InventoryError,
     apply_inventory_plan,
     materialize_registry_object,
@@ -344,6 +345,9 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
                 plan = plan_inventory_delta(
                     caller, removals=tuple(key for _ in range(quantity))
                 )
+            except EquippedRemovalError:
+                caller.msg("你無法丟下已裝備的物品。")
+                return
             except InventoryError:
                 caller.msg(f"你沒有帶著 {key}。")
                 return
@@ -373,6 +377,9 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
         )
         try:
             plan = plan_inventory_delta(caller, removals=removals) if removals else None
+        except EquippedRemovalError:
+            caller.msg("你無法丟下已裝備的物品。")
+            return
         except InventoryError:
             caller.msg(f"你沒有帶著 {key}。")
             return
@@ -438,6 +445,9 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
                     caller, removals=tuple(key for _ in range(quantity))
                 )
                 receiver_plan = _receiver_plan(target, tuple(key for _ in range(quantity)))
+            except EquippedRemovalError:
+                caller.msg("你無法給予已裝備的物品。")
+                return
             except InventoryError:
                 caller.msg(f"你沒有帶著 {key}。")
                 return
@@ -472,6 +482,9 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         try:
             plan = plan_inventory_delta(caller, removals=removals) if removals else None
             receiver_plan = _receiver_plan(target, removals)
+        except EquippedRemovalError:
+            caller.msg("你無法給予已裝備的物品。")
+            return
         except InventoryError:
             caller.msg(f"你沒有帶著 {key}。")
             return

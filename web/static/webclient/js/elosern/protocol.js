@@ -1959,6 +1959,12 @@
       requirePresentation(row.presentation, "inventory row.presentation");
       if (row.action !== null) {
         validateServicesAction(row.action);
+        if (
+          row.action.action_id !== "inventory.use" &&
+          row.action.action_id !== "inventory.toggle_equip"
+        ) {
+          throw new Error("inventory row action id is not allowed");
+        }
       }
     });
     return value;

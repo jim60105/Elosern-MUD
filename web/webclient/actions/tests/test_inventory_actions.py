@@ -69,6 +69,9 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
                 {"item_key": "healing_potion"},
             )
 
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
     def test_authority_like_fields_are_rejected(self):
         cases = (
             {},
@@ -134,7 +137,8 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.assertEqual(self.player.db.wallet, before["wallet"])
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "inventory-item-actions::inventory-actions-publish-all-affected-canonical-panels",
     )
     def test_in_combat_use_occupies_the_round_and_publishes_full_snapshot(self):
         self._hurt(20)

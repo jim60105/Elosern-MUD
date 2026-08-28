@@ -1018,6 +1018,9 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         )
         bad = [
             self._action("mystery.action"),
+            # Cross-service allowlisted ids are never valid row actions.
+            self._action("shop.buy"),
+            self._action("guild.register"),
             self._action("inventory.toggle_equip", quantity={"min": 1, "max": 2}),
             self._action("inventory.use", enabled=False),
             self._action(

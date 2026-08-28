@@ -32,6 +32,10 @@ from world.rules.surfaces import (
 )
 
 
+class EquippedRemovalError(ValueError):
+    """Raised when a removal would drop the last key of an equipped item."""
+
+
 class InventoryError(ValueError):
     """An inventory operation violates the deterministic planning contract."""
 
@@ -141,6 +145,11 @@ def plan_inventory_delta(
                 f"cannot remove {item_key!r}: only {remaining.count(item_key)} held"
             )
         remaining.remove(item_key)
+    conflict = equipped_removal_conflict(entity, removals)
+    if conflict is not None:
+        raise EquippedRemovalError(
+            f"cannot remove {conflict!r}: it is equipped; unequip it first"
+        )
     for item_key in removals:
         after.remove(item_key)
 
@@ -335,6 +344,47 @@ def _normalized_equipment(entity: Any) -> dict | None:
         if definition is None or definition.equipment_slot is not EquipmentSlot.ACCESSORY:
             return None
     return normalized
+
+
+def equipped_removal_conflict(entity: Any, removals: Sequence[str]) -> str | None:
+    """Return the first removal that would leave an equipped key unheld.
+
+    Equipped items must remain in canonical inventory, so an inventory
+    removal that drops the last held occurrence of an equipped key is a
+    contract violation for every removal writer (sell, drop, give, NPC
+    transfer). Fail-closed: malformed equipment storage protects every
+    removal of a registry-declared equipment key.
+    """
+    from collections import Counter
+
+    equipment = _normalized_equipment(entity)
+    counts = Counter(entity.db.inventory or [])
+    removed = Counter(removals)
+
+    def empties(key: str) -> bool:
+        return counts.get(key, 0) - removed.get(key, 0) < 1
+
+    for key in removed:
+        if not empties(key):
+            continue
+        if equipment is None:
+            definition = ITEM_REGISTRY.get(key)
+            if definition is not None and definition.equipment_slot is not None:
+                return key
+            continue
+        stored = set(equipment["accessories"])
+        stored.update(
+            value
+            for value in (
+                equipment["weapon_main"],
+                equipment["weapon_off"],
+                equipment["armor"],
+            )
+            if value is not None
+        )
+        if key in stored:
+            return key
+    return None
 
 
 def normalized_equipment(entity: Any) -> dict | None:

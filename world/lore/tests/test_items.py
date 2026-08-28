@@ -224,6 +224,9 @@ class ItemMechanicsTests(unittest.TestCase):
                 effect_key=ItemEffectKey.SELF_HEAL, consumable=True, combat_allowed=1
             )
 
+    @covers_requirement(
+        "item-use-resolution::item-mechanics-are-immutable-and-independent-from-presentation"
+    )
     def test_ambiguous_and_malformed_mechanics_fail_construction(self):
         cases = {
             "both-forms": dict(

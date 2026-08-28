@@ -308,6 +308,86 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertIsNotNone(read_session(self.player))
 
+    @covers_requirement(
+        "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
+    )
+    def test_upkeep_failure_after_item_use_restores_everything(self):
+        # The item mirror is deleted and HP written before upkeep runs; an
+        # upkeep fault must roll the whole round back through the item
+        # journals (fix-combat-settlement-recovery D1 extended by
+        # add-inventory-item-actions D2).
+        self._hurt(20)
+        self.player.db.inventory = ["healing_potion"]
+        materialize_registry_object(self.player, "healing_potion")
+        mirror_pk = next(
+            obj.id
+            for obj in self.player.contents
+            if registry_key_for_object(obj) == "healing_potion"
+        )
+        hp_before = int(self.player.traits.hp.current)
+        engage(self.player, self.monster)
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("upkeep boom")
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_item_use(self.player, "healing_potion")
+        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(int(self.player.traits.hp.current), hp_before)
+        self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
+        self.assertIn(
+            mirror_pk,
+            [
+                obj.id
+                for obj in self.player.contents
+                if registry_key_for_object(obj) == "healing_potion"
+            ],
+        )
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+
+    @covers_requirement(
+        "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
+    )
+    def test_terminal_settlement_failure_after_item_use_restores_everything(self):
+        self._hurt(20)
+        self.player.db.inventory = ["healing_potion"]
+        materialize_registry_object(self.player, "healing_potion")
+        mirror_pk = next(
+            obj.id
+            for obj in self.player.contents
+            if registry_key_for_object(obj) == "healing_potion"
+        )
+        hp_before = int(self.player.traits.hp.current)
+        engage(self.player, self.monster)
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("settlement boom")
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat_session._continue_or_settle", side_effect=boom),
+        ):
+            with self.assertRaises(RuntimeError):
+                submit_player_item_use(self.player, "healing_potion")
+        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(int(self.player.traits.hp.current), hp_before)
+        self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
+        self.assertIn(
+            mirror_pk,
+            [
+                obj.id
+                for obj in self.player.contents
+                if registry_key_for_object(obj) == "healing_potion"
+            ],
+        )
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+
 
 class CompressedItemTurnTests(EvenniaTestCase):
     def setUp(self):
