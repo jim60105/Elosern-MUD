@@ -104,17 +104,22 @@ test("root menu preserves stable action order and disables placeholders", () => 
   const root = combat.menus.root.items;
   assert.deepEqual(
     root.map((item) => item.key),
-    ["attack", "skills", "items", "defend", "flee", "forfeit"]
+    ["attack", "skills", "items", "bag", "defend", "flee", "forfeit"]
   );
   assert.equal(root[2].enabled, false);
   assert.equal(root[2].disabledReason.code, "not_implemented");
-  assert.equal(root[3].enabled, false);
-  assert.equal(root[4].actionId, "combat.flee");
-  assert.deepEqual(root[4].payload, {});
+  // The client-local 背包 row: enabled, never dispatches, opens the bag.
+  assert.equal(root[3].key, "bag");
+  assert.equal(root[3].enabled, true);
+  assert.equal(root[3].actionId, null);
+  assert.equal(root[3].openDrawer, "inventory");
+  assert.equal(root[4].enabled, false);
+  assert.equal(root[5].actionId, "combat.flee");
+  assert.deepEqual(root[5].payload, {});
   // Forfeit opens the confirmation secondary menu; it never submits directly.
-  assert.equal(root[5].key, "forfeit");
-  assert.equal(root[5].enabled, true);
-  assert.equal(root[5].actionId, null);
+  assert.equal(root[6].key, "forfeit");
+  assert.equal(root[6].enabled, true);
+  assert.equal(root[6].actionId, null);
 });
 
 test("forfeit confirmation menu requires explicit confirm to send", () => {

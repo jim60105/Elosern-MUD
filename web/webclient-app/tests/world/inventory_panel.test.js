@@ -314,3 +314,167 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     expect(source).toContain("inventory-inspector-in");
   });
 });
+
+// add-inventory-item-actions (task 6.4): deliberate activation follows the
+// committed action descriptor — inspect/disabled dispatch nothing, an
+// enabled use opens the labelled confirmation, an enabled toggle dispatches
+// immediately, and every intent emits exactly once to the parent.
+function servicesWithActions() {
+  const useAction = (enabled, reason = null) => ({
+    action_id: "inventory.use",
+    label: "使用",
+    enabled,
+    disabled_reason: enabled ? null : reason,
+    quantity: null,
+  });
+  const toggleAction = (label) => ({
+    action_id: "inventory.toggle_equip",
+    label,
+    enabled: true,
+    disabled_reason: null,
+    quantity: null,
+  });
+  const row = (item_key, display_name, action, equipped = false) => ({
+    item_key,
+    display_name,
+    held: 2,
+    equipped,
+    presentation: { kind: "potion", icon_key: "potion", summary: "恢復體力。", rarity: "common" },
+    action,
+  });
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: {
+      rows: [
+        row("potion_use", "治療藥水", useAction(true)),
+        row("potion_full", "過剩藥水", useAction(false, { code: "hp_full", message: "你的體力已滿。" })),
+        row("sword_toggle", "鐵劍", toggleAction("裝備"), true),
+        row("mystery", "未知物品", null),
+      ],
+      wallet: 3240,
+    },
+  };
+}
+
+describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  function mountActions() {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(InventoryPanel, {
+      attachTo: host,
+      props: {
+        services: servicesWithActions(),
+        character: CHARACTER_PANEL_SAMPLE,
+        wallet: CHARACTER_PANEL_SAMPLE.wallet,
+      },
+    });
+    return wrapper;
+  }
+
+  function bodyByTestId(id) {
+    return document.querySelector(`[data-testid="${id}"]`);
+  }
+
+  it("an enabled inventory.use opens the confirmation and dispatches only on confirm, exactly once", async () => {
+    const w = mountActions();
+    const tile = w.get('[data-testid="inventory-panel__tile--potion_use"]');
+    await tile.trigger("click");
+    expect(w.emitted("use")).toBeUndefined();
+    const dialog = bodyByTestId("inventory-panel__confirm-dialog");
+    expect(dialog).not.toBeNull();
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-label")).toContain("治療藥水");
+    expect(bodyByTestId("inventory-panel__confirm-text").textContent).toContain("治療藥水");
+    // Focus enters the dialog on the confirm control.
+    expect(document.activeElement).toBe(bodyByTestId("inventory-panel__confirm-ok"));
+    bodyByTestId("inventory-panel__confirm-ok").click();
+    await nextTick();
+    expect(w.emitted("use")).toEqual([
+      [{ action_id: "inventory.use", payload: { item_key: "potion_use" } }],
+    ]);
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+  });
+
+  it("cancel, backdrop, and Escape dispatch nothing and restore focus to the originating tile", async () => {
+    for (const close of ["cancel", "backdrop", "escape"]) {
+      const w = mountActions();
+      const tile = w.get('[data-testid="inventory-panel__tile--potion_use"]');
+      await tile.trigger("click");
+      if (close === "cancel") {
+        bodyByTestId("inventory-panel__confirm-cancel").click();
+      } else if (close === "backdrop") {
+        bodyByTestId("inventory-panel__confirm-backdrop").click();
+      } else {
+        bodyByTestId("inventory-panel__confirm").dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      }
+      await nextTick();
+      expect(w.emitted("use")).toBeUndefined();
+      expect(w.emitted("toggle-equip")).toBeUndefined();
+      expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+      expect(document.activeElement).toBe(tile.element);
+      w.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+    }
+  });
+
+  it("a committed panel replacement retires an open confirmation without dispatching", async () => {
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
+    await w.setProps({ services: { ...servicesWithActions() } });
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
+  });
+
+  it("the confirmation trap keeps Tab within the dialog controls", async () => {
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    const ok = bodyByTestId("inventory-panel__confirm-ok");
+    expect(document.activeElement).toBe(ok);
+    ok.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(bodyByTestId("inventory-panel__confirm-cancel"));
+  });
+
+  it("an enabled inventory.toggle_equip dispatches immediately, once, without confirmation", async () => {
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
+    expect(w.emitted("toggle-equip")).toEqual([
+      [{ action_id: "inventory.toggle_equip", payload: { item_key: "sword_toggle" } }],
+    ]);
+    expect(w.emitted("use")).toBeUndefined();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+  });
+
+  it("a disabled action is aria-disabled, spells the committed reason, and dispatches nothing", async () => {
+    const w = mountActions();
+    const tile = w.get('[data-testid="inventory-panel__tile--potion_full"]');
+    expect(tile.attributes("aria-disabled")).toBe("true");
+    await tile.trigger("click");
+    expect(w.emitted("use")).toBeUndefined();
+    expect(w.emitted("toggle-equip")).toBeUndefined();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    // The shared inspector still presents the row and spells the bounded reason.
+    expect(bodyByTestId("inventory-panel__inspector")).not.toBeNull();
+    expect(bodyByTestId("inventory-panel__inspector-reason").textContent).toContain("你的體力已滿。");
+  });
+
+  it("an inspect-only (null action) tile selects and dispatches nothing", async () => {
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--mystery"]').trigger("click");
+    expect(w.emitted("use")).toBeUndefined();
+    expect(w.emitted("toggle-equip")).toBeUndefined();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+  });
+});

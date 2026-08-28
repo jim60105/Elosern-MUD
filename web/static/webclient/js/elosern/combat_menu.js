@@ -120,6 +120,7 @@
       { key: "attack", label: "攻擊", enabled: true, actionId: null, payload: null },
       { key: "skills", label: "技能", enabled: true, actionId: null, payload: null },
       { key: "items", label: "道具", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
+      { key: "bag", label: "背包", enabled: true, actionId: null, payload: null, openDrawer: "inventory" },
       { key: "defend", label: "防禦", enabled: false, actionId: null, payload: null, disabledReason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
       { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" } },
       { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null },

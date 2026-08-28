@@ -684,6 +684,13 @@ export const useElosernStore = defineStore("elosern", () => {
         publishView();
         return;
       }
+      // The client-local 背包 drawer row (add-inventory-item-actions, task
+      // 6.3): activation opens the frameless inventory drawer without a
+      // dispatch, an invented gameplay action, or a router frame.
+      if (item.openDrawer === "inventory") {
+        openHudDrawer("inventory");
+        return;
+      }
       // AREA confirm: build the exact payload from the live selection.
       if (item.confirm && combat.focusSkillKey) {
         const skill = combat.skillByKey[combat.focusSkillKey];

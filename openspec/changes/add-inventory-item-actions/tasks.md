@@ -13,7 +13,7 @@
 
 ## 3. Equipment Toggle And Five Accessories
 
-- [ ] 3.1 Change `ACCESSORY_MAX_SLOTS` from three to five and update every rule, presenter, story, and existing test that currently assumes three.
+- [x] 3.1 Change `ACCESSORY_MAX_SLOTS` from three to five and update every rule, presenter, story, and existing test that currently assumes three.
 - [x] 3.2 Add shared side-effect-free equipment preflight and replace the slot-supplied mutation surface with its ownership-aware, registry-resolved immutable toggle plan and atomic singleton settlement.
 - [x] 3.3 Implement exact item-key accessory removal, distinct-key membership, append below five, and named rejection at five without automatic replacement.
 - [x] 3.4 Add focused tests for unheld and non-equipment rejection, all singleton slots, atomic replacement rollback, removing a middle accessory, five-slot capacity, sixth-item rejection, duplicate prevention, persistence round-trip, and no combat-round or clock cost.
@@ -33,11 +33,11 @@
 
 ## 6. Inventory Drawer Interaction
 
-- [ ] 6.1 Update `InventoryPanel` to preserve hover/focus inspection while making deliberate activation follow the committed nullable action descriptor, including inspect-only and `aria-disabled` reason behavior.
-- [ ] 6.2 Add the accessible item-use confirmation dialog with item naming, focus trap, confirm/cancel/Escape behavior, opener focus restoration, and reset on panel, drawer, mode, epoch, or transport replacement.
-- [ ] 6.3 Add the combat root's client-local `背包` drawer row using the existing frameless `openDrawer` path, route confirmed use and direct equipment toggle through the single Pinia dispatch entry, preserve the in-flight lock, and avoid optimistic quantity/equipped changes.
-- [ ] 6.4 Add Vitest coverage for pointer/keyboard parity, one dispatch, cancel, full-HP refusal, stale confirmation retirement, transport reset, direct equip/unequip/replacement, five accessories, cap warning, unknown items, and canonical post-result rendering.
-- [ ] 6.5 Update Storybook fixtures, stories, and the frozen component-coverage manifest for actionable use, confirmation, disabled reasons, equipment toggle, five accessories, cap warning, unknown items, combat inventory, and unavailable services.
+- [x] 6.1 Update `InventoryPanel` to preserve hover/focus inspection while making deliberate activation follow the committed nullable action descriptor, including inspect-only and `aria-disabled` reason behavior.
+- [x] 6.2 Add the accessible item-use confirmation dialog with item naming, focus trap, confirm/cancel/Escape behavior, opener focus restoration, and reset on panel, drawer, mode, epoch, or transport replacement.
+- [x] 6.3 Add the combat root's client-local `背包` drawer row using the existing frameless `openDrawer` path, route confirmed use and direct equipment toggle through the single Pinia dispatch entry, preserve the in-flight lock, and avoid optimistic quantity/equipped changes.
+- [x] 6.4 Add Vitest coverage for pointer/keyboard parity, one dispatch, cancel, full-HP refusal, stale confirmation retirement, transport reset, direct equip/unequip/replacement, five accessories, cap warning, unknown items, and canonical post-result rendering.
+- [x] 6.5 Update Storybook fixtures, stories, and the frozen component-coverage manifest for actionable use, confirmation, disabled reasons, equipment toggle, five accessories, cap warning, unknown items, combat inventory, and unavailable services.
 
 ## 7. Text Command Parity And Documentation
 

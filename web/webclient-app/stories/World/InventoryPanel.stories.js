@@ -361,3 +361,128 @@ export const WalletSectionAbsent = {
     character: { ...CHARACTER_PANEL_SAMPLE, wallet: null },
   },
 };
+
+// add-inventory-item-actions (task 6.5): the committed row action descriptor
+// states. The 使用 tile opens the labelled item-use confirmation on deliberate
+// activation (try it in this story); the disabled row spells its committed
+// bounded reason in the shared inspector and is aria-disabled; the 裝備 tile
+// toggles directly without confirmation; the null-action tile stays
+// inspect-only. The panel emits every intent to its parent — the story host
+// below records the emitted intent visibly instead of dispatching.
+function actionBag() {
+  const use = (enabled, reason = null) => ({
+    action_id: "inventory.use",
+    label: "使用",
+    enabled,
+    disabled_reason: enabled ? null : reason,
+    quantity: null,
+  });
+  const toggle = (label) => ({
+    action_id: "inventory.toggle_equip",
+    label,
+    enabled: true,
+    disabled_reason: null,
+    quantity: null,
+  });
+  const row = (item_key, display_name, held, equipped, presentation, action) => ({
+    item_key,
+    display_name,
+    held,
+    equipped,
+    presentation,
+    action,
+  });
+  const rows = [
+    row("healing_potion", "治療藥水", 3, false,
+      { kind: "potion", icon_key: "potion", rarity: "rare", summary: "盛裝於小瓶中的治療藥水。" },
+      use(true)),
+    row("glut_potion", "過剩藥水", 1, false,
+      { kind: "potion", icon_key: "potion", rarity: "common", summary: "體力已滿時派不上用場。" },
+      use(false, { code: "hp_full", message: "你的體力已滿。" })),
+    row("item_iron_sword", "鐵劍", 1, true,
+      { kind: "weapon", icon_key: "weapon", rarity: "uncommon", summary: "尋常鐵劍，輕巧耐用。" },
+      toggle("卸下")),
+    row("mystery_charm", "未知物品", 1, false, null, null),
+  ];
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: { rows, wallet: SERVICES_PANEL_SAMPLE.inventory.wallet },
+    pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: rows.length },
+  };
+}
+
+export const RowActionStates = {
+  render: (args) => {
+    const character = args.character ?? null;
+    const open = ref(true);
+    const lastIntent = ref(null);
+    return {
+      render: () =>
+        h(
+          "div",
+          { style: "position: relative; width: 100%; height: 560px; background: var(--ink-950); overflow: hidden;" },
+          [
+            h(
+              HudDrawer,
+              {
+                open: open.value,
+                title: "背包 · 裝備",
+                subtitle: walletSubtitle(args.services, character),
+                icon: "inventory",
+                drawerKey: "inventory",
+                onClose: () => {
+                  open.value = false;
+                },
+              },
+              {
+                default: () =>
+                  h(InventoryPanel, {
+                    services: args.services,
+                    character: character,
+                    wallet: walletCopper(args.services, character),
+                    onUse: (intent) => {
+                      lastIntent.value = `use：${intent.payload.item_key}`;
+                    },
+                    onToggleEquip: (intent) => {
+                      lastIntent.value = `${intent.action_id}：${intent.payload.item_key}`;
+                    },
+                  }),
+              },
+            ),
+            h(
+              "p",
+              {
+                style:
+                  "position: absolute; left: 12px; bottom: 8px; right: 12px; color: var(--paper-500); font-size: 12px;",
+              },
+              lastIntent.value ? `已發出意圖：${lastIntent.value}` : "尚無已發出的背包操作意圖。",
+            ),
+          ],
+        ),
+    };
+  },
+  args: { services: actionBag(), character: CHARACTER_PANEL_SAMPLE },
+};
+
+// The accessory ceiling (add-inventory-item-actions): five committed
+// accessory rows render in full in the doll's 飾品 group — no truncation,
+// and the group label states the committed count.
+function accessoryCapCharacter() {
+  return {
+    ...CHARACTER_PANEL_SAMPLE,
+    equipment: [
+      { slot: "weapon_main", item_key: "item_iron_sword", display_name: "鐵劍" },
+      { slot: "armor", item_key: "item_leather_armor", display_name: "皮甲" },
+      { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+      { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
+      { slot: "accessory", item_key: "ember_ring", display_name: "餘燼戒指" },
+      { slot: "accessory", item_key: "tide_pendant", display_name: "潮聲墜" },
+      { slot: "accessory", item_key: "owl_brooch", display_name: "夜鴉胸針" },
+    ],
+  };
+}
+
+export const AccessoryCapEquipment = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_SAMPLE, character: accessoryCapCharacter() },
+};

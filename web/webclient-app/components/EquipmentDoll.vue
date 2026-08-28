@@ -65,7 +65,7 @@ function slotIcon(slot) {
   return entry && entry.d;
 }
 
-// The accessory group: the 0..3 `accessory` rows (the retained detail list).
+// The accessory group: the 0..5 `accessory` rows (the retained detail list).
 const accessoryRows = computed(() =>
   equipment.value.filter((row) => row.slot === "accessory"),
 );
@@ -206,7 +206,7 @@ const duplicateRows = computed(() => {
             class="equipment-doll__description-row"
             data-testid="equipment-doll__description-row--accessory"
           >
-            <!-- The retained accessory detail group (0..3 accessory rows),
+            <!-- The retained accessory detail group (0..5 accessory rows),
                  now in the description column under its slot label. -->
             <section
               class="equipment-doll__accessories"

@@ -70,6 +70,20 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     expect(accessoryGroup.get('[data-testid="equipment-doll__accessory--speed_charm"]').text()).toContain("迅捷護符");
   });
 
+  it("renders all five committed accessory rows (the 5-slot accessory cap)", () => {
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      slot: "accessory",
+      item_key: `acc_cap_${i + 1}`,
+      display_name: `護符 ${i + 1}`,
+    }));
+    const w = mountDoll({ character: characterWith(rows) });
+    const group = w.get('[data-testid="equipment-doll__description-row--accessory"]');
+    expect(group.text()).toContain("飾品 · 5 件");
+    for (let i = 1; i <= 5; i += 1) {
+      expect(group.get(`[data-testid="equipment-doll__accessory--acc_cap_${i}"]`).exists()).toBe(true);
+    }
+  });
+
   it("renders each committed row exactly once, and pure v4 rows show no fabricated values", () => {
     // Pure committed shape: { slot, item_key, display_name } and nothing
     // more (the character panel's row validator rejects extra fields).

@@ -10,8 +10,12 @@
 // `services` panel's presentation metadata, and a `金錢` section rendering
 // the committed wallet as one labelled row with grouped integer copper. One
 // non-interactive inspector is shared by pointer hover and keyboard focus;
-// selection is client-local, resets when the committed panel data is
-// replaced, and no action is dispatched on click.
+// selection is client-local and resets when the committed panel data is
+// replaced (which also retires an open item-use confirmation). Deliberate
+// activation follows the row's committed action descriptor: inspect-only and
+// disabled rows dispatch nothing, an enabled `inventory.use` opens a labelled
+// confirmation, and an enabled `inventory.toggle_equip` emits immediately;
+// every intent is emitted to the parent, which owns the single dispatch.
 import { computed, nextTick, ref, watch } from "vue";
 import EquipmentDoll from "./EquipmentDoll.vue";
 import { formatCopper } from "./character-identity.js";
@@ -32,6 +36,10 @@ const props = defineProps({
   // body can never disagree. Absent (null) renders no row — never a zero.
   wallet: { type: Number, required: false, default: null },
 });
+
+// Row-action intents are published to the parent (AppClient), which owns the
+// single store dispatch path — the panel itself never touches the transport.
+const emit = defineEmits(["use", "toggle-equip"]);
 
 // The registry-owned unavailable form (available: false) carries only the
 // reason — no rows, no default wallet value.
@@ -81,8 +89,13 @@ watch(
   () => {
     // Every committed panel replacement resets the client-local selection so
     // stale inventory metadata is never presented (design: "every panel
-    // replacement resets selection").
+    // replacement resets selection"), and retires an open item-use
+    // confirmation — the descriptor it was opened against is no longer
+    // authoritative (stale-before-adapter guarantee).
     selectedKey.value = null;
+    if (confirming.value) {
+      closeConfirmation();
+    }
   },
 );
 
@@ -155,10 +168,96 @@ function onTileBlur(event) {
   }
 }
 
-function onTileClick(event) {
-  // Presentational selection only — no action is dispatched.
-  selectedKey.value = event.currentTarget.dataset.key;
+// Deliberate activation (click, Enter, or Space on the native tile button —
+// pointer and keyboard route through the same handler): the tile first
+// selects itself, then follows its committed action descriptor. An absent
+// descriptor (inspect-only / unknown item) or a disabled action dispatches
+// nothing; an enabled `inventory.use` opens the labelled confirmation; an
+// enabled `inventory.toggle_equip` dispatches immediately without one.
+function onTileActivate(event) {
+  const key = event.currentTarget.dataset.key;
+  selectedKey.value = key;
+  const row = rows.value.find((r) => r.item_key === key);
+  const action = row && row.action;
+  if (!action || action.enabled !== true) {
+    return;
+  }
+  if (action.action_id === "inventory.toggle_equip") {
+    emit("toggle-equip", {
+      action_id: "inventory.toggle_equip",
+      payload: { item_key: row.item_key },
+    });
+  } else if (action.action_id === "inventory.use") {
+    openerEl = event.currentTarget;
+    confirming.value = { itemKey: row.item_key, displayName: row.display_name };
+  }
 }
+
+// ---- Item-use confirmation (add-inventory-item-actions, task 6.2): a
+// labelled modal named after the committed display name. Confirm dispatches
+// exactly once through the parent; cancel, close, backdrop, and Escape
+// dispatch nothing and restore focus to the originating tile. Every
+// committed panel replacement retires an open confirmation (the descriptor
+// it was opened against is no longer authoritative).
+const confirming = ref(null);
+const dialogEl = ref(null);
+let openerEl = null;
+
+function closeConfirmation(restoreFocus = true) {
+  confirming.value = null;
+  const opener = openerEl;
+  openerEl = null;
+  if (restoreFocus && opener && document.contains(opener)) {
+    opener.focus();
+  }
+}
+
+function onConfirmUse() {
+  if (!confirming.value) {
+    return;
+  }
+  emit("use", {
+    action_id: "inventory.use",
+    payload: { item_key: confirming.value.itemKey },
+  });
+  closeConfirmation();
+}
+
+function onConfirmKeydown(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeConfirmation();
+    return;
+  }
+  if (event.key === "Tab" && dialogEl.value) {
+    // Focus stays on the dialog's own controls.
+    const controls = dialogEl.value.querySelectorAll("button");
+    if (controls.length === 0) {
+      return;
+    }
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+}
+
+// Opening the confirmation moves focus into the dialog (onto 使用).
+watch(confirming, (open) => {
+  if (open) {
+    nextTick(() => {
+      if (dialogEl.value) {
+        const target = dialogEl.value.querySelector("[data-confirm-focus]");
+        (target || dialogEl.value).focus();
+      }
+    });
+  }
+});
 
 // Keep the inspector contained in the drawer body: positioned below the
 // anchor tile, flipping above when it would leave the panel's visible
@@ -244,12 +343,13 @@ watch(selectedKey, () => {
             :data-equipped="String(!!row.equipped)"
             :data-unknown="String(!row.presentation)"
             :aria-label="row.display_name"
+            :aria-disabled="row.action && row.action.enabled === false ? 'true' : undefined"
             :aria-describedby="selectedKey === row.item_key ? 'inventory-panel-inspector' : undefined"
             @pointerenter="onTileEnter"
             @pointerleave="onTileLeave"
             @focus="onTileFocus"
             @blur="onTileBlur"
-            @click="onTileClick"
+            @click="onTileActivate"
           >
             <svg class="inventory-panel__icon" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none">
               <path :d="tileIconPath(row)" stroke="currentColor" stroke-width="1.6" />
@@ -309,6 +409,15 @@ watch(selectedKey, () => {
       <div v-if="kindWord(activeRow)" class="inventory-panel__inspector-kind" data-testid="inventory-panel__inspector-kind">
         {{ kindWord(activeRow) }}
       </div>
+      <!-- The committed bounded disabled reason for a non-activatable row
+           action — spelled verbatim, never invented, never a silent no-op. -->
+      <div
+        v-if="activeRow.action && activeRow.action.enabled === false && activeRow.action.disabled_reason"
+        class="inventory-panel__inspector-reason"
+        data-testid="inventory-panel__inspector-reason"
+      >
+        {{ activeRow.action.disabled_reason.message }}
+      </div>
       <div v-if="activeRow.presentation && activeRow.presentation.summary" class="inventory-panel__inspector-summary" data-testid="inventory-panel__inspector-summary">
         {{ activeRow.presentation.summary }}
       </div>
@@ -319,6 +428,53 @@ watch(selectedKey, () => {
         </span>
       </div>
     </div>
+
+    <!-- The labelled item-use confirmation modal (task 6.2), teleported to
+         the document body so drawer overflow never clips it. Focus enters
+         on 使用, Escape/cancel/backdrop dispatch nothing and restore focus
+         to the originating tile, and Tab stays within the dialog. -->
+    <Teleport to="body">
+      <div
+        v-if="confirming"
+        class="inventory-confirm"
+        data-testid="inventory-panel__confirm"
+        @keydown="onConfirmKeydown"
+      >
+        <div class="inventory-confirm__backdrop" data-testid="inventory-panel__confirm-backdrop" @click="closeConfirmation()"></div>
+        <div
+          ref="dialogEl"
+          class="inventory-confirm__dialog"
+          data-testid="inventory-panel__confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="`使用 ${confirming.displayName}`"
+        >
+          <h3 class="inventory-confirm__title">使用物品</h3>
+          <p class="inventory-confirm__text" data-testid="inventory-panel__confirm-text">
+            確定要使用「{{ confirming.displayName }}」？
+          </p>
+          <div class="inventory-confirm__actions">
+            <button
+              type="button"
+              class="inventory-confirm__cancel"
+              data-testid="inventory-panel__confirm-cancel"
+              @click="closeConfirmation()"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="inventory-confirm__ok"
+              data-confirm-focus
+              data-testid="inventory-panel__confirm-ok"
+              @click="onConfirmUse"
+            >
+              使用
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </aside>
 </template>
 
@@ -604,5 +760,78 @@ watch(selectedKey, () => {
   font-family: var(--f-mono);
   font-size: 11.5px;
   margin-top: 3px;
+}
+
+.inventory-panel__inspector-reason {
+  color: var(--gold-400);
+  font-size: 11.5px;
+  margin-top: 5px;
+}
+
+/* The item-use confirmation modal (teleported to the document body). */
+.inventory-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  font-family: var(--f-sans);
+}
+
+.inventory-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 55%);
+}
+
+.inventory-confirm__dialog {
+  position: relative;
+  width: min(320px, calc(100vw - 32px));
+  background: var(--panel-solid);
+  border: 1px solid var(--ink-600);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+
+.inventory-confirm__title {
+  margin: 0 0 8px;
+  color: var(--paper-50);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inventory-confirm__text {
+  margin: 0 0 16px;
+  color: var(--paper-300);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.inventory-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.inventory-confirm__cancel,
+.inventory-confirm__ok {
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.inventory-confirm__cancel {
+  background: transparent;
+  border: 1px solid var(--ink-600);
+  color: var(--paper-300);
+}
+
+.inventory-confirm__ok {
+  background: var(--gold-500);
+  border: 1px solid var(--gold-500);
+  color: var(--ink-900);
+  font-weight: 600;
 }
 </style>

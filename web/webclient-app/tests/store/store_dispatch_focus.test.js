@@ -251,12 +251,34 @@ describe("store dispatch + focus", () => {
       expect(store.focusPress("ArrowRight")).toBe(true);
       expect(store.view.focus.key).toBe("items");
       expect(store.focusPress("ArrowRight")).toBe(true);
+      expect(store.view.focus.key).toBe("bag");
+      expect(store.focusPress("ArrowRight")).toBe(true);
       expect(store.view.focus.key).toBe("defend");
       expect(store.focusPress("ArrowRight")).toBe(true);
       expect(store.view.focus.key).toBe("flee");
       expect(store.focusPress("ArrowRight")).toBe(true);
       expect(store.view.focus.key).toBe("forfeit");
       expect(store.view.focus.label).toBe("投降");
+    });
+
+    it("the combat root 背包 row opens the inventory drawer without any dispatch", () => {
+      openSession();
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({ revision: 2, panels: { context_actions: fx.combatActions() } })],
+        {},
+      );
+      // Walk attack → skills → items → bag (the client-local drawer row).
+      for (let i = 0; i < 3; i += 1) {
+        store.focusPress("ArrowRight");
+      }
+      expect(store.view.focus.key).toBe("bag");
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.view.hudDrawer).toBe("inventory");
+      // No OOB packet, no router frame pushed (the frame stays the root).
+      expect(sender.sent.actions.length).toBe(0);
+      expect(store.view.dockDepth).toBe(1);
     });
 
     it("rebuilds the frame only when the committed panel content changes", () => {
