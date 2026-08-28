@@ -13,7 +13,7 @@ import * as fx from "./protocol_fixtures.js";
 // service frame) so `ServiceMenu.buildMenus` yields a valid `menus.quests`.
 function servicesPanel() {
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "services",
     host: null,

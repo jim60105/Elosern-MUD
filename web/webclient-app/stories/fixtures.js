@@ -1065,7 +1065,7 @@ export const ART_PANEL_UNAVAILABLE_SAMPLE = {
 // present). Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -1164,14 +1164,15 @@ export const SERVICES_PANEL_SAMPLE = {
   },
   inventory: {
     rows: [
-      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true, presentation: null },
-      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true, presentation: null },
-      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false, presentation: null },
+      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true, presentation: null, action: null },
+      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true, presentation: null, action: null },
+      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false, presentation: null, action: null },
       {
         item_key: "healing_potion",
         display_name: "治療藥水",
         held: 2,
         equipped: false,
+        action: null,
         presentation: {
           kind: "potion",
           icon_key: "potion",
@@ -1206,6 +1207,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "普通餐食",
         held: 5,
         equipped: false,
+        action: null,
         presentation: {
           kind: "food",
           icon_key: "food",
@@ -1218,6 +1220,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "治療藥水",
         held: 3,
         equipped: false,
+        action: null,
         presentation: {
           kind: "potion",
           icon_key: "potion",
@@ -1230,6 +1233,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "普通劍",
         held: 1,
         equipped: true,
+        action: null,
         presentation: {
           kind: "weapon",
           icon_key: "weapon",
@@ -1242,6 +1246,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "皮甲",
         held: 1,
         equipped: true,
+        action: null,
         presentation: {
           kind: "armor",
           icon_key: "armor",
@@ -1254,6 +1259,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "霧隱護符",
         held: 2,
         equipped: true,
+        action: null,
         presentation: {
           kind: "accessory",
           icon_key: "accessory",
@@ -1266,6 +1272,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "皮箭",
         held: 12,
         equipped: false,
+        action: null,
         presentation: {
           kind: "ammunition",
           icon_key: "ammunition",
@@ -1278,6 +1285,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "燭",
         held: 4,
         equipped: false,
+        action: null,
         presentation: {
           kind: "tool",
           icon_key: "tool",
@@ -1290,6 +1298,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "鐵錠",
         held: 2,
         equipped: false,
+        action: null,
         presentation: {
           kind: "material",
           icon_key: "material",
@@ -1302,6 +1311,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
         display_name: "行囊",
         held: 1,
         equipped: false,
+        action: null,
         presentation: {
           kind: "misc",
           icon_key: "misc",
@@ -1319,7 +1329,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -1327,7 +1337,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop/inventory sections
 // (all null with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   kind: "services",
   host: null,
