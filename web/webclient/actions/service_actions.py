@@ -16,12 +16,21 @@ from typing import Any
 
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
 from world.lore.guild import GUILD_RANK_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
     QuestNotFound,
 )
+from world.rules.combat_result import emit_settlement, settle_to_oob_result
+from world.rules.combat_session import (
+    CombatSessionError,
+    is_in_active_session,
+    submit_player_item_use,
+)
 from world.rules.economy import TradeError, buy, sell
+from world.rules.equipment import toggle_equipment
+from world.rules.event_log import render_plain_text
 from world.rules.guild import (
     GuildDataError,
     GuildError,
@@ -39,7 +48,9 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
+from world.rules.items import use_item
 from world.rules.npc_schedules import interaction_reason
+from world.rules.player_messages import session_reason_message
 from world.rules.service_messages import rejection_code, rejection_message
 
 # Wire limits (equal to or below the protocol identifier bound).
@@ -152,6 +163,23 @@ def validate_sell_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return _validate_trade_payload(payload, "shop.sell")
 
 
+def _validate_inventory_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    body = _exact_single_field(payload, "item_key")
+    return {"item_key": _require_non_empty_string(
+        body["item_key"], "item_key", MAX_KEY_CODE_POINTS
+    )}
+
+
+def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``inventory.use`` payload (one item key)."""
+    return _validate_inventory_item_payload(payload)
+
+
+def validate_inventory_toggle_equip_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``inventory.toggle_equip`` payload (one item key)."""
+    return _validate_inventory_item_payload(payload)
+
+
 # ---------------------------------------------------------------------------
 # Adapter helpers.
 # ---------------------------------------------------------------------------
@@ -171,6 +199,11 @@ def _resolve_local(actor: Any, component_class: type, absent: str, ambiguous: st
 def _rejected(reason: Any) -> dict[str, Any]:
     code = rejection_code(reason)
     return {"outcome": "rejected", "code": code, "message": rejection_message(reason)}
+
+
+def _session_rejected(reason: Any) -> dict[str, Any]:
+    code = str(reason)
+    return {"outcome": "rejected", "code": code, "message": session_reason_message(code)}
 
 
 def _schedule_rejected(host: Any, interaction_kind: str) -> dict[str, Any] | None:
@@ -377,11 +410,73 @@ def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     return _success("sold", message, AFFECTED_TRADE)
 
 
+def _item_display_name(item_key: str) -> str:
+    definition = ITEM_REGISTRY.get(item_key)
+    return definition.display_name_zh if definition is not None else item_key
+
+
+def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Resolve actor mode and delegate one item use to its deterministic facade.
+
+    In an active combat session the request occupies one initiative-ordered
+    round through ``submit_player_item_use``; out of combat it settles with
+    its canonical six-second world cost through ``use_item``. Success always
+    publishes a full snapshot (empty affected-panel set).
+    """
+    del session
+    item_key = payload["item_key"]
+    if is_in_active_session(actor):
+        try:
+            result = submit_player_item_use(actor, item_key)
+        except CombatSessionError as error:
+            return _session_rejected(error.args[0])
+        if result["outcome"] == "rejected":
+            return _rejected(result.get("reason"))
+        emit_settlement(actor, result)
+        settled = settle_to_oob_result(result)
+        settled["affected_panels"] = ()
+        return settled
+    settlement = use_item(actor, item_key)
+    result = settlement.result
+    if result.outcome != "success":
+        return _rejected(result.reason)
+    message = render_plain_text(result.event_log)
+    actor.msg(message)
+    return _success("item_used", message, ())
+
+
+def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Delegate one ownership-aware equipment toggle (a free action)."""
+    del session
+    item_key = payload["item_key"]
+    result = toggle_equipment(actor, item_key)
+    if result.outcome != "success":
+        return _rejected(result.reason)
+    display = _item_display_name(item_key)
+    if result.action == "unequip-singleton":
+        message = f"你卸下了 {display}。"
+    elif result.action == "unequip-accessory":
+        message = f"你除下了 {display}。"
+    elif result.action == "equip-accessory":
+        message = f"你佩戴了 {display}。"
+    elif result.replaced_key is not None:
+        message = (
+            f"你裝備了 {display}，原本的 {_item_display_name(result.replaced_key)}"
+            " 已收回背包。"
+        )
+    else:
+        message = f"你裝備了 {display}。"
+    actor.msg(message)
+    return _success("equipment_toggled", message, ())
+
+
 __all__ = [
     "ServiceActionError",
     "validate_buy_payload",
     "validate_exam_start_payload",
     "validate_guild_register_payload",
+    "validate_inventory_toggle_equip_payload",
+    "validate_inventory_use_payload",
     "validate_quest_abandon_payload",
     "validate_quest_accept_payload",
     "validate_quest_turnin_payload",

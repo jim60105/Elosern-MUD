@@ -57,6 +57,8 @@ from world.rules.guild_offers import (
 )
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.skills.equipment import list_items
+from world.rules.equipment import preflight_equipment_toggle
+from world.rules.items import ItemUseRequest, preflight_item_use
 
 # Presentation bounds owned by the services view (equal or below the wire
 # limits enforced by web.webclient.presentation.services).
@@ -75,6 +77,10 @@ ACTION_TURNIN = "guild.quest_turnin"
 ACTION_EXAM_START = "guild.exam_start"
 ACTION_BUY = "shop.buy"
 ACTION_SELL = "shop.sell"
+
+# Personal item actions available in exploration and combat alike.
+ACTION_USE = "inventory.use"
+ACTION_TOGGLE_EQUIP = "inventory.toggle_equip"
 
 
 class ServicesViewError(ValueError):
@@ -238,7 +244,11 @@ class InventoryRowView:
     ``presentation`` carries the immutable registry visual identity for a
     registered item key; unknown but structurally valid keys carry ``None``
     so the UI can render a neutral unknown-item state without a fabricated
-    category, icon, rarity, or summary.
+    category, icon, rarity, or summary. ``action`` is the single nullable
+    personal-item descriptor derived from the shared side-effect-free
+    preflight APIs: ``inventory.use`` for a usable item,
+    ``inventory.toggle_equip`` for equipment, and ``None`` for unknown or
+    inspect-only keys.
     """
 
     item_key: str
@@ -246,6 +256,7 @@ class InventoryRowView:
     held: int
     equipped: bool
     presentation: ItemPresentation | None = None
+    action: ActionDescriptorView | None = None
 
 
 @dataclass(frozen=True)
@@ -699,8 +710,60 @@ def _equipped_keys(actor: Any) -> set[str]:
     return set(keys)
 
 
+def _reason_message(code: str) -> str:
+    return SERVICE_REASON_MESSAGES.get(code, "此操作目前無法完成。")
+
+
+def _descriptor(
+    action_id: str,
+    label: str,
+    reason: str | None,
+) -> ActionDescriptorView:
+    """Build one personal-item descriptor with the shared reason-message map."""
+    enabled = reason is None
+    return ActionDescriptorView(
+        action_id=action_id,
+        label=label,
+        enabled=enabled,
+        reason_code=None if enabled else reason,
+        reason_message=None if enabled else _reason_message(str(reason)),
+        quantity_min=None,
+        quantity_max=None,
+    )
+
+
+def _inventory_row_action(
+    actor: Any,
+    item_key: str,
+    definition: Any,
+    equipped: bool,
+    in_combat: bool,
+) -> ActionDescriptorView | None:
+    """Derive the row's single personal-item action descriptor.
+
+    Enablement comes only from the shared side-effect-free deterministic
+    preflight APIs (``preflight_item_use`` / ``preflight_equipment_toggle``);
+    unknown and inspect-only registry keys carry no descriptor at all.
+    """
+    if definition is None:
+        return None
+    if definition.use_mechanics is not None:
+        preflight = preflight_item_use(
+            ItemUseRequest(actor=actor, item_key=item_key), in_combat=in_combat
+        )
+        reason = None if preflight.allowed else str(preflight.reason.value)
+        return _descriptor(ACTION_USE, "使用", reason)
+    if definition.equipment_slot is not None:
+        preflight = preflight_equipment_toggle(actor, item_key)
+        reason = None if preflight.allowed else str(preflight.reason.value)
+        return _descriptor(
+            ACTION_TOGGLE_EQUIP, "卸下" if equipped else "裝備", reason
+        )
+    return None
+
+
 def _build_inventory(
-    actor: Any, wallet: int
+    actor: Any, wallet: int, *, in_combat: bool
 ) -> tuple[InventorySectionView | None, str | None]:
     try:
         items = list_items(actor)
@@ -712,13 +775,17 @@ def _build_inventory(
     for item_key in sorted(counts):
         definition = ITEM_REGISTRY.get(item_key)
         display_name = definition.display_name_zh if definition is not None else item_key
+        row_equipped = item_key in equipped
         rows.append(
             InventoryRowView(
                 item_key=item_key,
                 display_name=display_name,
                 held=counts[item_key],
-                equipped=item_key in equipped,
+                equipped=row_equipped,
                 presentation=definition.presentation if definition is not None else None,
+                action=_inventory_row_action(
+                    actor, item_key, definition, row_equipped, in_combat
+                ),
             )
         )
         if len(rows) >= MAX_INVENTORY_ROWS:
@@ -732,8 +799,13 @@ def build_services_view(actor: Any) -> ServicesView:
     A missing world-clock singleton or an unreadable player summary raises
     ``ServicesViewError`` so the caller can choose the whole-panel unavailable
     form; a failure confined to one surface is recorded as that surface's
-    stable reason while the rest of the panel stays healthy.
+    stable reason while the rest of the panel stays healthy. During an active
+    combat session the remote service surfaces (host, guild, shop) are forced
+    null with zero pagination totals while the canonical player and personal
+    inventory surfaces stay available with combat-mode preflight state.
     """
+    from world.rules.combat_session import is_in_active_session
+
     clock = read_world_clock()
     if clock is None:
         raise ServicesViewError("world clock is absent")
@@ -742,14 +814,23 @@ def build_services_view(actor: Any) -> ServicesView:
     wallet = _read_wallet(actor)
 
     player = _build_player(actor, wallet, catalog)
-    staff, staff_reason = _resolve_host(actor, GuildStaff)
-    examiner, _ = _resolve_host(actor, GuildExaminer)
-    merchant_host, merchant_reason = _resolve_host(actor, Merchant)
-    host = _build_host(staff, merchant_host)
-
-    guild, guild_reason = _build_guild(actor, staff, staff_reason, examiner, catalog, tick)
-    shop, shop_reason = _build_shop(actor, merchant_host, merchant_reason, catalog, tick, wallet)
-    inventory, inventory_reason = _build_inventory(actor, wallet)
+    in_combat = is_in_active_session(actor)
+    if in_combat:
+        guild, guild_reason = None, None
+        shop, shop_reason = None, None
+        host = None
+    else:
+        staff, staff_reason = _resolve_host(actor, GuildStaff)
+        examiner, _ = _resolve_host(actor, GuildExaminer)
+        merchant_host, merchant_reason = _resolve_host(actor, Merchant)
+        host = _build_host(staff, merchant_host)
+        guild, guild_reason = _build_guild(
+            actor, staff, staff_reason, examiner, catalog, tick
+        )
+        shop, shop_reason = _build_shop(
+            actor, merchant_host, merchant_reason, catalog, tick, wallet
+        )
+    inventory, inventory_reason = _build_inventory(actor, wallet, in_combat=in_combat)
 
     return ServicesView(
         host=host,
@@ -777,7 +858,9 @@ __all__ = [
     "ACTION_EXAM_START",
     "ACTION_REGISTER",
     "ACTION_SELL",
+    "ACTION_TOGGLE_EQUIP",
     "ACTION_TURNIN",
+    "ACTION_USE",
     "ActionDescriptorView",
     "BoardRowView",
     "GuildSectionView",

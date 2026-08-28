@@ -143,6 +143,8 @@ class RegistryTests(unittest.TestCase):
                     "guild.exam_start",
                     "shop.buy",
                     "shop.sell",
+                    "inventory.use",
+                    "inventory.toggle_equip",
                     "creation.preset",
                     "creation.custom",
                     "creation.concept",
