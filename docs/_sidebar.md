@@ -17,9 +17,11 @@
   - [WebClient 情境 HUD 重設計路線圖](/superpowers/specs/2026-08-25-webclient-hud-redesign-roadmap-design)
   - [Vue 元件展示](/development/frontend-developer-guide)
 
-- Developer guides
+- 開發者指南
   - [新增魔法指南](/development/adding-spells)
-  - [OpenSpec test traceability](/development/spec-test-traceability)
+  - [OpenSpec 測試可追溯性](/development/spec-test-traceability)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
+  - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)
   - [Vue 前端開發指南](/development/frontend-developer-guide)
+  - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)

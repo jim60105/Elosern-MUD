@@ -48,10 +48,7 @@ uv run --locked python -m compileall -q world typeclasses commands server
 git diff --check
 ```
 
-`server/db/evennia-test.sqlite3` is reserved for the retained test profile. If
-migrations change or retained-state failures appear, omit `--keepdb` and add
-`--noinput`, or remove only that file before rerunning. Do not remove
-`server/db/evennia.db3`.
+`server/db/evennia-test.sqlite3` 專供保留測試設定檔使用。若資料庫遷移有所變更，或出現保留狀態導致的失敗，可在重新執行時略過 `--keepdb` 並加上 `--noinput`，或於重新執行前僅刪除該檔案。請勿刪除 `server/db/evennia.db3`。
 
 OpenSpec 變更中的內容工作還需遵循該變更的 `tasks.md`。在交付前，執行 `openspec validate <change> --strict`，並確認勾選的工作項目都有對應的已驗證實作。
 

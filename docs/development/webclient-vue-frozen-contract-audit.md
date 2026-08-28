@@ -1,40 +1,23 @@
-# WebClient Phase-0 Frozen Contract Audit
+# WebClient Phase-0 凍結契約審查（Frozen Contract Audit）
 
-**Status:** FROZEN by `webclient-vue-00-audit-and-design-docs` (roadmap change **A1**).
-**Governing roadmap:** `docs/superpowers/specs/2026-08-19-webclient-vue-migration-roadmap-design.md`.
-**Binding consumers:**
+**狀態：** 由 `webclient-vue-00-audit-and-design-docs`（路線圖變更 **A1**）凍結（FROZEN）。
+**指導路線圖：** `docs/superpowers/specs/2026-08-19-webclient-vue-migration-roadmap-design.md`。
+**約束性消費者（Binding consumers）：**
 
-- `webclient-vue-08-wire-bridge-contracts` (**C2**) is the **binding consumer** of the frozen
-  façade-bridge surface (§1) and applies the delta entries that name it (§3).
-- `webclient-vue-10-wire-views-browser` (**C4**) applies the flip-time delta entries that name it
-  (§3) and executes the DOM remap decisions (§2.3).
+- `webclient-vue-08-wire-bridge-contracts`（**C2**）為凍結 façade 橋接介面（§1）的**約束性消費者（binding consumer）**，並套用指定它的增量項目（§3）。
+- `webclient-vue-10-wire-views-browser`（**C4**）套用指定它的切換期增量項目（§3），並執行 DOM 重新對應決策（§2.3）。
 
-This document is the Phase-0 contract audit of the Phase-0 design (A1 design D1/D2): it enumerates
-every implementation-bound client contract across `openspec/specs/webclient-*/spec.md` (the 17
-`webclient-*` main capabilities) and the managed Playwright suite `web/tests/browser/`, classifies
-each contract as preserve-via-bridge or delta, and freezes (a) the exact `window.Elosern.*`
-façade-bridge surface the browser bridge (C2) must expose and (b) the complete `MODIFIED`/`RENAMED`
-delta list. The deltas are **not applied by A1**; each entry names its applying change.
+本文件為 Phase-0 設計（A1 設計 D1/D2）的 Phase-0 契約審查：列舉了 `openspec/specs/webclient-*/spec.md`（17 個 `webclient-*` 主要能力）與受管 Playwright 套件 `web/tests/browser/` 中所有綁定實作的客戶端契約，將每個契約分類為「透過橋接保留」或「增量變更」，並凍結 (a) 瀏覽器橋接器（C2）必須暴露的確切 `window.Elosern.*` façade 橋接介面，以及 (b) 完整的 `MODIFIED`/`RENAMED` 增量清單。增量**不由 A1 套用**；每個項目皆註明其套用變更。
 
-Enumeration method (A1 design D2): grep-driven. Every occurrence of `window.Elosern.`, the
-`onKeydown` plugin path, `getElementById` / `#`-id targets in the Playwright suite and the keyboard
-router, and the layout-persistence keys was captured, then classified; classification sites in the
-client source (`web/static/webclient/js/`) and in `web/templates/webclient/base.html` were read to
-pin definition evidence. The façade member lists in §1 were derived mechanically from the UMD
-modules themselves (Node `Object.keys` on `protocol.js` and `keyboard_router.js`), not transcribed.
+列舉方法（A1 設計 D2）：grep 驅動。擷取了所有出現的 `window.Elosern.`、`onKeydown` 外掛路徑、Playwright 套件與鍵盤路由器中的 `getElementById` 與 `#`-id 目標，以及版面配置持久化索引鍵，並加以分類；讀取了客戶端原始碼（`web/static/webclient/js/`）與 `web/templates/webclient/base.html` 中的分類位置以確立定義證據。§1 中的 façade 成員清單是直接從 UMD 模組本身機械式衍生（在 `protocol.js` 與 `keyboard_router.js` 上執行 Node `Object.keys`），而非手動抄錄。
 
-Every implementation-bound identifier in this document lands in exactly one bucket (§2). No
-identifier is classified twice, and no bucket entry is left without a rationale.
+本文件中的每個實作綁定識別碼皆恰好落入單一分組（§2）。沒有任何識別碼被重複分類，且每個分組項目皆具備理由說明。
 
 ---
 
 ## 1. Frozen façade-bridge surface
 
-The browser bridge (C2) SHALL expose exactly these four façades at `window.Elosern.*` with exactly
-these members. `Protocol` and `KeyboardRouter` are the preserved UMD modules themselves, attached
-byte-identical (the bridge re-exposes the import; it does not re-implement). `narrativeInput` and
-`actions` are the single-owner façades: the store's one narrative/choice-point append path and the
-one action-dispatch entry, respectively.
+瀏覽器橋接器（C2）應在 `window.Elosern.*` 恰好暴露這四個 façade，且恰好包含這些成員。`Protocol` 與 `KeyboardRouter` 為保留的 UMD 模組本身，以位元組完全相同的方式附加（橋接器重新暴露匯入，不重新實作）。`narrativeInput` 與 `actions` 為單一擁有者 façade：分別為 store 的單一敘事／抉擇點附加路徑，以及單一動作分派進入點。
 
 ```json
 {
@@ -283,81 +266,52 @@ one action-dispatch entry, respectively.
 }
 ```
 
-Façade notes (behavioral contract; the bridge must preserve behavior, not just names):
+Façade 說明（行為契約，橋接器必須保留行為而不僅僅是名稱）：
 
-- **`Protocol`** — the transport-generation reducer and its validator table. `createStore`
-  returns the store surface `create_store_members` (atomic snapshot adoption, epoch/revision
-  gating, retired-epoch set, one-notification-per-commit semantics — the behavior fixed by the
-  `webclient-oob-protocol` and `webclient-desktop-shell` state-reduction requirements). The
-  `envelope_names` list is the exact versioned OOB message set (`PROTOCOL_VERSION = 1`).
-- **`KeyboardRouter`** — the menu-stack focus router. `createRouter(options)` returns a router
-  with exactly `router_instance_members`; `handle(key, repeat)` is the single key-entry adapter.
-  Claim semantics: `press`/`handle` returns `true` exactly when the router consumed the key
-  (arrows/Enter/Escape/Space/`/`), and repeated Enter/Space are suppressed; unconsumed keys
-  return `false` and fall through. `setMutationInFlight`/`isAwaitingRevision` are the
-  submission gates. The production `window.Elosern.keyboard` instance is an *adjacent*
-  harness-facing global, not part of the frozen module surface (§2.1).
-- **`narrativeInput`** — the single narrative append path (player input lines and the
-  choice-point stream-end block). `appendInput(text, display?)` echoes one `.inp` line through
-  the divider/unread/scroll-keep behavior; `mount/replace/unmountChoicePoint` own exactly one
-  stream-end block (no-ops when none is mounted; blocks are caller-supplied DOM nodes).
-- **`actions`** — the single action-dispatch entry. `submit(actionId, payload, display?)`
-  returns a request id exactly when a real request dispatched (locked or duplicate submits
-  dispatch nothing and echo nothing); the `display` descriptor never leaks into the wire
-  payload. `client` is the DOM-independent action client (`createActionClient` surface);
-  `isInFlight`/`isLocked` drive the mutation lock; reconnects resync and never auto-retry.
+- **`Protocol`** — 傳輸生成 reducer 及其驗證器表格。`createStore` 回傳 store 介面 `create_store_members`（不可部分發布的快照採用、epoch 與修訂版本門控、過期 epoch 集合、每次認可一次通知的語意，即由 `webclient-oob-protocol` 與 `webclient-desktop-shell` 狀態化簡需求所固定的行為）。`envelope_names` 清單為確切的版本化 OOB 訊息集合（`PROTOCOL_VERSION = 1`）。
+- **`KeyboardRouter`** — 選單堆疊焦點路由器。`createRouter(options)` 回傳恰好具備 `router_instance_members` 的路由器；`handle(key, repeat)` 為單一按鍵進入轉接器。宣告語意：`press`/`handle` 恰好在路由器消耗該按鍵（方向鍵／Enter／Escape／Space／`/`）時回傳 `true`，且重複的 Enter 與 Space 會被壓制；未消耗的按鍵回傳 `false` 並向下傳遞。`setMutationInFlight`/`isAwaitingRevision` 為提交門控。正式環境的 `window.Elosern.keyboard` 實例是*相鄰*的測試架構全域變數，非凍結模組介面的一部份（§2.1）。
+- **`narrativeInput`** — 單一敘事附加路徑（玩家輸入行與抉擇點串流結尾區塊）。`appendInput(text, display?)` 透過分隔線、未讀與捲動保持行為回顯一行 `.inp`；`mount/replace/unmountChoicePoint` 擁有恰好一個串流結尾區塊（無掛載時為 no-op，區塊為呼叫端提供的 DOM 節點）。
+- **`actions`** — 單一動作分派進入點。`submit(actionId, payload, display?)` 恰好在真實請求分派時回傳請求 ID（已鎖定或重複的提交不分派且不回顯）；`display` 描述器絕不外洩至傳輸承載資料中。`client` 為獨立於 DOM 的動作客戶端（`createActionClient` 介面）；`isInFlight`/`isLocked` 驅動異動鎖定；重新連線執行重新同步且絕不自動重試。
 
 ---
 
 ## 2. Classification (every implementation-bound contract)
 
-Bucket values:
+分組值（Bucket values）：
 
-- `PRESERVE-VIA-BRIDGE` — the contract survives as the C2 bridge re-exposes it; no spec delta.
-- `PRESERVE-SAME-HOOK` — the Vue shell must render the same element identifier/attribute; the
-  managed browser tests keep targeting it; no spec delta.
-- `REMAP-TO-TESTID` — the managing change (C4) carries a `data-testid` equal to the current
-  identifier string on the Vue element and retargets the affected Playwright slices; no spec
-  delta because no main-requirement wording names the identifier.
-- `RETIRED-WITH-SHELL` — the implementation retires at the C4 flip; the behavior it carried is
-  either already implementation-neutral in spec wording or re-expressed by a §3 delta entry.
-- `HARNESS-REMAP` — a test-harness global (injected by `web/tests/browser/*.py`) or an
-  adjacent `window.Elosern.*` global that no main-requirement wording depends on; C4 retargets
-  the affected harness/slices to the store/component contract.
-- `DELTA` — the requirement wording is bound to the retiring implementation and is re-expressed
-  by the named §3 delta entry.
+- `PRESERVE-VIA-BRIDGE` — 契約在 C2 橋接器重新暴露後存續，無規格增量。
+- `PRESERVE-SAME-HOOK` — Vue 主架構必須算繪相同的元素識別碼／屬性，受管瀏覽器測試持續以其為目標，無規格增量。
+- `REMAP-TO-TESTID` — 管理變更（C4）在 Vue 元素上帶有等於目前識別碼字串的 `data-testid`，並重新導向受影響的 Playwright 切片，因無主要需求文字命名該識別碼，故無規格增量。
+- `RETIRED-WITH-SHELL` — 該實作在 C4 切換時停用，其承載的行為在規格文字中已具備實作中立性，或由 §3 增量項目重新表述。
+- `HARNESS-REMAP` — 測試控管全域變數（由 `web/tests/browser/*.py` 注入）或無主要需求文字依賴的相鄰 `window.Elosern.*` 全域變數，C4 將受影響的架構與切片重新導向至 store 與元件契約。
+- `DELTA` — 需求文字綁定至停用的實作，並由指定的 §3 增量項目重新表述。
 
 ### 2.1 façades
 
 | Identifier | Decider | Bucket | Evidence | Rationale |
 |---|---|---|---|---|
-| `window.Elosern.Protocol` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/protocol.js:14-20,3501`; specs `webclient-oob-protocol`, `webclient-desktop-shell` (state reduction), `webclient-browser-verification` (Node gate) | The bridge attaches the imported UMD module byte-identical; every façade-referencing requirement stays true unchanged |
-| `window.Elosern.KeyboardRouter` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/keyboard_router.js:14-20,353-362` | Same: module re-exposed; router behavior (claim semantics, gates, repeat suppression) preserved by §3 key-path re-expressions |
-| `window.Elosern.narrativeInput` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/goldenlayout.js:1367-1381`; `js/elosern/stream_end_block.js:5-9`; spec `webclient-action-choicepoints:7,45`; `webclient-desktop-shell` (single append path) | The bridge makes the store's append path the single owner under the same façade name; §2.5 keeps the echo behavior |
-| `window.Elosern.actions` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/elosern_actions.js:286-338`; attached at `js/plugins/elosern_ui.js:611`; specs `webclient-options-surface:75-76`, `webclient-input-narrative:50-88`, `webclient-local-map:161` | The bridge keeps `actions.submit` the single dispatch entry and `client` the locked action client; requirements naming `window.Elosern.actions.submit` stay true |
-| `window.Elosern.keyboard` (live router instance) + adjacent instance façades: `StateController`, `goldenlayout`, `drawer`, `_combat`, `explorationDock`, `serviceDock`, `creationDock`, `characterDock`, `combatDock` | C4 | HARNESS-REMAP | defined in `js/plugins/elosern_ui.js:367`, `goldenlayout.js:1342-1354,496-497,1367`, `combat_dock.js:397-405`, `exploration_dock.js:996-999`, `services_dock.js:550-553`, `creation_dock.js:1141-1144`, `character_dock.js:205-206`; driven by `browser_helpers.py` (`store_state`, `waitActive`) and `test_browser_creation.py:238,711-712`, `test_browser_services.py:332-336,378-380`, `test_browser_exploration.py:403-416`, `test_browser_shell.py:547`, `test_browser_reconnect.py:184,238-240` | No main-requirement wording names these globals; they are test-harness and dock-internal handles. C4 retargets the harness to the store (`C1`) and component contract; the bridge need not expose them |
-| Module façades the Node/browser tests import directly: `LayoutStore`, `State`, `Actions`, `DockSurface`, `OptionCards`, `ChoicePoints`/`ChoicePointLogic`, `CharacterMenu`, `CombatMenu`, `ServiceMenu`, `CreationMenu`, `ExplorationMenu`, `LocalMap`, `NarrativeMarkup`, `StreamEndBlock`, `CommandEcho`, `ArtPanel`, `ArtFocus`, `KeyboardRouter` | C4 | HARNESS-REMAP | each defined at `js/elosern/<module>.js` (UMD attach); used by `js/tests/*.test.js` (Node gate, untouched) and `browser_helpers.py`/browser slices | The UMD modules themselves are preserved and imported through Vite CJS interop (A2 `lib/*`); the harness re-imports them via the app bundle at C4. No spec delta |
+| `window.Elosern.Protocol` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/protocol.js:14-20,3501`; specs `webclient-oob-protocol`, `webclient-desktop-shell` (state reduction), `webclient-browser-verification` (Node gate) | 橋接器以位元組完全相同的方式附加匯入的 UMD 模組，所有引用 façade 的需求維持不變且為真 |
+| `window.Elosern.KeyboardRouter` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/keyboard_router.js:14-20,353-362` | 相同：模組重新暴露；路由器行為（宣告語意、門控、重複壓制）由 §3 按鍵路徑重新表述所保留 |
+| `window.Elosern.narrativeInput` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/goldenlayout.js:1367-1381`; `js/elosern/stream_end_block.js:5-9`; spec `webclient-action-choicepoints:7,45`; `webclient-desktop-shell` (single append path) | 橋接器使 store 的附加路徑成為相同 façade 名稱下的單一擁有者，§2.5 保留回顯行為 |
+| `window.Elosern.actions` (all §1 members) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/elosern_actions.js:286-338`; attached at `js/plugins/elosern_ui.js:611`; specs `webclient-options-surface:75-76`, `webclient-input-narrative:50-88`, `webclient-local-map:161` | 橋接器維持 `actions.submit` 為單一分派進入點，`client` 為鎖定的動作客戶端，命名 `window.Elosern.actions.submit` 的需求維持為真 |
+| `window.Elosern.keyboard` (live router instance) + adjacent instance façades: `StateController`, `goldenlayout`, `drawer`, `_combat`, `explorationDock`, `serviceDock`, `creationDock`, `characterDock`, `combatDock` | C4 | HARNESS-REMAP | defined in `js/plugins/elosern_ui.js:367`, `goldenlayout.js:1342-1354,496-497,1367`, `combat_dock.js:397-405`, `exploration_dock.js:996-999`, `services_dock.js:550-553`, `creation_dock.js:1141-1144`, `character_dock.js:205-206`; driven by `browser_helpers.py` (`store_state`, `waitActive`) and `test_browser_creation.py:238,711-712`, `test_browser_services.py:332-336,378-380`, `test_browser_exploration.py:403-416`, `test_browser_shell.py:547`, `test_browser_reconnect.py:184,238-240` | 無主要需求文字命名這些全域變數；它們是測試架構與 dock 內部控制代碼。C4 將測試架構重新導向至 store（`C1`）與元件契約，橋接器無需暴露它們 |
+| Module façades the Node/browser tests import directly: `LayoutStore`, `State`, `Actions`, `DockSurface`, `OptionCards`, `ChoicePoints`/`ChoicePointLogic`, `CharacterMenu`, `CombatMenu`, `ServiceMenu`, `CreationMenu`, `ExplorationMenu`, `LocalMap`, `NarrativeMarkup`, `StreamEndBlock`, `CommandEcho`, `ArtPanel`, `ArtFocus`, `KeyboardRouter` | C4 | HARNESS-REMAP | each defined at `js/elosern/<module>.js` (UMD attach); used by `js/tests/*.test.js` (Node gate, untouched) and `browser_helpers.py`/browser slices | UMD 模組本身被保留並透過 Vite CJS 互通匯入（A2 `lib/*`）；測試架構於 C4 透過應用程式組合包重新匯入它們，無規格增量 |
 
 ### 2.2 Keyboard / plugin key-event path
 
 | Identifier | Decider | Bucket | Evidence | Rationale |
 |---|---|---|---|---|
-| Evennia plugin `onKeydown` hook = `routeKeyboard` (the single production key path) | C2 | DELTA | `js/plugins/elosern_ui.js:168-227,674`; claim contract (claim exactly when the router consumed or the open drawer owned; `/` drawer toggle; slash-as-text in editables; repeat guard) | The plugin hook retires at the C4 flip; the same claim contract is re-expressed against the C2 bridge (entries C2-01, C2-02) so the spec is true from C2 onward |
-| Stock-plugin ordering (“the project plugin SHALL be ordered after the stock plugins”) | C2 | DELTA | spec `webclient-pointer-activation:73-82` (requirement “Keyboard input is dispatched through the WebClient plugin contract”) | With no Evennia plugins after the flip, ordering is meaningless; the fall-through contract (unclaimed keys reach the text/history path) replaces it (entry C2-01) |
-| Plugin-handler log semantics (“NO plugin handled this Keydown”, “no unhandled keydown”) | C2 | DELTA | specs `webclient-desktop-shell:118-121,192`; `webclient-character-creation-ui:177,193,197` | Re-expressed as the bridge claiming owned keys and letting unowned keys reach the fall-through text path (entries C2-02, C2-03) |
-| Self-contained modal key captures: `_bindFormKeys` (creation), `_bindQuantityKeys` (services), `_bindRestKeys` (exploration) | C2 | DELTA | `js/plugins/creation_dock.js:791`, `services_dock.js:256`, `exploration_dock.js:587`; spec `webclient-character-creation-ui:177-197` | The capture-phase pre-emption behavior is preserved by the bridge/app; only the wording naming the stock handler changes (entry C2-03) |
-| `Evennia.sendInputField` (ordinary text send through the transport) | C4 | PRESERVE-VIA-BRIDGE | `js/plugins/goldenlayout.js:484`; spec `webclient-desktop-shell:136-160` (drawer text control) | The Vue app keeps the existing `evennia.js` transport; typed commands keep sending as ordinary text (never `ui_action`) — the requirement wording is implementation-neutral and stays true |
+| Evennia plugin `onKeydown` hook = `routeKeyboard` (the single production key path) | C2 | DELTA | `js/plugins/elosern_ui.js:168-227,674`; claim contract (claim exactly when the router consumed or the open drawer owned; `/` drawer toggle; slash-as-text in editables; repeat guard) | 外掛掛鉤在 C4 切換時停用；相同的宣告契約針對 C2 橋接器重新表述（項目 C2-01、C2-02），使規格自 C2 起維持為真 |
+| Stock-plugin ordering (“the project plugin SHALL be ordered after the stock plugins”) | C2 | DELTA | spec `webclient-pointer-activation:73-82` (requirement “Keyboard input is dispatched through the WebClient plugin contract”) | 在切換後無 Evennia 外掛的情況下，排序失去意義；向下傳遞契約（未宣告的按鍵到達文字／歷史路徑）取代之（項目 C2-01） |
+| Plugin-handler log semantics (“NO plugin handled this Keydown”, “no unhandled keydown”) | C2 | DELTA | specs `webclient-desktop-shell:118-121,192`; `webclient-character-creation-ui:177,193,197` | 重新表述為橋接器宣告所屬按鍵，並讓非所屬按鍵到達向下傳遞的文字路徑（項目 C2-02、C2-03） |
+| Self-contained modal key captures: `_bindFormKeys` (creation), `_bindQuantityKeys` (services), `_bindRestKeys` (exploration) | C2 | DELTA | `js/plugins/creation_dock.js:791`, `services_dock.js:256`, `exploration_dock.js:587`; spec `webclient-character-creation-ui:177-197` | 擷取階段的搶佔行為由橋接器／應用程式保留；僅有命名內建處理常式的文字有所變更（項目 C2-03） |
+| `Evennia.sendInputField` (ordinary text send through the transport) | C4 | PRESERVE-VIA-BRIDGE | `js/plugins/goldenlayout.js:484`; spec `webclient-desktop-shell:136-160` (drawer text control) | Vue 應用程式保留現有的 `evennia.js` 傳輸層；鍵入的指令持續作為普通文字發送（絕不為 `ui_action`），需求文字具實作中立性且維持為真 |
 
-### 2.3 DOM identifiers (managed browser tests + keyboard router targets) — re-frozen at the
-post-redesign client (H6)
+### 2.3 DOM identifiers (managed browser tests + keyboard router targets) — re-frozen at the post-redesign client (H6)
 
-The H1–H5 redesign waves re-mapped the browser-targeted identifier set. This section is the renewed
-frozen list: the preserved contract hooks H1 froze, plus every `data-testid` re-map performed by
-H1–H5 and the CSS class hooks the managed browser suite targets. It is a single deliverable — no
-second parallel list.
+H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合。本節為更新後的凍結清單：包含 H1 凍結的保留契約掛鉤，加上 H1 至 H5 執行的所有 `data-testid` 重新對應，以及受管瀏覽器套件鎖定的 CSS 類別掛鉤。
 
-**Preserved contract hooks** — the Vue shell renders these identifiers unchanged; the managed browser
-tests keep targeting them; no spec delta:
+**Preserved contract hooks** — Vue 主架構算繪這些不變的識別碼；受管瀏覽器測試持續以其為目標，無規格增量：
 
 | Hook | What it is | Bucket |
 |---|---|---|
@@ -371,9 +325,7 @@ tests keep targeting them; no spec delta:
 | `elosern-offline-overlay` | the non-dismissible offline overlay (`webclient-desktop-shell:262-283`); `test_browser_shell.py`, `test_browser_reconnect.py` | PRESERVE-SAME-HOOK |
 | `data-node` / `data-node-id` (minimap node attributes) | minimap node identity/focus hooks (`test_browser_local_map.py`) | PRESERVE-SAME-HOOK |
 
-**Re-mapped `data-testid` set (H1–H5)** — each family below is re-mapped to a stable `data-testid`
-hook; the managed Playwright slices were retargeted by the owning wave (roadmap §5: each wave re-maps
-the selectors it breaks). Prefix entries cover dynamic suffixes.
+**Re-mapped `data-testid` set (H1–H5)** — 下列各家族重新對應至穩定的 `data-testid` 掛鉤；受管 Playwright 切片由所屬波次重新導向。前綴項目涵蓋動態後綴。
 
 | Hook family | Wave | Bucket |
 |---|---|---|
@@ -401,13 +353,12 @@ the selectors it breaks). Prefix entries cover dynamic suffixes.
 | `quick-word-chip-<verb>` (prefix `quick-word-chip`: `quick-word-chip-看`, the quick-word command chips) | H6 | REMAP-TO-TESTID |
 | `inventory-panel` + `inventory-panel__<suffix>` (the redesigned inventory drawer: `inventory-panel__tile--<item_key>` item tiles, `inventory-panel__count--<item_key>` held-count badges, `inventory-panel__inspector-<field>` inspector fields; the realigned three-section stack adds `inventory-panel__section--<name>`, `inventory-panel__heading--<name>`, `inventory-panel__items-count`, `inventory-panel__wallet-value`, added by the realign-inventory-drawer-layout change) | inventory-grid | REMAP-TO-TESTID |
 
-**CSS class hooks the managed browser suite targets** (re-mapped to stable hooks, no main-requirement
-wording names any of these, so no spec delta):
+**CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
 | Hook | Bucket |
 |---|---|
 | `.dock-menu-item` (prefix; covers `.dock-menu-item--focused` under `#action-dock`) | REMAP-TO-TESTID |
-| `.dock-menu`, `.dock-menu__outlet`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
+| `.dock-menu`, `.dock-menu__outlet`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed`, `.dock-menu-layout` | REMAP-TO-TESTID |
 | `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
 | `.hint` (the command-line hint cluster naming the history-recall keys; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
@@ -415,43 +366,35 @@ wording names any of these, so no spec delta):
 | `.elosern-*` retired visual classes (`.elosern-narrative`, `.elosern-placeholder`, `.elosern-header`, `.elosern-status`, `.elosern-action-dock`) — the managed suite asserts they no longer render on the Vue shell | RETIRED-WITH-SHELL |
 | `messagewindow` (the retired `default_out` fallback host; revealed on demand by `test_vue_foundation.py`) | RETIRED-WITH-SHELL |
 
-**Out of shell scope (harness targets a Django-rendered page):** the managed harness logs in through
-`#id_username` / `#id_password` (`web/tests/browser/browser_helpers.py:105-112`). These select the
-stock Evennia login form, which the Vue shell does not own, so the login targets stay valid with no
-preserve/remap decision.
+**超出主架構範圍（測試架構以 Django 算繪的頁面為目標）：** 受管測試架構透過 `#id_username` / `#id_password` 登入（`web/tests/browser/browser_helpers.py:105-112`）。這些選取的是 Evennia 原廠登入表單，非 Vue 主架構所擁有，因此登入目標維持有效，無保留／重新對應決策。
 
-**Template / mount contract** (renewed at H6; no spec delta beyond the entries above):
+**範本與掛載契約**（於 H6 更新；除上述項目外無規格增量）：
 
 | Contract | Bucket |
 |---|---|
-| `base.html` serves the built Vite bundle (`web/static/webclient/app/dist`) — the jQuery/GoldenLayout/plugin script loads were removed at the C4 flip; the stage mounts through `main.js` | RETIRED-WITH-SHELL |
-| `evennia.js` transport + `Evennia.*` globals (`sendInputField`, `connection`, `.msg`) are preserved by the bridge | PRESERVE-VIA-BRIDGE |
+| `base.html` 提供建置後的 Vite 組合包（`web/static/webclient/app/dist`）— jQuery、GoldenLayout 與外掛腳本載入已在 C4 切換時移除；階段透過 `main.js` 掛載 | RETIRED-WITH-SHELL |
+| `evennia.js` 傳輸層與 `Evennia.*` 全域變數（`sendInputField`、`connection`、`.msg`）由橋接器保留 | PRESERVE-VIA-BRIDGE |
 
-**H6 verification (task 3.4):** the `window.Elosern.*` public façade surface (the §1
-`frozen-facade-surface` JSON — `Protocol`, `KeyboardRouter`, `narrativeInput`, `actions`) and the
-keyboard-router claim contract (C2's re-expression in `webclient-pointer-activation`) are **unchanged**
-by the H1–H5 redesign: the redesign is a view-layer change on the existing transport, so the frozen
-façade member lists in §1 remain the binding surface, and the keyboard-router consumption contract
-(`routeKeyboard` claim rules, modal capture pre-emption) is carried by the bridge untouched.
+**H6 驗證（工作 3.4）：** `window.Elosern.*` 公開 façade 介面（§1 `frozen-facade-surface` JSON — `Protocol`、`KeyboardRouter`、`narrativeInput`、`actions`）與鍵盤路由器宣告契約（C2 在 `webclient-pointer-activation` 中的重新表述）在 H1 至 H5 重設計中**維持不變**：重設計為現有傳輸層之上的檢視層變更，因此 §1 中的凍結成員清單維持為約束性介面，且鍵盤路由器消耗契約（`routeKeyboard` 宣告規則、強制回應擷取搶佔）由橋接器完整承載。
 
 ### 2.4 Layout-persistence keys
 
 | Key / constant | Decider | Bucket | Evidence | Rationale |
 |---|---|---|---|---|
-| `elosern.layout` (localStorage) + `CURRENT_LAYOUT_VERSION = 1` + wrapper shape `{layout_version, dimensions, tabs, preferences}` | — | PRESERVE-VIA-BRIDGE | `js/elosern/layout_store.js:25-33`; `webclient-desktop-shell:222-235` (“Browser persistence is versioned and presentation-only”); `test_browser_layout.py:25-34` | The preserved `LayoutStore` module remains the persistence owner (C1's store consumes it); the wording is implementation-neutral |
-| `STOCK_KEYS` = `["evenniaGoldenLayoutSavedState", "evenniaGoldenLayoutSavedStateName"]` | — | PRESERVE-VIA-BRIDGE | `layout_store.js:28-31`; spec scenario “Stock layout state is not imported” (`:233-235`) | Version 1 still must not import stock keys; the constant survives in the preserved module |
-| `REQUIRED_COMPONENTS` = header, narrative, art, status, local-map, action-dock, command-drawer; `PREFERENCE_TYPES` = `text2html`, `fontScale`; `MAX_STORAGE_BYTES = 2048`; dimension/font-scale bounds | — | PRESERVE-VIA-BRIDGE | `layout_store.js:33-53`; `webclient-desktop-shell:8` (required-component list) | The required-surface set is the Vue shell's too (roadmap §5 B-waves); `command-drawer` maps to the GL config id `inputComponent` (`layout_store.js:104`) |
-| Migration/reset rule (known versions migrate explicitly; unknown/malformed/oversized/stock reset to the version-1 default) | — | PRESERVE-VIA-BRIDGE | `layout_store.js:344-359,440-447`; `test_browser_layout.py:56-120` (incl. `elosern.migration-probe`) | Behavior preserved; C4 keeps the same `LayoutStore` under the Vue shell |
-| `elosern.sync_recovery_reload` (sessionStorage recovery marker) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/elosern_state.js:314`; `webclient-desktop-shell:262-283`, `webclient-oob-protocol:173`; `test_browser_session_lifecycle.py` | The one-reload-sync recovery stays with the state owner over the bridge |
+| `elosern.layout` (localStorage) + `CURRENT_LAYOUT_VERSION = 1` + wrapper shape `{layout_version, dimensions, tabs, preferences}` | — | PRESERVE-VIA-BRIDGE | `js/elosern/layout_store.js:25-33`; `webclient-desktop-shell:222-235` (“Browser persistence is versioned and presentation-only”); `test_browser_layout.py:25-34` | 保留的 `LayoutStore` 模組維持為持久化擁有者（C1 的 store 消費它）；文字具實作中立性 |
+| `STOCK_KEYS` = `["evenniaGoldenLayoutSavedState", "evenniaGoldenLayoutSavedStateName"]` | — | PRESERVE-VIA-BRIDGE | `layout_store.js:28-31`; spec scenario “Stock layout state is not imported” (`:233-235`) | 版本 1 仍不得匯入原廠索引鍵；常數在保留模組中存續 |
+| `REQUIRED_COMPONENTS` = header, narrative, art, status, local-map, action-dock, command-drawer; `PREFERENCE_TYPES` = `text2html`, `fontScale`; `MAX_STORAGE_BYTES = 2048`; dimension/font-scale bounds | — | PRESERVE-VIA-BRIDGE | `layout_store.js:33-53`; `webclient-desktop-shell:8` (required-component list) | 必要外觀集合亦為 Vue 主架構的集合（路線圖 §5 B 波次）；`command-drawer` 對應至 GL 設定 id `inputComponent`（`layout_store.js:104`） |
+| Migration/reset rule (known versions migrate explicitly; unknown/malformed/oversized/stock reset to the version-1 default) | — | PRESERVE-VIA-BRIDGE | `layout_store.js:344-359,440-447`; `test_browser_layout.py:56-120` (incl. `elosern.migration-probe`) | 行為獲得保留；C4 在 Vue 主架構下維持相同的 `LayoutStore` |
+| `elosern.sync_recovery_reload` (sessionStorage recovery marker) | C2 | PRESERVE-VIA-BRIDGE | `js/plugins/elosern_state.js:314`; `webclient-desktop-shell:262-283`, `webclient-oob-protocol:173`; `test_browser_session_lifecycle.py` | 單次重新載入同步復原機制隨狀態擁有者透過橋接器保留 |
 
 ### 2.5 Input path (typed command flow)
 
 | Contract | Decider | Bucket | Evidence | Rationale |
 |---|---|---|---|---|
-| Drawer default-closed; entry button a real `<button type="button">` with accessible name + `aria-expanded`; `/` toggle | C4 | PRESERVE-SAME-HOOK | `goldenlayout.js:385-391,446-457`; spec `webclient-desktop-shell:136-167` (behavioral wording, no id) | The Vue drawer implements the same behavioral contract; the entry-button hook is in the §2.3 remap table |
-| Enter sends exactly one ordinary text message via the transport; Shift+Enter newline; focus retention; borrowed-drawer release rules | C4 | PRESERVE-VIA-BRIDGE | `goldenlayout.js:459-489` (`sendCommand` → `Evennia.sendInputField`); spec `webclient-desktop-shell:136-218` | Implementation-neutral wording; the Vue input routes through the same transport text path |
-| Slash-as-text in focused editables (drawer field, creation forms, rest forms) | C2 | DELTA | spec `webclient-desktop-shell:96-98,129-133`; key path `js/plugins/elosern_ui.js:20-28,204-219` | Part of the bridge key-claim contract; covered by entry C2-02's re-expression |
-| One echo per dispatched mutation / typed send, via `CommandEcho.commandLine` → `narrativeInput.appendInput` (echo never affects the wire payload) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/command_echo.js`; `js/plugins/elosern_actions.js:286-338`; specs `webclient-input-narrative:11-88`, `webclient-desktop-shell:285-318` | Both façades frozen in §1; `CommandEcho` is preserved UMD logic imported by the bridge/app |
+| Drawer default-closed; entry button a real `<button type="button">` with accessible name + `aria-expanded`; `/` toggle | C4 | PRESERVE-SAME-HOOK | `goldenlayout.js:385-391,446-457`; spec `webclient-desktop-shell:136-167` (behavioral wording, no id) | Vue 抽屜實作相同的行為契約；進入按鈕掛鉤位於 §2.3 重新對應表格中 |
+| Enter sends exactly one ordinary text message via the transport; Shift+Enter newline; focus retention; borrowed-drawer release rules | C4 | PRESERVE-VIA-BRIDGE | `goldenlayout.js:459-489` (`sendCommand` → `Evennia.sendInputField`); spec `webclient-desktop-shell:136-218` | 實作中立文字；Vue 輸入透過相同的傳輸文字路徑路由 |
+| Slash-as-text in focused editables (drawer field, creation forms, rest forms) | C2 | DELTA | spec `webclient-desktop-shell:96-98,129-133`; key path `js/plugins/elosern_ui.js:20-28,204-219` | 橋接器按鍵宣告契約的一部份；由項目 C2-02 的重新表述所涵蓋 |
+| One echo per dispatched mutation / typed send, via `CommandEcho.commandLine` → `narrativeInput.appendInput` (echo never affects the wire payload) | C2 | PRESERVE-VIA-BRIDGE | `js/elosern/command_echo.js`; `js/plugins/elosern_actions.js:286-338`; specs `webclient-input-narrative:11-88`, `webclient-desktop-shell:285-318` | 兩個 façade 皆於 §1 凍結；`CommandEcho` 為保留的 UMD 邏輯，由橋接器／應用程式匯入 |
 
 ### 2.6 Test-harness globals (injected, not product surface)
 
@@ -460,19 +403,13 @@ façade member lists in §1 remain the binding surface, and the keyboard-router 
 | `window.__elosernWs` (OOB capture wrapper) | C4 | HARNESS-REMAP | `web/tests/browser/browser_base.py` (`_WS_CAPTURE_SCRIPT`) |
 | `window.__elosernSent` (outbound recorder) + helpers `sent_action_count`, `store_state`, `fresh_epoch`, `snapshot_envelope`, `valid_status_panel`, `guard_local_only` | C4 | HARNESS-REMAP | `web/tests/browser/browser_helpers.py` |
 | Adjacent-façade drives (`Elosern.StateController.getState/requestResync`, `Elosern.goldenlayout.onText/getGL`, `Elosern.explorationDock.*`, `Elosern.serviceDock.*`, `Elosern.creationDock.*`, `Elosern._combat.*`) | C4 | HARNESS-REMAP | `test_browser_input_narrative.py:162,212,238,445,556-558`, `test_browser_creation.py:711-712,1019-1023`, `test_browser_services.py:332-336,378-380`, `test_browser_exploration.py:403-416`, `test_browser_reconnect.py:184,334-336`, `test_browser_combat.py:426-443` |
-| `BROWSER_ACCOUNT`, `ELOSERN_BROWSER_EXPLORATION`, default viewport 1440x900 / 1280x720 | C4 | HARNESS-REMAP | `browser_helpers.py`, `browser_base.py` | Not a client contract; the harness retarget at C4 keeps these invariants unchanged |
+| `BROWSER_ACCOUNT`, `ELOSERN_BROWSER_EXPLORATION`, default viewport 1440x900 / 1280x720 | C4 | HARNESS-REMAP | `browser_helpers.py`, `browser_base.py` | 非客戶端契約；C4 的測試架構重新導向維持這些不變量 |
 
 ---
 
 ## 3. Delta list (MODIFIED / RENAMED)
 
-The complete `MODIFIED`/`RENAMED` delta set. Each entry names the affected main-spec requirement
-(capability + requirement heading, as of A1), the applying change, the instruction to the applying
-change, and the rationale. Entries are non-overlapping: no `(capability, requirement)` pair
-appears twice. The applying change writes the exact re-expression during its own implementation
-and re-points the requirement's traceability test in the same change (C2 design D2). Every
-requirement whose wording stays true through the migration is **not** listed here (it is
-preserve-classified in §2).
+完整的 `MODIFIED`/`RENAMED` 增量集合。每個項目皆指明受影響的主規格需求（能力名稱與需求標題，截至 A1）、套用變更、給套用變更的指示，以及理由。項目互不重疊：沒有任何 `(capability, requirement)` 配對出現兩次。套用變更在自身的實作期間撰寫確切的重新表述，並在同一個變更中重新指向該需求的追溯性測試（C2 設計 D2）。所有在遷移過程中文字維持為真的需求**未**列於此處（已在 §2 分類為保留）。
 
 ```json
 {
@@ -561,80 +498,34 @@ preserve-classified in §2).
 }
 ```
 
-Entry notes:
+項目附註：
 
-- **C2-01 … C2-03** are the bridge-contract re-expressions. The bridge (C2) lands with tests that
-  establish each re-expressed contract (asserted key path over the `KeyboardRouter` module,
-  single-entry `narrativeInput`/`actions`, no plugin involvement), so each re-expressed
-  requirement has a passing test at C2's archive (C2 design D2).
-- **C4-01, C4-02, C4-03** are the flip-time edits, applied at the production flip, where the main
-  spec becomes true-at-archive for the Vue desktop shell (roadmap §5 C4: “`webclient-desktop-shell`
-  RENAMED from the GoldenLayout shell to the Vue SPA desktop shell”). C4-03’s narrative-markup fix
-  lands with C4 (not C2) because the stock plugins it stops naming remain in the legacy load path
-  until the flip. C4 also executes the §2.3 remap decisions and remaps the remaining Playwright
-  behavioral slices to the preserved hooks + `data-testid` in the same change.
-- No other `webclient-*` requirement wording goes stale: every remaining implementation-bound
-  identifier is preserve-classified (§2) — the four façades survive via the bridge, the DOM
-  contract hooks are preserved, the layout-persistence contract is owned by the preserved
-  `LayoutStore`, and the narrative/echo/transport behavior is implementation-neutral.
+- **C2-01 至 C2-03** 為橋接契約重新表述。橋接器（C2）帶有建立各重新表述契約的測試（在 `KeyboardRouter` 模組上斷言按鍵路徑、單一進入點 `narrativeInput`/`actions`、無外掛參與），因此每個重新表述的需求在 C2 封存時皆具備通過的測試（C2 設計 D2）。
+- **C4-01、C4-02、C4-03** 為切換時編輯，於正式切換時套用，此時主規格在封存時對 Vue 桌面主架構為真（路線圖 §5 C4：「`webclient-desktop-shell` 從 GoldenLayout 主架構更名為 Vue SPA 桌面主架構」）。C4-03 的敘事標記修正隨 C4 落地（而非 C2），因為其停止命名的內建外掛在切換前仍留存在舊版載入路徑中。C4 亦在同一個變更中執行 §2.3 重新對應決策，並將其餘 Playwright 行為切片重新對應至保留掛鉤與 `data-testid`。
+- 無其他 `webclient-*` 需求文字失效：其餘所有綁定實作的識別碼皆分類為保留（§2）— 四個 façade 透過橋接器存續，DOM 契約掛鉤獲得保留，版面配置持久化契約由保留的 `LayoutStore` 擁有，且敘事／回顯／傳輸行為具實作中立性。
 
 ---
 
-## 4. Reference (informational; unchanged by the migration)
+## 4. 參考資料（資訊性，不受遷移影響）
 
-- **OOB envelopes** (client-validated names, `PROTOCOL_VERSION = 1`): `ui_sync`, `ui_action`,
-  `ui_snapshot`, `ui_update`, `ui_action_result`, `ui_protocol_error`, `connection_open`
-  (`js/elosern/protocol.js`; spec `webclient-oob-protocol:8`). Server-side shapes are unchanged by
-  the migration (roadmap §2 non-goals).
-- **Server-side action allowlist** (dispatched via `actions.submit`; the client never
-  allowlists): `explore.look`, `explore.move`, `explore.talk_scripted`, `explore.talk_freeform`,
-  `explore.examine`, `explore.ask`, `explore.query`, `explore.interact`, `explore.pick`,
-  `explore.drop`, `explore.engage`, `explore.wait`, `explore.party_invite`, `explore.party_leave`,
-  `explore.character`, `explore.guild`, `explore.guild.quest_accept`, `explore.guild.quest_turnin`,
-  `explore.guild.quest_abandon`, `creation.preset_selected`, `creation.custom_filled`,
-  `creation.concept_filled`, `creation.activate_player`, `creation.exploration`, `creation.reset`,
-  `combat.basic_attack`, `combat.cast`, `combat.attack_entity`, `combat.attack_allies`,
-  `combat.attack_all_enemies`, `combat.flee`, `combat.forfeit`, `guild.register`,
-  `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.exam_start`,
-  `shop.buy`, `shop.sell`, `options.dismiss` (spec `webclient-action-dispatch:30-50`).
-- **Test-harness invariants** (unaffected by the migration): isolated managed Evennia runtime
-  per invocation, localhost-only requests, deterministic fixtures, `BROWSER_ACCOUNT`,
-  1440x900 primary / 1280x720 minimum viewport (spec `webclient-browser-verification:19-38`).
+- **OOB 信封**（客戶端驗證名稱，`PROTOCOL_VERSION = 1`）：`ui_sync`、`ui_action`、`ui_snapshot`、`ui_update`、`ui_action_result`、`ui_protocol_error`、`connection_open`（`js/elosern/protocol.js`；規格 `webclient-oob-protocol:8`）。伺服器端形狀不受遷移影響（路線圖 §2 非目標）。
+- **伺服器端動作允許清單**（透過 `actions.submit` 分派；客戶端絕不設允許清單）：`explore.look`、`explore.move`、`explore.talk_scripted`、`explore.talk_freeform`、`explore.examine`、`explore.ask`、`explore.query`、`explore.interact`、`explore.pick`、`explore.drop`、`explore.engage`、`explore.wait`、`explore.party_invite`、`explore.party_leave`、`explore.character`、`explore.guild`、`explore.guild.quest_accept`、`explore.guild.quest_turnin`、`explore.guild.quest_abandon`、`creation.preset_selected`、`creation.custom_filled`、`creation.concept_filled`、`creation.activate_player`、`creation.exploration`、`creation.reset`、`combat.basic_attack`、`combat.cast`、`combat.attack_entity`、`combat.attack_allies`、`combat.attack_all_enemies`、`combat.flee`、`combat.forfeit`、`guild.register`、`guild.quest_accept`、`guild.quest_abandon`、`guild.quest_turnin`、`guild.exam_start`、`shop.buy`、`shop.sell`、`options.dismiss`（規格 `webclient-action-dispatch:30-50`）。
+- **測試控管不變量**（不受遷移影響）：每次呼叫皆為隔離的受管 Evennia 執行期、僅限本機請求、確定性 fixtures、`BROWSER_ACCOUNT`、1440x900 主要／1280x720 最小視埠（規格 `webclient-browser-verification:19-38`）。
 
 ---
 
-## 5. Completeness statement
+## 5. 完整性聲明
 
-- Enumeration was grep-driven (A1 design D2): `window.Elosern.`, `onKeydown`, `getElementById` /
-  `#` id selectors in `web/tests/browser/` and the keyboard router, and the layout-persistence
-  keys, across `openspec/specs/webclient-*/spec.md`, `web/tests/browser/`,
-  `web/static/webclient/js/`, and `web/templates/webclient/`.
-- Every implementation-bound identifier found lands in exactly one §2 row (one bucket). The
-  four frozen façades and their members are listed exhaustively in §1 (machine-derived).
-- Every main-spec requirement whose wording is bound to the retiring implementation appears in
-  exactly one §3 delta entry; every other requirement is preserve-classified. C2 re-checks this
-  net against the Playwright suite before the flip (C2 risk section); any omission C2 surfaces is
-  amended back into this document (roadmap §9 precedence).
+- 清點方式為 grep 驅動（A1 設計 D2）：涵蓋 `openspec/specs/webclient-*/spec.md`、`web/tests/browser/`、`web/static/webclient/js/` 與 `web/templates/webclient/` 中的 `window.Elosern.`、`onKeydown`、`web/tests/browser/` 與鍵盤路由器中的 `getElementById` / `#` id 選取器，以及版面配置持久化索引鍵。
+- 所發現的每個實作綁定識別碼皆恰好落入單一 §2 列（單一分組）。四個凍結的 façade 及其成員詳盡列於 §1（機械式衍生）。
+- 每個文字綁定至停用實作的主規格需求皆恰好出現在單一 §3 增量項目中；其他所有需求皆分類為保留。C2 在切換前對照 Playwright 套件重新檢查此網（C2 風險章節）；C2 發現的任何遺漏皆修正回本文件（路線圖 §9 優先順序）。
 
 ---
 
-## 6. Revision log
+## 6. 修訂記錄
 
-### A1.1 — 2026-08-20 (post-archive, synchronous rubber-duck critique)
+### A1.1 — 2026-08-20（封存後，同步 rubber-duck 審查）
 
-- **§2.3 completeness:** five missed managed-browser target groups were added as
-  `REMAP-TO-TESTID` rows — `creation-concept-submit` / `creation-form-message` /
-  `creation-race-<i>` (creation dock), `exploration-detail` (element + class), and
-  `services-quantity` / `services-quantity-value` (services dock). The harness login selects
-  (`#id_username`, `#id_password`) are documented as out of shell scope: they target the
-  Django-rendered login page, which the flip does not touch. `tests/test_webclient_frozen_contract.py`
-  now extracts every `getElementById` / `#id` target from `web/tests/browser/` and fails unless it
-  is covered by a §2 row (or an explicit exemption), so this class of omission cannot recur.
-- **C2-04 → C4-03 re-assignment:** the `webclient-narrative-markup` delta now names
-  `webclient-vue-10-wire-views-browser` as its applying change. The stock plugins it stops naming
-  remain in the legacy load path from C2 until C4's atomic flip (C4 task 1.1), so the main spec
-  must keep describing them until exactly the moment that behavior disappears. The C4 change's
-  artifacts were updated in the same revision (its `webclient-narrative-markup` delta spec, flip
-  task, and D2 hook wording now reference this audit row-by-row).
-- **C4-01 `rename_to` fixed** to `The WebClient loads a local Vue SPA desktop shell`, the exact
-  target name the C4 delta spec and the roadmap use (the A1.0 text had the word order inverted).
+- **§2.3 完整性：** 五個遺漏的受管瀏覽器目標群組被加入為 `REMAP-TO-TESTID` 列 — `creation-concept-submit` / `creation-form-message` / `creation-race-<i>`（創角 dock）、`exploration-detail`（元素與類別），以及 `services-quantity` / `services-quantity-value`（服務 dock）。測試架構登入選取器（`#id_username`、`#id_password`）被記錄為超出主架構範圍：它們以 Django 算繪的登入頁面為目標，切換不影響該處。`tests/test_webclient_frozen_contract.py` 現從 `web/tests/browser/` 擷取每個 `getElementById` / `#id` 目標，並在未被 §2 列（或明確豁免）涵蓋時判定失敗，防止此類遺漏再次發生。
+- **C2-04 → C4-03 重新指派：** `webclient-narrative-markup` 增量現指明 `webclient-vue-10-wire-views-browser` 為其套用變更。其停止命名的內建外掛在 C2 至 C4 的不可部分變更切換前（C4 工作 1.1）仍留存在舊版載入路徑中，因此主規格必須持續描述它們直到該行為消失的確切時刻。C4 變更的工件在同一修訂版本中更新（其 `webclient-narrative-markup` 增量規格、切換工作與 D2 掛鉤文字現逐列引用本審查）。
+- **C4-01 `rename_to` 修正**為 `The WebClient loads a local Vue SPA desktop shell`，即 C4 增量規格與路線圖使用的確切目標名稱（A1.0 文字將字詞順序顛倒）。
