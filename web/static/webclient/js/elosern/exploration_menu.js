@@ -161,13 +161,16 @@
       });
     }
     if (panel.inventory && panel.inventory.available) {
+      // 背包 is a client-local drawer open (the frameless precedent of the
+      // 角色狀態 row): activating it opens the 背包 · 裝備 drawer without
+      // pushing a keyboard frame or switching the action dock.
       items.push({
         key: "inventory",
         label: "背包",
         enabled: true,
         actionId: null,
         payload: null,
-        openServiceSubmenu: "inventory",
+        openDrawer: "inventory",
       });
     }
     items.push(openItem("wait", "等待/休息", "wait"));

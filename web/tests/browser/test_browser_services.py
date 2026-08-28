@@ -131,7 +131,9 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
 
         The standalone Services root no longer exists: guild/shop are reached
         through Interact -> the local host -> its navigate-kind service entry,
-        and inventory through the exploration root's Inventory entry. The root
+        and inventory through the exploration root's Inventory entry — which
+        opens the 背包 drawer frameless (make-inventory-drawer-frameless): no
+        keyboard frame is pushed and the router's stack is unchanged. The root
         is a single seven-column row (grid geometry), so horizontal arrows
         move across it; submenus are 2-column grids.
         """
@@ -449,7 +451,10 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(payload, {"item_key": "meal", "quantity": 2})
         self.assertEqual(self._services_panel(page)["player"]["wallet"], 980)
 
-    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement(
+        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
+        "webclient-contextual-hud::the-bag-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
+    )
     def test_sell_and_repeated_inventory_without_use_control(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -479,19 +484,67 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertNotIn("healing_potion", rows)
         self.assertEqual(rows["meal"]["held"], 2)
 
-        # Inventory rows must never offer a use/equip control.
-        inventory_menu = page.evaluate(
+        # make-inventory-drawer-frameless: the 背包 entry opens the bag
+        # drawer frameless. The drawer body is only its own three-section
+        # stack — the committed rows render as tiles, never as a hosted
+        # keyboard row region — and the router's frame stack is exactly the
+        # same around open+close. The close control closes the hosted 商店
+        # drawer first (its pop + re-home is unchanged behavior; the click is
+        # focus-independent), then the exploration root's 背包 entry (sixth
+        # grid cell) opens the bag.
+        page.locator('[data-testid="hud-drawer-close"]').click()
+        page.wait_for_timeout(120)
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+
+        def _frame_state():
+            return page.evaluate(
+                """() => ({
+                  depth: window.__elosernBridge.router.depth(),
+                  trail: window.__elosernBridge.router.trail(),
+                })"""
+            )
+
+        frame_before = _frame_state()
+        sent_before = sent_action_count(page)
+        bag_panel = self._open_surface(page, "inventory")
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") == "inventory")
+        committed = sorted(
+            "inventory-panel__tile--" + row["item_key"]
+            for row in bag_panel["inventory"]["rows"]
+        )
+        tiles = page.evaluate(
+            """() => Array.from(
+                document.querySelectorAll('[data-testid^="inventory-panel__tile--"]')
+              ).map((t) => t.getAttribute("data-testid")).sort()"""
+        )
+        self.assertEqual(tiles, committed, "the bag tiles are exactly the committed rows")
+        sections = page.evaluate(
+            """() => ({
+              equipment: !!document.querySelector('[data-testid="equipment-doll"]'),
+              items: !!document.querySelector('[data-testid="inventory-panel__section--items"]'),
+              money: !!document.querySelector('[data-testid="inventory-panel__section--wallet"]'),
+            })"""
+        )
+        self.assertEqual(sections, {"equipment": True, "items": True, "money": True})
+        hosted = page.evaluate(
             """() => {
-              const controls = Array.from(
-                document.querySelectorAll('.dock-menu-item')
-              );
-              return controls.map((el) => el.getAttribute('data-item-key'));
+              const drawer = document.querySelector('[data-testid="hud-drawer"]');
+              return {
+                menu: drawer.querySelectorAll('[data-testid="dock-menu"]').length,
+                detail: drawer.querySelectorAll('[data-testid="dock-detail"]').length,
+              };
             }"""
         )
-        self.assertTrue(
-            all(not key.startswith("item-") or True for key in inventory_menu),
-            "inventory rows may render but never submit",
-        )
+        self.assertEqual(hosted, {"menu": 0, "detail": 0})
+        # The open pushed nothing: same stack, same breadcrumb, same focused
+        # row, and it dispatched no action.
+        frame_open = _frame_state()
+        self.assertEqual(frame_open["depth"], frame_before["depth"])
+        self.assertEqual(frame_open["trail"], frame_before["trail"])
+        _press(page, "Escape", wait_ms=120)  # close the bag (frameless close)
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        self.assertEqual(_frame_state(), frame_before, "closing the bag moved the router")
+        self.assertEqual(sent_action_count(page), sent_before, "the frameless 背包 entry dispatches no action")
 
         # No remote or ambiguous host control is ever rendered: every service
         # control is a bounded submenu/action row, never a dbref or a host
