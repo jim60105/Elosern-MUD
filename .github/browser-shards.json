@@ -132,7 +132,8 @@
         "web.tests.browser.test_browser_services.ReconnectJourney",
         "web.tests.browser.test_browser_services.KeyboardServiceDrawerJourneys",
         "web.tests.browser.test_browser_services.ServicesUnavailableJourney",
-        "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest"
+        "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest",
+        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys"
       ]
     },
     {
