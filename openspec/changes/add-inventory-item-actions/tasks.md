@@ -14,9 +14,9 @@
 ## 3. Equipment Toggle And Five Accessories
 
 - [ ] 3.1 Change `ACCESSORY_MAX_SLOTS` from three to five and update every rule, presenter, story, and existing test that currently assumes three.
-- [ ] 3.2 Add shared side-effect-free equipment preflight and replace the slot-supplied mutation surface with its ownership-aware, registry-resolved immutable toggle plan and atomic singleton settlement.
-- [ ] 3.3 Implement exact item-key accessory removal, distinct-key membership, append below five, and named rejection at five without automatic replacement.
-- [ ] 3.4 Add focused tests for unheld and non-equipment rejection, all singleton slots, atomic replacement rollback, removing a middle accessory, five-slot capacity, sixth-item rejection, duplicate prevention, persistence round-trip, and no combat-round or clock cost.
+- [x] 3.2 Add shared side-effect-free equipment preflight and replace the slot-supplied mutation surface with its ownership-aware, registry-resolved immutable toggle plan and atomic singleton settlement.
+- [x] 3.3 Implement exact item-key accessory removal, distinct-key membership, append below five, and named rejection at five without automatic replacement.
+- [x] 3.4 Add focused tests for unheld and non-equipment rejection, all singleton slots, atomic replacement rollback, removing a middle accessory, five-slot capacity, sixth-item rejection, duplicate prevention, persistence round-trip, and no combat-round or clock cost.
 
 ## 4. Combat Item Turn
 

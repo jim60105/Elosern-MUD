@@ -1,5 +1,20 @@
 ## MODIFIED Requirements
 
+### Requirement: EquipmentSlot defines four slots sized to the sample cards' own equipment shapes
+`world/skills/equipment.py` SHALL define an `EquipmentSlot` `StrEnum` with exactly the members
+`WEAPON_MAIN`, `WEAPON_OFF`, `ARMOR`, and `ACCESSORY`, borrowing evadventure's wield-location slot
+structure (design doc §4: reference only, not its d20 formulas).
+
+#### Scenario: EquipmentSlot has exactly the four documented members
+- **WHEN** `EquipmentSlot` is inspected
+- **THEN** it has exactly the members `WEAPON_MAIN`, `WEAPON_OFF`, `ARMOR`, `ACCESSORY` and no others
+
+#### Scenario: A dual-wielded weapon pair occupies both weapon slots at once
+- **WHEN** `world.rules.equipment.toggle_equipment()` equips one held registry weapon declared for
+  `WEAPON_MAIN` and a second held registry weapon declared for `WEAPON_OFF`
+- **THEN** `slot_contents(EquipmentSlot.WEAPON_MAIN)` and `slot_contents(EquipmentSlot.WEAPON_OFF)`
+  each return their own distinct item key, and neither slot's assignment affects the other
+
 ### Requirement: ACCESSORY is a bounded multi-item slot
 The equipment contract SHALL treat `ACCESSORY` as a list-valued slot capped at exactly five items by `ACCESSORY_MAX_SLOTS`, distinct from the three single-item slots. The cap SHALL be read from the read-only equipment package by every deterministic writer and presenter rather than duplicated.
 

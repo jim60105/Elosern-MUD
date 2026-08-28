@@ -14,7 +14,7 @@ class EquipmentSlot(StrEnum):
     ACCESSORY = "accessory"
 
 
-ACCESSORY_MAX_SLOTS = 3
+ACCESSORY_MAX_SLOTS = 5
 _EMPTY_EQUIPMENT = {
     "weapon_main": None,
     "weapon_off": None,

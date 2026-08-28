@@ -7,9 +7,18 @@ Gameplay inventory mutations flow through one validated planning boundary.
 progress atomically. ``add_item``/``remove_item`` remain convenience wrappers.
 Import construction keeps populating the raw list directly -- that is initial
 state, not gameplay acquisition.
+
+The item-specific equipment toggle (add-inventory-item-actions D4) is the
+sole gameplay writer of ``entity.db.equipment``:
+``preflight_equipment_toggle`` resolves the slot from immutable registry
+mechanics and computes an exact before/after plan without writing, and
+``toggle_equipment`` repeats that preflight and applies the plan atomically.
+Callers never supply a slot; equipped items stay in canonical inventory.
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from django.db import transaction
@@ -17,6 +26,7 @@ from django.db import transaction
 from world.lore.items import ITEM_REGISTRY
 from world.rules.surfaces import (
     attribute_snapshot,
+    restore_attribute_best_effort,
     restore_traits,
     snapshot_traits,
 )
@@ -197,42 +207,216 @@ def remove_item(entity: Any, item_key: str) -> None:
     apply_inventory_plan(plan_inventory_delta(entity, removals=(item_key,)))
 
 
-def _equipment_snapshot(entity: Any) -> dict[str, str | list[str] | None]:
-    raw = entity.db.equipment or {}
-    return {
-        "weapon_main": None,
-        "weapon_off": None,
-        "armor": None,
-        **raw,
-        "accessories": list(raw.get("accessories", [])),
-    }
+class EquipmentToggleReason(StrEnum):
+    """Stable named rejection reasons for the item-specific equipment toggle."""
+
+    UNKNOWN_ITEM = "unknown_item"
+    NOT_EQUIPMENT = "not_equipment"
+    ITEM_NOT_HELD = "item_not_held"
+    ACCESSORY_SLOTS_FULL = "accessory_slots_full"
+    MALFORMED_STORAGE = "malformed_equipment"
 
 
-def equip_item(entity: Any, slot: Any, item_key: str) -> None:
-    """Place an item key into one equipment slot."""
+@dataclass(frozen=True)
+class EquipmentTogglePlan:
+    """The complete immutable before/after equipment mapping for one toggle.
+
+    ``action`` names the settlement shape; ``replaced_key`` is the prior
+    singleton occupant that becomes unequipped (still held), never an
+    accessory chosen by the system.
+    """
+
+    entity: Any
+    item_key: str
+    slot: Any
+    action: str
+    before: dict
+    after: dict
+    replaced_key: str | None = None
+
+
+@dataclass(frozen=True)
+class EquipmentTogglePreflight:
+    """The outcome of one side-effect-free toggle eligibility check."""
+
+    allowed: bool
+    reason: EquipmentToggleReason | None = None
+    plan: EquipmentTogglePlan | None = None
+
+
+@dataclass(frozen=True)
+class EquipmentToggleResult:
+    """The outcome of one equipment-toggle settlement."""
+
+    outcome: str
+    reason: EquipmentToggleReason | None = None
+    slot: Any = None
+    action: str | None = None
+    replaced_key: str | None = None
+
+
+_EMPTY_EQUIPMENT_STATE: dict = {
+    "weapon_main": None,
+    "weapon_off": None,
+    "armor": None,
+    "accessories": [],
+}
+
+_SINGLETON_SLOTS = ("weapon_main", "weapon_off", "armor")
+
+
+def _normalized_equipment(entity: Any) -> dict | None:
+    """Normalize stored equipment strictly, or fail closed with ``None``.
+
+    Accepts ``None``/empty as the empty mapping. Every other record must
+    carry exactly the three singleton keys (``None`` or a non-empty string)
+    and an ``accessories`` sequence of non-empty strings with at most one
+    occurrence per key; anything else is malformed and never auto-repaired.
+    """
+    from world.skills.equipment import ACCESSORY_MAX_SLOTS
+
+    raw = entity.db.equipment
+    if raw is None or raw == {} or raw == _EMPTY_EQUIPMENT_STATE:
+        return {**_EMPTY_EQUIPMENT_STATE, "accessories": []}
+    if not isinstance(raw, Mapping) or set(raw) != set(_EMPTY_EQUIPMENT_STATE):
+        return None
+    normalized: dict = {}
+    for slot_key in _SINGLETON_SLOTS:
+        value = raw[slot_key]
+        if value is None:
+            normalized[slot_key] = None
+            continue
+        if isinstance(value, bool) or not isinstance(value, str) or not value.strip():
+            return None
+        normalized[slot_key] = value
+    accessories = raw["accessories"]
+    if isinstance(accessories, str) or not isinstance(accessories, Sequence):
+        return None
+    items: list[str] = []
+    for entry in accessories:
+        if isinstance(entry, bool) or not isinstance(entry, str) or not entry.strip():
+            return None
+        if entry in items:
+            return None
+        items.append(entry)
+    if len(items) > ACCESSORY_MAX_SLOTS:
+        return None
+    normalized["accessories"] = items
+    return normalized
+
+
+def _equipped_singleton_key(equipment: Mapping, item_key: str) -> str | None:
+    """Return the singleton slot key currently holding ``item_key``."""
+    for slot_key in _SINGLETON_SLOTS:
+        if equipment[slot_key] == item_key:
+            return slot_key
+    return None
+
+
+def preflight_equipment_toggle(
+    entity: Any, item_key: str
+) -> EquipmentTogglePreflight:
+    """Compute one toggle's exact effect against current state, writing nothing.
+
+    Resolves the item's single slot from immutable registry mechanics,
+    verifies canonical inventory ownership, normalizes stored equipment
+    fail-closed, and returns the complete before/after plan with stable
+    named reasons. Shared verbatim by presentation and settlement.
+    """
     from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
 
-    equipment = _equipment_snapshot(entity)
-    if slot is EquipmentSlot.ACCESSORY:
-        accessories = equipment["accessories"]
-        if len(accessories) >= ACCESSORY_MAX_SLOTS:
-            raise ValueError("accessory slots are full")
-        accessories.append(item_key)
+    definition = ITEM_REGISTRY.get(item_key)
+    if definition is None:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.UNKNOWN_ITEM
+        )
+    slot = definition.equipment_slot
+    if slot is None:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.NOT_EQUIPMENT
+        )
+    inventory = entity.db.inventory
+    if inventory is None:
+        held: list[str] = []
+    elif isinstance(inventory, str) or not isinstance(inventory, Sequence):
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
+        )
     else:
-        equipment[slot.value] = item_key
-    entity.db.equipment = equipment
-
-
-def unequip_item(entity: Any, slot: Any) -> str | None:
-    """Remove and return a single item, or the last accessory."""
-    from world.skills.equipment import EquipmentSlot
-
-    equipment = _equipment_snapshot(entity)
+        if not all(isinstance(entry, str) for entry in inventory):
+            return EquipmentTogglePreflight(
+                allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
+            )
+        held = list(inventory)
+    if item_key not in held:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.ITEM_NOT_HELD
+        )
+    before = _normalized_equipment(entity)
+    if before is None:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
+        )
+    after = {**before, "accessories": list(before["accessories"])}
     if slot is EquipmentSlot.ACCESSORY:
-        accessories = equipment["accessories"]
-        removed = accessories.pop() if accessories else None
+        if item_key in after["accessories"]:
+            after["accessories"] = [k for k in after["accessories"] if k != item_key]
+            action = "unequip-accessory"
+        elif len(after["accessories"]) >= ACCESSORY_MAX_SLOTS:
+            return EquipmentTogglePreflight(
+                allowed=False, reason=EquipmentToggleReason.ACCESSORY_SLOTS_FULL
+            )
+        else:
+            after["accessories"].append(item_key)
+            action = "equip-accessory"
+        replaced_key = None
     else:
-        removed = equipment[slot.value]
-        equipment[slot.value] = None
-    entity.db.equipment = equipment
-    return removed
+        occupied = _equipped_singleton_key(before, item_key)
+        if occupied is not None:
+            after[occupied] = None
+            action = "unequip-singleton"
+            replaced_key = None
+        else:
+            prior = before[slot.value]
+            replaced_key = prior if prior is not None and prior != item_key else None
+            after[slot.value] = item_key
+            action = "equip-singleton"
+    plan = EquipmentTogglePlan(
+        entity=entity,
+        item_key=item_key,
+        slot=slot,
+        action=action,
+        before=before,
+        after=after,
+        replaced_key=replaced_key,
+    )
+    return EquipmentTogglePreflight(allowed=True, reason=None, plan=plan)
+
+
+def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
+    """Atomically equip or unequip one held, registry-declared equipment key.
+
+    Mutation repeats the shared preflight and writes the complete replacement
+    mapping inside one transaction, restoring the in-process equipment cache
+    when the write fails. Equipped items remain in canonical inventory; the
+    caller never supplies a slot and no unrelated accessory is ever removed.
+    """
+    preflight = preflight_equipment_toggle(entity, item_key)
+    if not preflight.allowed or preflight.plan is None:
+        return EquipmentToggleResult(
+            outcome="rejected", reason=preflight.reason
+        )
+    plan = preflight.plan
+    snapshot = attribute_snapshot(entity, "equipment")
+    try:
+        with transaction.atomic():
+            entity.db.equipment = plan.after
+    except Exception:
+        restore_attribute_best_effort(entity, "equipment", snapshot)
+        raise
+    return EquipmentToggleResult(
+        outcome="success",
+        slot=plan.slot,
+        action=plan.action,
+        replaced_key=plan.replaced_key,
+    )
