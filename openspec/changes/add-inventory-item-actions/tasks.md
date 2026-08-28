@@ -29,7 +29,7 @@
 - [x] 5.1 Evolve the services presenter and exact validator to schema v3, adding nullable inventory action descriptors and exposing canonical player/inventory data during combat while keeping host, guild, and shop absent.
 - [x] 5.2 Derive use and equipment descriptor enablement through their shared side-effect-free deterministic preflight APIs, including stable `hp_full` and `accessory_slots_full` reasons, with unknown and inspect-only rows carrying null actions.
 - [x] 5.3 Implement exact validators and narrow adapters for `inventory.use` and `inventory.toggle_equip`, register both in the production allowlist, and publish full canonical snapshots without direct state assignment or text-parser routing.
-- [ ] 5.4 Update protocol mirrors, fixtures, serializers, Node tests, Python presentation/action tests, and integration tests for the expanded exact allowlist, v3 fields, exploration/combat mode shapes, stale-before-adapter versus live domain rejection, malformed payloads, duplicates, no-puppet handling, and atomic panel refresh.
+- [x] 5.4 Update protocol mirrors, fixtures, serializers, Node tests, Python presentation/action tests, and integration tests for the expanded exact allowlist, v3 fields, exploration/combat mode shapes, stale-before-adapter versus live domain rejection, malformed payloads, duplicates, no-puppet handling, and atomic panel refresh.
 
 ## 6. Inventory Drawer Interaction
 

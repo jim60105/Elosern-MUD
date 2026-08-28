@@ -189,6 +189,8 @@
     "guild.exam_start",
     "shop.buy",
     "shop.sell",
+    "inventory.use",
+    "inventory.toggle_equip",
   ];
   var SERVICES_BUY = "shop.buy";
   var SERVICES_SELL = "shop.sell";
@@ -248,7 +250,7 @@
     status: 1,
     context_actions: 5,
     local_map: 1,
-    services: 2,
+    services: 3,
     creation: 1,
     exploration: 1,
     character: 4,
@@ -1934,7 +1936,14 @@
       requireExactFields(
         row,
         "inventory row",
-        ["item_key", "display_name", "held", "equipped", "presentation"],
+        [
+          "item_key",
+          "display_name",
+          "held",
+          "equipped",
+          "presentation",
+          "action",
+        ],
         []
       );
       var inventoryItemKey = requireString(row.item_key, "item_key", SERVICES_MAX_KEY);
@@ -1948,6 +1957,9 @@
       requireInt(row.held, "held", 1, MAX_SAFE_INTEGER);
       requireBool(row.equipped, "equipped");
       requirePresentation(row.presentation, "inventory row.presentation");
+      if (row.action !== null) {
+        validateServicesAction(row.action);
+      }
     });
     return value;
   }
@@ -1986,7 +1998,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 2) {
+    if (payload.schema_version !== 3) {
       throw new Error("unsupported services schema_version");
     }
     if (payload.available !== true || payload.kind !== "services") {
@@ -2057,7 +2069,7 @@
     validateServicesPaginationTotals(pagination, guild, shop, inventory);
 
     var result = {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "services",
       host: payload.host,

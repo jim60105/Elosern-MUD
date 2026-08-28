@@ -1387,7 +1387,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
@@ -2039,7 +2039,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "services",
       host: null,
@@ -2068,6 +2068,7 @@ function validServicesPanel(overrides) {
             display_name: "普通餐食",
             held: 1,
             equipped: false,
+            action: null,
             presentation: {
               kind: "food",
               icon_key: "food",
@@ -2080,6 +2081,7 @@ function validServicesPanel(overrides) {
             display_name: "mystery_relic",
             held: 2,
             equipped: false,
+            action: null,
             presentation: null,
           },
         ],
@@ -2103,7 +2105,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 2,
+    schema_version: 3,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
@@ -2268,6 +2270,7 @@ test("a structurally maximal realistic services payload fits the envelope", () =
       display_name: "普通餐食",
       held: 2,
       equipped: false,
+      action: null,
       presentation: {
         kind: "food",
         icon_key: "food",
@@ -2381,6 +2384,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
       display_name: max128,
       held: 20,
       equipped: false,
+      action: null,
       presentation: { kind: presKey, icon_key: presKey, rarity: presKey, summary: presSummary },
     });
   }
@@ -2433,7 +2437,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
   assert.throws(() => Protocol.validateServicesPanel(panel), /envelope/);
 });
 
-test("services v2 accepts registered and unknown-key presentation rows", () => {
+test("services v3 accepts registered and unknown-key presentation rows", () => {
   const panel = validServicesPanel();
   const validated = Protocol.validateServicesPanel(panel);
   assert.deepEqual(validated, panel);
@@ -2456,6 +2460,7 @@ test("services v2 accepts registered and unknown-key presentation rows", () => {
       display_name: "普通餐食",
       held: 1,
       equipped: false,
+      action: null,
       presentation: {
         kind: "food",
         icon_key: "food",
@@ -2468,7 +2473,7 @@ test("services v2 accepts registered and unknown-key presentation rows", () => {
   assert.doesNotThrow(() => Protocol.validateServicesPanel(boundary));
 });
 
-test("services v2 rejects invalid presentation fields", () => {
+test("services v3 rejects invalid presentation fields", () => {
   const mutate = (row) => {
     const p = validServicesPanel();
     p.inventory.rows = [row];
@@ -2480,6 +2485,7 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: { kind: "food", icon_key: "food", summary: "供旅人充飢的普通餐食。" },
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(missing)), /rarity/);
@@ -2489,6 +2495,7 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: {
       kind: "food",
       icon_key: "food",
@@ -2504,6 +2511,7 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: {
       kind: "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY + 1),
       icon_key: "food",
@@ -2518,6 +2526,7 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: {
       kind: "Potion",
       icon_key: "food",
@@ -2532,6 +2541,7 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: {
       kind: "food",
       icon_key: "food",
@@ -2546,19 +2556,70 @@ test("services v2 rejects invalid presentation fields", () => {
     display_name: "普通餐食",
     held: 1,
     equipped: false,
+    action: null,
     presentation: "food",
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(notObject)), /JSON object or null/);
 });
 
-test("services v1 payload is rejected by the v2 validator", () => {
+test("services v1 payload is rejected by the v3 validator", () => {
   const panel = { ...validServicesPanel(), schema_version: 1 };
   panel.inventory.rows = panel.inventory.rows.map(({ presentation, ...rest }) => rest);
   assert.throws(() => Protocol.validateServicesPanel(panel), /schema_version/);
 });
 
+test("services v2 payload is rejected by the v3 validator", () => {
+  const panel = { ...validServicesPanel(), schema_version: 2 };
+  assert.throws(() => Protocol.validateServicesPanel(panel), /schema_version/);
+});
+
+test("services v3 validates inventory row actions exactly", () => {
+  const good = validServicesPanel();
+  good.inventory.rows[0].action = {
+    action_id: "inventory.use",
+    label: "使用",
+    enabled: false,
+    disabled_reason: { code: "hp_full", message: "你的體力已經全滿。" },
+    quantity: null,
+  };
+  assert.deepEqual(
+    Protocol.validateServicesPanel(good).inventory.rows[0].action,
+    good.inventory.rows[0].action
+  );
+  const withQuantity = validServicesPanel();
+  withQuantity.inventory.rows[0].action = {
+    action_id: "inventory.use",
+    label: "使用",
+    enabled: true,
+    disabled_reason: null,
+    quantity: { min: 1, max: 2 },
+  };
+  assert.throws(() => Protocol.validateServicesPanel(withQuantity));
+  const unknownId = validServicesPanel();
+  unknownId.inventory.rows[0].action = {
+    action_id: "inventory.drop",
+    label: "丟棄",
+    enabled: true,
+    disabled_reason: null,
+    quantity: null,
+  };
+  assert.throws(() => Protocol.validateServicesPanel(unknownId));
+  const toggleGood = validServicesPanel();
+  toggleGood.inventory.rows[0].action = {
+    action_id: "inventory.toggle_equip",
+    label: "裝備",
+    enabled: true,
+    disabled_reason: null,
+    quantity: null,
+  };
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(toggleGood));
+  const missing = validServicesPanel();
+  delete missing.inventory.rows[0].action;
+  assert.throws(() => Protocol.validateServicesPanel(missing));
+});
+
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
