@@ -277,6 +277,16 @@ export const useElosernStore = defineStore("elosern", () => {
       if (hudDrawer.value === null) {
         return false;
       }
+      // make-inventory-drawer-frameless: the 背包 drawer never hosts a router
+      // frame, so closing it leaves the router alone — no menu level is
+      // popped and the action dock is never re-homed, whatever frame is
+      // current at close time. Every other drawer keeps the teardown below
+      // byte-for-byte.
+      if (hudDrawer.value === "inventory") {
+        hudDrawer.value = null;
+        publishView();
+        return true;
+      }
       // A drawer hosting a router frame (design D4): closing it pops exactly
       // one menu level. A frameless drawer (status / skill / lore) closes
       // without touching the frame stack.
@@ -475,7 +485,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // check; routing uses the recorded `serviceSurface`, not the title.
     const SERVICE_FRAME_TITLES = new Set([
       "公會", "任務板", "任務記錄", "任務詳情",
-      "商店", "貨架", "販賣", "背包",
+      "商店", "貨架", "販賣",
     ]);
     function currentFrameIsServiceFrame() {
       const menu = router.currentMenu();
@@ -494,12 +504,12 @@ export const useElosernStore = defineStore("elosern", () => {
 
     // The service surface -> reference drawer map (design D2): the guild
     // service frames (board / quests / quest-detail / abandon-confirm) present
-    // the 任務 drawer, the shop frames (stock / sell) present the 商店 drawer,
-    // and the inventory frame presents the 背包 · 裝備 drawer.
+    // the 任務 drawer and the shop frames (stock / sell) present the 商店
+    // drawer. The 背包 drawer is not here: it opens frameless
+    // (make-inventory-drawer-frameless) and never hosts a service frame.
     const SERVICE_SURFACE_DRAWERS = {
       guild: "quest",
       shop: "shop",
-      inventory: "inventory",
     };
 
   const view = ref(initialView());
@@ -886,6 +896,10 @@ export const useElosernStore = defineStore("elosern", () => {
       item.openSubmenu = raw.openSubmenu || null;
       item.openCharacter = !!raw.openCharacter;
       item.openServiceSubmenu = raw.openServiceSubmenu || null;
+      // Client-local drawer-open rows (make-inventory-drawer-frameless):
+      // activation opens the named reference drawer without touching the
+      // router (the frameless `openCharacter` precedent).
+      item.openDrawer = raw.openDrawer || null;
       item.actionId = raw.actionId || null;
       item.payload = raw.payload || null;
        dockRawByKey[raw.key] = raw;
@@ -1060,6 +1074,13 @@ export const useElosernStore = defineStore("elosern", () => {
     const suggestions = (contextActions && contextActions.suggestions) || null;
     const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
     const menus = model.menus;
+    // A client-local drawer-open row (the frameless 背包 row, the
+    // `openCharacter` precedent): open the drawer without pushing a frame,
+    // switching the sub-dock, or recording a service surface.
+    if (item.openDrawer === "inventory") {
+      openHudDrawer("inventory");
+      return true;
+    }
     if (item.openSubmenu && menus[item.openSubmenu]) {
       const submenu = menus[item.openSubmenu];
       router.pushMenu(submenu);
@@ -1086,8 +1107,7 @@ export const useElosernStore = defineStore("elosern", () => {
       // H4 (task 4.3): record the service surface at push time (design D2)
       // so the frame-hosting watcher routes to the matching reference drawer.
       // The submenu key maps to a service surface: "guild" / "shop" are
-      // surfaces; "quests" is the guild's quest log (guild surface); "inventory"
-      // is the inventory surface.
+      // surfaces; "quests" is the guild's quest log (guild surface).
       const subKey = item.openServiceSubmenu;
       const surface =
         subKey === "quests" ? "guild" : (subKey === "guild" ? "guild" : subKey);
@@ -1204,6 +1224,13 @@ export const useElosernStore = defineStore("elosern", () => {
     if (rs.mode !== "exploration" || activeSubDock.value !== "services") {
       return false;
     }
+    // A client-local drawer-open row (the services root's frameless 背包
+    // row): open the drawer without pushing a frame or recording a service
+    // surface (the exploration-root branch above is the same interception).
+    if (item.openDrawer === "inventory") {
+      openHudDrawer("inventory");
+      return true;
+    }
     const servicesPanel = (rs.panels && rs.panels.services) || {};
     const model = ServiceMenu.buildMenus(servicesPanel);
     // A bounded services submenu (board / quests / stock / sell / quest-N):
@@ -1212,16 +1239,13 @@ export const useElosernStore = defineStore("elosern", () => {
     // `questMenuFor`.
     if (item.openSubmenu) {
       // H4 (task 4.3): record the service surface at push time — the guild
-      // frames (board / quests / quest-detail) route to the 任務 drawer, the
-      // shop frames (stock / sell) route to the 商店 drawer, and the
-      // inventory frame routes to the 背包 · 裝備 drawer.
+      // frames (board / quests / quest-detail) route to the 任務 drawer and
+      // the shop frames (stock / sell) route to the 商店 drawer.
       const subKey = item.openSubmenu;
       if (subKey === "board" || subKey === "quests" || subKey.startsWith("quest-")) {
         setServiceSurface("guild");
       } else if (subKey === "stock" || subKey === "sell") {
         setServiceSurface("shop");
-      } else if (subKey === "inventory") {
-        setServiceSurface("inventory");
       }
       let submenu = model.menus[item.openSubmenu];
       if (!submenu && item.openSubmenu.startsWith("quest-")) {
@@ -2102,10 +2126,10 @@ export const useElosernStore = defineStore("elosern", () => {
         setTextToHtml,
         setReducedMotion,
         setColorblind,
-       // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
-       // router's current frame is a service frame (guild / shop / inventory)
-       // so the drawer layer can render that frame's rows through the shared
-       // row renderer beside the surface's own presentation.
-       currentFrameIsServiceFrame,
+        // H4 (R3, webclient-hud-04-reference-drawers): whether the keyboard
+        // router's current frame is a service frame (guild / shop)
+        // so the drawer layer can render that frame's rows through the shared
+        // row renderer beside the surface's own presentation.
+        currentFrameIsServiceFrame,
      };
 });

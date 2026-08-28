@@ -245,21 +245,40 @@ test("quantity validation rejects empty, non-integer, and out-of-bounds values",
   assert.ok(ServiceMenu.validateQuantity(huge) <= 1000 || ServiceMenu.validateQuantity(huge) === null);
 });
 
-test("inventory rows carry no use or equip control", () => {
+test("the 背包 root row is a frameless drawer open with no submenu shape", () => {
   const panel = validPanel();
-  const inventory = ServiceMenu.buildMenus(panel).menus.inventory.items;
-  assert.equal(inventory.length, 1);
-  assert.equal(inventory[0].enabled, false);
-  assert.equal(inventory[0].actionId, null);
-  assert.ok(inventory[0].label.indexOf("×2") !== -1);
+  const model = ServiceMenu.buildMenus(panel);
+  const row = model.menus.root.items.find((item) => item.key === "inventory");
+  // The exact shape (deepEqual): no openSubmenu/openServiceSubmenu/actionId
+  // may accompany the drawer open, and no row of the committed inventory
+  // list is rebuilt beside the drawer's own three-section stack.
+  assert.deepEqual(row, {
+    key: "inventory",
+    label: "背包",
+    enabled: true,
+    actionId: null,
+    payload: null,
+    openDrawer: "inventory",
+  });
 });
 
-test("empty lists render a readable non-submitting placeholder", () => {
+test("no 背包 keyboard menu exists in the built model", () => {
+  const panel = validPanel();
+  const model = ServiceMenu.buildMenus(panel);
+  // SURFACE_ORDER still gates root-row availability...
+  assert.deepEqual(model.surfaces, ["guild", "shop", "inventory"]);
+  // ...but the menu, its row builder, and its export are gone: the bag
+  // drawer is opened frameless and never hosts a router row region.
+  assert.equal(model.menus.inventory, undefined);
+  assert.equal(ServiceMenu.inventoryItems, undefined);
+});
+
+test("an inventory section with no rows still renders the frameless 背包 root row", () => {
   const panel = validPanel({ guild: null, shop: null });
   panel.inventory.rows = [];
   const model = ServiceMenu.buildMenus(panel);
-  const items = model.menus.inventory.items;
-  assert.equal(items.length, 1);
-  assert.equal(items[0].enabled, false);
-  assert.equal(items[0].actionId, null);
+  const row = model.menus.root.items.find((item) => item.key === "inventory");
+  assert.equal(row.openDrawer, "inventory");
+  assert.equal(row.enabled, true);
+  assert.equal(model.menus.inventory, undefined);
 });

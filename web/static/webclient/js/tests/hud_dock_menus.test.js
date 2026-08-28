@@ -201,7 +201,9 @@ test("service menus carry fixed breadcrumb titles", () => {
   assert.equal(menus.shop.title, "商店");
   assert.equal(menus.board.title, "任務板");
   assert.equal(menus.quests.title, "任務記錄");
-  assert.equal(menus.inventory.title, "背包");
+  // The 背包 keyboard menu no longer exists: the bag drawer opens frameless
+  // (make-inventory-drawer-frameless), so no 背包 frame can name a breadcrumb.
+  assert.equal(menus.inventory, undefined);
 });
 
 test("creation and character menus carry fixed breadcrumb titles", () => {

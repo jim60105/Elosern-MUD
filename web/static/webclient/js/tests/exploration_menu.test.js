@@ -73,6 +73,17 @@ test("root routes Move/Look/Interact/Character plus available quests and invento
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
   const keys = model.menus.root.items.map((item) => item.key);
   assert.deepEqual(keys, ["move", "look", "interact", "character", "quests", "inventory", "wait"]);
+  // The 背包 root row is a frameless drawer open (the 角色 row precedent):
+  // the exact shape carries openDrawer and no submenu/service-submenu field.
+  const inventory = model.menus.root.items.find((item) => item.key === "inventory");
+  assert.deepEqual(inventory, {
+    key: "inventory",
+    label: "背包",
+    enabled: true,
+    actionId: null,
+    payload: null,
+    openDrawer: "inventory",
+  });
 });
 
 test("quests and inventory are omitted when the services capability is absent", () => {

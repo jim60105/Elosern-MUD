@@ -3,8 +3,8 @@
  *
  * Reduces a validated `services` panel into the logical keyboard menus
  * consumed by KeyboardRouter: a Services root, per-surface submenus (Guild,
- * Shop, Inventory), bounded row lists (Board, Quests, Rank, Stock, Sell,
- * Items), quest-detail panes, a bounded quantity-form state for buy/sell, and
+ * Shop), bounded row lists (Board, Quests, Rank, Stock, Sell), quest-detail
+ * panes, a bounded quantity-form state for buy/sell, and
  * an explicit confirmation screen before the destructive `guild.quest_abandon`.
  * The module preserves deterministic ordering, keeps disabled rows focusable so
  * their server-provided reason is readable (they never submit), and keeps every
@@ -110,7 +110,18 @@
       items.push(disabledItem("shop", "商店", "商店服務目前無法使用。"));
     }
     if (present.indexOf("inventory") !== -1) {
-      items.push(openItem("inventory", "背包", "inventory"));
+      // 背包 is a client-local drawer open (the frameless precedent of the
+      // exploration root's 角色 row): activating it opens the 背包 · 裝備
+      // drawer without pushing a keyboard frame, so no second copy of the
+      // committed inventory rows is built.
+      items.push({
+        key: "inventory",
+        label: "背包",
+        enabled: true,
+        actionId: null,
+        payload: null,
+        openDrawer: "inventory",
+      });
     }
     return items;
   }
@@ -351,32 +362,6 @@
   }
 
   // -------------------------------------------------------------------------
-  // Inventory submenu.
-  // -------------------------------------------------------------------------
-
-  function inventoryItems(panel) {
-    var inventory = panelSection(panel, "inventory");
-    var rows = (inventory && inventory.rows) || [];
-    var items = [];
-    rows.forEach(function (row, index) {
-      var equipped = row.equipped ? "（已裝備）" : "";
-      items.push({
-        key: "item-" + index,
-        label: row.display_name + " ×" + row.held + equipped,
-        enabled: false,
-        actionId: null,
-        payload: null,
-        description: "持有 " + row.held + " 個。",
-        // No use/consume/equip control exists in this schema version.
-      });
-    });
-    if (items.length === 0) {
-      items.push(disabledItem("items-empty", "背包是空的。", null));
-    }
-    return items;
-  }
-
-  // -------------------------------------------------------------------------
   // Quantity form state.
   // -------------------------------------------------------------------------
 
@@ -473,10 +458,9 @@
          board: { items: boardItems(panel), focusKey: null, grid: true, gridCols: 2, title: "任務板" },
          quests: { items: questItems(panel), focusKey: null, grid: true, gridCols: 2, title: "任務記錄" },
          shop: { items: shopItems(panel), focusKey: null, grid: true, gridCols: 2, title: "商店" },
-         stock: { items: stockItems(panel), focusKey: null, grid: true, gridCols: 2, title: "貨架" },
-         sell: { items: sellableItems(panel), focusKey: null, grid: true, gridCols: 2, title: "販賣" },
-         inventory: { items: inventoryItems(panel), focusKey: null, grid: true, gridCols: 2, title: "背包" },
-       },
+          stock: { items: stockItems(panel), focusKey: null, grid: true, gridCols: 2, title: "貨架" },
+          sell: { items: sellableItems(panel), focusKey: null, grid: true, gridCols: 2, title: "販賣" },
+        },
     };
     return model;
   }
@@ -504,7 +488,6 @@
     shopItems: shopItems,
     stockItems: stockItems,
     sellableItems: sellableItems,
-    inventoryItems: inventoryItems,
     quantityState: quantityState,
     quantityInput: quantityInput,
     quantityBackspace: quantityBackspace,

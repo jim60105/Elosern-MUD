@@ -34,7 +34,12 @@ class InventoryGridJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_open"
 
     def _open_inventory_drawer(self, page):
-        """Open the re-homed inventory drawer from the exploration root."""
+        """Open the frameless inventory drawer from the exploration root.
+
+        make-inventory-drawer-frameless: the 背包 entry opens the drawer as a
+        client-local open — no keyboard frame is pushed and the router's
+        frame stack stays at the root.
+        """
         focus_action_dock(page)
         # Move, Look, Interact, Character, Quests, Inventory
         for _ in range(5):
@@ -46,6 +51,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
     @covers_requirement(
         "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully",
+        "webclient-contextual-hud::the-bag-drawer-opens-without-a-router-frame-and-hosts-no-row-region",
     )
     def test_grid_renders_only_committed_rows_without_invented_total_or_rarity(self):
         page = self.logged_in_page()
@@ -161,6 +167,50 @@ class InventoryGridJourneys(ServicesBrowserTest):
         )
         page.wait_for_timeout(120)
         self.assertEqual(sent_action_count(page), 0)
+
+        # Keyboard reachability (make-inventory-drawer-frameless): the tiles
+        # are the drawer's only row surface. Tab traversal through the focus
+        # trap reaches every committed row with the shared inspector following
+        # focus — the removed keyboard row list is not needed to reach them.
+        page.evaluate(
+            """() => {
+                document.querySelector('[data-testid="hud-drawer-close"]').focus();
+                return true;
+            }"""
+        )
+        visited = []
+        for _ in range(2):
+            page.keyboard.press("Tab")
+            page.wait_for_timeout(60)
+            visited.append(
+                page.evaluate(
+                    """() => {
+                        const el = document.activeElement;
+                        return el && el.getAttribute
+                            ? el.getAttribute("data-testid")
+                            : null;
+                    }"""
+                )
+            )
+        self.assertEqual(
+            sorted(visited),
+            [
+                "inventory-panel__tile--healing_potion",
+                "inventory-panel__tile--meal",
+            ],
+        )
+        focused_state = page.evaluate(
+            """() => ({
+                describedby: document.activeElement.getAttribute("aria-describedby"),
+                testid: document.activeElement.getAttribute("data-testid"),
+                name: document.querySelector('[data-testid="inventory-panel__inspector-name"]').textContent,
+            })"""
+        )
+        self.assertEqual(focused_state["describedby"], "inventory-panel-inspector")
+        # The shared inspector followed focus onto the last Tab stop: its
+        # committed display name, whatever the shipped row order is.
+        last_key = focused_state["testid"].split("--", 1)[1]
+        self.assertEqual(focused_state["name"], committed[last_key]["display_name"])
 
     @covers_requirement(
         "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
