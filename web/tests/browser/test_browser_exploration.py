@@ -95,6 +95,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "Enter")
 
     @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    @covers_requirement("webclient-desktop-shell::the-dock-s-row-region-and-detail-panes-are-direct-children-of-their-host")
     def test_keyboard_move_charges_time_and_refreshes_map(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -104,6 +105,20 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         time_before = store_state(page)["serverTime"]
 
         self._open_root(page, 0)  # Move
+        # remove-redundant-dock-menu-layout: the exit-outlet frame shows no
+        # detail pane, so the row region (`.dock-menu`) is the pane host's only
+        # dock-menu child — no anonymous layout wrapper, no detail aside.
+        self.assertEqual(page.locator(".dock-menu-layout").count(), 0)
+        self.assertEqual(
+            page.evaluate(
+                "() => { const host = document.querySelector('.dock-pane-host');"
+                " if (!host) return false;"
+                " const kids = Array.from(host.children);"
+                " return kids.length === 1 && kids[0].classList.contains('dock-menu'); }"
+            ),
+            True,
+            "the outlet frame renders the row region as the pane host's only child",
+        )
         _press(page, "Enter")  # first exit
         try:
             self._wait_panel(

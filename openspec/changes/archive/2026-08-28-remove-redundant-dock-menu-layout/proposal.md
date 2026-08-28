@@ -27,9 +27,11 @@ wrapper is 多餘: the host that owns the split already exists one level up.
   `SkillDetailPane`), so the listbox, DockMenu's own detail aside, and
   `SkillDetailPane` are sibling flex children; `.dock-menu` takes
   `flex:1; min-width:0` and `.dock-detail` keeps its `flex:0 0 220px` track.
-  The drawer host gets one explicit modifier (`hud-drawer__body--dock`, flex
-  row) applied when a dock frame is hosted, so the drawer-hosted split pair
-  remains side-by-side without any new component-level wrapper.
+  The drawer host gets one explicit modifier (`hud-drawer__body--dock`, a
+  wrapping flex row that pins the third child — the hosted surface — to its own
+  full-width line) applied when a dock frame is hosted, so the drawer-hosted
+  split pair remains side-by-side without squishing the surface and without any
+  new component-level wrapper.
 - `.dock-menu-layout` and its CSS are deleted. Managed assertions become:
   in split frames `.dock-menu` and the visible detail pane share
   `.dock-pane-host` as their direct parent (zero `.dock-menu-layout`); in the
@@ -54,8 +56,10 @@ wrapper is 多餘: the host that owns the split already exists one level up.
 
 - Code: `web/webclient-app/components/DockMenu.vue` (fragment root + scoped
   CSS), `web/webclient-app/AppClient.vue` (drawer-body modifier class when
-  `drawerHostsServiceFrame`), verify `ActionDock.vue` pane styles never assumed
-  the removed child chain.
+  `drawerHostsServiceFrame`) threaded through a new `bodyClass` prop on
+  `web/webclient-app/components/HudDrawer.vue` (the open drawer root is a
+  fragment, so the modifier cannot ride fallthrough), verify `ActionDock.vue`
+  pane styles never assumed the removed child chain.
 - Tests: `web/webclient-app/tests/action/dock_menu.test.js`,
   `web/webclient-app/tests/action/dock_menu_outlet.test.js` (root becomes the
   listbox; detail becomes a sibling of the root fragment), managed
