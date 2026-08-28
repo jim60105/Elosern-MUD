@@ -386,3 +386,61 @@ class CrossSlotNormalizationTests(_ToggleTestCase):
         for name, storage in cases.items():
             with self.subTest(case=name):
                 self._rejects_malformed(storage, "loop_ring")
+
+
+class RegistryBackedAccessoryCapTests(_ToggleTestCase):
+    """The shipped registry alone satisfies and exhausts the five-slot cap."""
+
+    _FIVE = (
+        "silver_hairpin",
+        "wolf_fang_necklace",
+        "pilgrim_medallion",
+        "protective_ring",
+        "storage_pouch",
+    )
+
+    @covers_requirement(
+        "equipment-inventory::accessory-is-a-bounded-multi-item-slot"
+    )
+    def test_five_registry_accessories_equip_and_the_sixth_rejects(self):
+        self.hold(*self._FIVE, "gliding_cloak")
+        for key in self._FIVE:
+            result = toggle_equipment(self.entity, key)
+            self.assertEqual(result.outcome, "success", key)
+        self.assertEqual(
+            self.entity.db.equipment["accessories"], list(self._FIVE)
+        )
+        before = self.state()
+        overflow = toggle_equipment(self.entity, "gliding_cloak")
+        self.assertEqual(overflow.outcome, "rejected")
+        self.assertIs(overflow.reason, EquipmentToggleReason.ACCESSORY_SLOTS_FULL)
+        self.assertEqual(self.state(), before)
+
+
+class RegistryBackedTwinWeaponTests(_ToggleTestCase):
+    """Real registry off-hand gear coexists with a main hand and replaces
+    atomically through its singleton slot."""
+
+    @covers_requirement(
+        "equipment-inventory::singleton-equipment-toggles-and-replaces-atomically"
+    )
+    def test_twin_blades_occupy_both_hand_slots(self):
+        self.hold("shadow_blade", "shadow_blade_echo")
+        main = toggle_equipment(self.entity, "shadow_blade")
+        off = toggle_equipment(self.entity, "shadow_blade_echo")
+        self.assertEqual(main.outcome, "success")
+        self.assertEqual(off.outcome, "success")
+        self.assertEqual(self.entity.db.equipment["weapon_main"], "shadow_blade")
+        self.assertEqual(self.entity.db.equipment["weapon_off"], "shadow_blade_echo")
+
+    @covers_requirement(
+        "equipment-inventory::singleton-equipment-toggles-and-replaces-atomically"
+    )
+    def test_shield_replaces_the_off_hand_blade_which_stays_held(self):
+        self.hold("shadow_blade_echo", "iron_shield")
+        toggle_equipment(self.entity, "shadow_blade_echo")
+        result = toggle_equipment(self.entity, "iron_shield")
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(result.replaced_key, "shadow_blade_echo")
+        self.assertEqual(self.entity.db.equipment["weapon_off"], "iron_shield")
+        self.assertIn("shadow_blade_echo", list_items(self.entity))

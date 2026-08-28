@@ -149,10 +149,11 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         maximum = int(self.player.traits.hp.max)
         self.player.traits.hp.current = maximum
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = ["healing_potion", "mana_potion"]
         clock = WorldClock()
         cases = (
             ("healing_potion", "hp_full"),
+            ("mana_potion", "mp_full"),
             ("mystery_key", "unknown_item"),
             ("plain_sword", "not_usable"),
         )
@@ -167,7 +168,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                 self.assertEqual(result["reason"], reason)
                 self.assertEqual(read_session(self.player).rounds_elapsed, 0)
                 self.assertEqual(
-                    self.player.db.inventory, ["healing_potion"]
+                    self.player.db.inventory, ["healing_potion", "mana_potion"]
                 )
                 self.assertEqual(int(self.player.traits.hp.current), maximum)
         self.assertEqual(clock.tick, 0)

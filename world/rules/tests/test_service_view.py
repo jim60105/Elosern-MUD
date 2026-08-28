@@ -998,11 +998,18 @@ class ShopEdgeTests(ServiceRegistryIsolation):
             FakeHost("m", 1, merchant(merchant_stock={"meal": 10, "healing_potion": 3, "plain_sword": 1}), location=None)
         )
         # "plain_sword" is sellable+offered; "healing_potion" is sellable and
-        # offered; a made-up key is neither.
+        # offered; "royal_signet_ring" is a held registry item that is both
+        # unsellable and unoffered; a made-up key is neither.
         player = actor(
             location=room,
             wallet=5,
-            inventory=["meal", "healing_potion", "made_up_item", "made_up_item"],
+            inventory=[
+                "meal",
+                "healing_potion",
+                "royal_signet_ring",
+                "made_up_item",
+                "made_up_item",
+            ],
         )
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -1012,6 +1019,7 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         keys = {row.item_key for row in view.shop.sellable}
         self.assertEqual(keys, {"meal", "healing_potion"})
         self.assertNotIn("made_up_item", keys)
+        self.assertNotIn("royal_signet_ring", keys)
 
     def test_closed_sell_and_insufficient_items_reasons(self):
         room = FakeRoom(

@@ -127,12 +127,16 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError):
                 buy(self.player, self.merchant_npc, "no_such_item", 1)
-        # Make meal unsellable by checking ITEM_REGISTRY sellable flag is true;
-        # a genuinely unsellable item requires a registry change, so use a
-        # not-offered item key instead.
         with self.assertRaises(TradeError) as ctx:
             sell(self.player, self.merchant_npc, "no_such_item", 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.UNKNOWN_ITEM)
+        # royal_signet_ring is a genuinely unsellable registry item; the
+        # sellable gate precedes merchant and shop-open resolution.
+        self.player.db.inventory = ["royal_signet_ring"]
+        with self.assertRaises(TradeError) as ctx:
+            sell(self.player, self.merchant_npc, "royal_signet_ring", 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+        self.assertEqual(self.player.db.inventory, ["royal_signet_ring"])
 
     def test_closed_shop_rejects_trade(self):
         with patch("world.rules.economy.get_world_clock", return_value=WorldClock(3 * 3600)):

@@ -207,6 +207,89 @@ class ItemUsePreflightTests(_ItemUseTestCase):
         self.assertIs(preflight.reason, ItemUseReason.MALFORMED_TRAITS)
 
 
+class RegistryEffectKeyTests(_ItemUseTestCase):
+    """The shipped registry's non-default effect keys settle through the
+    gauge-general path with real rulebook magnitudes."""
+
+    def drain_mp(self, missing: int) -> tuple[int, int]:
+        maximum = int(self.actor.traits.mp.max)
+        self.actor.traits.mp.current = maximum - missing
+        return maximum - missing, maximum
+
+    @covers_requirement(
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+    )
+    def test_registry_greater_heal_potion_uses_the_rulebook_magnitude(self):
+        greater = ITEM_EFFECT_RULES[ItemEffectKey.GREATER_HEAL].amount
+        self.assertGreater(greater, HEAL_AMOUNT)
+        maximum = int(self.actor.traits.hp.max)
+        self.actor.traits.hp.current = max(1, maximum - greater - 5)
+        self.actor.db.inventory = [
+            "greater_healing_potion",
+            "greater_healing_potion",
+        ]
+        before_hp = int(self.actor.traits.hp.current)
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, "greater_healing_potion"), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        expected = min(before_hp + greater, maximum)
+        self.assertEqual(int(self.actor.traits.hp.current), expected)
+        entry = result.event_log.entries[0]
+        self.assertEqual(entry.data["amount"], expected - before_hp)
+        self.assertEqual(list_items(self.actor), ["greater_healing_potion"])
+
+    @covers_requirement(
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+    )
+    def test_registry_mana_potion_writes_the_mp_gauge_only(self):
+        restore = ITEM_EFFECT_RULES[ItemEffectKey.MANA_RESTORE].amount
+        self.drain_mp(restore + 5)
+        self.actor.db.inventory = ["mana_potion"]
+        before_hp = int(self.actor.traits.hp.current)
+        before_mp = int(self.actor.traits.mp.current)
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, "mana_potion"), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(int(self.actor.traits.mp.current), before_mp + restore)
+        self.assertEqual(int(self.actor.traits.hp.current), before_hp)
+        self.assertEqual(list_items(self.actor), [])
+
+    @covers_requirement(
+        "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
+    )
+    def test_mana_restore_clamps_at_maximum_mp(self):
+        restore = ITEM_EFFECT_RULES[ItemEffectKey.MANA_RESTORE].amount
+        self.drain_mp(5)
+        self.actor.db.inventory = ["mana_potion"]
+        maximum = int(self.actor.traits.mp.max)
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, "mana_potion"), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(int(self.actor.traits.mp.current), maximum)
+        entry = result.event_log.entries[0]
+        self.assertEqual(entry.data["amount"], 5)
+        self.assertLess(entry.data["amount"], restore)
+
+    @covers_requirement(
+        "item-use-resolution::item-use-preflight-is-side-effect-free-and-revalidates-current-conditions"
+    )
+    def test_full_mp_rejects_with_mp_full(self):
+        self.actor.db.inventory = ["mana_potion"]
+        maximum = int(self.actor.traits.mp.max)
+        self.actor.traits.mp.current = maximum
+        before = self.canonical_state()
+        preflight = preflight_item_use(
+            ItemUseRequest(self.actor, "mana_potion"), in_combat=False
+        )
+        self.assertFalse(preflight.allowed)
+        self.assertIs(preflight.reason, ItemUseReason.MP_FULL)
+        self.assertIsNone(preflight.plan)
+        self.assert_state_unchanged(before)
+
+
 class ItemUseSettlementTests(_ItemUseTestCase):
     @covers_requirement(
         "item-use-resolution::item-use-applies-effect-and-conditional-consumption-atomically"
