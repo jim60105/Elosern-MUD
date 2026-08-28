@@ -192,6 +192,23 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.router.currentMenu().title).toBe("探索");
   });
 
+  it("opening an overlay over the bag closes the bag without touching the router or dock", () => {
+    openSession();
+    const depthBefore = store.router.depth();
+    const trailBefore = trailTitles(store.router);
+    expect(store.focusItemByKey("inventory")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+    expect(store.view.hudDrawer).toBe("inventory");
+    // The overlay's mutual-exclusion close (closeHudDrawer({}) from
+    // openOverlay) funnels through the same frameless early return.
+    expect(store.openOverlay("help")).toBe(true);
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.view.hudOverlay).toBe("help");
+    expect(store.router.depth()).toBe(depthBefore);
+    expect(trailTitles(store.router)).toEqual(trailBefore);
+    expect(store.view.activeSubDock).toBe(null);
+  });
+
   it("the frameless 狀態 drawer close keeps clearing its character sub-dock (regression)", () => {
     openSession();
     // The 角色狀態 row opens the frameless status drawer with the character
