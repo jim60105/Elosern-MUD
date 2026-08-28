@@ -76,10 +76,128 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     const w = mountDoll({ character: {
       schema_version: 4, available: false, kind: "character",
        reason: { code: "no_puppet", message: "你已離開角色" },
-     } });
+      } });
     const reason = w.get('[data-testid="equipment-doll__unavailable"]');
     expect(reason.text()).toBe("你已離開角色");
     expect(w.findAll('[data-testid^="equipment-doll__slot--"]').length).toBe(0);
     expect(w.find('[data-testid="equipment-doll__empty"]').exists()).toBe(false);
+  });
+
+  it("renders each fixed slot-role SVG by slot identity (restyle-inventory-equipment-slots)", () => {
+    const w = mountDoll({
+      character: characterWith([
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
+        { slot: "armor", item_key: "leather_armor", display_name: "皮甲", held: 1, equipped: true },
+        { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
+      ]),
+    });
+    const mainPath = w.find('[data-testid="equipment-doll__slot--weapon_main"] .equipment-doll__icon path').attributes("d");
+    const armorPath = w.find('[data-testid="equipment-doll__slot--armor"] .equipment-doll__icon path').attributes("d");
+    const accessoryPath = w.find('[data-testid="equipment-doll__slot--accessory"] .equipment-doll__icon path').attributes("d");
+    expect(mainPath).toBe("M5 19 17 7M17 7l-3 1M5 19l2-3");
+    expect(armorPath).toBe("M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z");
+    expect(accessoryPath).toBe("M12 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 14v6");
+    // The off-hand position is the iconless position: no SVG, but the
+    // committed display name still renders below the caption.
+    const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
+    expect(offSlot.find("svg").exists()).toBe(false);
+    expect(offSlot.text()).toContain("月牙短匕");
+  });
+
+  it("selects the slot symbol by slot identity, never by the item (source isolation)", () => {
+    const w = mountDoll({
+      character: characterWith([
+        { slot: "weapon_main", item_key: "shared_blade", display_name: "共用短刃", held: 1 },
+        { slot: "armor", item_key: "shared_blade", display_name: "共用短刃", held: 1 },
+      ]),
+    });
+    const mainD = w.find('[data-testid="equipment-doll__slot--weapon_main"] .equipment-doll__icon path').attributes("d");
+    const armorD = w.find('[data-testid="equipment-doll__slot--armor"] .equipment-doll__icon path').attributes("d");
+    expect(mainD).not.toBe(armorD);
+    const w2 = mountDoll({
+      character: characterWith([
+        { slot: "armor", item_key: "other_plate", display_name: "鋼板甲", held: 1 },
+      ]),
+    });
+    const armorD2 = w2.find('[data-testid="equipment-doll__slot--armor"] .equipment-doll__icon path').attributes("d");
+    expect(armorD2).toBe(armorD);
+    w2.unmount();
+  });
+
+  it("renders the dashed explicit empty state and the accessory summary count (0..3)", () => {
+    const w = mountDoll({ character: characterWith([]) });
+    for (const slot of ["weapon_main", "weapon_off", "armor"]) {
+      const box = w.get(`[data-testid="equipment-doll__slot--${slot}"] .equipment-doll__box`);
+      expect(box.classes()).toContain("equipment-doll__box--empty");
+      expect(w.get(`[data-testid="equipment-doll__slot-empty--${slot}"]`).text()).toBe("未裝備");
+    }
+    expect(w.get('[data-testid="equipment-doll__accessory-count"]').text()).toBe("0 件");
+    expect(w.find('[data-testid="equipment-doll__accessories"]').exists()).toBe(false);
+    expect(w.get('[data-testid="equipment-doll__empty"]').text()).toBe("目前沒有裝備任何物品。");
+  });
+
+  it("states the accessory summary count and renders every accessory row", () => {
+    const w = mountDoll({
+      character: characterWith([
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
+        { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符", held: 2, equipped: false },
+      ]),
+    });
+    expect(w.get('[data-testid="equipment-doll__accessory-count"]').text()).toBe("2 件");
+    const rows = w.findAll('[data-testid^="equipment-doll__accessory--"]');
+    expect(rows).toHaveLength(2);
+    expect(w.get('[data-testid="equipment-doll__accessories"]').exists()).toBe(true);
+    expect(rows[0].text()).toContain("霧隱護符");
+    expect(rows[1].text()).toContain("迅捷護符");
+  });
+
+  it("renders duplicate singleton rows as labelled overflow rows (no row dropped)", () => {
+    const w = mountDoll({
+      character: characterWith([
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍", held: 1, equipped: false },
+        { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
+        { slot: "weapon_off", item_key: "bone_knife", display_name: "骨刀", held: 1, equipped: false },
+        { slot: "armor", item_key: "leather_armor", display_name: "皮甲", held: 1, equipped: true },
+        { slot: "armor", item_key: "steel_plate", display_name: "鋼板甲", held: 1, equipped: false },
+      ]),
+    });
+    // The square grid consumes only the first row per singleton slot.
+    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
+    expect(offSlot.text()).toContain("月牙短匕");
+    expect(offSlot.find("svg").exists()).toBe(false);
+    expect(w.get('[data-testid="equipment-doll__slot--armor"]').text()).toContain("皮甲");
+    // The duplicate committed rows render as labelled overflow rows.
+    const dupes = w.findAll('[data-testid^="equipment-doll__duplicate-row--"]');
+    expect(dupes).toHaveLength(3);
+    expect(dupes[0].attributes("data-slot")).toBe("weapon_main");
+    expect(dupes[0].text()).toContain("輕劍");
+    expect(dupes[1].attributes("data-slot")).toBe("weapon_off");
+    expect(dupes[1].text()).toContain("骨刀");
+    expect(dupes[2].attributes("data-slot")).toBe("armor");
+    expect(dupes[2].text()).toContain("鋼板甲");
+    expect(w.get('[data-testid="equipment-doll__duplicates"]').exists()).toBe(true);
+  });
+
+  it("preserves an unrecognised slot as a labelled row and invents no item presentation", () => {
+    const w = mountDoll({
+      character: characterWith([
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "mount", item_key: "mount_ash", display_name: "灰驛", held: 1, equipped: false },
+      ]),
+    });
+    const row = w.get('[data-testid="equipment-doll__slot-row--mount"]');
+    expect(row.attributes("data-slot")).toBe("mount");
+    expect(row.text()).toContain("mount");
+    expect(row.text()).toContain("灰驛");
+    // No rarity, no stats, no comparison, and no new focusable control.
+    expect(w.text()).not.toContain("稀有");
+    expect(w.text()).not.toContain("攻擊");
+    expect(w.find("button").exists()).toBe(false);
+    expect(w.find("a").exists()).toBe(false);
+    expect(w.find("input").exists()).toBe(false);
   });
 });

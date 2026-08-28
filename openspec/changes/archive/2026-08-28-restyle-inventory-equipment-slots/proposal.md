@@ -5,8 +5,8 @@ After equipment is relocated into the inventory drawer, its three horizontal tex
 ## What Changes
 
 - Restyle the shared `EquipmentDoll` as a compact two-column square-slot layout for primary hand, off hand, armor, and an accessory summary.
-- Add only fixed local SVG symbols selected by server-authored slot identity, not by an item name or key; show explicit dashed empty slots and visible labels.
-- Retain all real equipment names, every accessory row, and unrecognised-slot fallback rows beneath the square layout.
+- Add only fixed local SVG symbols selected by server-authored slot identity, not by an item name or key (the off-hand position is iconless, matching the binding design's empty dashed box); show explicit dashed empty slots and visible labels.
+- Retain all real equipment names, every accessory row, duplicate-singleton overflow rows, and unrecognised-slot fallback rows beneath the square layout.
 - Expand the existing `Data/EquipmentDoll` and composed inventory Storybook cases for empty, filled, multi-accessory, and unknown-slot states at supported desktop viewports.
 - Preserve read-only behavior, drawer focus management, and no numeric item stat, rarity, icon, or comparison claim from the character equipment payload.
 

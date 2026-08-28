@@ -97,9 +97,18 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         "webclient-contextual-hud::the-equipment-doll-renders-only-server-authored-slots-and-drops-nothing"
     )
     def test_equipment_doll_server_authored_slots(self):
-        # The equipment doll renders only the server's slot vocabulary, shows an
-        # explicit empty state for vacant singleton slots, groups accessories, and
-        # passes through any unrecognised slot key instead of dropping a row.
+        # The equipment doll renders the server's three singleton slots and the
+        # accessory summary as four named positions in a compact two-column
+        # square layout (restyle-inventory-equipment-slots). Each position
+        # renders only a fixed local SVG selected by its server-authored slot
+        # role (the off-hand position is the iconless position); a vacant
+        # singleton slot renders its explicit dashed empty state, an occupied
+        # slot renders its committed display name (a duplicate committed row for
+        # a recognised singleton slot renders as a labelled overflow row), the
+        # accessory summary states the committed count while every accessory row
+        # renders in the retained detail group, and any unrecognised slot key
+        # renders as a labelled fallback row rather than being discarded. No
+        # item statistic, rarity, item icon, summary, or comparison is invented.
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "data" / "equipment_doll.test.js"),
             "equipment doll server-authored slots",
