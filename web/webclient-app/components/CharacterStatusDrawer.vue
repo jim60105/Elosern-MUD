@@ -408,9 +408,9 @@ const INTIMATE_ROWS = [
 .character-status-drawer {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
   font-family: var(--f-sans);
 }
 
@@ -441,14 +441,14 @@ const INTIMATE_ROWS = [
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  padding-top: var(--sp-2);
+  padding-top: 4px;
   border-top: var(--line);
 }
 
 /* The shared section heading: the same small-caps treatment ConditionChips'
    `.clab` uses, copied (not imported) per this component's convention. */
 .character-status-drawer__section-label {
-  margin: 0 0 7px;
+  margin: 0 0 4px;
   font-size: 10px;
   letter-spacing: 0.14em;
   color: var(--paper-500);
@@ -475,7 +475,7 @@ const INTIMATE_ROWS = [
   background: var(--ink-820);
   border: 1px solid var(--ink-700);
   border-radius: 9px;
-  padding: 9px 12px;
+  padding: 6px 12px;
   font-family: var(--f-sans);
 }
 
@@ -501,7 +501,7 @@ const INTIMATE_ROWS = [
 
 .character-status-drawer__vital-track {
   flex-basis: 100%;
-  height: 6px;
+  height: 4px;
   background: var(--ink-800);
   border-radius: 3px;
   overflow: hidden;
@@ -537,8 +537,8 @@ const INTIMATE_ROWS = [
   gap: 0 5px;
   min-width: 0;
   max-width: 100%;
-  font-size: 12px;
-  padding: 5px 11px;
+  font-size: 11px;
+  padding: 3px 11px;
   border-radius: 99px;
   border: 1px solid var(--ink-600);
   background: var(--ink-780);
