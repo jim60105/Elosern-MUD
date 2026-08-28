@@ -84,6 +84,7 @@ class ItemUseReason(StrEnum):
     NOT_USABLE = "not_usable"
     ITEM_NOT_HELD = "item_not_held"
     HP_FULL = "hp_full"
+    MP_FULL = "mp_full"
     NOT_ALIVE = "not_alive"
     COMBAT_NOT_ALLOWED = "combat_not_allowed"
     UNKNOWN_EFFECT = "unknown_effect"
@@ -166,6 +167,19 @@ ITEM_USE_SECONDS: int = _loaded["item_use_seconds"]
 # Immutable effect rulebook keyed by the closed lore effect vocabulary.
 ITEM_EFFECT_RULES: dict[ItemEffectKey, ItemEffectRule] = _loaded["rules"]
 
+# Which gauge each closed effect restores. Preflight full-gating, the
+# settlement write, and the stable log noun all resolve through this map.
+_EFFECT_GAUGES: dict[ItemEffectKey, str] = {
+    ItemEffectKey.SELF_HEAL: "hp",
+    ItemEffectKey.GREATER_HEAL: "hp",
+    ItemEffectKey.MANA_RESTORE: "mp",
+}
+_FULL_REASON_BY_GAUGE: dict[str, ItemUseReason] = {
+    "hp": ItemUseReason.HP_FULL,
+    "mp": ItemUseReason.MP_FULL,
+}
+_GAUGE_NOUN_ZH: dict[str, str] = {"hp": "生命值", "mp": "魔力值"}
+
 
 def reload_item_effect_rules(path: Path | None = None) -> None:
     """Re-validate and re-mirror the rulebook (idempotent startup sync)."""
@@ -187,18 +201,20 @@ class ItemUseRequest:
 class ItemUsePlan:
     """The complete, immutable settlement computed by a side-effect-free preflight.
 
-    ``amount`` is the actual bounded HP restoration for the current state, and
-    ``mirror_pk`` is the single existing contained-object mirror selected for
-    consumption (``None`` for a key-only holding), never a fabricated object.
+    ``amount`` is the actual bounded restoration for the current state on the
+    effect's gauge, and ``mirror_pk`` is the single existing contained-object
+    mirror selected for consumption (``None`` for a key-only holding), never a
+    fabricated object.
     """
 
     actor: Any
     item_key: str
     effect_key: ItemEffectKey
+    gauge: str
     consumable: bool
     amount: int
-    hp_current: int
-    hp_restored: int
+    gauge_current: int
+    gauge_restored: int
     mirror_pk: int | None
 
 
@@ -391,24 +407,31 @@ def preflight_item_use(
     rule = ITEM_EFFECT_RULES.get(mechanics.effect_key)
     if rule is None:
         return _rejected(ItemUseReason.UNKNOWN_EFFECT)
-    gauges = _gauge_from_storage(request.actor, "hp")
-    if gauges is None:
+    gauge = _EFFECT_GAUGES.get(mechanics.effect_key)
+    if gauge is None:
+        return _rejected(ItemUseReason.UNKNOWN_EFFECT)
+    hp_gauge = _gauge_from_storage(request.actor, "hp")
+    if hp_gauge is None:
         return _rejected(ItemUseReason.MALFORMED_TRAITS)
-    current, maximum = gauges
-    if current <= 0:
+    if hp_gauge[0] <= 0:
         return _rejected(ItemUseReason.NOT_ALIVE)
+    target = hp_gauge if gauge == "hp" else _gauge_from_storage(request.actor, gauge)
+    if target is None:
+        return _rejected(ItemUseReason.MALFORMED_TRAITS)
+    current, maximum = target
     if current >= maximum:
-        return _rejected(ItemUseReason.HP_FULL)
+        return _rejected(_FULL_REASON_BY_GAUGE[gauge])
     amount = min(rule.amount, maximum - current)
     mirror = _select_mirror(request.actor, request.item_key) if mechanics.consumable else None
     plan = ItemUsePlan(
         actor=request.actor,
         item_key=request.item_key,
         effect_key=mechanics.effect_key,
+        gauge=gauge,
         consumable=mechanics.consumable,
         amount=amount,
-        hp_current=current,
-        hp_restored=current + amount,
+        gauge_current=current,
+        gauge_restored=current + amount,
         mirror_pk=mirror.id if mirror is not None else None,
     )
     return ItemUsePreflight(allowed=True, reason=None, plan=plan)
@@ -421,6 +444,7 @@ def _item_used_event_log(
     definition = ITEM_REGISTRY[plan.item_key]
     display_name = definition.display_name_zh.replace("{", "{{").replace("}", "}}")
     amount = str(plan.amount).replace("{", "{{").replace("}", "}}")
+    noun = _GAUGE_NOUN_ZH[plan.gauge]
     entry = EventEntry(
         kind="item_used",
         actor=actor_key,
@@ -432,7 +456,7 @@ def _item_used_event_log(
             "amount": plan.amount,
         },
         text_template=(
-            f"你使用了「{display_name}」，恢復了 {amount} 點生命值。"
+            f"你使用了「{display_name}」，恢復了 {amount} 點{noun}。"
         ),
     )
     return EventLog(
@@ -444,9 +468,9 @@ def _item_used_event_log(
     )
 
 
-def _write_hp(entity: Any, value: int) -> None:
-    """Set the HP gauge through the trait handler (deterministic clamping)."""
-    trait = entity.traits.hp
+def _write_gauge(entity: Any, gauge: str, value: int) -> None:
+    """Set one gauge through the trait handler (deterministic clamping)."""
+    trait = getattr(entity.traits, gauge)
     if hasattr(trait, "current"):
         trait.current = value
     else:
@@ -472,13 +496,13 @@ def _delete_mirror(actor: Any, plan: ItemUsePlan, journal: ItemTouchedJournal) -
 def _apply_plan(
     request: ItemUseRequest, plan: ItemUsePlan, journal: ItemTouchedJournal
 ) -> None:
-    """Commit the HP effect, the one-key consumption, and the mirror deletion.
+    """Commit the gauge effect, the one-key consumption, and the mirror deletion.
 
     Runs inside the caller's transaction. Inventory removal goes through the
     inventory planner so ACQUIRE/quest journals compose with it; a key-only
     consumable deletes nothing and no mirror is ever fabricated.
     """
-    _write_hp(plan.actor, plan.hp_restored)
+    _write_gauge(plan.actor, plan.gauge, plan.gauge_restored)
     if plan.consumable:
         apply_inventory_plan(plan_inventory_delta(request.actor, removals=(request.item_key,)))
     _delete_mirror(request.actor, plan, journal)

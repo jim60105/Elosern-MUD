@@ -624,7 +624,7 @@ class ShopTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         shop = view.shop
         self.assertFalse(shop.open)
-        self.assertEqual(len(shop.stock), 3)
+        self.assertEqual(len(shop.stock), 12)
         for row in shop.stock:
             self.assertFalse(row.buy.enabled)
             self.assertEqual(row.buy.reason_code, "closed")
@@ -747,7 +747,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
         self.assertIsNotNone(view.shop)
         self.assertIsNotNone(view.inventory)
         self.assertEqual(view.pagination.board_total, 0)
-        self.assertEqual(view.pagination.stock_total, 3)
+        self.assertEqual(view.pagination.stock_total, 12)
 
     def test_malformed_merchant_stock_degrades_only_the_shop_surface(self):
         room = FakeRoom(
@@ -806,7 +806,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         self.assertEqual(view.pagination.board_total, 1)
         self.assertEqual(view.pagination.quest_total, 1)
-        self.assertEqual(view.pagination.stock_total, 3)
+        self.assertEqual(view.pagination.stock_total, 12)
         self.assertEqual(view.pagination.sellable_total, 1)
         self.assertEqual(view.pagination.inventory_total, 1)
 

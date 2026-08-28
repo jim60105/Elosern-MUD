@@ -16,8 +16,8 @@ class EconomyRegistryTests(unittest.TestCase):
         self.assertEqual(to_copper(copper=1), 1)
         self.assertIsInstance(to_copper(gold=1, silver=2, copper=3), int)
 
-    def test_seven_price_references_are_integral_and_ordered(self):
-        self.assertEqual(len(PRICE_TABLE), 7)
+    def test_price_references_are_integral_and_ordered(self):
+        self.assertEqual(len(PRICE_TABLE), 14)
         for entry in PRICE_TABLE.values():
             self.assertIsInstance(entry, PriceEntry)
             self.assertIsInstance(entry.min_copper, int)

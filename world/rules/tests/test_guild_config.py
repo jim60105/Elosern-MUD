@@ -77,13 +77,14 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        self.assertEqual(
-            set(ITEM_REGISTRY), {"meal", "healing_potion", "plain_sword"}
+        self.assertEqual(len(ITEM_REGISTRY), 42)
+        self.assertTrue(
+            {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
         )
         for key, definition in ITEM_REGISTRY.items():
             with self.subTest(item=key):
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
-                self.assertTrue(definition.sellable)
+                self.assertIsInstance(definition.sellable, bool)
                 self.assertIsInstance(definition.presentation, ItemPresentation)
                 self.assertIsInstance(definition.presentation.kind, ItemKind)
                 self.assertIsInstance(definition.presentation.icon_key, ItemIconKey)
@@ -290,7 +291,9 @@ class ShopRuleTests(unittest.TestCase):
             self.assertNotIsInstance(offer.buy_copper, bool)
             self.assertLessEqual(offer.sell_copper, offer.buy_copper)
             band = PRICE_TABLE[ITEM_REGISTRY[offer.item_key].price_table_key]
-            self.assertTrue(band.min_copper <= offer.buy_copper <= band.max_copper)
+            self.assertGreaterEqual(offer.buy_copper, band.min_copper)
+            if band.max_copper is not None:
+                self.assertLessEqual(offer.buy_copper, band.max_copper)
             self.assertLessEqual(offer.initial_stock, offer.max_stock)
 
     def test_float_price_is_rejected(self):

@@ -18,7 +18,7 @@ from world.maps.bootstrap import (
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
-from world.rules.guild_config import CATALOG
+from world.rules.guild_config import CATALOG, get_catalog
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.guild_economy import (
     GUILD_SERVICE_KEY,
@@ -26,7 +26,7 @@ from world.rules.guild_economy import (
     sync_service_content,
 )
 
-MERCHANT_STOCK_COUNT = 3  # meal, healing_potion, plain_sword
+MERCHANT_STOCK_COUNT = 30  # every offered item key
 
 
 class ServiceContentIsolation(QuestRegistryIsolation):
@@ -107,7 +107,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         merchant = self._merchant_host().components.get(Merchant.get_component_slot())
         stock = dict(merchant.merchant_stock)
-        self.assertEqual(sorted(stock), ["healing_potion", "meal", "plain_sword"])
+        offers = get_catalog().shop_configs["altoria_general_store"].offers
+        self.assertEqual(sorted(stock), sorted(offer.item_key for offer in offers))
+        self.assertGreater(len(stock), 3)
         stock["healing_potion"] = 1
         merchant.merchant_stock = stock
 

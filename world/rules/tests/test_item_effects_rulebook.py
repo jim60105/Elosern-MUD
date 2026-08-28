@@ -21,6 +21,10 @@ item_use_seconds: 6
 effects:
   self_heal:
     amount: 40
+  greater_heal:
+    amount: 120
+  mana_restore:
+    amount: 40
 """
 
 

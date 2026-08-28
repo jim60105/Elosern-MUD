@@ -30,6 +30,27 @@ PRICE_TABLE: dict[str, PriceEntry] = {
     "magic_weapon": PriceEntry(
         "magic_weapon", "魔法武器", 100_000, None, "Open-ended price starting at ten gold."
     ),
+    "mundane_weapon": PriceEntry(
+        "mundane_weapon", "普通兵器", 100, 2000, "Non-magical forged arms."
+    ),
+    "armor": PriceEntry(
+        "armor", "防具", 200, 5000, "Body and off-hand armor."
+    ),
+    "jewelry": PriceEntry(
+        "jewelry", "首飾", 100, 5000, "Ordinary worn jewelry."
+    ),
+    "magic_accessory": PriceEntry(
+        "magic_accessory", "魔法飾品", 10_000, 100_000, "Enchanted worn accessories."
+    ),
+    "tool": PriceEntry(
+        "tool", "魔法工具", 30, 300, "Common enchanted utility tools."
+    ),
+    "material": PriceEntry(
+        "material", "魔法素材", 20, None, "Open-ended price for rare materials."
+    ),
+    "relic": PriceEntry(
+        "relic", "唯一信物", 999_999, None, "One-of-a-kind keepsake, never traded."
+    ),
     "commoner_annual_income": PriceEntry(
         "commoner_annual_income", "平民年收入", 50_000, 100_000, "Approximate annual income."
     ),

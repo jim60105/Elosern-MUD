@@ -100,6 +100,7 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "malformed_equipment": "背包資料有誤。",
     # Personal item use and equipment toggle.
     "hp_full": "你的體力已經全滿。",
+    "mp_full": "你的魔力已經全滿。",
     "item_not_held": "你沒有攜帶這個物品。",
     "not_usable": "這個物品無法這樣使用。",
     "not_equipment": "這個物品無法裝備。",

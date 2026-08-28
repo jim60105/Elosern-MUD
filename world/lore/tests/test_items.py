@@ -25,7 +25,24 @@ class ItemPresentationTests(unittest.TestCase):
     )
     def test_every_registered_item_resolves_complete_metadata(self):
         self.assertEqual(
-            set(ITEM_REGISTRY), {"meal", "healing_potion", "plain_sword"}
+            set(ITEM_REGISTRY),
+            {
+                "meal", "healing_potion", "plain_sword",
+                "iron_dagger", "hunting_throwing_axe", "hunters_longbow",
+                "apprentice_focus_staff", "knight_blade", "magic_sword",
+                "leather_armor", "mage_robe", "chainmail", "iron_shield",
+                "silver_hairpin", "wolf_fang_necklace", "pilgrim_medallion",
+                "protective_ring", "storage_pouch", "gliding_cloak",
+                "magic_lamp", "healing_herb", "rough_iron_ore", "beast_crystal",
+                "evernight_shard", "mana_core", "dragon_scale_fragment",
+                "elven_spider_silk", "baptismal_holy_water",
+                "greater_healing_potion", "mana_potion",
+                "elven_traditional_robe", "royal_signet_ring",
+                "royal_heirloom_pendant", "rose_crest_rapier", "black_maid_dress",
+                "silver_feather_earring", "crescent_earring", "dark_elf_kimono",
+                "shadow_blade", "shadow_blade_echo", "dark_elf_ninja_garb",
+                "guild_recruit_badge",
+            }
         )
         for key, definition in ITEM_REGISTRY.items():
             presentation = definition.presentation

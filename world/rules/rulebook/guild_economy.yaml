@@ -120,3 +120,165 @@ shops:
         max_stock: 3
         initial_stock: 1
         restock_quantity: 1
+      - item_key: iron_dagger
+        buy_copper: 180
+        sell_copper: 90
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 2
+      - item_key: hunting_throwing_axe
+        buy_copper: 250
+        sell_copper: 125
+        max_stock: 10
+        initial_stock: 3
+        restock_quantity: 1
+      - item_key: hunters_longbow
+        buy_copper: 400
+        sell_copper: 200
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: apprentice_focus_staff
+        buy_copper: 500
+        sell_copper: 250
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: knight_blade
+        buy_copper: 900
+        sell_copper: 450
+        max_stock: 5
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: magic_sword
+        buy_copper: 150000
+        sell_copper: 75000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: leather_armor
+        buy_copper: 400
+        sell_copper: 200
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
+      - item_key: mage_robe
+        buy_copper: 800
+        sell_copper: 400
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: chainmail
+        buy_copper: 1200
+        sell_copper: 600
+        max_stock: 5
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: iron_shield
+        buy_copper: 300
+        sell_copper: 150
+        max_stock: 10
+        initial_stock: 3
+        restock_quantity: 2
+      - item_key: silver_hairpin
+        buy_copper: 200
+        sell_copper: 100
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 2
+      - item_key: wolf_fang_necklace
+        buy_copper: 800
+        sell_copper: 400
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: pilgrim_medallion
+        buy_copper: 1500
+        sell_copper: 750
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: protective_ring
+        buy_copper: 12000
+        sell_copper: 6000
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: storage_pouch
+        buy_copper: 30000
+        sell_copper: 15000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: gliding_cloak
+        buy_copper: 80000
+        sell_copper: 40000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: magic_lamp
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 20
+        initial_stock: 8
+        restock_quantity: 4
+      - item_key: healing_herb
+        buy_copper: 40
+        sell_copper: 20
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: rough_iron_ore
+        buy_copper: 100
+        sell_copper: 80
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: beast_crystal
+        buy_copper: 800
+        sell_copper: 400
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+      - item_key: evernight_shard
+        buy_copper: 1500
+        sell_copper: 750
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: mana_core
+        buy_copper: 2500
+        sell_copper: 1250
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: dragon_scale_fragment
+        buy_copper: 2800
+        sell_copper: 1400
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: elven_spider_silk
+        buy_copper: 60000
+        sell_copper: 30000
+        max_stock: 1
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: baptismal_holy_water
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2
+      - item_key: greater_healing_potion
+        buy_copper: 250
+        sell_copper: 125
+        max_stock: 5
+        initial_stock: 3
+        restock_quantity: 2
+      - item_key: mana_potion
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 10
+        initial_stock: 4
+        restock_quantity: 2

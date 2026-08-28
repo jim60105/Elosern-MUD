@@ -120,7 +120,7 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
         view = build_services_view(self.player)
         self.assertIsNotNone(view.shop)
         self.assertEqual(view.shop.open, True)
-        self.assertEqual(len(view.shop.stock), 3)
+        self.assertEqual(len(view.shop.stock), 12)
 
         snapshot = self._canonical_snapshot()
         rebuild = build_services_view(self.player)

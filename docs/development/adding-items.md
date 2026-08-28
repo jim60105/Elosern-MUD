@@ -41,7 +41,7 @@
 1. 它會被「使用」嗎？是 → 需要 `ItemEffectKey` 與 `item_effects.yaml` 條目。
 2. 它能裝備嗎？是 → 選 `EquipmentSlot`（`weapon_main`／`weapon_off`／`armor`／`accessory`），飾品共用 5 件上限。
 3. 它能買賣嗎？是 → 需要 `PRICE_TABLE` 價格帶與至少一家店的 offer。
-4. 現有的 effect key（目前僅 `self_heal`）能描述它的效果嗎？不能 → 這不只是加資料，見 §5。
+4. 現有的 effect key（`self_heal`／`greater_heal`／`mana_restore`）能描述它的效果嗎？不能 → 這不只是加資料，見 §5。
 
 ---
 
@@ -90,6 +90,10 @@ icon 只存 key，SVG 由 Vue 端自行映射，registry 不接受任何圖片�
 ```yaml
 effects:
   self_heal:
+    amount: 40
+  greater_heal:
+    amount: 120
+  mana_restore:
     amount: 40
 ```
 
