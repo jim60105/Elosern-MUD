@@ -127,7 +127,6 @@ For every item whose key exists in `ITEM_REGISTRY`, `actor.db.inventory` SHALL b
 - **WHEN** a player successfully consumes a registry key granted without a contained mirror
 - **THEN** one canonical key is removed and no object is created or unrelated mirror removed
 
-
 ### Requirement: Localized item commands synchronize containment and the key list
 `拿`, `丟`, and `給` SHALL move the Evennia Object's containment AND apply the matching key-list delta
 through the deterministic inventory planner in one atomic step, so a held registry item is always
@@ -185,7 +184,15 @@ The deterministic equipment service SHALL expose a side-effect-free preflight sh
 - **WHEN** presentation checks whether a sixth accessory can be equipped
 - **THEN** preflight returns `accessory_slots_full` while inventory and equipment remain byte-for-byte unchanged
 
-Stored equipment SHALL normalize fail-closed before any decision or projection: the mapping must carry exactly the three singleton keys and an `accessories` sequence, each key may hold at most one occurrence across all slots, and every stored key must be registry-declared equipment whose declared slot matches where it is stored. Presentation SHALL derive visible equipped truth from this same normalization; a mapping that fails it is reported as malformed (section unavailable or `malformed_equipment` refusal) and SHALL NOT yield partially trusted equipped flags.
+Stored equipment SHALL normalize fail-closed before any decision or projection: the mapping must carry exactly the three singleton keys and an `accessories` sequence, each key may hold at most one occurrence across all slots, and every stored key must be registry-declared equipment whose declared slot matches where it is stored. Presentation SHALL derive visible equipped truth from this same normalization; a mapping that fails it is reported as malformed (section unavailable or `malformed_equipment` refusal) and SHALL NOT yield partially trusted equipped flags. Every canonical inventory-removal writer (shop sell, drop, give, and NPC transfer) SHALL refuse to remove the last held occurrence of an equipped key with a stable named refusal and SHALL NOT mutate wallet, stock, inventory, or equipment; removals that leave at least one held occurrence SHALL remain allowed.
+
+#### Scenario: Selling the last equipped copy is refused
+- **WHEN** a player sells the only held copy of an equipped sellable item
+- **THEN** the sale rejects with `equipped_item` and wallet, merchant stock, inventory, and equipment are unchanged
+
+#### Scenario: Unequipped items sell normally
+- **WHEN** the same item is unequipped and then sold
+- **THEN** the sale proceeds exactly as before the guard existed
 
 #### Scenario: Cross-slot duplicate fails closed everywhere
 - **WHEN** stored equipment holds one key in both a singleton slot and the accessory list
@@ -231,3 +238,4 @@ A successful or rejected equipment toggle SHALL not advance the world clock or a
 #### Scenario: Combat equipment replacement is a free action
 - **WHEN** a player in active combat replaces a held main-hand item
 - **THEN** canonical equipment changes, but no participant acts and the combat round count and world clock remain unchanged
+

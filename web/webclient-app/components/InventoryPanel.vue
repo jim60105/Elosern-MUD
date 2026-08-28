@@ -768,11 +768,14 @@ watch(selectedKey, () => {
   margin-top: 5px;
 }
 
-/* The item-use confirmation modal (teleported to the document body). */
+/* The item-use confirmation modal (teleported to the document body).
+   It must clear the full-screen drawer tier (the scrim renders at
+   --z-surface-modal - 100), so it rides 100 above the modal token while
+   staying below the reserved --z-offline tier. */
 .inventory-confirm {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: calc(var(--z-surface-modal) + 100);
   display: grid;
   place-items: center;
   font-family: var(--f-sans);
