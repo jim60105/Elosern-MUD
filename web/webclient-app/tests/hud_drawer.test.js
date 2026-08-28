@@ -107,6 +107,38 @@ describe("HudDrawer (H4 D1)", () => {
     expect(document.activeElement).toBe(w.get('[data-testid="hud-drawer-close"]').element);
   });
 
+  it("pins the reference geometry and head type scale in the drawer's own CSS rules", () => {
+    // jsdom does not apply the SFC's <style>, so the reference geometry and
+    // head type scale (align-drawer-chrome-symbols) are pinned at the
+    // selector level: each assertion reads its rule's own block, so moving a
+    // declaration into another block cannot satisfy it (the same source-pinning
+    // pattern the reduced-motion test below uses for the transition).
+    const source = readFileSync(
+      join(process.cwd(), "web/webclient-app/components/HudDrawer.vue"),
+      "utf-8",
+    );
+    const ruleBlock = (selector, re) => {
+      const match = source.match(re);
+      expect(match, `${selector} rule block`).not.toBeNull();
+      return match[0];
+    };
+    // Top clearance: one --command-line-h below the stage top (the reference's
+    // .draw{top:46px}), bottom still at the stage bottom; the scrim keeps
+    // covering the whole stage.
+    const drawer = ruleBlock(".hud-drawer", /\.hud-drawer \{[^}]*\}/);
+    expect(drawer).toContain("top: var(--command-line-h)");
+    expect(drawer).toContain("bottom: 0");
+    const scrim = ruleBlock(".hud-drawer-scrim", /\.hud-drawer-scrim \{[^}]*\}/);
+    expect(scrim).toContain("inset: 0");
+    // Head type scale: the reference's 20px display title with .04em tracking
+    // and the 11px muted subtitle beside it.
+    const title = ruleBlock(".hud-drawer__title", /\.hud-drawer__title \{[^}]*\}/);
+    expect(title).toContain("font-size: 20px");
+    expect(title).toContain("letter-spacing: .04em");
+    const subtitle = ruleBlock(".hud-drawer__subtitle", /\.hud-drawer__subtitle \{[^}]*\}/);
+    expect(subtitle).toContain("font-size: 11px");
+  });
+
   it("reduced motion keeps the open state and drops the transition", () => {
     // The transition is expressed through `--motion-base`; the reduced-motion
     // block sets the token to 1ms, so the open state still applies while the

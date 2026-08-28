@@ -15,7 +15,11 @@ export const GLYPHS = {
   interact: "M4 5h16v11H8l-4 4V5Z",
   character: "M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-7 22v-1c0-3.9 3.1-7 7-7s7 3.1 7 7v1h-14z",
   quests: "M6 3h12v2h2v5h-2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5H5V3h1z",
-  inventory: "M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z",
+  // The reference's 背包 · 裝備 drawer-head backpack outline
+  // (docs/design/elosern-redesign/index.html:958), the identical string the
+  // combat `items` tab carries — one backpack glyph for 背包 semantics
+  // across the dock tab and the drawer head (align-drawer-chrome-symbols).
+  inventory: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
   wait: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 4v7l5 3-1.5 2.4L11 14V7h2z",
   suggestions: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
   // The reference's own get-icon (the command line's 拿 chip,

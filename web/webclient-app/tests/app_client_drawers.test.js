@@ -196,14 +196,16 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
       "施放入口：cast <技法>[@威力]=<代號>",
     );
-    // The inventory drawer carries the local `inventory` bag glyph and its
+    // The inventory drawer carries the reference's `inventory` backpack glyph
+    // (align-drawer-chrome-symbols; the string shared with `items`) and its
     // header wallet subtitle (relocate-inventory-drawer-essentials); the
     // remaining four drawers keep the icon-less / footer-less chrome.
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
     const invIcon = wrapper.find(".hud-drawer__icon");
     expect(invIcon.exists()).toBe(true);
-    expect(invIcon.find("path").attributes("d")).toBe("M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z");
+    expect(invIcon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
+    expect(wrapper.find('[data-testid="hud-drawer__title"].hud-drawer__title').exists()).toBe(true);
     expect(wrapper.get(".hud-drawer__subtitle").text()).toBe("錢袋 3,240 銅");
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
   });
@@ -275,13 +277,14 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    // No balance and no zero: the header keeps the local `inventory` bag
-    // glyph but renders no wallet subtitle (relocate-inventory-drawer-
-    // essentials: an unavailable panel renders no balance at all), and the
-    // body renders no `金錢` row either (realign-inventory-drawer-layout).
+    // No balance and no zero: the header keeps the reference `inventory`
+    // backpack glyph but renders no wallet subtitle
+    // (relocate-inventory-drawer-essentials: an unavailable panel renders no
+    // balance at all), and the body renders no `金錢` row either
+    // (realign-inventory-drawer-layout).
     const icon = wrapper.find(".hud-drawer__icon");
     expect(icon.exists()).toBe(true);
-    expect(icon.find("path").attributes("d")).toBe("M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z");
+    expect(icon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
     expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
     expect(wrapper.find('[data-testid="inventory-panel__wallet-value"]').exists()).toBe(false);
   });
