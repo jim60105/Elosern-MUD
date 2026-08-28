@@ -20,7 +20,7 @@ contains exactly ``item_key``, ``effect_key``, ``consumable``, and ``amount``
 (the actual bounded restoration, never the configured maximum).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -28,6 +28,7 @@ from typing import Any, Literal
 
 import yaml
 
+from django.db import transaction
 from evennia.utils.logger import log_warn
 
 from world.lore.items import ITEM_REGISTRY, ItemEffectKey
@@ -326,11 +327,17 @@ def _gauge_from_storage(entity: Any, key: str) -> tuple[int, int] | None:
 
 
 def _inventory_list(entity: Any) -> list[str] | None:
-    """Return a copy of the canonical key list, or ``None`` when malformed."""
+    """Return a copy of the canonical key list, or ``None`` when malformed.
+
+    Accepts Evennia's ``_SaverList`` storage (a Sequence, not a ``list``
+    subclass); a bare string, mapping, or non-string entry fails closed.
+    """
     raw = entity.db.inventory
     if raw is None:
         return []
-    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+    if isinstance(raw, str) or not isinstance(raw, Sequence):
+        return None
+    if not all(isinstance(item, str) for item in raw):
         return None
     return list(raw)
 
@@ -348,7 +355,7 @@ def _select_mirror(entity: Any, item_key: str) -> Any | None:
     matches = [obj for obj in contents if registry_key_for_object(obj) == item_key]
     if not matches:
         return None
-    matches.sort(key=lambda obj: (obj.id is None, obj.id))
+    matches.sort(key=lambda obj: (obj.id is None, obj.id or 0))
     return matches[0]
 
 

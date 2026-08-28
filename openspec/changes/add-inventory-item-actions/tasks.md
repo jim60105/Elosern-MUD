@@ -6,10 +6,10 @@
 
 ## 2. Deterministic Item Use
 
-- [ ] 2.1 Implement `ItemUseRequest`, stable rejection reasons, and side-effect-free `preflight_item_use()` for ownership, mode, effect validity, and current healing eligibility.
-- [ ] 2.2 Implement composable item-use planning and settlement, including HP clamping, exactly-one key and existing contained-mirror consumption, key-only consumption, unchanged reusable quantity, stable `item_used` EventLog output, and idmapper/contents/Attribute cache restoration.
-- [ ] 2.3 Implement one atomic exploration facade that composes item settlement with the canonical six-second clock advance and its due-event rollback journal.
-- [ ] 2.4 Add focused deterministic and Evennia tests for full-HP rejection, missing ownership, materialized and key-only consumables, reusable success, max-HP clamping, EventLog fields, mirror/cache rollback, and clock-callback fault rollback.
+- [x] 2.1 Implement `ItemUseRequest`, stable rejection reasons, and side-effect-free `preflight_item_use()` for ownership, mode, effect validity, and current healing eligibility.
+- [x] 2.2 Implement composable item-use planning and settlement, including HP clamping, exactly-one key and existing contained-mirror consumption, key-only consumption, unchanged reusable quantity, stable `item_used` EventLog output, and idmapper/contents/Attribute cache restoration.
+- [x] 2.3 Implement one atomic exploration facade that composes item settlement with the canonical six-second clock advance and its due-event rollback journal.
+- [x] 2.4 Add focused deterministic and Evennia tests for full-HP rejection, missing ownership, materialized and key-only consumables, reusable success, max-HP clamping, EventLog fields, mirror/cache rollback, and clock-callback fault rollback.
 
 ## 3. Equipment Toggle And Five Accessories
 
