@@ -48,7 +48,12 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     def test_reference_drawer_modal_contract(self):
         # The drawer chrome (right-anchored, single-open, focus trap, Escape /
         # close-control / scrim close, focus restoration, reduced-motion) is
-        # asserted by the drawer + focus-trap component suites.
+        # asserted by the drawer + focus-trap component suites. Since
+        # align-drawer-chrome-symbols the modified clauses — the
+        # --command-line-h top inset over a bottom edge at the stage bottom
+        # with the whole-stage scrim, and the reference's 20px / .04em head
+        # title with the 11px subtitle — are pinned selector-level by the
+        # drawer component suite's CSS-rule-block test.
         _assert_vitest_passes(
             _run_vitest(
                 TESTS_DIR / "hud_drawer.test.js",

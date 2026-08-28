@@ -1,7 +1,9 @@
 <script setup>
 // HudDrawer (H4, webclient-hud-04-reference-drawers, design D1): the
 // right-anchored drawer chrome shared by the six reference drawers. Fixed
-// to the stage's right edge at full stage height, bounded to a width that
+// to the stage's right edge, its top edge inset one `--command-line-h`
+// below the stage top (the reference's `.draw{top:46px}` clearance) and its
+// bottom at the stage bottom, bounded to a width that
 // never exceeds the viewport (`min(560px, 94vw)`), drawn on the solid panel
 // background with a left border and a left-cast shadow so it reads as a
 // surface laid over the stage, not a region of it. The head / body / foot
@@ -178,10 +180,13 @@ function onScrimClick() {
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* The right-anchored drawer (the draft's `.draw` chrome). */
+/* The right-anchored drawer (the draft's `.draw` chrome). The top edge is
+   inset one command-line strip height from the stage top, reproducing the
+   reference's `top:46px` clearance (index.html:404) through the shared 46px
+   token; the scrim keeps covering the whole stage. */
 .hud-drawer {
   position: fixed;
-  top: 0;
+  top: var(--command-line-h);
   right: 0;
   bottom: 0;
   width: min(560px, 94vw);
@@ -208,18 +213,23 @@ function onScrimClick() {
   border-bottom: var(--line);
 }
 
+/* The head title (the reference's `.dhead h3`: 20px display type with
+   `.04em` tracking, index.html:410). */
 .hud-drawer__title {
   margin: 0;
   color: var(--paper-100);
   font-family: var(--f-display);
-  font-size: 1em;
+  font-size: 20px;
+  letter-spacing: .04em;
   flex: 1;
 }
 
+/* The head subtitle (the reference's `.dhead .sub`: 11px muted,
+   index.html:411). */
 .hud-drawer__subtitle {
   margin: 0;
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: 11px;
 }
 
 /* The head icon (the reference's `.dhead .ic`, index.html:409-410). */

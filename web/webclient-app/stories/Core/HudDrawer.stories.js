@@ -59,8 +59,10 @@ export default {
     docs: {
       description: {
         component:
-          "The right-anchored drawer chrome (fixed to the stage's right edge, full height, " +
-          "width min(560px,94vw), solid panel background, left border + left-cast shadow). " +
+          "The right-anchored drawer chrome (fixed to the stage's right edge, top edge inset " +
+          "one --command-line-h below the stage top per the reference's .draw{top:46px}, " +
+          "bottom at the stage bottom, width min(560px,94vw), solid panel background, left " +
+          "border + left-cast shadow). " +
           "Slides in over a blurred scrim, traps focus, closes on Escape/close-control/scrim " +
           "with focus restored to the opener. At most one drawer is open at a time.",
       },
@@ -99,5 +101,20 @@ export const SkillDrawer = {
     subtitle: "主動 91 · 被動 23",
     drawerKey: "skill",
     skillDrawer: true,
+  },
+};
+
+// The inventory drawer's composed head (the offline showcase): the
+// reference's 背包 · 裝備 head with the backpack glyph shared with `items`
+// (align-drawer-chrome-symbols) and the wallet subtitle — the combination
+// AppClient wires for `hudDrawer === 'inventory'`.
+export const InventoryDrawer = {
+  render: renderDrawer,
+  args: {
+    open: true,
+    title: "背包 · 裝備",
+    subtitle: "錢袋 3,240 銅",
+    drawerKey: "inventory",
+    icon: "inventory",
   },
 };
