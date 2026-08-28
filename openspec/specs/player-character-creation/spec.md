@@ -174,6 +174,30 @@ payload are unchanged.
 - **THEN** importing `world.lore.player_presets` raises, so the invalid kit can never reach a
   player's activation
 
+### Requirement: Preset activation grants the preset's declared starting inventory
+Preset mode SHALL additionally grant the selected preset's declared starting inventory: the
+activated character's `inventory` SHALL equal the preset's `(item_key, quantity)` pairs flattened
+into the flat repeated-key list shape in declared order, written inside the same all-or-nothing
+activation transaction. Custom mode SHALL start with an empty inventory. A starting kit SHALL
+reference only keys that exist in `ITEM_REGISTRY`, with a positive integer quantity per key and no
+repeated key — an invalid kit SHALL fail at registry load, never at player activation. Starting
+items are granted unequipped; the player equips them through the ordinary equipment surface.
+
+#### Scenario: A preset activation grants the declared starting items
+- **WHEN** a pending player activates a shipped preset that declares `starting_items`
+- **THEN** the activated character's `db.inventory` equals the declared pairs flattened by
+  quantity in declared order, written atomically with the rest of the activation state
+
+#### Scenario: Custom activation starts with an empty inventory
+- **WHEN** a pending player completes the custom creation flow
+- **THEN** the activated character's `db.inventory` is `[]`
+
+#### Scenario: A preset kit with a registry-invalid item is rejected at load
+- **WHEN** a preset declares an item key absent from `ITEM_REGISTRY`, a non-positive or
+  non-integer quantity, or the same item key twice
+- **THEN** importing `world.lore.player_presets` raises, so the invalid kit can never reach a
+  player's activation
+
 ### Requirement: Custom creation collects a race-bounded affinity element set
 Custom mode SHALL additionally collect an optional element-affinity set whose size bound depends on
 the selected race: a human may pick at most 2 elements, a beastfolk at most 1, and an elf picks none

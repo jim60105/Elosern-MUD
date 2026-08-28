@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
@@ -23,6 +24,7 @@ class PlayerPreset:
     active_skills: tuple[str, ...] = ()
     passive_skills: tuple[str, ...] = ()
     affinity_elements: tuple[str, ...] = ()
+    starting_items: tuple[tuple[str, int], ...] = ()
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -31,6 +33,14 @@ class PlayerPreset:
     def skill_lists(self) -> dict[str, list[str]]:
         """Return the storage shape for the character ``skills`` attribute."""
         return {"active": list(self.active_skills), "passive": list(self.passive_skills)}
+
+    def inventory_list(self) -> list[str]:
+        """Return the flat repeated-key inventory the activation hands out."""
+        return [
+            item_key
+            for item_key, quantity in self.starting_items
+            for _ in range(quantity)
+        ]
 
 
 PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
@@ -43,6 +53,9 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "剛在公會登記為新人冒險者，均衡的劍術與基礎強化讓她對什麼委託都躍躍欲試。",
         ("light_sword_style",),
         ("body_enhancement_basic",),
+        starting_items=(("plain_sword", 1), ("leather_armor", 1),
+                        ("guild_recruit_badge", 1), ("healing_potion", 2),
+                        ("healing_herb", 2)),
     ),
     "foxkin_scout": PlayerPreset(
         "foxkin_scout", "露芙", 22, 22, "beastfolk", "foxkin",
@@ -54,6 +67,9 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("gale_step",),
         ("flash_step",),
         ("wind",),
+        starting_items=(("hunters_longbow", 1), ("hunting_throwing_axe", 1),
+                        ("leather_armor", 1), ("wolf_fang_necklace", 1),
+                        ("healing_potion", 1), ("healing_herb", 3)),
     ),
     "elf_guardian": PlayerPreset(
         "elf_guardian", "瑟芮雅", 180, 24, "elf", "fionnen",
@@ -64,6 +80,9 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "硬化肌膚與防禦直覺讓她成為隊伍最可靠的盾，守護他人的意志遠勝於爭勝之心。",
         ("hardened_skin",),
         ("defense_instinct", "elf_longevity"),
+        starting_items=(("knight_blade", 1), ("iron_shield", 1),
+                        ("chainmail", 1), ("pilgrim_medallion", 1),
+                        ("healing_potion", 1)),
     ),
     "violet_altoria": PlayerPreset(
         "violet_altoria", "薇歐蕾特", 18, 18, "human", "human_royal",
@@ -76,6 +95,8 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("fire_ball", "wind_blade"),
         ("magic_circle_comprehension", "precise_mana_control", "flight"),
         ("fire", "wind"),
+        starting_items=(("elven_traditional_robe", 1), ("royal_signet_ring", 1),
+                        ("royal_heirloom_pendant", 1)),
     ),
     "lidzia_rosenthal": PlayerPreset(
         "lidzia_rosenthal", "莉茲婭", 18, 18, "human", "human_noble",
@@ -86,6 +107,8 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         "輕劍術在護衛考核名列前茅，隨從武藝與護主本能，使她永遠站在主人與危險之間。",
         ("light_sword_style",),
         ("retainer_martial_training", "guardian_instinct"),
+        starting_items=(("rose_crest_rapier", 1), ("black_maid_dress", 1),
+                        ("silver_feather_earring", 1)),
     ),
     "yuka_darknight": PlayerPreset(
         "yuka_darknight", "悠花", 18, 18, "elf", "ciaran",
@@ -98,6 +121,8 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("dual_blade_mastery", "shadow_slash"),
         ("dual_wield_style", "blade_art_mastery", "extreme_endurance",
          "body_enhancement_extreme", "reincarnation_boon_yuka"),
+        starting_items=(("shadow_blade", 1), ("shadow_blade_echo", 1),
+                        ("dark_elf_ninja_garb", 1)),
     ),
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",
@@ -110,6 +135,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("divine_sexual_arts",),
         ("fire_mastery", "dark_mastery", "divine_sexual_mastery",
          "reincarnation_boon_yuna"),
+        starting_items=(("dark_elf_kimono", 1),),
     ),
     "elosia_shadowmoon": PlayerPreset(
         "elosia_shadowmoon", "伊洛希雅", 222, 24, "elf", "fionnen",
@@ -122,6 +148,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("dominion_art", "status_disguise"),
         ("wind_mastery", "light_mastery", "body_enhancement",
          "reincarnation_boon_elosia"),
+        starting_items=(("elven_traditional_robe", 1), ("crescent_earring", 1)),
     ),
 }
 
@@ -205,6 +232,38 @@ def _validate_preset_affinity_elements(registry: dict[str, PlayerPreset]) -> Non
             )
 
 
+def _validate_preset_starting_items(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a starting kit an activation could never hand out.
+
+    Mirrors the skill-kit validator's load-time stance: every item key must
+    exist in ``ITEM_REGISTRY``, every quantity must be a positive integer, and
+    one key may be declared at most once (extra copies repeat through the
+    quantity), so an invalid kit raises at import instead of mid-activation.
+    """
+    for preset in registry.values():
+        seen: set[str] = set()
+        for entry in preset.starting_items:
+            if not isinstance(entry, tuple) or len(entry) != 2:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a malformed starting-item entry"
+                )
+            item_key, quantity = entry
+            if item_key not in ITEM_REGISTRY:
+                raise ValueError(
+                    f"preset {preset.key!r} declares unknown item {item_key!r}"
+                )
+            if item_key in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate item {item_key!r}"
+                )
+            seen.add(item_key)
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a non-positive quantity for {item_key!r}"
+                )
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
+_validate_preset_starting_items(PLAYER_PRESET_REGISTRY)

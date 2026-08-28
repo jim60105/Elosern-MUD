@@ -446,6 +446,11 @@ def activate_player_character(
         if request.mode == "preset"
         else {"active": [], "passive": []}
     )
+    inventory_value = (
+        PLAYER_PRESET_REGISTRY[request.preset_key].inventory_list()
+        if request.mode == "preset"
+        else []
+    )
     attribute_values = {
         "age": validated.age,
         "apparent_age": validated.apparent_age,
@@ -456,7 +461,7 @@ def activate_player_character(
         "skills": skills_value,
         "skill_grants": [],
         "equipment": {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []},
-        "inventory": [],
+        "inventory": inventory_value,
         "wallet": 0,
         "quest_log": [],
         "guild_rank": None,
