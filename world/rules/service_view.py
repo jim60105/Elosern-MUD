@@ -57,7 +57,7 @@ from world.rules.guild_offers import (
 )
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.skills.equipment import list_items
-from world.rules.equipment import preflight_equipment_toggle
+from world.rules.equipment import normalized_equipment, preflight_equipment_toggle
 from world.rules.items import ItemUseRequest, preflight_item_use
 
 # Presentation bounds owned by the services view (equal or below the wire
@@ -694,20 +694,27 @@ def _build_shop(
 
 
 def _equipped_keys(actor: Any) -> set[str]:
-    raw = actor.db.equipment
-    if raw is None:
-        return set()
-    if not isinstance(raw, Mapping):
+    """Derive equipped truth from the shared fail-closed equipment layer.
+
+    The services rows and the only mutating API (``toggle_equipment``)
+    normalize storage through the same strict function, so a malformed
+    mapping is reported as ``malformed_equipment`` (section unavailable)
+    rather than presented as partially-trusted equipped flags.
+    """
+    equipment = normalized_equipment(actor)
+    if equipment is None:
         raise ServicesSectionError("malformed_equipment")
-    keys: list[str] = []
-    for slot in ("weapon_main", "weapon_off", "armor"):
-        value = raw.get(slot)
-        if isinstance(value, str) and value:
-            keys.append(value)
-    accessories = raw.get("accessories")
-    if isinstance(accessories, (list, tuple)):
-        keys.extend(str(item) for item in accessories if item)
-    return set(keys)
+    keys = {
+        value
+        for value in (
+            equipment["weapon_main"],
+            equipment["weapon_off"],
+            equipment["armor"],
+        )
+        if value is not None
+    }
+    keys.update(equipment["accessories"])
+    return keys
 
 
 def _reason_message(code: str) -> str:

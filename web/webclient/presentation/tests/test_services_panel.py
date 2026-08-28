@@ -901,7 +901,12 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
     def test_rendering_inventory_never_mutates_canonical_state(self):
         self.player.db.inventory = ["healing_potion", "healing_potion", "mystery_relic", "plain_sword"]
-        self.player.db.equipment = {"weapon_main": "plain_sword", "armor": "leather_armor"}
+        self.player.db.equipment = {
+            "weapon_main": "plain_sword",
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
         before = {
             "inventory": list(self.player.db.inventory or []),
             "equipment": dict(self.player.db.equipment or {}),

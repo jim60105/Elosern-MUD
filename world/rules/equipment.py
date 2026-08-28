@@ -302,7 +302,50 @@ def _normalized_equipment(entity: Any) -> dict | None:
     if len(items) > ACCESSORY_MAX_SLOTS:
         return None
     normalized["accessories"] = items
+    # Cross-slot integrity: one key may hold at most one occurrence across
+    # the whole mapping, and every stored key must be registry-declared
+    # equipment whose slot matches where it is stored. Registry membership
+    # failures never depend on the live registry for the SHAPE checks above.
+    from world.skills.equipment import EquipmentSlot
+
+    occurrences: set[str] = set()
+    for slot_key in _SINGLETON_SLOTS:
+        value = normalized[slot_key]
+        if value is None:
+            continue
+        if value in occurrences:
+            return None
+        occurrences.add(value)
+    for value in items:
+        if value in occurrences:
+            return None
+        occurrences.add(value)
+    for slot_key in _SINGLETON_SLOTS:
+        value = normalized[slot_key]
+        if value is None:
+            continue
+        definition = ITEM_REGISTRY.get(value)
+        if (
+            definition is None
+            or definition.equipment_slot is not EquipmentSlot(slot_key)
+        ):
+            return None
+    for value in items:
+        definition = ITEM_REGISTRY.get(value)
+        if definition is None or definition.equipment_slot is not EquipmentSlot.ACCESSORY:
+            return None
     return normalized
+
+
+def normalized_equipment(entity: Any) -> dict | None:
+    """Public pure read of the fail-closed normalized equipment mapping.
+
+    Returns the same normalization ``preflight_equipment_toggle`` and
+    ``toggle_equipment`` settle against (``None`` means malformed storage);
+    presentation surfaces must derive equipped truth from this function so
+    the visible state and the only mutating API can never disagree.
+    """
+    return _normalized_equipment(entity)
 
 
 def _equipped_singleton_key(equipment: Mapping, item_key: str) -> str | None:

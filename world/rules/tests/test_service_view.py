@@ -1052,7 +1052,11 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         self.assertIsNone(view.inventory)
         self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
 
-    def test_accessories_ignored_when_not_a_list(self):
+    def test_accessories_not_a_list_fails_closed_unavailable(self):
+        # The services rows normalize through the shared fail-closed
+        # equipment layer (add-inventory-item-actions rubber-duck fix): a
+        # malformed accessories value is never partially trusted — the
+        # inventory section is unavailable, not partially equipped.
         room = FakeRoom()
         player = actor(
             location=room,
@@ -1070,11 +1074,31 @@ class ShopEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        row = view.inventory.rows[0]
-        self.assertEqual(row.item_key, "plain_sword")
-        self.assertTrue(row.equipped)
+        self.assertIsNone(view.inventory)
+        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
 
-
+    def test_cross_slot_duplicate_fails_closed_unavailable(self):
+        # One key stored in two slots is malformed for the shared equipment
+        # layer, so the panel never publishes a partial equipped truth.
+        room = FakeRoom()
+        player = actor(
+            location=room,
+            wallet=5,
+            inventory=["plain_sword"],
+            equipment={
+                "weapon_main": "plain_sword",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": ["plain_sword"],
+            },
+        )
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            view = build_services_view(player)
+        self.assertIsNone(view.inventory)
+        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
 
 
 class InventoryRowActionTests(ServiceRegistryIsolation):

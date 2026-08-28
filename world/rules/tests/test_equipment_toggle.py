@@ -312,3 +312,77 @@ class ToggleFreeActionTests(_ToggleTestCase):
             self.entity.attributes.get("traits", category="traits"),
             traits_before,
         )
+
+
+class CrossSlotNormalizationTests(_ToggleTestCase):
+    """Registry slot agreement and one occurrence per key across slots."""
+
+    def setUp(self):
+        super().setUp()
+        self.register(
+            ("twin_blade", EquipmentSlot.WEAPON_MAIN),
+            ("plate_mail", EquipmentSlot.ARMOR),
+            ("loop_ring", EquipmentSlot.ACCESSORY),
+        )
+        self.hold("twin_blade", "plate_mail", "loop_ring")
+
+    def _rejects_malformed(self, storage: dict, key: str) -> None:
+        self.entity.db.equipment = storage
+        before = self.state()
+        result = toggle_equipment(self.entity, key)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertIs(result.reason, EquipmentToggleReason.MALFORMED_STORAGE)
+        self.assertEqual(self.state(), before)
+
+    def test_same_key_in_two_singleton_slots_fails_closed(self):
+        self._rejects_malformed(
+            {
+                "weapon_main": "twin_blade",
+                "weapon_off": "twin_blade",
+                "armor": None,
+                "accessories": [],
+            },
+            "twin_blade",
+        )
+
+    def test_singleton_and_accessory_duplicate_fails_closed(self):
+        self._rejects_malformed(
+            {
+                "weapon_main": "twin_blade",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": ["twin_blade"],
+            },
+            "loop_ring",
+        )
+
+    def test_slot_mismatch_and_unknown_keys_fail_closed(self):
+        cases = {
+            "main-hand-item-in-off-hand": {
+                "weapon_main": None,
+                "weapon_off": "twin_blade",
+                "armor": None,
+                "accessories": [],
+            },
+            "accessory-in-singleton-slot": {
+                "weapon_main": None,
+                "weapon_off": None,
+                "armor": "loop_ring",
+                "accessories": [],
+            },
+            "unknown-key-in-slot": {
+                "weapon_main": "ghost_item",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": [],
+            },
+            "non-equipment-in-accessories": {
+                "weapon_main": None,
+                "weapon_off": None,
+                "armor": None,
+                "accessories": ["plate_mail"],
+            },
+        }
+        for name, storage in cases.items():
+            with self.subTest(case=name):
+                self._rejects_malformed(storage, "loop_ring")

@@ -58,6 +58,16 @@ The deterministic equipment service SHALL expose a side-effect-free preflight sh
 - **WHEN** presentation checks whether a sixth accessory can be equipped
 - **THEN** preflight returns `accessory_slots_full` while inventory and equipment remain byte-for-byte unchanged
 
+Stored equipment SHALL normalize fail-closed before any decision or projection: the mapping must carry exactly the three singleton keys and an `accessories` sequence, each key may hold at most one occurrence across all slots, and every stored key must be registry-declared equipment whose declared slot matches where it is stored. Presentation SHALL derive visible equipped truth from this same normalization; a mapping that fails it is reported as malformed (section unavailable or `malformed_equipment` refusal) and SHALL NOT yield partially trusted equipped flags.
+
+#### Scenario: Cross-slot duplicate fails closed everywhere
+- **WHEN** stored equipment holds one key in both a singleton slot and the accessory list
+- **THEN** the toggle rejects with `malformed_equipment` and the services inventory section reports `malformed_equipment` instead of publishing equipped flags
+
+#### Scenario: Slot mismatch against the registry fails closed
+- **WHEN** a stored key is registry-declared for a different slot than the one holding it, or is not registry equipment at all
+- **THEN** normalization returns malformed and neither toggle nor presentation accepts the stored state
+
 ### Requirement: Singleton equipment toggles and replaces atomically
 For `WEAPON_MAIN`, `WEAPON_OFF`, and `ARMOR`, toggling the item already in its declared slot SHALL clear that slot. Toggling a held unequipped item SHALL atomically assign it to its declared slot and replace any prior occupant; the prior item SHALL remain held and become unequipped. Planning or write failure SHALL restore the complete prior equipment mapping.
 
