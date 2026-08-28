@@ -1191,6 +1191,130 @@ export const SERVICES_PANEL_SAMPLE = {
   },
 };
 
+// The services v2 panel whose inventory rows all carry committed
+// presentation metadata (redesign-inventory-item-grid): the row set covers
+// every closed `ItemIconKey`/`ItemKind` value (food, potion, weapon, armor,
+// accessory, ammunition, tool, material, misc) and every closed rarity
+// (common, uncommon, rare, epic, legendary). The presentation objects mirror
+// the server's registry (`world/lore/items.py`).
+export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
+  ...SERVICES_PANEL_SAMPLE,
+  inventory: {
+    rows: [
+      {
+        item_key: "meal",
+        display_name: "普通餐食",
+        held: 5,
+        equipped: false,
+        presentation: {
+          kind: "food",
+          icon_key: "food",
+          rarity: "common",
+          summary: "供旅人充飢的普通餐食。",
+        },
+      },
+      {
+        item_key: "healing_potion",
+        display_name: "治療藥水",
+        held: 3,
+        equipped: false,
+        presentation: {
+          kind: "potion",
+          icon_key: "potion",
+          rarity: "rare",
+          summary: "盛裝於小瓶中的治療藥水。",
+        },
+      },
+      {
+        item_key: "plain_sword",
+        display_name: "普通劍",
+        held: 1,
+        equipped: true,
+        presentation: {
+          kind: "weapon",
+          icon_key: "weapon",
+          rarity: "common",
+          summary: "鍛鐵打造的普通劍。",
+        },
+      },
+      {
+        item_key: "leather_armor",
+        display_name: "皮甲",
+        held: 1,
+        equipped: true,
+        presentation: {
+          kind: "armor",
+          icon_key: "armor",
+          rarity: "uncommon",
+          summary: "縫製的皮革盔甲。",
+        },
+      },
+      {
+        item_key: "mist_amulet",
+        display_name: "霧隱護符",
+        held: 2,
+        equipped: true,
+        presentation: {
+          kind: "accessory",
+          icon_key: "accessory",
+          rarity: "epic",
+          summary: "可短暫隱形的小型護符。",
+        },
+      },
+      {
+        item_key: "leather_arrows",
+        display_name: "皮箭",
+        held: 12,
+        equipped: false,
+        presentation: {
+          kind: "ammunition",
+          icon_key: "ammunition",
+          rarity: "common",
+          summary: "基本远程箭矢。",
+        },
+      },
+      {
+        item_key: "candle",
+        display_name: "燭",
+        held: 4,
+        equipped: false,
+        presentation: {
+          kind: "tool",
+          icon_key: "tool",
+          rarity: "common",
+          summary: "供照明的蠟燭。",
+        },
+      },
+      {
+        item_key: "iron_ingot",
+        display_name: "鐵錠",
+        held: 2,
+        equipped: false,
+        presentation: {
+          kind: "material",
+          icon_key: "material",
+          rarity: "uncommon",
+          summary: "可鍛造的鐵材。",
+        },
+      },
+      {
+        item_key: "travel_pack",
+        display_name: "行囊",
+        held: 1,
+        equipped: false,
+        presentation: {
+          kind: "misc",
+          icon_key: "misc",
+          rarity: "legendary",
+          summary: "旅人的多用途行囊。",
+        },
+      },
+    ],
+    wallet: 3240,
+  },
+  pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 9 },
+};
+
 // The registry-owned unavailable form for the services panel: the common
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.

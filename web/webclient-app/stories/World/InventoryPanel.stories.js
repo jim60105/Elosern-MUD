@@ -6,18 +6,23 @@ import {
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
+  SERVICES_PANEL_PRESENTATION_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
 } from "../fixtures.js";
 
 // InventoryPanel (H4, webclient-hud-04-reference-drawers, task 6.6;
-// relocate-inventory-drawer-essentials): the 背包 · 裝備 drawer body, shown
-// inside the open shared `HudDrawer` chrome (the real drawer width, header
-// icon and wallet subtitle) instead of an unframed body. The equipment
-// doll and the single drawer-layer wallet were relocated here from the
-// character-status drawer, so the story set deterministically covers: filled
-// equipment, empty equipment, the character panel's unavailable form, the
-// unknown-slot passthrough, the services 32-row ceiling, and the services
-// unavailable form.
+// relocate-inventory-drawer-essentials; redesign-inventory-item-grid): the
+// 背包 · 裝備 drawer body, shown inside the open shared `HudDrawer` chrome
+// (the real drawer width, header icon and wallet subtitle) instead of an
+// unframed body. The equipment doll and the single drawer-layer wallet
+// were relocated here from the character-status drawer, so the story set
+// deterministically covers: filled equipment, empty equipment, the
+// character panel's unavailable form, the unknown-slot passthrough, the
+// services 32-row ceiling, the services unavailable form, and — since
+// redesign-inventory-item-grid — the presentation-backed tile grid (every
+// closed icon key and rarity), the neutral unknown-item state, long
+// labels, equipped/un-equipped markers, and the keyboard-focused
+// inspection shared with pointer hover.
 
 function emptyBag() {
   return {
@@ -102,6 +107,107 @@ function renderDrawer(args) {
       ),
   };
 }
+
+// The presentation-backed bag (redesign-inventory-item-grid): every row
+// carries committed `presentation` metadata, so the grid renders mapped
+// local SVGs, per-rarity borders, and the inspector's kind/rarity words.
+// The row set covers all nine closed icon keys and all five rarities.
+export const AllRarities = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_PRESENTATION_SAMPLE, character: CHARACTER_PANEL_SAMPLE },
+};
+
+// Unknown-item bag: every row has `presentation: null` — each tile shows
+// the neutral unknown-item icon, the visible 未知 marker, the row's real
+// name, and its held count, with no inferred icon, kind, rarity, summary,
+// statistic, or action control.
+function unknownBag() {
+  const rows = [
+    { item_key: "mystery_relic", display_name: "遺物", held: 1, equipped: false, presentation: null },
+    { item_key: "stray_coin_pouch", display_name: "零錢袋", held: 6, equipped: false, presentation: null },
+  ];
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: { rows, wallet: 3240 },
+    pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 2 },
+  };
+}
+
+export const UnknownItem = {
+  render: renderDrawer,
+  args: { services: unknownBag(), character: CHARACTER_PANEL_SAMPLE },
+};
+
+// Long localised labels: a long CJK display name wraps in the unknown tile
+// and the inspector without truncating the accessible name.
+function longLabelBag() {
+  const rows = [
+    {
+      item_key: "ferry_lantern_commission_token",
+      display_name: "渡河燈油補充委託信物",
+      held: 1,
+      equipped: false,
+      presentation: null,
+    },
+  ];
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: { rows, wallet: 3240 },
+    pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 1 },
+  };
+}
+
+export const LongLabels = {
+  render: renderDrawer,
+  args: { services: longLabelBag(), character: CHARACTER_PANEL_SAMPLE },
+};
+
+// Equipped and un-equipped items: the non-colour equipped check marker
+// renders only on equipped rows; the inspector spells the equipped state.
+function equippedBag() {
+  const rows = [
+    {
+      item_key: "plain_sword",
+      display_name: "普通劍",
+      held: 1,
+      equipped: true,
+      presentation: { kind: "weapon", icon_key: "weapon", rarity: "common", summary: "鍛鐵打造的普通劍。" },
+    },
+    {
+      item_key: "healing_potion",
+      display_name: "治療藥水",
+      held: 3,
+      equipped: false,
+      presentation: { kind: "potion", icon_key: "potion", rarity: "rare", summary: "盛裝於小瓶中的治療藥水。" },
+    },
+  ];
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: { rows, wallet: 3240 },
+    pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 2 },
+  };
+}
+
+export const EquippedAndUnequipped = {
+  render: renderDrawer,
+  args: { services: equippedBag(), character: CHARACTER_PANEL_SAMPLE },
+};
+
+// Focused inspection: the `play` function moves keyboard focus to a
+// presentation-backed tile so the story deterministically shows the
+// keyboard-equivalent inspector state (the hover path shows the same
+// committed content).
+export const FocusedInspection = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_PRESENTATION_SAMPLE, character: CHARACTER_PANEL_SAMPLE },
+  play: async ({ canvasElement }) => {
+    const tile = canvasElement.querySelector('[data-testid="inventory-panel__tile--healing_potion"]');
+    if (tile) {
+      tile.focus();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+  },
+};
 
 // Filled equipment: the CHARACTER_PANEL_SAMPLE's own equipment rows
 // (主手 short_sword_lost, armor 皮甲, 飾品 霧隱護符) render in the doll.

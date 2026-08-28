@@ -1,18 +1,16 @@
 <script setup>
 // InventoryPanel (H4, webclient-hud-04-reference-drawers, tasks 6.1/6.2/6.5;
-// relocate-inventory-drawer-essentials): the 背包 · 裝備 drawer body. H4
-// removed the old `equipped === true` filter so the full
-// `services.inventory.rows` bag is rendered (display_name, held, and an
-// equipped marker on the equipped rows). The equipment doll and the single
-// drawer-layer wallet moved here from the character-status drawer: the doll
-// composes before the held rows, and the header wallet renders only when
-// the committed `character` panel is available with a valid integer
-// balance. When the listing holds the 32-row ceiling (SERVICES_MAX_INVENTORY_
-// ROWS) a worded ceiling note renders; otherwise no total is presented.
-// `pagination.inventory_total` is the shipped-row count and is never
-// presented as untruncated holdings.
-import { computed } from "vue";
+// relocate-inventory-drawer-essentials; redesign-inventory-item-grid): the
+// 背包 · 裝備 drawer body. The body begins with the read-only equipment doll
+// built from the committed `character` panel, followed by a responsive grid
+// of native-button item tiles driven by the committed `services` panel's
+// presentation metadata (icon key, kind, rarity, summary). One non-interactive
+// inspector is shared by pointer hover and keyboard focus; selection is
+// client-local, resets when the committed panel data is replaced, and no
+// action is dispatched on click.
+import { computed, nextTick, ref, watch } from "vue";
 import EquipmentDoll from "./EquipmentDoll.vue";
+import { itemIconPath, unknownItemPath, kindLabel, rarityLabel } from "./item-icons.js";
 
 const props = defineProps({
   // The committed `services` v2 panel payload (or the unavailable form).
@@ -28,6 +26,7 @@ const props = defineProps({
 // reason — no rows, no default wallet value.
 const unavailable = computed(() => props.services?.available === false);
 const inventory = computed(() => (unavailable.value ? null : (props.services?.inventory ?? null)));
+const bagVisible = computed(() => !unavailable.value && inventory.value !== null);
 
 // The equipment doll renders only when the bag itself is available (the
 // services panel is not in its unavailable form) AND the inventory section
@@ -38,7 +37,7 @@ const dollVisible = computed(
   () => !unavailable.value && inventory.value !== null && props.character !== null,
 );
 
-// The full bag: every committed row, equipped marker only on equipped rows.
+// The full bag: every committed row.
 const rows = computed(() => {
   const inv = inventory.value;
   return inv && Array.isArray(inv.rows) ? inv.rows : [];
@@ -48,10 +47,134 @@ const rows = computed(() => {
 // bound, state the ceiling in words.
 const INVENTORY_ROW_CEILING = 32;
 const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
+
+// Client-local transient selection (redesign-inventory-item-grid): the single
+// source shared by pointer hover and keyboard focus. It is never persisted;
+// a panel replacement (new `services` or `services.inventory` reference)
+// clears the selection when the held item no longer exists, so stale
+// inventory metadata is never presented. Clicking a tile only updates this
+// local selection — no OOB action is dispatched and no state is mutated.
+const selectedKey = ref(null);
+watch(
+  [() => props.services, () => props.services?.inventory],
+  () => {
+    // Every committed panel replacement resets the client-local selection so
+    // stale inventory metadata is never presented (design: "every panel
+    // replacement resets selection").
+    selectedKey.value = null;
+  },
+);
+
+// The committed row currently driving the inspector (hover or focus).
+const activeRow = computed(() => {
+  if (!selectedKey.value) {
+    return null;
+  }
+  return rows.value.find((r) => r.item_key === selectedKey.value) || null;
+});
+
+// The tile's local SVG: the closed icon map for a non-null presentation
+// (unmapped keys fall back to the neutral unknown-item icon), or the
+// neutral unknown-item icon when `presentation` is null.
+function tileIconPath(row) {
+  if (row.presentation) {
+    return itemIconPath(row.presentation.icon_key) || unknownItemPath();
+  }
+  return unknownItemPath();
+}
+
+// The inspector spells the committed kind and rarity words (never invented).
+function kindWord(row) {
+  return row.presentation ? kindLabel(row.presentation.kind) : null;
+}
+
+function rarityWord(row) {
+  return row.presentation ? rarityLabel(row.presentation.rarity) : null;
+}
+
+// ---- Inspector (task 1.2): one transient, non-interactive surface shared
+// by pointer hover and keyboard focus. It shows only the committed display
+// name, kind word, rarity word, held count, equipped state, and summary —
+// it never invents numeric stats or comparison values.
+const panelEl = ref(null);
+const inspectorEl = ref(null);
+const inspectorStyle = ref({});
+
+function onTileEnter(event) {
+  selectedKey.value = event.currentTarget.dataset.key;
+}
+
+function onTileLeave(event) {
+  // Pointer leave clears the hover selection only when keyboard focus is
+  // elsewhere; a focused tile keeps driving the inspector.
+  const focused = document.activeElement;
+  if (focused && focused.dataset && focused.dataset.key) {
+    if (focused.dataset.key !== selectedKey.value) {
+      selectedKey.value = focused.dataset.key;
+    }
+    return;
+  }
+  if (selectedKey.value === event.currentTarget.dataset.key) {
+    selectedKey.value = null;
+  }
+}
+
+function onTileFocus(event) {
+  selectedKey.value = event.currentTarget.dataset.key;
+}
+
+function onTileBlur(event) {
+  const focused = document.activeElement;
+  if (focused && focused.dataset && focused.dataset.key) {
+    selectedKey.value = focused.dataset.key;
+    return;
+  }
+  if (selectedKey.value === event.currentTarget.dataset.key) {
+    selectedKey.value = null;
+  }
+}
+
+function onTileClick(event) {
+  // Presentational selection only — no action is dispatched.
+  selectedKey.value = event.currentTarget.dataset.key;
+}
+
+// Keep the inspector contained in the drawer body: positioned below the
+// anchor tile, flipping above when it would leave the panel's visible
+// bounds, and clamped horizontally.
+watch(selectedKey, () => {
+  if (!selectedKey.value) {
+    inspectorStyle.value = {};
+    return;
+  }
+  nextTick(() => {
+    const panel = panelEl.value;
+    const tip = inspectorEl.value;
+    if (!panel || !tip) {
+      return;
+    }
+    const anchor = panel.querySelector(`[data-testid="inventory-panel__tile--${selectedKey.value}"]`);
+    if (!anchor) {
+      return;
+    }
+    const panelRect = panel.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    const tipH = tip.offsetHeight;
+    const pad = 8;
+    let left = anchorRect.left + anchorRect.width / 2 - panelRect.left - tipW / 2;
+    left = Math.max(pad, Math.min(left, panelRect.width - tipW - pad));
+    let top = anchorRect.bottom - panelRect.top + pad;
+    if (top + tipH > panelRect.height - pad) {
+      top = Math.max(pad, anchorRect.top - panelRect.top - tipH - pad);
+    }
+    inspectorStyle.value = { left: `${left}px`, top: `${top}px` };
+  });
+});
 </script>
 
 <template>
-  <aside class="inventory-panel" data-testid="inventory-panel">
+  <aside ref="panelEl" class="inventory-panel" data-testid="inventory-panel">
     <p
       v-if="unavailable"
       class="inventory-panel__unavailable"
@@ -65,33 +188,98 @@ const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
       背包目前是空的。
     </p>
 
-    <!-- The equipment doll (moved here from the character-status drawer):
-         it reads the committed `character` panel's equipment rows itself and
-         renders its registered unavailable message when that panel is in its
-         unavailable form. It mounts before the held-item listing and only
-         when the bag is available, the inventory section is present, and a
-         committed character panel exists. -->
-    <EquipmentDoll v-if="dollVisible" :character="character" />
+    <template v-if="bagVisible">
+      <!-- The equipment doll (moved here from the character-status drawer):
+           it reads the committed `character` panel's equipment rows itself and
+           renders its registered unavailable message when that panel is in its
+           unavailable form. It mounts before the held-item listing and only
+           when the bag is available, the inventory section is present, and a
+           committed character panel exists. -->
+      <EquipmentDoll v-if="dollVisible" :character="character" />
 
+      <!-- The held-item grid (redesign-inventory-item-grid): responsive
+           native-button tiles driven by the committed presentation metadata;
+           a null presentation renders the neutral unknown-item tile. -->
+      <div class="inventory-panel__grid" data-testid="inventory-panel__grid">
+        <button
+          v-for="row in rows"
+          :key="row.item_key"
+          type="button"
+          class="inventory-panel__tile"
+          :data-key="row.item_key"
+          :data-testid="`inventory-panel__tile--${row.item_key}`"
+          :data-rarity="row.presentation?.rarity || 'unknown'"
+          :data-equipped="String(!!row.equipped)"
+          :data-unknown="String(!row.presentation)"
+          :aria-label="row.display_name"
+          :aria-describedby="selectedKey === row.item_key ? 'inventory-panel-inspector' : undefined"
+          @pointerenter="onTileEnter"
+          @pointerleave="onTileLeave"
+          @focus="onTileFocus"
+          @blur="onTileBlur"
+          @click="onTileClick"
+        >
+          <svg class="inventory-panel__icon" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <path :d="tileIconPath(row)" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+          <span v-if="row.equipped" class="inventory-panel__equipped" :data-testid="`inventory-panel__equipped--${row.item_key}`" aria-hidden="true">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span v-if="!row.presentation" class="inventory-panel__unknown" :data-testid="`inventory-panel__unknown--${row.item_key}`">未知</span>
+          <span v-if="!row.presentation" class="inventory-panel__name" :data-testid="`inventory-panel__name--${row.item_key}`">{{ row.display_name }}</span>
+          <span class="inventory-panel__count" :data-testid="`inventory-panel__count--${row.item_key}`">{{ row.held }}</span>
+        </button>
+      </div>
+
+      <p v-if="atCeiling" class="inventory-panel__ceiling" data-testid="inventory-panel__ceiling">
+        背包清單以上限 32 項為限，僅顯示已載入的項目。
+      </p>
+    </template>
+
+    <!-- The single transient item inspector (task 1.2): non-focusable
+         `role="tooltip"` surface shared by hover and focus, positioned within
+         the drawer body and flipped above/below as needed. -->
     <div
-      v-for="row in rows"
-      :key="row.item_key"
-      class="inventory-panel__row"
-      :data-testid="`inventory-panel__row--${row.item_key}`"
+      v-if="activeRow"
+      ref="inspectorEl"
+      id="inventory-panel-inspector"
+      class="inventory-panel__inspector"
+      data-testid="inventory-panel__inspector"
+      role="tooltip"
+      :style="inspectorStyle"
     >
-      <span class="inventory-panel__name" :data-testid="`inventory-panel__row-name--${row.item_key}`">{{ row.display_name }}</span>
-      <span v-if="row.equipped" class="inventory-panel__equipped">裝備中</span>
-      <span class="inventory-panel__held" :data-testid="`inventory-panel__row-held--${row.item_key}`">{{ row.held }}</span>
+      <div class="inventory-panel__inspector-head">
+        <span class="inventory-panel__inspector-name" data-testid="inventory-panel__inspector-name">{{ activeRow.display_name }}</span>
+        <span
+          v-if="rarityWord(activeRow)"
+          class="inventory-panel__inspector-rarity"
+          :data-rarity="activeRow.presentation?.rarity"
+          data-testid="inventory-panel__inspector-rarity"
+        >
+          {{ rarityWord(activeRow) }}
+        </span>
+      </div>
+      <div v-if="kindWord(activeRow)" class="inventory-panel__inspector-kind" data-testid="inventory-panel__inspector-kind">
+        {{ kindWord(activeRow) }}
+      </div>
+      <div v-if="activeRow.presentation && activeRow.presentation.summary" class="inventory-panel__inspector-summary" data-testid="inventory-panel__inspector-summary">
+        {{ activeRow.presentation.summary }}
+      </div>
+      <div class="inventory-panel__inspector-meta">
+        <span class="inventory-panel__inspector-held" data-testid="inventory-panel__inspector-held">{{ activeRow.held }}</span>
+        <span class="inventory-panel__inspector-equipped" data-testid="inventory-panel__inspector-equipped">
+          {{ activeRow.equipped ? "裝備中" : "未裝備" }}
+        </span>
+      </div>
     </div>
-
-    <p v-if="atCeiling" class="inventory-panel__ceiling" data-testid="inventory-panel__ceiling">
-      背包清單以上限 32 項為限，僅顯示已載入的項目。
-    </p>
   </aside>
 </template>
 
 <style scoped>
 .inventory-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
@@ -118,34 +306,202 @@ const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
   font-size: 0.85em;
 }
 
-.inventory-panel__row {
+/* The responsive held-item grid (the reference's `.itgrid`): auto-fill
+   columns with a 58px cell minimum and an 8px gap. */
+.inventory-panel__grid {
   display: grid;
-  grid-template-columns: minmax(6em, auto) auto auto;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  border-bottom: 1px solid var(--ink-700);
-  font-size: 0.9em;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* The item tile (the reference's `.it`): a bounded native button with a
+   square aspect, a local SVG icon, a stable lower-corner held count, a
+   non-colour equipped check marker, and a per-rarity border treatment. */
+.inventory-panel__tile {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  border: 1px solid var(--ink-600);
+  background: var(--ink-820);
+  display: grid;
+  place-items: center;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  color: var(--paper-300);
+  transition: border-color var(--motion-fast) var(--ease-standard), outline-color var(--motion-fast) var(--ease-standard);
+}
+
+.inventory-panel__tile:hover,
+.inventory-panel__tile:focus-visible {
+  border-color: var(--gold-500);
+}
+
+.inventory-panel__tile:focus-visible {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+.inventory-panel__icon {
+  width: 26px;
+  height: 26px;
+  color: var(--paper-300);
+}
+
+.inventory-panel__count {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--paper-300);
+}
+
+/* The non-colour equipped state: a check glyph, not a colour cue. */
+.inventory-panel__equipped {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 10px;
+  height: 10px;
+  color: var(--gold-400);
+}
+
+/* The labelled neutral unknown-item marker and its real name (wrapping for
+   long localised labels; the button's accessible name stays complete). */
+.inventory-panel__unknown {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+  color: var(--paper-500);
 }
 
 .inventory-panel__name {
-  color: var(--paper-50);
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 20px;
+  font-size: 9px;
+  line-height: 1.15;
+  color: var(--paper-300);
+  word-break: break-word;
 }
 
-.inventory-panel__equipped {
-  color: var(--ok);
-  font-size: 0.85em;
+/* Per-rarity border treatment: a distinct border pattern as well as a
+   distinct colour, so rarity is never colour-only (the inspector spells
+   the rarity word). */
+.inventory-panel__tile[data-rarity="common"] {
+  border-color: var(--ink-600);
+  border-style: solid;
 }
-
-.inventory-panel__held {
-  color: var(--paper-500);
-  font-family: var(--f-mono);
-  text-align: right;
+.inventory-panel__tile[data-rarity="uncommon"] {
+  border-color: #7a9a6a;
+  border-style: dotted;
+}
+.inventory-panel__tile[data-rarity="rare"] {
+  border-color: #5c86dd;
+  border-style: dashed;
+}
+.inventory-panel__tile[data-rarity="epic"] {
+  border-color: #a46ad0;
+  border-style: double;
+}
+.inventory-panel__tile[data-rarity="legendary"] {
+  border-color: var(--gold-500);
+  border-style: ridge;
+}
+.inventory-panel__tile[data-rarity="unknown"] {
+  border-color: var(--ink-600);
+  border-style: solid;
 }
 
 .inventory-panel__ceiling {
   margin: 0;
   color: var(--paper-500);
   font-size: 0.8em;
+}
+
+/* The single transient item inspector (task 1.2): non-interactive,
+   non-focusable, positioned by JS within the drawer body. */
+.inventory-panel__inspector {
+  position: absolute;
+  z-index: 5;
+  width: 270px;
+  background: var(--panel-solid);
+  border: 1px solid var(--ink-600);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  padding: 13px 15px;
+  font-size: 12.5px;
+  pointer-events: none;
+  animation: inventory-inspector-in var(--motion-fast) var(--ease-standard);
+}
+
+@keyframes inventory-inspector-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.inventory-panel__inspector-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.inventory-panel__inspector-name {
+  font-size: 14px;
+  color: var(--paper-50);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.inventory-panel__inspector-rarity {
+  font-size: 11px;
+  color: var(--gold-400);
+  flex: none;
+}
+
+.inventory-panel__inspector-rarity[data-rarity="common"] {
+  color: var(--paper-500);
+}
+.inventory-panel__inspector-rarity[data-rarity="uncommon"] {
+  color: #7a9a6a;
+}
+.inventory-panel__inspector-rarity[data-rarity="rare"] {
+  color: #5c86dd;
+}
+.inventory-panel__inspector-rarity[data-rarity="epic"] {
+  color: #a46ad0;
+}
+.inventory-panel__inspector-rarity[data-rarity="legendary"] {
+  color: var(--gold-500);
+}
+
+.inventory-panel__inspector-kind {
+  font-size: 11px;
+  color: var(--paper-500);
+  margin-bottom: 7px;
+}
+
+.inventory-panel__inspector-summary {
+  color: var(--paper-300);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.inventory-panel__inspector-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--paper-300);
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  margin-top: 3px;
 }
 </style>

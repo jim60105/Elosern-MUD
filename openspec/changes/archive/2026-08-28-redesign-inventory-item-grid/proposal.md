@@ -24,5 +24,5 @@ Even after the inventory drawer owns its header, wallet, and equipment, its flat
 
 - `web/webclient-app/components/InventoryPanel.vue` and a small local item-icon/inspector helper implement the view-only interaction and CSS.
 - `AppClient.vue` data wiring remains read-only; the drawer's focus trap, action-dock service frame, and OOB dispatch boundary are unchanged.
-- Inventory Storybook stories and focused Vitest component tests become the visual and behavioral acceptance surface. Its data prerequisites — `add-item-presentation-metadata` and `expose-inventory-item-presentation` — are archived and complete; `relocate-inventory-drawer-essentials` remains its last prerequisite. The subsequent `restyle-inventory-equipment-slots` proposal owns square-slot styling.
+- Inventory Storybook stories and focused Vitest component tests become the visual and behavioral acceptance surface. All of its prerequisites — `add-item-presentation-metadata`, `expose-inventory-item-presentation`, and `relocate-inventory-drawer-essentials` — are archived and complete. The subsequent `restyle-inventory-equipment-slots` proposal owns square-slot styling.
 - No server mutation, action identifier, direct state assignment, sorting/filtering policy, gameplay modifier, comparison stat, data migration, or compatibility shim is introduced.
