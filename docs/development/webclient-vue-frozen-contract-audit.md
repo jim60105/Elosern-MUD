@@ -392,14 +392,14 @@ the selectors it breaks). Prefix entries cover dynamic suffixes.
 | `settings-overlay`, `help-overlay`, `creation-<suffix>` (prefix `creation`: `creation-body`, `creation-submit`, `creation-confirm`, `creation-reset`, `creation-concept-indicator`, `creation-preset-card`, `creation-race`, `creation-field-<name>`), `overlay-host`, `overlay-host-close` | H5 | REMAP-TO-TESTID |
 | `character-status-drawer__condition--<code>` (covers e.g. --regen), `character-status-drawer__guild-merit`, `character-status-drawer__guild-rank` (the re-chromed status-drawer condition and guild-counter rows, added by the align-webclient-character-status-drawer-chrome change) | chrome-align | REMAP-TO-TESTID |
 | `fulllog-overlay`, `fulllog-close` | H1 | REMAP-TO-TESTID |
-| `hud-drawer`, `hud-drawer-scrim` + `.hud-drawer__title`; `character-status-drawer`, `equipment-doll` (the drawer bodies H4 migrated out of the right column) | H4 | REMAP-TO-TESTID |
+| `hud-drawer`, `hud-drawer-scrim` + `.hud-drawer__title`; `character-status-drawer`, `equipment-doll` + `equipment-doll__<suffix>` (the drawer bodies H4 migrated out of the right column; the realigned doll adds `equipment-doll__title`, `equipment-doll__title-tag`, `equipment-doll__doll`, `equipment-doll__slots`, `equipment-doll__slot--<slot>`, `equipment-doll__slot-empty--<slot>`, `equipment-doll__description`, `equipment-doll__description-row--<slot>`, `equipment-doll__accessories`, `equipment-doll__accessory--<key>`, added by the realign-inventory-drawer-layout change) | H4 | REMAP-TO-TESTID |
 | `participant-frame`, `participant-portrait-placeholder` + `participant-frame__<suffix>` (`participant-frame__row`, `participant-frame__name`, `participant-frame__group-label`, `img.participant-frame__portrait`) | H3 | REMAP-TO-TESTID |
 | `quest-board` + `quest-board__<suffix>` (`quest-board__abandon`, `quest-board__register`, `quest-board__rankblock`, `quest-board__board-row--<state>`, `quest-board__quest-row--<state>`) | H4 | REMAP-TO-TESTID |
 | `art-panel` + `.art-panel__<suffix>` (`.art-panel__portrait-tile`) | H1 (still mounted) | REMAP-TO-TESTID |
 | `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
 | `combat-detail` | H3 | REMAP-TO-TESTID |
 | `quick-word-chip-<verb>` (prefix `quick-word-chip`: `quick-word-chip-看`, the quick-word command chips) | H6 | REMAP-TO-TESTID |
-| `inventory-panel` + `inventory-panel__<suffix>` (the redesigned inventory drawer: `inventory-panel__tile--<item_key>` item tiles, `inventory-panel__count--<item_key>` held-count badges, `inventory-panel__inspector-<field>` inspector fields) | inventory-grid | REMAP-TO-TESTID |
+| `inventory-panel` + `inventory-panel__<suffix>` (the redesigned inventory drawer: `inventory-panel__tile--<item_key>` item tiles, `inventory-panel__count--<item_key>` held-count badges, `inventory-panel__inspector-<field>` inspector fields; the realigned three-section stack adds `inventory-panel__section--<name>`, `inventory-panel__heading--<name>`, `inventory-panel__items-count`, `inventory-panel__wallet-value`, added by the realign-inventory-drawer-layout change) | inventory-grid | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets** (re-mapped to stable hooks, no main-requirement
 wording names any of these, so no spec delta):

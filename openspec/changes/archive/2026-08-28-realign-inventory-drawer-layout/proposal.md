@@ -82,7 +82,9 @@ row.
 ## Impact
 
 - Code: `web/webclient-app/components/EquipmentDoll.vue`,
-  `web/webclient-app/components/InventoryPanel.vue` (template + scoped CSS only;
+  `web/webclient-app/components/InventoryPanel.vue` (template + scoped CSS
+  only) and the one-line `wallet` prop wiring in `AppClient.vue` (template
+  only, reusing the existing validated character-panel wallet;
   no store/protocol/payload changes).
 - Showcase: `web/webclient-app/stories/Data/EquipmentDoll.stories.js`,
   `web/webclient-app/stories/World/InventoryPanel.stories.js` (new variant

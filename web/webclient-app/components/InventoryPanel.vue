@@ -1,15 +1,20 @@
 <script setup>
 // InventoryPanel (H4, webclient-hud-04-reference-drawers, tasks 6.1/6.2/6.5;
-// relocate-inventory-drawer-essentials; redesign-inventory-item-grid): the
-// 背包 · 裝備 drawer body. The body begins with the read-only equipment doll
-// built from the committed `character` panel, followed by a responsive grid
-// of native-button item tiles driven by the committed `services` panel's
-// presentation metadata (icon key, kind, rarity, summary). One non-interactive
-// inspector is shared by pointer hover and keyboard focus; selection is
-// client-local, resets when the committed panel data is replaced, and no
-// action is dispatched on click.
+// relocate-inventory-drawer-essentials; redesign-inventory-item-grid;
+// realign-inventory-drawer-layout): the 背包 · 裝備 drawer body — the
+// redesign's three-section stack rendered directly on the transparent drawer
+// body (no panel-card wrapper): the `裝備` section (the read-only equipment
+// doll built from the committed `character` panel), an `物品` section whose
+// tracked heading carries the shipped listing size as its tag over the
+// responsive grid of native-button item tiles driven by the committed
+// `services` panel's presentation metadata, and a `金錢` section rendering
+// the committed wallet as one labelled row with grouped integer copper. One
+// non-interactive inspector is shared by pointer hover and keyboard focus;
+// selection is client-local, resets when the committed panel data is
+// replaced, and no action is dispatched on click.
 import { computed, nextTick, ref, watch } from "vue";
 import EquipmentDoll from "./EquipmentDoll.vue";
+import { formatCopper } from "./character-identity.js";
 import { itemIconPath, unknownItemPath, kindLabel, rarityLabel } from "./item-icons.js";
 
 const props = defineProps({
@@ -20,6 +25,12 @@ const props = defineProps({
   // committed character panel exists (never fabricating empty slots for a
   // missing panel).
   character: { type: Object, required: false, default: null },
+  // The drawer-layer wallet figure for the `金錢` section: the exact
+  // validated integer copper the drawer head subtitle already renders
+  // (owned by `AppClient`, read from the available `character` panel).
+  // `services.inventory.wallet` is deliberately never used, so head and
+  // body can never disagree. Absent (null) renders no row — never a zero.
+  wallet: { type: Number, required: false, default: null },
 });
 
 // The registry-owned unavailable form (available: false) carries only the
@@ -47,6 +58,16 @@ const rows = computed(() => {
 // bound, state the ceiling in words.
 const INVENTORY_ROW_CEILING = 32;
 const atCeiling = computed(() => rows.value.length === INVENTORY_ROW_CEILING);
+
+// The 金錢 section (realign-inventory-drawer-layout, design D3): renders the
+// committed wallet figure `AppClient` passes in — the exact validated
+// character-panel integer the head subtitle draws — as one labelled row.
+// It shows only while the bag is available AND the prop carries a
+// committed non-negative integer; absent otherwise (never a fabricated
+// zero balance).
+const walletVisible = computed(
+  () => bagVisible.value && Number.isInteger(props.wallet) && props.wallet >= 0,
+);
 
 // Client-local transient selection (redesign-inventory-item-grid): the single
 // source shared by pointer hover and keyboard focus. It is never persisted;
@@ -189,53 +210,77 @@ watch(selectedKey, () => {
     </p>
 
     <template v-if="bagVisible">
-      <!-- The equipment doll (moved here from the character-status drawer):
-           it reads the committed `character` panel's equipment rows itself and
-           renders its registered unavailable message when that panel is in its
-           unavailable form. It mounts before the held-item listing and only
-           when the bag is available, the inventory section is present, and a
-           committed character panel exists. -->
-      <EquipmentDoll v-if="dollVisible" :character="character" />
+      <!-- The 裝備 section: the equipment doll (moved here from the
+           character-status drawer) — it reads the committed `character`
+           panel's equipment rows itself and renders its registered
+           unavailable message when that panel is in its unavailable form.
+           It mounts before the held-item listing and only when the bag is
+           available, the inventory section is present, and a committed
+           character panel exists. -->
+      <section v-if="dollVisible" class="inventory-panel__block">
+        <EquipmentDoll :character="character" />
+      </section>
 
-      <!-- The held-item grid (redesign-inventory-item-grid): responsive
-           native-button tiles driven by the committed presentation metadata;
-           a null presentation renders the neutral unknown-item tile. -->
-      <div class="inventory-panel__grid" data-testid="inventory-panel__grid">
-        <button
-          v-for="row in rows"
-          :key="row.item_key"
-          type="button"
-          class="inventory-panel__tile"
-          :data-key="row.item_key"
-          :data-testid="`inventory-panel__tile--${row.item_key}`"
-          :data-rarity="row.presentation?.rarity || 'unknown'"
-          :data-equipped="String(!!row.equipped)"
-          :data-unknown="String(!row.presentation)"
-          :aria-label="row.display_name"
-          :aria-describedby="selectedKey === row.item_key ? 'inventory-panel-inspector' : undefined"
-          @pointerenter="onTileEnter"
-          @pointerleave="onTileLeave"
-          @focus="onTileFocus"
-          @blur="onTileBlur"
-          @click="onTileClick"
-        >
-          <svg class="inventory-panel__icon" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none">
-            <path :d="tileIconPath(row)" stroke="currentColor" stroke-width="1.6" />
-          </svg>
-          <span v-if="row.equipped" class="inventory-panel__equipped" :data-testid="`inventory-panel__equipped--${row.item_key}`" aria-hidden="true">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-              <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <!-- The 物品 section: the mock's tracked heading tagged with the
+           shipped listing size (never a total of untruncated holdings —
+           the ceiling sentence already states the bound), over the held-
+           item grid (redesign-inventory-item-grid): responsive native-
+           button tiles driven by the committed presentation metadata; a
+           null presentation renders the neutral unknown-item tile. -->
+      <section class="inventory-panel__block" data-testid="inventory-panel__section--items">
+        <h4 class="inventory-panel__heading" data-testid="inventory-panel__heading--items">物品<span
+          class="inventory-panel__heading-tag"
+          data-testid="inventory-panel__items-count"
+        >{{ rows.length }}</span></h4>
+        <div class="inventory-panel__grid" data-testid="inventory-panel__grid">
+          <button
+            v-for="row in rows"
+            :key="row.item_key"
+            type="button"
+            class="inventory-panel__tile"
+            :data-key="row.item_key"
+            :data-testid="`inventory-panel__tile--${row.item_key}`"
+            :data-rarity="row.presentation?.rarity || 'unknown'"
+            :data-equipped="String(!!row.equipped)"
+            :data-unknown="String(!row.presentation)"
+            :aria-label="row.display_name"
+            :aria-describedby="selectedKey === row.item_key ? 'inventory-panel-inspector' : undefined"
+            @pointerenter="onTileEnter"
+            @pointerleave="onTileLeave"
+            @focus="onTileFocus"
+            @blur="onTileBlur"
+            @click="onTileClick"
+          >
+            <svg class="inventory-panel__icon" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <path :d="tileIconPath(row)" stroke="currentColor" stroke-width="1.6" />
             </svg>
-          </span>
-          <span v-if="!row.presentation" class="inventory-panel__unknown" :data-testid="`inventory-panel__unknown--${row.item_key}`">未知</span>
-          <span v-if="!row.presentation" class="inventory-panel__name" :data-testid="`inventory-panel__name--${row.item_key}`">{{ row.display_name }}</span>
-          <span class="inventory-panel__count" :data-testid="`inventory-panel__count--${row.item_key}`">{{ row.held }}</span>
-        </button>
-      </div>
+            <span v-if="row.equipped" class="inventory-panel__equipped" :data-testid="`inventory-panel__equipped--${row.item_key}`" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span v-if="!row.presentation" class="inventory-panel__unknown" :data-testid="`inventory-panel__unknown--${row.item_key}`">未知</span>
+            <span v-if="!row.presentation" class="inventory-panel__name" :data-testid="`inventory-panel__name--${row.item_key}`">{{ row.display_name }}</span>
+            <span class="inventory-panel__count" :data-testid="`inventory-panel__count--${row.item_key}`">{{ row.held }}</span>
+          </button>
+        </div>
 
-      <p v-if="atCeiling" class="inventory-panel__ceiling" data-testid="inventory-panel__ceiling">
-        背包清單以上限 32 項為限，僅顯示已載入的項目。
-      </p>
+        <p v-if="atCeiling" class="inventory-panel__ceiling" data-testid="inventory-panel__ceiling">
+          背包清單以上限 32 項為限，僅顯示已載入的項目。
+        </p>
+      </section>
+
+      <!-- The 金錢 section: one mock `.statrow`-styled row (錢袋 / integer
+           copper) carrying the same committed wallet figure the head
+           subtitle renders; absent — never a zero — when the figure is
+           not a committed non-negative integer. -->
+      <section v-if="walletVisible" class="inventory-panel__block" data-testid="inventory-panel__section--wallet">
+        <h4 class="inventory-panel__heading" data-testid="inventory-panel__heading--wallet">金錢</h4>
+        <div class="inventory-panel__statrow">
+          <span class="inventory-panel__statrow-label">錢袋 <small class="inventory-panel__statrow-unit">整數銅</small></span>
+          <span class="inventory-panel__wallet-value" data-testid="inventory-panel__wallet-value">{{ formatCopper(wallet) }}</span>
+        </div>
+      </section>
     </template>
 
     <!-- The single transient item inspector (task 1.2): non-focusable
@@ -278,17 +323,73 @@ watch(selectedKey, () => {
 </template>
 
 <style scoped>
+/* The drawer body is the mock's `.draw .body`: the sections sit directly on
+   the transparent drawer body (no panel-card wrapper, no own padding — the
+   drawer chrome pads), with the mock's 18px section rhythm. `position:
+   relative` remains so the transient inspector positions inside the body. */
 .inventory-panel {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 18px;
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--panel);
-  border: var(--line);
-  border-radius: var(--radius);
   font-family: var(--f-sans);
+}
+
+/* One mock `section.block`: heading (where it has one) over its content. */
+.inventory-panel__block {
+  margin: 0;
+}
+
+/* The mock's `section.block h4`: small tracked heading with the tag riding
+   at the right. */
+.inventory-panel__heading {
+  margin: 0 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--paper-500);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.inventory-panel__heading-tag {
+  margin-left: auto;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--paper-700);
+  font-size: 11px;
+}
+
+/* The mock's `.statrow`: label left, grouped mono gold value right. */
+.inventory-panel__statrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink-820);
+  border: 1px solid var(--ink-700);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+
+.inventory-panel__statrow-label {
+  font-size: 13px;
+  color: var(--paper-100);
+}
+
+.inventory-panel__statrow-unit {
+  color: var(--paper-700);
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.inventory-panel__wallet-value {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--gold-400);
 }
 
 .inventory-panel__unavailable {

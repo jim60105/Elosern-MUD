@@ -47,26 +47,31 @@ function ceilingBag() {
   };
 }
 
-// The header wallet subtitle: thousands-grouped integer copper from the
-// committed `character` panel (the shared `character-identity.js`
-// formatter), blank when the `services` panel is in its unavailable form or
-// its inventory section is absent (the bag states its registry-owned reason
-// / absent message and fabricates no wallet), or when the `character` panel
-// is missing/unavailable (never a zero).
-function walletSubtitle(services, character) {
+// The drawer-layer wallet figure (the same validation `AppClient` applies):
+// the committed `character` panel's integer copper when the `services` panel
+// is available and its inventory section present, else null. It feeds both
+// the head subtitle (thousands-grouped via the shared `character-identity.js`
+// formatter) and the body's `金錢` row, so the two story renderings can
+// never disagree (unavailable forms render neither — never a zero).
+function walletCopper(services, character) {
   const servicesAvailable = !!services && services.available !== false;
   const inventorySection = services ? (services.inventory ?? null) : null;
   if (!servicesAvailable || inventorySection === null) {
-    return "";
+    return null;
   }
   if (!character || character.available === false) {
-    return "";
+    return null;
   }
   const wallet = character.wallet;
   if (typeof wallet !== "number" || !Number.isInteger(wallet) || wallet < 0) {
-    return "";
+    return null;
   }
-  return `錢袋 ${formatCopper(wallet)} 銅`;
+  return wallet;
+}
+
+function walletSubtitle(services, character) {
+  const wallet = walletCopper(services, character);
+  return wallet === null ? "" : `錢袋 ${formatCopper(wallet)} 銅`;
 }
 
 // The component story title must be the first title key in the file, because
@@ -106,6 +111,7 @@ function renderDrawer(args) {
                 h(InventoryPanel, {
                   services: args.services,
                   character: character,
+                  wallet: walletCopper(args.services, character),
                 }),
             },
           ),
@@ -322,4 +328,36 @@ function longEquipmentLabelCharacter() {
 export const LongEquipmentLabels = {
   render: renderDrawer,
   args: { services: SERVICES_PANEL_SAMPLE, character: longEquipmentLabelCharacter() },
+};
+
+// The mock's three-section stack (realign-inventory-drawer-layout): the
+// 裝備 doll with its 裝備描述 column, the 物品 grid tagged with the shipped
+// listing size, and the 金錢 section whose single row carries the same
+// grouped integer copper the head subtitle renders.
+function richWalletCharacter() {
+  return {
+    ...CHARACTER_PANEL_SAMPLE,
+    equipment: [
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+      { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+    ],
+    wallet: 1284000,
+  };
+}
+
+export const WalletSection = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_PRESENTATION_SAMPLE, character: richWalletCharacter() },
+};
+
+// The 金錢 section's absence: the character panel is available but carries
+// no committed non-negative integer wallet — neither the head subtitle nor
+// the body row renders a balance (never a zero).
+export const WalletSectionAbsent = {
+  render: renderDrawer,
+  args: {
+    services: SERVICES_PANEL_SAMPLE,
+    character: { ...CHARACTER_PANEL_SAMPLE, wallet: null },
+  },
 };
