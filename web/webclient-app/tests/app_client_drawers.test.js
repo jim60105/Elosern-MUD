@@ -2,9 +2,11 @@
 // layer contract. Asserts (1) no reference surface is in the DOM while every
 // drawer is closed, (2) each reference surface is reachable in at most two
 // actions from the dock root (the store's single openHudDrawer call is one
-// action), and (3) exactly one wallet rendering exists across the whole
-// drawer layer — the wallet lives only in the inventory drawer's shared
-// header (relocate-inventory-drawer-essentials).
+// action), and (3) across the whole drawer layer the wallet renders exactly
+// twice per opening of the inventory drawer — its shared header subtitle and
+// the single row of its `金錢` body section, both from the committed
+// character panel — and nowhere else (relocate-inventory-drawer-essentials;
+// realign-inventory-drawer-layout).
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -69,14 +71,15 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     }
   });
 
-  it("renders the wallet exactly once across the whole drawer layer", async () => {
+  it("renders the wallet exactly once per inventory-drawer opening — subtitle + 金錢 row — and nowhere else", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     // Prime the transport and commit both panels: the character panel owns
     // the wallet (3240 copper); the services panel's own inventory wallet
-    // carries a different value (1200), proving the drawer-layer balance is
-    // sourced only from the committed character panel — the services-side
-    // wallet is never rendered.
+    // carries a different value (1200), proving both drawer-layer renderings
+    // are sourced only from the committed character panel — the services-side
+    // wallet is never rendered anywhere (realign-inventory-drawer-layout D3:
+    // head and body read one figure and can never disagree).
     store.beginTransport(1);
     store.setConnected(true);
     store.receive(
@@ -97,18 +100,32 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    // The single wallet figure now lives in the inventory drawer's shared
-    // header (relocate-inventory-drawer-essentials): thousands-grouped
-    // integer copper from the character panel (3,240 — not the services-side
-    // 1,200).
-    const subtitle = wrapper.get(".hud-drawer__subtitle");
-    expect(subtitle.text()).toBe("錢袋 3,240 銅");
-    // The character-status drawer renders no wallet figure of its own.
-    expect(wrapper.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(false);
-    // No body (shop, inventory, quest, lore, skill, status) carries a wallet
-    // node; exactly one wallet value renders in the drawer layer.
-    const walletNodes = wrapper.findAll("[class*='__wallet']");
-    expect(walletNodes).toHaveLength(0);
+    // Location 1 — the shared head subtitle (relocate-inventory-drawer-
+    // essentials): thousands-grouped integer copper from the character panel
+    // (3,240 — never the services-side 1,200).
+    const subtitles = wrapper.findAll(".hud-drawer__subtitle");
+    expect(subtitles).toHaveLength(1);
+    expect(subtitles[0].text()).toBe("錢袋 3,240 銅");
+    // Location 2 — the single row of the `金錢` body section: the exact same
+    // committed figure, grouped integer copper.
+    const drawer = wrapper.get('[data-testid="hud-drawer"]');
+    const walletNodes = drawer.findAll('[data-testid="inventory-panel__wallet-value"]');
+    expect(walletNodes).toHaveLength(1);
+    expect(walletNodes[0].text()).toBe("3,240");
+    // Nothing else in the drawer carries a wallet-classed node, and the
+    // services-side figure is never rendered.
+    expect(drawer.findAll("[class*='__wallet']")).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("1,200");
+    // Every other drawer renders no balance of its own — neither a wallet
+    // node nor a `錢袋` line (the character-status drawer included).
+    for (const name of ["skill", "shop", "quest", "lore", "status"]) {
+      store.openHudDrawer(name);
+      await wrapper.vm.$nextTick();
+      const other = wrapper.get('[data-testid="hud-drawer"]');
+      expect(other.findAll('[data-testid="inventory-panel__wallet-value"]').length, name).toBe(0);
+      expect(other.findAll("[class*='__wallet']").length, name).toBe(0);
+      expect(other.text(), name).not.toContain("錢袋");
+    }
   });
 
   // The character panel is an exact-schema v4 payload: the
@@ -260,11 +277,13 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     // No balance and no zero: the header keeps the local `inventory` bag
     // glyph but renders no wallet subtitle (relocate-inventory-drawer-
-    // essentials: an unavailable panel renders no balance at all).
+    // essentials: an unavailable panel renders no balance at all), and the
+    // body renders no `金錢` row either (realign-inventory-drawer-layout).
     const icon = wrapper.find(".hud-drawer__icon");
     expect(icon.exists()).toBe(true);
     expect(icon.find("path").attributes("d")).toBe("M4 7h16v12H4V7zm2-2h12l-1 2H7L5 5z");
     expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="inventory-panel__wallet-value"]').exists()).toBe(false);
   });
 
   it("renders no wallet subtitle when the services panel is unavailable", async () => {

@@ -72,7 +72,7 @@ The doll SHALL NOT render an item statistic, attack or defence value, rarity, it
 
 #### Scenario: The description column lists only committed rows
 - **WHEN** the committed equipment rows carry equipment
-- **THEN** the 裝備描述 column shows exactly one labelled entry per committed row (slot label plus committed display name), grouped by slot, and with no committed row it shows only the visible empty statement
+- **THEN** the 裝備描述 column shows one labelled entry per primary row (slot label plus committed display name) — the first committed row of each recognised singleton slot and, in the accessory group, every accessory row — grouped by slot label, while duplicate and unrecognised-slot rows are rendered only by the doll's labelled fallback sections so each committed row appears exactly once, and with no committed row the column shows only the visible empty statement
 
 #### Scenario: Duplicate singleton rows are rendered, not discarded
 - **WHEN** the committed equipment rows carry more than one row for a recognised singleton slot
@@ -91,7 +91,7 @@ The doll SHALL NOT render an item statistic, attack or defence value, rarity, it
 - **THEN** it shows its display name and its slot only, with no attack, defence, rarity, item icon, summary, or comparison value
 
 ### Requirement: The drawer layer renders the wallet exactly once
-Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer. The shop, the lore reference, the character-status drawer, and every other body element of the inventory drawer SHALL NOT render a balance of their own. A drawer that cannot read the wallet from an available character panel (or, for the body row, from an available inventory section carrying a committed non-negative integer wallet) SHALL render no balance at all rather than a zero.
+Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer. The shop, the lore reference, the character-status drawer, and every other body element of the inventory drawer SHALL NOT render a balance of their own. A drawer whose available character panel does not carry a committed non-negative integer wallet SHALL render no balance at all rather than a zero; the `金錢` body row is additionally gated on the bag's available inventory section, because it renders only inside the bag's three-section stack and the two renderings must never disagree.
 
 #### Scenario: One wallet per drawer-layer opening
 - **WHEN** every drawer is opened in turn with the `services` and `character` panels available
@@ -102,5 +102,5 @@ Across every drawer, the player's wallet SHALL be rendered exactly once per open
 - **THEN** no drawer renders a balance, and none renders a zero in its place
 
 #### Scenario: A missing wallet field renders no body row
-- **WHEN** the inventory section is available but carries no committed non-negative integer wallet
-- **THEN** the `金錢` section renders no balance row while the header subtitle keeps whatever the available character panel legitimately carries
+- **WHEN** the inventory section is available but the character panel's wallet is not a committed non-negative integer
+- **THEN** the `金錢` section renders no balance row and the header subtitle renders no balance either, since both read the same validated character-panel figure; neither renders a zero

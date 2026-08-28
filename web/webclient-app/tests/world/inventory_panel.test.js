@@ -38,6 +38,9 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
       props: {
         services: SERVICES_PANEL_SAMPLE,
         character: CHARACTER_PANEL_SAMPLE,
+        // The drawer-layer wallet figure `AppClient` would pass (the same
+        // validated `character` panel integer the head subtitle renders).
+        wallet: CHARACTER_PANEL_SAMPLE.wallet,
         ...props,
       },
     });
@@ -226,7 +229,64 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     const grid = w.get('[data-testid="inventory-panel__grid"]').element;
     const pos = doll.compareDocumentPosition(grid);
     expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    // The committed name reads in the doll's 裝備描述 column, not the cell.
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
+  });
+
+  it("stacks the mock's 裝備 / 物品 / 金錢 sections on the bare drawer body", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
+    const doll = w.get('[data-testid="equipment-doll"]').element;
+    const items = w.get('[data-testid="inventory-panel__section--items"]').element;
+    const wallet = w.get('[data-testid="inventory-panel__section--wallet"]').element;
+    const following = (a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) === Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(following(doll, items)).toBe(true);
+    expect(following(items, wallet)).toBe(true);
+    // The 物品 heading is tagged with the shipped listing size (the fixture
+    // carries 9 rows) — never a claim of the player's total holdings.
+    expect(w.get('[data-testid="inventory-panel__items-count"]').text()).toBe("9");
+    // No panel-card wrapper: the body paints no `--panel` background of its
+    // own (the sections sit directly on the transparent drawer body).
+    const source = readFileSync(
+      join(process.cwd(), "web/webclient-app/components/InventoryPanel.vue"),
+      "utf-8",
+    );
+    expect(source).not.toContain("background: var(--panel);");
+    expect(source).not.toContain("border-radius: var(--radius);");
+  });
+
+  it("renders the 金錢 section row with the grouped integer copper wallet", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE, wallet: 1284000 });
+    expect(w.get('[data-testid="inventory-panel__section--wallet"]').text()).toContain("金錢");
+    expect(w.get('[data-testid="inventory-panel__wallet-value"]').text()).toBe("1,284,000");
+    expect(w.get(".inventory-panel__statrow-label").text()).toContain("錢袋");
+    expect(w.get(".inventory-panel__statrow-unit").text()).toBe("整數銅");
+    // A committed zero is a committed figure: it renders (nothing is
+    // fabricated only when no committed figure exists — next test).
+    const wZero = mountPanel({ wallet: 0 });
+    expect(wZero.get('[data-testid="inventory-panel__wallet-value"]').text()).toBe("0");
+  });
+
+  it("renders no 金錢 row (and no balance) without a committed integer wallet", () => {
+    for (const wallet of [null, 12.5, -1, Number.NaN]) {
+      const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE, wallet });
+      expect(w.find('[data-testid="inventory-panel__section--wallet"]').exists(), String(wallet)).toBe(false);
+    }
+    // Unavailable services / absent section: the bag fabricates no wallet,
+    // no `物品` heading section, and no `金錢` row.
+    const wUnavailable = mountPanel({ services: SERVICES_PANEL_UNAVAILABLE_SAMPLE, wallet: 3240 });
+    expect(wUnavailable.find('[data-testid="inventory-panel__section--wallet"]').exists()).toBe(false);
+    expect(wUnavailable.find('[data-testid="inventory-panel__section--items"]').exists()).toBe(false);
+    const wAbsent = mountPanel({ services: SERVICES_PANEL_MINIMAL_SAMPLE, wallet: 3240 });
+    expect(wAbsent.find('[data-testid="inventory-panel__section--wallet"]').exists()).toBe(false);
+    expect(wAbsent.find('[data-testid="inventory-panel__section--items"]').exists()).toBe(false);
+  });
+
+  it("never reproduces the mock's 排序/篩選/找尋 pills", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
+    const text = w.text();
+    expect(text).not.toContain("排序");
+    expect(text).not.toContain("篩選");
+    expect(text).not.toContain("找尋");
   });
 
   it("renders no equipment doll when the character panel is unavailable; the held grid remains", () => {

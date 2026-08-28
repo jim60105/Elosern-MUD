@@ -1,14 +1,17 @@
 <script setup>
 // EquipmentDoll (H4, webclient-hud-04-reference-drawers, task 6.3;
-// restyle-inventory-equipment-slots): the equipment doll rendered from the
-// committed `character` v4 payload's `equipment[]`. The binding design's
-// compact paper-doll slot language: a two-column square grid of four stable
-// positions (主手 / 副手 / 盔甲 / 飾品 summary), a fixed slot-role SVG per
-// position (the off-hand position is the iconless position), an explicit
-// dashed empty state, and labelled passthrough rows for any other
-// server-authored slot key. No rarity borders, no per-item stats line, no
-// comparison tooltip, and no use / consume / equip control (task 6.4) — the
-// doll is a read-only presentation of what is equipped and held.
+// restyle-inventory-equipment-slots; realign-inventory-drawer-layout): the
+// 裝備 section of the 背包 drawer, built from the committed `character` v4
+// payload's `equipment[]`. The binding design's `.doll` row: a two-column
+// square grid of four stable positions (主手 / 副手 / 盔甲 / 飾品 summary)
+// beside a 裝備描述 column that lists the committed rows under their slot
+// labels — the section heading reads `裝備` with the `真值 · 偽裝不影響` tag.
+// Each position carries a fixed slot-role SVG (the off-hand position is the
+// iconless position) and an explicit dashed empty state; labelled
+// passthrough rows keep any other server-authored slot key. No rarity
+// borders, no per-item stats line, no comparison tooltip, and no use /
+// consume / equip control (task 6.4) — the doll is a read-only presentation
+// of what is equipped and held.
 import { computed } from "vue";
 
 const props = defineProps({
@@ -81,6 +84,16 @@ const otherRows = computed(() =>
 // renders as a labelled overflow row (the no-drop guarantee — the character
 // panel validator accepts duplicate slot rows).
 const SINGLETON_SLOTS = ["weapon_main", "weapon_off", "armor"];
+
+// The 裝備描述 column (realign-inventory-drawer-layout, design D1): one
+// labelled entry per primary row — the first committed row of each
+// recognised singleton slot — with the accessory group (all accessory rows)
+// rendered beside it under the 飾品 label. Duplicate and unrecognised-slot
+// rows are owned by the labelled fallback sections below the row, so every
+// committed row appears exactly once in the doll.
+const descriptionRows = computed(() =>
+  SINGLETON_SLOTS.map((slot) => ({ slot, row: slotItem(slot) })).filter((entry) => entry.row !== null),
+);
 const duplicateRows = computed(() => {
   const seen = {};
   const duplicates = [];
@@ -99,7 +112,7 @@ const duplicateRows = computed(() => {
 
 <template>
   <section class="equipment-doll" data-testid="equipment-doll">
-    <h3 class="equipment-doll__title" data-testid="equipment-doll__title">裝備人偶</h3>
+    <h3 class="equipment-doll__title" data-testid="equipment-doll__title">裝備<span class="equipment-doll__title-tag" data-testid="equipment-doll__title-tag">真值 · 偽裝不影響</span></h3>
 
     <p
       v-if="!available"
@@ -111,84 +124,112 @@ const duplicateRows = computed(() => {
     </p>
 
     <template v-else>
-      <!-- The binding design's `.dollslots` grid: two columns of 74px square
-           cells. Each position renders its fixed slot-role symbol (selected
-           by slot identity only); the off-hand position is iconless; empty
-           singleton slots render the dashed explicit empty state. -->
-      <div class="equipment-doll__slots">
-        <div
-          v-for="p in SLOT_POSITIONS"
-          :key="p.slot"
-          class="equipment-doll__slot"
-          :data-testid="`equipment-doll__slot--${p.slot}`"
-        >
+      <!-- The binding design's `.doll` flex row: the `.dollslots` grid
+           beside the 裝備描述 column. -->
+      <div class="equipment-doll__doll">
+        <!-- The binding design's `.dollslots` grid: two columns of 74px square
+             cells. Each position renders its fixed slot-role symbol (selected
+             by slot identity only); the off-hand position is iconless; empty
+             singleton slots render the dashed explicit empty state. The
+             committed item names are no longer hung under the boxes — they
+             read in the description column beside the grid. -->
+        <div class="equipment-doll__slots">
           <div
-            class="equipment-doll__box"
-            :class="{ 'equipment-doll__box--empty': p.slot !== 'accessory' && slotItem(p.slot) === null }"
+            v-for="p in SLOT_POSITIONS"
+            :key="p.slot"
+            class="equipment-doll__slot"
+            :data-testid="`equipment-doll__slot--${p.slot}`"
           >
-            <template v-if="p.slot === 'accessory'">
-              <svg
-                v-if="slotIcon('accessory')"
-                class="equipment-doll__icon"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path :d="slotIcon('accessory')" stroke="currentColor" stroke-width="1.6" />
-              </svg>
-              <p class="equipment-doll__accessory-count" data-testid="equipment-doll__accessory-count">
-                {{ accessoryCount }} 件
-              </p>
-            </template>
-            <template v-else>
-              <svg
-                v-if="slotItem(p.slot) && slotIcon(p.slot)"
-                class="equipment-doll__icon"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path :d="slotIcon(p.slot)" stroke="currentColor" stroke-width="1.6" />
-              </svg>
-              <p
-                v-else-if="slotItem(p.slot) === null"
-                class="equipment-doll__slot-empty"
-                :data-testid="`equipment-doll__slot-empty--${p.slot}`"
-              >
-                未裝備
-              </p>
-            </template>
+            <div
+              class="equipment-doll__box"
+              :class="{ 'equipment-doll__box--empty': p.slot !== 'accessory' && slotItem(p.slot) === null }"
+            >
+              <template v-if="p.slot === 'accessory'">
+                <svg
+                  v-if="slotIcon('accessory')"
+                  class="equipment-doll__icon"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path :d="slotIcon('accessory')" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+                <p class="equipment-doll__accessory-count" data-testid="equipment-doll__accessory-count">
+                  {{ accessoryCount }} 件
+                </p>
+              </template>
+              <template v-else>
+                <svg
+                  v-if="slotItem(p.slot) && slotIcon(p.slot)"
+                  class="equipment-doll__icon"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path :d="slotIcon(p.slot)" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+                <p
+                  v-else-if="slotItem(p.slot) === null"
+                  class="equipment-doll__slot-empty"
+                  :data-testid="`equipment-doll__slot-empty--${p.slot}`"
+                >
+                  未裝備
+                </p>
+              </template>
+            </div>
+            <p class="equipment-doll__caption">{{ slotLabel(p.slot) }}</p>
           </div>
-          <p class="equipment-doll__caption">{{ slotLabel(p.slot) }}</p>
-          <p
-            v-if="p.slot !== 'accessory' && slotItem(p.slot)"
-            class="equipment-doll__slot-item"
-          >{{ slotItem(p.slot).display_name }}</p>
+        </div>
+
+        <!-- The binding design's flex:1 裝備描述 column: one labelled entry
+             per primary committed row (slot label + committed display_name),
+             the accessory group under its slot label, and the unchanged
+             empty statement when no row is committed. Duplicate and
+             unrecognised-slot rows are owned by the labelled fallback
+             sections under the row, so every committed row appears exactly
+             once. -->
+        <div class="equipment-doll__description" data-testid="equipment-doll__description">
+          <div
+            v-for="entry in descriptionRows"
+            :key="entry.slot"
+            class="equipment-doll__description-row"
+            :data-testid="`equipment-doll__description-row--${entry.slot}`"
+          >
+            {{ slotLabel(entry.slot) }} · {{ entry.row.display_name }}
+          </div>
+          <div
+            v-if="accessoryRows.length > 0"
+            class="equipment-doll__description-row"
+            data-testid="equipment-doll__description-row--accessory"
+          >
+            <!-- The retained accessory detail group (0..3 accessory rows),
+                 now in the description column under its slot label. -->
+            <section
+              class="equipment-doll__accessories"
+              data-testid="equipment-doll__accessories"
+              aria-label="飾品"
+            >
+              <p class="equipment-doll__section-title">飾品 · {{ accessoryCount }} 件</p>
+              <div
+                v-for="(row, index) in accessoryRows"
+                :key="`${row.item_key}-${index}`"
+                class="equipment-doll__row"
+                :data-testid="`equipment-doll__accessory--${row.item_key}`"
+              >
+                <span class="equipment-doll__row-name">{{ row.display_name }}</span>
+                <span class="equipment-doll__row-held">{{ row.held }}</span>
+              </div>
+            </section>
+          </div>
+          <p v-if="equipment.length === 0" class="equipment-doll__empty" data-testid="equipment-doll__empty">
+            目前沒有裝備任何物品。
+          </p>
         </div>
       </div>
-
-      <!-- The retained accessory detail group (0..3 accessory rows). -->
-      <section
-        v-if="accessoryRows.length > 0"
-        class="equipment-doll__section"
-        data-testid="equipment-doll__accessories"
-        aria-label="飾品"
-      >
-        <p class="equipment-doll__section-title">飾品</p>
-        <div
-          v-for="(row, index) in accessoryRows"
-          :key="`${row.item_key}-${index}`"
-          class="equipment-doll__row"
-          :data-testid="`equipment-doll__accessory--${row.item_key}`"
-        >
-          <span class="equipment-doll__row-name">{{ row.display_name }}</span>
-          <span class="equipment-doll__row-held">{{ row.held }}</span>
-        </div>
-      </section>
 
       <!-- Duplicate rows for a recognised singleton slot: the square grid
            shows only the first row per slot, so every further committed row
@@ -230,10 +271,6 @@ const duplicateRows = computed(() => {
           <span class="equipment-doll__row-held">{{ row.held }}</span>
         </div>
       </section>
-
-      <p v-if="equipment.length === 0" class="equipment-doll__empty" data-testid="equipment-doll__empty">
-        目前沒有裝備任何物品。
-      </p>
     </template>
   </section>
 </template>
@@ -246,11 +283,26 @@ const duplicateRows = computed(() => {
   font-family: var(--f-sans);
 }
 
+/* The bag's shared tracked section heading (the mock's `section.block h4`
+   treatment): `裝備` with the right-aligned true-value tag. */
 .equipment-doll__title {
   margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--paper-500);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.equipment-doll__title-tag {
+  margin-left: auto;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--paper-700);
+  font-size: 11px;
 }
 
 .equipment-doll__unavailable {
@@ -260,6 +312,31 @@ const duplicateRows = computed(() => {
   font-size: 0.85em;
   border: 1px dashed var(--ink-700);
   border-radius: var(--radius-sm);
+}
+
+/* The binding design's `.doll`: the slot grid beside the 裝備描述 column. */
+.equipment-doll__doll {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* The binding design's flex:1 裝備描述 div: the committed rows under their
+   slot labels — long names wrap here, never in the square cells. */
+.equipment-doll__description {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--paper-300);
+  overflow-wrap: break-word;
+}
+
+.equipment-doll__description-row {
+  color: var(--paper-100);
 }
 
 /* The binding design's `.dollslots`: a two-column grid of 74px square cells
@@ -312,20 +389,13 @@ const duplicateRows = computed(() => {
 }
 
 /* The binding design's `.dslot .cap`: the visible slot caption below the
-   cell; the committed item name wraps below the caption (long names never
-   expand the square cells or overflow the drawer horizontally). */
+   cell. The committed item name now reads in the 裝備描述 column, so the
+   square cells never grow to fit long names. */
 .equipment-doll__caption {
   margin: 0;
   font-size: 10px;
   color: var(--paper-500);
   text-align: center;
-}
-
-.equipment-doll__slot-item {
-  margin: 0;
-  color: var(--paper-50);
-  font-size: 0.9em;
-  overflow-wrap: break-word;
 }
 
 /* The accessory summary cell: the committed accessory count in the gold
@@ -337,8 +407,16 @@ const duplicateRows = computed(() => {
   color: var(--gold-400);
 }
 
-/* The retained accessory detail group and the unknown-slot labelled
-   fallback rows (the no-drop guarantee). */
+/* The retained accessory detail group, now inside the description column
+   under its slot label (no bordered section of its own). */
+.equipment-doll__accessories {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--sp-1);
+}
+
+/* The unknown-slot labelled fallback rows (the no-drop guarantee). */
 .equipment-doll__section {
   display: flex;
   flex-direction: column;

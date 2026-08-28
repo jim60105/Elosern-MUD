@@ -33,9 +33,62 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     // 副手 and 盔甲 are unfilled → their boxes show the empty state.
     expect(w.get('[data-testid="equipment-doll__slot-empty--weapon_off"]').text()).toBe("未裝備");
     expect(w.get('[data-testid="equipment-doll__slot-empty--armor"]').text()).toBe("未裝備");
-    // 主手 is filled → shows the item name.
-    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    // 主手 is filled: the square cell carries only its fixed symbol and
+    // caption — the committed name reads in the 裝備描述 column beside the
+    // grid (realign-inventory-drawer-layout).
+    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).not.toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
     expect(w.find('[data-testid="equipment-doll__slot-empty--weapon_main"]').exists()).toBe(false);
+  });
+
+  it("titles the section 裝備 with the 真值 · 偽裝不影響 tag (realign-inventory-drawer-layout)", () => {
+    const w = mountDoll();
+    // The mock's tracked section heading replaces the old `裝備人偶` title.
+    expect(w.get('[data-testid="equipment-doll__title"]').text()).toBe("裝備真值 · 偽裝不影響");
+    expect(w.get('[data-testid="equipment-doll__title-tag"]').text()).toBe("真值 · 偽裝不影響");
+    expect(w.text()).not.toContain("裝備人偶");
+  });
+
+  it("renders the 裝備描述 column with one entry per primary row grouped by slot label", () => {
+    const w = mountDoll({ character: characterWith([
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+      { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+      { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
+    ]) });
+    const description = w.get('[data-testid="equipment-doll__description"]');
+    expect(description.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toBe("主手 · 短劍 · 拾遺");
+    expect(description.get('[data-testid="equipment-doll__description-row--armor"]').text()).toBe("盔甲 · 皮甲");
+    // 副手 carries no committed row → no description entry is invented.
+    expect(description.find('[data-testid="equipment-doll__description-row--weapon_off"]').exists()).toBe(false);
+    // Every accessory row renders in the description column's accessory
+    // group, under the 飾品 label.
+    const accessoryGroup = description.get('[data-testid="equipment-doll__description-row--accessory"]');
+    expect(accessoryGroup.text()).toContain("飾品 · 2 件");
+    expect(accessoryGroup.get('[data-testid="equipment-doll__accessories"]').exists()).toBe(true);
+    expect(accessoryGroup.get('[data-testid="equipment-doll__accessory--fog_talisman"]').text()).toContain("霧隱護符");
+    expect(accessoryGroup.get('[data-testid="equipment-doll__accessory--speed_charm"]').text()).toContain("迅捷護符");
+  });
+
+  it("renders each committed row exactly once, and pure v4 rows show no fabricated values", () => {
+    // Pure committed shape: { slot, item_key, display_name } and nothing
+    // more (the character panel's row validator rejects extra fields).
+    const w = mountDoll({ character: characterWith([
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍" },
+      { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+      { slot: "mount", item_key: "mount_ash", display_name: "灰驛" },
+    ]) });
+    const text = w.text();
+    expect(text).not.toContain("undefined");
+    expect(text).not.toContain("NaN");
+    // First row → description column; the duplicate and the unrecognised
+    // slot → their labelled fallback sections only (no double rendering).
+    expect(w.get('[data-testid="equipment-doll__description"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description"]').text()).not.toContain("輕劍");
+    expect(w.get('[data-testid="equipment-doll__duplicates"]').text()).toContain("輕劍");
+    expect(w.get('[data-testid="equipment-doll__description"]').text()).not.toContain("灰驛");
+    expect(w.get('[data-testid="equipment-doll__other-slots"]').text()).toContain("灰驛");
   });
 
   it("renders the accessory group for 0..3 accessory rows", () => {
@@ -98,11 +151,11 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     expect(mainPath).toBe("M5 19 17 7M17 7l-3 1M5 19l2-3");
     expect(armorPath).toBe("M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z");
     expect(accessoryPath).toBe("M12 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 14v6");
-    // The off-hand position is the iconless position: no SVG, but the
-    // committed display name still renders below the caption.
+    // The off-hand position is the iconless position: no SVG in the square
+    // cell; the committed display name reads in the description column.
     const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
     expect(offSlot.find("svg").exists()).toBe(false);
-    expect(offSlot.text()).toContain("月牙短匕");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_off"]').text()).toContain("月牙短匕");
   });
 
   it("selects the slot symbol by slot identity, never by the item (source isolation)", () => {
@@ -134,6 +187,8 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     }
     expect(w.get('[data-testid="equipment-doll__accessory-count"]').text()).toBe("0 件");
     expect(w.find('[data-testid="equipment-doll__accessories"]').exists()).toBe(false);
+    // The empty statement renders inside the 裝備描述 column.
+    expect(w.get('[data-testid="equipment-doll__description"]').text()).toContain("目前沒有裝備任何物品。");
     expect(w.get('[data-testid="equipment-doll__empty"]').text()).toBe("目前沒有裝備任何物品。");
   });
 
@@ -164,12 +219,14 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
         { slot: "armor", item_key: "steel_plate", display_name: "鋼板甲", held: 1, equipped: false },
       ]),
     });
-    // The square grid consumes only the first row per singleton slot.
-    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    // The square grid consumes only the first row per singleton slot: the
+    // first row shows in the description column; the cell keeps just its
+    // symbol/caption.
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
     const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
-    expect(offSlot.text()).toContain("月牙短匕");
     expect(offSlot.find("svg").exists()).toBe(false);
-    expect(w.get('[data-testid="equipment-doll__slot--armor"]').text()).toContain("皮甲");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_off"]').text()).toContain("月牙短匕");
+    expect(w.get('[data-testid="equipment-doll__description-row--armor"]').text()).toContain("皮甲");
     // The duplicate committed rows render as labelled overflow rows.
     const dupes = w.findAll('[data-testid^="equipment-doll__duplicate-row--"]');
     expect(dupes).toHaveLength(3);

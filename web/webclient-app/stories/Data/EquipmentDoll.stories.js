@@ -197,3 +197,20 @@ export const DuplicateSingletonSlots = {
   render: renderDoll,
   args: { character: duplicateSingletonSlots() },
 };
+
+// The mock's `.doll` row (realign-inventory-drawer-layout): the square slot
+// grid beside the 裝備描述 column listing the committed rows under their
+// slot labels — singleton first rows plus the accessory group.
+function describedEquipment() {
+  return characterWith([
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+    { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕" },
+    { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+    { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+  ]);
+}
+
+export const WithEquipmentDescription = {
+  render: renderDoll,
+  args: { character: describedEquipment() },
+};

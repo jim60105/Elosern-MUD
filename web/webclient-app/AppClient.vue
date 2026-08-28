@@ -546,34 +546,47 @@ const skillBookSubtitle = computed(() => {
   return `主動 ${skillCount(character?.actives)} · 被動 ${skillCount(character?.passives)}`;
 });
 
-// The inventory drawer's head subtitle (relocate-inventory-drawer-essentials):
-// the committed `character` panel's wallet, formatted as thousands-grouped
-// integer copper (the shared `character-identity.js` formatter, the same one
-// the character head card uses). It renders only when:
-//  - the open drawer is the inventory drawer,
-//  - the `services` panel is available and its `inventory` section is
-//    present (when the bag is unavailable or the section is absent the bag
+// The inventory drawer's committed wallet figure (relocate-inventory-drawer-
+// essentials; realign-inventory-drawer-layout D3): the validated integer
+// copper from the `character` panel, null when:
+//  - the `services` panel is unavailable or its `inventory` section is
+//    absent (when the bag is unavailable or the section is absent the bag
 //    states its registry-owned reason / absent message and fabricates no
 //    wallet),
-//  - the `character` panel is available and carries a valid non-negative
-//    integer balance (a missing or unavailable panel leaves the subtitle
-//    blank — no balance, and never a zero).
-const inventoryWalletSubtitle = computed(() => {
-  if (store.view.hudDrawer !== "inventory") {
-    return "";
-  }
+//  - the `character` panel is unavailable or carries no valid non-negative
+//    integer balance (a missing or unavailable panel yields null — no
+//    balance, and never a zero).
+// The head subtitle and the bag's `金錢` row are both derived from this one
+// figure (`services.inventory.wallet` is never read), so the two renderings
+// of the drawer-layer wallet can never disagree.
+const inventoryWalletCopper = computed(() => {
   const services = panel("services");
   const servicesAvailable = !!services && services.available !== false;
   const inventorySection = services ? (services.inventory ?? null) : null;
   if (!servicesAvailable || inventorySection === null) {
-    return "";
+    return null;
   }
   if (!panelAvailable("character")) {
-    return "";
+    return null;
   }
   const character = panel("character");
   const wallet = character?.wallet;
   if (typeof wallet !== "number" || !Number.isInteger(wallet) || wallet < 0) {
+    return null;
+  }
+  return wallet;
+});
+
+// The inventory drawer's head subtitle: the committed wallet figure above,
+// formatted as thousands-grouped integer copper (the shared
+// `character-identity.js` formatter, the same one the character head card
+// uses); blank for any other drawer or when the figure is null.
+const inventoryWalletSubtitle = computed(() => {
+  if (store.view.hudDrawer !== "inventory") {
+    return "";
+  }
+  const wallet = inventoryWalletCopper.value;
+  if (wallet === null) {
     return "";
   }
   return `錢袋 ${formatCopper(wallet)} 銅`;
@@ -776,6 +789,7 @@ onMounted(() => {
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
         :character="panel('character')"
+        :wallet="inventoryWalletCopper"
       />
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"

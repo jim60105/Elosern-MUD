@@ -87,7 +87,12 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     def test_bag_bounded_inventory_rows(self):
         # The bag renders the committed services inventory rows (name / held /
         # equipped), states the row ceiling in words, and fabricates no total /
-        # rarity / use-equip control.
+        # rarity / use-equip control. Since realign-inventory-drawer-layout the
+        # available body is the mock's three-section stack (equipment doll,
+        # `物品` heading tagged with the shipped listing size over the tile
+        # grid, and a `金錢` section whose single row carries the committed
+        # grouped integer wallet) on the bare drawer body, with no sort /
+        # filter / search pill reproduced.
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "world" / "inventory_panel.test.js"),
             "bag bounded inventory rows",
@@ -99,16 +104,20 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     def test_equipment_doll_server_authored_slots(self):
         # The equipment doll renders the server's three singleton slots and the
         # accessory summary as four named positions in a compact two-column
-        # square layout (restyle-inventory-equipment-slots). Each position
-        # renders only a fixed local SVG selected by its server-authored slot
-        # role (the off-hand position is the iconless position); a vacant
-        # singleton slot renders its explicit dashed empty state, an occupied
-        # slot renders its committed display name (a duplicate committed row for
-        # a recognised singleton slot renders as a labelled overflow row), the
-        # accessory summary states the committed count while every accessory row
-        # renders in the retained detail group, and any unrecognised slot key
-        # renders as a labelled fallback row rather than being discarded. No
-        # item statistic, rarity, item icon, summary, or comparison is invented.
+        # square layout (restyle-inventory-equipment-slots). Since
+        # realign-inventory-drawer-layout the section is titled `裝備` with the
+        # `真值 · 偽裝不影響` tag (never `裝備人偶`) and the square grid sits in
+        # the mock's `.doll` flex row beside a 裝備描述 column whose labelled
+        # entries carry the committed display names (slot label + name; every
+        # accessory row groups under the 飾品 label), while the accessory
+        # summary still states the committed count (a duplicate committed row
+        # for a recognised singleton slot renders as a labelled overflow row)
+        # and any unrecognised slot key renders as a labelled fallback row
+        # rather than being discarded. Each position renders only a fixed local
+        # SVG selected by its server-authored slot role (the off-hand position
+        # is the iconless position); a vacant singleton slot renders its
+        # explicit dashed empty state. No item statistic, rarity, item icon,
+        # summary, or comparison is invented.
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "data" / "equipment_doll.test.js"),
             "equipment doll server-authored slots",
@@ -131,9 +140,12 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         "webclient-contextual-hud::the-drawer-layer-renders-the-wallet-exactly-once"
     )
     def test_drawer_layer_single_wallet(self):
-        # The wallet renders in exactly one place (the inventory drawer's shared
-        # header, thousands-grouped integer copper from the committed character
-        # panel); no other drawer body renders a balance of its own, and an
+        # Across the whole drawer layer the wallet renders in exactly two
+        # places per opening of the inventory drawer (realign-inventory-
+        # drawer-layout): the shared header subtitle and the single row of the
+        # `金錢` body section — both the same thousands-grouped integer copper
+        # read from the committed character panel, never the services-side
+        # figure; no other drawer or body element renders a balance, and an
         # unavailable panel renders no balance (never a zero).
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "app_client_drawers.test.js"),
