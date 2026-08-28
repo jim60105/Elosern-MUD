@@ -306,7 +306,7 @@ test("root geometry: gridCols equals the item count (single-row tab bar)", () =>
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   const combatRoot = combat.menus.root;
   assert.equal(combatRoot.gridCols, combatRoot.items.length);
-  assert.equal(combatRoot.items.length, 6);
+  assert.equal(combatRoot.items.length, 7);
 
   const recoveryRoot = CombatMenu.rootItems(
     combatPanel({

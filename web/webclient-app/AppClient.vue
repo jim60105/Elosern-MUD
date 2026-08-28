@@ -461,6 +461,13 @@ function onShopSell(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
+// Inventory row-action intents (add-inventory-item-actions, task 6.3): both
+// the confirmed item use and the direct equipment toggle route through the
+// single store dispatch entry — one deliberate activation, one dispatch.
+function onInventoryItemAction(intent) {
+  store.dispatchAction(intent.action_id, intent.payload);
+}
+
 function onMapMove(moveData) {
   // The minimap node action carries `exit_ref` + `destination`; the
   // `explore.move` payload requires exactly `{ exit_ref, current_node }`,
@@ -795,6 +802,8 @@ onMounted(() => {
         :services="panel('services') || {}"
         :character="panel('character')"
         :wallet="inventoryWalletCopper"
+        @use="onInventoryItemAction"
+        @toggle-equip="onInventoryItemAction"
       />
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"

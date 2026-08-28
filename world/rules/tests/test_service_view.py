@@ -132,6 +132,8 @@ def actor(
     equipment=None,
     merit=0,
     guild_rank=None,
+    hp_current=None,
+    hp_maximum=100,
 ):
     traits = {
         "guild_merit": {
@@ -142,6 +144,14 @@ def actor(
             "trait_type": "counter",
         }
     }
+    if hp_current is not None:
+        traits["hp"] = {
+            "base": hp_maximum,
+            "mod": 0,
+            "mult": 1,
+            "current": hp_current,
+            "trait_type": "gauge",
+        }
     return SimpleNamespace(
         pk=pk,
         key=key,
@@ -860,7 +870,7 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
         self.assertIsNone(rank.next_rank)
         self.assertEqual(rank.exam_start.reason_code, "already_settled")
 
-    def test_exam_start_reports_active_combat(self):
+    def test_active_session_blanks_remote_surfaces(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
         player = actor(location=room, wallet=5, registration=registration(), guild_rank="F", merit=50)
         player.db.active_combat = {
@@ -879,8 +889,11 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        self.assertFalse(view.guild.rank.eligible)
-        self.assertEqual(view.guild.rank.exam_start.reason_code, "active_combat")
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.shop)
+        self.assertIsNone(view.host)
+        self.assertIsNotNone(view.player)
+        self.assertIsNotNone(view.inventory)
 
 
 class GuildCorruptionEdgeTests(ServiceRegistryIsolation):
@@ -1039,7 +1052,11 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         self.assertIsNone(view.inventory)
         self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
 
-    def test_accessories_ignored_when_not_a_list(self):
+    def test_accessories_not_a_list_fails_closed_unavailable(self):
+        # The services rows normalize through the shared fail-closed
+        # equipment layer (add-inventory-item-actions rubber-duck fix): a
+        # malformed accessories value is never partially trusted — the
+        # inventory section is unavailable, not partially equipped.
         room = FakeRoom()
         player = actor(
             location=room,
@@ -1057,11 +1074,206 @@ class ShopEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        row = view.inventory.rows[0]
-        self.assertEqual(row.item_key, "plain_sword")
+        self.assertIsNone(view.inventory)
+        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
+
+    def test_cross_slot_duplicate_fails_closed_unavailable(self):
+        # One key stored in two slots is malformed for the shared equipment
+        # layer, so the panel never publishes a partial equipped truth.
+        room = FakeRoom()
+        player = actor(
+            location=room,
+            wallet=5,
+            inventory=["plain_sword"],
+            equipment={
+                "weapon_main": "plain_sword",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": ["plain_sword"],
+            },
+        )
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            view = build_services_view(player)
+        self.assertIsNone(view.inventory)
+        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
+
+
+class InventoryRowActionTests(ServiceRegistryIsolation):
+    """Personal-item descriptors derived by the shared preflight APIs."""
+
+    def setUp(self):
+        super().setUp()
+        snapshot = dict(ITEM_REGISTRY)
+
+        def restore():
+            ITEM_REGISTRY.clear()
+            ITEM_REGISTRY.update(snapshot)
+
+        self.addCleanup(restore)
+
+    def _build(self, player):
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            return build_services_view(player)
+
+    def _rows(self, view):
+        return {row.item_key: row for row in view.inventory.rows}
+
+    def test_injured_usable_row_carries_enabled_use_descriptor(self):
+        player = actor(
+            location=FakeRoom(),
+            inventory=["healing_potion"],
+            hp_current=50,
+        )
+        row = self._rows(self._build(player))["healing_potion"]
+        self.assertIsNotNone(row.action)
+        self.assertEqual(row.action.action_id, "inventory.use")
+        self.assertEqual(row.action.label, "使用")
+        self.assertTrue(row.action.enabled)
+        self.assertIsNone(row.action.reason_code)
+
+    def test_full_hp_use_disabled_with_stable_reason(self):
+        player = actor(
+            location=FakeRoom(),
+            inventory=["healing_potion"],
+            hp_current=100,
+        )
+        row = self._rows(self._build(player))["healing_potion"]
+        self.assertFalse(row.action.enabled)
+        self.assertEqual(row.action.reason_code, "hp_full")
+        self.assertEqual(
+            row.action.reason_message,
+            "你的體力已經全滿。",
+        )
+
+    def test_unknown_and_inspect_only_rows_have_null_actions(self):
+        player = actor(
+            location=FakeRoom(),
+            inventory=["mystery_relic", "meal"],
+            hp_current=50,
+        )
+        rows = self._rows(self._build(player))
+        self.assertIsNone(rows["mystery_relic"].action)
+        self.assertIsNone(rows["mystery_relic"].presentation)
+        self.assertIsNone(rows["meal"].action)
+        self.assertIsNotNone(rows["meal"].presentation)
+
+    def test_equipment_toggle_descriptor_tracks_equipped_state(self):
+        equipment = {
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        player = actor(
+            location=FakeRoom(),
+            inventory=["plain_sword"],
+            equipment=dict(equipment),
+            hp_current=100,
+        )
+        row = self._rows(self._build(player))["plain_sword"]
+        self.assertEqual(row.action.action_id, "inventory.toggle_equip")
+        self.assertEqual(row.action.label, "裝備")
+        self.assertTrue(row.action.enabled)
+
+        player.db.equipment = {**equipment, "weapon_main": "plain_sword"}
+        row = self._rows(self._build(player))["plain_sword"]
         self.assertTrue(row.equipped)
+        self.assertEqual(row.action.label, "卸下")
+        self.assertTrue(row.action.enabled)
 
+    def test_sixth_accessory_disabled_and_equipped_rows_stay_enabled(self):
+        from world.lore.items import (
+            ItemDefinition,
+            ItemIconKey,
+            ItemKind,
+            ItemPresentation,
+            ItemRarity,
+        )
+        from world.skills.equipment import EquipmentSlot
 
+        for index in range(6):
+            ITEM_REGISTRY[f"ring_{index}"] = ItemDefinition(
+                key=f"ring_{index}",
+                display_name_zh="測試戒指",
+                price_table_key="ring_0",
+                sellable=False,
+                presentation=ItemPresentation(
+                    kind=ItemKind.ACCESSORY,
+                    icon_key=ItemIconKey.ACCESSORY,
+                    rarity=ItemRarity.COMMON,
+                    summary_zh="測試用的飾品。",
+                ),
+                equipment_slot=EquipmentSlot.ACCESSORY,
+            )
+        player = actor(
+            location=FakeRoom(),
+            inventory=[f"ring_{index}" for index in range(6)],
+            equipment={
+                "weapon_main": None,
+                "weapon_off": None,
+                "armor": None,
+                "accessories": [f"ring_{index}" for index in range(5)],
+            },
+            hp_current=100,
+        )
+        rows = self._rows(self._build(player))
+        for index in range(5):
+            row = rows[f"ring_{index}"]
+            self.assertTrue(row.equipped)
+            self.assertTrue(row.action.enabled)
+            self.assertEqual(row.action.label, "卸下")
+        overflow = rows["ring_5"]
+        self.assertFalse(overflow.action.enabled)
+        self.assertEqual(overflow.action.reason_code, "accessory_slots_full")
+        self.assertIn("飾品欄", overflow.action.reason_message)
+
+    def test_combat_view_keeps_personal_use_descriptor_available(self):
+        player = actor(
+            location=FakeRoom(),
+            inventory=["healing_potion"],
+            hp_current=50,
+        )
+        player.db.active_combat = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 1,
+            "player_ids": [1],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+        }
+        view = self._build(player)
+        self.assertIsNone(view.guild)
+        row = self._rows(view)["healing_potion"]
+        self.assertTrue(row.action.enabled)
+
+    def test_descriptor_derivation_mutates_nothing(self):
+        from copy import deepcopy
+
+        player = actor(
+            location=FakeRoom(),
+            inventory=["healing_potion", "plain_sword", "mystery_relic"],
+            equipment={
+                "weapon_main": "plain_sword",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": [],
+            },
+            hp_current=50,
+        )
+        before_db = deepcopy(vars(player.db))
+        before_traits = deepcopy(player.attributes._store)
+        self._build(player)
+        self.assertEqual(vars(player.db), before_db)
+        self.assertEqual(player.attributes._store, before_traits)
 
 
 if __name__ == "__main__":

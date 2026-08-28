@@ -8,12 +8,15 @@ from dataclasses import fields
 from world.lore.items import (
     ITEM_REGISTRY,
     ItemDefinition,
+    ItemEffectKey,
     ItemIconKey,
     ItemKind,
     ItemPresentation,
     ItemRarity,
+    ItemUseMechanics,
     SUMMARY_MAX,
 )
+from world.skills.equipment import EquipmentSlot
 
 
 class ItemPresentationTests(unittest.TestCase):
@@ -146,7 +149,15 @@ class ItemPresentationTests(unittest.TestCase):
     def test_presentation_schema_has_no_numeric_mechanics_fields(self):
         self.assertEqual(
             [field.name for field in fields(ItemDefinition)],
-            ["key", "display_name_zh", "price_table_key", "sellable", "presentation"],
+            [
+                "key",
+                "display_name_zh",
+                "price_table_key",
+                "sellable",
+                "presentation",
+                "use_mechanics",
+                "equipment_slot",
+            ],
         )
         self.assertEqual(
             [field.name for field in fields(ItemPresentation)],
@@ -154,6 +165,103 @@ class ItemPresentationTests(unittest.TestCase):
         )
         for definition in ITEM_REGISTRY.values():
             self.assertNotRegex(definition.presentation.summary_zh, r"[0-9]", definition.key)
+        # Mechanics bindings are references resolved by the deterministic
+        # rules capability; presentation carries no mechanics.
+        for definition in ITEM_REGISTRY.values():
+            for mechanics_field in ("use_mechanics", "equipment_slot"):
+                value = getattr(definition, mechanics_field)
+                if value is None:
+                    continue
+                self.assertIsInstance(
+                    value, (ItemUseMechanics, EquipmentSlot), definition.key
+                )
+
+
+class ItemMechanicsTests(unittest.TestCase):
+    """The closed, mutually exclusive mechanics seam of the lore registry."""
+
+    def _presentation(self) -> ItemPresentation:
+        return ItemPresentation(
+            kind=ItemKind.POTION,
+            icon_key=ItemIconKey.POTION,
+            rarity=ItemRarity.COMMON,
+            summary_zh="可重複使用的測試藥水。",
+        )
+
+    def _definition(self, **overrides) -> ItemDefinition:
+        base = dict(
+            key="test_item",
+            display_name_zh="測試物品",
+            price_table_key="potion",
+            sellable=False,
+            presentation=self._presentation(),
+        )
+        return ItemDefinition(**{**base, **overrides})
+
+    def test_canonical_bindings_resolve(self):
+        potion = ITEM_REGISTRY["healing_potion"]
+        self.assertEqual(
+            potion.use_mechanics.effect_key, ItemEffectKey.SELF_HEAL
+        )
+        self.assertTrue(potion.use_mechanics.consumable)
+        self.assertTrue(potion.use_mechanics.combat_allowed)
+        self.assertIsNone(potion.equipment_slot)
+        self.assertIs(ITEM_REGISTRY["plain_sword"].equipment_slot, EquipmentSlot.WEAPON_MAIN)
+        self.assertIsNone(ITEM_REGISTRY["plain_sword"].use_mechanics)
+        # Inspect-only items declare neither form.
+        self.assertIsNone(ITEM_REGISTRY["meal"].use_mechanics)
+        self.assertIsNone(ITEM_REGISTRY["meal"].equipment_slot)
+
+    def test_mutable_use_definition_rejects_malformed_members(self):
+        with self.assertRaises(ValueError):
+            ItemUseMechanics(effect_key="self_heal", consumable=True, combat_allowed=True)
+        with self.assertRaises(ValueError):
+            ItemUseMechanics(
+                effect_key=ItemEffectKey.SELF_HEAL, consumable="yes", combat_allowed=True
+            )
+        with self.assertRaises(ValueError):
+            ItemUseMechanics(
+                effect_key=ItemEffectKey.SELF_HEAL, consumable=True, combat_allowed=1
+            )
+
+    @covers_requirement(
+        "item-use-resolution::item-mechanics-are-immutable-and-independent-from-presentation"
+    )
+    def test_ambiguous_and_malformed_mechanics_fail_construction(self):
+        cases = {
+            "both-forms": dict(
+                use_mechanics=ItemUseMechanics(
+                    effect_key=ItemEffectKey.SELF_HEAL,
+                    consumable=True,
+                    combat_allowed=True,
+                ),
+                equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            ),
+            "bare-string-slot": dict(equipment_slot="weapon_main"),
+            "unknown-slot-string": dict(equipment_slot="saddle"),
+            "bare-mechanics-object": dict(use_mechanics="self_heal"),
+        }
+        for name, overrides in cases.items():
+            with self.subTest(case=name):
+                with self.assertRaises(ValueError):
+                    self._definition(**overrides)
+
+    def test_reusable_definition_is_valid(self):
+        definition = self._definition(
+            use_mechanics=ItemUseMechanics(
+                effect_key=ItemEffectKey.SELF_HEAL,
+                consumable=False,
+                combat_allowed=False,
+            )
+        )
+        self.assertFalse(definition.use_mechanics.consumable)
+        self.assertFalse(definition.use_mechanics.combat_allowed)
+
+    def test_each_equipment_slot_is_acceptable(self):
+        for slot in EquipmentSlot:
+            with self.subTest(slot=slot.value):
+                definition = self._definition(equipment_slot=slot)
+                self.assertIs(definition.equipment_slot, slot)
 
 
 if __name__ == "__main__":

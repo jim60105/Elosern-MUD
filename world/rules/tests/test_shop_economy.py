@@ -335,6 +335,118 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.assertEqual(swapped, baseline)
 
 
+class EquippedRemovalGuardTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
+    """Rubber-duck run-2 blocker: removal writers never unhold an equipped key."""
+
+    EMPTY_EQUIPMENT = {
+        "weapon_main": None,
+        "weapon_off": None,
+        "armor": None,
+        "accessories": [],
+    }
+
+    def setUp(self):
+        super().setUp()
+        load_catalog_into_cache()
+        self.store = create_object(Room, key="guard store")
+        self.merchant_npc = create_object(NPC, key="guard merchant", location=self.store)
+        self.merchant = Merchant.create(
+            self.merchant_npc,
+            service_id="guard-merchant",
+            shop_key="altoria_general_store",
+        )
+        self.merchant_npc.components.add(self.merchant)
+        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.store
+        self.player.db.wallet = 0
+        self.player.db.inventory = []
+        self.player.db.equipment = dict(self.EMPTY_EQUIPMENT)
+
+    def _open_clock(self, hour=12):
+        return WorldClock(hour * 3600)
+
+    def _wear(self, *keys):
+        self.player.db.inventory = list(keys)
+        if keys:
+            self.player.db.equipment = {
+                **self.EMPTY_EQUIPMENT,
+                "weapon_main": keys[0],
+            }
+
+    def test_sell_last_equipped_key_is_refused_without_mutation(self):
+        self.player.db.inventory = ["plain_sword"]
+        self.player.db.equipment = {**self.EMPTY_EQUIPMENT, "weapon_main": "plain_sword"}
+        stock_before = parse_merchant_stock(self.merchant)["plain_sword"]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with self.assertRaises(TradeError) as ctx:
+                sell(self.player, self.merchant_npc, "plain_sword", 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.EQUIPPED_ITEM)
+        self.assertEqual(self.player.db.wallet, 0)
+        self.assertEqual(list_items(self.player), ["plain_sword"])
+        self.assertEqual(
+            self.player.db.equipment["weapon_main"], "plain_sword"
+        )
+        self.assertEqual(parse_merchant_stock(self.merchant)["plain_sword"], stock_before)
+
+    def test_sell_leaving_one_equipped_copy_is_allowed(self):
+        self.player.db.inventory = ["plain_sword", "plain_sword"]
+        self.player.db.equipment = {**self.EMPTY_EQUIPMENT, "weapon_main": "plain_sword"}
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(self.player, self.merchant_npc, "plain_sword", 1)
+        self.assertEqual(result["quantity"], 1)
+        self.assertEqual(list_items(self.player), ["plain_sword"])
+
+    def test_unequipped_item_sells_normally(self):
+        self.player.db.inventory = ["plain_sword"]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(self.player, self.merchant_npc, "plain_sword", 1)
+        self.assertEqual(result["quantity"], 1)
+        self.assertEqual(list_items(self.player), [])
+
+    def test_planner_raises_equipped_removal_error(self):
+        from world.rules.equipment import (
+            EquippedRemovalError,
+            equipped_removal_conflict,
+            plan_inventory_delta,
+        )
+
+        self.player.db.inventory = ["plain_sword"]
+        self.player.db.equipment = {**self.EMPTY_EQUIPMENT, "weapon_main": "plain_sword"}
+        self.assertEqual(
+            equipped_removal_conflict(self.player, ("plain_sword",)), "plain_sword"
+        )
+        self.assertIsNone(equipped_removal_conflict(self.player, ("meal",)))
+        with self.assertRaises(EquippedRemovalError):
+            plan_inventory_delta(self.player, removals=("plain_sword",))
+        # Malformed storage protects every removal of a registry equipment key.
+        self.player.db.equipment = "corrupt"
+        self.assertEqual(
+            equipped_removal_conflict(self.player, ("plain_sword",)), "plain_sword"
+        )
+        self.assertIsNone(equipped_removal_conflict(self.player, ("meal",)))
+
+    def test_drop_and_give_refuse_the_last_equipped_key(self):
+        self.char2.location = self.store
+        self.player.db.inventory = ["plain_sword"]
+        self.player.db.equipment = {**self.EMPTY_EQUIPMENT, "weapon_main": "plain_sword"}
+        self.call(
+            CmdDrop(),
+            "plain_sword",
+            "你無法丟下已裝備的物品。",
+            caller=self.player,
+        )
+        self.assertEqual(list_items(self.player), ["plain_sword"])
+        self.call(
+            CmdGive(),
+            f"plain_sword = {self.char2.key}",
+            "你無法給予已裝備的物品。",
+            caller=self.player,
+        )
+        self.assertEqual(list_items(self.player), ["plain_sword"])
+
 class MerchantStockParsingTests(ShopRegistryIsolation, EvenniaTestCase):
     @covers_requirement("shop-economy::merchant-stock-is-finite-persistent-repeated-item-quantity-state")
     def test_malformed_stock_fails_closed(self):

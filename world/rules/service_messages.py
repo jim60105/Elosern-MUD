@@ -18,6 +18,8 @@ from world.quests.runtime import (
     QuestTransitionError,
 )
 from world.rules.economy import TradeError, TradeReason
+from world.rules.equipment import EquipmentToggleReason
+from world.rules.items import ItemUseReason
 from world.rules.guild import (
     GuildDataError,
     GuildServiceError,
@@ -96,10 +98,29 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "ambiguous_service_host": "這裡有多個對應的服務人員。",
     "malformed_quest_log": "任務記錄有誤。",
     "malformed_equipment": "背包資料有誤。",
+    # Personal item use and equipment toggle.
+    "hp_full": "你的體力已經全滿。",
+    "item_not_held": "你沒有攜帶這個物品。",
+    "not_usable": "這個物品無法這樣使用。",
+    "not_equipment": "這個物品無法裝備。",
+    "not_alive": "你目前無法使用這個物品。",
+    "combat_not_allowed": "戰鬥中無法使用這個物品。",
+    "unknown_effect": "這個物品的效果尚未設定。",
+    "accessory_slots_full": "飾品欄已經滿了，最多同時佩戴五個。",
+    "equipped_item": "已裝備的物品不能這樣賣出。",
+    "malformed_inventory": "背包資料有誤。",
+    "malformed_traits": "角色資料有誤。",
 }
 
 # Reason types whose enum member (``reason.args[0]``) names the exact code.
-_ENUM_REASON_TYPES = (RegistrationReason, RewardClaim, ExamReason, TradeReason)
+_ENUM_REASON_TYPES = (
+    RegistrationReason,
+    RewardClaim,
+    ExamReason,
+    TradeReason,
+    EquipmentToggleReason,
+    ItemUseReason,
+)
 # Exception types whose ``args[0]`` may carry an enum member or a raw string.
 _ARGS_REASON_TYPES = (GuildError, GuildExamError, TradeError, RewardClaimError)
 

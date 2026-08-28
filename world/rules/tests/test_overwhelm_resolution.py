@@ -354,7 +354,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             marked,
             default_attack_policy,
             commanded_actor="first-marked",
-            commanded_skill="shadow_slash",
+            commanded_action_kind="skill", commanded_action_key="shadow_slash",
         )
         self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
         self.assertEqual(result.total_seconds, baseline.total_seconds)

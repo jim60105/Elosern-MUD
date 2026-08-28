@@ -159,7 +159,7 @@ export const ArmorOnly = {
   args: { character: armorOnly() },
 };
 
-// The accessory summary cell states the committed count across 0..3
+// The accessory summary cell states the committed count across 0..5
 // accessories, while the retained detail group lists every row.
 export const ZeroAccessories = {
   render: renderDoll,

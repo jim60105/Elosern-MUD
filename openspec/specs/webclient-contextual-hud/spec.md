@@ -808,51 +808,65 @@ state inside it SHALL be discarded.
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
 
 ### Requirement: The bag renders the bounded inventory rows without inventing a total or a rarity
-The bag drawer SHALL use the shared drawer chrome for the `背包 · 裝備` title, local `inventory` SVG icon, close control, and a wallet subtitle formatted as integer copper from the committed available `character` panel. The wallet SHALL additionally render exactly once in the drawer body, as the single row of a `金錢` section, and in no other body location. Its available body SHALL be the redesign's three-section stack rendered directly on the drawer body without a panel-card wrapper: an `裝備` section carrying the read-only equipment doll built from the committed `character` panel's equipment rows, an `物品` section whose heading carries the shipped listing size as its tag and whose body carries the bounded responsive grid of the committed `services` panel's inventory rows, and a `金錢` section rendering the committed wallet as one labelled row with grouped integer copper. The listing SHALL remain bounded by the server's row ceiling; when it holds that many rows the drawer SHALL state the ceiling in words. The `物品` tag and the shipped row count label only the shipped listing size and SHALL NOT be presented as a count of the player's untruncated holdings, because the panel's inventory total is that same shipped count and carries no information about what was truncated.
+The bag drawer SHALL use the shared drawer chrome for the `背包 · 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the drawer body as the single row of a `金錢` section. The available body SHALL remain the redesign's unwrapped three-section stack: an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, and a `金錢` section carrying the same committed wallet. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
 
-Each registered row's non-null `presentation` object SHALL select one local inline SVG by `icon_key`, an item-kind label, a rarity label, a bounded summary, and a rarity border treatment. Its tile SHALL show the committed held count in a stable lower corner and a non-colour equipped check marker when equipped. Rarity SHALL use a distinct border pattern as well as its colour, and the focused or hovered inspector SHALL spell the rarity word. A null `presentation` SHALL render only the neutral unknown-item SVG and visible unknown marker; the browser SHALL NOT derive type, icon, rarity, or summary from `item_key` or `display_name`. The grid SHALL use native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both paths SHALL expose the same committed display name, kind, rarity, held count, equipped state, and summary. The currently focused tile SHALL use `aria-describedby` to reference that inspector's stable ID, and the relationship SHALL clear when no inspector is present. Selection SHALL be client-local, reset on panel replacement, and SHALL dispatch no action.
+Each registered row's non-null `presentation` SHALL select one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment. Its tile SHALL show committed held count and a non-colour equipped marker. A null presentation SHALL render only the neutral unknown-item SVG and visible unknown marker; the browser SHALL NOT derive type, icon, rarity, summary, or mechanics from item key or display name. The grid SHALL use native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths SHALL expose identical committed name, kind, rarity, count, equipped state, and summary, and the focused tile SHALL reference the stable inspector through `aria-describedby`.
 
-The bag SHALL NOT render a numeric item statistic, recovery amount, requirement, set bonus, comparison value, sorting, filtering, search, use, consume, equip, drag, or drop control; the redesign mock's static 排序/篩選/找尋 pills SHALL NOT be reproduced because the payload carries no ordering or filter state. When the `services` panel commits its unavailable form, or when its inventory section is absent, the bag SHALL render only the registry-owned reason and SHALL fabricate no wallet, equipment slot, row or count. When services are available but the character panel is unavailable, the held-item grid remains available, the doll renders its registered unavailable state, and the drawer header renders no balance and the body renders no `金錢` row. Any cell or inspector transition SHALL use existing motion tokens so the reduced-motion setting makes it effectively instant.
+Each tile SHALL follow only its committed nullable action descriptor. Inspect-only and unknown tiles SHALL dispatch nothing. Disabled tiles SHALL remain keyboard reachable, expose `aria-disabled`, and show the committed reason on activation without dispatch. Enabled usable items SHALL open a labelled, focus-trapped inventory-use confirmation; enabled equipment SHALL dispatch its toggle immediately. Selection and dialog state SHALL remain client-local and reset on panel replacement, drawer close, mode/epoch change, or transport loss. The bag SHALL NOT render or infer numeric item statistics, recovery amounts, conditions, effects, consumable flags, slots, set bonuses, comparisons, sorting, filtering, search, drag, or drop behavior, and SHALL render no static sort/filter/search pill.
 
-#### Scenario: A registered row renders as an inspectable inventory tile
-- **WHEN** a committed inventory row carries valid non-null presentation metadata
-- **THEN** its native button renders the mapped local SVG, lower-corner held count, rarity border pattern and colour, equipped check when applicable, and the identical committed metadata in its hover and focus inspector without dispatching an action
+The drawer SHALL remain available from its combat affordance when services v3 inventory is available. When services commits its unavailable form or inventory is absent, the bag SHALL render only the registered reason and fabricate no wallet, equipment, row, count, action, or dialog. When services inventory is available but character is unavailable, the grid SHALL remain available, the doll SHALL render its registered unavailable state, and no wallet subtitle, wallet body value, or zero balance SHALL be invented. All inspector, confirmation, and warning transitions SHALL use existing motion tokens so reduced motion makes them effectively instant.
+
+#### Scenario: A registered actionable row preserves truthful inspection
+- **WHEN** a committed registered inventory row carries presentation and an enabled action descriptor
+- **THEN** its tile renders committed visual identity and inspector data, and deliberate activation follows the descriptor without deriving mechanics locally
 
 #### Scenario: An unknown row has a neutral truthful fallback
-- **WHEN** a committed inventory row has `presentation` null
-- **THEN** its tile shows the neutral unknown-item SVG and unknown marker with its real name and held count, and no inferred kind, rarity, icon, summary, numeric value, or action control
+- **WHEN** a committed inventory row has `presentation` null and `action` null
+- **THEN** its tile shows the neutral unknown state and real quantity with no inferred metadata or mutation
 
-#### Scenario: Keyboard inspection matches pointer inspection
-- **WHEN** a keyboard user focuses an inventory tile that a pointer user can hover
-- **THEN** both users receive the same real name, kind, rarity word, held count, equipped state, and summary without the inspector entering the tab order, and the focused tile references the inspector through `aria-describedby`
+#### Scenario: Keyboard inspection and activation match pointer behavior
+- **WHEN** keyboard and pointer users inspect and activate the same tile
+- **THEN** both receive identical committed inspector data and action behavior, and the focused tile references the inspector through `aria-describedby`
 
-#### Scenario: The bag body is the redesign's three-section stack
-- **WHEN** the bag is available with at least one inventory row and a committed wallet
-- **THEN** the body renders, in order, the `裝備` section (the doll), an `物品` heading tagged with the shipped listing size over the tile grid, and a `金錢` section whose single row shows the grouped integer copper wallet; none of these sections is wrapped in its own bordered panel card
+#### Scenario: Eligible item use opens confirmation
+- **WHEN** the player activates an enabled usable-item tile
+- **THEN** the labelled confirmation dialog opens without dispatch and confirm is the only path that submits use
 
-#### Scenario: The wallet renders in the head and in the 金錢 section only
-- **WHEN** the bag renders with an available character panel and an available inventory section
-- **THEN** the integer copper wallet appears in the head subtitle and in the `金錢` section row, and in no other element of the drawer
+#### Scenario: Equipment activates directly
+- **WHEN** the player activates an enabled equipment tile
+- **THEN** one equipment-toggle intent is emitted without opening a confirmation
 
-#### Scenario: The ceiling is stated, the total is not invented
-- **WHEN** the inventory listing holds the server's maximum number of rows
-- **THEN** the drawer states that the listing is bounded at that maximum, and it never renders a figure claiming to be the player's complete holdings
+#### Scenario: Disabled item presents its reason
+- **WHEN** the player activates a full-HP potion or an unequipped accessory at the five-slot cap
+- **THEN** the committed reason is presented and no request is dispatched
 
-#### Scenario: No state-changing control appears
-- **WHEN** the bag renders a held item, whether equipped or not
-- **THEN** it offers no use, consume, equip, drag, drop, sort, filter, or search control, and renders no static sort/filter/search pill
+#### Scenario: Combat bag keeps personal items reachable
+- **WHEN** mode changes to active combat and services v3 commits canonical inventory
+- **THEN** the combat root's client-local `背包` row opens the frameless bag without dispatch or a router frame, and personal item tiles remain reachable while guild and shop surfaces are absent
 
-#### Scenario: An unavailable services panel fabricates nothing
-- **WHEN** the `services` panel commits its unavailable form
-- **THEN** the bag renders only the registry-owned reason message, with no rows, wallet, equipment slot, count, `物品` heading, or `金錢` row
+#### Scenario: The bag body retains the three-section stack
+- **WHEN** the bag is available with inventory, character equipment, and wallet
+- **THEN** it renders equipment, items, and money in order without a bordered panel-card wrapper or invented total
 
-#### Scenario: Character unavailability does not fabricate a balance or equipment
-- **WHEN** the services inventory is available and the character panel is unavailable
-- **THEN** the bag renders its held grid, renders the equipment section's registered unavailable reason, and shows no wallet subtitle, no wallet value, and no zero balance
+#### Scenario: Wallet renders only in the bag head and money row
+- **WHEN** the bag renders with available character and inventory panels
+- **THEN** the same integer copper wallet appears in the head subtitle and the single `金錢` row and nowhere else in the drawer
 
-#### Scenario: The reduced-motion setting preserves information
-- **WHEN** the reduced-motion preference is active and an inventory tile gains focus or an inspector changes row
-- **THEN** the transition is effectively instant while all tile, rarity, count, equipped, and inspector information remains visible
+#### Scenario: Ceiling is stated without inventing a total
+- **WHEN** the shipped inventory reaches its maximum row count
+- **THEN** the bag states the listing ceiling and never labels that count as complete holdings
+
+#### Scenario: Unavailable services fabricates nothing
+- **WHEN** the services panel commits its unavailable form
+- **THEN** the bag renders only the registered reason with no rows, wallet, equipment, count, heading, action, or dialog
+
+#### Scenario: Character unavailability preserves inventory without fabricating equipment
+- **WHEN** services inventory is available but the character panel is unavailable
+- **THEN** the bag renders held tiles, the equipment registered unavailable reason, and no wallet subtitle, wallet value, or zero balance
+
+#### Scenario: Reduced motion preserves action information
+- **WHEN** reduced motion is active and focus, inspector, confirmation, or warning state changes
+- **THEN** transitions are effectively instant while labels, reasons, focus, and committed item information remain available
 
 ### Requirement: The bag drawer opens without a router frame and hosts no row region
 The 背包 · 裝備 drawer SHALL present no router frame. Activating a 背包 entry — the exploration root's row or the services sub-dock's row — SHALL open the drawer as a client-local open: the router's frame stack, current frame, breadcrumb, and menu keys SHALL be unchanged by the open, no sub-dock switch SHALL occur, and no drawer-hosted service surface SHALL be recorded. The drawer's available body SHALL present only its own committed-panel stack, and no hosted row container, listbox, or detail pane SHALL render inside it in any state. Closing the bag drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the 背包 entry that opened it. Committed inventory rows SHALL remain reachable by keyboard through the focusable item tiles and their shared inspector, and those tiles SHALL be the drawer's only row surface: the drawer SHALL NOT additionally render a navigation list of the same rows.

@@ -141,6 +141,7 @@ class CmdSell(_ShopCommandBase):
                 TradeReason.UNKNOWN_ITEM: "商店不收這個物品。",
                 TradeReason.UNSELLABLE: "這個物品無法販賣。",
                 TradeReason.INSUFFICIENT_ITEMS: "你沒有足夠的這個物品。",
+                TradeReason.EQUIPPED_ITEM: "已裝備的物品不能這樣賣出。",
                 TradeReason.STOCK_OVERFLOW: "商店收購上限已滿。",
                 TradeReason.BAD_QUANTITY: "數量必須是正整數。",
             }.get(reason, f"販賣失敗：{error}")

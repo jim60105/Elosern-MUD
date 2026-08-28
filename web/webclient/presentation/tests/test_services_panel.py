@@ -96,6 +96,7 @@ def _valid_payload(**overrides):
                     "display_name": "普通餐食",
                     "held": 1,
                     "equipped": False,
+                    "action": None,
                     "presentation": {
                         "kind": "food",
                         "icon_key": "food",
@@ -241,6 +242,7 @@ def _all_ceilings_payload():
             "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
             "held": 20,
             "equipped": False,
+            "action": None,
             "presentation": {
                 "kind": "k" * MAX_PRESENTATION_KEY_CODE_POINTS,
                 "icon_key": "i" * MAX_PRESENTATION_KEY_CODE_POINTS,
@@ -359,6 +361,7 @@ def _realistic_maximal_payload():
             "display_name": "普通餐食",
             "held": 2,
             "equipped": False,
+            "action": None,
             "presentation": {
                 "kind": "food",
                 "icon_key": "food",
@@ -483,6 +486,7 @@ class ServicesSchemaTests(unittest.TestCase):
             "display_name": "普通餐食",
             "held": 1,
             "equipped": False,
+            "action": None,
             "presentation": {
                 "kind": "food",
                 "icon_key": "food",
@@ -630,6 +634,7 @@ class ServicesSchemaTests(unittest.TestCase):
                         "display_name": "普通餐食",
                         "held": 1,
                         "equipped": False,
+                        "action": None,
                         "presentation": presentation,
                     }
                 ],
@@ -818,10 +823,11 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(list(self.player.db.quest_log or []), before["quest_log"])
 
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
-    def test_combat_mode_renders_unavailable_form(self):
+    def test_combat_mode_ships_personal_inventory_only(self):
         from evennia.utils.create import create_object as co
         from typeclasses.monsters import Monster
 
+        self.player.db.inventory = ["healing_potion"]
         monster = co(Monster, key="goblin", location=self.room1)
         monster.threat_tier = "low"
         monster.apply_monster_tier("floor")
@@ -829,9 +835,19 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
         engage(self.player, monster)
         payload = self._render()
-        self.assertFalse(payload["available"])
-        self.assertNotIn("guild", payload)
-        self.assertNotIn("player", payload)
+        self.assertTrue(payload["available"])
+        self.assertIsNone(payload["host"])
+        self.assertIsNone(payload["guild"])
+        self.assertIsNone(payload["shop"])
+        self.assertIsNotNone(payload["player"])
+        self.assertIsNotNone(payload["inventory"])
+        self.assertEqual(payload["pagination"]["board_total"], 0)
+        self.assertEqual(payload["pagination"]["quest_total"], 0)
+        self.assertEqual(payload["pagination"]["stock_total"], 0)
+        self.assertEqual(payload["pagination"]["sellable_total"], 0)
+        row = payload["inventory"]["rows"][0]
+        self.assertEqual(row["item_key"], "healing_potion")
+        self.assertEqual(row["action"]["action_id"], "inventory.use")
 
     def test_creation_pending_renders_unavailable_form(self):
         self.player.db.creation_pending = True
@@ -885,7 +901,12 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
     def test_rendering_inventory_never_mutates_canonical_state(self):
         self.player.db.inventory = ["healing_potion", "healing_potion", "mystery_relic", "plain_sword"]
-        self.player.db.equipment = {"weapon_main": "plain_sword", "armor": "leather_armor"}
+        self.player.db.equipment = {
+            "weapon_main": "plain_sword",
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
         before = {
             "inventory": list(self.player.db.inventory or []),
             "equipment": dict(self.player.db.equipment or {}),
@@ -975,6 +996,49 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
                         )
                     )
                 )
+
+    def _inventory_row_action_payload(self, action, *, drop_action=False):
+        payload = _valid_payload()
+        if drop_action:
+            del payload["inventory"]["rows"][0]["action"]
+        else:
+            payload["inventory"]["rows"][0]["action"] = action
+        return payload
+
+    def test_inventory_row_action_acceptance_and_rejections(self):
+        good = self._action(
+            "inventory.use",
+            enabled=False,
+            disabled_reason={"code": "hp_full", "message": "你的體力已經全滿。"},
+        )
+        payload = validate_services(self._inventory_row_action_payload(good))
+        self.assertEqual(
+            payload["inventory"]["rows"][0]["action"]["disabled_reason"]["code"],
+            "hp_full",
+        )
+        bad = [
+            self._action("mystery.action"),
+            # Cross-service allowlisted ids are never valid row actions.
+            self._action("shop.buy"),
+            self._action("guild.register"),
+            self._action("inventory.toggle_equip", quantity={"min": 1, "max": 2}),
+            self._action("inventory.use", enabled=False),
+            self._action(
+                "inventory.use",
+                enabled=True,
+                disabled_reason={"code": "hp_full", "message": "你的體力已經全滿。"},
+            ),
+        ]
+        for action in bad:
+            with self.subTest(action_id=action["action_id"]):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_services(
+                        self._inventory_row_action_payload(action)
+                    )
+        with self.assertRaises(ProtocolValidationError):
+            validate_services(
+                self._inventory_row_action_payload(None, drop_action=True)
+            )
 
     def test_disabled_reason_branch_rejections(self):
         payload = _valid_payload(

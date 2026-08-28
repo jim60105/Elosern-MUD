@@ -7,12 +7,19 @@ joined to these identities by the guild-economy catalog loader.
 Presentation metadata — closed item kind, closed SVG icon key, closed rarity,
 and a bounded Traditional Chinese summary — is registry-owned and read-only.
 It is visual identity only: numeric combat, recovery, or comparison values
-stay out of this registry until a deterministic item-effects capability
-owns those facts.
+never enter this registry; the deterministic item-effects rulebook in
+``world/rules/rulebook/item_effects.yaml`` owns every magnitude.
+
+Item mechanics are the registry's only behavioral seam: an item declares
+exactly one of an immutable use definition (``ItemUseMechanics``), an
+equipment slot, or nothing at all. Presentation kind never selects or
+modifies mechanics.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
+
+from world.skills.equipment import EquipmentSlot
 
 # Player-facing item summaries are bounded; the bound mirrors the
 # skill-registry label contract.
@@ -66,6 +73,37 @@ class ItemRarity(StrEnum):
     LEGENDARY = "legendary"
 
 
+class ItemEffectKey(StrEnum):
+    """Closed vocabulary of deterministic item-effect keys.
+
+    Each key binds a usable-item definition to one entry in the item-effect
+    rulebook; magnitudes and conditions never live in this registry. The
+    loader in ``world/rules/items.py`` rejects any registered key without a
+    canonical rulebook entry.
+    """
+
+    SELF_HEAL = "self_heal"
+
+
+@dataclass(frozen=True)
+class ItemUseMechanics:
+    """The immutable use semantics of one registered consumable or reusable."""
+
+    effect_key: ItemEffectKey
+    consumable: bool
+    combat_allowed: bool
+
+    def __post_init__(self) -> None:
+        """Enforce the closed effect vocabulary and boolean flags."""
+        if not isinstance(self.effect_key, ItemEffectKey):
+            raise ValueError(
+                f"effect_key must be an ItemEffectKey member, got {self.effect_key!r}"
+            )
+        for name in ("consumable", "combat_allowed"):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{name} must be a boolean")
+
+
 @dataclass(frozen=True)
 class ItemPresentation:
     """The frozen visual identity of one registered item."""
@@ -112,19 +150,44 @@ class ItemPresentation:
 
 @dataclass(frozen=True)
 class ItemDefinition:
-    """The immutable identity of one supported inventory item."""
+    """The immutable identity of one supported inventory item.
+
+    Exactly one of ``use_mechanics`` or ``equipment_slot`` may be present;
+    an item carrying neither is inspect-only. The pair is validated at
+    construction so an ambiguous definition can never be presented or used.
+    """
 
     key: str
     display_name_zh: str
     price_table_key: str
     sellable: bool
     presentation: ItemPresentation
+    use_mechanics: ItemUseMechanics | None = None
+    equipment_slot: EquipmentSlot | None = None
 
     def __post_init__(self) -> None:
-        """Require the frozen presentation object on every registry entry."""
+        """Require the frozen presentation object and exclusive mechanics."""
         if not isinstance(self.presentation, ItemPresentation):
             raise ValueError(
                 f"item {self.key!r} presentation must be an ItemPresentation"
+            )
+        if self.use_mechanics is not None and self.equipment_slot is not None:
+            raise ValueError(
+                f"item {self.key!r} declares both use mechanics and an "
+                "equipment slot; the forms are mutually exclusive"
+            )
+        if self.use_mechanics is not None and not isinstance(
+            self.use_mechanics, ItemUseMechanics
+        ):
+            raise ValueError(
+                f"item {self.key!r} use_mechanics must be an ItemUseMechanics"
+            )
+        if self.equipment_slot is not None and not isinstance(
+            self.equipment_slot, EquipmentSlot
+        ):
+            raise ValueError(
+                f"item {self.key!r} equipment_slot must be an EquipmentSlot "
+                f"member, got {self.equipment_slot!r}"
             )
 
 
@@ -154,6 +217,11 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 rarity=ItemRarity.RARE,
                 summary_zh="盛裝於小瓶中的治療藥水。",
             ),
+            use_mechanics=ItemUseMechanics(
+                effect_key=ItemEffectKey.SELF_HEAL,
+                consumable=True,
+                combat_allowed=True,
+            ),
         ),
         ItemDefinition(
             key="plain_sword",
@@ -166,6 +234,7 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 rarity=ItemRarity.COMMON,
                 summary_zh="鍛鐵打造的普通劍。",
             ),
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
         ),
     )
 }

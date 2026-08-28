@@ -50,6 +50,7 @@ class TradeReason(StrEnum):
     INSUFFICIENT_ITEMS = "insufficient_items"
     STOCK_OVERFLOW = "stock_overflow"
     MALFORMED_STOCK = "malformed_stock"
+    EQUIPPED_ITEM = "equipped_item"
 
 
 def _require_local_merchant(actor: Any, merchant_host: Any) -> Any:
@@ -252,6 +253,10 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
     inventory = list(actor.db.inventory or [])
     if inventory.count(item_key) < quantity:
         raise TradeError(TradeReason.INSUFFICIENT_ITEMS)
+    from world.rules.equipment import equipped_removal_conflict
+
+    if equipped_removal_conflict(actor, (item_key,) * quantity) is not None:
+        raise TradeError(TradeReason.EQUIPPED_ITEM, item_key)
     stock = parse_merchant_stock(merchant)
     if stock.get(item_key, 0) + quantity > offer.max_stock:
         raise TradeError(TradeReason.STOCK_OVERFLOW)

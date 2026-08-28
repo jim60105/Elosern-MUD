@@ -13,6 +13,7 @@ from world.rules.combat import Battlefield
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
 from world.skills.registry import SKILL_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 
 
 OVERWHELM_YAML = yaml.safe_load(
@@ -258,25 +259,30 @@ def compress_event_logs(
     overwhelmed_team: str,
     rounds: int,
     commanded_actor: str | None = None,
-    commanded_skill: str | None = None,
+    commanded_action_kind: str | None = None,
+    commanded_action_key: str | None = None,
     commanded_window: Iterable[EventLog] | None = None,
 ) -> tuple[EventLog, ...]:
     """Preserve every per-attack record and prepend an encounter summary.
 
-    Every entry of every non-empty input ``EventLog`` is kept in original
-    order via ``dataclasses.replace()``; only an input ``EventLog`` with zero
-    entries is dropped. When ``commanded_actor``, ``commanded_skill``, and
-    ``commanded_window`` are all provided, exactly one ``commanded_action``
-    entry is prepended to the first log within ``commanded_window``, in
-    window order, whose actor and skill key both match; omitting any
-    argument, or finding no match in the window, adds no marker.
+    Every entry of every input ``EventLog`` is kept in original order via
+    ``dataclasses.replace()``; only an input ``EventLog`` with zero entries is
+    dropped. When all of ``commanded_actor``, ``commanded_action_kind``
+    (``"skill"`` or ``"item"``), ``commanded_action_key``, and
+    ``commanded_window`` are provided, exactly one ``commanded_action`` entry
+    is prepended to the first log within ``commanded_window``, in window
+    order, whose actor matches, whose ``skill_key`` equals the action key, and
+    whose entries agree with the action kind (item markers match an
+    ``item_used`` entry, skill markers match any skill-produced log);
+    omitting any argument, or finding no match in the window, adds no marker.
     """
     raw = tuple(raw_logs)
     window = None if commanded_window is None else tuple(commanded_window)
     marker_target = None
     if (
         commanded_actor is not None
-        and commanded_skill is not None
+        and commanded_action_kind in ("skill", "item")
+        and commanded_action_key is not None
         and window is not None
     ):
         raw_by_id = {id(log): log for log in raw}
@@ -287,7 +293,15 @@ def compress_event_logs(
                 if id(log) in raw_by_id
                 and log.entries
                 and log.actor == commanded_actor
-                and log.skill_key == commanded_skill
+                and log.skill_key == commanded_action_key
+                and (
+                    any(
+                        entry.kind == "item_used" and entry.actor == commanded_actor
+                        for entry in log.entries
+                    )
+                    if commanded_action_kind == "item"
+                    else True
+                )
             ),
             None,
         )
@@ -297,15 +311,30 @@ def compress_event_logs(
             continue
         entries = log.entries
         if log is marker_target:
-            skill = SKILL_REGISTRY.get(commanded_skill)
-            label = skill.label if skill is not None else commanded_skill
-            marker = EventEntry(
-                kind="commanded_action",
-                actor=commanded_actor,
-                target=None,
-                data={"skill": label},
-                text_template="你施展了「{data[skill]}」。",
-            )
+            if commanded_action_kind == "item":
+                definition = ITEM_REGISTRY.get(commanded_action_key)
+                label = (
+                    definition.display_name_zh
+                    if definition is not None
+                    else commanded_action_key
+                )
+                marker = EventEntry(
+                    kind="commanded_action",
+                    actor=commanded_actor,
+                    target=None,
+                    data={"item": label},
+                    text_template="你使用了「{data[item]}」。",
+                )
+            else:
+                skill = SKILL_REGISTRY.get(commanded_action_key)
+                label = skill.label if skill is not None else commanded_action_key
+                marker = EventEntry(
+                    kind="commanded_action",
+                    actor=commanded_actor,
+                    target=None,
+                    data={"skill": label},
+                    text_template="你施展了「{data[skill]}」。",
+                )
             entries = (marker,) + entries
         preserved.append(replace(log, entries=entries))
     filtered = tuple(preserved)
@@ -347,6 +376,7 @@ def _resolve_overwhelm_raw(
     *,
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
+    journal_sink: "list[object] | None" = None,
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
     """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
@@ -359,12 +389,13 @@ def _resolve_overwhelm_raw(
     verdict_after = initial
     round1_window: tuple[EventLog, ...] = ()
     while rounds < max_rounds and not combat.is_battle_over(battlefield):
-        if simulated or nonlethal_keys:
+        if simulated or nonlethal_keys or journal_sink is not None:
             round_logs = combat.run_round(
                 battlefield,
                 action_provider,
                 simulated=simulated,
                 nonlethal_keys=nonlethal_keys,
+                journal_sink=journal_sink,
             )
         else:
             round_logs = combat.run_round(battlefield, action_provider)
@@ -383,21 +414,26 @@ def resolve_overwhelm(
     action_provider: combat.ActionProvider,
     max_rounds: int = 12,
     commanded_actor: str | None = None,
-    commanded_skill: str | None = None,
+    commanded_action_kind: str | None = None,
+    commanded_action_key: str | None = None,
     *,
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
+    journal_sink: "list[object] | None" = None,
 ) -> OverwhelmResult:
     """Resolve a currently overwhelming encounter through the normal loop.
 
-    The optional ``commanded_actor``/``commanded_skill`` identity is
-    forwarded to compression (with the round-1 log slice) so the player's
-    commanded action can be marked in the compressed record; it never
-    affects combat math, and callers that omit it receive identical
-    resolution without the marker. The keyword-only ``simulated`` and
-    ``nonlethal_keys`` policy flags are forwarded to every compressed round
-    only when they differ from the defaults, so default-mode callers observe
-    the pre-change call signature byte-identically (fix-dot-kill-credit D4).
+    The optional ``commanded_actor``/``commanded_action_kind``/
+    ``commanded_action_key`` identity is forwarded to compression (with the
+    round-1 log slice) so the player's commanded skill or item can be marked
+    in the compressed record; it never affects combat math, and callers that
+    omit it receive identical resolution without the marker. The keyword-only
+    ``simulated`` and ``nonlethal_keys`` policy flags are forwarded to every
+    compressed round only when they differ from the defaults, so default-mode
+    callers observe the pre-change call signature byte-identically
+    (fix-dot-kill-credit D4). ``journal_sink`` collects each committed item
+    journal produced inside the compression so the session's outer rollback
+    can restore the actually-deleted mirrors.
     """
     initial, verdict_after, raw_logs, rounds, round1_window = (
         _resolve_overwhelm_raw(
@@ -406,6 +442,7 @@ def resolve_overwhelm(
             max_rounds,
             simulated=simulated,
             nonlethal_keys=nonlethal_keys,
+            journal_sink=journal_sink,
         )
     )
     event_logs = (
@@ -417,7 +454,8 @@ def resolve_overwhelm(
             next(team for team in battlefield.teams if team != initial),
             rounds,
             commanded_actor=commanded_actor,
-            commanded_skill=commanded_skill,
+            commanded_action_kind=commanded_action_kind,
+            commanded_action_key=commanded_action_key,
             commanded_window=round1_window,
         )
     )

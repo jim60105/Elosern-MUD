@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-3 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact
@@ -48,7 +48,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 2
+SERVICES_SCHEMA_VERSION = 3
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -78,6 +78,8 @@ TURNIN_ACTION = "guild.quest_turnin"
 EXAM_ACTION = "guild.exam_start"
 BUY_ACTION = "shop.buy"
 SELL_ACTION = "shop.sell"
+INVENTORY_USE_ACTION = "inventory.use"
+INVENTORY_TOGGLE_ACTION = "inventory.toggle_equip"
 _SERVICE_ACTIONS = frozenset(
     {
         REGISTER_ACTION,
@@ -87,6 +89,8 @@ _SERVICE_ACTIONS = frozenset(
         EXAM_ACTION,
         BUY_ACTION,
         SELL_ACTION,
+        INVENTORY_USE_ACTION,
+        INVENTORY_TOGGLE_ACTION,
     }
 )
 
@@ -468,7 +472,14 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
         _require_exact_fields(
             row,
             "inventory row",
-            {"item_key", "display_name", "held", "equipped", "presentation"},
+            {
+                "item_key",
+                "display_name",
+                "held",
+                "equipped",
+                "presentation",
+                "action",
+            },
             {},
         )
         item_key = _require_str(row, "item_key", maximum=MAX_KEY_CODE_POINTS)
@@ -478,6 +489,11 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
         held = _require_int(row, "held", minimum=1, maximum=MAX_SAFE_INTEGER)
         equipped = _require_bool(row, "equipped")
         presentation = _validate_presentation(row["presentation"])
+        action = row["action"]
+        if action is not None:
+            action = _validate_action(action)
+            if action["action_id"] not in (INVENTORY_USE_ACTION, INVENTORY_TOGGLE_ACTION):
+                raise ProtocolValidationError("inventory row action id is not allowed")
         row_views.append(
             {
                 "item_key": item_key,
@@ -485,6 +501,7 @@ def _validate_inventory(value: Any) -> dict[str, Any]:
                 "held": held,
                 "equipped": equipped,
                 "presentation": presentation,
+                "action": action,
             }
         )
     return {"rows": row_views, "wallet": wallet}
@@ -779,6 +796,11 @@ def _serialize_inventory(inventory: InventorySectionView) -> dict[str, Any]:
                 "held": row.held,
                 "equipped": row.equipped,
                 "presentation": _serialize_presentation(row),
+                "action": (
+                    None
+                    if row.action is None
+                    else _serialize_action(row.action)
+                ),
             }
             for row in inventory.rows
         ],
@@ -823,20 +845,16 @@ def _serialize(view: ServicesView) -> dict[str, Any]:
     }
 
 
-def _in_exploration_mode(actor: Any) -> bool:
-    from world.rules.combat_session import is_in_active_session
-
-    if bool(getattr(actor, "creation_pending", False)):
-        return False
-    if is_in_active_session(actor):
-        return False
-    return True
-
-
 def services_presenter(context: PresentationContext) -> dict[str, Any]:
-    """Return the exact available ``services`` panel for the authenticated puppet."""
+    """Return the exact available ``services`` panel for the authenticated puppet.
+
+    Exploration mode ships every surface normally; an active combat session
+    keeps the canonical player and personal inventory data while the
+    read model itself forces host, guild, and shop null. Creation-pending
+    puppets and read-model failures use the common unavailable form.
+    """
     actor = context.actor
-    if not _in_exploration_mode(actor):
+    if bool(getattr(actor, "creation_pending", False)):
         raise PanelUnavailableError
     try:
         view = build_services_view(actor)
@@ -850,6 +868,8 @@ __all__ = [
     "ACCEPT_ACTION",
     "BUY_ACTION",
     "EXAM_ACTION",
+    "INVENTORY_TOGGLE_ACTION",
+    "INVENTORY_USE_ACTION",
     "MAX_BOARD_ROWS",
     "MAX_DETAIL_CODE_POINTS",
     "MAX_DISPLAY_NAME_CODE_POINTS",

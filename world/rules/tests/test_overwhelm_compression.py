@@ -104,7 +104,7 @@ class CompressionTests(unittest.TestCase):
             "humans",
             1,
             commanded_actor="elf",
-            commanded_skill="attack",
+            commanded_action_kind="skill", commanded_action_key="attack",
             commanded_window=logs,
         )
         self.assertEqual(
@@ -162,7 +162,7 @@ class MarkerTests(unittest.TestCase):
             "foes",
             2,
             commanded_actor=player,
-            commanded_skill="basic_attack",
+            commanded_action_kind="skill", commanded_action_key="basic_attack",
             commanded_window=window,
         )
         marked = result[1]
@@ -193,7 +193,7 @@ class MarkerTests(unittest.TestCase):
             "foes",
             1,
             commanded_actor=player,
-            commanded_skill="basic_attack",
+            commanded_action_kind="skill", commanded_action_key="basic_attack",
             commanded_window=(second, first),
         )
         self.assertEqual(result[1].entries[0].kind, "roll")
@@ -211,7 +211,7 @@ class MarkerTests(unittest.TestCase):
             "foes",
             2,
             commanded_actor=player,
-            commanded_skill="basic_attack",
+            commanded_action_kind="skill", commanded_action_key="basic_attack",
             commanded_window=window,
         )
         kinds = [entry.kind for log in result for entry in log.entries]
@@ -233,7 +233,7 @@ class MarkerTests(unittest.TestCase):
             "humans",
             1,
             commanded_actor="elf",
-            commanded_skill="attack",
+            commanded_action_kind="skill", commanded_action_key="attack",
         )
         self.assertNotIn(
             "commanded_action",
@@ -250,7 +250,7 @@ class MarkerTests(unittest.TestCase):
             "foes",
             1,
             commanded_actor=player,
-            commanded_skill="mystery_art",
+            commanded_action_kind="skill", commanded_action_key="mystery_art",
             commanded_window=(log,),
         )
         self.assertEqual(result[1].entries[0].data, {"skill": "mystery_art"})
@@ -265,7 +265,7 @@ class MarkerTests(unittest.TestCase):
             "foes",
             1,
             commanded_actor=player,
-            commanded_skill="basic_attack",
+            commanded_action_kind="skill", commanded_action_key="basic_attack",
             commanded_window=(log,),
         )
         rendered = render_plain_text(result[1])
@@ -313,7 +313,7 @@ def _maximum_size_compressed_log() -> tuple[EventLog, ...]:
         "foes",
         12,
         commanded_actor="戰士0-0",
-        commanded_skill="basic_attack",
+        commanded_action_kind="skill", commanded_action_key="basic_attack",
         commanded_window=tuple(raw_logs[:16]),
     )
 

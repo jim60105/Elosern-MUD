@@ -401,6 +401,15 @@ def _services_fixture(character) -> None:
         character.db.wallet = 42
         character.db.inventory = ["meal", "meal", "plain_sword", "healing_potion"]
         character.save()
+    elif mode == "inventory_actions":
+        # add-inventory-item-actions browser journeys: one injured holder of
+        # two healing potions and one sword — use is enabled until the first
+        # use closes the HP gap, then the stable hp_full refusal governs.
+        character.db.wallet = 42
+        character.db.inventory = ["healing_potion", "healing_potion", "plain_sword"]
+        maximum = int(character.traits.hp.max)
+        character.traits.hp.current = maximum - 20
+        character.save()
     print(f"seeded services fixture: {mode}")
 
 

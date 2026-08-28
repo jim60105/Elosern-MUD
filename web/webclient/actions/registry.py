@@ -135,6 +135,8 @@ def build_production_action_registry() -> ActionRegistry:
         _buy_adapter,
         _exam_start_adapter,
         _guild_register_adapter,
+        _inventory_toggle_equip_adapter,
+        _inventory_use_adapter,
         _quest_abandon_adapter,
         _quest_accept_adapter,
         _quest_turnin_adapter,
@@ -142,6 +144,8 @@ def build_production_action_registry() -> ActionRegistry:
         validate_buy_payload,
         validate_exam_start_payload,
         validate_guild_register_payload,
+        validate_inventory_toggle_equip_payload,
+        validate_inventory_use_payload,
         validate_quest_abandon_payload,
         validate_quest_accept_payload,
         validate_quest_turnin_payload,
@@ -227,6 +231,29 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_sell_payload,
             adapter=_sell_adapter,
             affected_panels=("status", "services"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="inventory.use",
+            validate_payload=validate_inventory_use_payload,
+            adapter=_inventory_use_adapter,
+            # No affected panels: an item use may change inventory, mirrors,
+            # status, clock, and (in combat) mode, so every completion
+            # publishes a full canonical snapshot (add-inventory-item-actions
+            # D5).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="inventory.toggle_equip",
+            validate_payload=validate_inventory_toggle_equip_payload,
+            adapter=_inventory_toggle_equip_adapter,
+            # No affected panels: the toggle changes inventory, character
+            # equipment, and derived appraisal surfaces, published as one
+            # full canonical snapshot.
+            affected_panels=(),
         )
     )
     registry.register(

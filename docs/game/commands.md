@@ -82,6 +82,8 @@
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包與背包。 |
+| [`使用`](/game/command-reference?id=使用) | 使用一件持有物品；戰鬥中佔用一個回合。 |
+| [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備；免費動作，飾品上限 5 件。 |
 | [`拿`](/game/command-reference?id=拿) | 撿起地上的物品，登錄物品會同步計入背包清單。 |
 | [`丟`](/game/command-reference?id=丟) | 丟棄背包中的物品，登錄物品的背包清單記錄會同步移除。 |
 | [`給`](/game/command-reference?id=給) | 將物品交給他人，登錄物品的背包清單記錄會同步移除。 |
