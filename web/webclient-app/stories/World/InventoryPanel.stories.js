@@ -1,4 +1,4 @@
-import { h } from "vue";
+import { h, ref } from "vue";
 import HudDrawer from "../../components/HudDrawer.vue";
 import InventoryPanel from "../../components/InventoryPanel.vue";
 import { formatCopper } from "../../components/character-identity.js";
@@ -79,6 +79,10 @@ export default {
 
 function renderDrawer(args) {
   const character = args.character ?? null;
+  // The drawer opens on mount; Escape / the close control / the scrim each
+  // emit `close`, which flips the reactive open state so the drawer visibly
+  // closes and the drawer's focus trap restores focus to the opener.
+  const open = ref(true);
   return {
     render: () =>
       h(
@@ -88,12 +92,14 @@ function renderDrawer(args) {
           h(
             HudDrawer,
             {
-              open: true,
+              open: open.value,
               title: "背包 · 裝備",
               subtitle: walletSubtitle(args.services, character),
               icon: "inventory",
               drawerKey: "inventory",
-              onClose: () => {},
+              onClose: () => {
+                open.value = false;
+              },
             },
             {
               default: () =>
@@ -278,4 +284,42 @@ export const UnknownSlotEquipment = {
       ],
     },
   },
+};
+
+// Multi-accessory equipment (restyle-inventory-equipment-slots): the doll's
+// 飾品 summary cell states the committed count and the retained detail group
+// lists every accessory row inside the composed drawer.
+function multiAccessoryCharacter() {
+  return {
+    ...CHARACTER_PANEL_SAMPLE,
+    equipment: [
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+      { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
+      { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
+      { slot: "accessory", item_key: "guard_amulet", display_name: "防禦護身" },
+    ],
+  };
+}
+
+export const MultiAccessoryEquipment = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_SAMPLE, character: multiAccessoryCharacter() },
+};
+
+// Long equipment display names wrap below the square cells in the drawer
+// (the 1280x720 / 1440x900 drawer composition reviewed with agent-browser).
+function longEquipmentLabelCharacter() {
+  return {
+    ...CHARACTER_PANEL_SAMPLE,
+    equipment: [
+      { slot: "weapon_main", item_key: "ferry_lantern_commission_blade", display_name: "渡河燈油補充委託信劍" },
+      { slot: "weapon_off", item_key: "ferry_lantern_commission_dagger", display_name: "渡河燈油補充委託短匕" },
+    ],
+  };
+}
+
+export const LongEquipmentLabels = {
+  render: renderDrawer,
+  args: { services: SERVICES_PANEL_SAMPLE, character: longEquipmentLabelCharacter() },
 };
