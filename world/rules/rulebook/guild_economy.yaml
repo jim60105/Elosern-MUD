@@ -199,16 +199,16 @@ shops:
         initial_stock: 2
         restock_quantity: 1
       - item_key: protective_ring
-        buy_copper: 12000
-        sell_copper: 6000
-        max_stock: 2
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: storage_pouch
         buy_copper: 30000
         sell_copper: 15000
         max_stock: 1
         initial_stock: 1
+        restock_quantity: 1
+      - item_key: storage_pouch
+        buy_copper: 10000
+        sell_copper: 5000
+        max_stock: 3
+        initial_stock: 3
         restock_quantity: 1
       - item_key: gliding_cloak
         buy_copper: 80000
@@ -230,7 +230,7 @@ shops:
         restock_quantity: 5
       - item_key: rough_iron_ore
         buy_copper: 100
-        sell_copper: 80
+        sell_copper: 50
         max_stock: 20
         initial_stock: 10
         restock_quantity: 5
