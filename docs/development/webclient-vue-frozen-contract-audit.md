@@ -399,6 +399,7 @@ the selectors it breaks). Prefix entries cover dynamic suffixes.
 | `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
 | `combat-detail` | H3 | REMAP-TO-TESTID |
 | `quick-word-chip-<verb>` (prefix `quick-word-chip`: `quick-word-chip-看`, the quick-word command chips) | H6 | REMAP-TO-TESTID |
+| `inventory-panel` + `inventory-panel__<suffix>` (the redesigned inventory drawer: `inventory-panel__tile--<item_key>` item tiles, `inventory-panel__count--<item_key>` held-count badges, `inventory-panel__inspector-<field>` inspector fields) | inventory-grid | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets** (re-mapped to stable hooks, no main-requirement
 wording names any of these, so no spec delta):
