@@ -240,13 +240,18 @@ watch(
 </script>
 
 <template>
-  <div class="dock-menu-layout">
-    <!-- The single row container (the active row container at depth ≥ 2).
-         The listbox composite: `role="listbox"`, one tab stop,
-         `aria-activedescendant`, and `data-testid="dock-menu"` only at
-         depth ≥ 2 (task 1.1/5.8). -->
-    <div
-      class="dock-menu"
+  <!-- Fragment root (remove-redundant-dock-menu-layout): the row region and
+       the optional detail pane are the component's only roots, so the host
+       that owns the split (`.dock-pane-host`, or the drawer body) lays them
+       out as direct flex children. No anonymous wrapper sits between the
+       host and either child.
+
+       The single row container (the active row container at depth ≥ 2).
+       The listbox composite: `role="listbox"`, one tab stop,
+       `aria-activedescendant`, and `data-testid="dock-menu"` only at
+       depth ≥ 2 (task 1.1/5.8). -->
+  <div
+    class="dock-menu"
       role="listbox"
       tabindex="0"
       :aria-activedescendant="focusedRow && (paneKind !== 'outlet' || focusedRow.key !== 'back') ? focusedRow.rowId : null"
@@ -511,18 +516,13 @@ watch(
         </div>
       </template>
     </aside>
-  </div>
 </template>
 
 <style scoped>
-.dock-menu-layout {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  flex: 1;
-  min-height: 0;
-}
-
+/* The row region is a flex child of its host (`.dock-pane-host`, or the
+   drawer body that hosts a service frame); the host owns the side-by-side
+   split with the detail pane (remove-redundant-dock-menu-layout: no
+   anonymous wrapper between host and row region). */
 .dock-menu {
   flex: 1 1 auto;
   min-width: 0;

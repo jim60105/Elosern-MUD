@@ -758,6 +758,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
+    @covers_requirement("webclient-desktop-shell::the-dock-s-row-region-and-detail-panes-are-direct-children-of-their-host")
     def test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports(self):
         for viewport in ((1440, 900), (1280, 720)):
             page = self.logged_in_page(viewport)
@@ -772,8 +773,22 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
             self._press(page, "ArrowRight")  # focus the wind group (index 1)
             self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
-            # The dock body carries the split: item list left, detail pane right.
-            self.assertEqual(page.locator(".dock-menu-layout").count(), 1)
+            # The dock host carries the split: item list left, detail right —
+            # as direct children of `.dock-pane-host`, with no anonymous layout
+            # wrapper between the host and either child
+            # (remove-redundant-dock-menu-layout).
+            self.assertEqual(page.locator(".dock-menu-layout").count(), 0)
+            self.assertEqual(
+                page.evaluate(
+                    "() => { const list = document.querySelector('.dock-menu');"
+                    " const detail = document.querySelector('[data-testid=\"combat-detail\"]');"
+                    " const host = document.querySelector('.dock-pane-host');"
+                    " return !!(host && list && detail"
+                    " && list.parentElement === host && detail.parentElement === host); }"
+                ),
+                True,
+                "the row region and the detail pane are direct children of the pane host",
+            )
             self.assertTrue(page.locator(".dock-menu").is_visible())
             self.assertTrue(page.locator('[data-testid="combat-detail"]').is_visible())
             # The skill frame's row group (the variant container) uses the pane

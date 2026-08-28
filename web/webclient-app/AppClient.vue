@@ -782,6 +782,7 @@ onMounted(() => {
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : '')"
       :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : null)"
       :drawer-key="store.view.hudDrawer"
+      :body-class="drawerHostsServiceFrame ? 'hud-drawer__body--dock' : ''"
       @close="onHudDrawerClose"
     >
       <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" />
@@ -923,5 +924,23 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   align-items: flex-start;
+}
+
+/* H4 (remove-redundant-dock-menu-layout): when the drawer body hosts a dock
+   service frame, it becomes the host that owns the split, so the row region
+   (`.dock-menu`) and its detail pane (`.dock-detail`) render as direct flex
+   children side by side — the job the removed `.dock-menu-layout` wrapper used
+   to do. The hosted service surface keeps its own full-width row (it wraps to
+   the next line rather than being squished beside the rows), preserving the
+   pre-change stacked reading. */
+.hud-drawer__body--dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+.hud-drawer__body--dock > :not(.dock-menu):not(.dock-detail) {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 </style>

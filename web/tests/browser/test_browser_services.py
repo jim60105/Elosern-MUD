@@ -739,6 +739,26 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
         )
         self.assertTrue(inside_drawer, "the guild service frame renders inside the open reference drawer")
 
+        # remove-redundant-dock-menu-layout: the drawer body that hosts the
+        # service frame is itself the split owner — the row region (`.dock-menu`)
+        # and the surface are direct children of `.hud-drawer__body--dock`, with
+        # no component-level layout wrapper between the body and either child.
+        drawer_split = page.evaluate(
+            """() => {
+              const body = document.querySelector('.hud-drawer__body');
+              const list = document.querySelector('.dock-menu');
+              const surface = document.querySelector('[data-testid="quest-board"]');
+              if (!body || !list || !surface) return false;
+              return body.classList.contains('hud-drawer__body--dock')
+                && list.parentElement === body
+                && surface.parentElement === body;
+            }"""
+        )
+        self.assertTrue(
+            drawer_split,
+            "the drawer-hosted row region and surface are direct children of the drawer body",
+        )
+
         # The emitted payload is unchanged: the exact server-authored
         # guild.register action with an empty payload.
         sent = page.evaluate("window.__elosernSent || []")

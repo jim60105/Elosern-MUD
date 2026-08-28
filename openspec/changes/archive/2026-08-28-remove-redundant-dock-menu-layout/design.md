@@ -41,10 +41,19 @@ fallthrough to lose.
   `SkillDetailPane` exactly as today, and now pairs it with `.dock-detail`
   too (same flex row, same gap). No new AppClient CSS.
 - Drawer host: `.hud-drawer__body` gains a modifier class
-  `hud-drawer__body--dock` (`display:flex; align-items:flex-start;
+  `hud-drawer__body--dock` (`display:flex; flex-wrap:wrap; align-items:flex-start;
   gap:var(--sp-3)`) applied by AppClient only when `drawerHostsServiceFrame`
-  (an existing computed). Block layout would otherwise stack the pair — the
-  modifier is one host-side declaration, not a component wrapper.
+  (an existing computed) via a new `bodyClass` prop on `HudDrawer` — the
+  modifier cannot ride attribute fallthrough because the open drawer root is a
+  fragment (scrim + panel). The drawer body also holds the surface component
+  (Shop/Quest/InventoryPanel) as a third direct child, so the rule wraps and
+  pins the non-`.dock-menu`/non-`.dock-detail` child to a full-width row
+  (`.hud-drawer__body--dock > :not(.dock-menu):not(.dock-detail) { flex: 1 1
+  100%; min-width: 0 }`): the surface keeps its own line (the pre-change
+  stacked reading, never squished beside the rows) while `.dock-menu` and
+  `.dock-detail` wrap onto the next line side by side. Block layout would
+  otherwise stack the list/detail pair vertically; the modifier is one
+  host-side declaration, not a component wrapper.
 
 Rejected: a conditional split wrapper inside DockMenu — the mock's `.skwrap`
 counterpart is the skill content pair, and here the pair owner is the host:
@@ -73,8 +82,11 @@ with no replacement (it is retired, not remapped).
 ## Risks / trade-offs
 
 - `.dock-detail` now relies on `.dock-pane-host`'s flex context; the drawer
-  modifier replicates the needed properties, verified by the drawer-hosted
-  story state.
+  modifier replicates the needed properties. The third direct child (the hosted
+  service surface) is pinned to a full-width wrapped row so it is never squeezed
+  beside the dock rows — a bare flex-row body (the initial draft) would have put
+  the surface, the 220px detail, and the rows on one line inside the ~560px
+  drawer and overflowed it, so the modifier wraps instead.
 - Multi-root changes focus-order assumptions in `dock_menu*.test.js` root
   queries — mechanical rewrites.
 - Managed shard changes are CI-verified; locally only the two touched browser

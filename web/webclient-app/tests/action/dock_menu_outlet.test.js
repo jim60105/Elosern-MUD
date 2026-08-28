@@ -168,6 +168,20 @@ describe("DockMenu outlet tile presentation (outlet-tile-presentation)", () => {
     expect(w.find('[data-testid="dock-detail"]').exists()).toBe(false);
   });
 
+  // remove-redundant-dock-menu-layout: the listbox is the fragment root, so
+  // the host holds it directly (no `.dock-menu-layout` wrapper) and — with the
+  // aside suppressed for the outlet — it is the host's only dock-menu child.
+  it("renders the listbox as the fragment root with no layout wrapper", () => {
+    const w = mountOutlet([ENABLED_CANONICAL, BACK_ROW], { focusedKey: "exit-1" });
+    expect(w.find(".dock-menu-layout").exists()).toBe(false);
+    expect(w.find(".dock-detail").exists()).toBe(false);
+    const list = w.get('[data-testid="dock-menu"]');
+    // The host (multi-root `w.element` is the parent container) holds the
+    // listbox as its only dock-menu child.
+    expect(list.element.parentElement).toBe(w.element);
+    expect(w.element.querySelectorAll(".dock-menu").length).toBe(1);
+  });
+
   it("keeps a disabled outlet row's server-authored reason reachable from the tile itself", () => {
     const w = mountOutlet([DISABLED_CANONICAL, BACK_ROW], { focusedKey: "exit-2" });
     const tile = tiles(w).at(0);

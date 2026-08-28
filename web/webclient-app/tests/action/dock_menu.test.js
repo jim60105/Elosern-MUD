@@ -142,4 +142,33 @@ describe("DockMenu (B2 action-dock family)", () => {
       "grid-template-columns: repeat(3, 1fr)",
     );
   });
+
+  // remove-redundant-dock-menu-layout: DockMenu's roots are a fragment of the
+  // row region and (when shown) the detail pane — no anonymous layout wrapper
+  // sits between the host and either child.
+  it("renders no dock-menu-layout wrapper between the host and its children", () => {
+    const w = mountMenu({ focusedKey: "action-explore.move" });
+    expect(w.find(".dock-menu-layout").exists()).toBe(false);
+  });
+
+  it("places the row region and the detail pane as sibling roots of one host", () => {
+    const w = mountMenu({ focusedKey: "action-explore.move" });
+    const list = w.get('[data-testid="dock-menu"]');
+    const detail = w.get('[data-testid="dock-detail"]');
+    // The host is the attachTo container: both fragment roots are its direct
+    // children, so the listbox and the detail share one parent and neither is
+    // nested in an intermediate element.
+    expect(list.element.parentElement).toBe(detail.element.parentElement);
+    expect(detail.element.parentElement).toBe(w.element);
+  });
+
+  it("renders the row region as the host's only dock-menu child without a detail pane", () => {
+    const w = mountMenu({ focusedKey: null });
+    expect(w.find('[data-testid="dock-detail"]').exists()).toBe(false);
+    expect(w.find(".dock-menu-layout").exists()).toBe(false);
+    const list = w.get('[data-testid="dock-menu"]');
+    // No detail, no wrapper: the host holds exactly the listbox.
+    expect(list.element.parentElement).toBe(w.element);
+    expect(w.element.querySelectorAll(".dock-menu").length).toBe(1);
+  });
 });
