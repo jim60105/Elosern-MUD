@@ -11,6 +11,7 @@
     "build": "vite build",
     "test": "vitest run",
     "build-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook build -o .storybook-out",
+    "serve-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook dev -p 6006",
     "showcase-coverage": "node scripts/component-coverage.mjs"
   },
   "devDependencies": {
