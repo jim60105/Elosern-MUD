@@ -20,6 +20,7 @@ from world.rules.buffs import TickRecord, tick_buffs
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.items import ItemUseRequest, resolve_item_use
 from world.rules.progression import can_cast_skill, scaled_magnitude
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
@@ -132,7 +133,9 @@ class BattleResult:
     completed: bool
 
 
-ActionProvider = Callable[[Any, Battlefield], ActionRequest | None]
+RoundRequest = ActionRequest | ItemUseRequest
+
+ActionProvider = Callable[[Any, Battlefield], RoundRequest | None]
 
 
 def _stored_hp(entity: Any) -> float:
@@ -608,6 +611,7 @@ def run_round(
     *,
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
+    journal_sink: "list[object] | None" = None,
 ) -> list[EventLog]:
     """Resolve one action per capable combatant, then perform upkeep.
 
@@ -615,7 +619,12 @@ def run_round(
     tick records into defeat crossings, kill XP, and quest effects inside the
     same round; the keyword-only policy flags mirror the session's
     ``simulated`` (guild examination) and companion ``nonlethal_keys``
-    policies, and default to the plain combat behavior.
+    policies, and default to the plain combat behavior. The provider supplies
+    the closed deterministic request union: ``ItemUseRequest`` members settle
+    through ``resolve_item_use`` (whose item journal is appended to
+    ``journal_sink`` when provided, so an outer rollback can restore the
+    actually-deleted mirrors), and every other request resolves as an
+    ``ActionRequest``.
     """
     logs: list[EventLog] = []
     for key in roll_initiative(battlefield):
@@ -632,6 +641,14 @@ def run_round(
             continue
         request = action_provider(entity, battlefield)
         if request is None:
+            continue
+        if isinstance(request, ItemUseRequest):
+            item_result = resolve_item_use(request, in_combat=True)
+            if item_result.outcome == "success":
+                if item_result.journal is not None and journal_sink is not None:
+                    journal_sink.append(item_result.journal)
+                if item_result.event_log is not None:
+                    logs.append(item_result.event_log)
             continue
         result = ActionResolver.resolve(request)
         if result.outcome == "success" and result.event_log is not None:

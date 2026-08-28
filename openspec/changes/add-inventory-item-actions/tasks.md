@@ -20,9 +20,9 @@
 
 ## 4. Combat Item Turn
 
-- [ ] 4.1 Generalize ordinary and overwhelm round providers to the closed skill-or-item request union with explicit resolver dispatch and unchanged monster/companion `ActionRequest` policy behavior.
-- [ ] 4.2 Add combat-session item use with preflight-before-initiative, expanded inventory/mirror/cache outer snapshots, exactly-once first-turn use under ordinary and player-direction compressed resolution, generalized commanded-action identity, and no extra command-default time.
-- [ ] 4.3 Add combat tests for ordinary and player-direction overwhelm potion use, foe-overwhelm agency, commanded item logs, one action per participant, full-HP preservation, mid-round invalidation, knockout before item turn, upkeep/session/terminal fault rollback, and round-based elapsed time.
+- [x] 4.1 Generalize ordinary and overwhelm round providers to the closed skill-or-item request union with explicit resolver dispatch and unchanged monster/companion `ActionRequest` policy behavior.
+- [x] 4.2 Add combat-session item use with preflight-before-initiative, expanded inventory/mirror/cache outer snapshots, exactly-once first-turn use under ordinary and player-direction compressed resolution, generalized commanded-action identity, and no extra command-default time.
+- [x] 4.3 Add combat tests for ordinary and player-direction overwhelm potion use, foe-overwhelm agency, commanded item logs, one action per participant, full-HP preservation, mid-round invalidation, knockout before item turn, upkeep/session/terminal fault rollback, and round-based elapsed time.
 
 ## 5. Services V3 And UI Actions
 

@@ -27,6 +27,7 @@ from world.rules.action import (
     _stored_trait_value,
 )
 from world.rules.action_preview import revalidate_submission
+from world.rules import combat
 from world.rules.combat import (
     COMBAT_YAML,
     Battlefield,
@@ -35,6 +36,7 @@ from world.rules.combat import (
     run_round,
 )
 from world.rules.clock import get_world_clock, settle_combat_result
+from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
 from world.rules.skip_safety import (
@@ -528,7 +530,7 @@ def _enemy_policy(
     )
 
 
-def _round_provider(actor: Any, request: ActionRequest, battlefield: Battlefield, record: CombatSessionRecord):
+def _round_provider(actor: Any, request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
     """Supply the queued player request exactly once and deterministic enemy policies."""
     used = False
 
@@ -544,7 +546,7 @@ def _round_provider(actor: Any, request: ActionRequest, battlefield: Battlefield
     return provider
 
 
-def _overwhelm_provider(actor: Any, first_request: ActionRequest, battlefield: Battlefield, record: CombatSessionRecord):
+def _overwhelm_provider(actor: Any, first_request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
     """Supply the selected request once, then deterministic basic attacks."""
     used = False
 
@@ -1014,6 +1016,80 @@ def submit_player_action(
 
     overwhelming = classify_overwhelm(battlefield)
     player_team = battlefield.team_of(str(actor.key))
+    return _submit_request(
+        actor,
+        record,
+        battlefield,
+        request,
+        overwhelming,
+        player_team,
+        commanded_kind="skill",
+        commanded_key=skill_key,
+    )
+
+
+def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
+    """Run one combat round whose player turn consumes one held item.
+
+    The facade revalidates the request through the shared item preflight
+    with combat allowed, and only then starts one round (or the resolver-
+    backed overwhelm compression) exactly like ``submit_player_action``.
+    A rejection returns before initiative and consumes no round or world
+    time; a successful use resolves on the player's turn and the item
+    journal is merged into the session's outer rollback safety net.
+    """
+    record = read_session(actor)
+    if record is None:
+        raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
+    battlefield = reconstruct_battlefield(actor, record)
+    if _stored_trait_value(actor.traits.hp) <= 0:
+        raise CombatSessionError(SessionReason.INVALID_RECOVERY)
+    if not isinstance(item_key, str):
+        raise TypeError("submit_player_item_use requires an item key string")
+    preflight = preflight_item_use(
+        ItemUseRequest(actor=actor, item_key=item_key), in_combat=True
+    )
+    if not preflight.allowed:
+        return {
+            "outcome": "rejected",
+            "reason": preflight.reason.value if preflight.reason else None,
+            "detail": None,
+        }
+    overwhelming = classify_overwhelm(battlefield)
+    player_team = battlefield.team_of(str(actor.key))
+    return _submit_request(
+        actor,
+        record,
+        battlefield,
+        ItemUseRequest(actor=actor, item_key=item_key),
+        overwhelming,
+        player_team,
+        commanded_kind="item",
+        commanded_key=item_key,
+    )
+
+
+def _submit_request(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    request: "combat.RoundRequest",
+    overwhelming: str | None,
+    player_team: str,
+    *,
+    commanded_kind: str,
+    commanded_key: str,
+) -> dict[str, Any]:
+    """Run the shared round/overwhelm/settlement body for one request.
+
+    The request is a member of the closed round-request union;
+    ``commanded_kind``/``commanded_key`` carry the selected action's identity
+    into overwhelm compression for log marking only. Item journals produced
+    inside the outer transaction are collected through the sink so the
+    except-path restoration covers the actually-deleted mirrors
+    (fix-combat-settlement-recovery D1 extended by add-inventory-item-actions
+    D2).
+    """
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
         actor, battlefield
@@ -1021,6 +1097,7 @@ def submit_player_action(
     from django.db import transaction
 
     notifications: tuple[str, ...] = ()
+    item_journals: list[Any] = []
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     try:
         with transaction.atomic():
@@ -1050,9 +1127,11 @@ def submit_player_action(
                     provider,
                     max_rounds=12,
                     commanded_actor=str(actor.key),
-                    commanded_skill=skill_key,
+                    commanded_action_kind=commanded_kind,
+                    commanded_action_key=commanded_key,
                     simulated=simulated,
                     nonlethal_keys=nonlethal_keys,
+                    journal_sink=item_journals,
                 )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
@@ -1064,6 +1143,7 @@ def submit_player_action(
                     provider,
                     simulated=simulated,
                     nonlethal_keys=nonlethal_keys,
+                    journal_sink=item_journals,
                 )
                 gained = 1
 
@@ -1086,10 +1166,14 @@ def submit_player_action(
             _persist(actor, new_record)
             result = _continue_or_settle(actor, new_record, battlefield, logs)
     except Exception:
-        # The outer transaction rolled the database back; restore the
-        # in-process attribute surfaces so readers never observe the
-        # rolled-back values (the idmapper cache is not transaction-aware),
-        # and re-register skip safety because clear_session ran in-process.
+        # The outer transaction rolled the database back; restore the item
+        # journals first (they cover the actually-deleted mirrors and the
+        # HP surface written by the item resolver), then the in-process
+        # attribute surfaces so readers never observe the rolled-back values
+        # (the idmapper cache is not transaction-aware), and re-register
+        # skip safety because clear_session ran in-process.
+        for journal in item_journals:
+            journal.restore()
         _restore_round_touched(
             actor,
             touched,
