@@ -26,6 +26,7 @@ from commands.combat import (
     CmdGuildExam,
 )
 from commands.economy import CmdBuy, CmdInventory, CmdSell, CmdShopStock
+from commands.items import CmdToggleEquip, CmdUseItem
 from commands.guild import (
     CmdGuildAbandon,
     CmdGuildAccept,
@@ -174,6 +175,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdBuy)
         self.add(CmdSell)
         self.add(CmdInventory)
+        self.add(CmdUseItem)
+        self.add(CmdToggleEquip)
         self.add(CmdsTalk)
         self.add(CmdInvite)
         self.add(CmdLeave)

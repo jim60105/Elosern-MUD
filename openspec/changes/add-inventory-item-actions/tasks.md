@@ -41,9 +41,9 @@
 
 ## 7. Text Command Parity And Documentation
 
-- [ ] 7.1 Add `使用 <item_key>`/`use` and `裝備 <item_key>`/`equip`, parsing only the item key and delegating to the same exploration, combat-session, and equipment deterministic APIs.
-- [ ] 7.2 Add command tests for exploration use, combat use, full-HP rejection, consumable/reusable quantity, singleton replacement, exact accessory removal, five-slot warning, and free combat equipment changes.
-- [ ] 7.3 Update `docs/game/commands.md` and `docs/game/command-reference.md` with exact command keys, aliases, syntax, combat availability, turn/time costs, confirmation distinction, and named refusal behavior.
+- [x] 7.1 Add `使用 <item_key>`/`use` and `裝備 <item_key>`/`equip`, parsing only the item key and delegating to the same exploration, combat-session, and equipment deterministic APIs.
+- [x] 7.2 Add command tests for exploration use, combat use, full-HP rejection, consumable/reusable quantity, singleton replacement, exact accessory removal, five-slot warning, and free combat equipment changes.
+- [x] 7.3 Update `docs/game/commands.md` and `docs/game/command-reference.md` with exact command keys, aliases, syntax, combat availability, turn/time costs, confirmation distinction, and named refusal behavior.
 
 ## 8. Traceability And Verification
 

@@ -44,9 +44,10 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
 
 
 class EquipmentHandlerTests(EvenniaTestCase):
-    def _entity(self):
-        entity = create_object(PlayerCharacter, key="equipment tester")
-        entity.db.inventory = []
+    def setUp(self):
+        super().setUp()
+        # Snapshot before any test body: some tests register fixture items
+        # before creating an entity, so the restore must anchor at setUp.
         snapshot = dict(ITEM_REGISTRY)
 
         def restore():
@@ -54,6 +55,10 @@ class EquipmentHandlerTests(EvenniaTestCase):
             ITEM_REGISTRY.update(snapshot)
 
         self.addCleanup(restore)
+
+    def _entity(self):
+        entity = create_object(PlayerCharacter, key="equipment tester")
+        entity.db.inventory = []
         return entity
 
     def _register(self, *definitions: ItemDefinition) -> None:
