@@ -150,13 +150,13 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
         self.call(
             CmdToggleEquip(),
             "plain_sword",
-            "你裝備了 普通劍。",
+            "你裝備了 普通劍（攻擊 +2）。",
             caller=self.player,
         )
         self.call(
             CmdToggleEquip(),
             "test_second_blade",
-            "你裝備了 測試匕首，原本的 普通劍 已收回背包。",
+            "你裝備了 測試匕首（攻擊 +2），原本的 普通劍 已收回背包。",
             caller=self.player,
         )
         # Toggling the now-equipped item unequips it (ownership-aware).
@@ -169,7 +169,12 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
 
     def test_unequip_singleton_prose(self):
         self.player.db.inventory = ["plain_sword"]
-        self.call(CmdToggleEquip(), "plain_sword", "你裝備了 普通劍。", caller=self.player)
+        self.call(
+            CmdToggleEquip(),
+            "plain_sword",
+            "你裝備了 普通劍（攻擊 +2）。",
+            caller=self.player,
+        )
         self.call(CmdToggleEquip(), "plain_sword", "你卸下了 普通劍。", caller=self.player)
 
     def test_five_accessories_equip_and_the_sixth_is_refused(self):
@@ -181,7 +186,7 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
             self.call(
                 CmdToggleEquip(),
                 key,
-                f"你佩戴了 測試戒指 {key}。",
+                f"你佩戴了 測試戒指 {key}（防禦 +6｜生命上限 +10）。",
                 caller=self.player,
             )
         self.call(
@@ -256,5 +261,5 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
         self.player.db.inventory = ["plain_sword"]
         engage(self.player, self.monster)
         messages = self._run(CmdToggleEquip(), "plain_sword")
-        self.assertEqual(messages, ["你裝備了 普通劍。"])
+        self.assertEqual(messages, ["你裝備了 普通劍（攻擊 +2）。"])
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)

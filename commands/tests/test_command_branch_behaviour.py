@@ -377,6 +377,19 @@ class EconomyCommandBranchTests(TestCase):
             command.func()
         self.assertEqual(command.caller.msg.call_args_list[0].args[0], "錢包：7 銅")
         self.assertEqual(command.caller.msg.call_args_list[1].args[0], "  meal ×2\n  sword ×1")
+    def test_inventory_equipment_rows_carry_adjustment_prose(self):
+        command = _command(CmdInventory)
+        command.caller.db.wallet = 0
+        with patch(
+            "commands.economy.list_items",
+            return_value=["knight_platemail", "healing_potion"],
+        ):
+            command.func()
+        self.assertEqual(
+            command.caller.msg.call_args_list[1].args[0],
+            "  healing_potion ×1\n"
+            "  knight_platemail ×1——攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15",
+        )
 
     def test_stock_reports_missing_configuration_and_invalid_stock(self):
         host = Mock()

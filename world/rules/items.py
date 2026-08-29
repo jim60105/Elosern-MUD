@@ -9,15 +9,11 @@ out-of-combat facade that composes the item plan with the canonical
 command-source clock advance inside one outer transaction and rollback
 journal (mirroring ``cast_settlement``).
 
-The rules engine never trusts a presented descriptor: every mutating entry
-repeats preflight against current canonical state and commits trait,
-inventory, quest-progress, and contained-mirror writes atomically. On any
-rejection or settlement failure all durable rows and every in-process cache
-the plan touched (traits, attributes, idmapper, contents) are restored.
-
-A successful use emits exactly one ``item_used`` EventLog entry whose data
-contains exactly ``item_key``, ``effect_key``, ``consumable``, and ``amount``
-(the actual bounded restoration, never the configured maximum).
+A successful use emits exactly one ``item_used`` EventLog entry carrying
+``item_key``, ``effect_key``, and ``consumable`` plus the per-family payload:
+gauge-restoring effects add ``amount`` (the actual bounded restoration, never
+the configured maximum), and the ``blessed_cleansing`` effect adds ``count``
+(the number of debuff-polarity buffs actually removed).
 """
 
 from collections.abc import Mapping, Sequence
@@ -33,6 +29,11 @@ from evennia.utils.logger import log_warn
 
 from world.lore.items import ITEM_REGISTRY, ItemEffectKey
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    active_buff_keys_from_storage,
+    cleanse_debuffs,
+)
 from world.rules.clock import (
     MAX_ADVANCE_SECONDS,
     AdvanceSource,
@@ -86,6 +87,7 @@ class ItemUseReason(StrEnum):
     HP_FULL = "hp_full"
     MP_FULL = "mp_full"
     NOT_ALIVE = "not_alive"
+    NO_DEBUFFS = "no_debuffs"
     COMBAT_NOT_ALLOWED = "combat_not_allowed"
     UNKNOWN_EFFECT = "unknown_effect"
     ACTIVE_SESSION = "active_combat"
@@ -95,10 +97,15 @@ class ItemUseReason(StrEnum):
 
 @dataclass(frozen=True)
 class ItemEffectRule:
-    """One validated deterministic effect: a closed key and a positive amount."""
+    """One validated deterministic effect with a key and an optional amount.
+
+    ``amount`` is ``None`` for cleanse-family effects (their rulebook entries
+    carry no amount field by design); every gauge-restoring effect keeps a
+    positive bounded amount.
+    """
 
     effect_key: ItemEffectKey
-    amount: int
+    amount: int | None
 
 
 def _require_int(value: Any, field: str, *, minimum: int, maximum: int) -> int:
@@ -114,9 +121,10 @@ def _require_int(value: Any, field: str, *, minimum: int, maximum: int) -> int:
 def load_item_effect_rules(path: Path | None = None) -> dict[str, Any]:
     """Validate the item-effect rulebook against the closed lore vocabulary.
 
-    Returns ``(item_use_seconds, rules)``: every ``ItemEffectKey`` member
-    carries exactly one positively bounded amount, and the rulebook declares
-    no key the registry vocabulary does not know.
+    Returns ``(item_use_seconds, rules)``: every ``ItemEffectKey`` member is
+    covered exactly once — gauge-restoring keys with one positively bounded
+    amount, cleanse-family keys with an empty entry — and the rulebook
+    declares no key the registry vocabulary does not know.
     """
     raw = yaml.safe_load(
         (path or _RULEBOOK_PATH).read_text(encoding="utf-8")
@@ -147,11 +155,22 @@ def load_item_effect_rules(path: Path | None = None) -> dict[str, Any]:
     rules: dict[str, ItemEffectRule] = {}
     for effect_key_value, entry in effects.items():
         field = f"effects.{effect_key_value}"
-        if not isinstance(entry, Mapping) or set(entry) != {"amount"}:
-            raise ItemEffectsRulebookError(f"{field} must carry exactly amount")
-        amount = _require_int(
-            entry["amount"], f"{field}.amount", minimum=1, maximum=MAX_EFFECT_AMOUNT
-        )
+        if ItemEffectKey(effect_key_value) is ItemEffectKey.BLESSED_CLEANSE:
+            # Cleanse entries carry NO amount: the loader forbids the field
+            # so a malformed rulebook can never smuggle an unbounded number
+            # into settlement (P3 design D3).
+            if not isinstance(entry, Mapping) or len(entry) != 0:
+                raise ItemEffectsRulebookError(
+                    f"{field} must be an empty mapping (cleanse entries "
+                    "carry no amount)"
+                )
+            amount = None
+        else:
+            if not isinstance(entry, Mapping) or set(entry) != {"amount"}:
+                raise ItemEffectsRulebookError(f"{field} must carry exactly amount")
+            amount = _require_int(
+                entry["amount"], f"{field}.amount", minimum=1, maximum=MAX_EFFECT_AMOUNT
+            )
         rules[effect_key_value] = ItemEffectRule(
             effect_key=ItemEffectKey(effect_key_value), amount=amount
         )
@@ -166,9 +185,9 @@ ITEM_USE_SECONDS: int = _loaded["item_use_seconds"]
 
 # Immutable effect rulebook keyed by the closed lore effect vocabulary.
 ITEM_EFFECT_RULES: dict[ItemEffectKey, ItemEffectRule] = _loaded["rules"]
-
-# Which gauge each closed effect restores. Preflight full-gating, the
-# settlement write, and the stable log noun all resolve through this map.
+# Which gauge each effect restores (cleanse-family effects own no gauge and
+# never appear here). Preflight full-gating, the settlement write, and the
+# stable log noun all resolve through this map.
 _EFFECT_GAUGES: dict[ItemEffectKey, str] = {
     ItemEffectKey.SELF_HEAL: "hp",
     ItemEffectKey.GREATER_HEAL: "hp",
@@ -202,20 +221,22 @@ class ItemUsePlan:
     """The complete, immutable settlement computed by a side-effect-free preflight.
 
     ``amount`` is the actual bounded restoration for the current state on the
-    effect's gauge, and ``mirror_pk`` is the single existing contained-object
+    effect's gauge and ``mirror_pk`` is the single existing contained-object
     mirror selected for consumption (``None`` for a key-only holding), never a
-    fabricated object.
+    fabricated object. Cleanse-family effects carry ``gauge=None`` with
+    ``cleansed_count`` set to the preflight-verified active debuff count.
     """
 
     actor: Any
     item_key: str
     effect_key: ItemEffectKey
-    gauge: str
+    gauge: str | None
     consumable: bool
     amount: int
     gauge_current: int
     gauge_restored: int
     mirror_pk: int | None
+    cleansed_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -233,26 +254,31 @@ class ItemTouchedJournal:
 
     The resolver captures this before any write and hands it to the caller on
     success, so an outer combat transaction whose later phase fails can
-    restore the trait, inventory, quest-progress, and mirror/contents/idmapper
-    caches the resolver committed. Restoration is best-effort per surface with
-    a logged diagnostic and is safe to run twice (idempotent value writes).
+    restore the trait, inventory, quest-progress, buff, and mirror/contents/
+    idmapper caches the resolver committed. Restoration is best-effort per
+    surface with a logged diagnostic and is safe to run twice (idempotent
+    value writes). The buff surface restores through the attribute handler,
+    which Evennia's ``BuffHandler`` re-reads on every access, so live handler
+    reads recover together with persistence.
     """
 
     actor: Any
     traits: tuple[bool, Any] | None = None
     inventory: tuple[bool, Any] | None = None
     quest_log: tuple[bool, Any] | None = None
+    buffs: tuple[bool, Any] | None = None
     mirror: Any | None = None
     mirror_pk: int | None = None
 
     @classmethod
     def capture(cls, actor: Any) -> "ItemTouchedJournal":
-        """Snapshot traits, inventory, and quest progress before any write."""
+        """Snapshot traits, inventory, quest progress, and buffs pre-write."""
         return cls(
             actor=actor,
             traits=snapshot_traits(actor),
             inventory=attribute_snapshot(actor, "inventory"),
             quest_log=snapshot_quest_log(actor),
+            buffs=attribute_snapshot(actor, "buffs"),
         )
 
     def note_mirror(self, mirror: Any) -> None:
@@ -269,6 +295,8 @@ class ItemTouchedJournal:
             restore_attribute_best_effort(actor, "inventory", self.inventory)
         if self.quest_log is not None:
             restore_quest_log(actor, self.quest_log)
+        if self.buffs is not None:
+            restore_attribute_best_effort(actor, "buffs", self.buffs)
         if self.mirror is not None:
             try:
                 _flush_deleted_instance(self.mirror)
@@ -378,6 +406,22 @@ def _select_mirror(entity: Any, item_key: str) -> Any | None:
 def _rejected(reason: ItemUseReason) -> ItemUsePreflight:
     return ItemUsePreflight(allowed=False, reason=reason, plan=None)
 
+def _active_debuff_keys(entity: Any) -> tuple[str, ...]:
+    """Handler-free read of the active debuff-polarity definition keys.
+
+    Uses the storage accessor exactly like every presentation surface, so a
+    conditional read never materializes the buff handler. Raises ``TypeError``
+    on malformed buff storage for the caller to fail closed.
+    """
+    return tuple(
+        sorted(
+            key
+            for key in active_buff_keys_from_storage(entity)
+            if BUFF_DEFINITIONS.get(key) is not None
+            and BUFF_DEFINITIONS[key].polarity == "debuff"
+        )
+    )
+
 
 def preflight_item_use(
     request: ItemUseRequest, *, in_combat: bool
@@ -408,13 +452,42 @@ def preflight_item_use(
     if rule is None:
         return _rejected(ItemUseReason.UNKNOWN_EFFECT)
     gauge = _EFFECT_GAUGES.get(mechanics.effect_key)
-    if gauge is None:
+    if gauge is None and mechanics.effect_key is not ItemEffectKey.BLESSED_CLEANSE:
         return _rejected(ItemUseReason.UNKNOWN_EFFECT)
     hp_gauge = _gauge_from_storage(request.actor, "hp")
     if hp_gauge is None:
         return _rejected(ItemUseReason.MALFORMED_TRAITS)
     if hp_gauge[0] <= 0:
         return _rejected(ItemUseReason.NOT_ALIVE)
+    if mechanics.effect_key is ItemEffectKey.BLESSED_CLEANSE:
+        # Cleanse preflight (P3 D3): at least one active debuff-polarity buff
+        # must exist, read without materializing the handler. A clean actor
+        # rejects with ``no_debuffs`` (mirroring ``hp_full``): nothing is
+        # consumed, no event is logged, and no world clock advances.
+        try:
+            debuffs = _active_debuff_keys(request.actor)
+        except TypeError:
+            return _rejected(ItemUseReason.MALFORMED_TRAITS)
+        if not debuffs:
+            return _rejected(ItemUseReason.NO_DEBUFFS)
+        mirror = (
+            _select_mirror(request.actor, request.item_key)
+            if mechanics.consumable
+            else None
+        )
+        plan = ItemUsePlan(
+            actor=request.actor,
+            item_key=request.item_key,
+            effect_key=mechanics.effect_key,
+            gauge=None,
+            consumable=mechanics.consumable,
+            amount=0,
+            gauge_current=hp_gauge[0],
+            gauge_restored=hp_gauge[0],
+            mirror_pk=mirror.id if mirror is not None else None,
+            cleansed_count=len(debuffs),
+        )
+        return ItemUsePreflight(allowed=True, reason=None, plan=plan)
     target = hp_gauge if gauge == "hp" else _gauge_from_storage(request.actor, gauge)
     if target is None:
         return _rejected(ItemUseReason.MALFORMED_TRAITS)
@@ -438,27 +511,53 @@ def preflight_item_use(
 
 
 def _item_used_event_log(
-    plan: ItemUsePlan, actor_key: str, time_cost_seconds: int
+    plan: ItemUsePlan,
+    actor_key: str,
+    time_cost_seconds: int,
+    *,
+    cleansed_count: int = 0,
 ) -> EventLog:
-    """Build the single stable ``item_used`` log for one successful use."""
+    """Build the single stable ``item_used`` log for one successful use.
+
+    The cleanse branch reports the actually-removed debuff count (settlement
+    truth, not the preflight estimate); gauge-restoring effects report the
+    bounded amount as today. ``plan.gauge`` is never indexed for a cleanse
+    effect.
+    """
     definition = ITEM_REGISTRY[plan.item_key]
     display_name = definition.display_name_zh.replace("{", "{{").replace("}", "}}")
-    amount = str(plan.amount).replace("{", "{{").replace("}", "}}")
-    noun = _GAUGE_NOUN_ZH[plan.gauge]
-    entry = EventEntry(
-        kind="item_used",
-        actor=actor_key,
-        target=actor_key,
-        data={
-            "item_key": plan.item_key,
-            "effect_key": plan.effect_key.value,
-            "consumable": plan.consumable,
-            "amount": plan.amount,
-        },
-        text_template=(
-            f"你使用了「{display_name}」，恢復了 {amount} 點{noun}。"
-        ),
-    )
+    if plan.effect_key is ItemEffectKey.BLESSED_CLEANSE:
+        entry = EventEntry(
+            kind="item_used",
+            actor=actor_key,
+            target=actor_key,
+            data={
+                "item_key": plan.item_key,
+                "effect_key": plan.effect_key.value,
+                "consumable": plan.consumable,
+                "count": cleansed_count,
+            },
+            text_template=(
+                f"你使用了「{display_name}」，淨化了 {cleansed_count} 個負面狀態。"
+            ),
+        )
+    else:
+        amount = str(plan.amount).replace("{", "{{").replace("}", "}}")
+        noun = _GAUGE_NOUN_ZH[plan.gauge]
+        entry = EventEntry(
+            kind="item_used",
+            actor=actor_key,
+            target=actor_key,
+            data={
+                "item_key": plan.item_key,
+                "effect_key": plan.effect_key.value,
+                "consumable": plan.consumable,
+                "amount": plan.amount,
+            },
+            text_template=(
+                f"你使用了「{display_name}」，恢復了 {amount} 點{noun}。"
+            ),
+        )
     return EventLog(
         actor=actor_key,
         skill_key=plan.item_key,
@@ -495,17 +594,25 @@ def _delete_mirror(actor: Any, plan: ItemUsePlan, journal: ItemTouchedJournal) -
 
 def _apply_plan(
     request: ItemUseRequest, plan: ItemUsePlan, journal: ItemTouchedJournal
-) -> None:
-    """Commit the gauge effect, the one-key consumption, and the mirror deletion.
+) -> int:
+    """Commit the plan and return the actually-removed debuff count.
 
-    Runs inside the caller's transaction. Inventory removal goes through the
-    inventory planner so ACQUIRE/quest journals compose with it; a key-only
-    consumable deletes nothing and no mirror is ever fabricated.
+    Runs inside the caller's transaction. The cleanse branch skips the gauge
+    write and removes every active debuff-polarity buff through the shipped
+    ``cleanse:status`` removal path; gauge effects restore their bounded
+    amount as today. Inventory removal goes through the inventory planner so
+    ACQUIRE/quest journals compose with it; a key-only consumable deletes
+    nothing and no mirror is ever fabricated.
     """
-    _write_gauge(plan.actor, plan.gauge, plan.gauge_restored)
+    removed = 0
+    if plan.effect_key is ItemEffectKey.BLESSED_CLEANSE:
+        removed = cleanse_debuffs(request.actor)
+    else:
+        _write_gauge(plan.actor, plan.gauge, plan.gauge_restored)
     if plan.consumable:
         apply_inventory_plan(plan_inventory_delta(request.actor, removals=(request.item_key,)))
     _delete_mirror(request.actor, plan, journal)
+    return removed
 
 
 def resolve_item_use(
@@ -525,11 +632,16 @@ def resolve_item_use(
     journal = ItemTouchedJournal.capture(request.actor)
     try:
         with transaction.atomic():
-            _apply_plan(request, plan, journal)
+            cleansed_count = _apply_plan(request, plan, journal)
     except Exception:
         journal.restore()
         raise
-    event_log = _item_used_event_log(plan, str(request.actor.key), time_cost_seconds=0)
+    event_log = _item_used_event_log(
+        plan,
+        str(request.actor.key),
+        time_cost_seconds=0,
+        cleansed_count=cleansed_count,
+    )
     return ItemUseResult(
         outcome="success",
         event_log=event_log,

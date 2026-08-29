@@ -523,11 +523,24 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
 
     Mutation repeats the shared preflight and writes the complete replacement
     mapping plus the recompute-from-scratch gauge-ceiling sync inside one
-    transaction, restoring the in-process equipment cache and the trait
-    storage (handler caches refreshed) when the write fails. Equipped items
-    remain in canonical inventory; the caller never supplies a slot and no
-    unrelated accessory is ever removed.
+    transaction, restoring the in-process equipment cache, the trait storage
+    (handler caches refreshed), and the buff storage when the write fails.
+    Equipped items remain in canonical inventory; the caller never supplies a
+    slot and no unrelated accessory is ever removed.
+
+    Attached buffs travel with the toggle (P3): the worn-set diff against the
+    same before/after plan removes the instances of unequipped items first,
+    then applies the instances of newly equipped items, each keyed by
+    definition and item key with ``unique_per_source`` stacking. The ``buffs``
+    attribute joins the snapshot set because Evennia's BuffHandler keeps no
+    cache of its own — every read goes through the attribute, so an
+    assignment-restore leaves live handler reads consistent with storage.
+    Snapshots are captured before the one outer transaction and every surface
+    is restored in snapshot order.
     """
+    from world.rules.buffs import _add_buff, _remove_buff_keys
+    from world.rules.equipment_effects import attached_buff_instances
+
     preflight = preflight_equipment_toggle(entity, item_key)
     if not preflight.allowed or preflight.plan is None:
         return EquipmentToggleResult(
@@ -536,11 +549,27 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
     plan = preflight.plan
     snapshot = attribute_snapshot(entity, "equipment")
     traits_snapshot = snapshot_traits(entity)
+    buffs_snapshot = attribute_snapshot(entity, "buffs")
+    before_attached = attached_buff_instances(plan.before)
+    after_attached = attached_buff_instances(plan.after)
+    removed = tuple(sorted(before_attached.keys() - after_attached.keys()))
+    added = sorted(after_attached.keys() - before_attached.keys())
     try:
         with transaction.atomic():
             entity.db.equipment = plan.after
             sync_equipment_gauge_limits(entity)
+            if removed:
+                _remove_buff_keys(entity, removed)
+            for instance_key in added:
+                buff_key, item_key = after_attached[instance_key]
+                _add_buff(
+                    entity,
+                    buff_key,
+                    instance_key=instance_key,
+                    source_key=item_key,
+                )
     except Exception:
+        restore_attribute_best_effort(entity, "buffs", buffs_snapshot)
         restore_attribute_best_effort(entity, "equipment", snapshot)
         restore_traits(entity, traits_snapshot)
         raise

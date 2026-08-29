@@ -101,6 +101,7 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     # Personal item use and equipment toggle.
     "hp_full": "你的體力已經全滿。",
     "mp_full": "你的魔力已經全滿。",
+    "no_debuffs": "你身上沒有需要淨化的負面狀態。",
     "item_not_held": "你沒有攜帶這個物品。",
     "not_usable": "這個物品無法這樣使用。",
     "not_equipment": "這個物品無法裝備。",

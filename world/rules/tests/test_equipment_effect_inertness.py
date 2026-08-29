@@ -9,17 +9,16 @@
     literal ``import_module``/``__import__`` calls; deliberately obfuscated
     dynamic imports are out of its (and the requirement's) scope.
 
-(b) Deviant-copy behavior tests prove dormant fields cannot leak: every
-    probe entity WEARS the items whose rulebook entries are swapped for
-    copies whose dormant-only fields differ — the pleasure probe wears the
-    mutated ``black_maid_dress`` and the immune/attachment probe wears the
-    mutated accessories — and the regen buff is added under the mutated
-    item's source key. Combat modifier evaluation, item-use preflight, and
-    buff application results must stay identical between the two copies,
-    and each test first proves the two copies genuinely load differently.
-    (The heal probe was retired when wire-equipment-combat-modifiers made
-    ``heal_gain`` live; the surviving probes cover the still-dormant
-    fields.)
+(b) Deviant-copy behavior tests prove the still-dormant fields cannot leak:
+    the surviving probe wears the mutated ``black_maid_dress``
+    (pleasure_gain, whose consumer lands in P4) while combat modifier
+    evaluation, item-use preflight, and buff application results must stay
+    identical between the copies, with each test first proving the two
+    copies genuinely load differently. The heal probe was retired when
+    wire-equipment-combat-modifiers made ``heal_gain`` live, and the
+    immune/attachment probes were retired when
+    add-equipment-immunity-and-attached-buffs (P3) landed those fields;
+    their liveness is asserted by the P3 suites instead.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -48,15 +47,27 @@ _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
 # bootstrap consumer whose import performs startup validation (design D4);
 # the two combat-modifier consumers are the authorized P2 gameplay readers
 # (the merged-bundle accessor lives in the loader module itself, and the
-# gauge-ceiling sync consumes the cap accessor). The inertness requirement
-# bars ADDITIONAL resolution paths, and the allowlist records exactly the
-# sanctioned surface.
+# gauge-ceiling sync consumes the cap accessor); P3 lands the
+# immunity/attached/prose consumers — the action staging gate, the buff
+# handler backstop, the equipment toggle lifecycle, the item-use cleanse
+# path, the object look card, and the command/web prose surfaces — each is
+# a gameplay consumer, but only of fields its own change owns. The
+# inertness requirement bars ADDITIONAL resolution paths, and the allowlist
+# records exactly the sanctioned surface.
 _ALLOWLIST = frozenset(
     {
         Path("world/rules/equipment_effects.py"),
         Path("world/rules/combat_modifiers.py"),
         Path("world/rules/equipment.py"),
         Path("server/conf/at_server_startstop.py"),
+        Path("world/rules/action.py"),
+        Path("world/rules/buffs.py"),
+        Path("world/rules/equipment.py"),
+        Path("world/rules/items.py"),
+        Path("commands/economy.py"),
+        Path("commands/items.py"),
+        Path("typeclasses/objects.py"),
+        Path("web/webclient/actions/service_actions.py"),
     }
 )
 _MODULE = "world.rules.equipment_effects"
@@ -242,38 +253,6 @@ class EquipmentRulebookDormancyTests(EvenniaTestCase):
             "+14%",
         )
         self.assertEqual(first, second)
-
-    @covers_requirement(
-        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
-    )
-    def test_dormant_immune_and_attached_values_never_leak(self):
-        def deviate_a(document):
-            document["effects"]["fearless_brooch"] = {}
-            document["effects"]["apothecary_beads"] = {}
-
-        def deviate_b(document):
-            document["effects"]["fearless_brooch"] = {"immune": ["poisoned"]}
-            document["effects"]["apothecary_beads"] = {
-                "attached_buffs": ["item_regen_light"]
-            }
-
-        first = self._observations_under(deviate_a)
-        second = self._observations_under(deviate_b)
-        # Capture B genuinely loaded the immune/attachment deviants.
-        self.assertEqual(
-            equipment_effects.EQUIPMENT_EFFECT_RULES[
-                EquipmentModifierKey.FEARLESS_BROOCH
-            ].immune,
-            ("poisoned",),
-        )
-        self.assertEqual(
-            equipment_effects.EQUIPMENT_EFFECT_RULES[
-                EquipmentModifierKey.APOTHECARY_BEADS
-            ].attached_buffs,
-            ("item_regen_light",),
-        )
-        self.assertEqual(first, second)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,7 @@ from world.rules.economy import (
 )
 from world.rules.guild_config import get_catalog
 from world.lore.items import ITEM_REGISTRY
+from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.npc_schedules import interaction_reason
 from world.skills.equipment import list_items
 
@@ -169,9 +170,11 @@ class CmdInventory(Command):
         from collections import Counter
 
         counts = Counter(items)
-        self.caller.msg(
-            "\n".join(
-                f"  {item_key} ×{count}"
-                for item_key, count in sorted(counts.items())
-            )
-        )
+        lines: list[str] = []
+        for item_key, count in sorted(counts.items()):
+            text = f"  {item_key} ×{count}"
+            prose = equipment_adjustment_text(item_key)
+            if prose:
+                text = f"{text}——{prose}"
+            lines.append(text)
+        self.caller.msg("\n".join(lines))

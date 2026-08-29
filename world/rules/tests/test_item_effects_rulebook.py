@@ -25,6 +25,7 @@ effects:
     amount: 120
   mana_restore:
     amount: 40
+  blessed_cleansing: {}
 """
 
 

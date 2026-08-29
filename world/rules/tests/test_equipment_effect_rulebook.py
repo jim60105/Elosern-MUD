@@ -385,6 +385,44 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                 {"attached_buffs": ["poisoned"]}
             )
         )
+    @covers_requirement(
+        "equipment-effects::attached-buffs-never-carry-gauge-ceiling-modifiers"
+    )
+    def test_attached_buff_with_gauge_bounds_is_rejected(self):
+        # Synthetic rulebook-copy buffs with gauge-bound modifiers must be
+        # rejected for attached entries: attached instances never carry
+        # gauge-ceiling modifiers (P3 design D2).
+        document = _canonical_document()
+        document["effects"]["apothecary_beads"]["attached_buffs"] = [
+            "test_gauge_bounds_buff"
+        ]
+        buff_definitions = dict(BUFF_DEFINITIONS)
+        buff_definitions["test_gauge_bounds_buff"] = replace(
+            BUFF_DEFINITIONS["focus"],
+            key="test_gauge_bounds_buff",
+            modifiers={"bounds": {"target": "hp", "ceiling": 5}},
+        )
+        registry = {
+            definition.key: definition
+            for definition in ITEM_REGISTRY.values()
+            if definition.equipment_slot is not None
+        }
+        with self.assertRaises(EquipmentEffectsRulebookError):
+            validate_equipment_effect_rules(
+                document, registry, buff_definitions
+            )
+
+    @covers_requirement(
+        "equipment-effects::attached-buffs-never-carry-gauge-ceiling-modifiers"
+    )
+    def test_attached_regen_rate_buff_is_accepted(self):
+        # item_regen_light's HP rate is the shipped attached-buff precedent
+        # and must keep validating (rates are not ceiling modifiers).
+        loaded = load_equipment_effect_rules()
+        self.assertEqual(
+            loaded[EquipmentModifierKey.APOTHECARY_BEADS].attached_buffs,
+            ("item_regen_light",),
+        )
 
     @covers_requirement(
         "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
@@ -440,9 +478,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         return registry, document
 
     def _validate(self, registry, document):
-        return validate_equipment_effect_rules(
-            document, registry, frozenset(BUFF_DEFINITIONS)
-        )
+        return validate_equipment_effect_rules(document, registry, BUFF_DEFINITIONS)
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"

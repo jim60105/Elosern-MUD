@@ -21,6 +21,7 @@ from world.rules.buffs import (
 )
 from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
 from world.rules.dice import roll_d100
+from world.rules.equipment_effects import equipment_immune_buff_keys
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
@@ -518,15 +519,37 @@ def _handle_buff_apply(
                 f"buff {key!r} requires a caster with a positive-int dbref",
             )
         kwargs["source_pk"] = int(pk)
-    return [
-        PendingEffect(
-            target,
-            f"buff_applied|{_entity_key(target)}|{key}",
-            frozenset(),
-            lambda target=target: _add_buff(target, key, **kwargs),
+    pending: list[PendingEffect] = []
+    for target in targets:
+        if (
+            definition is not None
+            and definition.polarity == "debuff"
+            and key in equipment_immune_buff_keys(target)
+        ):
+            # Worn-equipment immunity is decided at STAGING time so the event
+            # tag is fixed here, in the ordinary replayable-entry path: a
+            # neutralized roll is never silently lied about (P3 design D1).
+            # Like ``_resist_pending_effect``, the staged effect is
+            # non-mutating; ``_add_buff`` still carries an independent
+            # no-write backstop for every direct caller.
+            pending.append(
+                PendingEffect(
+                    target,
+                    f"equipment_immune|{_entity_key(target)}|{key}",
+                    frozenset(),
+                    lambda: None,
+                )
+            )
+            continue
+        pending.append(
+            PendingEffect(
+                target,
+                f"buff_applied|{_entity_key(target)}|{key}",
+                frozenset(),
+                lambda target=target: _add_buff(target, key, **kwargs),
+            )
         )
-        for target in targets
-    ]
+    return pending
 
 
 def _handle_self_buff_apply(
@@ -541,7 +564,9 @@ def _handle_self_buff_apply(
     ``TargetSpec.NONE`` skills resolve to an empty target list, so this handler
     binds the actor directly instead of iterating targets. This keeps a NONE
     skill meaningful (a concentration-style self effect) while still never
-    accepting a caller-supplied target.
+    accepting a caller-supplied target. A debuff grant the actor's worn
+    equipment immunises stages the same non-mutating neutralization event as
+    the target-scoped handler.
     """
     del targets, context, scale
     try:
@@ -551,6 +576,20 @@ def _handle_self_buff_apply(
             RejectReason.EFFECT_RESOLUTION_FAILED,
             effect_id,
         ) from error
+    definition = BUFF_DEFINITIONS.get(key)
+    if (
+        definition is not None
+        and definition.polarity == "debuff"
+        and key in equipment_immune_buff_keys(actor)
+    ):
+        return [
+            PendingEffect(
+                actor,
+                f"equipment_immune|{_entity_key(actor)}|{key}",
+                frozenset(),
+                lambda: None,
+            )
+        ]
     return [
         PendingEffect(
             actor,
@@ -1475,6 +1514,7 @@ _ENTRY_TEMPLATES = {
     "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
     "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
     "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
+    "equipment_immune": "{target} 的裝備抵銷了{actor} 施加的負面效果——{target} 對此免疫。",
     "sexual_transition": "{target} 的狀態發生了變化。",
     "sexual_resist": "{target} 面對 {actor} 的意圖，做出了自己的選擇。",
     "pleasure_gain": "{target} 的快感提升了。",
@@ -1522,6 +1562,12 @@ def _entries_from_effect(
     elif kind == "buff_applied":
         data = {"buff_key": values[0]}
     elif kind == "self_buff_applied":
+        data = {"buff_key": values[0]}
+    elif kind == "equipment_immune":
+        if len(values) != 1:
+            raise ValueError(
+                f"malformed equipment_immune pending effect {effect.description!r}"
+            )
         data = {"buff_key": values[0]}
     elif kind == "buffs_cleansed":
         if len(values) != 1:
