@@ -352,6 +352,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `combat-detail` | H3 | REMAP-TO-TESTID |
 | `quick-word-chip-<verb>` (prefix `quick-word-chip`: `quick-word-chip-看`, the quick-word command chips) | H6 | REMAP-TO-TESTID |
 | `inventory-panel` + `inventory-panel__<suffix>` (the redesigned inventory drawer: `inventory-panel__tile--<item_key>` item tiles, `inventory-panel__count--<item_key>` held-count badges, `inventory-panel__inspector-<field>` inspector fields; the realigned three-section stack adds `inventory-panel__section--<name>`, `inventory-panel__heading--<name>`, `inventory-panel__items-count`, `inventory-panel__wallet-value`, added by the realign-inventory-drawer-layout change) | inventory-grid | REMAP-TO-TESTID |
+| `dock-detail`, `hud-drawer-close` (the shared `DockMenu` detail pane probed by the bag-hosting assertions, and the H4 `HudDrawer` close control newly targeted by the add-inventory-item-actions and bag-drawer journeys) | item-actions | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
