@@ -52,12 +52,45 @@ Every `immune` and `attached_buffs` entry SHALL name a buff key defined in the b
 - **WHEN** an entry declares immunity to a key absent from the buff rulebook
 - **THEN** the load fails with the named rulebook error
 
+### Requirement: Attached buffs never carry gauge-ceiling modifiers
+An `attached_buffs` entry SHALL NOT reference a buff whose modifiers include a `bounds` target over `hp`/`mp`/`sp`: gauge ceiling headroom is owned exclusively by the equipment-cap recompute, and an attached instance must never carry a gauge-ceiling modifier. Damage/regeneration `rate` modifiers remain permitted (the shipped `item_regen_light` regen is the canonical attached-buff precedent).
+
+#### Scenario: A gauge-bounds attached buff fails the load
+- **WHEN** an attached-buff reference resolves to a buff definition whose `bounds` modify `hp` (or any other gauge target)
+- **THEN** the equipment-effect rulebook load fails with the named rulebook error
+
+#### Scenario: A regen-rate attached buff is accepted
+- **WHEN** `apothecary_beads` attaches `item_regen_light` (HP `rate`, no gauge bounds)
+- **THEN** the rulebook loads and the attachment stays live
+
+### Requirement: Equipment immunity predicate is pure and fail-closed
+The equipment-effect capability SHALL expose one predicate returning the union of `immune` keys over the entity's currently worn equipment. It SHALL read stored state without materializing handlers, SHALL write nothing, and malformed equipment storage SHALL yield no immunities at all (fail-closed: broken storage never grants protection).
+
+#### Scenario: Worn pendant grants poison immunity
+- **WHEN** an actor wearing 淨化吊墜 is queried for immune buff keys
+- **THEN** the result contains `poisoned` and nothing was written
+
+#### Scenario: Malformed storage grants nothing
+- **WHEN** the predicate runs against malformed equipment storage
+- **THEN** it returns an empty set
+
+### Requirement: Equipment adjustments render as deterministic prose
+The capability SHALL provide one server-side formatter converting a registered item's rulebook entry into one deterministic 正體中文 summary: segments joined by 「｜」 in field-vocabulary declaration order, signed integers, percent fields as `±N%`, gauge fields as `<gauge>上限 ±N`, immunity keys rendered by their registered display names, and zero-valued fields omitted. Every number SHALL come from the rulebook; the formatter SHALL NOT recompute effective values.
+
+#### Scenario: Heavy armor describes its trade-off verbatim
+- **WHEN** the formatter renders 騎士全套板甲's entry (atk −2, defense +8, agility −10%, hp cap +15)
+- **THEN** the output is exactly 「攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15」
+
+#### Scenario: Immunity-only item
+- **WHEN** the formatter renders 無懼胸針's entry (immune `fear` only)
+- **THEN** the output contains only the immunity segment with the registered display name and no numeric segments
+
 ### Requirement: Rulebook fields stay inert until their owning change lands
 Rulebook fields whose consumers arrive in later changes (combat/stat merge, immunity enforcement, attached-buff application, sexual-system integration, rule conditions, presentation) SHALL NOT be read by gameplay resolution before the change that owns the consumer. A rulebook value with no consumer yet SHALL NOT change any deterministic gameplay outcome.
 
 #### Scenario: Authored values cannot leak before their consumer exists
-- **WHEN** two deviant rulebook copies differ only in dormant-only fields (for example `pleasure_gain` or `immune` values) while the consuming changes have not landed
-- **THEN** combat, act resolution, and buff application produce byte-for-byte identical results between the two copies, and no production module outside the validated loader imports the equipment-effect rulebook
+- **WHEN** two deviant rulebook copies differ only in dormant-only fields (for example `pleasure_gain` values) while the consuming changes have not landed
+- **THEN** combat, act resolution, and buff application produce byte-for-byte identical results between the two copies, and no production module outside the validated loader and the change-authorized consumers imports the equipment-effect rulebook
 
 ### Requirement: The new equipment roster is registered and tradeable
 The roster SHALL add the ten designed equipment items — 淨化吊墜, 無懼胸針, 騎士全套板甲, 藥師珠串, 大術師補綴長袍, 誘蠱蕾絲內衣, 迷情絲頸環, 修女聖袍, 光輝聖徽, 聖女聖袍 — each with a registry presentation identity, an existing price-table key, an effect binding, and a listing in the existing general store's offered keys.

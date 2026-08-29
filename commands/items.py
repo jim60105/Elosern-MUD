@@ -19,6 +19,7 @@ from world.rules.combat_session import (
     submit_player_item_use,
 )
 from world.rules.equipment import toggle_equipment
+from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.event_log import render_plain_text
 from world.rules.items import use_item
 from world.rules.player_messages import session_reason_message
@@ -31,17 +32,25 @@ def _item_display_name(item_key: str) -> str:
 
 
 def _toggle_message(result, item_key: str) -> str:
-    """Render the accepted equipment toggle in the shared command prose."""
+    """Render the accepted equipment toggle in the shared command prose.
+
+    Equip actions append the server-formatted adjustment summary (P3 D4);
+    unequip actions keep the plain line since nothing new is gained.
+    """
     display = _item_display_name(item_key)
+    prose = equipment_adjustment_text(item_key)
     if result.action == "unequip-singleton":
         return f"你卸下了 {display}。"
     if result.action == "unequip-accessory":
         return f"你除下了 {display}。"
     if result.action == "equip-accessory":
-        return f"你佩戴了 {display}。"
+        return f"你佩戴了 {display}" + (f"（{prose}）" if prose else "") + "。"
     if result.replaced_key is not None:
-        return f"你裝備了 {display}，原本的 {_item_display_name(result.replaced_key)} 已收回背包。"
-    return f"你裝備了 {display}。"
+        base = f"你裝備了 {display}，原本的 {_item_display_name(result.replaced_key)} 已收回背包。"
+        if prose:
+            return f"你裝備了 {display}（{prose}），原本的 {_item_display_name(result.replaced_key)} 已收回背包。"
+        return base
+    return f"你裝備了 {display}" + (f"（{prose}）" if prose else "") + "。"
 
 
 class CmdUseItem(Command):

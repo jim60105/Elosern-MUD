@@ -29,7 +29,8 @@ from world.rules.combat_session import (
     submit_player_item_use,
 )
 from world.rules.economy import TradeError, buy, sell
-from world.rules.equipment import toggle_equipment
+from world.rules.equipment import registry_key_for_object, toggle_equipment
+from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.event_log import render_plain_text
 from world.rules.guild import (
     GuildDataError,
@@ -468,19 +469,21 @@ def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session
     if result.outcome != "success":
         return _rejected(result.reason)
     display = _item_display_name(item_key)
+    prose = equipment_adjustment_text(item_key)
     if result.action == "unequip-singleton":
         message = f"你卸下了 {display}。"
     elif result.action == "unequip-accessory":
         message = f"你除下了 {display}。"
     elif result.action == "equip-accessory":
-        message = f"你佩戴了 {display}。"
+        message = f"你佩戴了 {display}" + (f"（{prose}）" if prose else "") + "。"
     elif result.replaced_key is not None:
-        message = (
-            f"你裝備了 {display}，原本的 {_item_display_name(result.replaced_key)}"
-            " 已收回背包。"
-        )
+        replaced = _item_display_name(result.replaced_key)
+        if prose:
+            message = f"你裝備了 {display}（{prose}），原本的 {replaced} 已收回背包。"
+        else:
+            message = f"你裝備了 {display}，原本的 {replaced} 已收回背包。"
     else:
-        message = f"你裝備了 {display}。"
+        message = f"你裝備了 {display}" + (f"（{prose}）" if prose else "") + "。"
     actor.msg(message)
     return _success("equipment_toggled", message, ())
 

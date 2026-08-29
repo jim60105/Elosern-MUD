@@ -20,10 +20,11 @@ magnitude. The loader mirrors ``world.rules.items.load_item_effect_rules``:
 P2 (wire-equipment-combat-modifiers) makes the combat adjustment fields and
 gauge caps live through exactly two pure read accessors —
 :func:`equipment_adjustments` and :func:`equipment_gauge_caps` — so no
-consumer re-implements equipment math. A structural inertness test allowlists
-the change-authorized consumers; ``pleasure_gain`` / ``exposure_bias`` stay
-dormant until P4 and ``immune`` / ``attached_buffs`` until P3, so their
-fields must not be folded into either accessor yet.
+consumer re-implements equipment math. P3 (add-equipment-immunity-and-attached-buffs)
+owns the immunity predicate, the attached-instance projection, and the
+adjustment-prose formatter. A structural inertness test allowlists the
+change-authorized consumers; ``pleasure_gain`` / ``exposure_bias`` stay
+dormant until P4, so those fields must not be folded into any accessor yet.
 """
 
 import re
@@ -35,7 +36,8 @@ from typing import Any, Mapping
 import yaml
 
 from world.lore.items import ITEM_REGISTRY, EquipmentModifierKey, ItemDefinition, ItemRarity
-from world.rules.buffs import BUFF_DEFINITIONS
+from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
+from world.rules.status_display import display_for
 
 _RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "equipment_effects.yaml"
 
@@ -190,7 +192,7 @@ def _validate_entry(
     raw: Any,
     budgets: Mapping[str, Mapping[str, int]],
     rarity: str,
-    buff_keys: frozenset[str],
+    buff_definitions: Mapping[str, BuffDefinition],
 ) -> EquipmentEffectRule:
     """Validate one entry and budget-check every value against its column."""
     if not isinstance(raw, dict):
@@ -282,7 +284,7 @@ def _validate_entry(
         raw.get("attached_buffs", []), f"effects.{item_key}.attached_buffs"
     )
     for label, keys in (("immune", immune), ("attached_buffs", attached)):
-        unresolved = [key for key in keys if key not in buff_keys]
+        unresolved = [key for key in keys if key not in buff_definitions]
         if unresolved:
             raise EquipmentEffectsRulebookError(
                 f"effects.{item_key}.{label} name buff keys absent from the "
@@ -297,6 +299,22 @@ def _validate_entry(
         raise EquipmentEffectsRulebookError(
             f"effects.{item_key} both immunises and attaches: {sorted(contradicted)}"
         )
+    for buff_key in attached:
+        buff_definition = buff_definitions.get(buff_key)
+        if buff_definition is None:
+            continue
+        bounds = buff_definition.modifiers.get("bounds", ())
+        bound_items = bounds if isinstance(bounds, list) else [bounds]
+        for modifier in bound_items:
+            if not isinstance(modifier, Mapping):
+                continue
+            target = modifier.get("target")
+            if target in _GAUGE_TARGETS:
+                raise EquipmentEffectsRulebookError(
+                    f"effects.{item_key}.attached_buffs buff {buff_key!r} carries "
+                    f"a gauge-bound modifier ({target}); attached instances must "
+                    "never carry gauge-ceiling modifiers (design D2)"
+                )
 
     bias = _require_int(
         raw.get("exposure_bias", 0),
@@ -322,15 +340,17 @@ def _validate_entry(
 def validate_equipment_effect_rules(
     document: Any,
     registry: Mapping[str, ItemDefinition],
-    buff_keys: frozenset[str],
+    buff_definitions: Mapping[str, BuffDefinition],
 ) -> dict[EquipmentModifierKey, EquipmentEffectRule]:
     """Validate a parsed rulebook document against an equipment registry.
 
-    Registry and buff-key set are injectable so rejection tests (including
-    the duplicate-binding case, unreachable through the production dict) run
-    against synthetic registries without mutating ``ITEM_REGISTRY``. Budget
-    lookup uses each entry key's registry rarity; an override document can
-    therefore never redefine rarity semantics.
+    Registry and buff-definition mapping are injectable so rejection tests
+    (including the duplicate-binding case, unreachable through the production
+    dict) run against synthetic registries without mutating
+    ``ITEM_REGISTRY``. Budget lookup uses each entry key's registry rarity; an
+    override document can therefore never redefine rarity semantics. The
+    definition mapping backs the immune/attached reference checks and the P3
+    gauge-bound guard for attached buffs.
     """
     if not isinstance(document, dict):
         raise EquipmentEffectsRulebookError(
@@ -406,7 +426,11 @@ def validate_equipment_effect_rules(
         definition = registry[item_key]
         rarity = definition.presentation.rarity.value
         rules[modifier_key] = _validate_entry(
-            item_key, raw_effects[modifier_key.value], budgets, rarity, buff_keys
+            item_key,
+            raw_effects[modifier_key.value],
+            budgets,
+            rarity,
+            buff_definitions,
         )
     return {key: rules[key] for key in sorted(rules, key=str)}
 
@@ -420,7 +444,12 @@ _equipped = {
 # The canonical registry projection used by every production load: equipment
 # definitions only, built once from the live registry.
 _PRODUCTION_EQUIPMENT: Mapping[str, ItemDefinition] = MappingProxyType(_equipped)
-_PRODUCTION_BUFF_KEYS = frozenset(BUFF_DEFINITIONS)
+# The canonical buff-definition projection for production loads: the
+# validator checks immune/attached references and the P3 gauge-bound guard
+# against the same definitions every gameplay read uses.
+_PRODUCTION_BUFF_DEFINITIONS: Mapping[str, BuffDefinition] = MappingProxyType(
+    BUFF_DEFINITIONS
+)
 
 
 class _UniqueKeyLoader(yaml.SafeLoader):
@@ -457,7 +486,7 @@ def load_equipment_effect_rules(
     source = _RULEBOOK_PATH if path is None else path
     document = yaml.load(source.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
     return validate_equipment_effect_rules(
-        document, _PRODUCTION_EQUIPMENT, _PRODUCTION_BUFF_KEYS
+        document, _PRODUCTION_EQUIPMENT, _PRODUCTION_BUFF_DEFINITIONS
     )
 
 
@@ -565,3 +594,145 @@ def reload_equipment_effect_rules(path: Path | None = None) -> None:
     """Re-validate and re-mirror the rulebook (idempotent startup sync)."""
     global EQUIPMENT_EFFECT_RULES
     EQUIPMENT_EFFECT_RULES = load_equipment_effect_rules(path)
+
+def worn_item_keys(entity: Any) -> frozenset[str]:
+    """Pure fail-closed read of the currently worn item keys.
+
+    Malformed equipment storage yields no keys (broken storage never grants
+    protection). The equipment import stays function-local so this module's
+    module-level dependencies remain lore/rulebook-only.
+    """
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return frozenset()
+    worn: set[str] = set()
+    for slot in ("weapon_main", "weapon_off", "armor"):
+        value = equipment.get(slot)
+        if isinstance(value, str) and value:
+            worn.add(value)
+    worn.update(
+        value for value in equipment.get("accessories", ()) if isinstance(value, str)
+    )
+    return frozenset(worn)
+
+
+def equipment_immune_buff_keys(entity: Any) -> frozenset[str]:
+    """Union of ``immune`` keys over the entity's currently worn equipment.
+
+    Pure: reads stored state without materializing handlers and writes
+    nothing. Grant-time-only semantics: already-applied debuffs are never
+    paused, removed, or altered by this predicate.
+    """
+    immune: set[str] = set()
+    for item_key in worn_item_keys(entity):
+        definition = ITEM_REGISTRY.get(item_key)
+        if definition is None or definition.modifier_key is None:
+            continue
+        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        if rule is not None:
+            immune.update(rule.immune)
+    return frozenset(immune)
+
+
+def attached_buff_instances(
+    equipment: Mapping[str, Any],
+) -> dict[str, tuple[str, str]]:
+    """Map one normalized equipment mapping to its required attached instances.
+
+    Returns ``{f"{buff_key}:{item_key}": (buff_key, item_key)}`` for every
+    worn item whose rulebook entry declares attached buffs. Pure dictionary
+    math over the canonical equipment shape (three singleton slots plus the
+    accessory list), so ``toggle_equipment`` can compute added/removed
+    instance-key sets from its before/after plans while owning every write.
+    """
+    instances: dict[str, tuple[str, str]] = {}
+
+    def collect(item_key: str) -> None:
+        definition = ITEM_REGISTRY.get(item_key)
+        if definition is None or definition.modifier_key is None:
+            return
+        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        if rule is None or not rule.attached_buffs:
+            return
+        for buff_key in rule.attached_buffs:
+            instances[f"{buff_key}:{item_key}"] = (buff_key, item_key)
+
+    for slot in ("weapon_main", "weapon_off", "armor"):
+        value = equipment.get(slot)
+        if isinstance(value, str) and value:
+            collect(value)
+    for value in equipment.get("accessories", ()):
+        if isinstance(value, str) and value:
+            collect(value)
+    return instances
+
+
+# Adjustment-prose vocabulary in one fixed order (P3 design D4): combat
+# adjustments first, then gauge ceilings, then immunity. Fields whose
+# presentation lands in later changes (sp_cost, pleasure_gain,
+# exposure_bias) are deliberately absent from this list.
+_PROSE_ADJUSTMENTS = (
+    ("atk_phys", "攻擊"),
+    ("defense", "防禦"),
+    ("agility", "敏捷"),
+    ("magic_level", "魔力"),
+    ("mp_cost", "施法消耗"),
+    ("heal_gain", "治療"),
+)
+_PROSE_GAUGES = (("hp", "生命上限"), ("mp", "法力上限"), ("sp", "體力上限"))
+
+
+def _signed_number_text(value: int) -> str:
+    """Render a signed flat integer with the U+2212 minus convention."""
+    if value > 0:
+        return f"+{value}"
+    if value < 0:
+        return f"−{abs(value)}"
+    return ""
+
+
+def _percent_text(value: str) -> str:
+    """Render an authored signed percent string with the U+2212 minus."""
+    if value.startswith("-") and not value.startswith("−"):
+        return f"−{value[1:]}"
+    return value
+
+
+def equipment_adjustment_text(item_key: str) -> str:
+    """Return one deterministic 正體中文 adjustment summary for an item.
+
+    Segments are joined with 「｜」 in the fixed D4 vocabulary order; every
+    number comes verbatim from the rulebook (no effective value is ever
+    recomputed). Zero-valued numeric fields are omitted, immunity renders
+    through the registered display labels, and non-equipment items, unknown
+    keys, and entries with nothing displayable all return ``""``.
+    """
+    definition = ITEM_REGISTRY.get(item_key)
+    if definition is None or definition.modifier_key is None:
+        return ""
+    rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+    if rule is None:
+        return ""
+    segments: list[str] = []
+    for field, label in _PROSE_ADJUSTMENTS:
+        value = rule.adjustments.get(field)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            if int(value[:-1]) == 0:
+                continue
+            segments.append(f"{label} {_percent_text(value)}")
+        else:
+            rendered = _signed_number_text(value)
+            if rendered:
+                segments.append(f"{label} {rendered}")
+    for target, label in _PROSE_GAUGES:
+        cap = rule.gauge_caps.get(target)
+        if cap is not None and cap > 0:
+            segments.append(f"{label} +{cap}")
+    if rule.immune:
+        labels = "、".join(display_for(key).label for key in rule.immune)
+        segments.append(f"免疫{labels}")
+    return "｜".join(segments)

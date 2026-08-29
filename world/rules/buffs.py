@@ -126,7 +126,20 @@ def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
 def _add_buff(
     entity, definition_key: str, *, instance_key: str | None = None, **data
 ) -> None:
+    from world.rules.equipment_effects import equipment_immune_buff_keys
+
     definition = BUFF_DEFINITIONS[definition_key]
+    if (
+        definition.polarity == "debuff"
+        and definition_key in equipment_immune_buff_keys(entity)
+    ):
+        # Defense-in-depth no-write backstop (P3 D1): the action workflow
+        # already stages a visible neutralization event before this point;
+        # this gate refuses the write for any direct caller so an immune
+        # debuff can never silently half-apply. Grant-time-only semantics:
+        # already-applied debuffs are untouched. The import is function-local
+        # because ``equipment_effects`` imports this module at module level.
+        return
     if definition.stacking == "unique_per_source" and "source_key" not in data:
         raise ValueError(f"buff {definition_key!r} requires source_key")
     cache = {
@@ -235,6 +248,22 @@ def _remove_buff_keys(entity, keys: tuple[str, ...]) -> None:
     """
     for key in keys:
         entity.buffs.remove(key, dispel=True)
+
+def cleanse_debuffs(entity) -> int:
+    """Remove every active debuff-polarity buff and return the count removed.
+
+    Reuses the shipped ``cleanse:status`` removal path so holy-water
+    settlement and the cleanse effect handler share one semantics. Returns 0
+    when nothing is active (and writes nothing).
+    """
+    debuff_keys = tuple(
+        buff.buffkey
+        for buff in _active_buff_instances(entity)
+        if BUFF_DEFINITIONS[buff.definition_key].polarity == "debuff"
+    )
+    if debuff_keys:
+        _remove_buff_keys(entity, debuff_keys)
+    return len(debuff_keys)
 
 
 def _handle_cleanse(

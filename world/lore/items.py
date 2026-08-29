@@ -79,12 +79,14 @@ class ItemEffectKey(StrEnum):
     Each key binds a usable-item definition to one entry in the item-effect
     rulebook; magnitudes and conditions never live in this registry. The
     loader in ``world/rules/items.py`` rejects any registered key without a
-    canonical rulebook entry.
+    canonical rulebook entry. ``BLESSED_CLEANSE`` (受洗聖水) removes every
+    active debuff through the shipped cleanse path and carries no amount.
     """
 
     SELF_HEAL = "self_heal"
     GREATER_HEAL = "greater_heal"
     MANA_RESTORE = "mana_restore"
+    BLESSED_CLEANSE = "blessed_cleansing"
 
 
 class EquipmentModifierKey(StrEnum):
@@ -735,7 +737,7 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
                 summary_zh="光明教會祝禱的受洗聖水。",
             ),
             use_mechanics=ItemUseMechanics(
-                effect_key=ItemEffectKey.SELF_HEAL,
+                effect_key=ItemEffectKey.BLESSED_CLEANSE,
                 consumable=True,
                 combat_allowed=True,
             ),

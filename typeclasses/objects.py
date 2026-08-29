@@ -31,17 +31,29 @@ class ObjectParent:
     default_description = "你沒有看到什麼特別的。"
 
     def get_display_desc(self, looker=None, **kwargs) -> str:
-        """Room description plus the optional scene-flavor paragraph.
+        """Registry item card, or the ordinary desc plus scene flavor.
 
-        Appends ``self.db.scene_flavor`` as a paragraph after the description
-        and before the exit line when the attribute is present (scene-flavor
-        apply design D4); every flavor-less entity renders byte-identical
-        output. This is the shared room appearance hook every room typeclass
-        resolves through ``return_appearance`` (adopted by ``Room``,
-        ``GridRoom``, ``TerrainRoom``, and ``InstanceRoom``), so the text 看
-        command, the ``at_look`` seam, and the webclient ``explore.look`` path
-        render the flavor identically.
+        A contained object carrying a canonical ``registry_key`` renders a
+        deterministic item card (display name, summary, and the equipment
+        adjustment line) instead of the raw object key, so 看 and the
+        webclient ``explore.look`` surface the same prose (P3 D4).
         """
+        from world.rules.equipment import registry_key_for_object
+        from world.rules.equipment_effects import equipment_adjustment_text
+
+        registry_key = registry_key_for_object(self)
+        if registry_key is not None:
+            from world.lore.items import ITEM_REGISTRY
+
+            definition = ITEM_REGISTRY.get(registry_key)
+            if definition is not None:
+                lines = [f"|w{definition.display_name_zh}|n"]
+                if definition.presentation.summary_zh:
+                    lines.append(definition.presentation.summary_zh)
+                prose = equipment_adjustment_text(registry_key)
+                if prose:
+                    lines.append(prose)
+                return "\n".join(lines)
         desc = super().get_display_desc(looker, **kwargs)
         flavor = self.db.scene_flavor
         if flavor:
