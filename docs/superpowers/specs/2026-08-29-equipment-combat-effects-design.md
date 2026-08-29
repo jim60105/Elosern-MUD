@@ -58,7 +58,7 @@ here is faked in this change (AGENTS.md forward-seam rule):
   decision: shops keep selling everything registered. `price_table_key` and
   `sellable` already exist on `ItemDefinition`, giving a future change a
   natural per-item hinge. New items get ordinary shop price entries.
-- **圣所 contraception (避孕之術).** The Church's light-magic contraception is
+- **聖所 contraception (避孕之術).** The Church's light-magic contraception is
   narrative; there is no pregnancy system. Forward seam only.
 - **Equipment affecting `sensitivity`, `shame`, `virgin`, or lifetime
   counters.** These carry one-way / state-machine semantics with defined
@@ -248,7 +248,7 @@ the shipped `dual_wielding` fact is. It AND-composes with existing conditions:
 ```
 
 (Arousal thresholds use the shipped `AROUSAL_LEVELS` vocabulary:
-平静／微興奮／中等／高度／極限.)
+平靜／微興奮／中等／高度／極限.)
 
 Rulebook validation requires the key to exist in `ITEM_REGISTRY` as a
 slot-bearing item. Every displayable rule (grace rules included) gets an
