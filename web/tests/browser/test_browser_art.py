@@ -743,11 +743,16 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         # H3: the combat root is a single-row tab bar (the draft's floating
         # panel), so the forfeit tab is reached with ArrowRight (ArrowDown is
         # a no-op on a single-row bar). Root order: attack, skills, items,
-        # defend, flee, forfeit.
+        # 背包 (the client-local drawer row), defend, flee, forfeit.
         self._focus_combat_dock(page)
-        for _ in range(5):
+        for _ in range(6):
             page.keyboard.press("ArrowRight")
             page.wait_for_timeout(60)
+        self.assertEqual(
+            store_state(page).get("focus", {}).get("key"),
+            "forfeit",
+            "the forfeit tab is the focused root cell",
+        )
         page.keyboard.press("Enter")  # open the secondary Forfeit menu
         # The confirmation frame mounts before the confirming Enter.
         self._wait_combat_row_key(page, "confirm-forfeit")

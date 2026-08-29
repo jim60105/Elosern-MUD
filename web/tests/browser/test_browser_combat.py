@@ -458,7 +458,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowRight")  # items (disabled)
         self._press(page, "Enter")
+        self._press(page, "ArrowRight")  # 背包 (the client-local drawer row)
         self._press(page, "ArrowRight")  # defend (disabled)
+        page.wait_for_timeout(120)
+        self.assertEqual(
+            store_state(page).get("focus", {}).get("key"),
+            "defend",
+            "the disabled defend tab is the focused root cell",
+        )
         self._press(page, "Enter")
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
@@ -468,10 +475,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowRight")
-        self._press(page, "ArrowRight")
-        self._press(page, "ArrowRight")
-        self._press(page, "ArrowRight")  # flee is the last root cell
+        self._press(page, "ArrowRight")  # skills (1)
+        self._press(page, "ArrowRight")  # items (2)
+        self._press(page, "ArrowRight")  # 背包 (3, client-local drawer row)
+        self._press(page, "ArrowRight")  # defend (4)
+        self._press(page, "ArrowRight")  # flee (5)
+        self.assertEqual(
+            store_state(page).get("focus", {}).get("key"),
+            "flee",
+            "the flee tab is the focused root cell",
+        )
         self._press(page, "Enter")
 
         actions = self._ui_actions(page)
@@ -487,13 +500,21 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         session_id = self._combat_panel(page)["session"]["session_id"]
         # H3 (design D2): the combat root is a single-row tab bar (attack,
-        # skills, items, defend, flee, forfeit) — navigation is horizontal.
-        # Focus reaches `forfeit` (index 5) by pressing ArrowRight five times.
+        # skills, items, 背包, defend, flee, forfeit — the client-local 背包
+        # row joined it with add-inventory-item-actions) — navigation is
+        # horizontal. Focus reaches `forfeit` (index 6) by pressing
+        # ArrowRight six times.
         self._press(page, "ArrowRight")  # skills (1)
         self._press(page, "ArrowRight")  # items (2)
-        self._press(page, "ArrowRight")  # defend (3)
-        self._press(page, "ArrowRight")  # flee (4)
-        self._press(page, "ArrowRight")  # forfeit (5)
+        self._press(page, "ArrowRight")  # 背包 (3, client-local drawer row)
+        self._press(page, "ArrowRight")  # defend (4)
+        self._press(page, "ArrowRight")  # flee (5)
+        self._press(page, "ArrowRight")  # forfeit (6)
+        self.assertEqual(
+            store_state(page).get("focus", {}).get("key"),
+            "forfeit",
+            "the forfeit tab is the focused root cell",
+        )
         self._press(page, "Enter")  # open the secondary Forfeit menu
         self.assertEqual(
             sent_action_count(page), 0, "opening Forfeit must not mutate"
@@ -526,12 +547,22 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # During combat the exploration-mode panels render unavailable; only a
-        # full post-settlement snapshot can restore them.
+        # During combat the exploration and character panels render
+        # unavailable; only a full post-settlement snapshot restores them.
+        # services v3 keeps its panel available through combat with the read
+        # model forcing host/guild/shop null, so personal item actions stay
+        # usable while no remote service is exposed.
         state = store_state(page)
-        for name in ("exploration", "character", "services"):
+        for name in ("exploration", "character"):
             self.assertIn(name, state["panels"])
             self.assertFalse(state["panels"][name]["available"], f"{name} must be combat-unavailable")
+        services = state["panels"]["services"]
+        self.assertTrue(services["available"], "services v3 keeps the personal surfaces available")
+        self.assertIsNone(services["host"])
+        self.assertIsNone(services["guild"])
+        self.assertIsNone(services["shop"])
+        self.assertIsNotNone(services["player"])
+        self.assertIsNotNone(services["inventory"])
         self.assertEqual(state["mode"], "combat")
 
         session_id = self._combat_panel(page)["session"]["session_id"]
