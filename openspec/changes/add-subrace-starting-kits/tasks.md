@@ -18,9 +18,9 @@
 
 ## 4. Verification gates
 
-- [ ] 4.1 Run the focused Evennia labels: `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.lore world.rules.tests.test_character_creation world.imports` and confirm green
-- [ ] 4.2 Run `uv run --locked python -m tools.spec_traceability check` (must stay green with NO annotations for the not-yet-synced requirement IDs) and `uv run --locked python -m compileall -q world typeclasses commands server`, and confirm both are clean
-- [ ] 4.3 Run `openspec validate add-subrace-starting-kits --strict` and confirm the change artifacts stay mutually consistent (no player command surface change, so `docs/game/commands.md` is intentionally untouched)
+- [x] 4.1 Run the focused Evennia labels: `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.lore world.rules.tests.test_character_creation world.imports` and confirm green
+- [x] 4.2 Run `uv run --locked python -m tools.spec_traceability check` (must stay green with NO annotations for the not-yet-synced requirement IDs) and `uv run --locked python -m compileall -q world typeclasses commands server`, and confirm both are clean
+- [x] 4.3 Run `openspec validate add-subrace-starting-kits --strict` and confirm the change artifacts stay mutually consistent (no player command surface change, so `docs/game/commands.md` is intentionally untouched)
 
 ## 5. Post-sync traceability (execute during the archive/sync workflow, after the delta is merged into `openspec/specs/`)
 
