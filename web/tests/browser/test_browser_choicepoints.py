@@ -34,6 +34,7 @@ from .browser_helpers import (
 )
 from .harness import ManagedServer
 from . import fixtures
+from .test_browser_input_narrative import _wait_inp_line
 
 GENERATING_LINE = "AI 正在構思建議…"
 DEGRADED_NOTE = "AI 建議目前不可用"
@@ -412,6 +413,14 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
             for entry in panel["affordances"]
             if entry["action_id"] == "explore.talk_freeform"
         )
+        # The echoed line composes its NPC label verbatim from the committed
+        # exploration panel (the store's central descriptor fill), so the
+        # expected text is read from the same committed state, never invented.
+        npc_name = next(
+            target["display_name"]
+            for target in store_state(page)["panels"]["exploration"]["interact"]
+            if str(target["identity"]) == str(freeform_entry["params"]["npc_id"])
+        )
         page.locator(
             '[data-testid="narrative-feed"] .choicepoint-ready .option-card',
             has_text="我們聊聊好嗎？",
@@ -438,10 +447,21 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         wait_for_store_state(page, _talked_result)
         result = store_state(page).get("lastActionResult") or {}
         self.assertEqual(result.get("message"), "對方回應了你的話。")
+        # complete-ui-command-echo: a freeform stream card is a deliberate
+        # mutation, so its dispatch echoes exactly one `talk <NPC> <speech>`
+        # line — the central descriptor fill composing the committed display
+        # name — and never a second raw echo.
+        _wait_inp_line(
+            page,
+            inp_before + 1,
+            "talk %s 我們聊聊好嗎？" % npc_name,
+            exact=True,
+        )
+        page.wait_for_timeout(250)
         self.assertEqual(
             self._narrative_inp_count(page),
-            inp_before,
-            "a freeform stream card dispatch must never echo a command line",
+            inp_before + 1,
+            "a freeform stream card dispatch echoes exactly one command line, never a second",
         )
         self.assertEqual(
             sent_action_count(page, "explore.talk_freeform"),
