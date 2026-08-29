@@ -59,6 +59,7 @@ toolbox/*.lock
 # ==========================================
 # Frontend (npm toolchain, dev/CI-time only)
 # ==========================================
+node_modules
 node_modules/
 .storybook-out/
 # Showcase build lock: lives outside .storybook-out so a rebuild's
