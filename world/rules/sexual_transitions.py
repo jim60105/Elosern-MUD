@@ -150,6 +150,11 @@ def _load_rules() -> list[Rule]:
     rules = load_rules(_RULE_PATH)
     for rule in rules:
         _validate_rule_effect(rule)
+        if "equipment_worn" in rule.when:
+            raise ValueError(
+                f"rule {rule.id!r} uses condition 'equipment_worn', which "
+                "transition condition contexts do not support"
+            )
     return rules
 
 

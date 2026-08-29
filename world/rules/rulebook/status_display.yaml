@@ -131,3 +131,15 @@
 - code: dual_wield_style_atk_phys_bonus
   label: 雙持劍術攻擊提升
   severity: beneficial
+- code: sister_vestment_grace
+  label: 修女聖袍恩典
+  severity: beneficial
+- code: saintess_vestment_grace
+  label: 聖女聖袍恩典
+  severity: beneficial
+- code: holy_emblem_grace
+  label: 光輝聖徽恩典
+  severity: beneficial
+- code: pilgrim_medallion_grace
+  label: 朝聖者銅符恩典
+  severity: beneficial

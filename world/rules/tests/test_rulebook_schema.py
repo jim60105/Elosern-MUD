@@ -78,6 +78,12 @@ class RulebookSchemaTests(TestCase):
                 {"dual_wielding": True},
             )
         )
+        self.assertTrue(
+            evaluate_condition(
+                {"equipment_worn": "sister_vestments"},
+                {"worn_item_keys": frozenset({"sister_vestments"})},
+            )
+        )
         combined = {"field": "level", "gte": 3, "buff_active": "fear"}
         self.assertFalse(evaluate_condition(combined, {"level": 4}))
         self.assertTrue(
@@ -88,6 +94,18 @@ class RulebookSchemaTests(TestCase):
     def test_missing_context_is_false_and_unknown_key_raises(self):
         self.assertFalse(evaluate_condition({"field": "level", "gte": 3}, {}))
         self.assertFalse(evaluate_condition({"skill_owned": "x"}, {}))
+        # equipment_worn: a missing or malformed worn-item fact fails closed,
+        # never raising and never matching by accident; a non-string rule
+        # value is malformed data and raises (P5 D2).
+        self.assertFalse(evaluate_condition({"equipment_worn": "x"}, {}))
+        self.assertFalse(
+            evaluate_condition({"equipment_worn": "x"}, {"worn_item_keys": None})
+        )
+        self.assertFalse(
+            evaluate_condition({"equipment_worn": "x"}, {"worn_item_keys": "x"})
+        )
+        with self.assertRaisesRegex(ValueError, "equipment_worn"):
+            evaluate_condition({"equipment_worn": 123}, {"worn_item_keys": set()})
         with self.assertRaisesRegex(ValueError, "unknown"):
             evaluate_condition({"unknown": "x"}, {})
 

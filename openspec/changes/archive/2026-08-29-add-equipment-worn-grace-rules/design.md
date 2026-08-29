@@ -35,18 +35,19 @@ the same contexts.
 
 ## Decisions
 
-### D1 — Fact injection mirrors `dual_wielding` exactly
-
-`worn_item_keys_from_storage(entity)` lives in
-`world/rules/equipment_effects.py` (pure stored read via the P2
-function-local normalized-equipment import; malformed → empty frozenset;
-writes nothing; imports no rules modules — the module edge
+The worn-item fact reuses the shipped `worn_item_keys(entity)` accessor in
+`world/rules/equipment_effects.py` — pure stored read via the P2
+function-local normalized-equipment import, malformed → empty frozenset,
+writes nothing; it imports no rules modules (the module edge
 `combat_modifiers → equipment_effects` already exists from P2's merge and
-stays acyclic). All three context sources gain the fact: both builders
-set it; `matched_combat_modifiers` gains a `setdefault("worn_item_keys",
-...)` beside the shipped `dual_wielding` default so presentation,
-preview, and resolution share one fact. `evaluate_condition` grows one
-branch: `equipment_worn` matches iff the string is in
+stays acyclic). The design's earlier working name
+`worn_item_keys_from_storage` was dropped because P2 shipped the identical
+contract under `worn_item_keys` (recorded deviation, tasks 4.2). All three
+context sources gain the fact: both builders set it;
+`matched_combat_modifiers` gains a `setdefault("worn_item_keys", ...)`
+beside the shipped `dual_wielding` default so presentation, preview, and
+resolution share one fact. `evaluate_condition` grows one branch:
+`equipment_worn` matches iff the string is in
 `context["worn_item_keys"]`; a missing context key FAILS the condition
 (fail-closed). The single-key shape (parent §9) keeps `status_display`
 rule↔label 1:1 and AND-composition free.

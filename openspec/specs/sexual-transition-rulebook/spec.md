@@ -296,3 +296,16 @@ pleasure numbers — so that a pleasure change remaining within one band reports
   within the same call and `entity.sexual.climax_phase.level` becomes `"接近"`, proving
   `arousal`-keyed `when` conditions continue to evaluate correctly against the derived view with no
   change to `climax_gate` itself
+
+### Requirement: Transition rulebook rejects unbacked condition vocabulary
+
+Because transition condition contexts provide no worn-item fact, the
+sexual-transition rulebook loader SHALL reject any rule using the shared
+`equipment_worn` condition at load time with an identifying error, so a
+syntactically-valid but never-matching transition rule can never ship.
+
+#### Scenario: Grace condition in the transition rulebook fails loading
+
+- **WHEN** `sexual.yaml` contains a transition rule with an
+  `equipment_worn` condition
+- **THEN** the transition loader rejects the rulebook before mirroring
