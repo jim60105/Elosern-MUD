@@ -29,7 +29,7 @@ function renderDrawer(args) {
   // rows) for the combat story.
   const character =
     args.combat
-      ? { schema_version: 4, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } }
+      ? { schema_version: 5, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } }
       : args.undisguised
         ? CHARACTER_PANEL_UNDISGUISED_SAMPLE
         : CHARACTER_PANEL_SAMPLE;
@@ -84,4 +84,15 @@ export const IntimateCollapsed = {
 export const IntimateAbsent = {
   render: renderDrawer,
   args: { undisguised: true },
+};
+
+// The render-equipment-breakdown-webclient breakdown states: the Full
+// sample's v5 payload renders every layer chip — all three source tints on
+// the 防禦 row (which sits at the 16-layer bound), the 生命 gauge chips
+// decomposing its maximum, and the static 攻擊/敏捷 chips — while the
+// Undisguised variant above proves the layer-free state renders no
+// breakdown element at all.
+export const BreakdownChips = {
+  render: renderDrawer,
+  args: {},
 };

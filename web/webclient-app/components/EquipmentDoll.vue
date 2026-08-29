@@ -1,7 +1,7 @@
 <script setup>
 // EquipmentDoll (H4, webclient-hud-04-reference-drawers, task 6.3;
 // restyle-inventory-equipment-slots; realign-inventory-drawer-layout): the
-// 裝備 section of the 背包 drawer, built from the committed `character` v4
+// 裝備 section of the 背包 drawer, built from the committed `character` v5
 // payload's `equipment[]`. The binding design's `.doll` row: a two-column
 // square grid of four stable positions (主手 / 副手 / 盔甲 / 飾品 summary)
 // beside a 裝備描述 column that lists the committed rows under their slot
@@ -12,10 +12,13 @@
 // borders, no per-item stats line, no comparison tooltip, and no use /
 // consume / equip control (task 6.4) — the doll is a read-only presentation
 // of what is equipped and held.
+// render-equipment-breakdown-webclient: every row that carries a non-empty
+// server-generated `adjustment` string prints it verbatim; an empty string
+// renders no element.
 import { computed } from "vue";
 
 const props = defineProps({
-  // The committed `character` v4 panel payload (or the unavailable form).
+  // The committed `character` v5 panel payload (or the unavailable form).
   character: { type: Object, required: true },
 });
 
@@ -200,6 +203,11 @@ const duplicateRows = computed(() => {
             :data-testid="`equipment-doll__description-row--${entry.slot}`"
           >
             {{ slotLabel(entry.slot) }} · {{ entry.row.display_name }}
+            <span
+              v-if="entry.row.adjustment"
+              class="equipment-doll__adjustment"
+              :data-testid="`equipment-doll__adjustment--${entry.slot}`"
+            >{{ entry.row.adjustment }}</span>
           </div>
           <div
             v-if="accessoryRows.length > 0"
@@ -221,6 +229,11 @@ const duplicateRows = computed(() => {
                 :data-testid="`equipment-doll__accessory--${row.item_key}`"
               >
                 <span class="equipment-doll__row-name">{{ row.display_name }}</span>
+                <span
+                  v-if="row.adjustment"
+                  class="equipment-doll__adjustment"
+                  :data-testid="`equipment-doll__adjustment--${row.item_key}`"
+                >{{ row.adjustment }}</span>
                 <span class="equipment-doll__row-held">{{ row.held }}</span>
               </div>
             </section>
@@ -249,6 +262,11 @@ const duplicateRows = computed(() => {
         >
           <span class="equipment-doll__row-slot">{{ slotLabel(row.slot) }}</span>
           <span class="equipment-doll__row-name">{{ row.display_name }}</span>
+          <span
+            v-if="row.adjustment"
+            class="equipment-doll__adjustment"
+            :data-testid="`equipment-doll__adjustment--${row.item_key}`"
+          >{{ row.adjustment }}</span>
         </div>
       </section>
 
@@ -268,6 +286,11 @@ const duplicateRows = computed(() => {
         >
           <span class="equipment-doll__row-slot">{{ slotLabel(row.slot) }}</span>
           <span class="equipment-doll__row-name">{{ row.display_name }}</span>
+          <span
+            v-if="row.adjustment"
+            class="equipment-doll__adjustment"
+            :data-testid="`equipment-doll__adjustment--${row.item_key}`"
+          >{{ row.adjustment }}</span>
           <span class="equipment-doll__row-held">{{ row.held }}</span>
         </div>
       </section>
@@ -465,6 +488,18 @@ const duplicateRows = computed(() => {
   color: var(--paper-500);
   font-family: var(--f-mono);
   text-align: right;
+}
+
+/* The verbatim server-generated adjustment summary (render-equipment-
+   breakdown-webclient D2): its own wrapped line under the row's item name
+   (spans every grid column); empty strings never render an element. */
+.equipment-doll__adjustment {
+  grid-column: 1 / -1;
+  display: block;
+  color: var(--paper-500);
+  font-size: 0.8em;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .equipment-doll__empty {

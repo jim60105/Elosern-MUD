@@ -84,9 +84,10 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     }
   });
 
-  it("renders each committed row exactly once, and pure v4 rows show no fabricated values", () => {
-    // Pure committed shape: { slot, item_key, display_name } and nothing
-    // more (the character panel's row validator rejects extra fields).
+  it("renders each committed row exactly once, and rows without an adjustment show no fabricated values", () => {
+    // Rows WITHOUT the optional-in-hand-built-props adjustment field (the
+    // wire always carries it; a missing/empty string renders no adjustment
+    // element) must not fabricate any value.
     const w = mountDoll({ character: characterWith([
       { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
       { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍" },
@@ -141,7 +142,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
 
   it("unavailable character: renders the registry-owned reason, no fabricated slots", () => {
     const w = mountDoll({ character: {
-      schema_version: 4, available: false, kind: "character",
+      schema_version: 5, available: false, kind: "character",
        reason: { code: "no_puppet", message: "你已離開角色" },
       } });
     const reason = w.get('[data-testid="equipment-doll__unavailable"]');

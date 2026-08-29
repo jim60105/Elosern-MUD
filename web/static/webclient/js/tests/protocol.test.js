@@ -3559,10 +3559,6 @@ function validCharacterTraitRow(overrides) {
   );
 }
 
-function validCharacterTraitRowV4(overrides) {
-  return Object.assign({ key: "hp", label: "生命", current: 10, max: 10 }, overrides || {});
-}
-
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
@@ -3634,8 +3630,9 @@ function characterCategoryGroup(keys) {
 
 test("validates the character panel available/unavailable discriminator", () => {
   // The unavailable fixture carries the registered version (5), and the real
-  // validatePanel dispatch path is exercised. The retained legacy v4 branch
-  // is accepted on both forms; every other version rejects.
+  // validatePanel dispatch path is exercised. The transitional character v4
+  // tolerance is closed (render-equipment-breakdown-webclient): only the
+  // registered version 5 is accepted on both forms.
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
@@ -3644,13 +3641,12 @@ test("validates the character panel available/unavailable discriminator", () => 
     ),
     unavailableStatusPanel({ schema_version: 5 })
   );
-  assert.deepEqual(
+  assert.throws(() =>
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
       unavailableStatusPanel({ schema_version: 4 })
-    ),
-    unavailableStatusPanel({ schema_version: 4 })
+    )
   );
   assert.throws(() =>
     Protocol.validatePanel(
@@ -3673,23 +3669,16 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 6 })));
-  // The retained legacy branch: a byte-identical v4 payload still validates,
-  // and a v5 row under version 4 (or a v4 row under 5) rejects.
-  assert.doesNotThrow(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({
-        schema_version: 4,
-        traits: [validCharacterTraitRowV4(), validCharacterTraitRowV4({ key: "atk_phys", label: "攻擊", current: 5, max: null })],
-        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" }],
-      })
-    )
-  );
+  // v4 rejects on the version gate (both forms), and a legacy v4 trait row
+  // smuggled under version 5 rejects on the exact breakdown-shape rules.
   assert.throws(() =>
     Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 }))
   );
   assert.throws(() =>
     Protocol.validateCharacterPanel(
-      validCharacterPanel({ traits: [validCharacterTraitRowV4()] })
+      validCharacterPanel({
+        traits: [{ key: "hp", label: "生命", current: 10, max: 10 }],
+      })
     )
   );
   const missing = validCharacterPanel();
@@ -3861,7 +3850,7 @@ test("v5 equipment rows require the adjustment summary", () => {
   );
 });
 
-test("character panel v4 validates the intimate status section", () => {
+test("character panel v5 validates the intimate status section", () => {
   // A null intimate section (no sexual-state record) is valid.
   assert.doesNotThrow(() =>
     Protocol.validateCharacterPanel(validCharacterPanel({ intimate: null }))

@@ -629,22 +629,33 @@ def valid_art_panel() -> dict:
 
 
 def valid_character_panel(**overrides) -> dict:
-    """A schema-valid available character panel (schema version 4) for
+    """A schema-valid available character panel (schema version 5) for
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
-    (``web/webclient/presentation/character.py``): a `magic_level` trait row,
-    a guild rank/merit, and an integer-copper wallet. The v4 exact-field set
-    includes the nullable ``intimate`` section (webclient-intimate-status-
-    section); a `None` value is schema-valid. ``overrides`` replace
-    top-level fields for variant cases (e.g. an active disguise).
+    (``web/webclient/presentation/character.py``): a `magic_level` breakdown
+    trait row (``base``/``current``/``max``/``effective``/``layers``; a
+    static row's ``current`` equals its ``effective`` and ``max`` is null),
+    adjustment-bearing equipment rows, a guild rank/merit, and an integer-
+    copper wallet. The v5 exact-field set includes the nullable ``intimate``
+    section (webclient-intimate-status-section); a `None` value is schema-
+    valid. ``overrides`` replace top-level fields for variant cases (e.g. an
+    active disguise).
     """
     panel = {
-        "schema_version": 4,
+        "schema_version": 5,
         "available": True,
         "kind": "character",
         "traits": [
-            {"key": "magic_level", "label": "魔法階級", "current": 27, "max": 99},
+            {
+                "key": "magic_level",
+                "label": "魔法階級",
+                "base": 27,
+                "current": 27,
+                "max": None,
+                "effective": 27,
+                "layers": [],
+            },
         ],
         "actives": [],
         "passives": [],

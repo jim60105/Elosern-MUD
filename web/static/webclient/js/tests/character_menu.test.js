@@ -16,12 +16,12 @@ const CharacterMenu = require("../elosern/character_menu.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "character",
       traits: [
-        { key: "hp", label: "生命", current: 10, max: 10 },
-        { key: "atk_phys", label: "攻擊", current: 5, max: null },
+        { key: "hp", label: "生命", base: 10, current: 10, max: 10, effective: 10, layers: [] },
+        { key: "atk_phys", label: "攻擊", base: 5, current: 5, max: null, effective: 5, layers: [] },
       ],
       actives: [
         {
@@ -47,7 +47,7 @@ function validPanel(overrides) {
         },
       ],
       equipment: [
-        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" },
+        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "攻擊 +2" },
       ],
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
@@ -170,34 +170,32 @@ test("a character without a background renders no persona row", () => {
   assert.ok(!labels.includes("背景"));
 });
 
-test("a version-5 payload renders the same totals as the equivalent v4", () => {
-  // The legacy-client tolerance requirement: the menu reads current/max on
-  // every row (statics included), ignores the breakdown layers, and errors
-  // on nothing.
-  const v4 = validPanel();
-  const v5 = validPanel({
-    schema_version: 5,
-    traits: v4.traits.map((row) =>
+test("a version-5 payload renders totals and ignores the breakdown layers", () => {
+  // The legacy client is totals-only at v5 (render-equipment-
+  // breakdown-webclient closed the transitional v4 window): the menu reads
+  // current/max on every row (statics included), never renders the
+  // breakdown layers or the adjustment text, and errors on nothing.
+  const panel = validPanel({
+    traits: validPanel().traits.map((row) =>
       Object.assign({}, row, {
-        base: row.current,
-        effective: row.current,
-        layers: [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
+        layers: row.key === "hp" ? [] : [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
       })
     ),
-    equipment: v4.equipment.map((row) => Object.assign({}, row, { adjustment: "攻擊 +2" })),
   });
   const consoleErrors = [];
   const originalError = console.error;
   console.error = (...args) => consoleErrors.push(args);
   try {
-    const menuV4 = CharacterMenu.buildMenu(v4);
-    const menuV5 = CharacterMenu.buildMenu(v5);
+    const menu = CharacterMenu.buildMenu(panel);
     console.error = originalError;
-    assert.deepEqual(
-      menuV5.items.map((item) => item.label),
-      menuV4.items.map((item) => item.label),
-      "identical totals across versions"
+    const labels = menu.items.map((item) => item.label);
+    assert.ok(labels.includes("生命：10 / 10"));
+    assert.ok(labels.includes("攻擊：5"), "static rows keep the total display");
+    assert.ok(
+      !labels.some((label) => label.includes("鐵劍") && label.includes("+2")),
+      "layer amounts never render"
     );
+    assert.ok(!labels.some((label) => label.includes("攻擊 +2")), "adjustment text never renders");
     assert.deepEqual(consoleErrors, [], "no console errors while ignoring layers");
   } finally {
     console.error = originalError;

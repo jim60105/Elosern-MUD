@@ -25,8 +25,11 @@ renders totals.
 
 **Non-Goals:**
 
-- Any Python/payload change (P6 owns them), new components/manifest
-  entries, recomputation or re-sorting in JS, command-surface changes.
+- Any Python PAYLOAD change (P6 owns the wire shape), new components/
+  manifest entries, recomputation or re-sorting in JS, command-surface
+  changes. The one authorized Python edit is D3's v4 retirement in the
+  `character` panel validator (deleting the transitional acceptance
+  branch); no serializer, read-model, or rule change.
 
 ## Decisions
 
@@ -38,8 +41,10 @@ attach to the maximum, whose decomposed value IS the payload `max`) and
 one chip per layer IN PAYLOAD ORDER — ALL layers rendered, wrapping freely
 (≤ 16 by payload bound; NO truncation or `+n` collapse concept exists),
 source-tinted (skill／狀況／裝備 palette from existing design tokens),
-label = layer `name` verbatim, formatted amount by `kind` (`mult` → `×1.2`
-with trailing zeros stripped, `flat` → `+4`/`−2`, `pct` → `−10%`/`+15%`,
+label = layer `name` verbatim, formatted amount by `kind` (`mult` → a
+SIGNED factor `×1.2`/`×−1.2` — the wire accepts negative non-zero factors
+and the server prose keeps the sign — with trailing zeros stripped,
+`flat` → `+4`/`−2`, `pct` → `−10%`/`+15%`,
 server amounts re-signed only for display, never recomputed). No sorting,
 no grouping arithmetic, no client-side totals. Rows without layers keep
 the existing value text and render NO breakdown elements (no chip
@@ -47,9 +52,21 @@ containers, no wrappers). Unknown `source`/`kind` values are a
 DEFENSE-IN-DEPTH for direct component rendering only: the wire contract
 (Python + legacy JS exact validators) still REJECTS unknown enums, and a
 component-level Vitest renders an unknown-enum props object directly to
-prove the neutral 其他 chip never corrupts the value line — no wire
+prove the neutral 其他 chip — classified neutral when EITHER `source` is
+unregistered OR `kind` is unrecognised (rubber-duck run 2) — never
+corrupts the value line; no wire
 relaxation anywhere. Accessibility: chips are text-bearing (never
 color-alone) per the existing WCAG baseline.
+
+Gauge-row pairing guard (rubber-duck run 1): the vitals value line renders
+from the `status` v1 payload, while layer chips come from the `character`
+payload — two independently committed panels. Attaching a character trait's
+layers to a status gauge whose maximum they do not decompose would explain
+a different number than the player sees. A vitals row therefore attaches
+the matching character trait's layers ONLY when the character panel is
+available, that trait row carries a non-null `max`, and
+`trait.max === status.resources[key].maximum`; every other combination
+keeps the existing value text and renders no breakdown element.
 
 ### D2 — Adjustment text renders where equipment is listed
 
@@ -67,10 +84,14 @@ is NOT rendered (non-vacuous).
 
 ### D3 — v5-only acceptance closes the tolerance window
 
-Vue app validation, legacy `protocol.js` gate, and fixtures accept ONLY
-schema version 5; the P6 v4 branches and v4 fixture are deleted (unreleased
-project — no compat per AGENTS.md). The legacy client keeps its totals-only
-rendering at v5 (long-lived fallback for non-Vue contexts).
+Vue app validation (through the shared `protocol.js` gate), the legacy
+`protocol.js` gate AND panel-dispatch special case, the Python
+`presentation/character.py` 4|5 dispatch, and every fixture (Vitest,
+Storybook, Node gate, browser helper) accept ONLY schema version 5; the P6
+v4 branches and v4 fixtures are deleted (unreleased project — no compat per
+AGENTS.md). The `webclient-exploration-menu` transitional requirement is
+retired through a REMOVED delta in the same change. The legacy client keeps
+its totals-only rendering at v5 (long-lived fallback for non-Vue contexts).
 
 ### D4 — Showcase coverage stays frozen-manifest-clean
 

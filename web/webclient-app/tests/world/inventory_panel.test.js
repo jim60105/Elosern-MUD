@@ -13,7 +13,7 @@ import {
 } from "../../stories/fixtures.js";
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },

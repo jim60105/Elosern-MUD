@@ -15,14 +15,14 @@ import {
 // the registry-owned reason (and invent nothing) when the `character` panel
 // is unavailable. The 親密狀態 (intimate-status) section renders as a
 // collapsed-by-default `<details>` disclosure when the committed `character`
-// v4 payload's `intimate` field is present, and is entirely absent from the
+// v5 payload's `intimate` field is present, and is entirely absent from the
 // DOM when it is `null` or the `character` panel is unavailable (never a
 // placeholder or a collapsed-empty widget). The equipment doll and the
 // single drawer-layer wallet now live in the inventory drawer, so this body
 // renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
@@ -116,7 +116,14 @@ describe("CharacterStatusDrawer", () => {
     expect(w.get('[data-testid="character-status-drawer__intimate--arousal"]').text()).toContain("中等");
     expect(w.get('[data-testid="character-status-drawer__intimate--wetness"]').text()).toContain("微濕");
     expect(w.get('[data-testid="character-status-drawer__intimate--shame"]').text()).toContain("輕微");
-    expect(w.get('[data-testid="character-status-drawer__intimate--exposure"]').text()).toContain("低");
+    // The effective-exposure pin (render-equipment-breakdown-webclient D2,
+    // non-vacuous): the fixture's worn 修女聖袍 biases the stored base 「低」
+    // to the effective 「中等」, and the wire never carries the base. The
+    // assertion is scoped to the exposure row itself so no other row's
+    // wording can satisfy it.
+    const exposureRow = w.get('[data-testid="character-status-drawer__intimate--exposure"]');
+    expect(exposureRow.text()).toContain("中等");
+    expect(exposureRow.text()).not.toContain("低");
     expect(w.get('[data-testid="character-status-drawer__intimate--climax_phase"]').text()).toContain("未達");
     expect(w.get('[data-testid="character-status-drawer__intimate--climax_today"]').text()).toContain("2 次");
     expect(w.get('[data-testid="character-status-drawer__intimate-hint"]').text()).toBe("詞彙封閉；數值依設定折線/級別顯示。");

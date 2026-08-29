@@ -7,7 +7,9 @@ status-vs-character parity proving both panels share the same canonical trait
 source.
 Version 5 (expose-stat-breakdown-read-model) adds the breakdown trait rows
 (``base``/``effective``/``layers``) and the equipment ``adjustment`` summary;
-the retained v4 branch is pinned by dedicated legacy-fixture tests.
+render-equipment-breakdown-webclient closed the transitional tolerance
+window: version 5 is the only accepted schema version, and v4 payloads
+reject.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -22,7 +24,6 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.character import (
     CHARACTER_SCHEMA_VERSION,
-    CHARACTER_LEGACY_SCHEMA_VERSION,
     MAX_ACTIVE_ROWS,
     MAX_CATEGORY_GROUPS,
     MAX_DISPLAYED_ROWS,
@@ -58,12 +59,6 @@ def _context(actor):
     return PresentationContext(actor=actor, protocol_version=1)
 
 
-def _trait_v4(**overrides):
-    value = {"key": "hp", "label": "生命", "current": 10, "max": 10}
-    value.update(overrides)
-    return value
-
-
 def _trait(**overrides):
     value = {
         "key": "hp",
@@ -90,33 +85,6 @@ def _equipment_row(**overrides):
         "item_key": "plain_sword",
         "display_name": "鐵劍",
         "adjustment": "",
-    }
-    value.update(overrides)
-    return value
-
-
-def _valid_panel_v4(**overrides):
-    """A byte-identical v4 payload (the retained legacy validator branch)."""
-    value = {
-        "schema_version": CHARACTER_LEGACY_SCHEMA_VERSION,
-        "available": True,
-        "kind": "character",
-        "traits": [
-            _trait_v4(),
-            _trait_v4(key="atk_phys", label="攻擊", current=5, max=None),
-        ],
-        "actives": _skill_categories(["fire_ball"]),
-        "passives": _skill_categories(
-            ["defense_instinct"], category="enhancement", label="強化"
-        ),
-        "equipment": [
-            {"slot": "weapon_main", "item_key": "plain_sword", "display_name": "鐵劍"}
-        ],
-        "disguise": {"active": False, "description": "", "displayed": []},
-        "guild": {"rank": None, "merit": 0},
-        "wallet": 100,
-        "persona": {"background": None},
-        "intimate": None,
     }
     value.update(overrides)
     return value
@@ -215,21 +183,20 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertTrue(normalized["available"])
         self.assertEqual(normalized["kind"], "character")
 
-    @covers_requirement("webclient-exploration-menu::the-legacy-client-tolerates-the-version-5-character-payload")
-    def test_legacy_v4_panel_still_validates_exactly(self):
-        normalized = validate_character(_valid_panel_v4())
-        self.assertEqual(normalized["schema_version"], CHARACTER_LEGACY_SCHEMA_VERSION)
-        self.assertEqual(
-            set(normalized["traits"][0]), {"key", "label", "current", "max"}
-        )
-        # A v4 row at schema version 5 is rejected by the v5 exact-shape rules.
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    def test_version_four_payloads_reject_everywhere(self):
+        # The transitional v4 tolerance is closed (render-equipment-
+        # breakdown-webclient): a v4 payload rejects on the version gate,
+        # and a v4 trait row smuggled under version 5 rejects on the exact
+        # breakdown-shape rules.
+        with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(schema_version=4))
         with self.assertRaises(ProtocolValidationError):
             validate_character(
-                _valid_panel(traits=[_trait_v4()])
+                _valid_panel(
+                    traits=[{"key": "hp", "label": "生命", "current": 10, "max": 10}]
+                )
             )
-        # A v5 row under v4 is likewise rejected.
-        with self.assertRaises(ProtocolValidationError):
-            validate_character(_valid_panel_v4(traits=[_trait()]))
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_v5_trait_layer_validation_is_exact(self):

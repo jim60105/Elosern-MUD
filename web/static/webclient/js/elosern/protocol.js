@@ -2973,7 +2973,6 @@
   // closed source/kind alphabets.
   var CHARACTER_MAX_LAYERS = 16;
   var CHARACTER_MAX_ADJUSTMENT = CHARACTER_MAX_DESCRIPTION;
-  var CHARACTER_LEGACY_SCHEMA_VERSION = 4;
   var CHARACTER_LAYER_SOURCES = ["skill", "condition", "equipment"];
   var CHARACTER_LAYER_KINDS = ["mult", "flat", "pct"];
   // Fixed level vocabularies for the character panel's intimate section
@@ -2992,23 +2991,6 @@
     return key;
   }
 
-  function validateCharacterTraitRowV4(value) {
-    requireExactFields(value, "trait row", ["key", "label", "current", "max"], []);
-    validateCharacterKey(value.key, "trait key");
-    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
-    if (!label.trim()) {
-      throw new Error("trait label must be non-empty");
-    }
-    requireInt(value.current, "current", 0, MAX_SAFE_INTEGER);
-    if (value.max !== null) {
-      requireInt(value.max, "max", 1, MAX_SAFE_INTEGER);
-      if (value.current > value.max) {
-        throw new Error("trait current must not exceed maximum");
-      }
-    }
-    return value;
-  }
-
   function requireNumber(value, field, minimum, maximum) {
     // JSON numbers with the wire bounds: finite, safe-ranged, non-boolean.
     if (typeof value !== "number" || !isFinite(value)) {
@@ -3020,7 +3002,7 @@
     return value;
   }
 
-  // v5 breakdown row pieces (expose-stat-breakdown-read-model): the exact
+  // Breakdown row pieces (expose-stat-breakdown-read-model): the exact
   // {source, name, kind, amount} layer and the seven-field trait row. The
   // numeric fields accept JSON numbers (a scaled rule-table grant produces
   // fractional values such as 2.5), never booleans or non-finite numbers.
@@ -3048,7 +3030,7 @@
     return value;
   }
 
-  function validateCharacterTraitRowV5(value) {
+  function validateCharacterTraitRow(value) {
     requireExactFields(
       value,
       "trait row",
@@ -3069,7 +3051,7 @@
       }
     }
     requireNumber(value.effective, "effective", 0, MAX_SAFE_INTEGER);
-    // The defining row contract (v5): a gauge row's effective value IS its
+    // The defining row contract: a gauge row's effective value IS its
     // maximum; a static row exposes its authoritative effective total through
     // the total-display field. A payload contradicting either is rejected at
     // the boundary instead of letting two incompatible totals diverge.
@@ -3189,23 +3171,9 @@
     return count;
   }
 
-  function validateCharacterEquipmentRowV4(value) {
-    requireExactFields(value, "equipment row", ["slot", "item_key", "display_name"], []);
-    var slot = requireString(value.slot, "slot", CHARACTER_MAX_SLOT);
-    if (!slot.trim()) {
-      throw new Error("slot must be non-empty");
-    }
-    validateCharacterKey(value.item_key, "item_key");
-    var displayName = requireString(value.display_name, "display_name", CHARACTER_MAX_LABEL);
-    if (!displayName.trim()) {
-      throw new Error("equipment display_name must be non-empty");
-    }
-    return value;
-  }
-
-  // v5 equipment row: the v4 fields plus the required (possibly empty)
+  // Equipment row: the identity fields plus the required (possibly empty)
   // server-formatted adjustment summary.
-  function validateCharacterEquipmentRowV5(value) {
+  function validateCharacterEquipmentRow(value) {
     requireExactFields(
       value,
       "equipment row",
@@ -3279,7 +3247,7 @@
     return { background: background.trim() };
   }
 
-  // Nullable intimate section of the character panel v4 (webclient-intimate-status-section).
+  // Nullable intimate section of the character panel (webclient-intimate-status-section).
   // `null` means the actor has no sexual-state record; otherwise the section
   // carries exactly the six intimate fields, each level field checked against
   // its fixed vocabulary and `climax_today` as a non-negative safe integer.
@@ -3311,13 +3279,13 @@
     };
   }
 
-  // Exact available character panel schema (design D10 + skill category
-  // grouping + the intimate-status section from webclient-intimate-status-section).
-  // v5 (expose-stat-breakdown-read-model) swaps in the breakdown trait rows
-  // and the adjustment-bearing equipment rows; every other section is
-  // byte-identical to v4, whose rules are retained unchanged. Shared bounds
-  // are guarded by a dual-direction parity test.
-  function validateCharacterPanelAt(payload, version) {
+  // Exact available character panel v5 schema (design D10: skill category
+  // grouping + the intimate-status section; expose-stat-breakdown-read-model
+  // added the breakdown trait rows and the adjustment-bearing equipment
+  // rows; render-equipment-breakdown-webclient closed the transitional v4
+  // tolerance window so version 5 is the only accepted version). Shared
+  // bounds are guarded by a dual-direction parity test.
+  function validateCharacterAvailablePanel(payload) {
     requireExactFields(
       payload,
       "character panel",
@@ -3337,21 +3305,18 @@
       ],
       []
     );
-    if (payload.schema_version !== version) {
+    if (payload.schema_version !== 5) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
       throw new Error("character panel must be available with kind character");
     }
-    var traitRowValidator = version >= 5 ? validateCharacterTraitRowV5 : validateCharacterTraitRowV4;
-    var equipmentRowValidator =
-      version >= 5 ? validateCharacterEquipmentRowV5 : validateCharacterEquipmentRowV4;
     if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
       throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
     }
     var traitKeys = {};
     payload.traits.forEach(function (row) {
-      traitRowValidator(row);
+      validateCharacterTraitRow(row);
       if (traitKeys[row.key]) {
         throw new Error("trait keys must be unique");
       }
@@ -3386,7 +3351,7 @@
     if (!Array.isArray(payload.equipment) || payload.equipment.length > CHARACTER_MAX_EQUIPMENT_ROWS) {
       throw new Error("equipment must be a list of at most " + CHARACTER_MAX_EQUIPMENT_ROWS + " rows");
     }
-    payload.equipment.forEach(equipmentRowValidator);
+    payload.equipment.forEach(validateCharacterEquipmentRow);
     validateCharacterDisguise(payload.disguise);
     validateCharacterGuild(payload.guild);
     requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
@@ -3394,7 +3359,7 @@
 
     var intimate = validateCharacterIntimate(payload.intimate);
     var result = {
-      schema_version: version,
+      schema_version: 5,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -3415,17 +3380,13 @@
   }
 
   function validateCharacterPanel(payload) {
-    // Version dispatch (mirror of the server validator): 5 is the shipped
-    // schema; the exact 4 branch stays available for retained legacy
-    // fixtures and is never relaxed.
+    // Version gate (mirror of the server validator): 5 is the only accepted
+    // schema version (render-equipment-breakdown-webclient).
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
     if (payload.schema_version !== 5) {
-      if (payload.schema_version === CHARACTER_LEGACY_SCHEMA_VERSION) {
-        return validateCharacterPanelAt(payload, CHARACTER_LEGACY_SCHEMA_VERSION);
-      }
       throw new Error("unsupported character schema_version");
     }
-    return validateCharacterPanelAt(payload, 5);
+    return validateCharacterAvailablePanel(payload);
   }
 
   // Panel discriminator dispatch: the unavailable form is common to every
@@ -3641,23 +3602,16 @@
       throw new Error("panel " + name + " must be a JSON object");
     }
     requireInt(payload.schema_version, "panel schema_version", 1, MAX_SAFE_INTEGER);
-    // The character panel retains its exact legacy v4 branch: the registered
-    // version is 5, and v4 payloads (both forms) still validate against the
-    // byte-identical v4 rules. Every other panel must match its registered
-    // version exactly.
-    var accepted =
-      name === "character" &&
-      (payload.schema_version === schemaVersion ||
-        payload.schema_version === CHARACTER_LEGACY_SCHEMA_VERSION)
-        ? payload.schema_version
-        : schemaVersion;
-    if (payload.schema_version !== accepted) {
+    // Every panel (character included, since render-equipment-
+    // breakdown-webclient retired the transitional character v4 branch)
+    // must match its registered version exactly.
+    if (payload.schema_version !== schemaVersion) {
       throw new Error(
         "panel " + name + " schema_version does not match registered version"
       );
     }
     if (payload.available === false) {
-      return validateUnavailablePanel(payload, accepted);
+      return validateUnavailablePanel(payload, schemaVersion);
     }
     if (payload.available !== true) {
       throw new Error("panel " + name + " is missing the availability discriminator");
@@ -3944,8 +3898,8 @@
     validateArtPanel: validateArtPanel,
     validateExplorationPanel: validateExplorationPanel,
     validateCharacterPanel: validateCharacterPanel,
-    validateCharacterTraitRowV5: validateCharacterTraitRowV5,
-    validateCharacterEquipmentRowV5: validateCharacterEquipmentRowV5,
+    validateCharacterTraitRow: validateCharacterTraitRow,
+    validateCharacterEquipmentRow: validateCharacterEquipmentRow,
     validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
     validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
     validateContextActionsPanel: validateContextActionsPanel,
