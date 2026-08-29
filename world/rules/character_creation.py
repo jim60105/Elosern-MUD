@@ -12,6 +12,7 @@ from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
+from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.surfaces import (
     restore_attributes,
     restore_traits,
@@ -446,11 +447,17 @@ def activate_player_character(
         if request.mode == "preset"
         else {"active": [], "passive": []}
     )
-    inventory_value = (
-        PLAYER_PRESET_REGISTRY[request.preset_key].inventory_list()
-        if request.mode == "preset"
-        else []
-    )
+    if request.mode == "preset":
+        inventory_value = PLAYER_PRESET_REGISTRY[request.preset_key].inventory_list()
+    else:
+        # Custom mode hands out the chosen subrace's basic starting kit
+        # (add-subrace-starting-kits D2). Load-time coverage guarantees the
+        # lookup succeeds; the guarded get keeps even a future registry bug
+        # failing pre-persistence like every other activation error.
+        kit = SUBRACE_STARTING_KIT_REGISTRY.get(validated.subrace)
+        if kit is None:
+            raise CharacterCreationError("subrace has no registered starting kit")
+        inventory_value = kit.inventory_list()
     attribute_values = {
         "age": validated.age,
         "apparent_age": validated.apparent_age,

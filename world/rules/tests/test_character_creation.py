@@ -11,6 +11,8 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.races import SUBRACE_REGISTRY
+from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -91,7 +93,10 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(self.character.traits.magic_level.value, 27)
         self.assertEqual(self.character.traits.guild_merit.value, 0)
         self.assertEqual(self.character.db.skills, {"active": [], "passive": []})
-        self.assertEqual(self.character.db.inventory, [])
+        self.assertEqual(
+            self.character.db.inventory,
+            SUBRACE_STARTING_KIT_REGISTRY["human_commoner"].inventory_list(),
+        )
         self.assertEqual(self.character.wallet, 0)
         self.assertEqual(self.character.id, old_id)
         self.assertEqual(self.character.location, old_location)
@@ -225,6 +230,29 @@ class CharacterActivationTests(EvenniaTest):
                 expected = PLAYER_PRESET_REGISTRY[preset_key].inventory_list()
                 self.assertEqual(character.db.inventory, expected)
                 self.assertGreater(len(expected), 0)
+
+    def test_custom_activation_grants_each_subrace_starting_kit(self):
+        for subrace_key, subrace in SUBRACE_REGISTRY.items():
+            with self.subTest(subrace=subrace_key):
+                character = create_object(
+                    PlayerCharacter, key=f"custom-shell-{subrace_key}"
+                )
+                self.account.at_post_create_character(character)
+                activate_player_character(
+                    self.account, character,
+                    self.request(
+                        race=subrace.race_key,
+                        subrace=subrace_key,
+                        allocations=balanced_allocations(subrace.race_key, subrace_key),
+                    ),
+                    sampler=lambda low, high: low,
+                )
+                expected = SUBRACE_STARTING_KIT_REGISTRY[
+                    subrace_key
+                ].inventory_list()
+                self.assertEqual(character.db.inventory, expected)
+                self.assertGreater(len(expected), 0)
+                self.assertFalse(character.creation_pending)
 
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):
         self.character.db.magic_xp = 9
