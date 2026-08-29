@@ -6,6 +6,7 @@
 // no surface is invented for a panel without a backing model).
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
+import LocalMapLogic from "./lib/local_map.js";
 import { classifyPane } from "./components/dock-panes.js";
 import { formatCopper } from "./components/character-identity.js";
 import AppShell from "./components/AppShell.vue";
@@ -472,11 +473,23 @@ function onMapMove(moveData) {
   // The minimap node action carries `exit_ref` + `destination`; the
   // `explore.move` payload requires exactly `{ exit_ref, current_node }`,
   // where `current_node` is the actor's current node (the committed
-  // `local_map.current_node`), not the destination.
-  store.dispatchAction("explore.move", {
-    exit_ref: moveData.exit_ref,
-    current_node: store.view.localMapModel?.currentNode ?? null,
-  });
+  // `local_map.current_node`), not the destination. The echo label is the
+  // uniquely matching traversable edge label (else the destination node's
+  // committed label; else nothing — never an invented exit, D3).
+  const model = store.view.localMapModel ?? null;
+  const exitLabel = LocalMapLogic.exitLabelFor(
+    model,
+    model?.currentNode ?? null,
+    moveData.destination ?? null
+  );
+  store.dispatchAction(
+    "explore.move",
+    {
+      exit_ref: moveData.exit_ref,
+      current_node: model?.currentNode ?? null,
+    },
+    exitLabel ? { exitLabel } : null
+  );
 }
 
 // H5 (webclient-hud-05-overlays-and-command-line, tasks 5.2/6.4): the

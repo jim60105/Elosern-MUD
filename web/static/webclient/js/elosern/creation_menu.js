@@ -28,6 +28,11 @@
   var CONCEPT_ACTION = "creation.concept";
   var ACTIVATE_ACTION = "creation.activate";
   var RESET_ACTION = "creation.reset";
+  // The reset control has no typed command and the creation panel carries no
+  // reset label to read; this bounded client-owned control label is the echo's
+  // form-(b) exception (complete-ui-command-echo D7), pinned by the Node
+  // suite exactly like the combat flee row's button label.
+  var RESET_DISPLAY = { actionLabel: "清除草稿" };
 
   // -------------------------------------------------------------------------
   // Root and preset menus.
@@ -460,7 +465,7 @@
   // Confirmation screens.
   // -------------------------------------------------------------------------
 
-  function confirmMenu(label, actionId, payload, itemLabel) {
+  function confirmMenu(label, actionId, payload, commandDisplay) {
     return {
       items: [
         {
@@ -469,6 +474,11 @@
           enabled: true,
           actionId: actionId,
           payload: payload,
+          // The echo descriptor rides the confirm item itself so both the
+          // dock submit and the overlay's confirm intent (which reads the
+          // committed confirm items) resolve exactly one display line
+          // (complete-ui-command-echo D3).
+          commandDisplay: commandDisplay || null,
         },
         {
           key: "cancel-" + actionId,
@@ -478,7 +488,7 @@
           payload: null,
         },
       ],
-      itemLabel: itemLabel || null,
+      itemLabel: (commandDisplay && commandDisplay.presetKey) || null,
       // The breadcrumb names the confirmation frame (H3 webclient-hud-03-action-dock).
       title: "確認",
     };
@@ -486,7 +496,12 @@
 
   function activateConfirm(presetKey) {
     var label = presetKey ? "確認啟用此預設角色？" : "確認建立此角色？";
-    return confirmMenu(label, ACTIVATE_ACTION, {}, presetKey || null);
+    return confirmMenu(
+      label,
+      ACTIVATE_ACTION,
+      {},
+      presetKey ? { presetKey: presetKey } : null
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -511,6 +526,7 @@
     CONCEPT_ACTION: CONCEPT_ACTION,
     ACTIVATE_ACTION: ACTIVATE_ACTION,
     RESET_ACTION: RESET_ACTION,
+    RESET_DISPLAY: RESET_DISPLAY,
     rootItems: rootItems,
     presetItems: presetItems,
     presetCard: presetCard,

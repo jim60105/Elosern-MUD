@@ -10,9 +10,13 @@
  *
  * The catalog is pure client presentation: it never submits, never replays,
  * never alters dispatch payloads, and never touches the transport. Command
- * spellings are pinned against `commands/*.py` by the Node suite; actions
- * without a typed command (`combat.flee`, exit traversal) emit their
- * server-authored label as an action description and never invent a command.
+ * spellings are pinned against `commands/*.py` by the Node suite; the three
+ * actions without a typed command (`combat.flee`, exit traversal,
+ * `creation.reset`) emit a bounded action label of the activating control as
+ * an action description (the server exit label where the panel carries one,
+ * a verbatim-pinned client-owned control label otherwise) and never invent a
+ * command. Declared silent presentation controls (`options.dismiss`) return
+ * `null` by declaration.
  *
  * No `document` or `window` access at load time; Node tests exercise the
  * module directly.
@@ -68,6 +72,16 @@
 
   function join(parts) {
     return parts.filter(isNonEmpty).join(" ");
+  }
+
+  // Declared silent presentation controls (design D4): UI visibility
+  // controls with no game action and no typed equivalent. `commandLine`
+  // checks this list first, so the declaration and the silence share one
+  // code path.
+  var SILENT_PRESENTATION_CONTROLS = ["options.dismiss"];
+
+  function isSilentPresentationControl(actionId) {
+    return SILENT_PRESENTATION_CONTROLS.indexOf(actionId) !== -1;
   }
 
   // Resolver table: actionId -> (payload, display) => string | null. Every
@@ -146,6 +160,15 @@
         target = payload.target_shorthand;
       } else if (isNonEmpty(display && display.targetLabel)) {
         target = display.targetLabel;
+      } else if (Array.isArray(display && display.targetLabels)) {
+        // D3b: explicit multi-target AREA payloads echo every selected
+        // participant label in payload order (bounded, joined with 、).
+        var names = display.targetLabels
+          .map(label)
+          .filter(isNonEmpty);
+        if (names.length > 0) {
+          target = names.join("、");
+        }
       }
       // The chosen freeform magnitude is echoed as a display-only suffix
       // (e.g. 「施展 風刃術（威力×2）」), composed from the server-authored
@@ -201,6 +224,19 @@
       }
       return join(["sell", item, String(quantity)]);
     },
+    // The backpack surface echoes the keyboard it teaches: the typed
+    // `使用`/`use` and `裝備`/`equip` commands (commands/items.py) accept the
+    // literal `item_key` as their first argument, so the line is exactly
+    // what the keyboard replays. `裝備`/`equip` IS the equipment toggle —
+    // both directions echo `equip` (design D1/D2; no typed `unequip` exists).
+    "inventory.use": function (payload) {
+      var key = label(payload && payload.item_key);
+      return key === null ? null : join(["use", key]);
+    },
+    "inventory.toggle_equip": function (payload) {
+      var key = label(payload && payload.item_key);
+      return key === null ? null : join(["equip", key]);
+    },
     "creation.preset": function (payload) {
       var key = payload && payload.preset_key;
       return isNonEmpty(key) ? join(["character preset", key]) : null;
@@ -227,6 +263,9 @@
     if (typeof actionId !== "string") {
       return null;
     }
+    if (isSilentPresentationControl(actionId)) {
+      return null;
+    }
     var resolve = RESOLVERS[actionId];
     if (!resolve) {
       return null;
@@ -243,6 +282,8 @@
 
   return {
     commandLine: commandLine,
+    isSilentPresentationControl: isSilentPresentationControl,
+    SILENT_PRESENTATION_CONTROLS: SILENT_PRESENTATION_CONTROLS.slice(),
     MAX_LABEL_LENGTH: MAX_LABEL_LENGTH,
     MAX_LINE_LENGTH: MAX_LINE_LENGTH,
   };

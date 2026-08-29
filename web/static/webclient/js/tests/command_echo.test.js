@@ -341,3 +341,165 @@ test("line separators in speech are collapsed, never echoed as raw newlines", ()
   );
   assert.strictEqual(line, "talk 老闆 第一行 第二行 結尾");
 });
+
+test("inventory.use resolves to the typed use command", () => {
+  assert.strictEqual(
+    Echo.commandLine("inventory.use", { item_key: "healing_potion" }, null),
+    "use healing_potion"
+  );
+});
+
+test("inventory.use stays silent on a missing, empty, or non-string item_key", () => {
+  assert.strictEqual(Echo.commandLine("inventory.use", {}, null), null);
+  assert.strictEqual(
+    Echo.commandLine("inventory.use", { item_key: "  " }, null),
+    null
+  );
+  assert.strictEqual(
+    Echo.commandLine("inventory.use", { item_key: 7 }, null),
+    null
+  );
+});
+
+test("inventory.toggle_equip echoes the typed equip command in both directions", () => {
+  // The typed 裝備/equip command IS the toggle: the unequip click echoes the
+  // same replayable line, and no `unequip` command is ever invented.
+  assert.strictEqual(
+    Echo.commandLine("inventory.toggle_equip", { item_key: "leather_vest" }, null),
+    "equip leather_vest"
+  );
+  assert.strictEqual(
+    Echo.commandLine("inventory.toggle_equip", { item_key: "leather_vest" }, { equipped: true }),
+    "equip leather_vest"
+  );
+});
+
+test("combat.cast echoes explicit multi-target labels in payload order (D3b)", () => {
+  const line = Echo.commandLine(
+    "combat.cast",
+    { skill_key: "wind_blade", target_ids: ["goblin_1", "orc_2"] },
+    { skillLabel: "風刃術", targetLabels: ["哥布林", "獸人"] }
+  );
+  assert.strictEqual(line, "cast 風刃術=哥布林、獸人");
+});
+
+test("combat.cast bounds multi-target labels and prefers shorthand over them", () => {
+  const huge = "太".repeat(Echo.MAX_LABEL_LENGTH + 10);
+  const line = Echo.commandLine(
+    "combat.cast",
+    { skill_key: "wind_blade", target_ids: ["a", "b"] },
+    { skillLabel: "風", targetLabels: [huge, "乙"] }
+  );
+  assert.ok(line !== null);
+  assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
+  const shorthand = Echo.commandLine(
+    "combat.cast",
+    { skill_key: "wind_blade", target_shorthand: "all-enemies", target_ids: ["a"] },
+    { skillLabel: "風", targetLabels: ["甲", "乙"] }
+  );
+  assert.strictEqual(shorthand, "cast 風=all-enemies");
+});
+
+test("combat.cast with empty or non-array targetLabels falls back like before", () => {
+  assert.strictEqual(
+    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: "風", targetLabels: [] }),
+    "cast 風"
+  );
+  assert.strictEqual(
+    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: "風", targetLabels: "甲" }),
+    "cast 風"
+  );
+});
+
+test("options.dismiss is a declared silent presentation control", () => {
+  assert.ok(Echo.SILENT_PRESENTATION_CONTROLS.indexOf("options.dismiss") !== -1);
+  assert.strictEqual(Echo.isSilentPresentationControl("options.dismiss"), true);
+  assert.strictEqual(
+    Echo.commandLine("options.dismiss", {}, { npcLabel: "老闆" }),
+    null,
+    "the silence is by declaration, not an accidental missing resolver"
+  );
+});
+
+// Coverage invariant (webclient-input-narrative, design D5): every action id
+// registered in `web/webclient/actions/registry.py` resolves to a bounded
+// line from this pinned fixture or appears on the declared silent list. The
+// shared manifest `command_echo_coverage_manifest.json` is the single id
+// source for this suite, the Vitest per-surface table
+// (web/webclient-app/tests/store/command_echo_surfaces.test.js), and the
+// Python registry pin (web/webclient/actions/tests/
+// test_action_catalog_coverage.py), so a newly registered action cannot ship
+// with a silent catalog gap.
+const COVERAGE_MANIFEST = require("./command_echo_coverage_manifest.json");
+
+const REGISTERED_MUTATION_ACTIONS = {
+  "combat.cast": { payload: { skill_key: "wind_blade" }, display: { skillLabel: "風刃術" } },
+  "combat.flee": { payload: {}, display: { actionLabel: "逃跑" } },
+  "combat.forfeit": { payload: {}, display: {} },
+  "creation.activate": { payload: {}, display: { presetKey: "elf_mage" } },
+  "creation.concept": { payload: { concept: "流浪學者" }, display: {} },
+  "creation.custom": { payload: {}, display: {} },
+  "creation.preset": { payload: { preset_key: "elf_mage" }, display: {} },
+  "creation.reset": { payload: {}, display: { actionLabel: "清除草稿" } },
+  "explore.engage": { payload: {}, display: { targetLabel: "哥布林" } },
+  "explore.look": { payload: { room: true }, display: { room: true } },
+  "explore.move": { payload: { exit_ref: "e1", current_node: "n1" }, display: { exitLabel: "北門" } },
+  "explore.party_invite": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.party_leave": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
+  "explore.wait": { payload: { daypart: "dusk" }, display: {} },
+  "guild.exam_start": { payload: { target_rank: "正式會員" }, display: {} },
+  "guild.quest_abandon": { payload: { quest_id: "quest_1" }, display: {} },
+  "guild.quest_accept": { payload: { definition_key: "escort" }, display: {} },
+  "guild.quest_turnin": { payload: { quest_id: "quest_1" }, display: {} },
+  "guild.register": { payload: {}, display: {} },
+  "inventory.toggle_equip": { payload: { item_key: "leather_vest" }, display: {} },
+  "inventory.use": { payload: { item_key: "healing_potion" }, display: {} },
+  "options.dismiss": null,
+  "shop.buy": { payload: { item_key: "healing_potion", quantity: 2 }, display: { itemLabel: "治療藥水" } },
+  "shop.sell": { payload: { item_key: "healing_potion", quantity: 1 }, display: { itemLabel: "治療藥水" } },
+};
+
+test("every registered mutation action resolves non-null or is declared silent", () => {
+  const manifestIds = COVERAGE_MANIFEST.registeredMutationActionIds.slice().sort();
+  const fixtureIds = Object.keys(REGISTERED_MUTATION_ACTIONS).sort();
+  assert.deepStrictEqual(
+    fixtureIds,
+    manifestIds,
+    "the catalog coverage fixture must cover exactly the manifest's registered ids"
+  );
+  for (const actionId of fixtureIds) {
+    const fixture = REGISTERED_MUTATION_ACTIONS[actionId];
+    if (fixture === null) {
+      assert.ok(
+        COVERAGE_MANIFEST.silentPresentationControlIds.indexOf(actionId) !== -1,
+        `${actionId} must appear on the manifest's silent list`
+      );
+      assert.ok(
+        Echo.isSilentPresentationControl(actionId),
+        `${actionId} must be on the catalog's declared silent list`
+      );
+      assert.strictEqual(Echo.commandLine(actionId, {}, {}), null);
+      continue;
+    }
+    assert.ok(
+      !Echo.isSilentPresentationControl(actionId),
+      `${actionId} must not be declared silent`
+    );
+    const line = Echo.commandLine(actionId, fixture.payload, fixture.display);
+    assert.ok(
+      typeof line === "string" && line.trim() !== "",
+      `${actionId} must resolve to a non-empty display line`
+    );
+    assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
+  }
+});
+
+test("the silent list contains only registered presentation controls", () => {
+  assert.deepStrictEqual(
+    Echo.SILENT_PRESENTATION_CONTROLS,
+    COVERAGE_MANIFEST.silentPresentationControlIds,
+    "adding a silent control is a spec-reviewed decision (manifest + catalog together)"
+  );
+});

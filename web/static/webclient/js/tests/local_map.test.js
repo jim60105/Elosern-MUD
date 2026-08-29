@@ -237,3 +237,54 @@ test("an empty or missing panel reduces to an inert model", () => {
   assert.equal(empty.cols, 0);
   assert.equal(empty.rows, 0);
 });
+
+// exitLabelFor (complete-ui-command-echo D3): unique traversable edge label,
+// node-label fallback, parallel-edge ambiguity, and hard silence.
+test("exitLabelFor returns the unique traversable edge label", () => {
+  const model = LocalMap.reducePanel({
+    current_node: "n1",
+    nodes: [
+      { id: "n1", label: "廣場", x: 0, y: 0, visibility: "in_view" },
+      { id: "n2", label: "北門", x: 1, y: 0, visibility: "in_view" },
+    ],
+    edges: [
+      { source: "n1", destination: "n2", label: "通往北門的石階", known: true, traversable: true },
+    ],
+    legend: [],
+  });
+  assert.equal(LocalMap.exitLabelFor(model, "n1", "n2"), "通往北門的石階");
+});
+
+test("exitLabelFor degrades parallel-edge ambiguity to the node label", () => {
+  const model = LocalMap.reducePanel({
+    current_node: "n1",
+    nodes: [
+      { id: "n1", label: "廣場", x: 0, y: 0, visibility: "in_view" },
+      { id: "n2", label: "北門", x: 1, y: 0, visibility: "in_view" },
+    ],
+    edges: [
+      { source: "n1", destination: "n2", label: "左階", known: true, traversable: true },
+      { source: "n1", destination: "n2", label: "右階", known: true, traversable: true },
+    ],
+    legend: [],
+  });
+  assert.equal(LocalMap.exitLabelFor(model, "n1", "n2"), "北門");
+});
+
+test("exitLabelFor ignores non-traversable edges and stays silent without data", () => {
+  const model = LocalMap.reducePanel({
+    current_node: "n1",
+    nodes: [
+      { id: "n1", label: "廣場", x: 0, y: 0, visibility: "in_view" },
+      { id: "n2", label: "北門", x: 1, y: 0, visibility: "in_view" },
+    ],
+    edges: [
+      { source: "n1", destination: "n2", label: "封閉的門", known: true, traversable: false },
+    ],
+    legend: [],
+  });
+  assert.equal(LocalMap.exitLabelFor(model, "n1", "n2"), "北門");
+  assert.equal(LocalMap.exitLabelFor(model, "n1", "n9"), null);
+  assert.equal(LocalMap.exitLabelFor(null, "n1", "n2"), null);
+  assert.equal(LocalMap.exitLabelFor(model, null, "n2"), null);
+});

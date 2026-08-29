@@ -1,0 +1,33 @@
+{
+  "registeredMutationActionIds": [
+    "combat.cast",
+    "combat.flee",
+    "combat.forfeit",
+    "creation.activate",
+    "creation.concept",
+    "creation.custom",
+    "creation.preset",
+    "creation.reset",
+    "explore.engage",
+    "explore.look",
+    "explore.move",
+    "explore.party_invite",
+    "explore.party_leave",
+    "explore.talk_freeform",
+    "explore.talk_scripted",
+    "explore.wait",
+    "guild.exam_start",
+    "guild.quest_abandon",
+    "guild.quest_accept",
+    "guild.quest_turnin",
+    "guild.register",
+    "inventory.toggle_equip",
+    "inventory.use",
+    "options.dismiss",
+    "shop.buy",
+    "shop.sell"
+  ],
+  "silentPresentationControlIds": [
+    "options.dismiss"
+  ]
+}

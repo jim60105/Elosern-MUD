@@ -1,12 +1,6 @@
-## Purpose
+# Delta: webclient-input-narrative
 
-The display-only client command-line catalog that fountains the player-facing narrative: typed drawer
-commands and button-triggered `ui_action` mutations resolve to exactly one readable command line each,
-so the narrative log reads as a complete, explainable action→result flow. The catalog is pure client
-presentation — it never submits, never replays, never alters dispatch payloads, and never touches the
-transport.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The command-line catalog resolves a display line deterministically
 
@@ -211,27 +205,7 @@ acted.
   `character create`), or the reset row's bounded action label (the pinned
   no-typed-command form) — is appended at dispatch
 
-### Requirement: Echoed command lines never affect state
-
-The display command line SHALL be strictly input-side and presentation-only. It SHALL never be
-evaluated, parsed, held for re-execution, or sent as a `text` message; it SHALL NOT write to
-localStorage, session state, transport, epoch, or revision, and it SHALL degrade gracefully: an
-unknown `actionId`, a missing payload, or a descriptor missing a required label SHALL produce `null`
-(silent) rather than a guessed command, and an oversized or non-string server label SHALL be truncated
-to a bounded length with literal-text rendering. The catalog module SHALL keep no stored state and be
-safe to instantiate per page.
-
-#### Scenario: Unknown action stays silent
-- **WHEN** the catalog is asked for an unregistered `actionId`
-- **THEN** it returns `null` and no narrative line is created
-
-#### Scenario: Display text is never treated as markup
-- **WHEN** a label-derived line contains characters that resemble markup
-- **THEN** the narrative renders it as literal text with no element or script created
-
-#### Scenario: Oversized labels degrade to bounded literal text
-- **WHEN** a server label used by the catalog exceeds the bound
-- **THEN** the emitted line is truncated to the bounded length and rendered as literal text
+## ADDED Requirements
 
 ### Requirement: Catalog coverage is pinned against the action registry
 
