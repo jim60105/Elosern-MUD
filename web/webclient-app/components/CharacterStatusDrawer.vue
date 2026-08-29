@@ -2,7 +2,7 @@
 // CharacterStatusDrawer (H4, webclient-hud-04-reference-drawers, task 5.3):
 // the 角色狀態 drawer body. It presents the committed `status` v1 payload's
 // vitals (hp/mp/sp gauges) and the FULL condition roster (no 6-chip cap,
-// unlike H2's ConditionChips island), plus the `character` v4 payload body
+// unlike H2's ConditionChips island), plus the `character` v5 payload body
 // (traits, disguise, guild, persona, intimate). In every mode the status
 // sections render; when the `character` panel is unavailable the drawer
 // shows the registry-owned reason and invents nothing. The equipment doll
@@ -12,13 +12,18 @@
 // when the panel's `intimate` field is present, and is entirely absent from
 // the DOM when `intimate` is null or the panel is unavailable — never a
 // placeholder. A single labelled control opens the skill drawer (task 5.5).
+// render-equipment-breakdown-webclient: v5 trait rows carry the server-
+// computed breakdown `layers`, and each stat row renders one source-tinted
+// chip per layer IN PAYLOAD ORDER — a pure projection with no sorting,
+// recomputation, or truncation (all ≤ 16 layers render). Layer-free rows
+// render no breakdown element at all.
 import { computed } from "vue";
 import { gaugeRatio } from "./vitals.js";
 
 const props = defineProps({
   // The committed `status` v1 panel payload (vitals + conditions).
   status: { type: Object, required: true },
-  // The committed `character` v3 panel payload (traits/equipment/disguise/...).
+  // The committed `character` v5 panel payload (traits/equipment/disguise/...).
   character: { type: Object, required: true },
   // The derived low-HP presentation state (store view.vitals.lowHp).
   lowHp: { type: Boolean, default: false },
@@ -43,6 +48,69 @@ const SEVERITY_LABELS = {
 };
 
 const resources = computed(() => props.status?.resources ?? null);
+
+// --- Breakdown layer chips (render-equipment-breakdown-webclient D1) -----
+// A chip is a pure projection of one payload layer: the verbatim registry
+// `name` plus an amount formatted ONLY by `kind` (the raw amount is
+// re-signed for display, never recomputed): mult → `×1.2` with trailing
+// zeros stripped, flat → `+4`/`−2` (U+2212), pct → `−10%`/`+15%`. An
+// unknown kind renders the signed verbatim number (direct-render defense;
+// the wire validators reject unknown enums).
+function formatLayerAmount(kind, amount) {
+  const n = Number(amount);
+  const magnitude = Math.abs(n);
+  if (kind === "mult") {
+    return `×${String(magnitude)}`;
+  }
+  const sign = n < 0 ? "−" : "+";
+  const digits = String(magnitude);
+  if (kind === "pct") {
+    return `${sign}${digits}%`;
+  }
+  if (kind === "flat") {
+    return `${sign}${digits}`;
+  }
+  return `${sign}${digits}`;
+}
+
+// Source tints reuse the existing design tokens (skill = buff-green,
+// condition = warn-amber, equipment = gold). An unknown source gets the
+// neutral 其他 class AND label suffix — text-bearing, never colour-alone
+// (WCAG baseline). The wire never carries unknown enums; this fallback only
+// guards a direct component render with hand-built props.
+const LAYER_TINTS = { skill: "skill", condition: "condition", equipment: "equipment" };
+
+function layerTint(source) {
+  return LAYER_TINTS[source] ?? "other";
+}
+
+function layerLabel(layer) {
+  return layerTint(layer.source) === "other"
+    ? `${layer.name}（其他）`
+    : layer.name;
+}
+
+// The committed traits keyed by trait key (empty when unavailable).
+const traitsByKey = computed(
+  () => new Map(traits.value.map((row) => [row.key, row]))
+);
+
+// A gauge row's chips decompose its maximum, whose decomposed value IS the
+// trait payload's `max` — so the layers attach ONLY while both panels agree
+// on that maximum (and the row is a gauge at all: a null trait max has
+// nothing to decompose). Cross-payload disagreement (a stale pair) renders
+// the existing status text with no breakdown element.
+function gaugeLayers(key) {
+  const trait = traitsByKey.value.get(key);
+  const maximum = resources.value?.[key]?.maximum;
+  if (!trait || trait.max === null || maximum === null || maximum === undefined) {
+    return [];
+  }
+  if (trait.max !== maximum || !Array.isArray(trait.layers)) {
+    return [];
+  }
+  return trait.layers;
+}
 
 // The three gauge rows (hp/mp/sp). A missing gauge or non-numeric fields
 // yield a null ratio (no value is invented); a non-positive maximum yields 0.
@@ -181,6 +249,26 @@ const INTIMATE_ROWS = [
           <span class="character-status-drawer__statrow-value" :data-testid="`character-status-drawer__vital-value--${v.key}`">
             {{ resources?.[v.key]?.current ?? "—" }} / {{ resources?.[v.key]?.maximum ?? "—" }}
           </span>
+          <!-- Breakdown chips decompose THIS gauge's maximum (guarded by
+               gaugeLayers); a layer-free (or cross-payload-disagreeing) row
+               renders NO element here at all. -->
+          <span
+            v-if="gaugeLayers(v.key).length"
+            class="character-status-drawer__layerrow"
+            :data-testid="`character-status-drawer__layers--${v.key}`"
+          >
+            <span
+              v-for="(layer, index) in gaugeLayers(v.key)"
+              :key="index"
+              class="character-status-drawer__layer"
+              :class="`character-status-drawer__layer--${layerTint(layer.source)}`"
+              :data-source="layer.source"
+              :data-testid="`character-status-drawer__layer--${v.key}--${index}`"
+            >
+              <span class="character-status-drawer__layer-name">{{ layerLabel(layer) }}</span>
+              <span class="character-status-drawer__layer-amount">{{ formatLayerAmount(layer.kind, layer.amount) }}</span>
+            </span>
+          </span>
           <span class="character-status-drawer__vital-track" aria-hidden="true">
             <span
               class="character-status-drawer__vital-fill"
@@ -217,6 +305,25 @@ const INTIMATE_ROWS = [
         >
           <span class="character-status-drawer__statrow-key">{{ TRAIT_LABEL_OVERRIDES[row.key] ?? row.label }}</span>
           <span class="character-status-drawer__statrow-value">{{ traitValue(row) }}</span>
+          <!-- One chip per payload layer, payload order, all rendered (≤ 16
+               by the payload contract); no layers → no element. -->
+          <span
+            v-if="row.layers?.length"
+            class="character-status-drawer__layerrow"
+            :data-testid="`character-status-drawer__layers--${row.key}`"
+          >
+            <span
+              v-for="(layer, index) in row.layers"
+              :key="index"
+              class="character-status-drawer__layer"
+              :class="`character-status-drawer__layer--${layerTint(layer.source)}`"
+              :data-source="layer.source"
+              :data-testid="`character-status-drawer__layer--${row.key}--${index}`"
+            >
+              <span class="character-status-drawer__layer-name">{{ layerLabel(layer) }}</span>
+              <span class="character-status-drawer__layer-amount">{{ formatLayerAmount(layer.kind, layer.amount) }}</span>
+            </span>
+          </span>
         </div>
       </div>
       <p
@@ -493,6 +600,64 @@ const INTIMATE_ROWS = [
   font-family: var(--f-mono);
   font-size: 13px;
   color: var(--gold-400);
+}
+
+/* The breakdown chip row (render-equipment-breakdown-webclient D1): the
+   chips ride their own full-width wrapped line inside the statrow tile
+   (the same flex-basis treatment as the vital track), wrap freely at the
+   16-layer bound, and are text-bearing (source word / 其他 marker + signed
+   amount) so the tint never carries meaning alone. */
+.character-status-drawer__layerrow {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.character-status-drawer__layer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--ink-600);
+  background: var(--ink-780);
+  color: var(--paper-300);
+}
+
+.character-status-drawer__layer-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.character-status-drawer__layer-amount {
+  font-family: var(--f-mono);
+}
+
+/* Source tints reuse the existing design tokens (same non-colour-alone
+   principle as the condition pills: the chip already carries its words). */
+.character-status-drawer__layer--skill {
+  border-color: rgba(127, 191, 127, 0.5);
+  color: var(--buff);
+}
+
+.character-status-drawer__layer--condition {
+  border-color: rgba(199, 154, 74, 0.55);
+  color: var(--warn);
+}
+
+.character-status-drawer__layer--equipment {
+  border-color: rgba(201, 162, 39, 0.55);
+  color: var(--gold-400);
+}
+
+.character-status-drawer__layer--other {
+  border-style: dashed;
+  color: var(--paper-500);
 }
 
 .character-status-drawer__vital-key {

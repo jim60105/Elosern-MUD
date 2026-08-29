@@ -99,30 +99,6 @@ The production presentation registry SHALL register panel name `character` at sc
 - **WHEN** an actor's persisted sexual-state record exists but is structurally malformed (e.g. a level field's stored value is absent from its vocabulary)
 - **THEN** the entire `character` panel becomes unavailable via the common unavailable form, with no partial or fabricated `intimate` value
 
-### Requirement: The legacy client tolerates the version-5 character payload
-
-Until the Vue breakdown renderer lands, the legacy web client SHALL accept
-character payloads at schema version 4 or 5 through version-dispatched
-exact-shape validators (v5 validating the added `base`, `effective`,
-`layers`, and `adjustment` fields exactly, not by relaxing v4 rules),
-rendering `current`/`max` values exactly as at v4 — static traits
-included, because `current` remains populated — and ignoring `layers`
-without console errors. Component and Python-side fixtures SHALL pin both
-version branches.
-
-#### Scenario: Version-5 payload renders totals in the legacy client
-
-- **WHEN** the legacy client receives a version-5 character payload with
-  layer-bearing trait rows including static traits
-- **THEN** it renders the same `current`/`max` values as it would for the
-  equivalent v4 payload and no error is raised
-
-#### Scenario: Version branches validate exactly
-
-- **WHEN** a v5 payload with an unknown extra field, or a v4 payload at
-  schema version 5, reaches the validator
-- **THEN** it is rejected by the version-dispatched exact-shape rules
-
 ### Requirement: Character panel skills are grouped by category with the same ordering rule as the combat panel
 Each of `actives` and `passives` SHALL be an ordered array of category groups, structurally identical
 in shape to `context_actions`'s `skills` field: each category group SHALL contain the category's

@@ -93,7 +93,7 @@ function longLabels() {
 
 function unavailableCharacter() {
   return {
-    schema_version: 4,
+    schema_version: 5,
     available: false,
     kind: "character",
     reason: { code: "no_puppet", message: "你已離開角色" },
@@ -213,4 +213,14 @@ function describedEquipment() {
 export const WithEquipmentDescription = {
   render: renderDoll,
   args: { character: describedEquipment() },
+};
+
+// The render-equipment-breakdown-webclient state: the fixture's own v5
+// equipment rows, where the 騎士全套板甲 armor row and the 修女聖袍
+// accessory row carry the server-generated adjustment summaries verbatim
+// (「攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15」 / 「治療 +10%」) and the
+// main-hand row's empty adjustment renders nothing.
+export const AdjustmentBearingSlots = {
+  render: renderDoll,
+  args: { character: CHARACTER_PANEL_SAMPLE },
 };

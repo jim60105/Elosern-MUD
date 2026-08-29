@@ -4,7 +4,7 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
 
 ## 1. Components
 
-- [ ] 1.1 `CharacterStatusDrawer.vue`: render ALL payload-ordered layer
+- [x] 1.1 `CharacterStatusDrawer.vue`: render ALL payload-ordered layer
       chips (source-tinted design tokens, verbatim names, kind-formatted
       signed amounts: mult ×N.N trailing zeros stripped, flat ±N, pct ±N%;
       text-bearing, never color-alone; wrapping, NO truncation/`+n`
@@ -17,23 +17,23 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
       otherwise the row keeps its existing value text with no breakdown
       element. No chip site on the 公會 rows (`guild_merit` layers are
       empty by construction — unobservable).
-- [ ] 1.2 `EquipmentDoll.vue`: print the character payload's `adjustment`
+- [x] 1.2 `EquipmentDoll.vue`: print the character payload's `adjustment`
       string verbatim; empty renders nothing.
-- [ ] 1.3 `InventoryPanel.vue`: equipment rows source the same
+- [x] 1.3 `InventoryPanel.vue`: equipment rows source the same
       server-generated string by joining the store's character equipment
       rows on `item_key`; bag-only items render none; no client-side
       synthesis.
-- [ ] 1.4 Direct-render defense: unknown `source`/`kind` props render a
+- [x] 1.4 Direct-render defense: unknown `source`/`kind` props render a
       neutral 其他 chip with an untouched value line (wire validators stay
       strict — do NOT relax any payload validation for this).
 
 ## 2. v5-only migration
 
-- [ ] 2.1 Update `stories/fixtures.js` character fixture to schema_version
+- [x] 2.1 Update `stories/fixtures.js` character fixture to schema_version
       5: mirror the Python panel contract test's serialized sample;
       include a worn bias-bearing item with stored-base ≠ effective
       exposure, an adjustment-bearing item, and a 16-layer-bound row.
-- [ ] 2.2 Delete EVERY v4 wire branch: Vue acceptance goes through the
+- [x] 2.2 Delete EVERY v4 wire branch: Vue acceptance goes through the
       shared `protocol.js` gate (v5-only there covers the store path);
       Python `web/webclient/presentation/character.py` loses
       `CHARACTER_LEGACY_SCHEMA_VERSION`, `_validate_trait_row_v4`, the v4
@@ -42,7 +42,7 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
       are deleted; `web/tests/browser/browser_helpers.py
       valid_character_panel` migrates to the exact v5 form; delete all v4
       fixture usages.
-- [ ] 2.3 Legacy `protocol.js`: v5-only gate (keep the
+- [x] 2.3 Legacy `protocol.js`: v5-only gate (keep the
       `payload.schema_version !== 5` literals the schema-version parity
       contract extracts); rewrite the P6 v4/5 tolerance Node-gate tests in
       `protocol.test.js` to v5-accept / v4-reject, and rewrite
@@ -53,19 +53,19 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
 
 ## 3. Stories, tests, evidence
 
-- [ ] 3.1 Stories: drawer (all three sources + gauge max + 16-layer-bound
+- [x] 3.1 Stories: drawer (all three sources + gauge max + 16-layer-bound
       row), doll (adjustment-bearing slot), inventory (joined + bag-only
       rows) — `component-manifest.json` byte-unchanged.
-- [ ] 3.2 Vitest: chip order/name/kind formatting; all-layers-rendered at
+- [x] 3.2 Vitest: chip order/name/kind formatting; all-layers-rendered at
       the 16 bound; no-layers equivalence (no breakdown elements);
       adjustment verbatim + join + bag-only + empty; exposure pin asserts
       effective present AND stored-base absent WITHIN THE EXPOSURE ROW
       (scoped selector, not whole-drawer); direct-render unknown-enum
       defense; v4 rejected on every wire path; gauge-chip guard negatives
       (character unavailable / mismatched maxima render no chips).
-- [ ] 3.3 `npm test`, `npm run build-storybook`,
+- [x] 3.3 `npm test`, `npm run build-storybook`,
       `npm run showcase-coverage` green.
-- [ ] 3.4 Python evidence tests in `web/webclient/tests/` (extend the
+- [x] 3.4 Python evidence tests in `web/webclient/tests/` (extend the
       data-evidence pattern): `run_npm` Vitest-family + Storybook build +
       coverage evidence, annotated with canonical IDs from
       `uv run --locked python -m tools.spec_traceability list` after spec
@@ -76,13 +76,26 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
 
 ## 4. Regression and handoff
 
-- [ ] 4.1 `tests/test_command_docs.py` green (no command-surface change);
+- [x] 4.1 `tests/test_command_docs.py` green (no command-surface change);
       non-browser suite once with `--parallel 16 --noinput --keepdb`
       (the only Python behavior change is the v4 acceptance deletion).
-- [ ] 4.2 Record deviations (or none) from the parent design here; run
+- [x] 4.2 Record deviations (or none) from the parent design here; run
       `openspec validate render-equipment-breakdown-webclient --strict`.
-- [ ] 4.3 Sync the deltas into `openspec/specs/`: ADD both new requirements
+- [x] 4.3 Sync the deltas into `openspec/specs/`: ADD both new requirements
       and REMOVE 「The legacy client tolerates the version-5 character
       payload」 from `webclient-exploration-menu`; annotate the evidence
       tests with the canonical IDs; `openspec validate --all --strict`
       and `tools.spec_traceability check` green.
+
+## Deviations from the parent design
+
+- None from the parent design's §11 Vue paragraph. Two implementation-time
+  decisions were made inside the change's own scope: (1) the gauge-row chip
+  attachment is cross-payload-guarded — layers render on a 生命量 row only
+  when the character trait's `max` equals `status.resources[key].maximum`
+  (the vitals text is `status` v1 and the layers are `character` v5, so a
+  stale pair must not decompose a maximum the two panels disagree on); and
+  (2) the transitional v4 deletion reaches the Python presenter as
+  authorized by this change's REMOVED delta for
+  「The legacy client tolerates the version-5 character payload」, closing
+  the tolerance window on every wire at once (design.md D3).

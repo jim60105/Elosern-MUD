@@ -128,7 +128,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     }
   });
 
-  // The character panel is an exact-schema v4 payload: the
+  // The character panel is an exact-schema v5 payload: the
   // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
   // character-panel active-row schema does not register, so it is stripped
   // before committing. The other exact fields (traits, equipment, disguise,
@@ -136,7 +136,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "character",
       traits: CHARACTER_PANEL_SAMPLE.traits,
@@ -232,7 +232,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 4,
+              schema_version: 5,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },
@@ -265,7 +265,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 4,
+              schema_version: 5,
               available: false,
               reason: { code: "no_puppet", message: "你已離開角色" },
             },

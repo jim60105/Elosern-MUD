@@ -24,7 +24,7 @@ import { itemIconPath, unknownItemPath, kindLabel, rarityLabel } from "./item-ic
 const props = defineProps({
   // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
-  // The committed `character` v4 panel payload (or the unavailable form). A
+  // The committed `character` v5 panel payload (or the unavailable form). A
   // completely missing panel arrives as `null`; the doll mounts only when a
   // committed character panel exists (never fabricating empty slots for a
   // missing panel).
@@ -105,6 +105,34 @@ const activeRow = computed(() => {
     return null;
   }
   return rows.value.find((r) => r.item_key === selectedKey.value) || null;
+});
+
+// The server-generated adjustment strings, joined on `item_key` (render-
+// equipment-breakdown-webclient D2): the SAME verbatim string the doll
+// prints, sourced by indexing the committed `character` panel's equipment
+// rows — a presentation-layer join of two server-formatted sources, never
+// client-side synthesis. A bag-only item (no character row), an empty
+// string, or an unavailable/missing character panel yields null (no line).
+const adjustmentByKey = computed(() => {
+  const map = new Map();
+  const character = props.character;
+  if (character && character.available !== false && Array.isArray(character.equipment)) {
+    for (const row of character.equipment) {
+      if (!map.has(row.item_key)) {
+        map.set(row.item_key, row.adjustment);
+      }
+    }
+  }
+  return map;
+});
+
+const activeAdjustment = computed(() => {
+  const row = activeRow.value;
+  if (!row) {
+    return null;
+  }
+  const text = adjustmentByKey.value.get(row.item_key);
+  return typeof text === "string" && text !== "" ? text : null;
 });
 
 // The tile's local SVG: the closed icon map for a non-null presentation
@@ -420,6 +448,13 @@ watch(selectedKey, () => {
       </div>
       <div v-if="activeRow.presentation && activeRow.presentation.summary" class="inventory-panel__inspector-summary" data-testid="inventory-panel__inspector-summary">
         {{ activeRow.presentation.summary }}
+      </div>
+      <!-- The server-generated adjustment string for the same item, joined
+           on item_key against the character panel's equipment rows
+           (render-equipment-breakdown-webclient D2): verbatim, and absent
+           for a bag-only item or an empty string. -->
+      <div v-if="activeAdjustment" class="inventory-panel__inspector-adjustment" data-testid="inventory-panel__inspector-adjustment">
+        {{ activeAdjustment }}
       </div>
       <div class="inventory-panel__inspector-meta">
         <span class="inventory-panel__inspector-held" data-testid="inventory-panel__inspector-held">{{ activeRow.held }}</span>
@@ -751,6 +786,17 @@ watch(selectedKey, () => {
   color: var(--paper-300);
   line-height: 1.5;
   margin-top: 4px;
+}
+
+/* The verbatim server-generated adjustment line, joined on item_key
+   (render-equipment-breakdown-webclient D2): styled like the summary, in
+   the muted token; bag-only items render no element at all. */
+.inventory-panel__inspector-adjustment {
+  color: var(--paper-500);
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
 }
 
 .inventory-panel__inspector-meta {

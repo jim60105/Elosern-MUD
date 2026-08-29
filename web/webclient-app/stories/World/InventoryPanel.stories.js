@@ -205,6 +205,48 @@ export const EquippedAndUnequipped = {
   args: { services: equippedBag(), character: CHARACTER_PANEL_SAMPLE },
 };
 
+// The render-equipment-breakdown-webclient joined-adjustment state: the
+// bag carries a row sharing the character panel's `knight_platemail`
+// item_key (the inspector prints the SAME server string the doll shows)
+// beside a bag-only 繩索 row (no character row → no adjustment line). The
+// play function focuses the plate-mail tile so the story deterministically
+// shows the joined line.
+function adjustmentBag() {
+  const rows = [
+    {
+      item_key: "knight_platemail",
+      display_name: "騎士全套板甲",
+      held: 1,
+      equipped: true,
+      presentation: { kind: "armor", icon_key: "armor", rarity: "rare", summary: "厚重的騎士板甲。" },
+    },
+    {
+      item_key: "loose_rope",
+      display_name: "繩索",
+      held: 2,
+      equipped: false,
+      presentation: { kind: "misc", icon_key: "misc", rarity: "common", summary: "一捆結實的麻繩。" },
+    },
+  ];
+  return {
+    ...SERVICES_PANEL_SAMPLE,
+    inventory: { rows, wallet: 3240 },
+    pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 2 },
+  };
+}
+
+export const JoinedAdjustment = {
+  render: renderDrawer,
+  args: { services: adjustmentBag(), character: CHARACTER_PANEL_SAMPLE },
+  play: async ({ canvasElement }) => {
+    const tile = canvasElement.querySelector('[data-testid="inventory-panel__tile--knight_platemail"]');
+    if (tile) {
+      tile.focus();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+  },
+};
+
 // Focused inspection: the `play` function moves keyboard focus to a
 // presentation-backed tile so the story deterministically shows the
 // keyboard-equivalent inspector state (the hover path shows the same
@@ -268,7 +310,7 @@ export const CharacterUnavailable = {
   args: {
     services: SERVICES_PANEL_SAMPLE,
     character: {
-      schema_version: 4,
+      schema_version: 5,
       available: false,
       kind: "character",
       reason: { code: "no_puppet", message: "你已離開角色" },
