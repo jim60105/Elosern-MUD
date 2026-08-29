@@ -28,7 +28,8 @@
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_rebuilds_keyboard_menu_after_round",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_renders_at_minimum_viewport",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level",
+        "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_area_space_selects_once_even_when_held",
@@ -115,7 +116,8 @@
         "web.tests.browser.test_browser_services.GuildRegistrationJourneys",
         "web.tests.browser.test_browser_services.GuildBoardJourneys",
         "web.tests.browser.test_browser_services.GuildQuestJourneys",
-        "web.tests.browser.test_browser_services.GuildTurninJourneys"
+        "web.tests.browser.test_browser_services.GuildTurninJourneys",
+        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys"
       ]
     },
     {
