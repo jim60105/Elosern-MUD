@@ -37,7 +37,6 @@ import yaml
 
 from world.lore.items import ITEM_REGISTRY, EquipmentModifierKey, ItemDefinition, ItemRarity
 from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
-from world.rules.status_display import display_for
 
 _RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "equipment_effects.yaml"
 
@@ -733,6 +732,11 @@ def equipment_adjustment_text(item_key: str) -> str:
         if cap is not None and cap > 0:
             segments.append(f"{label} +{cap}")
     if rule.immune:
+        # Function-local: status_display reaches this module's consumers
+        # through combat_modifiers, so a module-level import would close a
+        # cycle now that P2 made the adjustment accessor live.
+        from world.rules.status_display import display_for
+
         labels = "、".join(display_for(key).label for key in rule.immune)
         segments.append(f"免疫{labels}")
     return "｜".join(segments)
