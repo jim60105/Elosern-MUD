@@ -48,10 +48,10 @@ roster would become unassertable.
 `adjustments` ships the complete closed vocabulary of the parent design
 (`atk_phys`, `defense`, `magic_level`, `agility` flat-or-percent,
 `mp_cost`, `sp_cost`, `pleasure_gain`, `heal_gain`) plus `gauge_caps`
-(positive integers only — the parent design §6 syncs gauge ceilings as a
-recomputed derived write, and negative caps would retroactively clamp
-stored currents), `immune`, `attached_buffs`, and `exposure_bias`, so roster
-values are authored by one balance pass and never rewritten per-consumer. Fields with
+(positive integers only — v1 discipline per the parent design §6; the gear
+ceiling is synced on toggle with an explicit same-transaction current
+clamp), `immune`, `attached_buffs`, and `exposure_bias`, so roster values
+are authored by one balance pass and never rewritten per-consumer. Fields with
 no consumer before their owning change (P2–P5) are dormant data: nothing
 reads them, loader tests cover them, and each owning change turns them on.
 Alternative: shard the vocabulary across P2/P3/P4 — rejected because each

@@ -70,9 +70,9 @@ NOT repair, clamp, or silently drop deviating data.
 The rulebook SHALL carry a budgets table keyed by the item's registered
 rarity with separate ceilings for flat values, combat percents
 (`agility`, `mp_cost`, `sp_cost`), soft percents (`pleasure_gain`,
-`heal_gain`), `exposure_bias`, and positive-only `gauge_caps` (a negative
-gauge cap is rejected regardless of budget, because gauge ceilings must
-never retroactively clamp stored currents). The loader SHALL reject any
+`heal_gain`), `exposure_bias`, and positive-only `gauge_caps` (v1
+discipline: every designed cap is positive and negative resource penalties
+belong to debuff bounds, not to gear). The loader SHALL reject any
 entry whose value exceeds the ceiling of its rarity's corresponding column
 (in absolute value). Rarity SHALL be consulted only at load time and SHALL
 NOT be read by any runtime resolution path.

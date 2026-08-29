@@ -180,16 +180,20 @@ effective = round( ( stored_base × skill_multiplier ) × (1 + percent_sum/100) 
   from inverting the to-hit formula).
 
 Gauge ceilings: the summed `gauge_caps` contributions are authored as
-positive integers only (negative caps are rejected by the loader, because
-Evennia's `GaugeTrait` re-clamps `current` whenever its ceiling drops, and a
-silent retroactive clamp would violate the no-retroactive-rewrite rule).
+positive integers only (v1 discipline: every designed cap is positive, and
+negative resource penalties belong to debuff bounds, not to gear).
 `toggle_equipment()` — already the sole equipment writer — recomputes each
 gauge trait's non-literal `mod` from scratch as Σ(equipment caps) inside the
 same transaction (base stays the literal value; `mod` is Evennia's sanctioned
-non-literal adjuster, and `max` is `(base+mod)`). All maximum readers and
-heal clamps then agree for free. This amends the earlier read-time phrasing:
-gauge caps are a deterministic derived write owned by the single writer,
-recomputed — never accumulated — so no drift state exists.
+non-literal adjuster, and `max` is `(base+mod)`). Because Evennia's gauge
+`current` only clamps at read time (storage would otherwise keep a stale
+value above a lowered ceiling and the strict status read model would reject
+it), the sync also writes `current = min(current, new ceiling)` in the same
+transaction: unequipping a capped item therefore settles any excess as an
+immediate, deterministic resource cost at the single writer — no fail-closed
+panel, no hidden stale headroom. This amends the earlier read-time phrasing
+of §6: gauge caps are a deterministic derived write owned by the single
+writer, recomputed — never accumulated — so no drift state exists.
 
 ## 7. Status-Effect Interactions
 
