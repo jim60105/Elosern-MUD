@@ -77,7 +77,7 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        self.assertEqual(len(ITEM_REGISTRY), 42)
+        self.assertEqual(len(ITEM_REGISTRY), 48)
         self.assertTrue(
             {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
         )
