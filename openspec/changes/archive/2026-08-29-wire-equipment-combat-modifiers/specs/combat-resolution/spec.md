@@ -2,13 +2,14 @@
 
 ### Requirement: Skill heal magnitude scales by the merged heal_gain percent
 
-The skill-heal magnitude funnel SHALL apply the merged bundle's
-`heal_gain` signed percentage (rule-table and equipment contributions
-merged) with one normative formula: compute the unamplified base amount as
-today (`max(round(magic × multiplier), heal.floor)`), then
-`max(floor(base_amount × (1 + percent/100)), heal.floor)`. Consumable
-item-use healing SHALL keep its flat rulebook amount and SHALL NOT be scaled
-by `heal_gain`.
+The skill-heal magnitude funnel SHALL read the caster's magic stat through the
+same equipment-adjusted magic path as magic-school damage, and SHALL apply the
+merged bundle's `heal_gain` signed percentage (rule-table and equipment
+contributions merged) with one normative formula: compute the unamplified base
+amount as today (`max(round(adjusted_magic × multiplier), heal.floor)`), then
+`max(floor(base_amount × (1 + percent/100)), heal.floor)`. Consumable item-use
+healing SHALL keep its flat rulebook amount and SHALL NOT be scaled by
+`heal_gain`.
 
 #### Scenario: Holy gear amplifies a skill heal
 

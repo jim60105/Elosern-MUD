@@ -13,9 +13,10 @@ score blends effective ``agility`` (the speed to break away) with effective
 ``atk_phys`` (the strength to physically break free), weighted by
 ``sexual_resist.yaml`` and read through the no-create combat-modifier query
 (``evaluate_combat_modifiers_no_create``) with the same stat-specific
-treatments the two shipped consumers use: ``agility`` as a percentage string
-via ``combat._apply_percent_mod`` (as ``disengage._adjusted_agility`` does)
-and ``atk_phys`` as a flat addend (as ``combat._adjusted_attack`` does).
+treatments the two shipped consumers use: ``agility`` through the shared
+:func:`world.rules.combat_modifiers.adjusted_agility` helper (percent scaled,
+flat ``agility_flat`` added, floored at zero — as ``disengage`` does) and
+``atk_phys`` as a flat addend (as ``combat._adjusted_attack`` does).
 
 Before any roll, ``resist_verdict()`` short-circuits to compliance when the
 resister's affinity stage toward the actor carries ``auto_comply: true``
@@ -48,6 +49,7 @@ from typeclasses.npcs import NPC
 from world.rules import combat
 from world.rules.affinity_config import get_config
 from world.rules.combat_modifiers import (
+    adjusted_agility,
     build_no_create_condition_context,
     evaluate_combat_modifiers_no_create,
 )
@@ -209,22 +211,19 @@ class ResistVerdict:
 def _blended_score(entity: Any) -> float:
     """Return the weighted agility/atk_phys contest score for one participant.
 
-    ``agility`` is adjusted via ``combat._apply_percent_mod`` against the
-    no-create modifier bundle's ``"agility"`` key (a percentage string,
-    mirroring ``disengage._adjusted_agility`` exactly); ``atk_phys`` is added
-    as a flat addend (mirroring ``combat._adjusted_attack`` exactly). Neither
-    stat's adjustment is routed through the other stat's treatment: feeding a
-    flat integer through ``_apply_percent_mod`` would raise ``TypeError``.
-    The no-create query is load-bearing: the live variant materializes the
-    ``sexual`` handler, which persists traits on first access and would break
-    ``resist_verdict()``'s no-mutation contract.
+    ``agility`` goes through ``combat_modifiers.adjusted_agility`` against
+    the no-create modifier bundle (percentage scaled, flat ``agility_flat``
+    addend, floored at zero — mirroring ``disengage._adjusted_agility``
+    exactly); ``atk_phys`` is added as a flat addend (mirroring
+    ``combat._adjusted_attack`` exactly). The no-create query is
+    load-bearing: the live variant materializes the ``sexual`` handler,
+    which persists traits on first access and would break
+    ``resist_verdict()``'s no-mutation contract. ``adjusted_agility`` never
+    re-evaluates because the bundle is passed in explicitly.
     """
     modifiers = evaluate_combat_modifiers_no_create(entity)
     config = get_resist_config()
-    agility_component = combat._apply_percent_mod(
-        float(entity.skills.effective_value("agility")),
-        modifiers.get("agility"),
-    )
+    agility_component = adjusted_agility(entity, modifiers)
     atk_phys_component = (
         float(entity.skills.effective_value("atk_phys"))
         + modifiers.get("atk_phys", 0)
