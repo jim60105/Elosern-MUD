@@ -29,6 +29,7 @@ from .browser_helpers import (
     store_state_or_none,
     wait_for_store_state,
 )
+from .test_browser_input_narrative import _wait_inp_line
 from .test_browser_services import ServicesBrowserTest
 
 TILE = "inventory-panel__tile--{}"
@@ -181,6 +182,58 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
             self.assertEqual(env["action_id"], "inventory.toggle_equip")
             self.assertEqual(env["payload"], {"item_key": "plain_sword"})
         self._wait_row(page, "plain_sword", lambda row: row["equipped"] is False)
+
+    @covers_requirement(
+        "webclient-input-narrative::every-deliberate-mutation-echo-appears-exactly-once-at-dispatch"
+    )
+    def test_backpack_row_actions_echo_their_typed_commands(self):
+        """Each deliberate backpack activation echoes exactly one typed line."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_services_available(page)
+        self._open_inventory_drawer(page)
+
+        # Equip: the toggle click dispatches once and echoes the typed
+        # `equip <item_key>` — the exact text the 裝備/equip command accepts.
+        self._keyboard_activate_tile(page, "plain_sword")
+        self.assertEqual(sent_action_count(page, "inventory.toggle_equip"), 1)
+        _wait_inp_line(page, 1, "equip plain_sword", exact=True)
+
+        # Unequip direction: the same replayable line (the typed command IS
+        # the toggle; no `unequip` line is ever printed).
+        self._wait_row(page, "plain_sword", lambda row: row["equipped"] is True)
+        self._keyboard_activate_tile(page, "plain_sword")
+        self.assertEqual(sent_action_count(page, "inventory.toggle_equip"), 2)
+        _wait_inp_line(page, 2, "equip plain_sword", exact=True)
+
+        # Use: the confirmation-protected use echoes the typed `use <key>`.
+        self._keyboard_activate_tile(page, "healing_potion")
+        self._keyboard_confirm_dialog(page)
+        self.assertEqual(sent_action_count(page, "inventory.use"), 1)
+        _wait_inp_line(page, 3, "use healing_potion", exact=True)
+
+        # The envelopes stay descriptor-free: the echo never enters the wire.
+        envelopes = [
+            args[0]
+            for cmdname, args, _kwargs in page.evaluate("window.__elosernSent || []")
+            if cmdname == "ui_action"
+            and args
+            and args[0].get("action_id")
+            in {"inventory.use", "inventory.toggle_equip"}
+        ]
+        self.assertEqual(len(envelopes), 3)
+        for envelope in envelopes:
+            self.assertEqual(
+                set(envelope),
+                {
+                    "protocol_version",
+                    "presentation_epoch",
+                    "request_id",
+                    "base_revision",
+                    "action_id",
+                    "payload",
+                },
+            )
 
     @covers_requirement(
         "inventory-item-actions::item-dialogs-and-dispatch-state-fail-closed-across-replacement-and-transport-changes"

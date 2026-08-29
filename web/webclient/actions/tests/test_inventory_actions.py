@@ -72,6 +72,23 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
     )
+    def test_whitespace_item_keys_are_rejected(self):
+        # The typed `use`/`equip` commands parse the first whitespace token
+        # and the input echo prints the key verbatim: a whitespace-bearing
+        # key would echo a line whose keyboard replay targets a different
+        # item, so the action boundary rejects it (complete-ui-command-echo D1).
+        for validator in (
+            validate_inventory_use_payload,
+            validate_inventory_toggle_equip_payload,
+        ):
+            for key in ("healing potion", "healing\tpotion", " healing_potion", "healing_potion "):
+                with self.subTest(validator=validator.__name__, key=key):
+                    with self.assertRaises(ServiceActionError):
+                        validator({"item_key": key})
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
     def test_authority_like_fields_are_rejected(self):
         cases = (
             {},

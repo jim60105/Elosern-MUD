@@ -163,9 +163,24 @@ def validate_sell_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return _validate_trade_payload(payload, "shop.sell")
 
 
+def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
+    """Require a whitespace-free bounded key.
+
+    The typed `使用`/`use` and `裝備`/`equip` commands parse the key as their
+    first whitespace-delimited token, and the browser's input echo prints the
+    key verbatim — a whitespace-bearing key would echo a line whose keyboard
+    replay resolves a DIFFERENT key. Reject at the action boundary instead
+    (complete-ui-command-echo D1).
+    """
+    text = _require_non_empty_string(value, field, maximum)
+    if any(character.isspace() for character in text):
+        raise ServiceActionError(f"{field} must not contain whitespace")
+    return text
+
+
 def _validate_inventory_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
     body = _exact_single_field(payload, "item_key")
-    return {"item_key": _require_non_empty_string(
+    return {"item_key": _require_key_identifier(
         body["item_key"], "item_key", MAX_KEY_CODE_POINTS
     )}
 

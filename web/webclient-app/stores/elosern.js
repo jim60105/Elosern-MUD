@@ -244,6 +244,10 @@ export const useElosernStore = defineStore("elosern", () => {
        quantityForm.value = {
          itemKey: item.itemKey,
          actionId: item.actionId,
+         // The echo label is captured at open time (the row's server-authored
+         // display name) and replayed on the Enter submit
+         // (complete-ui-command-echo D3).
+         itemLabel: (item.commandDisplay && item.commandDisplay.itemLabel) || null,
          state: ServiceMenu.quantityState(qty.min, qty.max),
          open: true,
        };
@@ -697,7 +701,11 @@ export const useElosernStore = defineStore("elosern", () => {
         if (skill && skill.targetSpec === "area") {
           const areaPayload = CombatMenu.areaPayload(skill);
           if (areaPayload) {
-            dispatchAction("combat.cast", areaPayload);
+            dispatchAction(
+              "combat.cast",
+              areaPayload,
+              castSubmitDisplay(skill, areaPayload, item.commandDisplay)
+            );
           }
           return;
         }
@@ -715,14 +723,23 @@ export const useElosernStore = defineStore("elosern", () => {
       ) {
         lastTarget = String(item.payload.target_ids[0]);
         if (lastConfirmSource === "keyboard") {
-          dispatchAction("combat.cast", item.payload);
+          const focusSkill = combat.focusSkillKey
+            ? combat.skillByKey[combat.focusSkillKey]
+            : null;
+          dispatchAction(
+            "combat.cast",
+            item.payload,
+            focusSkill
+              ? castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
+              : item.commandDisplay || null
+          );
         }
         publishView();
         return;
       }
       // Real OOB action items (combat.cast / combat.flee / combat.forfeit).
       if (item.actionId) {
-        dispatchAction(item.actionId, item.payload || {});
+        dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
         return;
       }
     }
@@ -1055,7 +1072,7 @@ export const useElosernStore = defineStore("elosern", () => {
     creation.returnStage = returnStage || creation.view || "root";
     const menu =
       kind === "reset"
-        ? CreationMenu.confirmMenu("確認清除角色草稿？此操作無法回復。", CreationMenu.RESET_ACTION, {}, null)
+        ? CreationMenu.confirmMenu("確認清除角色草稿？此操作無法回復。", CreationMenu.RESET_ACTION, {}, CreationMenu.RESET_DISPLAY)
         : CreationMenu.activateConfirm(kind === "preset" ? presetKey : null);
     creation.confirmItems = menu.items;
     creation.view = "confirm";
@@ -1304,9 +1321,11 @@ export const useElosernStore = defineStore("elosern", () => {
       return true;
     }
     // A services action row (guild.register / quest_accept / quest_turnin /
-    // exam_start / shop.buy / shop.sell): dispatch the exact OOB action.
+    // exam_start / shop.buy / shop.sell): dispatch the exact OOB action,
+    // forwarding the row's server-authored display descriptor (buy/sell rows
+    // carry `itemLabel`; the guild rows resolve from the payload alone).
     if (item.actionId) {
-      dispatchAction(item.actionId, item.payload || {});
+      dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
       return true;
     }
     return false;
@@ -1352,7 +1371,7 @@ export const useElosernStore = defineStore("elosern", () => {
       item.actionId === CreationMenu.ACTIVATE_ACTION ||
       item.actionId === CreationMenu.RESET_ACTION
     ) {
-      dispatchAction(item.actionId, item.payload || {});
+      dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
       return true;
     }
     if (item.key && item.key.indexOf("cancel-") === 0) {
@@ -1868,6 +1887,214 @@ export const useElosernStore = defineStore("elosern", () => {
     return true;
   }
 
+  // The participant display names (server-authored committed combat panel
+  // rows) for one payload-ordered identity list; `null` when any identity has
+  // no committed row, so a partial target list is never echoed as complete
+  // (D3b).
+  function participantNamesByIdentity(identities) {
+    const rs = reducer.getState();
+    const panel = (rs.panels && rs.panels.context_actions) || {};
+    const byId = new Map();
+    if (panel.kind !== "combat") {
+      return null;
+    }
+    (Array.isArray(panel.participants) ? panel.participants : []).forEach((p) => {
+      if (p && typeof p.display_name === "string" && p.display_name !== "") {
+        byId.set(String(p.identity), p.display_name);
+      }
+    });
+    const names = [];
+    for (const identity of identities) {
+      const name = byId.get(String(identity));
+      if (!name) {
+        return null;
+      }
+      names.push(name);
+    }
+    return names;
+  }
+
+  // The echo descriptor for one combat.cast submit (D3): the row descriptor
+  // plus the chosen NON-DEFAULT freeform magnitude label and — for payloads
+  // with explicit selected targets — the payload-ordered target labels
+  // (D3b). Display-only: the payload is never touched here.
+  function castSubmitDisplay(skill, payload, baseDisplay) {
+    const display = Object.assign({}, baseDisplay || {});
+    if (!display.skillLabel && typeof skill.label === "string" && skill.label !== "") {
+      display.skillLabel = skill.label;
+    }
+    if (
+      display.scaleLabel === undefined &&
+      Array.isArray(skill.freeformScales) &&
+      skill.freeformScales.length > 0 &&
+      skill.scale !== 1
+    ) {
+      const scaleLabel = CombatMenu.scaleLabelFor(skill);
+      if (scaleLabel !== null) {
+        display.scaleLabel = scaleLabel;
+      }
+    }
+    if (
+      display.targetLabel === undefined &&
+      display.targetLabels === undefined &&
+      Array.isArray(payload.target_ids) &&
+      payload.target_ids.length > 0 &&
+      !payload.target_shorthand
+    ) {
+      const names = participantNamesByIdentity(payload.target_ids);
+      if (names !== null) {
+        display.targetLabels = names;
+      }
+    }
+    return display;
+  }
+
+  // One committed exploration interact target's server-authored display name
+  // by identity, or null (the freeform-talk lookup, factored out).
+  function explorationTargetName(identity) {
+    if (identity === undefined || identity === null) {
+      return null;
+    }
+    const rs = reducer.getState();
+    const panel = (rs.panels && rs.panels.exploration) || {};
+    for (const target of panel.interact || []) {
+      if (String(target.identity) === String(identity)) {
+        return typeof target.display_name === "string" && target.display_name !== ""
+          ? target.display_name
+          : null;
+      }
+    }
+    return null;
+  }
+
+  // The committed combat-form `context_actions` panel's skill label for one
+  // skill key (the v3 nested categories -> groups -> skills shape flattened),
+  // or null.
+  function combatSkillLabel(skillKey) {
+    if (typeof skillKey !== "string" || skillKey === "") {
+      return null;
+    }
+    const rs = reducer.getState();
+    const panel = (rs.panels && rs.panels.context_actions) || {};
+    if (panel.kind !== "combat") {
+      return null;
+    }
+    for (const category of panel.skills || []) {
+      for (const group of category.groups || []) {
+        for (const skill of group.skills || []) {
+          if (skill && skill.key === skillKey) {
+            return typeof skill.label === "string" && skill.label !== ""
+              ? skill.label
+              : null;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // The central descriptor fill (complete-ui-command-echo D3, intent
+  // surfaces): component intents carry only {action_id, payload}, so missing
+  // echo labels are read VERBATIM from committed store state at dispatch time
+  // (the freeform-talk branch generalized). The fill never overwrites an
+  // explicitly provided field, never composes or invents a label, and feeds
+  // only the catalog call — the `ui_action` envelope is untouched. Absent
+  // state leaves the field absent (catalog silence, audited by the
+  // per-surface table).
+  function fillDisplayFor(actionId, payload, display) {
+    const base = display || null;
+    const filled = Object.assign({}, base || {});
+    // Declared-field semantics: an empty array counts as ABSENT (a caller
+    // handing over `targetLabels: []` has no labels, and committed state may
+    // supply them); any other present value — including falsy strings — is
+    // never overwritten.
+    const has = (field) => {
+      const value = base && base[field];
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      return value !== undefined && value !== null && value !== "";
+    };
+    const panels = (reducer.getState().panels) || {};
+    if (actionId === "shop.buy" || actionId === "shop.sell") {
+      if (!has("itemLabel")) {
+        const shop = (panels.services && panels.services.shop) || {};
+        const rows =
+          (actionId === "shop.buy" ? shop.stock : shop.sellable) || [];
+        for (const row of rows) {
+          if (
+            row &&
+            row.item_key === payload.item_key &&
+            typeof row.display_name === "string" &&
+            row.display_name !== ""
+          ) {
+            filled.itemLabel = row.display_name;
+            break;
+          }
+        }
+      }
+    } else if (
+      actionId === "explore.talk_scripted" ||
+      actionId === "explore.talk_freeform" ||
+      actionId === "explore.party_invite" ||
+      actionId === "explore.party_leave"
+    ) {
+      if (!has("npcLabel")) {
+        const name = explorationTargetName(payload.npc_id);
+        if (name !== null) {
+          filled.npcLabel = name;
+        }
+      }
+    } else if (actionId === "explore.engage" || actionId === "explore.look") {
+      if (!has("targetLabel")) {
+        // `explore.engage` carries `monster_id`; `explore.look` carries
+        // `target_id` (both are interact-target identities in the committed
+        // exploration panel).
+        const identity =
+          actionId === "explore.engage" ? payload.monster_id : payload.target_id;
+        const name = explorationTargetName(identity);
+        if (name !== null) {
+          filled.targetLabel = name;
+        }
+      }
+    } else if (actionId === "combat.cast") {
+      if (!has("skillLabel")) {
+        const label = combatSkillLabel(payload.skill_key);
+        if (label !== null) {
+          filled.skillLabel = label;
+        }
+      }
+      if (
+        !has("targetLabel") &&
+        !has("targetLabels") &&
+        Array.isArray(payload.target_ids) &&
+        payload.target_ids.length > 0 &&
+        !payload.target_shorthand
+      ) {
+        const names = participantNamesByIdentity(payload.target_ids);
+        if (names !== null) {
+          filled.targetLabels = names;
+        }
+      }
+    } else if (actionId === "creation.activate" || actionId === "creation.reset") {
+      // The creation overlay's confirm intent emits only {action_id, payload}
+      // — the descriptor rides the committed confirmation item it mirrors.
+      const confirmItem =
+        creation && Array.isArray(creation.confirmItems) && creation.confirmItems.length > 0
+          ? creation.confirmItems[0]
+          : null;
+      const carried = confirmItem && confirmItem.commandDisplay;
+      if (carried) {
+        for (const field of Object.keys(carried)) {
+          if (!has(field)) {
+            filled[field] = carried[field];
+          }
+        }
+      }
+    }
+    return filled;
+  }
+
   function dispatchAction(actionId, payload, display) {
     const v = view.value;
     if (!v.connected || v.mutationsLocked || v.phase !== "active" || inFlight) {
@@ -1899,8 +2126,12 @@ export const useElosernStore = defineStore("elosern", () => {
         sender.sendAction(envelope);
         // The display command line (webclient-input-narrative): resolve exactly
         // one bounded echo line from the pure catalog and append it as a literal
-        // text line; a rejected result leaves the line in place.
-        const line = CommandEcho.commandLine(actionId, envelope.payload, display);
+        // text line; a rejected result leaves the line in place. Intent
+        // surfaces get their missing labels filled from committed state first
+        // (fillDisplayFor); the filled descriptor feeds the catalog ONLY — the
+        // envelope above is already built and untouched.
+        const echoDisplay = fillDisplayFor(actionId, envelope.payload, display);
+        const line = CommandEcho.commandLine(actionId, envelope.payload, echoDisplay);
         if (line) {
           appendText("in", line);
         }
@@ -1959,7 +2190,11 @@ export const useElosernStore = defineStore("elosern", () => {
       if (key === "Enter") {
         const value = ServiceMenu.validateQuantity(q.state);
         if (value !== null) {
-          dispatchAction(q.actionId, { item_key: q.itemKey, quantity: value });
+          dispatchAction(
+            q.actionId,
+            { item_key: q.itemKey, quantity: value },
+            q.itemLabel ? { itemLabel: q.itemLabel } : null
+          );
           q.open = false;
         }
         publishView();

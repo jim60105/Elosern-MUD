@@ -203,6 +203,40 @@
     return model;
   }
 
+  // The echo label for one traversal (complete-ui-command-echo D3): the label
+  // of the UNIQUE traversable edge from `fromNode` to `toNode` — the committed
+  // edge model carries no exit_ref and the schema does not forbid parallel
+  // edges, so an ambiguous match must never pick one arbitrarily — falling
+  // back to the destination node's label. Neither available → null (the echo
+  // stays silent; nothing is invented).
+  function exitLabelFor(model, fromNode, toNode) {
+    if (!model || fromNode === null || fromNode === undefined || toNode === null || toNode === undefined) {
+      return null;
+    }
+    var matches = [];
+    (model.edges || []).forEach(function (edge) {
+      if (
+        edge &&
+        edge.traversable &&
+        String(edge.source) === String(fromNode) &&
+        String(edge.destination) === String(toNode) &&
+        edge.label
+      ) {
+        matches.push(edge.label);
+      }
+    });
+    if (matches.length === 1) {
+      return matches[0];
+    }
+    var nodes = [].concat(model.nodes || [], model.remembered || []);
+    for (var i = 0; i < nodes.length; i += 1) {
+      if (nodes[i] && String(nodes[i].id) === String(toNode)) {
+        return nodes[i].label || null;
+      }
+    }
+    return null;
+  }
+
   return {
     MAX_LATTICE: MAX_LATTICE,
     MAX_FOCUS_TARGETS: MAX_FOCUS_TARGETS,
@@ -211,5 +245,6 @@
     reducePanel: reducePanel,
     focusTargets: focusTargets,
     layoutNodes: layoutNodes,
+    exitLabelFor: exitLabelFor,
   };
 });
