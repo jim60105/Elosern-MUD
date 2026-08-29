@@ -382,15 +382,19 @@ Deterministic throughout; no live LLM/SD, fixed seeds or patched RNG.
 
 ## 14. OpenSpec Decomposition
 
-Two sequential changes, cut at the payload boundary:
+Seven sequential changes, each scoped to roughly one working day:
 
-1. `add-equipment-effects` — registry field, rulebook + loader, combat/state/
-   sexual integration, `equipment_worn` grace rules, item roster (existing
-   alignment + new items incl. Church line), holy-water cleanse, text-side
-   prose, all server tests.
-2. `show-equipment-breakdown` — character panel payload v5, Vue components,
-   Storybook/Vitest/coverage, panel validator tests.
+| # | Change | Dependency |
+|---|---|---|
+| P1 | `add-equipment-effect-rulebook` — registry `EquipmentModifierKey` + `modifier_key` field; new `equipment_effects.yaml` with the five-column budget table + validated loader (registry↔rulebook bijection, immune/attached reference checks); rulebook entries for all existing equipment and all ten new items (incl. Church line) with registry + shop listings | none |
+| P2 | `wire-equipment-combat-modifiers` — `equipment_adjustments()` merged into both `evaluate_combat_modifiers` variants; agility ≥ 0 clamp; gauge-cap read/consume points incl. heal clamp; `heal_gain` into `_heal_magnitude()`; overwhelm/preview consistency tests | P1 |
+| P3 | `add-equipment-immunity-and-attached-buffs` — immunity check at the buff-grant chokepoint with deterministic resistance prose; attached buffs applied/removed inside `toggle_equipment`'s transaction; 藥師珠串 regen buff; 受洗聖水 cleanse item effect; equipment adjustment prose on toggle/inspect surfaces | P1 (parallel-safe with P2) |
+| P4 | `add-equipment-sexual-effects` — `pleasure_gain` folded into `compute_pleasure_gain()`; effective 露出 (bias) in condition contexts and intimate presentation; regression test that resist scores pick up equipment-adjusted stats | P2 |
+| P5 | `add-equipment-worn-grace-rules` — `equipment_worn` condition vocabulary, context injection, loader validation; 聖袍/聖徽 grace rules; `status_display.yaml` coverage | P2 (after P4 recommended) |
+| P6 | `expose-stat-breakdown-read-model` — character panel payload v5 with `layers` (skill/condition/equipment), read model, text-client breakdown rows, payload validators | P2, P4, P5 |
+| P7 | `render-equipment-breakdown-webclient` — Vue breakdown rows and equipment adjustment display, Storybook/Vitest/coverage | P6 |
 
-Each change lands its own delta specs against `openspec/specs/`, with the
-first change also amending the combat-modifier and sexual-act surfaces it
-touches.
+Execution order: P1 → P2 → P3 → P4 → P5 → P6 → P7 (P3 may run in parallel
+with P2; sequential execution is the safe default). Each change lands its own
+delta specs against `openspec/specs/`; the new capability `equipment-effects`
+is introduced by P1 and amended by its successors.
