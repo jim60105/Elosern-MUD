@@ -45,6 +45,8 @@
         "world.rules.tests.test_divine_mystery_gate",
         "world.rules.tests.test_effect_handlers",
         "world.rules.tests.test_effective_power",
+        "world.rules.tests.test_equipment_effect_inertness",
+        "world.rules.tests.test_equipment_effect_rulebook",
         "world.rules.tests.test_equipment_toggle",
         "world.rules.tests.test_event_log"
       ]

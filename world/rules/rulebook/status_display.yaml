@@ -20,6 +20,9 @@
 - code: conferred_growth_rate
   label: 成長率加乘
   severity: beneficial
+- code: item_regen_light
+  label: 輕效回春
+  severity: beneficial
 - code: poison_agility_penalty
   label: 中毒敏捷減損
   severity: harmful

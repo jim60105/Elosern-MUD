@@ -7,6 +7,7 @@ from dataclasses import fields
 
 from world.lore.items import (
     ITEM_REGISTRY,
+    EquipmentModifierKey,
     ItemDefinition,
     ItemEffectKey,
     ItemIconKey,
@@ -45,6 +46,10 @@ class ItemPresentationTests(unittest.TestCase):
                 "silver_feather_earring", "crescent_earring", "dark_elf_kimono",
                 "shadow_blade", "shadow_blade_echo", "dark_elf_ninja_garb",
                 "guild_recruit_badge",
+                "purified_pendant", "fearless_brooch", "knight_platemail",
+                "apothecary_beads", "archmage_mending_robe", "enticing_lace_set",
+                "passion_silk_choker", "sister_vestments", "radiant_holy_emblem",
+                "saintess_vestments",
             }
         )
         for key, definition in ITEM_REGISTRY.items():
@@ -177,6 +182,7 @@ class ItemPresentationTests(unittest.TestCase):
                 "presentation",
                 "use_mechanics",
                 "equipment_slot",
+                "modifier_key",
             ],
         )
         self.assertEqual(
@@ -188,12 +194,14 @@ class ItemPresentationTests(unittest.TestCase):
         # Mechanics bindings are references resolved by the deterministic
         # rules capability; presentation carries no mechanics.
         for definition in ITEM_REGISTRY.values():
-            for mechanics_field in ("use_mechanics", "equipment_slot"):
+            for mechanics_field in ("use_mechanics", "equipment_slot", "modifier_key"):
                 value = getattr(definition, mechanics_field)
                 if value is None:
                     continue
                 self.assertIsInstance(
-                    value, (ItemUseMechanics, EquipmentSlot), definition.key
+                    value,
+                    (ItemUseMechanics, EquipmentSlot, EquipmentModifierKey),
+                    definition.key,
                 )
 
 
@@ -256,10 +264,24 @@ class ItemMechanicsTests(unittest.TestCase):
                     combat_allowed=True,
                 ),
                 equipment_slot=EquipmentSlot.WEAPON_MAIN,
+                modifier_key=EquipmentModifierKey.PLAIN_SWORD,
             ),
             "bare-string-slot": dict(equipment_slot="weapon_main"),
             "unknown-slot-string": dict(equipment_slot="saddle"),
             "bare-mechanics-object": dict(use_mechanics="self_heal"),
+            "slot-without-modifier": dict(equipment_slot=EquipmentSlot.WEAPON_MAIN),
+            "modifier-without-slot": dict(
+                modifier_key=EquipmentModifierKey.PLAIN_SWORD
+            ),
+            "use-with-modifier": dict(
+                use_mechanics=ItemUseMechanics(
+                    effect_key=ItemEffectKey.SELF_HEAL,
+                    consumable=True,
+                    combat_allowed=True,
+                ),
+                modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+            ),
+            "bare-string-modifier": dict(modifier_key="plain_sword"),
         }
         for name, overrides in cases.items():
             with self.subTest(case=name):
@@ -280,8 +302,18 @@ class ItemMechanicsTests(unittest.TestCase):
     def test_each_equipment_slot_is_acceptable(self):
         for slot in EquipmentSlot:
             with self.subTest(slot=slot.value):
-                definition = self._definition(equipment_slot=slot)
+                definition = self._definition(
+                    equipment_slot=slot,
+                    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+                )
                 self.assertIs(definition.equipment_slot, slot)
+
+    def test_equipment_slot_requires_a_modifier_key(self):
+        definition = self._definition(
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+        )
+        self.assertIs(definition.modifier_key, EquipmentModifierKey.PLAIN_SWORD)
 
 
 if __name__ == "__main__":

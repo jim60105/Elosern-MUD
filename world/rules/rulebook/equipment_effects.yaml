@@ -1,0 +1,116 @@
+# Equipment-effect rulebook (add-equipment-effect-rulebook).
+#
+# One entry per registered equipment item, keyed by the item key (identical to
+# its EquipmentModifierKey value). Magnitudes live ONLY here; the lore
+# registry carries identity. `budgets` caps every authored value per column by
+# the item's registered rarity, checked by world/rules/equipment_effects.py at
+# load time (rarity is never read at runtime). Percent fields use an explicit
+# signed `+N%` / `-N%` string; flat fields are signed integers.
+budgets:
+  common: {flat: 4, percent: 5, soft_percent: 10, bias: 0, gauge: 5}
+  uncommon: {flat: 6, percent: 8, soft_percent: 15, bias: 1, gauge: 10}
+  rare: {flat: 8, percent: 10, soft_percent: 20, bias: 1, gauge: 15}
+  epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20}
+  legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25}
+effects:
+  apprentice_focus_staff:
+    adjustments: {magic_level: 4, mp_cost: "-5%"}
+  apothecary_beads:
+    attached_buffs: [item_regen_light]
+  archmage_mending_robe:
+    adjustments: {magic_level: 8, mp_cost: "-12%"}
+  ashen_scimitar:
+    adjustments: {atk_phys: 4, agility: 2}
+  black_maid_dress:
+    adjustments: {pleasure_gain: "+10%"}
+    exposure_bias: 1
+  chainmail:
+    adjustments: {defense: 5, agility: "-5%"}
+  crescent_earring:
+    adjustments: {pleasure_gain: "+15%", sp_cost: "-8%"}
+  dark_elf_kimono:
+    adjustments: {pleasure_gain: "+15%", agility: 3}
+    exposure_bias: 1
+  dark_elf_ninja_garb:
+    adjustments: {defense: 5, agility: 5}
+  elven_traditional_robe:
+    adjustments: {defense: 3, pleasure_gain: "+20%"}
+    exposure_bias: 2
+  enticing_lace_set:
+    adjustments: {pleasure_gain: "+15%"}
+    exposure_bias: 1
+  fearless_brooch:
+    immune: [fear]
+  gilded_saber:
+    adjustments: {atk_phys: 5}
+  gliding_cloak:
+    adjustments: {agility: 8}
+  great_axe:
+    adjustments: {atk_phys: 6, agility: "-8%"}
+  guild_recruit_badge:
+    adjustments: {defense: 1}
+  hunters_longbow:
+    adjustments: {atk_phys: 4, agility: 2}
+  hunting_throwing_axe:
+    adjustments: {atk_phys: 2, agility: -1}
+  iron_dagger:
+    adjustments: {atk_phys: 1}
+  iron_shield:
+    adjustments: {defense: 4}
+  knight_blade:
+    adjustments: {atk_phys: 5, defense: 1}
+  knight_platemail:
+    adjustments: {atk_phys: -2, defense: 8, agility: "-10%"}
+    gauge_caps: {hp: 15}
+  leather_armor:
+    adjustments: {defense: 4}
+  mage_robe:
+    adjustments: {magic_level: 3, mp_cost: "-8%"}
+  magic_sword:
+    adjustments: {atk_phys: 8, magic_level: 6}
+  passion_silk_choker:
+    adjustments: {defense: -3, pleasure_gain: "+25%"}
+  pilgrim_medallion:
+    adjustments: {pleasure_gain: "+10%", heal_gain: "+5%"}
+  plain_sword:
+    adjustments: {atk_phys: 2}
+  prism_charm:
+    adjustments: {magic_level: 5}
+  protective_ring:
+    adjustments: {defense: 6}
+    gauge_caps: {hp: 10}
+  purified_pendant:
+    adjustments: {defense: 2}
+    immune: [poisoned]
+  radiant_holy_emblem:
+    adjustments: {pleasure_gain: "+10%", heal_gain: "+20%"}
+    immune: [dark_curse]
+  rose_crest_rapier:
+    adjustments: {atk_phys: 7, agility: 3}
+  royal_heirloom_pendant:
+    adjustments: {defense: 4, mp_cost: "-5%"}
+  royal_signet_ring:
+    adjustments: {atk_phys: 3, sp_cost: "-5%"}
+  saintess_vestments:
+    adjustments: {defense: -3, pleasure_gain: "+25%", heal_gain: "+25%"}
+    exposure_bias: 2
+  sister_vestments:
+    adjustments: {pleasure_gain: "+15%", heal_gain: "+10%"}
+    exposure_bias: 1
+  shadow_blade:
+    adjustments: {atk_phys: 12, agility: 3}
+  shadow_blade_echo:
+    adjustments: {atk_phys: 10, agility: -3}
+  silver_feather_earring:
+    adjustments: {pleasure_gain: "+15%"}
+    exposure_bias: 1
+  silver_hairpin:
+    adjustments: {pleasure_gain: "+5%"}
+  steel_fang_dagger:
+    adjustments: {atk_phys: 4, agility: 2}
+  # Utility equipment: explicitly no combat or social effects (D1).
+  storage_pouch: {}
+  wolf_fang_necklace:
+    adjustments: {atk_phys: 3}
+  wooden_club:
+    adjustments: {atk_phys: 3, agility: -2}

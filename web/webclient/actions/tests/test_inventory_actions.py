@@ -228,6 +228,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
     def test_sixth_accessory_refuses_with_cap_reason(self):
         from world.lore.items import (
             ITEM_REGISTRY,
+            EquipmentModifierKey,
             ItemDefinition,
             ItemIconKey,
             ItemKind,
@@ -256,6 +257,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
                     summary_zh="測試用的飾品。",
                 ),
                 equipment_slot=EquipmentSlot.ACCESSORY,
+                modifier_key=EquipmentModifierKey.PROTECTIVE_RING,
             )
         self.player.db.inventory = [f"ring_{index}" for index in range(6)]
         for index in range(5):

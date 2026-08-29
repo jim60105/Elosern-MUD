@@ -282,3 +282,63 @@ shops:
         max_stock: 10
         initial_stock: 4
         restock_quantity: 2
+      - item_key: purified_pendant
+        buy_copper: 15000
+        sell_copper: 7500
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: fearless_brooch
+        buy_copper: 15000
+        sell_copper: 7500
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: knight_platemail
+        buy_copper: 4800
+        sell_copper: 2400
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: apothecary_beads
+        buy_copper: 2500
+        sell_copper: 1250
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+      - item_key: archmage_mending_robe
+        buy_copper: 5000
+        sell_copper: 2500
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: enticing_lace_set
+        buy_copper: 1500
+        sell_copper: 750
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+      - item_key: passion_silk_choker
+        buy_copper: 4800
+        sell_copper: 2400
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: sister_vestments
+        buy_copper: 1800
+        sell_copper: 900
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+      - item_key: radiant_holy_emblem
+        buy_copper: 20000
+        sell_copper: 10000
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: saintess_vestments
+        buy_copper: 5000
+        sell_copper: 2500
+        max_stock: 2
+        initial_stock: 1
+        restock_quantity: 1

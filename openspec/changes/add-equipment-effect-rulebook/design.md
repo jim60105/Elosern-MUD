@@ -113,6 +113,15 @@ production registry is untouched; no test-only enum members are added
 The tasks list the known fixture files and require a `rg "ItemDefinition\("`
 sweep at implementation time.
 
+The loader additionally enforces three fail-loud properties on the production
+side (construction stays permissive, so the fixture policy above holds): a
+registered item whose modifier *value* is not its own item key is a load-time
+error — the enum guarantees the pair invariant, and the loader enforces the
+identity the enum alone cannot, so a registered item can never hijack another
+item's effects or budget; the rules document may not repeat a key at any
+nesting (PyYAML's default last-wins would silently diverge from the reviewed
+file); percent grammar is ASCII-only because `int()` accepts non-ASCII digits.
+
 ### D8 — Church doctrine scope is a named set, not a runtime tag
 
 A registry-owned faith tag would be a new persistent identity surface with
