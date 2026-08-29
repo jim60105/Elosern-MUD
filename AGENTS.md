@@ -141,6 +141,13 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 
 - Run the smallest focused test label, Node file, or browser class that covers
   the change. A local command estimated above 10 minutes is forbidden.
+- Every non-browser test module under `commands`, `server`, `typeclasses`,
+  `world`, or `web/webclient` must be registered in exactly one shard of
+  `.github/evennia-shards.json`. Adding, renaming, or moving a test module MUST
+  update that manifest in the same change, or the CI ownership contract
+  (`tests.test_evennia_test_optimization_contract`) fails on every branch after
+  yours. Verify locally with
+  `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
 - The full non-browser Evennia suite is allowed once only when needed, under 10
   minutes, and run with `--parallel 16 --noinput`; never run it serially.
 - The full managed browser suite and `tools.spec_traceability verify --evidence`
