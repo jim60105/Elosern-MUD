@@ -21,7 +21,7 @@ from world.rules.buffs import (
 )
 from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
 from world.rules.dice import roll_d100
-from world.rules.equipment_effects import equipment_immune_buff_keys
+from world.rules.equipment_effects import equipment_immune_buff_keys, equipment_pleasure_gain
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
@@ -832,8 +832,11 @@ def _handle_pleasure_effect(
     The acting entity uses ``actor_part``/``actor_pleasure_ratio`` and every
     other participant uses ``target_part``/``1.0`` (design D-5); the
     participant count is computed once per cast and reused for every
-    participant's gain. Each staged ``PendingEffect`` applies that
-    participant's own computed gain through :func:`_apply_pleasure_gain`.
+    participant's gain. Each participant's gain carries that
+    participant's OWN equipment ``pleasure_gain`` percent (the pure
+    accessor is evaluated per participant, never shared across the cast).
+    Each staged ``PendingEffect`` applies that participant's own computed
+    gain through :func:`_apply_pleasure_gain`.
     """
     del context, scale
     act = _resolve_act(effect_id)
@@ -847,7 +850,14 @@ def _handle_pleasure_effect(
             act.actor_part if is_actor else act.target_part,
         )
         ratio = act.actor_pleasure_ratio if is_actor else 1.0
-        gain = compute_pleasure_gain(participant, part, act.base_pleasure, ratio, count)
+        gain = compute_pleasure_gain(
+            participant,
+            part,
+            act.base_pleasure,
+            ratio,
+            count,
+            pleasure_percent=equipment_pleasure_gain(participant),
+        )
         pending.append(
             PendingEffect(
                 participant,

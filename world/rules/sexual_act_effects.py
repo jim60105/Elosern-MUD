@@ -238,24 +238,42 @@ def compute_pleasure_gain(
     base_pleasure: int,
     ratio: float,
     participant_count: int,
+    pleasure_percent: int = 0,
 ) -> int:
     """Compute one participant's pleasure gain from an act's base magnitude.
 
-    The formula is base × ratio × sensitivity × shame × participant-count.
-    The sensitivity and shame multipliers are read from ``PLEASURE_CONFIG``
+    The formula is
+    ``max(round(base × ratio × sensitivity × shame × participant-count ×
+    (1 + pleasure_percent / 100)), 0)`` with a single final rounding. The
+    sensitivity and shame multipliers are read from ``PLEASURE_CONFIG``
     (``pleasure-gauge``-owned, read-only) keyed by the participant's current
     sensitivity level for the resolved part and its shame level; the
     participant-count multiplier comes from this module's own validated
     ladder. ``ratio`` is ``1.0`` for every recipient and
     ``act.actor_pleasure_ratio`` for the actor's own entry, so the D-4/D-9
     self-pleasure split lives entirely in the caller's ratio choice.
+
+    ``pleasure_percent`` is the caller-contributed equipment percentage
+    (add-equipment-sexual-effects D3): the pure
+    ``equipment_effects.equipment_pleasure_gain`` accessor is its only
+    sanctioned source, keeping this module free of rulebook reads. Zero
+    reproduces the pre-overlay result exactly; the floor keeps a hypothetical
+    negative percent from ever subtracting pleasure.
     """
     sensitivity = PLEASURE_CONFIG.sensitivity_multipliers[
         _sensitivity_level(participant, part)
     ]
     shame = PLEASURE_CONFIG.shame_multipliers[participant.sexual.shame.level]
     crowd = _EFFECTS_CONFIG.participant_multiplier(participant_count)
-    return round(base_pleasure * ratio * sensitivity * shame * crowd)
+    gain = round(
+        base_pleasure
+        * ratio
+        * sensitivity
+        * shame
+        * crowd
+        * (1 + pleasure_percent / 100)
+    )
+    return max(gain, 0)
 
 
 # The eleven lifetime counter attribute names map to their sanctioned
