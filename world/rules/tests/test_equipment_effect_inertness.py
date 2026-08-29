@@ -12,12 +12,14 @@
 (b) Deviant-copy behavior tests prove dormant fields cannot leak: every
     probe entity WEARS the items whose rulebook entries are swapped for
     copies whose dormant-only fields differ — the pleasure probe wears the
-    mutated ``black_maid_dress``, the heal probe wears the mutated
-    ``sister_vestments``, and the immune/attachment probe wears the mutated
-    accessories — and the regen buff is added under the mutated item's
-    source key. Combat modifier evaluation, item-use preflight, and buff
-    application results must stay identical between the two copies, and
-    each test first proves the two copies genuinely load differently.
+    mutated ``black_maid_dress`` and the immune/attachment probe wears the
+    mutated accessories — and the regen buff is added under the mutated
+    item's source key. Combat modifier evaluation, item-use preflight, and
+    buff application results must stay identical between the two copies,
+    and each test first proves the two copies genuinely load differently.
+    (The heal probe was retired when wire-equipment-combat-modifiers made
+    ``heal_gain`` live; the surviving probes cover the still-dormant
+    fields.)
 """
 
 from tools.spec_traceability import covers_requirement
@@ -43,12 +45,17 @@ from world.rules.equipment_effects import reload_equipment_effect_rules
 _ROOT = Path(__file__).resolve().parents[3]
 _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
 # The loader module may reference itself; the server-start hook is the one
-# bootstrap consumer whose import performs startup validation (design D4).
-# The inertness requirement bars GAMEPLAY consumers, not this validation
-# hook, and the allowlist records exactly that distinction.
+# bootstrap consumer whose import performs startup validation (design D4);
+# the two combat-modifier consumers are the authorized P2 gameplay readers
+# (the merged-bundle accessor lives in the loader module itself, and the
+# gauge-ceiling sync consumes the cap accessor). The inertness requirement
+# bars ADDITIONAL resolution paths, and the allowlist records exactly the
+# sanctioned surface.
 _ALLOWLIST = frozenset(
     {
         Path("world/rules/equipment_effects.py"),
+        Path("world/rules/combat_modifiers.py"),
+        Path("world/rules/equipment.py"),
         Path("server/conf/at_server_startstop.py"),
     }
 )
@@ -233,31 +240,6 @@ class EquipmentRulebookDormancyTests(EvenniaTestCase):
                 EquipmentModifierKey.BLACK_MAID_DRESS
             ].adjustments["pleasure_gain"],
             "+14%",
-        )
-        self.assertEqual(first, second)
-
-    @covers_requirement(
-        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
-    )
-    def test_dormant_heal_value_never_leaks_from_worn_vestments(self):
-        def deviate_a(document):
-            document["effects"]["sister_vestments"]["adjustments"][
-                "heal_gain"
-            ] = "+3%"
-
-        def deviate_b(document):
-            document["effects"]["sister_vestments"]["adjustments"][
-                "heal_gain"
-            ] = "+15%"
-
-        first = self._observations_under(deviate_a, armor="sister_vestments")
-        second = self._observations_under(deviate_b, armor="sister_vestments")
-        # The loaded dormant value really does differ between the captures.
-        self.assertEqual(
-            equipment_effects.EQUIPMENT_EFFECT_RULES[
-                EquipmentModifierKey.SISTER_VESTMENTS
-            ].adjustments["heal_gain"],
-            "+15%",
         )
         self.assertEqual(first, second)
 

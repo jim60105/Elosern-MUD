@@ -36,10 +36,12 @@ accessor and both evaluation paths SHALL NOT write any entity state.
 ### Requirement: Adjusted agility never resolves negative
 
 Every consumer path that derives a modifier-adjusted effective agility for
-to-hit, overwhelm estimation, resist scoring, or the flee contest SHALL
-clamp the adjusted value at 0 after percentage modifiers (skill multipliers,
-rules, and equipment) are applied. Initiative order keeps its documented
-raw-agility exception unchanged.
+to-hit, overwhelm estimation, resist scoring, or the flee contest SHALL share
+one accessor that applies both agility components of the merged bundle in
+order — the `agility` percentage string (rule-table rows and percent-shaped
+gear) scales the effective skill value, then the flat `agility_flat` addend
+(flat gear such as `shadow_blade`) is added — and clamps the adjusted value
+at 0. Initiative order keeps its documented raw-agility exception unchanged.
 
 #### Scenario: Heavy gear cannot invert the to-hit inequality
 

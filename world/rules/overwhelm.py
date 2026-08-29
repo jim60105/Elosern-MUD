@@ -10,7 +10,7 @@ import yaml
 
 from world.rules import combat
 from world.rules.combat import Battlefield
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
 from world.skills.registry import SKILL_REGISTRY
 from world.lore.items import ITEM_REGISTRY
@@ -74,23 +74,14 @@ def power_ratio_verdict(
     return None
 
 
-def _apply_percent(base: float, modifier: str | None) -> float:
-    if modifier is None:
-        return base
-    return combat._apply_percent_mod(base, modifier)
-
-
 def _adjusted_agility(
     entity: Any,
     modifiers: dict[str, Any] | None = None,
 ) -> float:
-    """Read agility through the same skill and modifier paths as combat."""
+    """Read agility through the same adjusted path as live combat."""
     if modifiers is None:
         modifiers = evaluate_combat_modifiers(entity)
-    return _apply_percent(
-        float(entity.skills.effective_value("agility")),
-        modifiers.get("agility"),
-    )
+    return adjusted_agility(entity, modifiers)
 
 
 def _required_roll(attacker: Any, defender: Any) -> float:

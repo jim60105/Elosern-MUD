@@ -486,13 +486,47 @@ def preflight_equipment_toggle(
     return EquipmentTogglePreflight(allowed=True, reason=None, plan=plan)
 
 
+def sync_equipment_gauge_limits(entity: Any) -> None:
+    """Recompute every gauge ceiling from the currently worn equipment.
+
+    The single writer of the non-literal gauge ceiling (wire-equipment-
+    combat-modifiers D1): ``mod`` is recomputed from scratch as the sum of
+    the worn items' rulebook gauge caps — never accumulated, so repeated
+    toggles cannot drift — and the literal ``base`` is never written. Absent
+    gauge traits are skipped. When a recompute lowers a ceiling, the stored
+    ``current`` settles down to the lowered ceiling (the read-side clamp does
+    not write back, and the strict status read model rejects a stored value
+    above the effective maximum). Call only inside ``toggle_equipment``'s
+    transaction, after the equipment write it reads.
+    """
+    from world.rules.equipment_effects import equipment_gauge_caps
+
+    caps = equipment_gauge_caps(entity)
+    for key in ("hp", "mp", "sp"):
+        gauge = entity.traits.get(key)
+        if gauge is None or gauge.trait_type != "gauge":
+            continue
+        total = int(caps.get(key, 0))
+        if gauge.mod != total:
+            gauge.mod = total
+        ceiling = gauge.max
+        data = gauge._data
+        stored = data.get(
+            "current", (data["base"] + data["mod"]) * data["mult"]
+        )
+        if stored > ceiling:
+            gauge.current = ceiling
+
+
 def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
     """Atomically equip or unequip one held, registry-declared equipment key.
 
     Mutation repeats the shared preflight and writes the complete replacement
-    mapping inside one transaction, restoring the in-process equipment cache
-    when the write fails. Equipped items remain in canonical inventory; the
-    caller never supplies a slot and no unrelated accessory is ever removed.
+    mapping plus the recompute-from-scratch gauge-ceiling sync inside one
+    transaction, restoring the in-process equipment cache and the trait
+    storage (handler caches refreshed) when the write fails. Equipped items
+    remain in canonical inventory; the caller never supplies a slot and no
+    unrelated accessory is ever removed.
     """
     preflight = preflight_equipment_toggle(entity, item_key)
     if not preflight.allowed or preflight.plan is None:
@@ -501,11 +535,14 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
         )
     plan = preflight.plan
     snapshot = attribute_snapshot(entity, "equipment")
+    traits_snapshot = snapshot_traits(entity)
     try:
         with transaction.atomic():
             entity.db.equipment = plan.after
+            sync_equipment_gauge_limits(entity)
     except Exception:
         restore_attribute_best_effort(entity, "equipment", snapshot)
+        restore_traits(entity, traits_snapshot)
         raise
     return EquipmentToggleResult(
         outcome="success",

@@ -1,4 +1,12 @@
-"""Pure combat-modifier query for design section 6.4."""
+"""Pure combat-modifier query for design section 6.4.
+
+Merges the rule-table matches with the worn-equipment bundle from
+``world.rules.equipment_effects.equipment_adjustments`` (P2) in BOTH
+evaluation paths, so to-hit, damage, estimation, preview, cost, and resist
+consumers share one effective bundle. The merge appends AFTER rule-table
+matching so ``matched_combat_modifiers`` keeps its per-rule breakdown free
+of equipment contributions.
+"""
 
 import math
 from pathlib import Path
@@ -7,6 +15,7 @@ from typing import Any
 
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, EXPOSURE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
+from world.rules.equipment_effects import equipment_adjustments
 from world.rules.rulebook.schema import evaluate_condition, load_rules
 from world.rules.sexual_state import PLEASURE_CONFIG
 from world.skills.equipment import dual_wielding_from_storage
@@ -118,13 +127,19 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
 
 
 def evaluate_combat_modifiers_no_create(entity: Any) -> dict[str, Any]:
-    """Return the merged matching bundle from stored state without handlers."""
+    """Return the merged matching bundle from stored state without handlers.
+
+    The equipment fold reads only ``entity.db.equipment`` through the
+    accessor's fail-closed normalization, so the no-create contract (no
+    handler materialization, no writes) holds for the equipment contribution
+    too.
+    """
     result: dict[str, Any] = {}
     for _, adjustments in matched_combat_modifiers(
         entity, context=build_no_create_condition_context(entity)
     ):
         result = _merge_adjustments(result, adjustments)
-    return result
+    return _merge_adjustments(result, equipment_adjustments(entity))
 
 
 def _build_context(entity) -> dict[str, Any]:
@@ -167,7 +182,7 @@ def apply_cost_modifier(amount: int, percentage: str | None) -> int:
     ``max(0, floor(amount * (1 + pct / 100)))``: reductions can make a cast
     free at zero but never negative. A missing, non-string, or malformed
     percentage raises ``ValueError`` (fail loud, matching
-    ``combat._apply_percent_mod``).
+    :func:`adjusted_agility`).
     """
     if percentage is None:
         return amount
@@ -256,4 +271,28 @@ def evaluate_combat_modifiers(entity) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for _, adjustments in matched_combat_modifiers(entity):
         result = _merge_adjustments(result, adjustments)
-    return result
+    return _merge_adjustments(result, equipment_adjustments(entity))
+
+
+def adjusted_agility(entity: Any, modifiers: dict[str, Any] | None = None) -> float:
+    """Return the effective agility with bundle adjustments, floored at zero.
+
+    Both agility components of the merged bundle apply, in order: the
+    percentage string (rule-table rows and percent-shaped gear) scales the
+    effective skill value, then the flat ``agility_flat`` addend (flat gear
+    such as ``ashen_scimitar``) is added. The result is clamped at 0 so heavy
+    gear can never invert an agility-driven inequality (to-hit, overwhelm
+    estimation, resist scoring, flee contest). ``combat.roll_initiative``
+    deliberately keeps its raw-agility exception and does not call this.
+    ``modifiers`` may be a caller-evaluated bundle to avoid a re-read.
+    """
+    if modifiers is None:
+        modifiers = evaluate_combat_modifiers(entity)
+    agility = float(entity.skills.effective_value("agility"))
+    percent = modifiers.get("agility")
+    if percent is not None:
+        if not isinstance(percent, str) or _PERCENT_RE.fullmatch(percent) is None:
+            raise ValueError(f"invalid percentage modifier {percent!r}")
+        agility *= 1 + float(percent[:-1]) / 100
+    agility += float(modifiers.get("agility_flat", 0))
+    return max(0.0, agility)

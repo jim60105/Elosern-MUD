@@ -87,9 +87,14 @@ this change does not alter it.
 
 ### D4 — `heal_gain` scales skill heals only
 
-One formula, normative: `base_amount = max(round(magic × heal.multiplier),
-heal.floor)` (unchanged), then `final = max(floor(base_amount ×
-(1 + heal_gain_pct/100)), heal.floor)`. Consumable item-use heals
+One formula, normative: `base_amount = max(round(adjusted_magic ×
+heal.multiplier), heal.floor)`, where `adjusted_magic` is the caster's
+`magic_level` read through the same equipment-adjusted magic path as
+magic-school damage (`combat._adjusted_attack`, so `mage_robe`-style
+`magic_level` gear lifts heals too), then `final = max(floor(base_amount ×
+(1 + heal_gain_pct/100)), heal.floor)` — the same floor-rounded percentage
+parse as `apply_cost_modifier`, so fractional percentages are tolerated and
+the floor never banker-rounds up. Consumable item-use heals
 (`item_effects.yaml` amounts) stay unscaled: they are the offline-friendly
 guaranteed baseline, and scaling them would couple two rulebooks
 mid-resolution. A test pair distinguishes floor from Python's banker

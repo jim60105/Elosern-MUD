@@ -9,7 +9,7 @@ from world.rules.action import (
     RejectedAction,
     register_effect_handler,
 )
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.dice import roll_d100
 from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import (
@@ -43,12 +43,8 @@ SKILL_REGISTRY[FLEE_SKILL_KEY] = SkillDef(
 
 
 def _adjusted_agility(entity: Any) -> float:
-    """Return effective agility with only the shared agility modifier applied."""
-    modifiers = evaluate_combat_modifiers(entity)
-    return combat._apply_percent_mod(
-        float(entity.skills.effective_value("agility")),
-        modifiers.get("agility"),
-    )
+    """Return effective agility with only the shared agility bundle applied."""
+    return adjusted_agility(entity, evaluate_combat_modifiers(entity))
 
 
 def _fastest_pursuer_agility(

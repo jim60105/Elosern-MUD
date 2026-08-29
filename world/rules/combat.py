@@ -3,7 +3,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-import re
 from typing import Any
 
 import yaml
@@ -17,7 +16,11 @@ from world.rules.action import (
     register_effect_handler,
 )
 from world.rules.buffs import TickRecord, tick_buffs
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import (
+    adjusted_agility,
+    apply_cost_modifier,
+    evaluate_combat_modifiers,
+)
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.items import ItemUseRequest, resolve_item_use
@@ -34,7 +37,6 @@ COMBAT_YAML = yaml.safe_load(
         encoding="utf-8"
     )
 )
-_PERCENT_RE = re.compile(r"([+-]\d+)%")
 
 
 @dataclass
@@ -152,16 +154,6 @@ def _max_hp(entity: Any) -> float:
     return max(float(maximum), 0.0)
 
 
-def _apply_percent_mod(base: float, pct: str | None) -> float:
-    """Apply a signed percentage string from the modifier rulebook."""
-    if pct is None:
-        return base
-    match = _PERCENT_RE.fullmatch(pct)
-    if match is None:
-        raise ValueError(f"invalid percentage modifier {pct!r}")
-    return base * (1 + int(match.group(1)) / 100)
-
-
 def _roll_multiplier(raw_roll: int, margin: float) -> float:
     damage = COMBAT_YAML["damage"]
     if raw_roll == 100:
@@ -178,14 +170,8 @@ def _to_hit(
 ) -> tuple[bool, float]:
     attacker_mods = evaluate_combat_modifiers(attacker)
     defender_mods = evaluate_combat_modifiers(defender)
-    attacker_agility = _apply_percent_mod(
-        attacker.skills.effective_value("agility"),
-        attacker_mods.get("agility"),
-    )
-    defender_agility = _apply_percent_mod(
-        defender.skills.effective_value("agility"),
-        defender_mods.get("agility"),
-    )
+    attacker_agility = adjusted_agility(attacker, attacker_mods)
+    defender_agility = adjusted_agility(defender, defender_mods)
     attack_score = (
         raw_roll + attacker_agility + attacker_mods.get("accuracy", 0)
     )
@@ -206,16 +192,17 @@ def effective_power(entity: Any) -> float:
 
 
 def _adjusted_attack(entity: Any, attack_key: str) -> float:
-    """Return effective attack plus the flat ``atk_phys`` bundle bonus.
+    """Return effective attack plus the matching flat bundle bonus.
 
-    The bonus enters only physical attacks (``attack_key == "atk_phys"``),
-    matching the stat's role in the damage formula: magic-school damage reads
-    ``magic_level`` and never receives the physical-attack adjustment.
+    The ``atk_phys`` bonus enters only physical attacks, the ``magic_level``
+    bonus (mage robes, staves, magic swords) only the magic school, each
+    matching the stat's role in the damage formula; neither school receives
+    the other stat's adjustment.
     """
-    attack = entity.skills.effective_value(attack_key)
-    if attack_key != "atk_phys":
-        return float(attack)
-    return float(attack) + evaluate_combat_modifiers(entity).get("atk_phys", 0)
+    attack = float(entity.skills.effective_value(attack_key))
+    if attack_key not in {"atk_phys", "magic_level"}:
+        return attack
+    return attack + evaluate_combat_modifiers(entity).get(attack_key, 0)
 
 
 def _adjusted_defense(entity: Any) -> float:
@@ -374,13 +361,20 @@ def _heal_magnitude(actor: Any) -> int:
     drops the defense-mitigation term entirely (healing is not mitigated), so
     the magnitude shares damage's ``round(effective value x multiplier)``
     shape without inheriting its to-hit or defense assumptions (design.md
-    magnitude decision).
+    magnitude decision). The caster stat reads through the equipment-aware
+    attack path (a ``magic_level``-granting robe heals harder), and the
+    unamplified base is then scaled by the merged ``heal_gain`` percent with
+    the normative formula ``max(floor(base x (1 + pct/100)), heal.floor)``
+    (wire-equipment-combat-modifiers D4): flooring, not banker-rounding, and
+    the configured floor always wins. Item-use healing keeps its flat
+    rulebook amount and is never scaled here.
     """
     multiplier = float(COMBAT_YAML["heal"]["multiplier"])
-    return max(
-        round(actor.skills.effective_value("magic_level") * multiplier),
-        int(COMBAT_YAML["heal"]["floor"]),
-    )
+    floor = int(COMBAT_YAML["heal"]["floor"])
+    magic = _adjusted_attack(actor, "magic_level")
+    base_amount = max(round(magic * multiplier), floor)
+    heal_gain = evaluate_combat_modifiers(actor).get("heal_gain")
+    return max(apply_cost_modifier(base_amount, heal_gain), floor)
 
 
 def _parse_heal_effect(effect_id: str) -> str:

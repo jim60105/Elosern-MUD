@@ -248,7 +248,10 @@ class RoundEstimateTests(unittest.TestCase):
             )
             self.assertEqual(team_effective_power(field, "second"), power)
             self.assertGreater(_expected_damage_per_attack(attacker, defender), 0)
-            attacker.skills.values["agility"] = -100
+            # A modifier-blind negative raw agility is clamped at 0 by the
+            # shared adjusted-agility path, so unreachable comes from the
+            # defender's agility instead (required roll beyond 100).
+            defender.skills.values["agility"] = 1000
             self.assertTrue(
                 math.isinf(
                     estimated_rounds_to_conclude(

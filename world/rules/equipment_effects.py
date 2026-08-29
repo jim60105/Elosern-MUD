@@ -17,9 +17,13 @@ magnitude. The loader mirrors ``world.rules.items.load_item_effect_rules``:
 - ``immune`` / ``attached_buffs`` keys must resolve in the buff rulebook, and
   one entry may never immunise a buff it also attaches.
 
-Until the owning changes (P2-P5) land, no gameplay module may import this
-rulebook; a structural test enforces that inertness, with server bootstrap
-validation as the only sanctioned startup consumer.
+P2 (wire-equipment-combat-modifiers) makes the combat adjustment fields and
+gauge caps live through exactly two pure read accessors —
+:func:`equipment_adjustments` and :func:`equipment_gauge_caps` — so no
+consumer re-implements equipment math. A structural inertness test allowlists
+the change-authorized consumers; ``pleasure_gain`` / ``exposure_bias`` stay
+dormant until P4 and ``immune`` / ``attached_buffs`` until P3, so their
+fields must not be folded into either accessor yet.
 """
 
 import re
@@ -461,6 +465,100 @@ _loaded = load_equipment_effect_rules()
 
 # Immutable equipment-effect rulebook keyed by the closed registry vocabulary.
 EQUIPMENT_EFFECT_RULES: dict[EquipmentModifierKey, EquipmentEffectRule] = _loaded
+
+
+# The bundle vocabulary this change activates. ``pleasure_gain`` /
+# ``exposure_bias`` / ``immune`` / ``attached_buffs`` stay dormant until their
+# owning changes (P3/P4) land and must NOT be folded here. ``agility`` splits
+# by authored kind: a percent string merges under ``agility`` and a flat
+# integer under ``agility_flat``, because the shared merge in
+# ``combat_modifiers._merge_adjustments`` silently replaces values of
+# different kinds and the percent consumers reject flat ints.
+_BUNDLE_FLAT_FIELDS = frozenset({"atk_phys", "defense", "magic_level"})
+_BUNDLE_PERCENT_FIELDS = frozenset({"mp_cost", "sp_cost", "heal_gain"})
+
+
+def _worn_item_keys(equipment: Mapping) -> list[str]:
+    """Return every worn item key of one normalized equipment mapping."""
+    keys: list[str] = []
+    for slot_key in ("weapon_main", "weapon_off", "armor"):
+        value = equipment[slot_key]
+        if value is not None:
+            keys.append(value)
+    keys.extend(equipment["accessories"])
+    return keys
+
+
+def _worn_rules(entity: Any) -> list[EquipmentEffectRule]:
+    """Resolve one entity's worn equipment to its loaded effect rules.
+
+    Fail-closed: malformed equipment storage (``normalized_equipment`` →
+    ``None``) reads as "nothing worn". A registry-validated mapping only ever
+    holds equipment keys with bound modifier keys (the normalization checks
+    registry membership and slot fit), so every lookup resolves.
+    """
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return []
+    rules: list[EquipmentEffectRule] = []
+    for item_key in _worn_item_keys(equipment):
+        definition = ITEM_REGISTRY[item_key]
+        modifier_key = definition.modifier_key
+        if modifier_key is None:  # pragma: no cover - registry invariant
+            continue
+        rules.append(EQUIPMENT_EFFECT_RULES[modifier_key])
+    return rules
+
+
+def equipment_adjustments(entity: Any) -> Mapping[str, int | str]:
+    """Return the pure additive adjustment bundle of one entity's worn gear.
+
+    The single accessor converting worn equipment into combat adjustments
+    (wire-equipment-combat-modifiers): every consumer reads the merged
+    bundle from ``combat_modifiers`` — none may compute a parallel equipment
+    formula. Flat fields sum as integers; percent fields sum and re-render as
+    signed percent strings; flat ``agility`` lands under ``agility_flat``
+    (see ``_BUNDLE_FLAT_FIELDS``). Malformed storage yields the empty bundle.
+    Writes nothing.
+    """
+    flats: dict[str, int] = {}
+    percents: dict[str, int] = {}
+    agility_flat_total = 0
+    for rule in _worn_rules(entity):
+        for field, value in rule.adjustments.items():
+            if field in _BUNDLE_FLAT_FIELDS:
+                flats[field] = flats.get(field, 0) + int(value)
+            elif field in _BUNDLE_PERCENT_FIELDS:
+                percents[field] = percents.get(field, 0) + int(value[:-1])
+            elif field == "agility":
+                if isinstance(value, str):
+                    percents["agility"] = percents.get("agility", 0) + int(value[:-1])
+                else:
+                    agility_flat_total += int(value)
+            # pleasure_gain stays dormant (P4); every other adjustment field
+            # is already covered by the branches above.
+    bundle: dict[str, int | str] = dict(flats)
+    if agility_flat_total:
+        bundle["agility_flat"] = agility_flat_total
+    for field, total in percents.items():
+        bundle[field] = f"{total:+d}%"
+    return MappingProxyType(bundle)
+
+
+def equipment_gauge_caps(entity: Any) -> Mapping[str, int]:
+    """Return the additive per-gauge caps of one entity's worn gear.
+
+    The single accessor for gauge-cap reads (the ceiling sync in
+    ``world.rules.equipment`` is its only consumer). Positive-only by loader
+    contract; malformed storage yields the empty mapping. Writes nothing.
+    """
+    caps: dict[str, int] = {}
+    for rule in _worn_rules(entity):
+        for target, cap in rule.gauge_caps.items():
+            caps[target] = caps.get(target, 0) + int(cap)
+    return MappingProxyType(caps)
 
 
 def reload_equipment_effect_rules(path: Path | None = None) -> None:
