@@ -33,13 +33,14 @@ payload validators, and removal of the transitional v4 tolerance.
   `run_npm` evidence tests (annotated with canonical IDs after sync)
   execute the new Vitest suites and the Storybook/coverage gates, mirroring
   `test_vue_showcase_data_evidence.py`.
-- v4 retirement: the Vue app and the legacy client accept ONLY schema
-  version 5 (P6's dual-version tolerance window closes); v4 fixtures and
-  the v4 validator branch are deleted (unreleased, no compat).
+- v4 retirement: the Vue app, the legacy client, AND the Python panel
+  validator accept ONLY schema version 5 (P6's dual-version tolerance
+  window closes); v4 fixtures and every v4 validator branch are deleted
+  (unreleased, no compat).
 
-No backward compatibility or migration work; no Python changes beyond none;
-no new commands (command docs untouched, `tests/test_command_docs.py`
-green).
+No backward compatibility or migration work; no Python changes beyond the
+v4-branch deletion in the `character` panel validator and its tests; no new
+commands (command docs untouched, `tests/test_command_docs.py` green).
 
 ## Capabilities
 
@@ -56,6 +57,11 @@ green).
   renders payload-provided breakdown layers and equipment adjustment text
   exactly as ordered/formatted server-side, the intimate view shows the
   effective exposure value, and only schema version 5 is accepted.
+- `webclient-exploration-menu`: REMOVED requirement — 「The legacy client
+  tolerates the version-5 character payload」 was transitional ("until the
+  Vue breakdown renderer lands"); this change IS that renderer, so the v4
+  tolerance window closes and schema version 5 becomes the only accepted
+  character payload version at every wire validator.
 
 ## Impact
 
@@ -74,6 +80,12 @@ green).
 - `web/webclient/tests/`: new Python evidence tests (canonical-ID
   annotated) running the new Vitest family and the showcase gates as CI
   evidence.
+- `web/webclient/presentation/character.py`: the transitional v4
+  acceptance branch deleted (v5-only exact validator); its contract tests
+  and `web/tests/browser/browser_helpers.py`'s v4 snapshot helper migrate
+  to v5.
+- `web/static/webclient/js/tests/protocol.test.js` +
+  `character_menu.test.js`: P6 v4/5 tolerance tests rewritten v5-only.
 - Gates: `npm test`, `npm run build-storybook`, `npm run showcase-coverage`;
-  Python suites untouched (regression-only run).
+  Python suites regression-run (plus the v4-deletion focused tests).
 - Not affected: any `world/` code, payloads (P6 shipped them), commands.

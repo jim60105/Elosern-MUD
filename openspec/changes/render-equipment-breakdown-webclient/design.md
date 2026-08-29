@@ -25,8 +25,11 @@ renders totals.
 
 **Non-Goals:**
 
-- Any Python/payload change (P6 owns them), new components/manifest
-  entries, recomputation or re-sorting in JS, command-surface changes.
+- Any Python PAYLOAD change (P6 owns the wire shape), new components/
+  manifest entries, recomputation or re-sorting in JS, command-surface
+  changes. The one authorized Python edit is D3's v4 retirement in the
+  `character` panel validator (deleting the transitional acceptance
+  branch); no serializer, read-model, or rule change.
 
 ## Decisions
 
@@ -51,6 +54,16 @@ prove the neutral 其他 chip never corrupts the value line — no wire
 relaxation anywhere. Accessibility: chips are text-bearing (never
 color-alone) per the existing WCAG baseline.
 
+Gauge-row pairing guard (rubber-duck run 1): the vitals value line renders
+from the `status` v1 payload, while layer chips come from the `character`
+payload — two independently committed panels. Attaching a character trait's
+layers to a status gauge whose maximum they do not decompose would explain
+a different number than the player sees. A vitals row therefore attaches
+the matching character trait's layers ONLY when the character panel is
+available, that trait row carries a non-null `max`, and
+`trait.max === status.resources[key].maximum`; every other combination
+keeps the existing value text and renders no breakdown element.
+
 ### D2 — Adjustment text renders where equipment is listed
 
 `EquipmentDoll` slot tooltips/rows print the character payload's
@@ -67,10 +80,14 @@ is NOT rendered (non-vacuous).
 
 ### D3 — v5-only acceptance closes the tolerance window
 
-Vue app validation, legacy `protocol.js` gate, and fixtures accept ONLY
-schema version 5; the P6 v4 branches and v4 fixture are deleted (unreleased
-project — no compat per AGENTS.md). The legacy client keeps its totals-only
-rendering at v5 (long-lived fallback for non-Vue contexts).
+Vue app validation (through the shared `protocol.js` gate), the legacy
+`protocol.js` gate AND panel-dispatch special case, the Python
+`presentation/character.py` 4|5 dispatch, and every fixture (Vitest,
+Storybook, Node gate, browser helper) accept ONLY schema version 5; the P6
+v4 branches and v4 fixtures are deleted (unreleased project — no compat per
+AGENTS.md). The `webclient-exploration-menu` transitional requirement is
+retired through a REMOVED delta in the same change. The legacy client keeps
+its totals-only rendering at v5 (long-lived fallback for non-Vue contexts).
 
 ### D4 — Showcase coverage stays frozen-manifest-clean
 
