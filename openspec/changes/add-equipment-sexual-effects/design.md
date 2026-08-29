@@ -95,7 +95,7 @@ contract unchanged, value overlay only), and the web status payload derives
 from the same read-model, so both surfaces agree by construction; an
 end-to-end contract test asserts one effective value in both surfaces and
 an unchanged row/payload schema (no JS change). Per-source layer breakdown
-(装备 +1) lands with P6/P7.
+(裝備 +1) lands with P6/P7.
 
 ## Risks / Trade-offs
 

@@ -79,7 +79,7 @@ plate-armor flat 8; the emblem's heal_gain +10% rides P2's merged heal
 funnel, consumed exactly like an equipment heal_gain). Arousal gates
 (微興奮/中等/高度) encode the 敬拜弧線: modest devotion grants modest
 protection, rapture grants the emblem's healing. The shipped slot model
-allows FIVE concurrent accessories, so 圣女聖袍 + 光輝聖徽 + 朝聖者銅符 can
+allows FIVE concurrent accessories, so 聖女聖袍 + 光輝聖徽 + 朝聖者銅符 can
 all match at once (+6/+2 defense and +10% heal_gain merging); this stacking
 is declared intentional in the spec with a multi-slot merge test, so the
 balance audit sees the real ceiling, not a per-rule view. No negative

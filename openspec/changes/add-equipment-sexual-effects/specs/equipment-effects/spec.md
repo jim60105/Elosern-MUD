@@ -14,7 +14,7 @@ rule.
 
 #### Scenario: Vestments lift a nun's exposure two bands
 
-- **WHEN** an actor with stored exposure 中等 wears 圣女聖袍 (bias +2)
+- **WHEN** an actor with stored exposure 中等 wears 聖女聖袍 (bias +2)
 - **THEN** effective exposure is 極高 and the stored trait is untouched
 
 #### Scenario: Bias clamps at both vocabulary ends

@@ -40,7 +40,7 @@ Depends on P2 (merge + equipment_effects module + heal funnel) and P4
 - [ ] 3.3 Behavior (fixed RNG): grace fires in live resolution; no-create
       and partial-presentation contexts agree with resolution; unequipped/
       low-arousal silence; emblem grace raises a skill heal through P2's
-      funnel; declared multi-accessory stack (圣女聖袍+光輝聖徽+朝聖者銅符,
+      funnel; declared multi-accessory stack (聖女聖袍+光輝聖徽+朝聖者銅符,
       arousal 高度) merges def +8 and heal_gain +10% with all three rows
       listed.
 - [ ] 3.4 Extend the Church named-key invariant test to the grace rules'

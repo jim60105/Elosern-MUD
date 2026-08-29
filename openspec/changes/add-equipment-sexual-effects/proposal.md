@@ -3,7 +3,7 @@
 ## Why
 
 P1 authored `pleasure_gain` and `exposure_bias` values (誘蠱蕾絲內衣,
-迷情絲頸環, 修女聖袍, 光輝聖徽, 圣女聖袍 …) that nothing consumes yet. This
+迷情絲頸環, 修女聖袍, 光輝聖徽, 聖女聖袍 …) that nothing consumes yet. This
 is P4 of the equipment-effects design
 (`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` §8):
 revealing or alluring equipment finally changes how the sexual system

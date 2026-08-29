@@ -33,7 +33,7 @@ gated blessings.
   test stays green):
   - `sister_vestment_grace`: 修女聖袍 + arousal ≥ 中等 → defense +4
     (the parent §9 example).
-  - `saintess_vestment_grace`: 圣女聖袍 + arousal ≥ 中等 → defense +6.
+  - `saintess_vestment_grace`: 聖女聖袍 + arousal ≥ 中等 → defense +6.
   - `holy_emblem_grace`: 光輝聖徽 + arousal ≥ 高度 → heal_gain +10%
     (consumed by P2's heal funnel — rule-table soft percents were always
     in the adjustments vocabulary).

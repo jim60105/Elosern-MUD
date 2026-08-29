@@ -36,7 +36,7 @@ AND-compose with all existing conditions.
 
 #### Scenario: Multi-accessory devotion stack merges as declared
 
-- **WHEN** an actor simultaneously wears 圣女聖袍, 光輝聖徽, and 朝聖者銅符
+- **WHEN** an actor simultaneously wears 聖女聖袍, 光輝聖徽, and 朝聖者銅符
   (within the shipped accessory slot budget) with arousal 高度
 - **THEN** the merged bundle carries the combined defense +8 and the
   emblem's heal_gain +10%, and the display layer lists all three matched
