@@ -13,15 +13,57 @@ from pathlib import Path
 import re
 from typing import Any
 
+from world.lore.items import ITEM_REGISTRY
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, EXPOSURE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
-from world.rules.equipment_effects import equipment_adjustments, effective_exposure
-from world.rules.rulebook.schema import evaluate_condition, load_rules
+from world.rules.equipment_effects import (
+    effective_exposure,
+    equipment_adjustments,
+    worn_item_keys,
+)
+from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
 from world.rules.sexual_state import PLEASURE_CONFIG
 from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
 from world.skills.equipment import dual_wielding_from_storage
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
+
+
+def validate_combat_modifier_rules(rules: list[Rule]) -> None:
+    """Preflight every ``equipment_worn`` condition against the item registry.
+
+    Runs at the combat rulebook's load site, before any rule matching or
+    startup mirroring: an ``equipment_worn`` value must be a string naming an
+    ``ITEM_REGISTRY`` member that carries an equipment slot. Unknown keys,
+    consumable/non-slot items, and non-string values fail loading with an
+    identifying error so a dead or mis-targeted rule can never boot. (The
+    shipped ``dual_wielding`` boolean check stays lazy-evaluated inside
+    ``evaluate_condition``; this referential check deliberately does NOT
+    repeat that mistake — a grace rule naming a typo'd or consumable key is
+    exactly the failure mode this preflight exists to prevent.)
+    """
+    for rule in rules:
+        if "equipment_worn" not in rule.when:
+            continue
+        value = rule.when["equipment_worn"]
+        if not isinstance(value, str):
+            raise ValueError(
+                f"rule {rule.id!r}: equipment_worn must name a slot-bearing "
+                f"item key, got {value!r}"
+            )
+        definition = ITEM_REGISTRY.get(value)
+        if definition is None:
+            raise ValueError(
+                f"rule {rule.id!r}: equipment_worn names unknown item {value!r}"
+            )
+        if definition.equipment_slot is None:
+            raise ValueError(
+                f"rule {rule.id!r}: equipment_worn names {value!r}, which "
+                "carries no equipment slot"
+            )
+
+
+validate_combat_modifier_rules(_RULES)
 
 # Percentage adjustments may be fractional after a conferred grant scales a
 # whole-number percentage ("+5%" at scale 0.5 becomes "+2.5%"), so both the
@@ -96,6 +138,10 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
         context["exposure"] = exposure
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
+    # Worn-item fact from the same pure stored read the dual-wield fact uses,
+    # so equipment_worn rules resolve identically here and in the handler
+    # path without materializing the equipment handler (P5 D1).
+    context["worn_item_keys"] = worn_item_keys(entity)
     return context
 
 
@@ -132,6 +178,7 @@ def _build_context(entity) -> dict[str, Any]:
         context["exposure"] = exposure
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
+    context["worn_item_keys"] = worn_item_keys(entity)
     return context
 
 
@@ -221,10 +268,10 @@ def matched_combat_modifiers(
     omitted it is rebuilt from ``entity``. A caller-supplied context is
     treated as a partial context: the entity is injected so ``skill_owned``
     conditions always resolve against the real entity rather than silently
-    never matching, and the stored dual-wield equipment fact is injected the
-    same way. A ``skill_owned`` rule that matches only through a conferred
-    grant (the entity does not own the skill) returns the grant's scaled-down
-    adjustment instead of the full bundle.
+    never matching, and the stored dual-wield and worn-item equipment facts
+    are injected the same way. A ``skill_owned`` rule that matches only
+    through a conferred grant (the entity does not own the skill) returns the
+    grant's scaled-down adjustment instead of the full bundle.
     """
     if context is None:
         context = _build_context(entity)
@@ -232,6 +279,7 @@ def matched_combat_modifiers(
         context = dict(context)
         context.setdefault("entity", entity)
         context.setdefault("dual_wielding", dual_wielding_from_storage(entity))
+        context.setdefault("worn_item_keys", worn_item_keys(entity))
     matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
         if not evaluate_condition(rule.when, context):

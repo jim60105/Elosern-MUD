@@ -211,6 +211,93 @@ class CombatModifierTests(EvenniaTestCase):
         with self.assertRaisesRegex(ValueError, "boolean"):
             evaluate_condition({"dual_wielding": "yes"}, {"dual_wielding": True})
 
+    def test_equipment_worn_condition_matches_a_context_value(self):
+        self.assertTrue(
+            evaluate_condition(
+                {"equipment_worn": "sister_vestments"},
+                {"worn_item_keys": frozenset({"sister_vestments"})},
+            )
+        )
+        self.assertFalse(
+            evaluate_condition(
+                {"equipment_worn": "sister_vestments"},
+                {"worn_item_keys": frozenset({"saintess_vestments"})},
+            )
+        )
+        # A context lacking the fact must fail the condition closed, and a
+        # malformed fact (None or a bare string) must never crash or match
+        # by substring accident (P5 D2).
+        self.assertFalse(evaluate_condition({"equipment_worn": "x"}, {}))
+        self.assertFalse(
+            evaluate_condition({"equipment_worn": "x"}, {"worn_item_keys": None})
+        )
+        self.assertFalse(
+            evaluate_condition({"equipment_worn": "x"}, {"worn_item_keys": "x"})
+        )
+        with self.assertRaisesRegex(ValueError, "string item key"):
+            evaluate_condition({"equipment_worn": 123}, {"worn_item_keys": set()})
+
+    def _wearing_grace(self, *, armor=None, accessories=()):
+        entity = self._entity()
+        entity.db.equipment = {
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": armor,
+            "accessories": list(accessories),
+        }
+        return entity
+
+    def test_rule_sister_vestment_grace(self):
+        # 修女聖袍 (sister_vestments) + arousal >= 中等 (35..59) → defense +4.
+        entity = self._wearing_grace(armor="sister_vestments")
+        entity.sexual.pleasure.base = 40
+        # The robe's own equipment heal_gain +10% merges beside the grace.
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"defense": 4, "heal_gain": "+10%"}
+        )
+        # Same habit at 平靜 arousal: no grace.
+        entity.sexual.pleasure.base = 0
+        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+10%"})
+        # Same arousal without the habit: no grace.
+        self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
+
+    def test_rule_saintess_vestment_grace(self):
+        # 聖女聖袍 (saintess_vestments) + arousal >= 中等 → defense +6 on top
+        # of the robe's own equipment defense -3; the merged bundle is +3.
+        entity = self._wearing_grace(armor="saintess_vestments")
+        entity.sexual.pleasure.base = 40
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"defense": 3, "heal_gain": "+25%"}
+        )
+        entity.sexual.pleasure.base = 0
+        # Equipment defense -3 still applies without the grace.
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"defense": -3, "heal_gain": "+25%"}
+        )
+
+    def test_rule_holy_emblem_grace(self):
+        # 光輝聖徽 (radiant_holy_emblem) + arousal >= 高度 (60..84) →
+        # heal_gain +10% on top of the emblem's own +20%.
+        entity = self._wearing_grace(accessories=("radiant_holy_emblem",))
+        entity.sexual.pleasure.base = 60
+        bundle = evaluate_combat_modifiers(entity)
+        # Arousal 高度 also fires the high-arousal penalty row.
+        self.assertEqual(
+            bundle, {"heal_gain": "+30%", "agility": "-20%", "accuracy": -15}
+        )
+        entity.sexual.pleasure.base = 0
+        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+20%"})
+
+    def test_rule_pilgrim_medallion_grace(self):
+        # 朝聖者銅符 (pilgrim_medallion) + arousal >= 微興奮 (15..34) → defense +2.
+        entity = self._wearing_grace(accessories=("pilgrim_medallion",))
+        entity.sexual.pleasure.base = 15
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {"defense": 2, "heal_gain": "+5%"}
+        )
+        entity.sexual.pleasure.base = 0
+        self.assertEqual(evaluate_combat_modifiers(entity), {"heal_gain": "+5%"})
+
     def test_malformed_equipment_storage_fails_closed(self):
         entity = self._entity()
         entity.db.skills = {"active": [], "passive": ["dual_wield_style"]}

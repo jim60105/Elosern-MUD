@@ -58,7 +58,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     """Evaluate all recognized conditions in *when* with implicit AND."""
     recognized = {
         "event", "field", "equals", "gte", "field_changed", "direction",
-        "buff_active", "skill_owned", "dual_wielding",
+        "buff_active", "skill_owned", "dual_wielding", "equipment_worn",
     }
     unknown = set(when) - recognized
     if unknown:
@@ -108,4 +108,18 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
         if not isinstance(when["dual_wielding"], bool):
             raise ValueError("dual_wielding condition requires a boolean value")
         checks.append(context.get("dual_wielding") == when["dual_wielding"])
+    if "equipment_worn" in when:
+        # Generic membership mechanism only: referential validation (the
+        # value must name a slot-bearing ITEM_REGISTRY member) is table-
+        # specific and runs at each table owner's load site. A non-string
+        # value is malformed data and must never silently mis-match. A
+        # missing or non-collection context fact fails the condition closed
+        # — a rule whose context lacks the worn-item fact never matches.
+        item_key = when["equipment_worn"]
+        if not isinstance(item_key, str):
+            raise ValueError("equipment_worn condition requires a string item key")
+        worn = context.get("worn_item_keys")
+        if not isinstance(worn, (set, frozenset)):
+            worn = frozenset()
+        checks.append(item_key in worn)
     return bool(checks) and all(checks)

@@ -81,3 +81,22 @@
   # retainer_martial_training_atk_phys_bonus), matching its magnitude.
   when: {skill_owned: dual_wield_style, dual_wielding: true}
   then: {atk_phys: 5}
+- id: sister_vestment_grace
+  # 光明教會恩典 (以坦露為聖、性之歡愉為至高恩賜): 修女聖袍 (sister_vestments)
+  # 穿戴者於中等興奮 (敬拜的虔誠) 時獲得防禦 +4 — 獨立於護甲本身的數值,
+  # 階級低於聖女聖袍的 +6。
+  when: {equipment_worn: sister_vestments, field: arousal, gte: 中等}
+  then: {defense: 4}
+- id: saintess_vestment_grace
+  # 聖女聖袍 (saintess_vestments) — 更高聖職, 中等興奮時防禦 +6。
+  when: {equipment_worn: saintess_vestments, field: arousal, gte: 中等}
+  then: {defense: 6}
+- id: holy_emblem_grace
+  # 光輝聖徽 (radiant_holy_emblem) — 女神回應敬拜, 高度興奮 (狂喜) 時
+  # 治療 +10%, 由 P2 的 heal 漏斗 (heal_gain 百分比) 消費。
+  when: {equipment_worn: radiant_holy_emblem, field: arousal, gte: 高度}
+  then: {heal_gain: "+10%"}
+- id: pilgrim_medallion_grace
+  # 朝聖者銅符 (pilgrim_medallion) — 朝聖旅途的虔誠, 微興奮即得防禦 +2。
+  when: {equipment_worn: pilgrim_medallion, field: arousal, gte: 微興奮}
+  then: {defense: 2}
